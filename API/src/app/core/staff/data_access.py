@@ -32,25 +32,71 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.activities.models import Activity
 from src.app.core.leads.models import Lead, LeadStatus
 from src.app.core.staff.models import Attendance, StaffProfile
-from src.app.core.users.models import User, UserInfo
+from src.app.core.users.models import OrganizationMember, User, UserInfo
 
 # --- Staff users + profiles ---------------------------------------------
 
 
 async def list_users_with_profiles(
     session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
 ) -> list[Row]:
-    """Every user in the org joined LEFT-OUTER against
-    ``tbl_staff_profiles``. Users without profiles appear with a NULL
-    profile — Settings → Staff needs all of them. Ordered by
-    ``UserInfo.first_name``."""
+    """Every ACTIVE member of ``org_id`` joined LEFT-OUTER against
+    ``tbl_staff_profiles``. Users without a staff-profile row appear
+    with ``profile=None`` — Settings → Staff needs the full roster
+    (admin creates profiles via ``PUT /staff/{id}``). Ordered by
+    ``UserInfo.first_name``.
+
+    Filters:
+
+    * ``OrganizationMember.organization_id == org_id`` — hard tenant
+      scope (``User`` is not ``TenantScoped``, so the ORM filter
+      wouldn't inject this automatically; belt + suspenders against
+      cross-tenant leaks).
+    * ``OrganizationMember.is_active == True`` — hides
+      terminated / on-leave members from the roster.
+    * ``User.legacy_uuid IS NOT NULL`` — legacy pre-DR.6.1 rows
+      without a UUID identity would otherwise crash the response
+      serialiser (``StaffListItem.id`` requires a UUID).
+    """
     stmt = (
         select(User, StaffProfile)
         .join(UserInfo, UserInfo.member_id == User.id)
+        .join(OrganizationMember, OrganizationMember.user_member_id == User.id)
         .outerjoin(StaffProfile, StaffProfile.user_id == User.legacy_uuid)
+        .where(OrganizationMember.organization_id == org_id)
+        .where(OrganizationMember.is_active.is_(True))
+        .where(User.legacy_uuid.is_not(None))
         .order_by(UserInfo.first_name.asc())
     )
     return list((await session.execute(stmt)).all())
+
+
+async def count_present_today(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> int:
+    """Return the number of distinct users with at least one
+    attendance row dated today (server tz) in ``org_id``.
+
+    Powers the Staff dashboard's "Present today" KPI. Uses the same
+    ``tbl_attendance`` rows written by ``clock_in`` / ``clock_out``;
+    a rep who clocked in and out still counts as present. ``org_id``
+    is passed explicitly since the ORM tenant filter already scopes
+    ``Attendance``, but keeping it in the WHERE clause makes the
+    intent explicit and matches the pattern the rest of the module
+    uses.
+    """
+    from datetime import date as _date
+
+    stmt = (
+        select(func.count(func.distinct(Attendance.user_id)))
+        .where(Attendance.org_id == org_id)
+        .where(Attendance.date == _date.today())
+    )
+    return int((await session.execute(stmt)).scalar_one() or 0)
 
 
 async def get_staff_profile_by_user_id(
@@ -154,6 +200,7 @@ __all__ = [
     "get_staff_profile_by_user_id",
     "insert_attendance",
     "insert_staff_profile",
+    "count_present_today",
     "list_activities_for_user",
     "list_attendance_for_user",
     "list_users_with_profiles",

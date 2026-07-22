@@ -85,9 +85,15 @@ async def _ensure_user_in_scope(session: AsyncSession, user_id: uuid.UUID) -> Us
 # --- staff list (users left-outer staff_profiles) ---
 
 
-async def list_staff(session: AsyncSession) -> list[StaffListItem]:
-    """Every user in the org + their profile (if any)."""
-    rows = await _da.list_users_with_profiles(session)
+async def list_staff(session: AsyncSession, *, org_id: uuid.UUID) -> list[StaffListItem]:
+    """Every ACTIVE member of ``org_id`` + their profile (if any).
+
+    Tenant-scoping is enforced in the DAL (``User`` isn't
+    ``TenantScoped`` so the ORM filter can't inject it automatically);
+    passing ``org_id`` explicitly keeps the boundary visible at the
+    call site.
+    """
+    rows = await _da.list_users_with_profiles(session, org_id=org_id)
     out: list[StaffListItem] = []
     for user, profile in rows:
         out.append(
@@ -107,6 +113,12 @@ async def list_staff(session: AsyncSession) -> list[StaffListItem]:
             )
         )
     return out
+
+
+async def count_present_today(session: AsyncSession, *, org_id: uuid.UUID) -> int:
+    """Distinct staff who have at least one attendance row dated
+    today. Powers the Staff dashboard's "Present today" KPI."""
+    return await _da.count_present_today(session, org_id=org_id)
 
 
 # --- profile upsert ---

@@ -54,9 +54,24 @@ router = APIRouter(prefix="/staff", tags=["Staff"])
 @router.get("", response_model=list[StaffListItem])
 async def list_staff_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("staff.read")),
+    user: User = Depends(require_permissions("staff.read")),
 ) -> list[StaffListItem]:
-    return await list_staff(db)
+    return await list_staff(db, org_id=user.org_id)
+
+
+@router.get("/present-today", response_model=dict)
+async def present_today_endpoint(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("staff.read")),
+) -> dict:
+    """Return today's headcount: ``{count: N}`` where ``N`` is the
+    number of distinct users who have at least one attendance row
+    dated today. Consumed by the Staff dashboard "Present today" KPI.
+    """
+    from src.app.core.staff.service import count_present_today
+
+    n = await count_present_today(db, org_id=user.org_id)
+    return {"count": n}
 
 
 @router.put("/{user_id}", response_model=StaffProfileOut)

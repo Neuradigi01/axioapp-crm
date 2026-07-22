@@ -91,6 +91,11 @@ export class StaffApiService {
     return this.http.get<StaffListItem[]>(this.base);
   }
 
+  /** Distinct staff members present (at least one attendance row) today. */
+  presentToday(): Observable<{ count: number }> {
+    return this.http.get<{ count: number }>(`${this.base}/present-today`);
+  }
+
   upsertProfile(userId: string, payload: StaffProfileUpsert): Observable<StaffProfileOut> {
     return this.http.put<StaffProfileOut>(`${this.base}/${userId}`, payload);
   }
