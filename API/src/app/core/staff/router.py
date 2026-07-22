@@ -74,6 +74,25 @@ async def present_today_endpoint(
     return {"count": n}
 
 
+@router.get("/revenue-totals", response_model=dict)
+async def revenue_totals_endpoint(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("staff.read")),
+) -> dict:
+    """Return ``{total, today}`` — sums of ``Invoice.total`` over paid
+    invoices in this org (all-time and today). Consumed by the Staff
+    dashboard's Total Revenue + Today's Revenue KPI cards.
+
+    Currency is assumed uniform per org (invoices carry a currency
+    column but multi-currency aggregation is future work — orgs are
+    single-currency in v1).
+    """
+    from src.app.core.staff.service import revenue_totals
+
+    total, today = await revenue_totals(db, org_id=user.org_id)
+    return {"total": total, "today": today}
+
+
 @router.put("/{user_id}", response_model=StaffProfileOut)
 async def upsert_profile_endpoint(
     user_id: uuid.UUID,

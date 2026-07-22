@@ -73,6 +73,49 @@ async def list_users_with_profiles(
     return list((await session.execute(stmt)).all())
 
 
+async def sum_paid_revenue(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> tuple[float, float]:
+    """Return ``(total_revenue, todays_revenue)`` from paid invoices.
+
+    * ``total_revenue`` — sum of ``Invoice.total`` for every invoice in
+      ``org_id`` with ``status='paid'``. Currency is org-uniform for
+      now (invoices carry a currency column but multi-currency
+      reporting is future work).
+    * ``todays_revenue`` — same filter, additionally scoped to
+      invoices whose ``paid_at`` is between today's start-of-day and
+      end-of-day in server tz.
+
+    Both come back as plain ``float`` for JSON transport; the caller
+    routes them into the Staff dashboard's KPI cards. Missing rows
+    return ``0.0`` — no need to cast a ``None`` back to a number.
+    """
+    from datetime import UTC, datetime, time
+    from datetime import date as _date
+
+    from src.app.core.billing.models import Invoice, InvoiceStatus
+
+    total_row = await session.execute(
+        select(func.coalesce(func.sum(Invoice.total), 0))
+        .where(Invoice.org_id == org_id)
+        .where(Invoice.status == InvoiceStatus.paid)
+    )
+    today = _date.today()
+    start = datetime.combine(today, time.min, tzinfo=UTC)
+    end = datetime.combine(today, time.max, tzinfo=UTC)
+    today_row = await session.execute(
+        select(func.coalesce(func.sum(Invoice.total), 0))
+        .where(Invoice.org_id == org_id)
+        .where(Invoice.status == InvoiceStatus.paid)
+        .where(Invoice.paid_at.is_not(None))
+        .where(Invoice.paid_at >= start)
+        .where(Invoice.paid_at <= end)
+    )
+    return float(total_row.scalar_one() or 0), float(today_row.scalar_one() or 0)
+
+
 async def count_present_today(
     session: AsyncSession,
     *,
@@ -204,4 +247,5 @@ __all__ = [
     "list_activities_for_user",
     "list_attendance_for_user",
     "list_users_with_profiles",
+    "sum_paid_revenue",
 ]

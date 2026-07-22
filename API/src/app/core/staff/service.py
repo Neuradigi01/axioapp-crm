@@ -121,6 +121,14 @@ async def count_present_today(session: AsyncSession, *, org_id: uuid.UUID) -> in
     return await _da.count_present_today(session, org_id=org_id)
 
 
+async def revenue_totals(
+    session: AsyncSession, *, org_id: uuid.UUID
+) -> tuple[float, float]:
+    """``(total, today)`` revenue sums drawn from paid invoices.
+    Powers the two right-most KPI cards on the Staff dashboard."""
+    return await _da.sum_paid_revenue(session, org_id=org_id)
+
+
 # --- profile upsert ---
 
 

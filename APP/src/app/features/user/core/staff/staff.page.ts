@@ -72,6 +72,12 @@ export class StaffPageComponent {
    * attendance query never blanks the whole dashboard. */
   private readonly presentTodayCount = signal(0);
 
+  /** Sums of paid-invoice `Invoice.total` from `/staff/revenue-totals`.
+   * Same fall-back-to-zero pattern as `presentTodayCount` — a broken
+   * billing query shouldn't wipe the roster. */
+  private readonly revenueTotal = signal(0);
+  private readonly revenueToday = signal(0);
+
   protected readonly activeTab = signal<StaffTabId>('overview');
 
   protected readonly tabs: ReadonlyArray<{ id: StaffTabId; label: string }> = [
@@ -91,10 +97,7 @@ export class StaffPageComponent {
 
   protected readonly presentToday = computed(() => this.presentTodayCount());
 
-  protected readonly totalRevenue = computed(() => {
-    // Sum of leaderboard.sales — sales placeholder is 0 today.
-    return this.rows().reduce((acc, r) => acc + Number(r.performance.sales || 0), 0);
-  });
+  protected readonly totalRevenue = computed(() => this.revenueTotal());
 
   protected readonly avgConversionPct = computed(() => {
     const rs = this.rows();
@@ -103,10 +106,7 @@ export class StaffPageComponent {
     return Math.round(total / rs.length);
   });
 
-  protected readonly todaysRevenue = computed(() => {
-    // Same Phase-5 placeholder as totalRevenue.
-    return 0;
-  });
+  protected readonly todaysRevenue = computed(() => this.revenueToday());
 
   constructor() {
     this.reload();
@@ -137,6 +137,21 @@ export class StaffPageComponent {
       .subscribe({
         next: (r) => this.presentTodayCount.set(r.count),
         error: () => this.presentTodayCount.set(0),
+      });
+    // Revenue KPIs — same independent-load pattern; a billing outage
+    // shouldn't blank the whole staff page.
+    this.api
+      .revenueTotals()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (r) => {
+          this.revenueTotal.set(r.total);
+          this.revenueToday.set(r.today);
+        },
+        error: () => {
+          this.revenueTotal.set(0);
+          this.revenueToday.set(0);
+        },
       });
   }
 
