@@ -138,30 +138,14 @@ async def list_endpoint(
     return ConversationListResponse(items=items, total=total, page=page, size=size)
 
 
-@router.get("/{conversation_id}", response_model=ConversationDetail)
-async def get_detail_endpoint(
-    conversation_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("conversations.read")),
-) -> ConversationDetail:
-    conv = await get_conversation(db, conversation_id)
-    msgs = await list_messages(db, conversation_id)
-    conv_out = ConversationOut.model_validate(conv)
-    conv_out.tags = await list_tags_for_conversation(db, conversation_id)
-    # Step 15 — attach WhatsApp 24-hour session state only for
-    # whatsapp conversations. Other channels (SMS / Email / web)
-    # have no session-window concept; the banner stays hidden.
-    session_state = None
-    if conv.channel == ConversationChannel.whatsapp:
-        session_state = compute_session_state(conv.last_customer_message_at)
-    return ConversationDetail(
-        conversation=conv_out,
-        messages=[MessageOut.model_validate(m) for m in msgs],
-        whatsapp_session_state=session_state,
-    )
-
-
 # --- Tags (whatsapp-platform-upgrade Step 14) -----------------------------
+# NOTE: These MUST be declared BEFORE ``GET /{conversation_id}`` and the
+# other ``/{conversation_id}`` greedy routes. FastAPI matches routes in
+# registration order — if ``/{conversation_id}`` comes first, a request
+# for ``/tags`` gets caught by it and 422's trying to parse ``"tags"`` as
+# a UUID. Same pattern as any static-path-vs-{id} collision; kept close
+# to the top of the router so future edits don't accidentally re-break
+# it.
 
 
 @router.get("/tags", response_model=list[TagOut])
@@ -218,6 +202,29 @@ async def delete_tag_endpoint(
 ) -> Response:
     await delete_tag(db, actor_id=user.legacy_uuid, tag_id=tag_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{conversation_id}", response_model=ConversationDetail)
+async def get_detail_endpoint(
+    conversation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.read")),
+) -> ConversationDetail:
+    conv = await get_conversation(db, conversation_id)
+    msgs = await list_messages(db, conversation_id)
+    conv_out = ConversationOut.model_validate(conv)
+    conv_out.tags = await list_tags_for_conversation(db, conversation_id)
+    # Step 15 — attach WhatsApp 24-hour session state only for
+    # whatsapp conversations. Other channels (SMS / Email / web)
+    # have no session-window concept; the banner stays hidden.
+    session_state = None
+    if conv.channel == ConversationChannel.whatsapp:
+        session_state = compute_session_state(conv.last_customer_message_at)
+    return ConversationDetail(
+        conversation=conv_out,
+        messages=[MessageOut.model_validate(m) for m in msgs],
+        whatsapp_session_state=session_state,
+    )
 
 
 @router.post(
