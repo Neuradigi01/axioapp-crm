@@ -9,6 +9,30 @@
           {{ loadedCount() }} loaded · {{ newTodayCount() }} new today
         }
       </p>
+      <!-- F23 — Pipeline value roll-up. Scope follows caller row
+           visibility (org vs. personal), decided server-side. -->
+      @if (pipelineRollup(); as r) {
+        <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+          <span class="inline-flex items-center gap-1 text-zinc-600">
+            <span class="font-medium text-zinc-500">Open pipeline:</span>
+            <span class="font-semibold text-zinc-900">{{
+              formatMoney(r.open_value, r.currency)
+            }}</span>
+            <span class="text-zinc-400">({{ r.open_count }})</span>
+          </span>
+          <span class="inline-flex items-center gap-1 text-emerald-700">
+            <span class="font-medium text-emerald-600">Won this month:</span>
+            <span class="font-semibold">{{ formatMoney(r.won_value_this_month, r.currency) }}</span>
+            <span class="text-emerald-500">({{ r.won_count_this_month }})</span>
+          </span>
+          @if (r.lost_count_this_month > 0) {
+            <span class="inline-flex items-center gap-1 text-rose-700">
+              <span class="font-medium text-rose-600">Lost this month:</span>
+              <span class="font-semibold">{{ r.lost_count_this_month }}</span>
+            </span>
+          }
+        </div>
+      }
     </div>
     <div class="flex items-center gap-2">
       <div class="inline-flex overflow-hidden rounded-md ring-1 ring-zinc-300">
@@ -726,6 +750,21 @@
     [error]="lostReasonError()"
     (confirm)="onLostReasonConfirm($event)"
     (cancel)="onLostReasonCancel()"
+  />
+}
+
+<!-- F2 — Won-capture modal: opens when the user moves a lead into a
+     stage marked is_won=true. Unlike Lost this is proactive (backend
+     doesn't 422 on missing won fields); we check `is_won` on the
+     destination stage in onItemMoved and open the modal there. -->
+@if (pendingWonMove()) {
+  <app-won-capture-modal
+    [submitting]="wonCaptureSubmitting()"
+    [error]="wonCaptureError()"
+    [suggestedValue]="pendingWonSuggestion()"
+    [currency]="pipelineRollup()?.currency ?? 'INR'"
+    (confirm)="onWonCaptureConfirm($event)"
+    (cancel)="onWonCaptureCancel()"
   />
 }
 

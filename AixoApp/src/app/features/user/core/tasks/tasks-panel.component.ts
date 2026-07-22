@@ -13,6 +13,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { FurnitureAuthService } from '../auth/auth.service';
+import { TaskAssignee, TaskFormModalComponent } from './task-form-modal.component';
 import { Task, TaskPriority, TasksApiService } from './tasks-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -31,13 +33,20 @@ import { extractApiError } from '@core/services/api-error.util';
   selector: 'app-tasks-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, LucideAngularModule],
+  imports: [ReactiveFormsModule, LucideAngularModule, TaskFormModalComponent],
   templateUrl: './tasks-panel.component.html',
 })
 export class TasksPanelComponent {
   private readonly api = inject(TasksApiService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(FurnitureAuthService);
+
+  // T6 — Edit + delete on the panel. Edit reuses the shared
+  // TaskFormModal; delete uses a native confirm to stay lightweight.
+  protected readonly editingTask = signal<Task | null>(null);
+  protected readonly callerUuid = signal<string | null>(null);
+  protected readonly assignees = signal<TaskAssignee[]>([]);
 
   readonly entityType = input.required<string>();
   readonly entityId = input.required<string>();
@@ -64,12 +73,45 @@ export class TasksPanelComponent {
   protected readonly skeletonRows = [0, 1] as const;
 
   constructor() {
+    // Cache caller UUID for the edit-modal (used as the fallback
+    // assignee). Silently no-op if /me isn't accessible.
+    this.callerUuid.set(this.auth.currentUserId());
     effect(() => {
       const eType = this.entityType();
       const eId = this.entityId();
       if (!eType || !eId) return;
       this.reload();
     });
+  }
+
+  // T6 — Edit + delete row actions.
+
+  protected openEdit(task: Task): void {
+    this.editingTask.set(task);
+  }
+
+  protected closeEdit(): void {
+    this.editingTask.set(null);
+  }
+
+  protected onEditSaved(updated: Task): void {
+    this.editingTask.set(null);
+    this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+  }
+
+  protected onDelete(task: Task): void {
+    if (!confirm(`Delete task “${task.title}”?`)) return;
+    this.api
+      .delete(task.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.items.update((rows) => rows.filter((r) => r.id !== task.id));
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loadError.set(extractApiError(err) ?? 'Could not delete the task.');
+        },
+      });
   }
 
   protected reload(): void {

@@ -22,7 +22,13 @@ import { ImportsApiService, LeadImport, LeadImportStatus } from './imports-api.s
  * `cancelled`), polling stops and the page renders:
  *
  *   - counts card (imported / duplicates skipped / errors);
+ *   - per-category reason breakdown (e.g. "50× invalid date …")
+ *     under the counters that had non-empty `error_reasons` /
+ *     `skipped_reasons` / `warning_reasons` maps in the response;
  *   - "Download error report" button when the job produced errors;
+ *   - "Download duplicates report" button when the job skipped rows;
+ *   - "Download warnings report" button when the job substituted
+ *     out-of-vocabulary values (e.g. unknown pipeline_stage → default);
  *   - "Back to leads" CTA.
  *
  * In dev (CELERY_ENABLED=false), the commit endpoint awaits the
@@ -52,6 +58,8 @@ export class ResultPageComponent {
   protected readonly importRow = signal<LeadImport | null>(null);
   protected readonly loadError = signal<string | null>(null);
   protected readonly downloading = signal(false);
+  protected readonly downloadingSkipped = signal(false);
+  protected readonly downloadingWarnings = signal(false);
 
   protected readonly isTerminal = computed(() => {
     const row = this.importRow();
@@ -82,6 +90,42 @@ export class ResultPageComponent {
     const c = this.counts();
     return c !== null && (c.errors ?? 0) > 0 && !!this.importRow()?.error_report_path;
   });
+
+  protected readonly hasSkipped = computed(() => {
+    const c = this.counts();
+    return c !== null && (c.duplicates_skipped ?? 0) > 0 && !!this.importRow()?.skipped_report_path;
+  });
+
+  protected readonly hasWarnings = computed(() => {
+    const c = this.counts();
+    return c !== null && (c.warnings ?? 0) > 0 && !!this.importRow()?.warnings_report_path;
+  });
+
+  /** Error reasons sorted count-descending for a stable readout order.
+   * Empty when the processor didn't emit any bucketed reasons (legacy
+   * completed imports from before the reason-tracking work). */
+  protected readonly errorReasonList = computed(() =>
+    this.reasonList(this.counts()?.error_reasons),
+  );
+
+  /** Same shape as `errorReasonList`, for the "duplicates skipped" tally. */
+  protected readonly skippedReasonList = computed(() =>
+    this.reasonList(this.counts()?.skipped_reasons),
+  );
+
+  /** Same shape, for the "imported with a value fallback" tally. */
+  protected readonly warningReasonList = computed(() =>
+    this.reasonList(this.counts()?.warning_reasons),
+  );
+
+  private reasonList(
+    bucket: Record<string, number> | undefined,
+  ): { label: string; count: number }[] {
+    if (!bucket) return [];
+    return Object.entries(bucket)
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count);
+  }
 
   private pollSub: Subscription | null = null;
 
@@ -131,16 +175,50 @@ export class ResultPageComponent {
       .subscribe({
         next: (blob) => {
           this.downloading.set(false);
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `import-${this.importId}-errors.csv`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
+          this.triggerDownload(blob, `import-${this.importId}-errors.csv`);
         },
         error: () => this.downloading.set(false),
       });
+  }
+
+  protected downloadSkipped(): void {
+    if (!this.hasSkipped() || this.downloadingSkipped()) return;
+    this.downloadingSkipped.set(true);
+    this.api
+      .downloadSkipped(this.importId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => {
+          this.downloadingSkipped.set(false);
+          this.triggerDownload(blob, `import-${this.importId}-skipped.csv`);
+        },
+        error: () => this.downloadingSkipped.set(false),
+      });
+  }
+
+  protected downloadWarnings(): void {
+    if (!this.hasWarnings() || this.downloadingWarnings()) return;
+    this.downloadingWarnings.set(true);
+    this.api
+      .downloadWarnings(this.importId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => {
+          this.downloadingWarnings.set(false);
+          this.triggerDownload(blob, `import-${this.importId}-warnings.csv`);
+        },
+        error: () => this.downloadingWarnings.set(false),
+      });
+  }
+
+  private triggerDownload(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 }

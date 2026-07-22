@@ -115,4 +115,13 @@ export class ContactGroupsApiService {
   previewSize(payload: PreviewSizeIn): Observable<PreviewSizeOut> {
     return this.http.post<PreviewSizeOut>(`${this.base}/preview-size`, payload);
   }
+
+  /** Full ordered member-id list for a static group. Backend caps the
+   *  dynamic branch at 10K. The edit page uses this to hydrate the
+   *  picker with every existing member so a save doesn't drop the
+   *  tail (previous behaviour used `sample_contact_ids` — first 10 —
+   *  which caused silent membership loss on any group with >10 rows). */
+  listMemberIds(id: string): Observable<string[]> {
+    return this.http.get<string[]>(`${this.base}/${id}/members`);
+  }
 }

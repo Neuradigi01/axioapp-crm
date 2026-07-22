@@ -11,6 +11,7 @@
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
+import { RouterLink } from '@angular/router';
 
 import { Task, TasksApiService } from './tasks-api.service';
 import { extractApiError } from '@core/services/api-error.util';
@@ -36,7 +37,7 @@ interface BucketView {
   selector: 'app-my-tasks-popover',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, RouterLink],
   templateUrl: './my-tasks-popover.component.html',
 })
 export class MyTasksPopoverComponent {

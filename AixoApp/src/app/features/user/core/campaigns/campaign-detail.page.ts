@@ -21,6 +21,7 @@ import {
   CampaignStats,
   CampaignsApiService,
 } from './campaigns-api.service';
+import { ContactsApiService } from '../contacts/contacts-api.service';
 
 const POLL_INTERVAL_MS = 5_000;
 
@@ -52,6 +53,7 @@ export class CampaignDetailPageComponent {
   }
 
   private readonly api = inject(CampaignsApiService);
+  private readonly contactsApi = inject(ContactsApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -63,6 +65,14 @@ export class CampaignDetailPageComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
   protected readonly retryingId = signal<string | null>(null);
+
+  /** contact_id → {full_name, phone, email} lookup. Populated after
+   *  each `listMessages()` refresh via a batched `/contacts/hydrate`
+   *  round-trip so the Messages table shows real names instead of
+   *  8-char id snippets. */
+  protected readonly contactsById = signal<
+    Record<string, { full_name: string; phone: string | null; email: string | null }>
+  >({});
 
   /** Campaigns v1 Step 05 — funnel branches on channel. Email
    *  campaigns render Opened / Clicked / Bounced boxes; WA campaigns
@@ -134,12 +144,60 @@ export class CampaignDetailPageComponent {
         next: (rows) => {
           this.messages.set(rows);
           this.loading.set(false);
+          this._hydrateContactsForMessages(rows);
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load messages.');
         },
       });
+  }
+
+  /** Batched `POST /contacts/hydrate` — fetches names/phones/emails
+   *  for every contact referenced by the messages table so we can
+   *  render real names instead of 8-char id snippets. Skips any id
+   *  already cached. */
+  private _hydrateContactsForMessages(rows: CampaignMessage[]): void {
+    const cache = this.contactsById();
+    const missing = [...new Set(rows.map((r) => r.contact_id))].filter((id) => !cache[id]);
+    if (missing.length === 0) return;
+    this.contactsApi
+      .hydrateByIds(missing)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (contacts) => {
+          this.contactsById.update((prev) => {
+            const next = { ...prev };
+            for (const c of contacts) {
+              next[c.id] = {
+                full_name: c.full_name,
+                phone: c.phone,
+                email: c.email,
+              };
+            }
+            return next;
+          });
+        },
+        error: () => {
+          // Silent — the table falls back to the id-snippet shortId()
+          // if hydration fails.
+        },
+      });
+  }
+
+  /** Real name for a contact, or a fallback to the id-snippet if we
+   *  haven't hydrated it yet (or hydration failed). */
+  protected contactLabel(contactId: string): string {
+    return this.contactsById()[contactId]?.full_name ?? this.shortId(contactId);
+  }
+
+  /** Secondary line (phone or email) for a hydrated contact — the
+   *  Messages table uses it as a subtitle so the operator can identify
+   *  a customer without leaving the page. */
+  protected contactSubtitle(contactId: string): string | null {
+    const c = this.contactsById()[contactId];
+    if (!c) return null;
+    return c.phone ?? c.email ?? null;
   }
 
   protected retry(msg: CampaignMessage): void {

@@ -1,0 +1,381 @@
+/**
+ * Email-sender card on the Integrations page.
+ *
+ * Renders alongside Google Ads / Meta / WhatsApp cards. Shows the
+ * org's unified sender list (verified SMTP senders + live OAuth
+ * mailboxes) and — once ≥1 SMTP sender exists — a Domain
+ * Authentication sub-section that reuses the existing
+ * `add-domain-modal` + `dns-records-modal` from `sender-setup/`.
+ *
+ * Owner-managed via the `email.accounts.manage` permission (backend
+ * enforces; the card only surfaces when the caller can see the
+ * endpoint).
+ */
+import { HttpErrorResponse } from '@angular/common/http';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DatePipe } from '@angular/common';
+import { LucideAngularModule } from 'lucide-angular';
+
+import { extractApiError } from '@core/services/api-error.util';
+import { AddDomainModalComponent } from '../sender-setup/add-domain-modal.component';
+import { DnsRecordsModalComponent } from '../sender-setup/dns-records-modal.component';
+import {
+  EmailSenderDnsRecord,
+  EmailSenderDomain,
+  EmailSenderSetupApiService,
+} from '../../services/email-sender-setup-api.service';
+import { AddSenderIdentityModalComponent } from './add-sender-identity-modal.component';
+import {
+  EmailSendersApiService,
+  SmtpSender,
+  UnifiedSender,
+  UnifiedSenderKind,
+} from './email-senders-api.service';
+import { VerifySenderCodeModalComponent } from './verify-sender-code-modal.component';
+
+type Toast = { tone: 'success' | 'error'; message: string };
+
+@Component({
+  selector: 'app-email-sender-card',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    DatePipe,
+    LucideAngularModule,
+    AddSenderIdentityModalComponent,
+    VerifySenderCodeModalComponent,
+    AddDomainModalComponent,
+    DnsRecordsModalComponent,
+  ],
+  templateUrl: './email-sender-card.component.html',
+})
+export class EmailSenderCardComponent implements OnInit {
+  private readonly api = inject(EmailSendersApiService);
+  private readonly domainsApi = inject(EmailSenderSetupApiService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  protected readonly senders = signal<UnifiedSender[] | null>(null);
+  protected readonly loading = signal(false);
+  protected readonly loadError = signal<string | null>(null);
+  protected readonly rowError = signal<string | null>(null);
+  protected readonly toast = signal<Toast | null>(null);
+
+  protected readonly addModalOpen = signal(false);
+  protected readonly verifyModal = signal<{ id: string; from: string } | null>(null);
+
+  protected readonly settingDefaultId = signal<string | null>(null);
+  protected readonly deletingId = signal<string | null>(null);
+
+  // --- Domain-authentication sub-section state (reused SPF/DKIM/DMARC UI).
+  protected readonly domains = signal<EmailSenderDomain[] | null>(null);
+  protected readonly domainsLoading = signal(false);
+  protected readonly domainsError = signal<string | null>(null);
+  protected readonly addDomainOpen = signal(false);
+  protected readonly creatingDomain = signal(false);
+  protected readonly verifyingDomainId = signal<string | null>(null);
+  protected readonly deletingDomainId = signal<string | null>(null);
+  protected readonly dnsModal = signal<{
+    domain: string;
+    records: EmailSenderDnsRecord[];
+  } | null>(null);
+
+  protected readonly hasSmtpSender = computed(() =>
+    (this.senders() ?? []).some((s) => s.kind === 'smtp'),
+  );
+
+  protected readonly emptyState = computed(() => (this.senders()?.length ?? 0) === 0);
+
+  ngOnInit(): void {
+    this._load();
+  }
+
+  // --- sender-list actions ------------------------------------
+
+  openAdd(): void {
+    this.rowError.set(null);
+    this.addModalOpen.set(true);
+  }
+
+  closeAdd(): void {
+    this.addModalOpen.set(false);
+  }
+
+  onSmtpCreated(payload: { sender: SmtpSender; from: string }): void {
+    this.addModalOpen.set(false);
+    this.verifyModal.set({ id: payload.sender.id, from: payload.from });
+    this._load();
+  }
+
+  closeVerify(): void {
+    this.verifyModal.set(null);
+  }
+
+  onVerified(sender: SmtpSender): void {
+    this.verifyModal.set(null);
+    this.toast.set({
+      tone: 'success',
+      message: `${sender.from_address} verified. It's now available as an outbound sender.`,
+    });
+    this._load();
+    if (!this.hasSmtpSender()) {
+      // Optimistic — the create just went through so we can eagerly
+      // load domains on the assumption that at least one row is
+      // present. `_load()` runs concurrently and will settle the
+      // authoritative state.
+      this._loadDomains();
+    } else {
+      this._loadDomains();
+    }
+  }
+
+  setDefault(row: UnifiedSender): void {
+    if (row.kind !== 'smtp') return;
+    if (row.is_default || !row.verified) return;
+    this.settingDefaultId.set(row.id);
+    this.rowError.set(null);
+    this.api
+      .setDefault(row.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.settingDefaultId.set(null);
+          this.toast.set({
+            tone: 'success',
+            message: `Default sender set to ${row.from_address}.`,
+          });
+          this._load();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.settingDefaultId.set(null);
+          this.rowError.set(extractApiError(err) ?? 'Could not set default sender.');
+        },
+      });
+  }
+
+  remove(row: UnifiedSender): void {
+    if (row.kind !== 'smtp') return;
+    const confirmed = window.confirm(
+      `Delete SMTP sender ${row.from_address}? Automations and workflows that send email will fall back to another verified sender (if any) or skip until you add one back.`,
+    );
+    if (!confirmed) return;
+    this.deletingId.set(row.id);
+    this.rowError.set(null);
+    this.api
+      .delete(row.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.deletingId.set(null);
+          this.toast.set({ tone: 'success', message: `Removed ${row.from_address}.` });
+          this._load();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.deletingId.set(null);
+          this.rowError.set(extractApiError(err) ?? 'Could not delete sender.');
+        },
+      });
+  }
+
+  resendVerification(row: UnifiedSender): void {
+    if (row.kind !== 'smtp' || row.verified) return;
+    this.verifyModal.set({ id: row.id, from: row.from_address });
+  }
+
+  dismissToast(): void {
+    this.toast.set(null);
+  }
+
+  // --- Domain authentication actions --------------------------
+
+  openAddDomain(): void {
+    this.domainsError.set(null);
+    this.addDomainOpen.set(true);
+  }
+
+  closeAddDomain(): void {
+    if (this.creatingDomain()) return;
+    this.addDomainOpen.set(false);
+  }
+
+  submitDomain(domain: string): void {
+    if (this.creatingDomain()) return;
+    this.creatingDomain.set(true);
+    this.domainsApi
+      .createDomain(domain)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (row) => {
+          this.creatingDomain.set(false);
+          this.addDomainOpen.set(false);
+          this.toast.set({
+            tone: 'success',
+            message: `Added ${row.domain}. Publish the DNS records, then click Verify.`,
+          });
+          this._loadDomains();
+          this._loadDnsForDomain(row.id);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.creatingDomain.set(false);
+          this.domainsError.set(extractApiError(err) ?? 'Could not add domain.');
+        },
+      });
+  }
+
+  verifyDomain(row: EmailSenderDomain): void {
+    if (this.verifyingDomainId() !== null) return;
+    this.verifyingDomainId.set(row.id);
+    this.domainsError.set(null);
+    this.domainsApi
+      .verifyDomain(row.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.verifyingDomainId.set(null);
+          this.toast.set({
+            tone: result.fully_verified ? 'success' : 'error',
+            message: result.fully_verified
+              ? `${result.domain} — SPF, DKIM, DMARC all verified.`
+              : `${result.domain} — DNS records not yet detected. Try again in a few minutes.`,
+          });
+          this._loadDomains();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.verifyingDomainId.set(null);
+          if (err.status === 429) {
+            this.domainsError.set(
+              'Verification refreshes are limited to once per minute per domain.',
+            );
+          } else {
+            this.domainsError.set(extractApiError(err) ?? 'Could not verify domain.');
+          }
+        },
+      });
+  }
+
+  showDns(row: EmailSenderDomain): void {
+    this._loadDnsForDomain(row.id);
+  }
+
+  closeDns(): void {
+    this.dnsModal.set(null);
+  }
+
+  removeDomain(row: EmailSenderDomain): void {
+    const confirmed = window.confirm(
+      `Remove ${row.domain} from the sender registry? Existing mailboxes on this domain will keep working, but they'll show as un-verified in the campaign wizard.`,
+    );
+    if (!confirmed) return;
+    this.deletingDomainId.set(row.id);
+    this.domainsError.set(null);
+    this.domainsApi
+      .deleteDomain(row.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.deletingDomainId.set(null);
+          this.toast.set({ tone: 'success', message: `Removed ${row.domain}.` });
+          this._loadDomains();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.deletingDomainId.set(null);
+          this.domainsError.set(extractApiError(err) ?? 'Could not remove domain.');
+        },
+      });
+  }
+
+  // --- render helpers -----------------------------------------
+
+  protected providerLabel(kind: UnifiedSenderKind): string {
+    return kind === 'gmail' ? 'Gmail' : kind === 'microsoft' ? 'Microsoft' : 'SMTP';
+  }
+
+  protected providerBadgeClasses(kind: UnifiedSenderKind): string {
+    if (kind === 'gmail') return 'bg-blue-50 text-blue-700 ring-1 ring-blue-200';
+    if (kind === 'microsoft') return 'bg-sky-50 text-sky-700 ring-1 ring-sky-200';
+    return 'bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200';
+  }
+
+  protected domainState(row: EmailSenderDomain): {
+    label: string;
+    tone: 'green' | 'amber' | 'zinc';
+  } {
+    if (row.spf_verified && row.dkim_verified && row.dmarc_verified) {
+      return { label: 'Verified', tone: 'green' };
+    }
+    if (row.spf_verified || row.dkim_verified || row.dmarc_verified) {
+      return { label: 'Partial', tone: 'amber' };
+    }
+    return { label: 'Pending', tone: 'zinc' };
+  }
+
+  protected domainToneClass(tone: 'green' | 'amber' | 'zinc'): string {
+    if (tone === 'green') return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
+    if (tone === 'amber') return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200';
+    return 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200';
+  }
+
+  // --- internals ----------------------------------------------
+
+  private _load(): void {
+    this.loading.set(true);
+    this.loadError.set(null);
+    this.api
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          this.senders.set(rows);
+          this.loading.set(false);
+          if (this.hasSmtpSender()) {
+            this._loadDomains();
+          } else {
+            this.domains.set(null);
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loading.set(false);
+          this.loadError.set(extractApiError(err) ?? 'Could not load senders.');
+        },
+      });
+  }
+
+  private _loadDomains(): void {
+    this.domainsLoading.set(true);
+    this.domainsApi
+      .listDomains()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          this.domains.set(rows);
+          this.domainsLoading.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.domainsLoading.set(false);
+          this.domainsError.set(extractApiError(err) ?? 'Could not load domains.');
+        },
+      });
+  }
+
+  private _loadDnsForDomain(domainId: string): void {
+    this.domainsApi
+      .dnsRecords(domainId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          this.dnsModal.set({ domain: res.domain, records: res.records });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.domainsError.set(extractApiError(err) ?? 'Could not load DNS records.');
+        },
+      });
+  }
+}

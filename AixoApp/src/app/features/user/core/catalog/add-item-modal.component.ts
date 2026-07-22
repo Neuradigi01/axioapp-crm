@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -13,12 +13,20 @@
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { nullableTrim } from '@core/services/form.util';
+import { LucideAngularModule } from 'lucide-angular';
 
+import { nullableTrim } from '@core/services/form.util';
+import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
+import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { StandardFieldsApiService } from '../standard-fields/standard-fields-api.service';
 import { StandardFieldsSignalsService } from '../standard-fields/standard-fields-signals.service';
 import type { StandardFieldRendered } from '../standard-fields/types';
-import { CatalogApiService, CatalogItem } from './catalog-api.service';
+import {
+  CatalogApiService,
+  CatalogCategoriesApiService,
+  CatalogCategory,
+  CatalogItem,
+} from './catalog-api.service';
 import { deriveApiOrigin } from '@core/services/url.util';
 
 /**
@@ -28,19 +36,26 @@ import { deriveApiOrigin } from '@core/services/url.util';
  * create form. `sku` is locked in edit mode (matches backend's
  * "SKU is a stable identifier" rule).
  *
- * The 409 from a duplicate SKU is surfaced inline ("SKU already
- * exists in this org") instead of bubbling as a toast.
+ * Widened by the catalog review (0163):
+ *   C2 — server-fed category select + "add new" free-text
+ *   C3 — dynamic custom fields via <app-dynamic-form>
+ *   C4 — description textarea
+ *   C5 — gallery thumbnail strip with add + remove
+ *   C6 — cost_price input
+ *   C9 — atomic create: image upload failure rolls back the item
+ *   C13 — tags chip input (comma or Enter to add, backspace to remove)
  */
 @Component({
   selector: 'app-add-item-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, LucideAngularModule, DynamicFormComponent],
   templateUrl: './add-item-modal.component.html',
 })
 export class AddItemModalComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(CatalogApiService);
+  private readonly categoriesApi = inject(CatalogCategoriesApiService);
   private readonly stdApi = inject(StandardFieldsApiService);
   private readonly stdSignals = inject(StandardFieldsSignalsService);
   private readonly destroyRef = inject(DestroyRef);
@@ -55,12 +70,53 @@ export class AddItemModalComponent {
     return this.stdField(key)?.is_hidden === true;
   }
 
+  // C2 — categories fed from the server, not derived from loaded items.
+  protected readonly categories = signal<CatalogCategory[]>([]);
+
+  // C3 — dynamic custom-field defs + form state, mirrors the pattern
+  // used by contacts / leads / walk-ins.
+  protected readonly customFields = signal<FieldDef[]>([]);
+  protected readonly customFieldsLoading = signal(false);
+  protected readonly customValue = signal<FormValue>({});
+  protected readonly customValid = signal(true);
+
   constructor() {
     effect(() => {
       this.stdSignals.changedAt();
       this.refreshStdFields();
     });
-    this.destroyRef.onDestroy(() => this.revokePreview());
+    this.destroyRef.onDestroy(() => {
+      this.revokePreview();
+    });
+    this.loadCategories();
+    this.loadCustomFields();
+  }
+
+  private loadCategories(): void {
+    this.categoriesApi
+      .list(true)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => this.categories.set(rows),
+        error: () => this.categories.set([]),
+      });
+  }
+
+  private loadCustomFields(): void {
+    this.customFieldsLoading.set(true);
+    this.api
+      .renderFields()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (defs) => {
+          this.customFields.set(defs);
+          this.customFieldsLoading.set(false);
+        },
+        error: () => {
+          this.customFields.set([]);
+          this.customFieldsLoading.set(false);
+        },
+      });
   }
 
   private refreshStdFields(): void {
@@ -106,6 +162,7 @@ export class AddItemModalComponent {
   @Input() set item(value: CatalogItem | null) {
     this._item.set(value);
     if (value !== null) this.resetForm(value);
+    else this.resetForCreate();
   }
 
   @Output() readonly saved = new EventEmitter<CatalogItem>();
@@ -126,6 +183,14 @@ export class AddItemModalComponent {
   protected readonly previewUrl = signal<string | null>(null);
   protected readonly imageError = signal<string | null>(null);
 
+  // C5 — gallery state. Loaded from `item.image_urls`; add/remove hit
+  // the /images endpoints and mutate the local signal on success.
+  protected readonly galleryBusy = signal(false);
+  protected readonly galleryError = signal<string | null>(null);
+
+  // C13 — tag chip state. Simple array + input; Enter or comma adds.
+  protected readonly tagInput = signal('');
+
   private readonly apiOrigin = deriveApiOrigin();
 
   /** What the preview shows: freshly picked file > existing image_url > nothing.
@@ -139,7 +204,14 @@ export class AddItemModalComponent {
     return stored ? `${this.apiOrigin}${stored}` : null;
   });
 
+  /** Absolute URL for a gallery entry (same anchoring as displayImage). */
+  protected galleryHref(url: string): string {
+    return `${this.apiOrigin}${url}`;
+  }
+
   readonly isEdit = computed(() => this._item() !== null);
+  readonly canAddGallery = computed(() => this._item() !== null);
+  readonly galleryUrls = computed<string[]>(() => this._item()?.image_urls ?? []);
 
   protected readonly form = this.fb.group({
     sku: this.fb.control('', {
@@ -150,6 +222,7 @@ export class AddItemModalComponent {
       nonNullable: true,
       validators: [Validators.required, Validators.maxLength(255)],
     }),
+    description: this.fb.control('', { nonNullable: true }),
     category: this.fb.control('', {
       nonNullable: true,
       validators: [Validators.maxLength(64)],
@@ -157,8 +230,59 @@ export class AddItemModalComponent {
     price: this.fb.control<number | null>(null, {
       validators: [Validators.required, Validators.min(0)],
     }),
+    cost_price: this.fb.control<number | null>(null, {
+      validators: [Validators.min(0)],
+    }),
     is_active: this.fb.control<boolean>(true, { nonNullable: true }),
+    tags: this.fb.control<string[]>([], { nonNullable: true }),
   });
+
+  // --- C3 custom-form pass-through --------------------------------------
+
+  protected onCustomValueChange(v: FormValue): void {
+    this.customValue.set(v);
+  }
+
+  protected onCustomValidityChange(valid: boolean): void {
+    this.customValid.set(valid);
+  }
+
+  // --- C13 tag chips ----------------------------------------------------
+
+  protected onTagInput(event: Event): void {
+    this.tagInput.set((event.target as HTMLInputElement).value);
+  }
+
+  protected onTagKeydown(event: KeyboardEvent): void {
+    const value = this.tagInput().trim();
+    if ((event.key === 'Enter' || event.key === ',') && value) {
+      event.preventDefault();
+      this.addTag(value);
+      this.tagInput.set('');
+      (event.target as HTMLInputElement).value = '';
+    } else if (event.key === 'Backspace' && !value) {
+      // Delete the last tag on backspace-with-empty-input for the
+      // Todoist-style chip UX.
+      const tags = this.form.controls.tags.value;
+      if (tags.length > 0) {
+        this.form.controls.tags.setValue(tags.slice(0, -1));
+      }
+    }
+  }
+
+  protected addTag(raw: string): void {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const current = this.form.controls.tags.value;
+    if (current.includes(trimmed)) return;
+    this.form.controls.tags.setValue([...current, trimmed]);
+  }
+
+  protected removeTag(tag: string): void {
+    this.form.controls.tags.setValue(this.form.controls.tags.value.filter((t) => t !== tag));
+  }
+
+  // --- Image upload -----------------------------------------------------
 
   protected onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -206,9 +330,74 @@ export class AddItemModalComponent {
     this.previewUrl.set(null);
   }
 
+  // --- C5 gallery -------------------------------------------------------
+
+  protected onGalleryFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    if (!file) return;
+    this.uploadGalleryImage(file);
+  }
+
+  private uploadGalleryImage(file: File): void {
+    const item = this._item();
+    if (!item) return;
+    if (!AddItemModalComponent.ALLOWED_IMAGE_MIME.has(file.type)) {
+      this.galleryError.set('Pick a JPEG, PNG, or WebP image.');
+      return;
+    }
+    if (file.size > AddItemModalComponent.MAX_IMAGE_BYTES) {
+      this.galleryError.set('Image exceeds the 5 MB cap.');
+      return;
+    }
+    this.galleryBusy.set(true);
+    this.galleryError.set(null);
+    this.api
+      .addGalleryImage(item.id, file)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.galleryBusy.set(false);
+          this._item.set(updated);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.galleryBusy.set(false);
+          this.galleryError.set(this.errorFor(err) ?? 'Could not add gallery image.');
+        },
+      });
+  }
+
+  protected removeGalleryImage(index: number): void {
+    const item = this._item();
+    if (!item) return;
+    if (!confirm('Remove this gallery image?')) return;
+    this.galleryBusy.set(true);
+    this.galleryError.set(null);
+    this.api
+      .removeGalleryImage(item.id, index)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.galleryBusy.set(false);
+          this._item.set(updated);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.galleryBusy.set(false);
+          this.galleryError.set(this.errorFor(err) ?? 'Could not remove gallery image.');
+        },
+      });
+  }
+
+  // --- Submit -----------------------------------------------------------
+
   protected onSubmit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      return;
+    }
+    if (!this.customValid()) {
+      this.submitError.set('Please fix the highlighted custom fields.');
       return;
     }
     const raw = this.form.getRawValue();
@@ -224,13 +413,17 @@ export class AddItemModalComponent {
       this.api
         .update(existing.id, {
           name: raw.name,
+          description: nullableTrim(raw.description),
           category: nullableTrim(raw.category),
           price: raw.price,
+          cost_price: raw.cost_price,
           is_active: raw.is_active,
+          tags: raw.tags,
+          custom_data: this.customValue() as Record<string, unknown>,
         })
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
-          next: (item) => this.maybeUploadImage(item),
+          next: (item) => this.maybeUploadImage(item, false),
           error: (err: HttpErrorResponse) => {
             this.submitting.set(false);
             this.submitError.set(this.errorFor(err) ?? 'Could not save item.');
@@ -241,13 +434,17 @@ export class AddItemModalComponent {
         .create({
           sku: raw.sku.trim(),
           name: raw.name,
+          description: nullableTrim(raw.description),
           category: nullableTrim(raw.category),
           price: raw.price,
+          cost_price: raw.cost_price,
           is_active: raw.is_active,
+          tags: raw.tags,
+          custom_data: this.customValue() as Record<string, unknown>,
         })
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
-          next: (item) => this.maybeUploadImage(item),
+          next: (item) => this.maybeUploadImage(item, true),
           error: (err: HttpErrorResponse) => {
             this.submitting.set(false);
             if (err.status === 409) {
@@ -260,10 +457,15 @@ export class AddItemModalComponent {
     }
   }
 
-  /** Chain the image upload after a successful create/update. The
-   *  item row is already saved at this point; image-upload failure
-   *  surfaces an error but keeps the (image-less) row. */
-  private maybeUploadImage(item: CatalogItem): void {
+  /** Chain the image upload after a successful create/update.
+   *
+   *  C9 — atomic create: on the CREATE path, if the image upload
+   *  fails we DELETE the item we just created so the operator isn't
+   *  left with a half-saved row + a confusing "saved but image failed"
+   *  banner. Edit path keeps the previous behaviour (item stays
+   *  saved; error shown) — an existing row with a failed image swap
+   *  isn't ambiguous. */
+  private maybeUploadImage(item: CatalogItem, wasCreate: boolean): void {
     const file = this.selectedFile();
     if (!file) {
       this.submitting.set(false);
@@ -283,8 +485,22 @@ export class AddItemModalComponent {
           this.saved.emit(updated);
         },
         error: (err: HttpErrorResponse) => {
-          this.submitting.set(false);
-          this.submitError.set(this.errorFor(err) ?? 'Saved, but the image upload failed.');
+          if (wasCreate) {
+            // Roll back — delete the item we just created so the user
+            // sees one clean error instead of a half-created row.
+            this.api
+              .delete(item.id)
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({ error: () => undefined });
+            this.submitting.set(false);
+            this.submitError.set(
+              this.errorFor(err) ??
+                'Image upload failed; the product was not created. Try again with a different image.',
+            );
+          } else {
+            this.submitting.set(false);
+            this.submitError.set(this.errorFor(err) ?? 'Saved, but the image upload failed.');
+          }
         },
       });
   }
@@ -293,11 +509,32 @@ export class AddItemModalComponent {
     this.form.reset({
       sku: item.sku,
       name: item.name,
+      description: item.description ?? '',
       category: item.category ?? '',
       price: Number(item.price),
+      cost_price: item.cost_price !== null ? Number(item.cost_price) : null,
       is_active: item.is_active,
+      tags: item.tags ?? [],
     });
     this.form.controls.sku.disable();
+    this.customValue.set((item.custom_data ?? {}) as FormValue);
+  }
+
+  private resetForCreate(): void {
+    this.form.reset({
+      sku: '',
+      name: '',
+      description: '',
+      category: '',
+      price: null,
+      cost_price: null,
+      is_active: true,
+      tags: [],
+    });
+    this.form.controls.sku.enable();
+    this.customValue.set({});
+    this.tagInput.set('');
+    this.galleryError.set(null);
   }
 
   private errorFor(err: HttpErrorResponse): string | null {

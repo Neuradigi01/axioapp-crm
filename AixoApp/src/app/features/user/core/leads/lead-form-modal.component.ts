@@ -137,12 +137,8 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
         commonValidators.required,
         commonValidators.maxLength(255),
       ]);
-      this.contactBasics.controls.phone.setValidators([
-        commonValidators.required,
-        commonValidators.maxLength(32),
-      ]);
+      this.contactBasics.controls.phone.setValidators([commonValidators.maxLength(32)]);
       this.contactBasics.controls.email.setValidators([
-        commonValidators.required,
         commonValidators.email,
         commonValidators.maxLength(255),
       ]);

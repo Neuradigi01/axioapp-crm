@@ -4,10 +4,12 @@
     (click)="close.emit()"
   >
     <div
-      class="w-full max-w-lg rounded-lg bg-white shadow-xl ring-1 ring-zinc-200"
+      class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl ring-1 ring-zinc-200"
       (click)="$event.stopPropagation()"
     >
-      <header class="flex items-start justify-between border-b border-zinc-200 px-6 py-4">
+      <header
+        class="sticky top-0 z-10 flex items-start justify-between border-b border-zinc-200 bg-white px-6 py-4"
+      >
         <div>
           <p class="text-[11px] font-mono uppercase tracking-wider text-zinc-500">{{ item.sku }}</p>
           <h2 class="mt-0.5 text-base font-semibold text-zinc-900">{{ item.name }}</h2>
@@ -44,6 +46,21 @@
           }
         </div>
 
+        @if (galleryHrefs().length > 0) {
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Gallery</p>
+            <div class="mt-1 flex flex-wrap gap-2">
+              @for (href of galleryHrefs(); track href) {
+                <img
+                  [src]="href"
+                  [alt]="item.name + ' gallery image'"
+                  class="h-16 w-16 rounded-md object-cover ring-1 ring-zinc-200"
+                />
+              }
+            </div>
+          </div>
+        }
+
         <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <div>
             <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Category</dt>
@@ -53,6 +70,12 @@
             <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Price</dt>
             <dd class="mt-0.5 font-semibold text-zinc-900">{{ item.price | formatINR }}</dd>
           </div>
+          @if (item.cost_price != null) {
+            <div>
+              <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Cost price</dt>
+              <dd class="mt-0.5 text-zinc-900">{{ item.cost_price | formatINR }}</dd>
+            </div>
+          }
           <div>
             <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Currency</dt>
             <dd class="mt-0.5 text-zinc-900">{{ item.currency }}</dd>
@@ -62,6 +85,28 @@
             <dd class="mt-0.5 text-zinc-900">{{ item.is_active ? 'Active' : 'Inactive' }}</dd>
           </div>
         </dl>
+
+        @if (item.description) {
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Description</p>
+            <p class="mt-1 whitespace-pre-wrap text-sm text-zinc-800">{{ item.description }}</p>
+          </div>
+        }
+
+        @if (item.tags.length > 0) {
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Tags</p>
+            <div class="mt-1 flex flex-wrap gap-1.5">
+              @for (tag of item.tags; track tag) {
+                <span
+                  class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+                >
+                  {{ tag }}
+                </span>
+              }
+            </div>
+          </div>
+        }
 
         @if (customEntries().length > 0) {
           <div>
@@ -84,7 +129,7 @@
       </div>
 
       <footer
-        class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg"
+        class="sticky bottom-0 flex items-center justify-end gap-2 rounded-b-lg border-t border-zinc-200 bg-zinc-50 px-6 py-3"
       >
         <button
           type="button"

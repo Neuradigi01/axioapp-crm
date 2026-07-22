@@ -31,7 +31,12 @@ export interface Contact {
   email: string | null;
   source: string | null;
   tags: string[];
-  notes: string | null;
+  /**
+   * Notes for a contact live in `tbl_activities` rows (type='note')
+   * — versioned, authored, queryable. The former single-blob
+   * `Contact.notes` column was retired in backend migration 0158.
+   * Post via `POST /activities`; render via the Activities tab.
+   */
   custom_data: Record<string, unknown>;
   assigned_to_id: string | null;
   last_activity_at: string | null;
@@ -51,6 +56,11 @@ export interface Contact {
   email_opt_in_status?: EmailOptInStatus;
   email_opt_in_source?: EmailOptInSource | null;
   email_opt_in_recorded_at?: string | null;
+  /** DPDP right-to-be-forgotten stamp. Non-null → PII wiped, both
+   *  channels forced to opted_out, row retained so cross-module FKs
+   *  don't break. UI must render an "Anonymised" chip instead of the
+   *  placeholder full_name. */
+  anonymised_at?: string | null;
 }
 
 /** Step 22 — DPDP opt-in state machine. Mirrored from the backend
@@ -107,7 +117,7 @@ export interface ContactCreate {
   email?: string | null;
   source?: string | null;
   tags?: string[];
-  notes?: string | null;
+  // `notes` was retired — post a note via /activities after create.
   custom_data?: Record<string, unknown>;
   assigned_to_id?: string | null;
 }
@@ -139,6 +149,10 @@ export interface ContactListQuery {
   size?: number;
   /** `custom.<field_key> = value` filters. */
   customFilters?: Record<string, string>;
+  /** When true, anonymised (DPDP right-to-be-forgotten) contacts are
+   *  excluded server-side. Merge modal + link pickers pass true so a
+   *  wiped record can never appear as a merge / link target. */
+  exclude_anonymised?: boolean;
 }
 
 /** Targets the operator can map a CSV column to. Mirrors the
@@ -162,6 +176,10 @@ export interface ContactImportRunIn {
   mapping: Record<string, ContactFieldTarget>;
   create_group: boolean;
   group_name?: string | null;
+  /** DPDP opt-in provenance picked on the wizard's mapping step.
+   *  Backend Step 0164 persists it onto every contact this import
+   *  inserts (whatsapp_opt_in_status='opted_in' + source=…). */
+  opt_in_source?: WhatsAppOptInSource | null;
 }
 
 export interface ContactImportRowError {
@@ -202,6 +220,7 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
       order: query.order,
       page: query.page,
       size: query.size,
+      exclude_anonymised: query.exclude_anonymised ? true : undefined,
       ...prefixCustomFilters(query.customFilters),
     });
     return this.http.get<ContactListResponse>(this.base, { params });
@@ -213,6 +232,38 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
       assigned_to_id: body.userId,
       note: body.note ?? null,
     });
+  }
+
+  /** DPDP right-to-be-forgotten. Wipes PII on the contact row +
+   *  force-flips both consent channels to opted_out. Historical FKs
+   *  (activities, leads, appointments, invoices) are preserved. The
+   *  operator-supplied `reason` is written to the audit log for
+   *  future auditor trace. */
+  anonymise(id: string, reason: string | null): Observable<Contact> {
+    return this.http.post<Contact>(`${this.base}/${id}/anonymise`, {
+      reason: reason ?? null,
+    });
+  }
+
+  /** Fold `secondaryId` into `primaryId` and delete the secondary.
+   *  Every FK / polymorphic ref that pointed at the secondary is
+   *  repointed at the primary (activities, tasks, leads, appointments,
+   *  calls, conversations, campaign messages, consent events, workflow
+   *  runs, group memberships, ...). Returns the refreshed primary +
+   *  a per-table count of rows reassigned. */
+  merge(
+    primaryId: string,
+    secondaryId: string,
+  ): Observable<{
+    primary: Contact;
+    secondary_id: string;
+    rows_reassigned: Record<string, number>;
+  }> {
+    return this.http.post<{
+      primary: Contact;
+      secondary_id: string;
+      rows_reassigned: Record<string, number>;
+    }>(`${this.base}/${primaryId}/merge`, { secondary_id: secondaryId });
   }
 
   bulkReassign(
@@ -237,6 +288,13 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
       ids,
       tag,
     });
+  }
+
+  /** Bulk-hydrate `ContactListItem`s by id. Used by list pages that
+   *  render contact summaries per row (walk-ins, appointments) to
+   *  collapse per-row `GET /contacts/{id}` fan-outs into one call. */
+  hydrateByIds(ids: string[]): Observable<ContactListItem[]> {
+    return this.http.post<ContactListItem[]>(`${this.base}/hydrate`, { ids });
   }
 
   /** Live duplicate check called from the create / edit modal as the

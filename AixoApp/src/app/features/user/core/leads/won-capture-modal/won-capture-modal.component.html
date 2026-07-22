@@ -1,0 +1,93 @@
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="won-capture-title"
+>
+  <div class="w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
+    <div class="border-b border-zinc-200 px-5 py-3">
+      <h2 id="won-capture-title" class="text-sm font-semibold text-zinc-900">Mark deal as Won</h2>
+      <p class="mt-1 text-xs text-zinc-500">
+        Optional close details help the sales reports. Skip if you don't have them yet — you can
+        fill them in later from the lead detail page.
+      </p>
+    </div>
+
+    <div class="space-y-3 px-5 py-4 text-xs">
+      <label class="block">
+        <span class="font-medium text-zinc-700">
+          Closed amount
+          <span class="ml-1 text-zinc-400">({{ currency }})</span>
+        </span>
+        <input
+          type="text"
+          inputmode="decimal"
+          [formControl]="valueControl"
+          placeholder="e.g. 50000"
+          class="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+        @if (valueControl.invalid && valueControl.dirty) {
+          <span class="mt-1 block text-xs text-red-600"
+            >Enter a number, e.g. 12500 or 12500.50</span
+          >
+        }
+      </label>
+
+      <label class="block">
+        <span class="font-medium text-zinc-700">Close date</span>
+        <input
+          type="date"
+          [formControl]="closeDateControl"
+          class="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+      </label>
+
+      <label class="block">
+        <span class="font-medium text-zinc-700">Reason / notes</span>
+        <input
+          type="text"
+          maxlength="64"
+          [formControl]="reasonControl"
+          placeholder="e.g. Referral · Existing customer · Landing page"
+          class="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+      </label>
+
+      @if (_error(); as err) {
+        <p class="text-xs text-red-600">{{ err }}</p>
+      }
+    </div>
+
+    <div class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3">
+      <button
+        type="button"
+        (click)="cancel.emit()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        [disabled]="_submitting()"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        (click)="onSkip()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+        [disabled]="_submitting()"
+        title="Mark won without recording details"
+      >
+        Skip
+      </button>
+      <button
+        type="button"
+        (click)="onConfirm()"
+        class="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+        [disabled]="!canConfirm()"
+      >
+        @if (_submitting()) {
+          Saving…
+        } @else {
+          Mark won
+        }
+      </button>
+    </div>
+  </div>
+</div>

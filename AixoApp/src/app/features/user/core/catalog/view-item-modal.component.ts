@@ -16,8 +16,9 @@ import { deriveApiOrigin } from '@core/services/url.util';
 /**
  * Read-only modal for a catalog item — opens on card click. Shows
  * everything the operator might want at a glance (image, SKU, price,
- * active state, custom fields, audit timestamps) without the edit
- * form fields. "Edit" hands off to the existing add/edit modal.
+ * active state, description, cost price, tags, gallery, custom
+ * fields, audit timestamps) without the edit form fields. "Edit"
+ * hands off to the existing add/edit modal.
  */
 @Component({
   selector: 'app-view-item-modal',
@@ -42,6 +43,12 @@ export class ViewItemModalComponent {
   protected readonly imageHref = computed<string | null>(() => {
     const stored = this._item()?.image_url;
     return stored ? `${this.apiOrigin}${stored}` : null;
+  });
+
+  /** C5 — Gallery URLs anchored to the API origin. */
+  protected readonly galleryHrefs = computed<string[]>(() => {
+    const urls = this._item()?.image_urls ?? [];
+    return urls.map((u) => `${this.apiOrigin}${u}`);
   });
 
   protected readonly customEntries = computed<Array<[string, unknown]>>(() => {

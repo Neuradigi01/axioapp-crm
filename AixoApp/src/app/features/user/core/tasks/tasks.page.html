@@ -43,27 +43,89 @@
         </button>
       }
 
-      <!-- Assignee dropdown — orthogonal to chips. Selecting "All
-           owners" leaves the chip scope in charge; picking a user
-           narrows the visible list to that owner. -->
-      <select
-        [formControl]="assigneeControl"
-        class="rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-        aria-label="Filter by assignee"
-      >
-        <option value="">All owners</option>
-        <option value="me">Me</option>
-        @for (u of users(); track u.id) {
-          <option [value]="u.id">{{ u.full_name }}</option>
-        }
-      </select>
+      <!-- T7 — Assignee dropdown hidden when Mine is active (filtering
+           "Mine" by owner=Someone Else silently yields zero rows).
+           Also only exposed to callers with users.read since the API
+           they filter through requires it. -->
+      @if (showAssigneeDropdown()) {
+        <select
+          [formControl]="assigneeControl"
+          class="rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          aria-label="Filter by assignee"
+        >
+          <option value="">All owners</option>
+          <option value="me">Me</option>
+          @for (u of users(); track u.id) {
+            <option [value]="u.id">{{ u.full_name }}</option>
+          }
+        </select>
+      }
     </div>
-    <input
-      [formControl]="searchCtrl"
-      type="text"
-      placeholder="Search tasks…"
-      class="w-full max-w-xs rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none sm:w-64"
-    />
+    <div class="flex items-center gap-2">
+      <!-- T15 — Saved views toolbar (mirrors leads). -->
+      <div class="relative">
+        <button
+          type="button"
+          (click)="toggleViewsMenu()"
+          class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          title="Saved views"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="viewsMenuOpen()"
+        >
+          <lucide-icon [name]="currentViewName() ? 'bookmark-check' : 'bookmark'" class="h-4 w-4" />
+          {{ currentViewName() ?? 'Default view' }}
+          <lucide-icon name="chevron-down" class="h-3 w-3 text-zinc-400" />
+        </button>
+        @if (viewsMenuOpen()) {
+          <div class="fixed inset-0 z-30" (click)="toggleViewsMenu()" role="presentation"></div>
+          <div
+            class="absolute right-0 z-40 mt-1 w-64 rounded-md border border-zinc-200 bg-white shadow-lg"
+          >
+            <div class="max-h-64 overflow-auto py-1">
+              @for (v of savedViews(); track v.id) {
+                <button
+                  type="button"
+                  (click)="applyView(v); toggleViewsMenu()"
+                  class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-zinc-700 hover:bg-zinc-50"
+                  [class.font-medium]="v.id === currentViewId()"
+                >
+                  <span class="truncate">{{ v.name }}</span>
+                  @if (v.shared) {
+                    <span class="ml-2 text-[10px] text-zinc-400">shared</span>
+                  }
+                </button>
+              } @empty {
+                <p class="px-3 py-2 text-xs text-zinc-500">No saved views yet.</p>
+              }
+            </div>
+            <div class="border-t border-zinc-100 px-3 py-2">
+              <button
+                type="button"
+                (click)="openSaveView(); toggleViewsMenu()"
+                class="text-xs font-medium text-zinc-900 hover:underline"
+              >
+                Save current filters as view…
+              </button>
+              @if (isCurrentViewOwner()) {
+                <button
+                  type="button"
+                  (click)="deleteCurrentView(); toggleViewsMenu()"
+                  class="ml-3 text-xs font-medium text-rose-600 hover:underline"
+                >
+                  Delete this view
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+      <input
+        [formControl]="searchCtrl"
+        type="text"
+        placeholder="Search tasks…"
+        class="w-full max-w-xs rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none sm:w-64"
+      />
+    </div>
   </div>
 
   @if (state.loadError(); as err) {
@@ -135,6 +197,10 @@
             </th>
             <th class="px-3 py-2 text-left font-medium">Assignee</th>
             <th class="px-3 py-2 text-left font-medium">Related</th>
+            <!-- T1/T2/T9 — row actions column. -->
+            <th class="w-10 px-3 py-2 text-right font-medium">
+              <span class="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-zinc-100">
@@ -163,15 +229,36 @@
                 />
               </td>
               <td class="px-3 py-2">
-                <button
-                  type="button"
-                  (click)="openEdit(t)"
-                  class="text-left text-sm font-medium text-zinc-900 hover:underline"
-                  [class.line-through]="t.status === 'done'"
-                  [class.text-zinc-400]="t.status === 'done'"
-                >
-                  {{ t.title }}
-                </button>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    (click)="openEdit(t)"
+                    class="text-left text-sm font-medium text-zinc-900 hover:underline"
+                    [class.line-through]="t.status === 'done' || t.status === 'missed'"
+                    [class.text-zinc-400]="t.status === 'done' || t.status === 'missed'"
+                  >
+                    {{ t.title }}
+                  </button>
+                  <!-- T3 — followup_type badge. Backend enum exposed
+                       via `t.followup_type` (nullable). -->
+                  @if (t.followup_type) {
+                    <span
+                      class="inline-flex items-center rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 ring-1 ring-sky-200"
+                      [title]="'Follow-up type: ' + t.followup_type"
+                    >
+                      {{ t.followup_type }}
+                    </span>
+                  }
+                  <!-- T1 — Missed badge, only visible once terminal. -->
+                  @if (t.status === 'missed') {
+                    <span
+                      class="inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 ring-1 ring-rose-200"
+                      title="Task was marked missed"
+                    >
+                      missed
+                    </span>
+                  }
+                </div>
                 @if (t.description) {
                   <p class="mt-0.5 truncate text-[11px] text-zinc-500">{{ t.description }}</p>
                 }
@@ -197,6 +284,59 @@
               </td>
               <td class="px-3 py-2 text-xs text-zinc-500">
                 {{ t.related_entity_type || '—' }}
+              </td>
+              <!-- T1/T2/T9 — row actions. Missed only visible for
+                   open tasks (state machine terminal); snooze only
+                   for open tasks. Delete always visible. -->
+              <td class="whitespace-nowrap px-3 py-2 text-right">
+                <div class="inline-flex items-center gap-1">
+                  @if (t.status === 'open') {
+                    <!-- T9 — Snooze +1d. Tooltip explains the anchor
+                         behaviour ("existing due" vs "now"). -->
+                    <button
+                      type="button"
+                      (click)="snoozeToTomorrow(t)"
+                      [disabled]="togglingId() !== null"
+                      class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed"
+                      title="Snooze to tomorrow 9am"
+                      aria-label="Snooze to tomorrow"
+                    >
+                      <lucide-icon name="clock" class="h-3.5 w-3.5" />
+                    </button>
+                    <!-- T9 — Snooze +1 week. -->
+                    <button
+                      type="button"
+                      (click)="snoozeTask(t, 60 * 24 * 7)"
+                      [disabled]="togglingId() !== null"
+                      class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed"
+                      title="Snooze +1 week"
+                      aria-label="Snooze +1 week"
+                    >
+                      <lucide-icon name="calendar-plus" class="h-3.5 w-3.5" />
+                    </button>
+                    <!-- T1 — Mark missed. -->
+                    <button
+                      type="button"
+                      (click)="onMarkMissed(t)"
+                      [disabled]="togglingId() !== null"
+                      class="rounded-md p-1 text-zinc-400 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed"
+                      title="Mark as missed"
+                      aria-label="Mark task missed"
+                    >
+                      <lucide-icon name="clock-alert" class="h-3.5 w-3.5" />
+                    </button>
+                  }
+                  <!-- T2 — Single-row delete. -->
+                  <button
+                    type="button"
+                    (click)="openDeleteRow(t)"
+                    class="rounded-md p-1 text-zinc-400 hover:bg-red-50 hover:text-red-700"
+                    title="Delete task"
+                    aria-label="Delete task"
+                  >
+                    <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </td>
             </tr>
           }
@@ -273,4 +413,74 @@
     (confirm)="onBulkDelete()"
     (cancel)="closeBulkModal()"
   />
+}
+
+<!-- T2 — Single-row delete confirm -->
+@if (deletingTask(); as t) {
+  <app-confirm-dialog
+    [title]="'Delete task “' + t.title + '”?'"
+    [body]="'This cannot be undone.'"
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    [submitting]="deleteSubmitting()"
+    (confirm)="confirmDeleteRow()"
+    (cancel)="closeDeleteRow()"
+  />
+}
+
+<!-- T15 — Save view modal. Small; reuses the same
+     confirm-dialog pattern with an inline input. -->
+@if (saveViewOpen()) {
+  <div class="fixed inset-0 z-40 bg-black/40" (click)="closeSaveView()" role="presentation"></div>
+  <div
+    class="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-white shadow-2xl"
+    role="dialog"
+    aria-label="Save view"
+  >
+    <div class="border-b border-zinc-200 px-5 py-3">
+      <h3 class="text-sm font-semibold text-zinc-900">Save current filters as a view</h3>
+      <p class="mt-1 text-xs text-zinc-500">
+        Captures the active chip, status, due filter, priority, and sort. Restore by picking the
+        view from the bookmark menu.
+      </p>
+    </div>
+    <div class="space-y-3 px-5 py-4">
+      <label class="block text-sm">
+        <span class="mb-1 block text-xs font-medium text-zinc-600">Name</span>
+        <input
+          type="text"
+          [formControl]="saveViewName"
+          placeholder="e.g. My overdue high-priority"
+          maxlength="80"
+          class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+        />
+      </label>
+      <label class="flex items-center gap-2 text-xs text-zinc-700">
+        <input
+          type="checkbox"
+          class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+          [checked]="saveViewShared()"
+          (change)="saveViewShared.set($any($event.target).checked)"
+        />
+        Share with the team
+      </label>
+    </div>
+    <div class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3">
+      <button
+        type="button"
+        (click)="closeSaveView()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        (click)="submitSaveView()"
+        [disabled]="!saveViewName.value.trim()"
+        class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Save view
+      </button>
+    </div>
+  </div>
 }

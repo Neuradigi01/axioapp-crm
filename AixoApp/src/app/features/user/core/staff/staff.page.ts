@@ -32,13 +32,13 @@ export type StaffTabId =
   | 'store-marketing';
 
 /**
- * Staff Dashboard â€” admin-facing tab host. The 5 real tabs read from
+ * Staff Dashboard — admin-facing tab host. The 5 real tabs read from
  * `loadWithPerformance()` (one /staff + N /staff/{id}/performance calls
  * in parallel) and share the result via input bindings to keep child
  * tabs cheap to switch between. The 3 placeholder tabs are stubs until
  * Phase 4.4 / 4.10 / 5.6 ship.
  *
- * KPI header mirrors the Vercel reference layout â€” Present-today,
+ * KPI header mirrors the Vercel reference layout — Present-today,
  * total staff, total revenue (placeholder zero until invoices land),
  * avg conversion %, today's revenue (also zero today).
  */
@@ -67,6 +67,17 @@ export class StaffPageComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
 
+  /** Present-today headcount from `/staff/present-today`. Loaded
+   * alongside the roster; falls back to 0 on failure so a bad
+   * attendance query never blanks the whole dashboard. */
+  private readonly presentTodayCount = signal(0);
+
+  /** Sums of paid-invoice `Invoice.total` from `/staff/revenue-totals`.
+   * Same fall-back-to-zero pattern as `presentTodayCount` — a broken
+   * billing query shouldn't wipe the roster. */
+  private readonly revenueTotal = signal(0);
+  private readonly revenueToday = signal(0);
+
   protected readonly activeTab = signal<StaffTabId>('overview');
 
   protected readonly tabs: ReadonlyArray<{ id: StaffTabId; label: string }> = [
@@ -84,17 +95,9 @@ export class StaffPageComponent {
 
   protected readonly totalStaff = computed(() => this.rows().length);
 
-  protected readonly presentToday = computed(() => {
-    // Present-today isn't returned by the list endpoint; we leave the
-    // numerator at 0 here and fill it in once the staff-portal clock-in
-    // ledger is queryable from the admin side (Phase 3.6).
-    return 0;
-  });
+  protected readonly presentToday = computed(() => this.presentTodayCount());
 
-  protected readonly totalRevenue = computed(() => {
-    // Sum of leaderboard.sales â€” sales placeholder is 0 today.
-    return this.rows().reduce((acc, r) => acc + Number(r.performance.sales || 0), 0);
-  });
+  protected readonly totalRevenue = computed(() => this.revenueTotal());
 
   protected readonly avgConversionPct = computed(() => {
     const rs = this.rows();
@@ -103,10 +106,7 @@ export class StaffPageComponent {
     return Math.round(total / rs.length);
   });
 
-  protected readonly todaysRevenue = computed(() => {
-    // Same Phase-5 placeholder as totalRevenue.
-    return 0;
-  });
+  protected readonly todaysRevenue = computed(() => this.revenueToday());
 
   constructor() {
     this.reload();
@@ -127,6 +127,30 @@ export class StaffPageComponent {
           this.rows.set([]);
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load staff.');
+        },
+      });
+    // Present-today is an independent call — errors here don't blank
+    // the roster, they just leave the KPI at 0.
+    this.api
+      .presentToday()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (r) => this.presentTodayCount.set(r.count),
+        error: () => this.presentTodayCount.set(0),
+      });
+    // Revenue KPIs — same independent-load pattern; a billing outage
+    // shouldn't blank the whole staff page.
+    this.api
+      .revenueTotals()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (r) => {
+          this.revenueTotal.set(r.total);
+          this.revenueToday.set(r.today);
+        },
+        error: () => {
+          this.revenueTotal.set(0);
+          this.revenueToday.set(0);
         },
       });
   }

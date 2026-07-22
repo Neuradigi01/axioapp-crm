@@ -110,6 +110,51 @@ export class LeadCardComponent {
 
   readonly statusPillClass = computed(() => this.classForStatus(this.lead().status));
 
+  /**
+   * F24 — stale deal warning. Returns a level:
+   *   - `stale`   — no activity for ≥ 14 days (amber dot)
+   *   - `rotten`  — no activity for ≥ 30 days (rose dot)
+   *   - `null`    — fresh / won / lost / never-touched
+   *
+   * `never-touched` (last_activity_at is null) is intentionally not
+   * flagged: a brand-new lead created seconds ago hasn't earned a
+   * warning yet. The daily-scan Celery job could later paint these
+   * amber too if the create-time is stale, but this v1 just uses
+   * activity recency.
+   */
+  readonly stalenessLevel = computed<'stale' | 'rotten' | null>(() => {
+    const lead = this.lead();
+    if (lead.status !== 'active') return null;
+    if (!lead.last_activity_at) return null;
+    const ageMs = Date.now() - new Date(lead.last_activity_at).getTime();
+    const days = ageMs / (1000 * 60 * 60 * 24);
+    if (days >= 30) return 'rotten';
+    if (days >= 14) return 'stale';
+    return null;
+  });
+
+  readonly stalenessDotClass = computed(() => {
+    switch (this.stalenessLevel()) {
+      case 'rotten':
+        return 'bg-rose-500';
+      case 'stale':
+        return 'bg-amber-500';
+      default:
+        return null;
+    }
+  });
+
+  readonly stalenessTooltip = computed(() => {
+    switch (this.stalenessLevel()) {
+      case 'rotten':
+        return 'No activity in 30+ days — deal likely rotten';
+      case 'stale':
+        return 'No activity in 14+ days — stale';
+      default:
+        return null;
+    }
+  });
+
   /** Tailwind classes for the per-source badge. */
   readonly sourceBadgeClass = computed(() => this.classForSource(this.lead().source));
 
@@ -137,6 +182,10 @@ export class LeadCardComponent {
         return 'bg-amber-100 text-amber-700 ring-amber-200';
       case 'meta_ads':
         return 'bg-blue-100 text-blue-700 ring-blue-200';
+      case 'whatsapp_flow':
+        return 'bg-green-100 text-green-700 ring-green-200';
+      case 'walk_in':
+        return 'bg-teal-100 text-teal-700 ring-teal-200';
       default:
         return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
     }
@@ -152,6 +201,10 @@ export class LeadCardComponent {
         return 'Google Ads';
       case 'meta_ads':
         return 'Meta Ads';
+      case 'whatsapp_flow':
+        return 'WhatsApp Flow';
+      case 'walk_in':
+        return 'Walk-in';
       default:
         return 'Manual';
     }

@@ -24,6 +24,13 @@ export interface WalkIn {
   custom_data: Record<string, unknown>;
   last_activity_at: string | null;
   linked_lead_id: string | null;
+  /** W8 — group visit tracking. Nullable when reception skips. */
+  party_size: number | null;
+  /** W9 — queue-arrival timestamp (before rep engagement). Wait
+   *  time = time_in − wait_started_at. Null on orgs that don't track. */
+  wait_started_at: string | null;
+  /** W11 — "customer said they'd return by X." */
+  expected_return_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +45,9 @@ export interface WalkInUpdate {
   status?: WalkInStatus;
   notes?: string | null;
   custom_data?: Record<string, unknown>;
+  party_size?: number | null;
+  wait_started_at?: string | null;
+  expected_return_date?: string | null;
 }
 
 export interface QuickRegisterPayload {
@@ -50,6 +60,20 @@ export interface QuickRegisterPayload {
   assigned_to_id?: string | null;
   notes?: string | null;
   custom_data?: Record<string, unknown>;
+  party_size?: number | null;
+  wait_started_at?: string | null;
+  expected_return_date?: string | null;
+}
+
+/** W7 — Server-side KPI roll-up for the walk-ins page header. */
+export interface WalkInsRollup {
+  today_count: number;
+  today_converted: number;
+  open_now: number;
+  interested_or_follow_up: number;
+  conversion_rate_pct: number | null;
+  avg_duration_min: number | null;
+  avg_wait_min: number | null;
 }
 
 export interface QuickRegisterResponse {
@@ -122,8 +146,11 @@ export class WalkInsApiService {
   bulkReassign(
     ids: string[],
     body: { userId: string | null; note?: string | null },
-  ): Observable<{ reassigned: number }> {
-    return this.http.post<{ reassigned: number }>(`${this.base}/bulk-reassign`, {
+  ): Observable<{ reassigned: number; already_assigned: number }> {
+    return this.http.post<{
+      reassigned: number;
+      already_assigned: number;
+    }>(`${this.base}/bulk-reassign`, {
       ids,
       assigned_to_id: body.userId,
       note: body.note ?? null,
@@ -135,6 +162,18 @@ export class WalkInsApiService {
       checked_out: number;
       already_checked_out: number;
     }>(`${this.base}/bulk-checkout`, { ids });
+  }
+
+  /** W1 — Single-call bulk-delete. Replaces the per-row loop the FE
+   *  used to run. Mirror of leads' `bulkDelete`. */
+  bulkDelete(ids: string[]): Observable<{ deleted: number }> {
+    return this.http.post<{ deleted: number }>(`${this.base}/bulk-delete`, { ids });
+  }
+
+  /** W7 — Server-side KPI roll-up. Scope follows caller row
+   *  visibility (org vs. personal) — decided server-side. */
+  rollup(): Observable<WalkInsRollup> {
+    return this.http.get<WalkInsRollup>(`${this.base}/rollup`);
   }
 
   /** Walk-in → Lead conversion. Returns ids of the touched rows so

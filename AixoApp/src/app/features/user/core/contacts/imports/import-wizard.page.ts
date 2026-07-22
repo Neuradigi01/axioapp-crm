@@ -342,6 +342,9 @@ export class ContactImportWizardPageComponent {
       mapping: this.mapping(),
       create_group: this.createGroup(),
       group_name: this.createGroup() ? this.groupName().trim() : null,
+      // DPDP: opt-in provenance picked on the map step. Persists on
+      // every contact this import inserts (backend Step 0164).
+      opt_in_source: this.optInSource(),
     };
   }
 

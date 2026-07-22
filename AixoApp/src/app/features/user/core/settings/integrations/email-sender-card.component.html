@@ -1,0 +1,431 @@
+<section
+  class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm"
+  data-testid="email-sender-card"
+>
+  <header class="flex items-start justify-between gap-4">
+    <div class="flex items-start gap-3">
+      <span
+        class="flex h-10 w-10 items-center justify-center rounded-md bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200"
+        aria-hidden="true"
+      >
+        <lucide-icon name="mail" size="18" aria-hidden="true"></lucide-icon>
+      </span>
+      <div>
+        <h3 class="text-base font-semibold text-zinc-900">Email Sender</h3>
+        <p class="mt-0.5 text-sm text-zinc-600">
+          Configure the address emails from CRM automations, workflows, and templates are sent from.
+          Auth mail (welcome, verification, password reset) always goes from the platform address.
+        </p>
+      </div>
+    </div>
+    <div class="flex shrink-0 items-center gap-2">
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-zinc-800"
+        (click)="openAdd()"
+      >
+        <lucide-icon name="plus" size="12" aria-hidden="true"></lucide-icon>
+        Add sender identity
+      </button>
+    </div>
+  </header>
+
+  @if (toast(); as t) {
+    <div
+      class="mt-4 flex items-start gap-2 rounded-md border p-3 text-sm"
+      [class.border-emerald-200]="t.tone === 'success'"
+      [class.bg-emerald-50]="t.tone === 'success'"
+      [class.text-emerald-800]="t.tone === 'success'"
+      [class.border-rose-200]="t.tone === 'error'"
+      [class.bg-rose-50]="t.tone === 'error'"
+      [class.text-rose-800]="t.tone === 'error'"
+    >
+      <lucide-icon
+        [name]="t.tone === 'success' ? 'check-circle-2' : 'alert-triangle'"
+        size="14"
+        class="mt-0.5 shrink-0"
+        aria-hidden="true"
+      ></lucide-icon>
+      <span class="flex-1">{{ t.message }}</span>
+      <button
+        type="button"
+        class="shrink-0 rounded p-0.5 hover:bg-black/5"
+        (click)="dismissToast()"
+        aria-label="Dismiss"
+      >
+        <lucide-icon name="x" size="12" aria-hidden="true"></lucide-icon>
+      </button>
+    </div>
+  }
+
+  @if (rowError(); as err) {
+    <div
+      class="mt-4 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+    >
+      <lucide-icon
+        name="alert-triangle"
+        size="14"
+        class="mt-0.5 shrink-0"
+        aria-hidden="true"
+      ></lucide-icon>
+      <span>{{ err }}</span>
+    </div>
+  }
+
+  <!-- Senders section -->
+  <div class="mt-5">
+    @if (loadError(); as err) {
+      <div class="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+        Could not load senders: {{ err }}
+      </div>
+    } @else if (loading() && senders() === null) {
+      <div class="space-y-2">
+        @for (i of [0, 1]; track i) {
+          <div class="h-12 animate-pulse rounded bg-zinc-100" aria-hidden="true"></div>
+        }
+      </div>
+    } @else if (emptyState()) {
+      <div class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center">
+        <p class="text-sm font-medium text-zinc-700">No sender configured</p>
+        <p class="mt-1 text-xs text-zinc-500">
+          CRM automation, workflow, and template emails won't send until you add a sender identity.
+        </p>
+        <button
+          type="button"
+          class="mt-3 inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-zinc-800"
+          (click)="openAdd()"
+        >
+          <lucide-icon name="plus" size="12" aria-hidden="true"></lucide-icon>
+          Add sender identity
+        </button>
+      </div>
+    } @else {
+      <div class="overflow-x-auto rounded-md border border-zinc-200">
+        <table class="min-w-full text-sm">
+          <thead
+            class="bg-zinc-50 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+          >
+            <tr>
+              <th class="px-4 py-2">Provider</th>
+              <th class="px-4 py-2">From address</th>
+              <th class="px-4 py-2">Status</th>
+              <th class="px-4 py-2">Default</th>
+              <th class="px-4 py-2 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100">
+            @for (row of senders(); track row.id) {
+              <tr class="text-zinc-700">
+                <td class="px-4 py-3">
+                  <span
+                    class="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium"
+                    [class]="providerBadgeClasses(row.kind)"
+                  >
+                    {{ providerLabel(row.kind) }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="font-mono text-xs text-zinc-800">{{ row.from_address }}</div>
+                  @if (row.display_name) {
+                    <div class="text-[11px] text-zinc-500">{{ row.display_name }}</div>
+                  }
+                </td>
+                <td class="px-4 py-3">
+                  @if (row.verified) {
+                    <span
+                      class="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+                    >
+                      Verified
+                    </span>
+                  } @else {
+                    <span
+                      class="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-amber-200"
+                    >
+                      Pending
+                    </span>
+                  }
+                </td>
+                <td class="px-4 py-3">
+                  @if (row.is_default) {
+                    <span
+                      class="inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2 py-0.5 text-[11px] font-medium text-white"
+                    >
+                      <lucide-icon name="star" size="10" aria-hidden="true"></lucide-icon>
+                      Default
+                    </span>
+                  } @else if (row.kind === 'smtp' && row.verified) {
+                    <button
+                      type="button"
+                      class="text-[11px] font-medium text-zinc-600 underline underline-offset-2 hover:text-zinc-900 disabled:opacity-50"
+                      [disabled]="settingDefaultId() === row.id"
+                      (click)="setDefault(row)"
+                    >
+                      @if (settingDefaultId() === row.id) {
+                        Setting…
+                      } @else {
+                        Set default
+                      }
+                    </button>
+                  } @else {
+                    <span class="text-[11px] text-zinc-400">—</span>
+                  }
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <div class="inline-flex items-center gap-1">
+                    @if (row.kind === 'smtp' && !row.verified) {
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                        (click)="resendVerification(row)"
+                      >
+                        <lucide-icon name="shield-check" size="12" aria-hidden="true"></lucide-icon>
+                        Verify
+                      </button>
+                    }
+                    @if (row.kind === 'smtp') {
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded-md border border-transparent px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                        [disabled]="deletingId() === row.id"
+                        (click)="remove(row)"
+                      >
+                        @if (deletingId() === row.id) {
+                          <lucide-icon
+                            name="loader-2"
+                            size="12"
+                            class="animate-spin"
+                            aria-hidden="true"
+                          ></lucide-icon>
+                        } @else {
+                          <lucide-icon name="trash-2" size="12" aria-hidden="true"></lucide-icon>
+                        }
+                        Delete
+                      </button>
+                    } @else {
+                      <span class="text-[11px] text-zinc-400"
+                        >Manage in Settings → Email Accounts</span
+                      >
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+  <!-- Domain authentication (SPF/DKIM/DMARC) — only when the org has ≥1 SMTP sender. -->
+  @if (hasSmtpSender()) {
+    <div class="mt-6 border-t border-zinc-200 pt-5">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h4 class="text-sm font-semibold text-zinc-900">
+            Domain authentication (SPF, DKIM, DMARC)
+          </h4>
+          <p class="mt-1 text-xs text-zinc-500">
+            Verify the domain your SMTP senders use so recipients see mail from
+            <span class="font-mono">you&#64;yourshop.com</span> as trusted. Publish the DNS records
+            we hand you, then click Verify.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          (click)="openAddDomain()"
+        >
+          <lucide-icon name="plus" size="12" aria-hidden="true"></lucide-icon>
+          Add domain
+        </button>
+      </div>
+
+      @if (domainsError(); as err) {
+        <div
+          class="mt-3 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+        >
+          <lucide-icon
+            name="alert-triangle"
+            size="14"
+            class="mt-0.5 shrink-0"
+            aria-hidden="true"
+          ></lucide-icon>
+          <span>{{ err }}</span>
+        </div>
+      }
+
+      <div class="mt-3">
+        @if (domainsLoading() && domains() === null) {
+          <div class="space-y-2">
+            @for (i of [0, 1]; track i) {
+              <div class="h-10 animate-pulse rounded bg-zinc-100" aria-hidden="true"></div>
+            }
+          </div>
+        } @else if ((domains()?.length ?? 0) === 0) {
+          <p
+            class="rounded-md border border-dashed border-zinc-200 bg-zinc-50 px-3 py-4 text-xs text-zinc-500"
+          >
+            No sender domains registered yet. Add the domain(s) your SMTP senders send from to
+            improve deliverability.
+          </p>
+        } @else {
+          <div class="overflow-x-auto rounded-md border border-zinc-200">
+            <table class="min-w-full text-sm">
+              <thead
+                class="bg-zinc-50 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+              >
+                <tr>
+                  <th class="px-4 py-2">Domain</th>
+                  <th class="px-4 py-2">Status</th>
+                  <th class="px-4 py-2">SPF</th>
+                  <th class="px-4 py-2">DKIM</th>
+                  <th class="px-4 py-2">DMARC</th>
+                  <th class="px-4 py-2">Last checked</th>
+                  <th class="px-4 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-100">
+                @for (row of domains(); track row.id) {
+                  <tr class="text-zinc-700">
+                    <td class="px-4 py-2">
+                      <div class="font-mono text-xs text-zinc-800">{{ row.domain }}</div>
+                    </td>
+                    <td class="px-4 py-2">
+                      <span
+                        class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                        [class]="domainToneClass(domainState(row).tone)"
+                      >
+                        {{ domainState(row).label }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-2">
+                      <span
+                        class="rounded px-2 py-0.5 text-[11px] font-medium"
+                        [class]="
+                          row.spf_verified
+                            ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                            : 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200'
+                        "
+                      >
+                        {{ row.spf_verified ? 'OK' : '—' }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-2">
+                      <span
+                        class="rounded px-2 py-0.5 text-[11px] font-medium"
+                        [class]="
+                          row.dkim_verified
+                            ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                            : 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200'
+                        "
+                      >
+                        {{ row.dkim_verified ? 'OK' : '—' }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-2">
+                      <span
+                        class="rounded px-2 py-0.5 text-[11px] font-medium"
+                        [class]="
+                          row.dmarc_verified
+                            ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                            : 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200'
+                        "
+                      >
+                        {{ row.dmarc_verified ? 'OK' : '—' }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-2 text-xs text-zinc-600">
+                      @if (row.spf_last_checked_at) {
+                        {{ row.spf_last_checked_at | date: 'medium' }}
+                      } @else {
+                        <span class="text-zinc-400">Never</span>
+                      }
+                    </td>
+                    <td class="px-4 py-2 text-right">
+                      <div class="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                          (click)="showDns(row)"
+                        >
+                          <lucide-icon name="file-text" size="12" aria-hidden="true"></lucide-icon>
+                          DNS
+                        </button>
+                        <button
+                          type="button"
+                          class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                          [disabled]="verifyingDomainId() === row.id"
+                          (click)="verifyDomain(row)"
+                        >
+                          @if (verifyingDomainId() === row.id) {
+                            <lucide-icon
+                              name="loader-2"
+                              size="12"
+                              class="animate-spin"
+                              aria-hidden="true"
+                            ></lucide-icon>
+                            Verifying…
+                          } @else {
+                            <lucide-icon
+                              name="shield-check"
+                              size="12"
+                              aria-hidden="true"
+                            ></lucide-icon>
+                            Verify
+                          }
+                        </button>
+                        <button
+                          type="button"
+                          class="inline-flex items-center gap-1 rounded-md border border-transparent px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                          [disabled]="deletingDomainId() === row.id"
+                          (click)="removeDomain(row)"
+                        >
+                          @if (deletingDomainId() === row.id) {
+                            <lucide-icon
+                              name="loader-2"
+                              size="12"
+                              class="animate-spin"
+                              aria-hidden="true"
+                            ></lucide-icon>
+                          } @else {
+                            <lucide-icon name="trash-2" size="12" aria-hidden="true"></lucide-icon>
+                          }
+                          Remove
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</section>
+
+@if (addModalOpen()) {
+  <app-add-sender-identity-modal (cancelled)="closeAdd()" (smtpCreated)="onSmtpCreated($event)" />
+}
+
+@if (verifyModal(); as v) {
+  <app-verify-sender-code-modal
+    [senderId]="v.id"
+    [fromAddress]="v.from"
+    (verified)="onVerified($event)"
+    (cancelled)="closeVerify()"
+  />
+}
+
+@if (addDomainOpen()) {
+  <app-sender-add-domain-modal
+    [creating]="creatingDomain()"
+    (submitted)="submitDomain($event)"
+    (cancelled)="closeAddDomain()"
+  />
+}
+
+@if (dnsModal(); as m) {
+  <app-sender-dns-records-modal [domain]="m.domain" [records]="m.records" (closed)="closeDns()" />
+}

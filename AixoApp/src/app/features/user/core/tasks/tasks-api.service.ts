@@ -3,15 +3,19 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import { FieldDef } from '../shared/dynamic-form/types';
 import { buildHttpParams } from '../shared/services/query-builder';
 
 /**
- * Mirrors `TaskStatus` / `TaskPriority` from the backend. Keep these
- * unions in sync with `api/src/app/core/tasks/models.py` — new values
- * here without the backend enum will be rejected at HTTP boundary.
+ * Mirrors `TaskStatus` / `TaskPriority` / `TaskFollowupType` from the
+ * backend. Keep these unions in sync with
+ * `api/src/app/core/tasks/models.py` — new values here without the
+ * backend enum will be rejected at HTTP boundary.
  */
-export type TaskStatus = 'open' | 'done' | 'cancelled';
+export type TaskStatus = 'open' | 'done' | 'cancelled' | 'missed';
 export type TaskPriority = 'low' | 'med' | 'high';
+/** T3 — the enum backend already has. Was previously not on the FE at all. */
+export type TaskFollowupType = 'call' | 'whatsapp' | 'email' | 'document' | 'meeting' | 'other';
 export type TaskDueFilter = 'today' | 'overdue' | 'upcoming';
 export type TaskSortBy = 'due_at' | 'priority' | 'title' | 'created_at' | 'last_activity_at';
 export type TaskSortDir = 'asc' | 'desc';
@@ -39,7 +43,11 @@ export interface Task {
   related_entity_id: string | null;
   status: TaskStatus;
   priority: TaskPriority;
+  /** T3 — the touchpoint channel type. Nullable = generic to-do. */
+  followup_type: TaskFollowupType | null;
   last_activity_at: string | null;
+  /** T4 — dynamic per-org custom field payload. */
+  custom_data: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -59,6 +67,8 @@ export interface TaskCreate {
   related_entity_type?: string | null;
   related_entity_id?: string | null;
   priority?: TaskPriority;
+  followup_type?: TaskFollowupType | null;
+  custom_data?: Record<string, unknown>;
 }
 
 export type TaskUpdate = Partial<{
@@ -68,6 +78,10 @@ export type TaskUpdate = Partial<{
   assigned_to_id: string | null;
   status: TaskStatus;
   priority: TaskPriority;
+  followup_type: TaskFollowupType | null;
+  related_entity_type: string | null;
+  related_entity_id: string | null;
+  custom_data: Record<string, unknown>;
 }>;
 
 function toParams(filters: TaskListFilters) {
@@ -88,6 +102,18 @@ function toParams(filters: TaskListFilters) {
 export class TasksApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/tasks`;
+  private readonly renderUrl = `${environment.apiBaseUrl}/custom-fields/task/render`;
+
+  /** T4 — Field defs for `entity_type='task'`; feeds the dynamic form. */
+  renderFields(): Observable<FieldDef[]> {
+    return this.http.get<FieldDef[]>(this.renderUrl);
+  }
+
+  /** T1 — Terminal transition to `missed`. Backend refuses if the task
+   *  isn't `open`; caller shows a toast either way. */
+  markMissed(id: string): Observable<Task> {
+    return this.http.post<Task>(`${this.base}/${id}/mark-missed`, {});
+  }
 
   /** Tasks attached to one entity (panel inside contact/lead detail). */
   listForEntity(

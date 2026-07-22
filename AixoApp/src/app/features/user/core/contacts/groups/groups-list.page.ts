@@ -15,7 +15,14 @@
  * action buttons unconditionally and lets the API enforce.
  */
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
@@ -37,6 +44,9 @@ export class ContactGroupsListPageComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly groups = signal<ContactGroup[]>([]);
+  protected readonly total = signal(0);
+  protected readonly page = signal(1);
+  protected readonly pageSize = signal(50);
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
   /** Pending-delete confirm — set to the group whose Delete button
@@ -45,7 +55,27 @@ export class ContactGroupsListPageComponent {
   protected readonly pendingDelete = signal<ContactGroup | null>(null);
   protected readonly deleting = signal(false);
 
+  protected readonly totalPages = computed(() => {
+    const t = this.total();
+    const s = this.pageSize();
+    return t === 0 ? 1 : Math.ceil(t / s);
+  });
+
   constructor() {
+    this._refresh();
+  }
+
+  protected goToPage(next: number): void {
+    if (next < 1 || next > this.totalPages() || next === this.page()) return;
+    this.page.set(next);
+    this._refresh();
+  }
+
+  protected onPageSizeChange(next: number): void {
+    if (next !== 25 && next !== 50 && next !== 100) return;
+    if (next === this.pageSize()) return;
+    this.pageSize.set(next);
+    this.page.set(1);
     this._refresh();
   }
 
@@ -87,11 +117,12 @@ export class ContactGroupsListPageComponent {
     this.loading.set(true);
     this.loadError.set(null);
     this.api
-      .list()
+      .list(this.page(), this.pageSize())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (response) => {
           this.groups.set(response.items);
+          this.total.set(response.total);
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {

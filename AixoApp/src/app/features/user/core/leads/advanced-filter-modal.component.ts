@@ -49,6 +49,8 @@ const STANDARD_FIELDS: StandardFieldDef[] = [
       { value: 'widget', label: 'Widget' },
       { value: 'google_ads', label: 'Google Ads' },
       { value: 'meta_ads', label: 'Meta Ads' },
+      { value: 'whatsapp_flow', label: 'WhatsApp Flow' },
+      { value: 'walk_in', label: 'Walk-in' },
     ],
   },
   { field: 'assigned_to_id', label: 'Owner', kind: 'uuid' },

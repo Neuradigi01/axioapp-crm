@@ -32,20 +32,23 @@ import {
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { Contact, ContactCreate, ContactUpdate, ContactsApiService } from './contacts-api.service';
 import { ContactFormModalComponent } from './contact-form-modal.component';
+import { MergeContactModalComponent } from './merge-contact-modal.component';
 import { OptInChipComponent } from './opt-in/opt-in-chip.component';
 import { OptInSectionComponent } from './opt-in/opt-in-section.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
 
-type DetailTab = 'overview' | 'activities' | 'notes' | 'tasks' | 'automations';
+type DetailTab = 'overview' | 'activities' | 'tasks' | 'automations';
 
-const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: string | null }> = [
-  { id: 'overview', label: 'Overview', placeholderStep: null },
-  { id: 'activities', label: 'Activities', placeholderStep: null },
-  { id: 'notes', label: 'Notes', placeholderStep: 'later' },
-  { id: 'tasks', label: 'Tasks', placeholderStep: null },
+const TABS: ReadonlyArray<{ id: DetailTab; label: string }> = [
+  { id: 'overview', label: 'Overview' },
+  // Activities is the canonical notes + timeline surface: `AddNoteComponent`
+  // posts `type=note` Activity rows and the timeline renders them. No
+  // separate Notes tab.
+  { id: 'activities', label: 'Activities' },
+  { id: 'tasks', label: 'Tasks' },
   // tasks/automation-engine Step 9 — per-contact run history.
-  { id: 'automations', label: 'Automations', placeholderStep: null },
+  { id: 'automations', label: 'Automations' },
 ];
 
 @Component({
@@ -56,6 +59,7 @@ const TABS: ReadonlyArray<{ id: DetailTab; label: string; placeholderStep: strin
     RouterLink,
     LucideAngularModule,
     ContactFormModalComponent,
+    MergeContactModalComponent,
     ActivityTimelineComponent,
     AddNoteComponent,
     ContactAutomationsTabComponent,
@@ -88,6 +92,21 @@ export class ContactDetailPageComponent implements OnInit {
   readonly deleteOpen = signal(false);
   readonly deleteSubmitting = signal(false);
   readonly deleteError = signal<string | null>(null);
+
+  /** Merge modal state. Open shows a search box + confirm; on merged
+   *  we refresh the primary contact signal so custom_data + tags
+   *  reflect the union that came back from the server. */
+  readonly mergeOpen = signal(false);
+
+  /** DPDP right-to-be-forgotten (U7) — confirm dialog state. */
+  readonly anonymiseOpen = signal(false);
+  readonly anonymiseSubmitting = signal(false);
+  readonly anonymiseError = signal<string | null>(null);
+  readonly anonymiseReason = signal('');
+
+  /** True when the loaded contact has already been anonymised — used
+   *  to hide the Anonymise button + show the "Anonymised" chip. */
+  readonly isAnonymised = computed(() => this.contact()?.anonymised_at != null);
 
   /** Tied to `*ngIf` on the pencil-icon — junior staff shouldn't see it. */
   readonly canReassign = computed(() => this.auth.hasPermission('contacts.reassign'));
@@ -133,11 +152,6 @@ export class ContactDetailPageComponent implements OnInit {
       label: def.field_label,
       value: this.formatValue(def, data[def.field_key]),
     }));
-  });
-
-  readonly placeholderForActiveTab = computed<string | null>(() => {
-    const tab = TABS.find((t) => t.id === this.activeTab());
-    return tab?.placeholderStep ?? null;
   });
 
   ngOnInit(): void {
@@ -217,6 +231,60 @@ export class ContactDetailPageComponent implements OnInit {
           this.deleteError.set(extractApiError(err) ?? 'Could not delete contact.');
         },
       });
+  }
+
+  protected openAnonymise(): void {
+    this.anonymiseError.set(null);
+    this.anonymiseReason.set('');
+    this.anonymiseOpen.set(true);
+  }
+
+  protected closeAnonymise(): void {
+    this.anonymiseOpen.set(false);
+    this.anonymiseSubmitting.set(false);
+    this.anonymiseError.set(null);
+  }
+
+  protected onAnonymiseReasonInput(event: Event): void {
+    this.anonymiseReason.set((event.target as HTMLInputElement).value);
+  }
+
+  protected confirmAnonymise(): void {
+    const c = this.contact();
+    if (!c) return;
+    this.anonymiseSubmitting.set(true);
+    this.anonymiseError.set(null);
+    const reason = this.anonymiseReason().trim() || null;
+    this.api
+      .anonymise(c.id, reason)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.contact.set(updated);
+          this.anonymiseSubmitting.set(false);
+          this.closeAnonymise();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.anonymiseSubmitting.set(false);
+          this.anonymiseError.set(extractApiError(err) ?? 'Could not anonymise contact.');
+        },
+      });
+  }
+
+  protected openMerge(): void {
+    this.mergeOpen.set(true);
+  }
+
+  protected closeMerge(): void {
+    this.mergeOpen.set(false);
+  }
+
+  protected onMerged(primary: Contact): void {
+    // Refresh the header with the union'd primary and refetch the
+    // timeline so the "merged from..." breadcrumb appears.
+    this.contact.set(primary);
+    this.mergeOpen.set(false);
+    this.timeline()?.reload();
   }
 
   protected openReassign(): void {
