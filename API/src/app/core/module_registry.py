@@ -22,7 +22,7 @@ import logging
 import pkgutil
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 logger = logging.getLogger(__name__)
@@ -67,6 +67,12 @@ class ModuleDescriptor:
     menu_position: int | None = 100
     parent: str | None = None
     always_visible: bool = False
+    # Auto-populated by `discover_modules` for pack modules (extracted
+    # from the import path `src.app.packs.<pack_id>.modules.<mod>`).
+    # None for core modules. Filtered against `org.template_id` in
+    # `list_for_user` so pack modules never render on orgs that haven't
+    # installed the pack — even if stray permission rows exist.
+    pack_id: str | None = None
 
     def __post_init__(self) -> None:
         if not _ID_RE.match(self.id):
@@ -113,7 +119,12 @@ class ModuleRegistry:
             ),
         )
 
-    def list_for_user(self, granted: Iterable[str]) -> list[ModuleDescriptor]:
+    def list_for_user(
+        self,
+        granted: Iterable[str],
+        *,
+        org_template_id: str | None = None,
+    ) -> list[ModuleDescriptor]:
         """Return modules the user holds at least one declared permission for.
 
         Modules that declare an empty permission list — or set
@@ -121,18 +132,34 @@ class ModuleRegistry:
         with `menu_position=None` are excluded — they exist in the
         registry for permission discovery only and do not render in the
         sidebar (they surface from within other UIs, e.g. Settings).
+
+        Pack modules (`pack_id is not None`) additionally require the
+        caller's org to be on that pack — `pack_id == org_template_id`.
+        This is the second gate that keeps a leaked permission grant
+        (e.g. someone ran the real_estate installer against a base-pack
+        org) from surfacing pack UI on the wrong tenant. Passing
+        `org_template_id=None` disables the tenant gate (used only by
+        tests that pre-date the gate).
         """
         granted_set = set(granted)
-        return [
-            m
-            for m in self.list()
-            if m.menu_position is not None
-            and (
+        result: list[ModuleDescriptor] = []
+        for m in self.list():
+            if m.menu_position is None:
+                continue
+            if (
+                m.pack_id is not None
+                and org_template_id is not None
+                and m.pack_id != org_template_id
+            ):
+                continue
+            if not (
                 m.always_visible
                 or not m.permissions
                 or any(p in granted_set for p in m.permissions)
-            )
-        ]
+            ):
+                continue
+            result.append(m)
+        return result
 
     def clear(self) -> None:
         """Wipe the registry (used by tests and the dev refresh endpoint)."""
@@ -205,12 +232,27 @@ def _walk_pack_module_files() -> list[str]:
     return found
 
 
+def _extract_pack_id(path: str) -> str | None:
+    """Return the pack slug for a pack-module import path, else None.
+
+    Pack modules live at `src.app.packs.<pack_id>.modules.<mod>.module`
+    — the pack slug is the 4th dotted segment (index 3). Core modules
+    (`src.app.core.<mod>.module`) get `None`.
+    """
+    parts = path.split(".")
+    if len(parts) >= 5 and parts[:3] == ["src", "app", "packs"]:
+        return parts[3]
+    return None
+
+
 def discover_modules() -> list[ModuleDescriptor]:
     """Find every `module.py` under core + packs, register their MODULEs.
 
     Idempotent: callers (lifespan + dev refresh endpoint) `clear()`
     first, then call this. Returns the registered descriptors in
-    registry order.
+    registry order. Pack modules get their `pack_id` auto-populated
+    from the import path so the sidebar filter can gate them by
+    `org.template_id` without each module needing to declare it.
     """
     paths = _walk_module_files(_CORE_PACKAGE) + _walk_pack_module_files()
     for path in paths:
@@ -225,5 +267,8 @@ def discover_modules() -> list[ModuleDescriptor]:
                 type(descriptor).__name__,
             )
             continue
+        pack_id = _extract_pack_id(path)
+        if pack_id is not None and descriptor.pack_id != pack_id:
+            descriptor = replace(descriptor, pack_id=pack_id)
         registry.register(descriptor)
     return registry.list()

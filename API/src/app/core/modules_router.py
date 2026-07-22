@@ -30,6 +30,7 @@ from src.app.core.permissions.service import (
     list_permissions_for_role,
     register_permissions,
 )
+from src.app.core.tenants.service import get_organization_by_id
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -62,7 +63,12 @@ async def list_modules(
     db: AsyncSession = Depends(get_db),
 ) -> list[ModuleOut]:
     granted = {p.key for p in await list_permissions_for_role(db, user.role_id)}
-    return [ModuleOut.from_descriptor(m) for m in registry.list_for_user(granted)]
+    org = await get_organization_by_id(db, user.org_id)
+    org_template_id = org.template_id if org is not None else None
+    return [
+        ModuleOut.from_descriptor(m)
+        for m in registry.list_for_user(granted, org_template_id=org_template_id)
+    ]
 
 
 @router.post("/dev/refresh-modules", response_model=RefreshModulesResponse)
