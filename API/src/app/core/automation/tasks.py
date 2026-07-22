@@ -140,6 +140,12 @@ async def _deliver_run_async(run_id: str) -> dict[str, Any]:
 
             try:
                 channel_message_id = await _execute_send(session, run)
+            except _SkipSendError as exc:
+                run.status = AutomationRunStatus.skipped
+                run.error = str(exc)
+                run.completed_at = datetime.now(UTC)
+                await session.commit()
+                return {"status": "skipped", "error": str(exc)}
             except _PermanentSendError as exc:
                 run.status = AutomationRunStatus.failed
                 run.error = str(exc)
@@ -289,6 +295,14 @@ class _PermanentSendError(Exception):
     Transient errors propagate out so Celery's autoretry fires."""
 
 
+class _SkipSendError(Exception):
+    """Internal sentinel — the send should be recorded as ``skipped``
+    (not ``failed``) with the reason as the exception message. Used
+    for ``org_sender_not_configured`` — the org hasn't wired an
+    outbound identity yet, so we log at INFO + mark the run skipped
+    instead of failing it."""
+
+
 async def _execute_send(session, run) -> str | None:
     """Resolve trigger + template + adapter and ship the message.
     Returns the channel-adapter's ``channel_message_id`` (or
@@ -342,7 +356,8 @@ async def _execute_send(session, run) -> str | None:
         from src.app.core.automation.tracking import (
             inject_tracking_pixel_and_links,
         )
-        from src.app.shared.email import Email, get_email_backend
+        from src.app.shared.email import Email
+        from src.app.shared.email.org_sender import resolve_org_sender
 
         # Step 14 — wrap the plain-text body in a minimal HTML
         # envelope + inject the open-pixel + click-rewrites. The
@@ -362,7 +377,20 @@ async def _execute_send(session, run) -> str | None:
             public_base_url=public_base_url,
         )
 
-        backend = get_email_backend()
+        # Use the ORG's own sender identity (SMTP or OAuth) rather
+        # than the platform Brevo sender — org-generated automation
+        # mail must originate from the org's brand. No silent
+        # fallback to Brevo; when the org hasn't configured a
+        # sender, the run is marked ``skipped`` with the reason.
+        backend = await resolve_org_sender(session, org_id=run.org_id)
+        if backend is None:
+            logger.info(
+                "org_sender_not_configured run=%s org_id=%s",
+                run.id,
+                run.org_id,
+            )
+            raise _SkipSendError("org_sender_not_configured")
+
         await backend.send(
             Email(
                 to=recipient,

@@ -153,24 +153,45 @@ async def _email_opted_in(session: AsyncSession, *, user_id: uuid.UUID, type_: s
 
 
 async def _send_email_for(notif: NotificationOut, *, to: str) -> None:
-    """Best-effort email send + audit. Swallows + logs every failure."""
+    """Best-effort email send + audit. Swallows + logs every failure.
+
+    Uses the ORG's own sender identity (verified SMTP or live OAuth
+    mailbox) via :func:`shared.email.org_sender.resolve_org_sender`
+    rather than the platform Brevo sender — auth mail (welcome,
+    verify, reset, OTP) still goes through the platform sender, but
+    per-user notification mirrors should originate from the org so
+    the recipient sees consistent branding.
+    """
     from src.app.core.audit import service as audit
     from src.app.core.notifications.email_renderer import render_email
-    from src.app.shared.email import Email, get_email_backend
+    from src.app.shared.db import async_session
+    from src.app.shared.email import Email
+    from src.app.shared.email.org_sender import resolve_org_sender
 
     try:
         rendered = render_email(notif)
         if rendered is None:
             return
         subject, html_body, text_body = rendered
-        await get_email_backend().send(
-            Email(
-                to=to,
-                subject=subject,
-                body_text=text_body,
-                body_html=html_body,
+
+        async with async_session() as sender_session:
+            backend = await resolve_org_sender(sender_session, org_id=notif.org_id)
+            if backend is None:
+                logger.info(
+                    "org_sender_not_configured notification_id=%s type=%s org_id=%s",
+                    notif.id,
+                    notif.type,
+                    notif.org_id,
+                )
+                return
+            await backend.send(
+                Email(
+                    to=to,
+                    subject=subject,
+                    body_text=text_body,
+                    body_html=html_body,
+                )
             )
-        )
         await audit.log(
             "notification.email.sent",
             org_id=notif.org_id,

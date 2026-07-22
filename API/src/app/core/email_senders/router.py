@@ -1,0 +1,106 @@
+"""HTTP endpoints for the ``/api/v1/email-senders`` surface.
+
+Gated by ``email.accounts.manage`` (same key the OAuth email-accounts
+router uses — the two surfaces both let a rep manage the outbound
+identity their sends will originate from).
+"""
+
+from __future__ import annotations
+
+import uuid
+
+from fastapi import APIRouter, Depends, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.app.core.auth.dependencies import require_permissions
+from src.app.core.email_senders import service
+from src.app.core.email_senders.schemas import (
+    SmtpSenderCreate,
+    SmtpSenderOut,
+    SmtpSenderVerify,
+    UnifiedSenderOut,
+)
+from src.app.core.users.models import User
+from src.app.shared.db import get_db
+
+router = APIRouter(prefix="/email-senders", tags=["Email Senders"])
+
+
+@router.get("/", response_model=list[UnifiedSenderOut])
+async def list_senders_endpoint(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("email.accounts.manage")),
+) -> list[UnifiedSenderOut]:
+    """Merged list — verified SMTP senders + live OAuth mailboxes."""
+    return await service.list_unified_senders(db, org_id=user.org_id)
+
+
+@router.post(
+    "/smtp",
+    response_model=SmtpSenderOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_smtp_sender_endpoint(
+    payload: SmtpSenderCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("email.accounts.manage")),
+) -> SmtpSenderOut:
+    """Register an SMTP sender. Ships the 6-digit verification code
+    to ``from_address`` using the submitted creds — a failure here
+    surfaces the SMTP error verbatim so the operator can diagnose
+    port/auth issues without checking logs."""
+    row = await service.create_smtp_sender(db, org_id=user.org_id, payload=payload)
+    return SmtpSenderOut.model_validate(row)
+
+
+@router.post("/smtp/{sender_id}/verify", response_model=SmtpSenderOut)
+async def verify_smtp_sender_endpoint(
+    sender_id: uuid.UUID,
+    payload: SmtpSenderVerify,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("email.accounts.manage")),
+) -> SmtpSenderOut:
+    """Submit the 6-digit code delivered to ``from_address``."""
+    row = await service.verify_smtp_sender(
+        db, org_id=user.org_id, sender_id=sender_id, code=payload.code
+    )
+    return SmtpSenderOut.model_validate(row)
+
+
+@router.post("/smtp/{sender_id}/resend-code", response_model=SmtpSenderOut)
+async def resend_code_endpoint(
+    sender_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("email.accounts.manage")),
+) -> SmtpSenderOut:
+    """Regenerate + redispatch the verification code."""
+    row = await service.resend_code(db, org_id=user.org_id, sender_id=sender_id)
+    return SmtpSenderOut.model_validate(row)
+
+
+@router.post("/smtp/{sender_id}/set-default", response_model=SmtpSenderOut)
+async def set_default_sender_endpoint(
+    sender_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("email.accounts.manage")),
+) -> SmtpSenderOut:
+    """Mark this verified SMTP sender as the org's default."""
+    row = await service.set_default_sender(
+        db, org_id=user.org_id, sender_id=sender_id
+    )
+    return SmtpSenderOut.model_validate(row)
+
+
+@router.delete("/{sender_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_sender_endpoint(
+    sender_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("email.accounts.manage")),
+) -> Response:
+    """Delete an SMTP sender. OAuth mailbox deletion continues to
+    live on ``DELETE /api/v1/email/accounts/{id}``."""
+    await service.delete_sender(db, org_id=user.org_id, sender_id=sender_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+__all__ = ["router"]

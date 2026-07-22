@@ -43,6 +43,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { DlqListComponent } from './dlq-list.component';
+import { EmailSenderCardComponent } from './email-sender-card.component';
 import { FieldMappingEditorComponent } from './field-mapping-editor.component';
 import { GoogleCalendarCardComponent } from './google-calendar-card.component';
 import { GoogleCardComponent } from './google-card.component';
@@ -77,6 +78,7 @@ type CallbackStatus =
     GoogleCalendarCardComponent,
     MetaCardComponent,
     WhatsAppCardComponent,
+    EmailSenderCardComponent,
     IntegrationStatusComponent,
     DlqListComponent,
     FieldMappingEditorComponent,

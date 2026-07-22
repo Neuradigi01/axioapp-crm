@@ -77,14 +77,14 @@ export const userRoutes: Routes = [
         pathMatch: 'full',
       },
       {
-        // App-updates Email Step 9 — alias so the Gmail + Microsoft
-        // OAuth `/callback` handlers can redirect users straight onto
-        // the Email Accounts tab with `?status=…` for the success /
-        // denied toast. Backend `_SETTINGS_RETURN_PATH` points here.
+        // Legacy alias — the Email Accounts + Sender Setup tabs were
+        // consolidated into the per-org Email Sender card on Settings
+        // → Integrations. Gmail + Microsoft OAuth `/callback` handlers
+        // still redirect here with `?status=…`; forward to the new
+        // location preserving the query string.
         path: 'settings/email-accounts',
-        data: { tab: 'email-accounts' },
-        loadComponent: () =>
-          import('./core/settings/settings-page.component').then((m) => m.SettingsPageComponent),
+        redirectTo: '/user/integrations',
+        pathMatch: 'full',
       },
       {
         // tasks/template-library Step 10 — the Settings → Email

@@ -301,9 +301,16 @@ export class CreateCampaignModalComponent {
   }
 
   /** Click handler for a picker row. Non-selectable rows (pending /
-   *  rejected WA) are a hard no-op — no selection change, no error. */
+   *  rejected WA) are a hard no-op — no selection change, no error.
+   *  Clicking the currently-selected template toggles it off so the
+   *  operator can back out to "no template" and edit the body inline
+   *  without having to pick a different one first. */
   protected onRowClick(row: PickerRow): void {
     if (!this.isRowSelectable(row)) return;
+    if (this.selectedTemplateId() === row.id) {
+      this.selectedTemplateId.set(null);
+      return;
+    }
     this.selectedTemplateId.set(row.id);
   }
   protected readonly templatesLoading = signal(false);
@@ -451,6 +458,29 @@ export class CreateCampaignModalComponent {
   });
 
   constructor() {
+    // Mirror the three Email-branch form fields into `emailBranchState`
+    // so `emailBranchIncomplete` (a signal-computed) re-evaluates on
+    // every keystroke / dropdown pick. Reactive-forms `valueChanges`
+    // is what actually notifies us — the signal is just the bridge to
+    // Angular signal reactivity.
+    const _pushEmailBranchState = () => {
+      const v = this.form.getRawValue();
+      this.emailBranchState.set({
+        email_account_id: v.email_account_id ?? null,
+        sender_name: v.sender_name ?? '',
+        subject: v.subject ?? '',
+      });
+    };
+    this.form.controls.email_account_id.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(_pushEmailBranchState);
+    this.form.controls.sender_name.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(_pushEmailBranchState);
+    this.form.controls.subject.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(_pushEmailBranchState);
+
     // Step 15 — load templates whenever the channel changes. Each
     // channel's published templates come from the central library;
     // the picker reset clears any stale selection from the prior
@@ -603,12 +633,28 @@ export class CreateCampaignModalComponent {
     this.form.controls.body_html.markAsDirty();
   }
 
+  /** Signal mirror of the three Email-branch form fields so the
+   *  `emailBranchIncomplete` computed re-evaluates when the operator
+   *  types in Sender name / Subject or picks a mailbox. Without this,
+   *  the computed reads `form.getRawValue()` — which isn't a signal —
+   *  so Angular never invalidates the cache and Save Draft stays
+   *  disabled even when every field is filled. */
+  protected readonly emailBranchState = signal<{
+    email_account_id: string | null;
+    sender_name: string;
+    subject: string;
+  }>({
+    email_account_id: null,
+    sender_name: '',
+    subject: '',
+  });
+
   /** True when the Email branch is missing any of its required fields.
    *  Drives the disabled state on the submit button so the operator
    *  can't send a payload the backend would 422. */
   protected readonly emailBranchIncomplete = computed<boolean>(() => {
     if (!this.isEmailChannel()) return false;
-    const v = this.form.getRawValue();
+    const v = this.emailBranchState();
     return (
       !v.email_account_id ||
       !(v.sender_name && v.sender_name.trim()) ||
@@ -627,6 +673,15 @@ export class CreateCampaignModalComponent {
       .subscribe((rows) => {
         this.emailAccounts.set(rows);
         this.emailAccountsLoading.set(false);
+        // Auto-pick the mailbox when the operator has exactly one
+        // verified account. Removes a form-control sync bug where the
+        // `<select>` visually shows the option but the reactive form
+        // never captures it, leaving `email_account_id` null and the
+        // Save Draft button disabled with an "Pick a mailbox…" tooltip.
+        if (rows.length === 1 && !this.form.controls.email_account_id.value) {
+          this.form.controls.email_account_id.setValue(rows[0].id);
+          this.form.controls.email_account_id.markAsDirty();
+        }
       });
   }
 

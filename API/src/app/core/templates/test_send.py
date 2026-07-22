@@ -136,22 +136,48 @@ def _build_context(extra: dict[str, Any] | None) -> dict[str, Any]:
     return ctx
 
 
+class OrgSenderNotConfigured(Exception):
+    """Raised by :func:`_dispatch_email` when the org hasn't wired an
+    outbound sender identity yet. The router catches + surfaces this
+    as a 400 with a hint pointing at Settings → Integrations."""
+
+
 async def _dispatch_email(
     *,
+    session: AsyncSession,
+    org_id: uuid.UUID,
     recipient: str,
     subject: str,
     body: str,
 ) -> str | None:
-    """Ship the rendered email via the generic outbound backend.
+    """Ship the rendered email via the ORG's own outbound sender.
+
+    Uses :func:`shared.email.org_sender.resolve_org_sender` so test
+    sends originate from the org's SMTP or OAuth mailbox — never
+    from the platform Brevo sender. Raises
+    :class:`OrgSenderNotConfigured` when no sender exists so the
+    caller can surface an actionable message rather than silently
+    dropping to the platform sender.
 
     Returns the provider's message id when the backend supplies one;
-    the default ``SmtpEmailBackend`` doesn't surface an id today, so
-    ``None`` is the common case. The audit row still gets written —
-    operators check their inbox to confirm receipt.
+    the SMTP path doesn't, so ``None`` is the common case. The audit
+    row still gets written — operators check their inbox to confirm
+    receipt.
     """
-    from src.app.shared.email import Email, get_email_backend
+    from src.app.shared.email import Email
+    from src.app.shared.email.org_sender import resolve_org_sender
 
-    backend = get_email_backend()
+    backend = await resolve_org_sender(session, org_id=org_id)
+    if backend is None:
+        logger.info(
+            "org_sender_not_configured template_test_send org_id=%s recipient=%s",
+            org_id,
+            recipient,
+        )
+        raise OrgSenderNotConfigured(
+            "No email sender configured for this organisation. "
+            "Add one in Settings → Integrations → Email Sender."
+        )
     await backend.send(Email(to=recipient, subject=subject, body_text=body, body_html=None))
     return None
 
@@ -227,6 +253,8 @@ async def dispatch_test_send(
         # to a clear marker so the recipient still knows what arrived.
         subject = rendered_subject or f"[Test] {template.name}"
         channel_message_id = await _dispatch_email(
+            session=session,
+            org_id=org_id,
             recipient=cleaned_recipient,
             subject=subject,
             body=rendered_body,
@@ -265,4 +293,4 @@ async def dispatch_test_send(
     return audit
 
 
-__all__ = ["dispatch_test_send"]
+__all__ = ["OrgSenderNotConfigured", "dispatch_test_send"]

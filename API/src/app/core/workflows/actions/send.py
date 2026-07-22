@@ -284,9 +284,23 @@ async def _send_email(session, *, run, step_run, node, context):
         body=rendered_body,
     )
 
-    from src.app.shared.email import Email, get_email_backend
+    from src.app.shared.email import Email
+    from src.app.shared.email.org_sender import resolve_org_sender
 
-    backend = get_email_backend()
+    # Org-originated workflow mail flows through the org's own
+    # sender identity (SMTP or OAuth) — never the platform Brevo
+    # sender. When the org hasn't wired one, skip cleanly (INFO log
+    # + skip_reason) so the workflow continues rather than erroring.
+    backend = await resolve_org_sender(session, org_id=run.org_id)
+    if backend is None:
+        logger.info(
+            "org_sender_not_configured node=%s run=%s org_id=%s",
+            node.get("id"),
+            run.id,
+            run.org_id,
+        )
+        return _result_skipped("org_sender_not_configured")
+
     try:
         await backend.send(
             Email(

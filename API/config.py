@@ -64,7 +64,7 @@ SMS_API_KEY = os.getenv("SMS_API_KEY")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:4200")
 
 # Logo URL (used in email templates — must be an absolute URL accessible externally)
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:30007")
 LOGO_URL = os.getenv("LOGO_URL", f"{API_BASE_URL}/static/images/Logo.svg")
 
 # Routes (API-internal cache only — Angular fetches routes via API endpoint)
@@ -174,7 +174,7 @@ GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
 GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
 GOOGLE_OAUTH_REDIRECT_URI = os.getenv(
     "GOOGLE_OAUTH_REDIRECT_URI",
-    "http://localhost:8000/api/v1/integrations/google/callback",
+    "http://localhost:30007/api/v1/integrations/google/callback",
 )
 # Gmail uses the SAME OAuth client (same `GOOGLE_OAUTH_CLIENT_ID` /
 # `GOOGLE_OAUTH_CLIENT_SECRET`) but a separate redirect URI so the
@@ -182,7 +182,7 @@ GOOGLE_OAUTH_REDIRECT_URI = os.getenv(
 # different scopes (gmail.modify) than the Ads flow (adwords).
 GOOGLE_GMAIL_REDIRECT_URI = os.getenv(
     "GOOGLE_GMAIL_REDIRECT_URI",
-    "http://localhost:8000/api/v1/email/gmail/callback",
+    "http://localhost:30007/api/v1/email/gmail/callback",
 )
 # tasks/google-calendar-sync Step 2 — per-user Google Calendar sync.
 # Shares the same OAuth client as Ads / Gmail (one GOOGLE_OAUTH_CLIENT_ID /
@@ -217,7 +217,7 @@ MICROSOFT_CLIENT_SECRET = os.getenv("MICROSOFT_CLIENT_SECRET", "")
 MICROSOFT_TENANT = os.getenv("MICROSOFT_TENANT", "common")
 MICROSOFT_GRAPH_REDIRECT_URI = os.getenv(
     "MICROSOFT_GRAPH_REDIRECT_URI",
-    "http://localhost:8000/api/v1/email/microsoft/callback",
+    "http://localhost:30007/api/v1/email/microsoft/callback",
 )
 # Public HTTPS URL Graph will POST change notifications to. Must be
 # reachable from the internet (localhost won't work — Graph rejects
@@ -251,7 +251,7 @@ META_APP_ID = os.getenv("META_APP_ID", "")
 META_APP_SECRET = os.getenv("META_APP_SECRET", "")
 META_OAUTH_REDIRECT_URI = os.getenv(
     "META_OAUTH_REDIRECT_URI",
-    "http://localhost:8000/api/v1/integrations/meta/callback",
+    "http://localhost:30007/api/v1/integrations/meta/callback",
 )
 # Random secret SHARED with the Meta app's Webhooks tab — Meta sends
 # it back to us during the GET-time subscription verification handshake
