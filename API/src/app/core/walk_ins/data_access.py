@@ -175,12 +175,12 @@ async def rollup_query(
         f"""
         SELECT
           COUNT(*) FILTER (
-            WHERE (time_in + (:offset_min || ' minutes')::interval)::date
-                = (NOW() + (:offset_min || ' minutes')::interval)::date
+            WHERE (time_in + make_interval(mins => :offset_min))::date
+                = (NOW() + make_interval(mins => :offset_min))::date
           ) AS today_count,
           COUNT(*) FILTER (
-            WHERE (time_in + (:offset_min || ' minutes')::interval)::date
-                = (NOW() + (:offset_min || ' minutes')::interval)::date
+            WHERE (time_in + make_interval(mins => :offset_min))::date
+                = (NOW() + make_interval(mins => :offset_min))::date
               AND status = 'converted'
           ) AS today_converted,
           COUNT(*) FILTER (WHERE time_out IS NULL) AS open_now,

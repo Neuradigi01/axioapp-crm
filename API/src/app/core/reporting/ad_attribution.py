@@ -22,9 +22,10 @@ Attribution model
   Until that's wired (a future step), the aggregation falls back
   to "count distinct conversations" as the conversion proxy.
 
-* **Revenue.** Leads carry ``estimated_value`` (Phase 4 spec);
-  campaign revenue is `SUM(estimated_value)` over the linked
-  leads.
+* **Revenue.** Leads carry ``won_value`` — populated by the
+  move-stage service when a lead transitions into an ``is_won``
+  stage. Campaign revenue is ``SUM(won_value)`` over the linked
+  leads; unclosed / lost leads contribute 0.
 
 Range / RLS scoping
 -------------------
@@ -116,7 +117,7 @@ async def compute_ad_attribution(
                     MAX(ac.ad_name) AS ad_name,
                     COUNT(DISTINCT ac.conversation_id) AS conversations,
                     COUNT(DISTINCT l.id) AS leads,
-                    COALESCE(SUM(l.estimated_value), 0) AS revenue
+                    COALESCE(SUM(l.won_value), 0) AS revenue
                 FROM attrib_conv ac
                 LEFT JOIN tbl_leads l
                        ON l.contact_id = ac.contact_id

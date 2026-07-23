@@ -130,6 +130,10 @@ class MoveStageRequest(BaseModel):
 class LeadOut(TimestampedOrgScopedOut):
     id: uuid.UUID
     contact_id: uuid.UUID
+    # W6 — non-null when the lead was created from a walk-in via
+    # ``convert_walk_in_to_lead``. Powers the "Originated from walk-in"
+    # chip + deep-link on the lead-detail page.
+    source_walk_in_id: uuid.UUID | None = None
     pipeline_stage: str
     status: LeadStatus
     source: LeadSource

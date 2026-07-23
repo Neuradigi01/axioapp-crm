@@ -308,7 +308,7 @@ const TAG_LIFECYCLE_NODES: WorkflowNodeType[] = [
     category: 'tag_lifecycle',
     label: 'Remove tag',
     description: 'Remove a tag from the contact / lead.',
-    icon: 'TagOff',
+    icon: 'Ban',
     colorClass: 'bg-teal-50 border-teal-300',
     inputPorts: 1,
     outputs: [{ label: null, display: 'out' }],

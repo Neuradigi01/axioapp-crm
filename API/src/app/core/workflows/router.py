@@ -248,23 +248,6 @@ class WorkflowRunListOut(BaseModel):
 
 
 @router.get(
-    "/runs/{run_id}",
-    response_model=WorkflowRunRead,
-)
-async def get_run_endpoint(
-    run_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_permissions(PERM_READ)),
-) -> WorkflowRunRead:
-    """Single-row hydrate for the run-detail drawer."""
-    org_id = _require_org_id()
-    run = await _workflows_da.get_run(db, org_id=org_id, run_id=run_id)
-    if run is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
-    return WorkflowRunRead.model_validate(run)
-
-
-@router.get(
     "/runs/{run_id}/steps",
     response_model=list[WorkflowStepRunRead],
 )
@@ -283,6 +266,57 @@ async def list_run_steps_endpoint(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
     rows = await _workflows_da.list_step_runs(db, org_id=org_id, run_id=run_id)
     return [WorkflowStepRunRead.model_validate(r) for r in rows]
+
+
+# --- Step 16: gallery list endpoint -------------------------------------
+# Mounted BEFORE /{workflow_id} so 'GET /workflows/gallery' doesn't get
+# swallowed by the UUID matcher on the workflow-detail route (which would
+# reject 'gallery' as a UUID coercion → 422). The POST clone lives further
+# down alongside its request schema — it's 3 segments so the UUID matcher
+# doesn't catch it.
+
+
+class WorkflowGalleryEntryRead(BaseModel):
+    """Serialised gallery template. The ``graph_preview`` field is a
+    full workflow-graph dict (same shape as
+    ``WorkflowRead.graph``) so the frontend canvas component can
+    render it directly in read-only mode."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    description: str
+    category: str
+    channels: list[str]
+    goal_node_label: str
+    est_setup_time_minutes: int
+    est_completion_rate_pct: int
+    screenshot_url: str | None = None
+    graph_preview: dict
+    is_marketing: bool
+    re_enrollment_rule: str
+
+
+class WorkflowGalleryListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    items: list[WorkflowGalleryEntryRead]
+    total: int
+
+
+@router.get("/gallery", response_model=WorkflowGalleryListResponse)
+async def list_workflow_gallery_endpoint(
+    _user: User = Depends(require_permissions(PERM_READ)),
+) -> WorkflowGalleryListResponse:
+    """Return the static gallery catalogue. Org-agnostic — every org
+    sees the same 15 templates plus any pack-registered entries
+    (Layer 2; not present in v1)."""
+    entries = templates_gallery.list_gallery()
+    return WorkflowGalleryListResponse(
+        items=[WorkflowGalleryEntryRead.model_validate(e) for e in entries],
+        total=len(entries),
+    )
 
 
 # --- workflow CRUD --------------------------------------------------------
@@ -680,36 +714,11 @@ async def test_fire_workflow_endpoint(
     return WorkflowTestFireResponse.model_validate(result)
 
 
-# --- Step 16: templates gallery + clone-from-gallery -------------------
-
-
-class WorkflowGalleryEntryRead(BaseModel):
-    """Serialised gallery template. The ``graph_preview`` field is a
-    full workflow-graph dict (same shape as
-    ``WorkflowRead.graph``) so the frontend canvas component can
-    render it directly in read-only mode."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    name: str
-    description: str
-    category: str
-    channels: list[str]
-    goal_node_label: str
-    est_setup_time_minutes: int
-    est_completion_rate_pct: int
-    screenshot_url: str | None = None
-    graph_preview: dict
-    is_marketing: bool
-    re_enrollment_rule: str
-
-
-class WorkflowGalleryListResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    items: list[WorkflowGalleryEntryRead]
-    total: int
+# --- Step 16: clone-from-gallery ---------------------------------------
+# The GET /gallery list endpoint + its response schemas are hoisted above
+# /{workflow_id} (see "Step 16: gallery list endpoint" block). The POST
+# clone below is 3 segments so the UUID matcher on /{workflow_id} never
+# catches it — it can live here next to its request schema.
 
 
 class WorkflowGalleryCloneRequest(BaseModel):
@@ -719,20 +728,6 @@ class WorkflowGalleryCloneRequest(BaseModel):
 
     name: str | None = Field(default=None, max_length=120)
     folder_id: uuid.UUID | None = Field(default=None)
-
-
-@router.get("/gallery", response_model=WorkflowGalleryListResponse)
-async def list_workflow_gallery_endpoint(
-    _user: User = Depends(require_permissions(PERM_READ)),
-) -> WorkflowGalleryListResponse:
-    """Return the static gallery catalogue. Org-agnostic — every org
-    sees the same 15 templates plus any pack-registered entries
-    (Layer 2; not present in v1)."""
-    entries = templates_gallery.list_gallery()
-    return WorkflowGalleryListResponse(
-        items=[WorkflowGalleryEntryRead.model_validate(e) for e in entries],
-        total=len(entries),
-    )
 
 
 @router.post(

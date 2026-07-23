@@ -94,6 +94,11 @@ class ContactOut(TimestampedOrgScopedOut):
     whatsapp_opt_in_recorded_by_user_id: uuid.UUID | None = None
     whatsapp_opt_out_recorded_at: datetime | None = None
     whatsapp_opt_out_reason: str | None = None
+    # Campaigns v1 Step 06 — email opt-in mirror. Drives the
+    # "Email opted out" chip + opt-in source/timestamp on contact detail.
+    email_opt_in_status: str = "never_contacted"
+    email_opt_in_source: str | None = None
+    email_opt_in_recorded_at: datetime | None = None
     # U7 — DPDP right-to-be-forgotten. Non-null on anonymised rows.
     anonymised_at: datetime | None = None
 
