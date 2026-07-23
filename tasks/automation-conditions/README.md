@@ -38,13 +38,42 @@ The right shape is **backend-driven per-event field metadata**: each event in `e
 - **Nested condition groups.** The current builder is linear (`all` OR `any` of the leaves). Drag-drop nested rules stay a polish item.
 - **Multi-event triggers.** One event per trigger, same as v1.
 - **Cross-event conditions** (e.g. "fire when a lead was created AND had an appointment within 7 days"). That's `tasks/workflows/` territory.
-- **Custom field discovery.** The catalog only knows about system fields — an org's user-created custom fields (`tbl_custom_field_definitions`) aren't auto-added to the field dropdown. Follow-up task once the shape settles.
+- **Customer-editable event schemas.** No mainstream CRM lets end-users declare new event types via UI (HubSpot's "custom behavioral events" is developer-API only). Event definitions stay in code — `bus.publish(...)` and its catalog entry ship together as one deploy.
 
 ## Dependency on automation-engine
 
 This track **assumes** `tasks/automation-engine/` is shipped. The condition builder is a UX layer on top of the trigger editor and its condition-JSON contract. The AST shape (`{field, op, value}` leaves, `{all: [...]}` / `{any: [...]}` branches, `{}` empty = always-match) is inherited and unchanged.
 
-No new tables. No new migrations. The change is a schema extension of the existing `GET /automations/event-types` response and a rewrite of one frontend component.
+No new tables. No new migrations. The change is a schema extension of the existing `GET /automations/event-types` response, one new lookup endpoint, and a rewrite of one frontend component.
+
+## Storage model — where every piece of data lives
+
+The condition builder is powered by three storage layers, all of which already exist. Nothing new to persist.
+
+| Layer | Where it lives | Why |
+|---|---|---|
+| **Event catalog + `condition_fields` specs** (label, type, group, path) | Python code — [`core/automation/event_catalog.py`](../../API/src/app/core/automation/event_catalog.py) and each pack's `event_catalog.py` (step-7). Extended with `condition_fields: list[FieldSpec]` on each `CatalogEntry`. | Same for every tenant. A field only exists if the code publishing the event emits it — so the catalog and the emit call ship together as one deploy. A `tbl_condition_field_catalog` table would just create a drift surface with no user-facing benefit (customers don't add events, developers do). |
+| **Enum value pools** — this org's live pipeline stages, lead sources, user roles, tags, custom-field option sets | Existing per-tenant tables — `tbl_pipeline_stages`, `tbl_lead_sources`, `tbl_users` + RBAC registry, `tbl_tags`, `tbl_custom_field_definitions`. Read live per-request through a resolver registry (step-2). | Already per-org today. The value dropdown for "Lead → Stage" simply reads *this* caller's pipeline stages — fresh every call, no cache to invalidate. |
+| **The saved condition itself** (`{field, op, value}` AST + `{all: [...]}` / `{any: [...]}` branches) | Existing `tbl_automation_triggers.conditions` JSONB column. | Contract unchanged — that's why "no data migration." Only the UI that authors the JSONB changes. |
+
+## Registry pattern — extension across every core module and pack
+
+Two new registries (introduced in steps 1 + 2) mirror the existing sidebar-registry + permission-registry pattern from rules 5 + 6 of [`CLAUDE.md`](../../CLAUDE.md):
+
+```
+core/automation/event_catalog.register(CatalogEntry(...))     ← core events (step-1)
+core/automation/enum_resolvers.register("pipeline_stages", ...) ← core resolvers (step-2)
+                                    ▲
+                                    │ same public API
+                                    │
+   packs/furniture/modules/*/event_catalog.py                  ← furniture events + resolvers (step-7)
+   packs/real_estate/modules/*/event_catalog.py                ← future packs — zero core change
+```
+
+- **Core never imports packs** (rule 1). Packs push into core registries at import time; the pack-loader (`module_registry.py`) already walks `src.app.packs.*.modules.*`.
+- **`GET /automations/event-types` filters by `org.template_id`** so an org sees core events + only the events from packs it has installed (matches the existing sidebar visibility filter).
+- **`GET /automations/event-types/{event}/field-values`** dispatches to a resolver by name — core ships `pipeline_stages` / `lead_sources` / `users` / `tags`; packs register e.g. `fp_warehouses`, `fp_item_categories`.
+- Result: a new pack ships an `event_catalog.py`, gets picked up by the discovery walker on next boot, and its events + custom enum fields appear in the picker for every org that installs it — **with zero frontend or core changes**.
 
 ## Multi-tenancy
 
@@ -61,18 +90,28 @@ No new tables. No new migrations. The change is a schema extension of the existi
 
 ## Sub-tasks
 
-- [step-1-catalog-schema-extension.md](step-1-catalog-schema-extension.md) — extend `CatalogEntry` with `condition_fields: list[FieldSpec]`; declare specs for every event currently in the catalog (lead, contact, appointment, invoice, quote, user, etc.).
-- [step-2-live-enum-resolver.md](step-2-live-enum-resolver.md) — `POST /automations/event-types/{event}/field-values?field=<path>` returns the org's live choices for enum fields (pipeline stages, lead sources, user roles, tags, custom-field enum values).
-- [step-3-frontend-builder-rewrite.md](step-3-frontend-builder-rewrite.md) — rewrite `condition-builder.component.ts` to consume the catalog + live enum resolver. Field dropdown grouped by section. Op dropdown type-filtered. Value input type-aware. Sentence preview.
+**v1 (blocks GA — feature stays behind the flag until all of these ship):**
+
+- [step-1-catalog-schema-extension.md](step-1-catalog-schema-extension.md) — extend `CatalogEntry` with `condition_fields: list[FieldSpec]`; declare specs for every event currently in the core catalog (lead, contact, appointment, invoice, quote, user, etc.).
+- [step-2-live-enum-resolver.md](step-2-live-enum-resolver.md) — resolver registry + `POST /automations/event-types/{event}/field-values?field=<path>` returns the org's live choices for enum fields (pipeline stages, lead sources, user roles, tags).
+- [step-6-custom-field-discovery.md](step-6-custom-field-discovery.md) — auto-add the org's `tbl_custom_field_definitions` rows (system + pack + user) to the field dropdown for events whose payload carries `custom_data`. Resolver for `select` / `multiselect` custom fields reads their `options` JSONB. **Promoted from Phase-2 → v1: no standard CRM ships a filter builder without customer-created custom fields in it.**
+- [step-7-pack-registry-integration.md](step-7-pack-registry-integration.md) — wire the module-registry pack-discovery walker to also import each pack's `event_catalog.py`; expose `register(CatalogEntry)` + `register_resolver(...)` as public core API. `GET /event-types` filters by the caller org's `template_id` so an org sees core + only-its-installed-pack events. **v1** because the whole point ("works across every module and every pack") depends on it.
+- [step-3-frontend-builder-rewrite.md](step-3-frontend-builder-rewrite.md) — rewrite `condition-builder.component.ts` to consume the catalog + live enum resolver. Field dropdown grouped by section. Op dropdown type-filtered. Value input type-aware. Sentence preview. Also fixes the pre-existing `selectedEntry` signal-tracking bug in `automation-editor.page.ts`.
 - [step-4-legacy-paths-compat.md](step-4-legacy-paths-compat.md) — preserve editing of triggers whose stored condition references paths not in the catalog. "Custom (legacy)" flag + free-text fallback for value.
-- [step-5-matched-events-preview.md](step-5-matched-events-preview.md) — optional Phase 2. `POST /triggers/preview-matches` returns count of past runs the condition would have matched; render as a small info line under the builder.
-- [step-6-custom-field-discovery.md](step-6-custom-field-discovery.md) — auto-add the org's `tbl_custom_field_definitions` rows to the field dropdown for events whose payload carries `custom_data`.
+
+**Phase 2 (nice-to-have polish — ships after v1):**
+
+- [step-5-matched-events-preview.md](step-5-matched-events-preview.md) — `POST /triggers/preview-matches` returns count of past runs the condition would have matched; render as a small info line under the builder.
 
 ## Sequencing
 
-`step-1` and `step-2` block `step-3`. `step-3` blocks `step-4`. `step-5` and `step-6` are independent Phase-2 polish tasks that can ship after `step-4` in any order.
+- `step-1` (foundation types + core catalog) blocks everything else.
+- `step-2`, `step-6`, `step-7` depend on `step-1` and can run in parallel.
+- `step-3` (frontend rewrite) depends on `step-1` + `step-2` + `step-6` + `step-7` — needs the wire shape stable across core catalog, enum resolver, custom fields, and pack-installed events before it can render generically.
+- `step-4` (legacy compat) depends on `step-3`.
+- `step-5` (Phase 2) depends on `step-4`.
 
-Estimated total: ~2–3 days of focused work for steps 1–4 (v1). Steps 5–6 add another 1–2 days.
+Estimated total: ~4–5 days for v1 (steps 1, 2, 3, 4, 6, 7). Step 5 adds ~1 day.
 
 ## Rollback strategy
 
@@ -81,6 +120,7 @@ Every step ships behind a feature flag `automation_conditions.friendly_builder_e
 ## Notes for the AI implementing
 
 - **Do NOT hardcode enum values in the frontend.** Every attempted redesign that hardcodes `new / contacted / qualified / proposal / won / lost` will fail for orgs with custom pipeline stages. Fetch live from the backend.
-- **Do NOT ship a partial coverage where some events have friendly labels and others don't.** Either every event in `list_catalog()` gets its `condition_fields` entry, or the feature stays behind the flag until they all do. Half-covered is worse than not-covered because users learn to distrust the picker.
+- **Do NOT ship a partial coverage where some events have friendly labels and others don't.** Either every event in `list_catalog()` gets its `condition_fields` entry (across core + every installed pack), or the feature stays behind the flag until they all do. Half-covered is worse than not-covered because users learn to distrust the picker.
+- **Do NOT introduce a `tbl_condition_field_catalog` table.** The storage split above is deliberate — a DB-shadow of a code-owned contract just adds a drift surface. If you find yourself wanting one, re-read the "Storage model" section.
 - **Existing triggers keep working with no data migration.** The `conditions` JSONB column shape is unchanged. Any field path that isn't in the new catalog surfaces as a legacy option in the dropdown.
 - **Existing pre-existing bug**: `automation-editor.page.ts:selectedEntry` reads `form.controls.event_type.value` inside a `computed()`. FormControl values aren't signals, so the computed doesn't re-fire when the operator picks a new event and `samplePayload()` stays `{}`. Under the current datalist-backed builder this manifests as "no autocomplete suggestions" (survivable). Under any dropdown-only redesign it manifests as "field dropdown is empty forever" (broken). **Fix as part of step-3**: route `event_type.valueChanges` through `toSignal(...)` and read the signal in the `selectedEntry` computed.
