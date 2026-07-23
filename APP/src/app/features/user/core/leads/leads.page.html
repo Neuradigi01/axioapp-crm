@@ -363,20 +363,22 @@
         }
       </select>
     </div>
-    <div>
-      <label for="leads_assignee" class="sr-only">Owner</label>
-      <select
-        id="leads_assignee"
-        [formControl]="assigneeControl"
-        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-      >
-        <option value="">All owners</option>
-        <option value="me">Me</option>
-        @for (u of users(); track u.id) {
-          <option [value]="u.id">{{ u.full_name }}</option>
-        }
-      </select>
-    </div>
+    @if (canFilterByOwner()) {
+      <div>
+        <label for="leads_assignee" class="sr-only">Owner</label>
+        <select
+          id="leads_assignee"
+          [formControl]="assigneeControl"
+          class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        >
+          <option value="">All owners</option>
+          <option value="me">Me</option>
+          @for (u of users(); track u.id) {
+            <option [value]="u.id">{{ u.full_name }}</option>
+          }
+        </select>
+      </div>
+    }
   </div>
 
   @if (state.loadError(); as err) {

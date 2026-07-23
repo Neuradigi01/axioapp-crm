@@ -165,6 +165,15 @@ export class LeadsPageComponent {
     this.auth.currentPermissions().includes('leads.export'),
   );
 
+  /** Gates the "Owner" filter dropdown. Only users with ``users.read`` see
+   * the org-wide leads list (backend list endpoint clamps everyone else
+   * to their own rows — see ``api/src/app/core/leads/router.py``). Showing
+   * the dropdown to scoped roles is misleading because picking another
+   * owner would return an empty list. */
+  protected readonly canFilterByOwner = computed(() =>
+    this.auth.currentPermissions().includes('users.read'),
+  );
+
   readonly view = signal<View>('pipeline');
   readonly searchControl = new FormControl('', { nonNullable: true });
   readonly sourceControl = new FormControl('', { nonNullable: true });

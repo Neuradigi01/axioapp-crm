@@ -164,6 +164,15 @@ export class WalkInsPageComponent {
     return map;
   });
 
+  /** Gates the "Owner" filter dropdown. Only users with ``users.read``
+   * see org-wide walk-ins (backend list endpoint clamps everyone else
+   * to their own rows — see ``api/src/app/core/walk_ins/router.py``).
+   * Showing the dropdown to scoped roles is misleading because picking
+   * another owner would return an empty list. */
+  protected readonly canFilterByOwner = computed(() =>
+    this.auth.currentPermissions().includes('users.read'),
+  );
+
   /** Whether the scope toggle should be visible. Junior staff get the
    * implicit "mine" default with no toggle. */
   readonly canChangeScope = computed(() => {
