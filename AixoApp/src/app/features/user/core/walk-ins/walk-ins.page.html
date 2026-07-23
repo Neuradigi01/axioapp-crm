@@ -15,13 +15,15 @@
   </header>
 
   <!-- KPI cards -->
-  <section class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+  <!-- W7 — KPI cards now read from `GET /walk-ins/rollup` (server-side
+       aggregate over the full org, not the loaded page). -->
+  <section class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
     <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
       <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Today's Walk-ins</p>
       <p class="mt-2 text-2xl font-semibold text-zinc-900">{{ todayCount() }}</p>
     </div>
     <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
-      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Converted</p>
+      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Converted today</p>
       <p class="mt-2 text-2xl font-semibold text-emerald-600">{{ convertedTodayCount() }}</p>
     </div>
     <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
@@ -31,7 +33,9 @@
       <p class="mt-2 text-2xl font-semibold text-amber-600">{{ interestedOrFollowUpCount() }}</p>
     </div>
     <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
-      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Conversion Rate</p>
+      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        Conversion rate <span class="text-[10px] text-zinc-400">(30d)</span>
+      </p>
       <p class="mt-2 text-2xl font-semibold text-zinc-900">
         @if (conversionRate() === null) {
           —%
@@ -41,12 +45,28 @@
       </p>
     </div>
     <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
-      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Avg Visit Duration</p>
+      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        Avg visit <span class="text-[10px] text-zinc-400">(30d)</span>
+      </p>
       <p class="mt-2 text-2xl font-semibold text-zinc-900">
         @if (avgVisitDuration() === null) {
           —
         } @else {
           {{ avgVisitDuration() }} min
+        }
+      </p>
+    </div>
+    <!-- W9 — avg wait time (only meaningful for orgs that capture
+         wait_started_at at reception). -->
+    <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
+      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        Avg wait <span class="text-[10px] text-zinc-400">(30d)</span>
+      </p>
+      <p class="mt-2 text-2xl font-semibold text-zinc-900">
+        @if (avgWaitMin() === null) {
+          —
+        } @else {
+          {{ avgWaitMin() }} min
         }
       </p>
     </div>
@@ -121,6 +141,26 @@
         }
       </div>
     }
+
+    <!-- W? — Open-only toggle. Reception's most common query
+         ("who's currently in-store"). Backend already supports
+         open_only=1; the toggle here surfaces it in the UI. -->
+    <button
+      type="button"
+      (click)="toggleOpenOnly()"
+      class="rounded-full px-3 py-1 font-medium ring-1 transition"
+      [class.bg-emerald-600]="openOnly()"
+      [class.text-white]="openOnly()"
+      [class.ring-emerald-600]="openOnly()"
+      [class.bg-white]="!openOnly()"
+      [class.text-zinc-700]="!openOnly()"
+      [class.ring-zinc-300]="!openOnly()"
+      [class.hover:bg-zinc-50]="!openOnly()"
+      title="Show only currently-in-store visitors"
+    >
+      <lucide-icon name="user-check" class="mr-1 inline h-3 w-3 -translate-y-[1px]" />
+      In-store now
+    </button>
 
     <!-- Sort dropdown -->
     <select
@@ -392,6 +432,30 @@
                         Convert
                       </button>
                     }
+                    <!-- W5 — schedule a follow-up appointment. Deep-
+                         links to /user/appointments?new=1 with the
+                         contact + owner prefilled. -->
+                    <button
+                      type="button"
+                      (click)="onScheduleAppointment(w)"
+                      class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50"
+                      title="Schedule a follow-up appointment with this contact"
+                    >
+                      <lucide-icon name="calendar-plus" class="h-3 w-3" />
+                      Schedule
+                    </button>
+                    <!-- W2 — single-row delete affordance. Was
+                         previously only reachable via bulk-select
+                         → bulk-delete loop. -->
+                    <button
+                      type="button"
+                      (click)="onDeleteRow(w)"
+                      class="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50"
+                      title="Delete this walk-in"
+                      aria-label="Delete walk-in"
+                    >
+                      <lucide-icon name="trash-2" class="h-3 w-3" />
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -485,5 +549,21 @@
     [error]="convertError()"
     (confirm)="onConvertConfirm($event)"
     (cancel)="closeConvert()"
+  />
+}
+
+<!-- Single-row delete confirm (replaces `window.confirm`). -->
+@if (pendingDelete()) {
+  <app-confirm-dialog
+    [title]="'Delete this walk-in?'"
+    [body]="
+      deleteError() ??
+      'This cannot be undone. Contacts and activities linked to this visit remain in their timelines.'
+    "
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    [submitting]="deleteSubmitting()"
+    (confirm)="confirmDelete()"
+    (cancel)="cancelDelete()"
   />
 }

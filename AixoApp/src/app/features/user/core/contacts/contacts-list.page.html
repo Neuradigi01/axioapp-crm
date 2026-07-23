@@ -239,8 +239,19 @@
                   </span>
                   <span class="flex items-center gap-2">
                     {{ item.full_name }}
-                    @if ($any(item).whatsapp_opt_in_status === 'opted_out') {
-                      <app-opt-in-chip [status]="$any(item).whatsapp_opt_in_status" />
+                    @if (item.anonymised_at) {
+                      <span
+                        class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 ring-1 ring-zinc-300"
+                        title="This contact has been anonymised (DPDP right-to-be-forgotten). PII is wiped and both consent channels are opted-out."
+                      >
+                        Anonymised
+                      </span>
+                    }
+                    @if (item.whatsapp_opt_in_status === 'opted_out') {
+                      <app-opt-in-chip [status]="item.whatsapp_opt_in_status" channel="whatsapp" />
+                    }
+                    @if (item.email_opt_in_status === 'opted_out') {
+                      <app-opt-in-chip [status]="item.email_opt_in_status" channel="email" />
                     }
                   </span>
                 </div>

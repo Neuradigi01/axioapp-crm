@@ -136,7 +136,7 @@
       @if (mode() === 'static') {
         <fieldset class="rounded-md border border-zinc-200 p-3">
           <legend class="px-1 text-xs font-medium text-zinc-600">
-            Members ({{ selectedContacts().length }})
+            Members ({{ selectedContacts().length + hiddenExistingIds().size }})
           </legend>
 
           <label class="block text-sm">
@@ -178,7 +178,7 @@
             </ul>
           }
 
-          @if (selectedContacts().length > 0) {
+          @if (selectedContacts().length > 0 || hiddenExistingIds().size > 0) {
             <div class="mt-3 flex flex-wrap gap-2">
               @for (c of selectedContacts(); track c.id) {
                 <span
@@ -193,6 +193,16 @@
                   >
                     <lucide-icon name="x" class="h-3 w-3" />
                   </button>
+                </span>
+              }
+              @if (hiddenExistingIds().size > 0) {
+                <span
+                  class="inline-flex items-center rounded-full bg-zinc-50 px-2 py-0.5 text-xs text-zinc-500 ring-1 ring-zinc-200"
+                  title="Existing members not shown as chips — preserved on save"
+                >
+                  + {{ hiddenExistingIds().size }} more existing member{{
+                    hiddenExistingIds().size === 1 ? '' : 's'
+                  }}
                 </span>
               }
             </div>

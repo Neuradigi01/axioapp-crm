@@ -5622,6 +5622,22 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Whatsapp Opt In Status
+             * @default never_contacted
+             */
+            whatsapp_opt_in_status?:
+                | 'never_contacted'
+                | 'implicit'
+                | 'opted_in'
+                | 'opted_out';
+            /**
+             * Email Opt In Status
+             * @default never_contacted
+             */
+            email_opt_in_status?: 'never_contacted' | 'implicit' | 'opted_in' | 'opted_out';
+            /** Anonymised At */
+            anonymised_at?: string | null;
         };
         /** ContactOut */
         ContactOut: {

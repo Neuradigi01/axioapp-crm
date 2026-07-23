@@ -383,6 +383,7 @@
   <app-book-appointment-modal
     [defaultDate]="selectedDay()"
     [conflictTitleFor]="conflictTitleFor"
+    [prefillContact]="prefillContact()"
     (created)="onAppointmentCreated($event)"
     (cancel)="closeBook()"
   />

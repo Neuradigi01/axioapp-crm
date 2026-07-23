@@ -1,6 +1,6 @@
 <div class="fixed inset-0 z-40 bg-black/40" (click)="onCancel()" role="presentation"></div>
 <div
-  class="fixed left-1/2 top-1/2 z-50 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-white shadow-2xl"
+  class="fixed left-1/2 top-1/2 z-50 flex max-h-[92vh] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
   role="dialog"
   aria-label="Task form"
 >
@@ -10,7 +10,11 @@
     </h3>
   </div>
 
-  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4 px-5 py-4">
+  <form
+    [formGroup]="form"
+    (ngSubmit)="onSubmit()"
+    class="max-h-full flex-1 space-y-4 overflow-y-auto px-5 py-4"
+  >
     @if (!isHidden('title')) {
       <label class="block text-sm">
         <span class="mb-1 block text-xs font-medium text-zinc-600">
@@ -113,6 +117,106 @@
       <p class="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
         Task will be assigned to you.
       </p>
+    }
+
+    <!-- T3 — Followup type. Optional; NULL = generic to-do. -->
+    <label class="block text-sm">
+      <span class="mb-1 block text-xs font-medium text-zinc-600">
+        Follow-up type
+        <span class="ml-1 text-zinc-400">(optional)</span>
+      </span>
+      <select
+        formControlName="followup_type"
+        class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+      >
+        @for (o of followupOptions; track o.value) {
+          <option [value]="o.value">{{ o.label }}</option>
+        }
+      </select>
+    </label>
+
+    <!-- T5 — Related contact picker. Optional. On save, sets
+         related_entity_type='contact' + related_entity_id. -->
+    <div class="text-sm">
+      <span class="mb-1 block text-xs font-medium text-zinc-600">
+        Linked contact
+        <span class="ml-1 text-zinc-400">(optional)</span>
+      </span>
+      @if (selectedContact(); as c) {
+        <div
+          class="flex items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200"
+        >
+          <div>
+            <p class="font-medium">{{ c.full_name }}</p>
+            <p class="mt-0.5 text-[11px]">
+              {{ c.phone || '—' }}
+              @if (c.email) {
+                · {{ c.email }}
+              }
+            </p>
+          </div>
+          <button
+            type="button"
+            (click)="clearContact()"
+            class="rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-medium text-amber-900 hover:bg-amber-100"
+          >
+            Change
+          </button>
+        </div>
+      } @else {
+        <input
+          type="search"
+          [value]="contactSearch()"
+          (input)="onContactSearchInput($event)"
+          placeholder="Search by name, phone, or email…"
+          autocomplete="off"
+          class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+        />
+        @if (contactResults().length > 0) {
+          <ul
+            class="mt-2 max-h-40 divide-y divide-zinc-100 overflow-auto rounded-md border border-zinc-200"
+          >
+            @for (row of contactResults(); track row.id) {
+              <li>
+                <button
+                  type="button"
+                  (click)="pickContact(row)"
+                  class="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-xs hover:bg-zinc-50"
+                >
+                  <span class="font-medium text-zinc-900">{{ row.full_name }}</span>
+                  <span class="text-zinc-500">
+                    {{ row.phone || '—' }}
+                    @if (row.email) {
+                      · {{ row.email }}
+                    }
+                  </span>
+                </button>
+              </li>
+            }
+          </ul>
+        } @else if (contactSearch().length >= 2 && !contactSearching()) {
+          <p class="mt-1 text-xs text-zinc-500">
+            No contacts match &ldquo;{{ contactSearch() }}&rdquo;.
+          </p>
+        }
+      }
+    </div>
+
+    <!-- T4 — Dynamic custom fields. Renders zero output when the org
+         has no `entity_type='task'` definitions. -->
+    @if (fields().length > 0) {
+      <div class="border-t border-zinc-200 pt-4">
+        <h4 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Custom</h4>
+        <div class="mt-2">
+          <app-dynamic-form
+            [fields]="fields()"
+            [value]="customValue()"
+            [loading]="fieldsLoading()"
+            (valueChange)="onCustomValueChange($event)"
+            (validityChange)="onCustomValidityChange($event)"
+          />
+        </div>
+      </div>
     }
 
     @if (error(); as err) {

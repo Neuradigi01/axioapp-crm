@@ -1,6 +1,8 @@
 <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-  <div class="w-full max-w-lg rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
-    <header class="border-b border-zinc-200 px-6 py-4">
+  <div
+    class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl ring-1 ring-zinc-200"
+  >
+    <header class="sticky top-0 z-10 border-b border-zinc-200 bg-white px-6 py-4">
       <h2 class="text-base font-semibold text-zinc-900">
         {{ isEdit() ? 'Edit product' : 'Add product' }}
       </h2>
@@ -13,9 +15,10 @@
       </p>
     </header>
 
-    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4 px-6 py-5">
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-5 px-6 py-5">
+      <!-- Primary cover image -->
       <div>
-        <label class="block text-xs font-medium text-zinc-700">Product image</label>
+        <label class="block text-xs font-medium text-zinc-700">Primary cover image</label>
         <div class="mt-1 flex items-start gap-3">
           @if (displayImage(); as src) {
             <img
@@ -62,6 +65,57 @@
         }
       </div>
 
+      <!-- C5 — Gallery strip. Only visible after save (needs item.id
+           to hit the /images endpoints). -->
+      @if (canAddGallery()) {
+        <div>
+          <label class="block text-xs font-medium text-zinc-700">
+            Gallery images
+            <span class="text-zinc-400">({{ galleryUrls().length }}/8)</span>
+          </label>
+          <div class="mt-1 flex flex-wrap items-start gap-2">
+            @for (url of galleryUrls(); track url; let i = $index) {
+              <div class="relative">
+                <img
+                  [src]="galleryHref(url)"
+                  [alt]="'Gallery image ' + (i + 1)"
+                  class="h-16 w-16 rounded-md object-cover ring-1 ring-zinc-200"
+                />
+                <button
+                  type="button"
+                  (click)="removeGalleryImage(i)"
+                  [disabled]="galleryBusy()"
+                  class="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-red-600 shadow ring-1 ring-zinc-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Remove"
+                >
+                  <lucide-icon name="x" class="h-3 w-3" />
+                </button>
+              </div>
+            }
+            @if (galleryUrls().length < 8) {
+              <label
+                class="flex h-16 w-16 cursor-pointer items-center justify-center rounded-md border border-dashed border-zinc-300 text-zinc-400 hover:border-zinc-500 hover:text-zinc-600"
+                [class.pointer-events-none]="galleryBusy()"
+                [class.opacity-50]="galleryBusy()"
+                title="Add gallery image"
+              >
+                <lucide-icon name="plus" class="h-5 w-5" />
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  class="hidden"
+                  (change)="onGalleryFileSelected($event)"
+                />
+              </label>
+            }
+          </div>
+          @if (galleryError(); as err) {
+            <p class="mt-1 text-xs text-red-600">{{ err }}</p>
+          }
+        </div>
+      }
+
+      <!-- SKU + Category -->
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         @if (!isHidden('sku')) {
           <div>
@@ -89,13 +143,32 @@
                 <span class="text-red-600">*</span>
               }
             </label>
-            <input
-              id="ci_category"
-              type="text"
-              formControlName="category"
-              [attr.placeholder]="stdField('category')?.placeholder ?? 'e.g. Sofa'"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-            />
+            <!-- C2 — server-fed dropdown with a free-text "add new" row
+                 at the bottom. Free-text falls back to auto-creating
+                 the category server-side. -->
+            @if (categories().length > 0) {
+              <input
+                id="ci_category"
+                type="text"
+                formControlName="category"
+                list="ci_category_options"
+                [attr.placeholder]="stdField('category')?.placeholder ?? 'Pick or type a new one'"
+                class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+              <datalist id="ci_category_options">
+                @for (c of categories(); track c.id) {
+                  <option [value]="c.name"></option>
+                }
+              </datalist>
+            } @else {
+              <input
+                id="ci_category"
+                type="text"
+                formControlName="category"
+                [attr.placeholder]="stdField('category')?.placeholder ?? 'e.g. Sofa'"
+                class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+            }
             @if (stdField('category')?.help_text; as help) {
               <p class="mt-1 text-xs text-zinc-500">{{ help }}</p>
             }
@@ -103,6 +176,7 @@
         }
       </div>
 
+      <!-- Name -->
       @if (!isHidden('name')) {
         <div>
           <label class="block text-xs font-medium text-zinc-700" for="ci_name">
@@ -121,6 +195,21 @@
         </div>
       }
 
+      <!-- C4 — Description -->
+      <div>
+        <label class="block text-xs font-medium text-zinc-700" for="ci_description">
+          Description
+        </label>
+        <textarea
+          id="ci_description"
+          rows="3"
+          formControlName="description"
+          placeholder="Optional notes shown on the product detail page"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        ></textarea>
+      </div>
+
+      <!-- Price + Cost price -->
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         @if (!isHidden('price')) {
           <div>
@@ -155,20 +244,95 @@
             }
           </div>
         }
-        @if (!isHidden('is_active')) {
-          <div class="flex items-end">
-            <label class="flex items-center gap-2 text-sm text-zinc-700">
-              <input
-                type="checkbox"
-                formControlName="is_active"
-                class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
-              />
-              {{ stdField('is_active')?.label ?? 'Active' }}
-              <span class="text-xs text-zinc-500">(shown in pickers + lists)</span>
-            </label>
-          </div>
-        }
+        <!-- C6 — Cost price -->
+        <div>
+          <label class="block text-xs font-medium text-zinc-700" for="ci_cost_price">
+            Cost price (₹)
+          </label>
+          <input
+            id="ci_cost_price"
+            type="number"
+            min="0"
+            step="0.01"
+            formControlName="cost_price"
+            placeholder="Optional — for margin analytics"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          />
+          @if (form.controls.cost_price.touched && form.controls.cost_price.invalid) {
+            <p class="mt-1 text-xs text-red-600">Must be zero or more.</p>
+          }
+        </div>
       </div>
+
+      <!-- C13 — Tags -->
+      <div>
+        <label class="block text-xs font-medium text-zinc-700" for="ci_tags">Tags</label>
+        <div
+          class="mt-1 flex flex-wrap items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2 py-1.5 shadow-sm focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-500"
+        >
+          @for (tag of form.controls.tags.value; track tag) {
+            <span
+              class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+            >
+              {{ tag }}
+              <button
+                type="button"
+                (click)="removeTag(tag)"
+                class="text-zinc-500 hover:text-red-600"
+                title="Remove tag"
+              >
+                <lucide-icon name="x" class="h-3 w-3" />
+              </button>
+            </span>
+          }
+          <input
+            id="ci_tags"
+            type="text"
+            [value]="tagInput()"
+            (input)="onTagInput($event)"
+            (keydown)="onTagKeydown($event)"
+            placeholder="Type &amp; press Enter or ,"
+            class="flex-1 border-0 bg-transparent p-1 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-0"
+          />
+        </div>
+        <p class="mt-1 text-[11px] text-zinc-500">
+          Free-form labels shown on the card. Backspace to remove the last tag.
+        </p>
+      </div>
+
+      <!-- Active toggle -->
+      @if (!isHidden('is_active')) {
+        <div>
+          <label class="flex items-center gap-2 text-sm text-zinc-700">
+            <input
+              type="checkbox"
+              formControlName="is_active"
+              class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+            />
+            {{ stdField('is_active')?.label ?? 'Active' }}
+            <span class="text-xs text-zinc-500">(shown in pickers + lists)</span>
+          </label>
+        </div>
+      }
+
+      <!-- C3 — Dynamic custom fields -->
+      @if (customFieldsLoading()) {
+        <div class="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+          Loading custom fields…
+        </div>
+      } @else if (customFields().length > 0) {
+        <div class="border-t border-zinc-200 pt-4">
+          <p class="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+            Custom fields
+          </p>
+          <app-dynamic-form
+            [fields]="customFields()"
+            [value]="customValue()"
+            (valueChange)="onCustomValueChange($event)"
+            (validityChange)="onCustomValidityChange($event)"
+          />
+        </div>
+      }
 
       @if (submitError(); as err) {
         <div class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
@@ -178,7 +342,7 @@
     </form>
 
     <footer
-      class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg"
+      class="sticky bottom-0 flex items-center justify-end gap-2 rounded-b-lg border-t border-zinc-200 bg-zinc-50 px-6 py-3"
     >
       <button
         type="button"

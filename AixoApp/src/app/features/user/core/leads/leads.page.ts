@@ -14,11 +14,16 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService } from '../auth/auth.service';
-import { forkJoin, of } from 'rxjs';
+import { of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { ContactsApiService } from '../contacts/contacts-api.service';
-import { ItemMovedEvent, PipelineItem } from '../pipelines/pipelines-api.service';
+import {
+  ItemMovedEvent,
+  PipelineItem,
+  PipelineStage,
+  PipelinesApiService,
+} from '../pipelines/pipelines-api.service';
 import { PipelineBoardComponent } from '../pipelines/pipeline-board.component';
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ColumnDef, ColumnPrefsService } from '../shared/column-prefs.service';
@@ -55,9 +60,14 @@ import {
   LeadStatus,
   LeadUpdate,
   LeadsApiService,
+  PipelineValueRollup,
   SortOrder,
 } from './leads-api.service';
 import { SavedView, SavedViewConfig, SavedViewsApiService } from './saved-views-api.service';
+import {
+  WonCaptureConfirm,
+  WonCaptureModalComponent,
+} from './won-capture-modal/won-capture-modal.component';
 
 /**
  * Top-level Leads page.
@@ -123,6 +133,7 @@ class LeadsListState extends ListPageState<Lead> {}
     ConfirmDialogComponent,
     UrlFilterStateDirective,
     LostReasonModalComponent,
+    WonCaptureModalComponent,
     PhoneLinkDirective,
     WhatsappLinkDirective,
     ColumnCustomizationMenuComponent,
@@ -358,6 +369,27 @@ export class LeadsPageComponent {
   readonly lostReasonSubmitting = signal(false);
   readonly lostReasonError = signal<string | null>(null);
 
+  /** Pending move-stage waiting on Won-capture (F2). Unlike Lost the
+   *  backend doesn't reject — we check `is_won` up-front from the
+   *  loaded pipeline stages and open the modal before dispatching. */
+  readonly pendingWonMove = signal<ItemMovedEvent | null>(null);
+  readonly wonCaptureSubmitting = signal(false);
+  readonly wonCaptureError = signal<string | null>(null);
+
+  /** Suggestion feed for the Won modal's "closed amount" input —
+   *  seeds with the lead's own `budget`. */
+  readonly pendingWonSuggestion = signal<string | null>(null);
+
+  /** Loaded pipeline stages (leads pipeline). Used to check
+   *  `is_won` / `is_lost` on the destination stage of a card move
+   *  before dispatching. Empty until the pipeline API responds. */
+  readonly pipelineStages = signal<PipelineStage[]>([]);
+
+  /** F23 pipeline value roll-up. Fetched on init + on any move-stage /
+   *  create / delete so the header stays live. Null while loading. */
+  readonly pipelineRollup = signal<PipelineValueRollup | null>(null);
+  private readonly pipelinesApi = inject(PipelinesApiService);
+
   /** URL ↔ state map for the filter chip strip + filter row + view +
    * page. Refresh / share / browser-back all preserve the view.
    * Pagination cursor is intentionally NOT URL-persisted: the cursor
@@ -453,6 +485,8 @@ export class LeadsPageComponent {
     this.reload();
     this.loadCustomFields();
     this.reloadSavedViews();
+    this.loadPipelineStages();
+    this.reloadRollup();
 
     // Filter changes trigger re-fetch.
     this.searchControl.valueChanges
@@ -508,6 +542,7 @@ export class LeadsPageComponent {
       source: this.sourceFilter() || undefined,
       status: (this.statusControl.value as LeadStatus) || undefined,
       assigned_to: this.resolveAssignee(),
+      unassigned_only: this.assigneeControl.value === 'unassigned' ? true : undefined,
       last_activity_lt: this.resolveNoActivityCutoff() ?? undefined,
       sort: this.sortKey(),
       order: this.sortOrder(),
@@ -988,6 +1023,24 @@ export class LeadsPageComponent {
   }
 
   protected onItemMoved(event: ItemMovedEvent): void {
+    // F2 — intercept move-to-Won up-front so the Won-capture modal
+    // can prompt for close details before the API call fires. Same
+    // shape as the Lost interception but proactive (backend doesn't
+    // 422 on missing won fields).
+    const targetStage = this.pipelineStages().find((s) => s.key === event.toStage);
+    if (targetStage?.is_won) {
+      const lead = this.state.items().find((r) => r.id === event.itemId) as Lead | undefined;
+      // Optimistically flip the local card so the drag feels solid;
+      // reverts on cancel via reload().
+      this.state.items.update((rows) =>
+        rows.map((r) => (r.id === event.itemId ? { ...r, pipeline_stage: event.toStage } : r)),
+      );
+      this.pendingWonMove.set(event);
+      this.pendingWonSuggestion.set(lead?.budget ?? null);
+      this.wonCaptureError.set(null);
+      return;
+    }
+
     const before = this.state.items();
     // Optimistic local update so the kanban doesn't flicker.
     this.state.items.update((rows) =>
@@ -999,6 +1052,8 @@ export class LeadsPageComponent {
       .subscribe({
         next: (updated) => {
           this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          // Roll-up numbers change on any stage move — refresh header.
+          this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
           // Backend signals "moving to Lost needs a reason" with a 422
@@ -1015,6 +1070,90 @@ export class LeadsPageComponent {
           this.state.loadError.set(detail || 'Could not move lead.');
         },
       });
+  }
+
+  protected onWonCaptureConfirm(payload: WonCaptureConfirm): void {
+    const move = this.pendingWonMove();
+    if (!move) return;
+    this.wonCaptureSubmitting.set(true);
+    this.wonCaptureError.set(null);
+    this.api
+      .moveStage(move.itemId, move.toStage, {
+        won_value: payload.won_value,
+        close_date: payload.close_date,
+        won_reason: payload.won_reason,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          this.wonCaptureSubmitting.set(false);
+          this.pendingWonMove.set(null);
+          this.pendingWonSuggestion.set(null);
+          this.reloadRollup();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.wonCaptureSubmitting.set(false);
+          this.wonCaptureError.set(extractApiError(err) ?? 'Could not mark lead as Won.');
+        },
+      });
+  }
+
+  protected onWonCaptureCancel(): void {
+    if (this.pendingWonMove()) {
+      this.pendingWonMove.set(null);
+      this.pendingWonSuggestion.set(null);
+      this.wonCaptureError.set(null);
+      this.wonCaptureSubmitting.set(false);
+      // Undo the optimistic stage flip by re-fetching.
+      this.reload();
+    }
+  }
+
+  private loadPipelineStages(): void {
+    this.pipelinesApi
+      .getByKey('leads')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (p) => this.pipelineStages.set(p.stages ?? []),
+        // Non-blocking: if the pipeline load fails, the Won-capture
+        // interception silently no-ops and the standard move-stage
+        // path handles it. The frontend already surfaces load errors
+        // elsewhere on this page.
+        error: () => this.pipelineStages.set([]),
+      });
+  }
+
+  private reloadRollup(): void {
+    this.api
+      .pipelineValue()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (r) => this.pipelineRollup.set(r),
+        error: () => {
+          // Header is aesthetic — silently hide on failure.
+          this.pipelineRollup.set(null);
+        },
+      });
+  }
+
+  /** Format money with the roll-up's currency. Used by the header
+   *  strip; kept here (not in a pipe) so the "compact" thousands / lakhs
+   *  formatting is one place to tweak. */
+  protected formatMoney(raw: string | null | undefined, currency: string): string {
+    if (raw == null) return '—';
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return String(raw);
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency,
+        maximumFractionDigits: 0,
+        notation: n >= 100000 ? 'compact' : 'standard',
+      }).format(n);
+    } catch {
+      return `${currency} ${n.toLocaleString()}`;
+    }
   }
 
   protected onLostReasonConfirm(payload: LostReasonConfirm): void {
@@ -1259,13 +1398,24 @@ export class LeadsPageComponent {
   }
 
   private fetchContacts(ids: string[]): void {
-    forkJoin(ids.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((results) => {
-        this.contactsById.update((cache) => {
-          const next = { ...cache };
-          for (const c of results) {
-            if (c) {
+    // Batched hydrate collapses N per-id `GET /contacts/{id}` requests
+    // into one `POST /contacts/hydrate`. Backend caps id lists at
+    // 200; the list size matches the leads page cap so chunking is a
+    // no-op today, but we chunk defensively for future page-size
+    // bumps.
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK);
+      this.contactsApi
+        .hydrateByIds(slice)
+        .pipe(
+          catchError(() => of([])),
+          takeUntilDestroyed(this.destroyRef),
+        )
+        .subscribe((results) => {
+          this.contactsById.update((cache) => {
+            const next = { ...cache };
+            for (const c of results) {
               next[c.id] = {
                 id: c.id,
                 full_name: c.full_name,
@@ -1273,9 +1423,9 @@ export class LeadsPageComponent {
                 source: c.source,
               };
             }
-          }
-          return next;
+            return next;
+          });
         });
-      });
+    }
   }
 }

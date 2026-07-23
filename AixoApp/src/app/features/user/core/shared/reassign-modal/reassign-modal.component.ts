@@ -74,7 +74,11 @@ export class ReassignModalComponent {
   @Input() set currentOwnerId(value: string | null | undefined) {
     const v = value ?? null;
     this._currentOwnerId.set(v);
-    this.userControl.setValue(v ?? '', { emitEvent: false });
+    // Emit on this setValue so the `userControlValue` signal below
+    // picks up the change; skipping the event would leave `canConfirm`
+    // reading a stale value and the Reassign button would never enable
+    // when the operator picks a different owner.
+    this.userControl.setValue(v ?? '');
   }
 
   @Input() set submitting(value: boolean) {
@@ -97,6 +101,15 @@ export class ReassignModalComponent {
     nonNullable: true,
   });
 
+  /** Signal mirror of `userControl.value` so `canConfirm` (a computed)
+   * re-runs on dropdown changes. Reading `userControl.value` directly
+   * inside a computed doesn't work — Angular's signal graph doesn't
+   * track FormControl mutations. */
+  private readonly userControlValue = toSignal(
+    this.userControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)),
+    { initialValue: this.userControl.value },
+  );
+
   protected readonly users = toSignal(
     this.usersDir.list().pipe(takeUntilDestroyed(this.destroyRef)),
     { initialValue: [] },
@@ -113,7 +126,7 @@ export class ReassignModalComponent {
   /** Disable confirm when nothing's selected for a no-owner-change attempt. */
   protected readonly canConfirm = computed(() => {
     if (this._submitting()) return false;
-    const picked = this.userControl.value || null;
+    const picked = this.userControlValue() || null;
     const current = this._currentOwnerId();
     // Bulk mode (no currentOwnerId reference) → always allow.
     if (current === null && picked === null) {
@@ -125,7 +138,7 @@ export class ReassignModalComponent {
 
   protected onConfirm(): void {
     if (!this.canConfirm()) return;
-    const userId = this.userControl.value || null;
+    const userId = this.userControlValue() || null;
     const noteRaw = this.noteControl.value.trim();
     this.confirm.emit({
       userId,

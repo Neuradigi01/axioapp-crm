@@ -65,6 +65,13 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
     source: this.fb.control('walk_in', { nonNullable: true }),
     requirement: this.fb.control('', { nonNullable: true }),
     budget: this.fb.control('', { nonNullable: true }),
+    // W8 — party size (1–99). Empty = single visitor / not tracked.
+    party_size: this.fb.control('', { nonNullable: true }),
+    // W9 — queue arrival ISO. When present, the (time_in - wait_started_at)
+    // delta populates the org's avg-wait metric. Empty = not tracked.
+    wait_started_at: this.fb.control('', { nonNullable: true }),
+    // W11 — "customer will return by" YYYY-MM-DD. Retention analytics.
+    expected_return_date: this.fb.control('', { nonNullable: true }),
   });
 
   protected readonly hasMatch = computed(() => this.matchedContact() !== null);
@@ -177,6 +184,13 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
     this._submitting.set(true);
 
     const raw = this.form.getRawValue();
+    // W8/W9/W11 — coerce optional strings to their typed shape or null
+    // before hitting the backend (which is Pydantic-strict on int / iso
+    // datetime / iso date).
+    const partySize = raw.party_size.trim();
+    const partySizeNum = partySize ? Number.parseInt(partySize, 10) : null;
+    const waitStr = raw.wait_started_at.trim();
+    const returnStr = raw.expected_return_date.trim();
     this.api
       .quickRegister({
         phone: raw.phone.trim(),
@@ -186,6 +200,9 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
         requirement: nullableTrim(raw.requirement),
         budget: nullableTrim(raw.budget),
         custom_data: this.customValue() as Record<string, unknown>,
+        party_size: partySizeNum && Number.isFinite(partySizeNum) ? partySizeNum : null,
+        wait_started_at: waitStr ? new Date(waitStr).toISOString() : null,
+        expected_return_date: returnStr || null,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({

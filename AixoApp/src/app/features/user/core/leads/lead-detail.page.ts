@@ -339,14 +339,23 @@ export class LeadDetailPageComponent implements OnInit {
       });
   }
 
+  /** Resolve the currency to render for money values: lead's
+   *  per-row `currency` wins, falling back to the org default.
+   *  Prevents USD/EUR orgs from seeing INR symbols on every budget. */
+  private resolveCurrency(): string {
+    const perLead = this.lead()?.currency ?? null;
+    if (perLead) return perLead;
+    return this.auth.currentOrg()?.currency || 'INR';
+  }
+
   private formatValue(def: FieldDef, value: unknown): string {
     if (value === null || value === undefined || value === '') return '—';
     if (Array.isArray(value)) return value.length === 0 ? '—' : value.join(', ');
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (def.field_type === 'currency' && typeof value === 'number') {
-      return new Intl.NumberFormat('en-IN', {
+      return new Intl.NumberFormat(undefined, {
         style: 'currency',
-        currency: 'INR',
+        currency: this.resolveCurrency(),
         maximumFractionDigits: 2,
       }).format(value);
     }
@@ -357,9 +366,9 @@ export class LeadDetailPageComponent implements OnInit {
     if (value === null || value === '' || value === undefined) return '—';
     const n = Number(value);
     if (Number.isNaN(n)) return value;
-    return new Intl.NumberFormat('en-IN', {
+    return new Intl.NumberFormat(undefined, {
       style: 'currency',
-      currency: 'INR',
+      currency: this.resolveCurrency(),
       maximumFractionDigits: 2,
     }).format(n);
   }

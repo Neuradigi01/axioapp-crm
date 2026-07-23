@@ -384,6 +384,11 @@ export class ContactsListPageComponent {
         source: this.sourceFilter() || undefined,
         tag: this.tagFilter() || undefined,
         assigned_to_id: this.resolveAssignee(),
+        // Passthrough any `custom.<key>=<value>` params already present
+        // on the URL so the export mirrors the on-screen filter set.
+        // The list page has no UI to set these today; the export path
+        // shouldn't lose them the moment we add one.
+        customFilters: this._readCustomFiltersFromUrl(),
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -398,6 +403,21 @@ export class ContactsListPageComponent {
           );
         },
       });
+  }
+
+  /** Pull every `custom.<key>` query param off the current URL and
+   *  return them as a `{key: value}` map for `exportCsv`. Returns
+   *  undefined when the URL carries none — the API service skips the
+   *  passthrough on undefined. */
+  private _readCustomFiltersFromUrl(): Record<string, string> | undefined {
+    const map = this.route.snapshot.queryParamMap;
+    const out: Record<string, string> = {};
+    for (const key of map.keys) {
+      if (!key.startsWith('custom.') || key.length <= 'custom.'.length) continue;
+      const value = map.get(key);
+      if (value != null) out[key.slice('custom.'.length)] = value;
+    }
+    return Object.keys(out).length > 0 ? out : undefined;
   }
 
   /** Browser-side blob → download. Synthesises a hidden anchor so the

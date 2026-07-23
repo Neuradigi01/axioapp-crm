@@ -106,6 +106,10 @@
 
       <app-whatsapp-card [status]="whatsapp()" (changed)="onCardChanged()"></app-whatsapp-card>
 
+      <!-- Per-org outbound email sender identity — replaces the
+           Settings → Email Accounts + Sender Setup tabs. -->
+      <app-email-sender-card></app-email-sender-card>
+
       <!-- Compact DLQ summary card (Step 7) — kept as a quick-access
          link to expand the inline table even when the status banner
          isn't showing. -->

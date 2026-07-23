@@ -169,7 +169,9 @@ export class OptInSectionComponent {
 
   protected formatDate(iso: string | null | undefined): string {
     if (!iso) return '—';
-    return new Date(iso).toLocaleString();
+    const parsed = new Date(iso);
+    if (Number.isNaN(parsed.getTime())) return '—';
+    return parsed.toLocaleString();
   }
 
   protected humanSource(source: string | null | undefined): string {

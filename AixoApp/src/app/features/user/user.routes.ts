@@ -77,14 +77,14 @@ export const userRoutes: Routes = [
         pathMatch: 'full',
       },
       {
-        // App-updates Email Step 9 — alias so the Gmail + Microsoft
-        // OAuth `/callback` handlers can redirect users straight onto
-        // the Email Accounts tab with `?status=…` for the success /
-        // denied toast. Backend `_SETTINGS_RETURN_PATH` points here.
+        // Legacy alias — the Email Accounts + Sender Setup tabs were
+        // consolidated into the per-org Email Sender card on Settings
+        // → Integrations. Gmail + Microsoft OAuth `/callback` handlers
+        // still redirect here with `?status=…`; forward to the new
+        // location preserving the query string.
         path: 'settings/email-accounts',
-        data: { tab: 'email-accounts' },
-        loadComponent: () =>
-          import('./core/settings/settings-page.component').then((m) => m.SettingsPageComponent),
+        redirectTo: '/user/integrations',
+        pathMatch: 'full',
       },
       {
         // tasks/template-library Step 10 — the Settings → Email
@@ -157,6 +157,27 @@ export const userRoutes: Routes = [
         canActivate: [permissionGuard('leads.scoring.manage')],
         loadComponent: () =>
           import('./core/settings/lead-scoring-rules.page').then((m) => m.LeadScoringRulesPage),
+      },
+      {
+        // Catalog category taxonomy management. Gated on `catalog.write`
+        // — read-only Employees can pick categories in the catalog
+        // modal but can't manage the taxonomy.
+        path: 'settings/catalog-categories',
+        canActivate: [permissionGuard('catalog.write')],
+        loadComponent: () =>
+          import('./core/settings/catalog-categories.page').then(
+            (m) => m.CatalogCategoriesPageComponent,
+          ),
+      },
+      {
+        // E.16 / F1 — Lead routing config. Backend endpoints are
+        // gated on `settings.read` / `settings.write`; the guard here
+        // uses `settings.write` so read-only Admins can still land on
+        // the page but the save action 403s.
+        path: 'settings/lead-routing',
+        canActivate: [permissionGuard('settings.write')],
+        loadComponent: () =>
+          import('./core/settings/lead-routing.page').then((m) => m.LeadRoutingPage),
       },
       {
         // Fold-in redirect: the standalone /user/profile page was
@@ -260,6 +281,17 @@ export const userRoutes: Routes = [
         path: 'walk-ins',
         loadComponent: () =>
           import('./core/walk-ins/walk-ins.page').then((m) => m.WalkInsPageComponent),
+      },
+      {
+        // MUST precede `catalog/:id` if that route is ever added
+        // (same reason as `contacts/import`) — the wizard is a static
+        // segment.
+        path: 'catalog/import',
+        canActivate: [permissionGuard('catalog.write')],
+        loadComponent: () =>
+          import('./core/catalog/import/bulk-import.page').then(
+            (m) => m.CatalogBulkImportPageComponent,
+          ),
       },
       {
         path: 'catalog',

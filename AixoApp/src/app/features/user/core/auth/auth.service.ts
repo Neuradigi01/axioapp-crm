@@ -43,6 +43,10 @@ export interface OrgSummary {
   name: string;
   slug: string;
   template_id: string;
+  /** Org-level default currency (3-letter ISO). Money-formatting UIs
+   * (lead detail, invoices) fall back to this when the row itself
+   * doesn't carry a per-record currency. Backend defaults to 'INR'. */
+  currency: string;
 }
 
 export interface MeResponse {

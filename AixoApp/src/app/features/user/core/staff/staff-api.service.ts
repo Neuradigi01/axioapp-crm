@@ -91,6 +91,17 @@ export class StaffApiService {
     return this.http.get<StaffListItem[]>(this.base);
   }
 
+  /** Distinct staff members present (at least one attendance row) today. */
+  presentToday(): Observable<{ count: number }> {
+    return this.http.get<{ count: number }>(`${this.base}/present-today`);
+  }
+
+  /** Sums of `Invoice.total` over paid invoices (all-time and today).
+   * Powers the Total Revenue + Today's Revenue KPI cards. */
+  revenueTotals(): Observable<{ total: number; today: number }> {
+    return this.http.get<{ total: number; today: number }>(`${this.base}/revenue-totals`);
+  }
+
   upsertProfile(userId: string, payload: StaffProfileUpsert): Observable<StaffProfileOut> {
     return this.http.put<StaffProfileOut>(`${this.base}/${userId}`, payload);
   }

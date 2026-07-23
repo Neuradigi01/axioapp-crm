@@ -16,7 +16,14 @@ export type LeadStatus = 'active' | 'won' | 'lost';
 
 /** Provenance of a lead row. Matches the backend `lead_source` PG enum
  * exactly — keep in sync. */
-export type LeadSource = 'manual' | 'bulk_import' | 'widget' | 'google_ads' | 'meta_ads';
+export type LeadSource =
+  | 'manual'
+  | 'bulk_import'
+  | 'widget'
+  | 'google_ads'
+  | 'meta_ads'
+  | 'whatsapp_flow'
+  | 'walk_in';
 
 export interface Lead {
   id: string;
@@ -27,6 +34,9 @@ export interface Lead {
   source: LeadSource;
   assigned_to_id: string | null;
   budget: string | null;
+  /** ISO-4217 code. Null → renderers fall back to the org's default
+   *  currency (from `/users/me → org.currency`). */
+  currency: string | null;
   expected_close_date: string | null;
   /** Operator-defined rule engine output, clamped `[0, 100]`. Surfaced
    * for the Step 6 "Score" column. */
@@ -35,6 +45,16 @@ export interface Lead {
   last_activity_at: string | null;
   lost_reason: string | null;
   lost_reason_other: string | null;
+  /** Won-capture fields (F2). Set by the move-stage endpoint when the
+   *  destination stage has `is_won=true`. */
+  won_value: string | null;
+  close_date: string | null;
+  won_reason: string | null;
+  /** Lifecycle timestamps (F22). Auto-stamped by move-stage on first
+   *  entry into an `is_won` / `is_lost` stage. Feed the funnel
+   *  time-in-stage story once the reports UI lands. */
+  won_at: string | null;
+  lost_at: string | null;
   /** Origin-channel attribution metadata. Populated by the ingest layer
    * for `widget`, `google_ads`, `meta_ads` sources; null for `manual`
    * and `bulk_import`. Keys vary by channel — Google Ads sends
@@ -42,6 +62,10 @@ export interface Lead {
    * Meta sends `external_form_id`, `external_lead_id`, `page_id`;
    * widget sends `utm_source`, `utm_medium`, `utm_campaign`, `referrer`. */
   attribution: Record<string, unknown> | null;
+  /** W6 attribution — set when the lead was created from a walk-in
+   *  conversion. Detail-page renders an "Originated from walk-in"
+   *  panel that deep-links back to the walk-in row when set. */
+  source_walk_in_id?: string | null;
   created_at: string;
   updated_at: string;
   /** Index signature so `Lead` is structurally compatible with `PipelineItem`. */
@@ -71,6 +95,7 @@ export interface LeadCreate {
   pipeline_stage?: string | null;
   assigned_to_id?: string | null;
   budget?: string | null;
+  currency?: string | null;
   expected_close_date?: string | null;
   custom_data?: Record<string, unknown>;
   /** Defaults to 'manual' server-side when omitted. */
@@ -81,11 +106,46 @@ export type LeadUpdate = Partial<{
   contact_id: string;
   assigned_to_id: string | null;
   budget: string | null;
+  currency: string | null;
   expected_close_date: string | null;
   custom_data: Record<string, unknown>;
   lost_reason: string | null;
   lost_reason_other: string | null;
+  won_value: string | null;
+  close_date: string | null;
+  won_reason: string | null;
 }>;
+
+/** Header-strip roll-up rendered above the kanban / list view (F23).
+ *  Values are strings because Pydantic serialises Decimal as a string
+ *  by default; the frontend formats via `Intl.NumberFormat` using the
+ *  returned `currency`. */
+export interface PipelineValueByCurrency {
+  currency: string;
+  open_value: string;
+  won_value_this_month: string;
+}
+
+export interface PipelineValueRollup {
+  open_value: string;
+  open_count: number;
+  won_value_this_month: string;
+  won_count_this_month: number;
+  lost_count_this_month: number;
+  currency: string;
+  /** Per-currency split for mixed-currency orgs. Empty when every
+   *  lead uses the org default (flat totals are authoritative). */
+  by_currency?: PipelineValueByCurrency[];
+}
+
+/** Routing config (F1 / E.16). v1 accepts only `round_robin`; the
+ *  Literal widens here + on the backend when `sticky_by_source` or
+ *  future strategies actually land. */
+export type LeadRoutingStrategy = 'round_robin';
+
+export interface LeadRoutingConfig {
+  strategy: LeadRoutingStrategy;
+}
 
 // --- Lead scoring rules (Step 7 admin UI) ---------------------------------
 
@@ -123,6 +183,10 @@ export interface LeadListQuery {
   stage?: string;
   status?: LeadStatus;
   assigned_to?: string | null;
+  /** When true, only leads with `assigned_to_id IS NULL` are returned.
+   *  Ignored if `assigned_to` is also set. Powers the "Unassigned"
+   *  chip on the assignee filter. */
+  unassigned_only?: boolean;
   q?: string;
   source?: string;
   /** ISO timestamps for the no-activity chip. `lt` returns rows older
@@ -197,13 +261,60 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
   moveStage(
     id: string,
     toStage: string,
-    extras?: { lost_reason?: string | null; lost_reason_other?: string | null },
+    extras?: {
+      lost_reason?: string | null;
+      lost_reason_other?: string | null;
+      /** F2 — Won capture. Optional on the API; the frontend modal
+       *  prompts and enforces. */
+      won_value?: string | null;
+      close_date?: string | null;
+      won_reason?: string | null;
+    },
   ): Observable<Lead> {
     return this.http.post<Lead>(`${this.base}/${id}/move-stage`, {
       to_stage: toStage,
       lost_reason: extras?.lost_reason ?? null,
       lost_reason_other: extras?.lost_reason_other ?? null,
+      won_value: extras?.won_value ?? null,
+      close_date: extras?.close_date ?? null,
+      won_reason: extras?.won_reason ?? null,
     });
+  }
+
+  /** F4 — Bulk move-stage. Moves every id to the same `to_stage`;
+   *  same validation rules as single-row move-stage apply (Lost
+   *  needs a reason). Returns `{moved, already_in_stage}` so the FE
+   *  can render an honest "X moved, Y already there" summary
+   *  (previous shape underreported by rolling both into `reassigned`). */
+  bulkMoveStage(
+    ids: string[],
+    toStage: string,
+    extras?: {
+      lost_reason?: string | null;
+      lost_reason_other?: string | null;
+      won_value?: string | null;
+      close_date?: string | null;
+      won_reason?: string | null;
+    },
+  ): Observable<{ moved: number; already_in_stage: number }> {
+    return this.http.post<{ moved: number; already_in_stage: number }>(
+      `${this.base}/bulk-move-stage`,
+      {
+        ids,
+        to_stage: toStage,
+        lost_reason: extras?.lost_reason ?? null,
+        lost_reason_other: extras?.lost_reason_other ?? null,
+        won_value: extras?.won_value ?? null,
+        close_date: extras?.close_date ?? null,
+        won_reason: extras?.won_reason ?? null,
+      },
+    );
+  }
+
+  /** F23 — Pipeline value roll-up. Scope follows caller's row
+   *  visibility (org vs. personal) — decided server-side. */
+  pipelineValue(): Observable<PipelineValueRollup> {
+    return this.http.get<PipelineValueRollup>(`${this.base}/pipeline-value`);
   }
 
   /** Single-row reassign. `userId === null` clears the owner. */
@@ -274,11 +385,22 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
     return this.http.post<{ touched: number }>(`${this.base}/scoring-rules/recompute`, {});
   }
 
+  // --- Routing config (F1 / E.16) -----------------------------------------
+
+  getRoutingConfig(): Observable<LeadRoutingConfig> {
+    return this.http.get<LeadRoutingConfig>(`${this.base}/routing-config`);
+  }
+
+  updateRoutingConfig(payload: LeadRoutingConfig): Observable<LeadRoutingConfig> {
+    return this.http.put<LeadRoutingConfig>(`${this.base}/routing-config`, payload);
+  }
+
   private buildParams(query: LeadListQuery) {
     return buildHttpParams({
       stage: query.stage,
       status: query.status,
       assigned_to: query.assigned_to,
+      unassigned_only: query.unassigned_only ? true : undefined,
       q: query.q,
       source: query.source,
       last_activity_lt: query.last_activity_lt,

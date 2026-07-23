@@ -1,8 +1,14 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, shareReplay } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
+
+/** Server-side cap on `GET /users` is 200. Owner-picker dropdowns
+ *  should surface every active seat in the org; a 50-row default cap
+ *  silently truncated the tail for orgs with > 50 users, so the
+ *  operator couldn't reassign to people alphabetically past the 50th. */
+const USER_DIRECTORY_LIMIT = 200;
 
 /**
  * Minimal user shape needed by owner dropdowns / assignee filters on
@@ -36,8 +42,9 @@ export class UsersDirectoryService {
 
   list(): Observable<UserMini[]> {
     if (!this.cache$) {
+      const params = new HttpParams().set('limit', String(USER_DIRECTORY_LIMIT));
       this.cache$ = this.http
-        .get<UserMini[]>(this.url)
+        .get<UserMini[]>(this.url, { params })
         .pipe(shareReplay({ bufferSize: 1, refCount: false }));
     }
     return this.cache$;
