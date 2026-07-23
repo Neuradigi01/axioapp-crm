@@ -81,8 +81,12 @@ class PlanShort(BaseModel):
     name: str
     monthly_bundle_usd: int
     annual_bundle_usd: int
+    monthly_bundle_inr: int
+    annual_bundle_inr: int
     extra_seat_monthly_usd: int
     extra_seat_annual_usd: int
+    extra_seat_monthly_inr: int
+    extra_seat_annual_inr: int
     included_seats: int
 
 
@@ -212,8 +216,12 @@ class SubscriptionCurrentResponse(BaseModel):
                 name=plan.name,
                 monthly_bundle_usd=plan.pricing.monthly_bundle_usd,
                 annual_bundle_usd=plan.pricing.annual_bundle_usd,
+                monthly_bundle_inr=plan.pricing.monthly_bundle_inr,
+                annual_bundle_inr=plan.pricing.annual_bundle_inr,
                 extra_seat_monthly_usd=plan.pricing.extra_seat_monthly_usd,
                 extra_seat_annual_usd=plan.pricing.extra_seat_annual_usd,
+                extra_seat_monthly_inr=plan.pricing.extra_seat_monthly_inr,
+                extra_seat_annual_inr=plan.pricing.extra_seat_annual_inr,
                 included_seats=plan.pricing.included_seats,
             ),
             status=sub.status,
