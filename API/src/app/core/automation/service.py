@@ -421,7 +421,74 @@ async def list_field_values(
     if resolver is None:
         raise ResolverNotRegistered(resolver_key)
 
+    # Wildcard resolvers (step-6) — the wildcard-registry entry is a
+    # placeholder that just raises, since it can't function without
+    # the concrete key. Dispatch through the specific handler that
+    # accepts the key so it can parse ``entity_type`` + ``field_key``
+    # back out. Today the only wildcard is ``custom_field_options:*``;
+    # if a second wildcard-shaped resolver is ever added, extend this
+    # dispatch table alongside it.
+    from src.app.core.automation.custom_field_bridge import parse_resolver_key
+
+    if parse_resolver_key(resolver_key) is not None:
+        return await enum_resolvers.resolve_custom_field_options(session, org_id, resolver_key)
+
     return await resolver(session, org_id)
+
+
+async def list_event_types_with_custom_fields(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> list[dict[str, Any]]:
+    """Assemble the full ``/event-types`` response — base catalog +
+    the caller org's custom fields appended to every event whose
+    payload carries a ``custom_data`` mount
+    (``tasks/automation-conditions/`` Step 6).
+
+    One batched SQL round-trip: every entity type referenced anywhere
+    in ``_CUSTOM_DATA_MOUNTS`` gets its definitions read in a single
+    ``WHERE entity_type IN (...)`` query. The per-event loop then
+    dispatches purely in-memory. Aim is ≤2 DB round-trips per full
+    catalog response (this one + the tenant-context RLS pre-check
+    the session applies automatically).
+
+    Returns raw dicts matching the router's ``EventCatalogEntry``
+    shape — the router transforms them into Pydantic models on
+    serialisation. Kept as dicts here so the assembly logic stays
+    the service's concern and the router remains a thin wrapper.
+    """
+    from src.app.core.automation import custom_field_bridge
+    from src.app.core.custom_fields import data_access as custom_fields_dal
+
+    mounted_entities = sorted(custom_field_bridge.all_mounted_entity_types())
+    definitions = await custom_fields_dal.list_fields_by_entities(
+        session,
+        entity_types=mounted_entities,
+        include_hidden=False,
+    )
+    # Index definitions by entity_type for O(1) per-event lookups
+    # inside the assembly loop.
+    defs_by_entity: dict[str, list] = {}
+    for definition in definitions:
+        defs_by_entity.setdefault(definition.entity_type, []).append(definition)
+
+    out: list[dict[str, Any]] = []
+    for entry in event_catalog.list_catalog():
+        specs = list(entry.condition_fields)
+        for entity_type, mount_path in custom_field_bridge.mounts_for(entry.event_type):
+            for definition in defs_by_entity.get(entity_type, []):
+                specs.append(custom_field_bridge.to_field_spec(definition, mount_path))
+        out.append(
+            {
+                "event_type": entry.event_type,
+                "label": entry.label,
+                "description": entry.description,
+                "sample_payload": entry.sample_payload,
+                "condition_fields": specs,
+            }
+        )
+    return out
 
 
 async def preview_matches(
@@ -523,6 +590,7 @@ __all__ = [
     "disable_trigger",
     "enable_trigger",
     "get_trigger",
+    "list_event_types_with_custom_fields",
     "list_field_values",
     "list_triggers",
     "match_triggers",

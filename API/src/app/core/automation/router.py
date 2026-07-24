@@ -335,19 +335,27 @@ async def list_runs_endpoint(
 
 @router.get("/event-types", response_model=list[EventCatalogEntry])
 async def list_event_types_endpoint(
-    _user: User = Depends(require_permissions(PERM_READ)),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_READ)),
 ) -> list[EventCatalogEntry]:
     """Discovery catalog — feeds the trigger editor's event picker,
     the variable-hint side panel, and the customer-friendly
-    condition builder's field dropdown. Static per-deploy (no DB
-    hit).
+    condition builder's field dropdown.
+
+    Per event, ``condition_fields`` is the base catalog's spec list
+    (code-owned per step-1) plus the caller org's custom fields for
+    every entity the event mounts a ``custom_data`` on (step-6).
+    Runs a single batched SQL round-trip to pull all
+    ``tbl_custom_field_definitions`` rows across every mounted
+    entity type in one shot.
     """
+    entries = await automation_service.list_event_types_with_custom_fields(db, org_id=user.org_id)
     return [
         EventCatalogEntry(
-            event_type=entry.event_type,
-            label=entry.label,
-            description=entry.description,
-            sample_payload=entry.sample_payload,
+            event_type=entry["event_type"],
+            label=entry["label"],
+            description=entry["description"],
+            sample_payload=entry["sample_payload"],
             condition_fields=[
                 FieldSpecOut(
                     path=spec.path,
@@ -357,10 +365,10 @@ async def list_event_types_endpoint(
                     enum_resolver=spec.enum_resolver,
                     help_text=spec.help_text,
                 )
-                for spec in entry.condition_fields
+                for spec in entry["condition_fields"]
             ],
         )
-        for entry in event_catalog.list_catalog()
+        for entry in entries
     ]
 
 

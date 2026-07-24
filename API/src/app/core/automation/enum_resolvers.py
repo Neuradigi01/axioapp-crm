@@ -92,8 +92,16 @@ EnumResolver = Callable[[AsyncSession, uuid.UUID], Coroutine[Any, Any, list[Enum
 
 _REGISTRY: dict[str, EnumResolver] = {}
 
+# Wildcard registry — keys are prefixes ending in ``*`` (e.g.
+# ``"custom_field_options:*"``). ``get_resolver`` falls through to
+# these when the exact-match lookup misses. Enables step-6's
+# custom-field-options resolver to serve any of the millions of
+# possible ``custom_field_options:<entity>:<field_key>`` lookups
+# without needing to register each one individually at boot.
+_WILDCARD_REGISTRY: dict[str, EnumResolver] = {}
 
-def register_resolver(key: str, fn: EnumResolver) -> None:
+
+def register_resolver(key: str, fn: EnumResolver, *, wildcard: bool = False) -> None:
     """Register a resolver under ``key``.
 
     Idempotent for the exact same callable (harmless during test
@@ -101,9 +109,31 @@ def register_resolver(key: str, fn: EnumResolver) -> None:
     registered under an already-taken key — that means two modules
     accidentally picked the same key, which would silently overwrite
     one behaviour with the other.
+
+    ``wildcard=True`` treats ``key`` as a prefix ending in ``*``.
+    Lookups via :func:`get_resolver` first check exact matches,
+    then fall through to wildcards whose prefix matches. Step-6's
+    ``custom_field_options:*`` handler uses this to serve the
+    per-org-per-field-key lookups without pre-registering every
+    combination.
     """
     if not key:
         raise ValueError("resolver key must be non-empty")
+    if wildcard:
+        if not key.endswith("*"):
+            raise ValueError(f"wildcard resolver key {key!r} must end with '*'")
+        prefix = key[:-1]
+        if not prefix:
+            raise ValueError("wildcard resolver key must have a non-empty prefix")
+        existing = _WILDCARD_REGISTRY.get(prefix)
+        if existing is not None and existing is not fn:
+            raise RuntimeError(
+                f"wildcard enum_resolver prefix {prefix!r} is already registered "
+                f"to a different callable ({existing!r}); pick a distinct prefix "
+                f"or reuse the same resolver function."
+            )
+        _WILDCARD_REGISTRY[prefix] = fn
+        return
     existing = _REGISTRY.get(key)
     if existing is not None and existing is not fn:
         raise RuntimeError(
@@ -116,21 +146,42 @@ def register_resolver(key: str, fn: EnumResolver) -> None:
 
 def get_resolver(key: str) -> EnumResolver | None:
     """Return the resolver registered under ``key``, or ``None`` if
-    the key is unknown. The router maps ``None`` to a 404."""
-    return _REGISTRY.get(key)
+    the key is unknown. Exact matches win; wildcard-prefix matches
+    are a fallback (longest-prefix wins so more-specific handlers
+    beat catch-alls if someone ever registers both). The router
+    maps ``None`` to a 404."""
+    exact = _REGISTRY.get(key)
+    if exact is not None:
+        return exact
+    best_prefix = ""
+    for prefix in _WILDCARD_REGISTRY:
+        if key.startswith(prefix) and len(prefix) > len(best_prefix):
+            best_prefix = prefix
+    if best_prefix:
+        return _WILDCARD_REGISTRY[best_prefix]
+    return None
 
 
 def list_registered_keys() -> list[str]:
     """Sorted list of every currently-registered resolver key.
 
-    Used by the step-1 coverage pin-test to validate every
-    ``FieldSpec.enum_resolver`` references a real key at test time.
+    Includes exact keys plus wildcard prefixes appended with ``*``
+    so callers can see the shape of what's dispatchable. Used by
+    the step-1 coverage pin-test to validate every
+    ``FieldSpec.enum_resolver`` references either a real key or is
+    matched by a registered wildcard.
     """
-    return sorted(_REGISTRY.keys())
+    exacts = list(_REGISTRY.keys())
+    wildcards = [f"{prefix}*" for prefix in _WILDCARD_REGISTRY]
+    return sorted(exacts + wildcards)
 
 
 def _unregister(key: str) -> None:
-    """Test helper — drop a previously registered resolver."""
+    """Test helper — drop a previously registered resolver (exact
+    or wildcard). Wildcard keys must include the trailing ``*``."""
+    if key.endswith("*"):
+        _WILDCARD_REGISTRY.pop(key[:-1], None)
+        return
     _REGISTRY.pop(key, None)
 
 
@@ -247,6 +298,86 @@ async def resolve_users(session: AsyncSession, org_id: uuid.UUID) -> list[EnumOp
     return [EnumOption(value=str(u.id), label=u.full_name) for u in users if u.full_name]
 
 
+# --- wildcard resolvers (tasks/automation-conditions/ Step 6) -------
+#
+# Wildcard resolvers dispatch to a generic handler that reads the
+# per-org context out of the key itself. Used for custom-field
+# option lookups where every (entity_type, field_key) combination
+# would need its own registration — impractical when the set is
+# per-org and unbounded.
+
+
+async def resolve_custom_field_options(
+    session: AsyncSession, org_id: uuid.UUID, resolver_key: str
+) -> list[EnumOption]:
+    """Wildcard-dispatch handler for keys shaped
+    ``custom_field_options:<entity_type>:<field_key>``.
+
+    Parses the key back into ``(entity_type, field_key)``, looks
+    up the caller org's :class:`~core.custom_fields.models.CustomFieldDefinition`
+    row for that pair, and turns its ``options.choices`` list into
+    a value dropdown. Choices are stored as flat strings — value
+    and label are the same string (matching what the customer
+    typed under Settings → Custom Fields).
+
+    Zero-rows cases:
+      * Key not shaped correctly → returns ``[]`` (safer than
+        raising; the endpoint should never dispatch an unparseable
+        key thanks to the ``FieldSpec`` drift guard).
+      * Definition not found for the org / entity / field → ``[]``
+        (the frontend renders a "no options configured" hint).
+      * ``options`` is null or missing the ``choices`` key → ``[]``
+        (same treatment — the customer needs to add options under
+        Settings first).
+
+    Signature is broader than the base ``EnumResolver`` protocol so
+    the wildcard-dispatch path can hand the raw key in. The
+    protocol adapter in ``list_field_values`` (service) unpacks
+    the key from the FieldSpec's ``enum_resolver`` before invoking.
+    """
+    from src.app.core.automation import custom_field_bridge
+    from src.app.core.custom_fields.models import CustomFieldDefinition
+
+    parsed = custom_field_bridge.parse_resolver_key(resolver_key)
+    if parsed is None:
+        return []
+    entity_type, field_key = parsed
+
+    from sqlalchemy import select as sa_select
+
+    stmt = sa_select(CustomFieldDefinition).where(
+        CustomFieldDefinition.org_id == org_id,
+        CustomFieldDefinition.entity_type == entity_type,
+        CustomFieldDefinition.field_key == field_key,
+    )
+    result = await session.execute(stmt)
+    definition = result.scalar_one_or_none()
+    if definition is None or not definition.options:
+        return []
+    choices = definition.options.get("choices") or []
+    if not isinstance(choices, list):
+        return []
+    return [EnumOption(value=str(c), label=str(c)) for c in choices if isinstance(c, str) and c]
+
+
+async def _custom_field_options_wildcard_dispatch(
+    session: AsyncSession, org_id: uuid.UUID
+) -> list[EnumOption]:
+    """Placeholder — the wildcard registry stores this callable
+    against the ``custom_field_options:*`` prefix so the router's
+    ``get_resolver(key)`` call returns something callable. The
+    actual per-request dispatch happens in
+    :func:`core.automation.service.list_field_values` which passes
+    the concrete resolver key through to
+    :func:`resolve_custom_field_options`.
+    """
+    raise RuntimeError(
+        "custom_field_options:* is a wildcard resolver — invoke "
+        "resolve_custom_field_options(session, org_id, key) directly "
+        "from the service layer."
+    )
+
+
 # --- registration ---------------------------------------------------
 #
 # Registered at module import so every ``FieldSpec.enum_resolver``
@@ -264,6 +395,14 @@ register_resolver("channels", resolve_channels)
 register_resolver("pipeline_stages", resolve_pipeline_stages)
 register_resolver("users", resolve_users)
 
+# Wildcard: matches every custom_field_options:<entity>:<field_key>
+# key generated by step-6's custom-field bridge.
+register_resolver(
+    "custom_field_options:*",
+    _custom_field_options_wildcard_dispatch,
+    wildcard=True,
+)
+
 
 __all__ = [
     "EnumOption",
@@ -274,6 +413,7 @@ __all__ = [
     "register_resolver",
     "resolve_appointment_purposes",
     "resolve_channels",
+    "resolve_custom_field_options",
     "resolve_direction_updown",
     "resolve_invoice_statuses",
     "resolve_lead_sources",

@@ -57,6 +57,41 @@ async def list_fields_query(
     return list(result.scalars().all())
 
 
+async def list_fields_by_entities(
+    session: AsyncSession,
+    *,
+    entity_types: list[str],
+    include_hidden: bool = False,
+) -> list[CustomFieldDefinition]:
+    """Batch read — pull every non-hidden definition for a set of
+    entity types in a single SQL round-trip.
+
+    Backs the automation module's custom-field discovery
+    (``tasks/automation-conditions/`` Step 6) — the ``/event-types``
+    handler needs to append all definitions across every entity
+    referenced by any event's ``custom_data`` mounts, and looping
+    :func:`list_fields_query` per entity would be N+1.
+
+    Ordering matches ``list_fields_query`` — display_order then
+    field_key — so definitions render deterministically in the
+    caller's dropdown across page reloads.
+    """
+    if not entity_types:
+        return []
+    stmt = select(CustomFieldDefinition).where(
+        CustomFieldDefinition.entity_type.in_(entity_types),
+    )
+    if not include_hidden:
+        stmt = stmt.where(CustomFieldDefinition.is_hidden.is_(False))
+    stmt = stmt.order_by(
+        CustomFieldDefinition.entity_type,
+        CustomFieldDefinition.display_order,
+        CustomFieldDefinition.field_key,
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
 def insert_field(session: AsyncSession, field: CustomFieldDefinition) -> None:
     """Register an already-constructed CustomFieldDefinition for INSERT."""
     session.add(field)

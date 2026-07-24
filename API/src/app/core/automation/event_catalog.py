@@ -211,12 +211,14 @@ _register(
                 "assigned_to_id": None,
                 "budget": None,
                 "attribution": {"utm_source": "google"},
+                "custom_data": {},
             },
             "contact": {
                 "id": "00000000-0000-0000-0000-000000000000",
                 "full_name": "Asha Mehta",
                 "email": "asha@example.com",
                 "phone": "+919876543210",
+                "custom_data": {},
             },
             "org": {
                 "id": "00000000-0000-0000-0000-000000000000",
@@ -316,12 +318,14 @@ _register(
                 "pipeline_stage": "new",
                 "assigned_to_id": "00000000-0000-0000-0000-000000000000",
                 "budget": None,
+                "custom_data": {},
             },
             "contact": {
                 "id": "00000000-0000-0000-0000-000000000000",
                 "full_name": "Asha Mehta",
                 "email": "asha@example.com",
                 "phone": "+919876543210",
+                "custom_data": {},
             },
             "org": {
                 "id": "00000000-0000-0000-0000-000000000000",
@@ -378,7 +382,7 @@ _register(
         label="Lead status changed",
         description="The lead transitions between pipeline stages.",
         sample_payload={
-            "lead": {"id": "00000000-0000-0000-0000-000000000000"},
+            "lead": {"id": "00000000-0000-0000-0000-000000000000", "custom_data": {}},
             "from_status": "new",
             "to_status": "qualified",
             "contact": {"first_name": "Asha"},
@@ -407,7 +411,7 @@ _register(
         label="Lead score crossed threshold",
         description="Lead score crosses a configured threshold (e.g. ≥75).",
         sample_payload={
-            "lead": {"id": "00000000-0000-0000-0000-000000000000", "score": 75},
+            "lead": {"id": "00000000-0000-0000-0000-000000000000", "score": 75, "custom_data": {}},
             "threshold": 75,
             "direction": "up",
             "contact": {"first_name": "Asha"},
@@ -457,6 +461,7 @@ _register(
                 "email": "asha@example.com",
                 "phone": "+919876543210",
                 "date_of_birth": "1991-06-29",
+                "custom_data": {},
             },
             "org": {
                 "id": "00000000-0000-0000-0000-000000000000",
@@ -508,12 +513,14 @@ _register(
                 "pipeline_stage": "qualified",
                 "assigned_to_id": "00000000-0000-0000-0000-000000000000",
                 "last_activity_at": "2026-05-29T10:00:00+00:00",
+                "custom_data": {},
             },
             "contact": {
                 "id": "00000000-0000-0000-0000-000000000000",
                 "full_name": "Asha Mehta",
                 "email": "asha@example.com",
                 "phone": "+919876543210",
+                "custom_data": {},
             },
             "org": {
                 "id": "00000000-0000-0000-0000-000000000000",
@@ -589,12 +596,14 @@ _register(
                 "scheduled_at": "2026-07-01T10:00:00+05:30",
                 "duration_min": 60,
                 "location": "Bengaluru Showroom",
+                "custom_data": {},
             },
             "contact": {
                 "id": "00000000-0000-0000-0000-000000000000",
                 "full_name": "Asha Mehta",
                 "email": "asha@example.com",
                 "phone": "+919876543210",
+                "custom_data": {},
             },
             "org": {
                 "id": "00000000-0000-0000-0000-000000000000",
@@ -652,12 +661,14 @@ _register(
                 "scheduled_at": "2026-07-01T10:00:00+05:30",
                 "duration_min": 60,
                 "location": "Bengaluru Showroom",
+                "custom_data": {},
             },
             "contact": {
                 "id": "00000000-0000-0000-0000-000000000000",
                 "full_name": "Asha Mehta",
                 "email": "asha@example.com",
                 "phone": "+919876543210",
+                "custom_data": {},
             },
             "org": {
                 "id": "00000000-0000-0000-0000-000000000000",
@@ -709,12 +720,14 @@ _register(
                 "scheduled_at": "2026-07-01T10:00:00+05:30",
                 "duration_min": 60,
                 "location": "Bengaluru Showroom",
+                "custom_data": {},
             },
             "contact": {
                 "id": "00000000-0000-0000-0000-000000000000",
                 "full_name": "Asha Mehta",
                 "email": "asha@example.com",
                 "phone": "+919876543210",
+                "custom_data": {},
             },
             "org": {
                 "id": "00000000-0000-0000-0000-000000000000",
@@ -777,6 +790,7 @@ _register(
                 "full_name": "Asha Mehta",
                 "email": "asha@example.com",
                 "phone": "+919876543210",
+                "custom_data": {},
             },
             "org": {
                 "id": "00000000-0000-0000-0000-000000000000",
@@ -831,6 +845,7 @@ _register(
                 "full_name": "Asha Mehta",
                 "email": "asha@example.com",
                 "phone": "+919876543210",
+                "custom_data": {},
             },
             "org": {
                 "id": "00000000-0000-0000-0000-000000000000",
@@ -890,6 +905,7 @@ _register(
                 "full_name": "Asha Mehta",
                 "email": "asha@example.com",
                 "phone": "+919876543210",
+                "custom_data": {},
             },
             "org": {
                 "id": "00000000-0000-0000-0000-000000000000",
@@ -956,6 +972,7 @@ _register(
                 "full_name": "Asha Mehta",
                 "email": "asha@example.com",
                 "phone": "+919876543210",
+                "custom_data": {},
             },
             "org": {
                 "id": "00000000-0000-0000-0000-000000000000",
@@ -1022,6 +1039,7 @@ _register(
                 "full_name": "Asha Mehta",
                 "email": "asha@example.com",
                 "phone": "+919876543210",
+                "custom_data": {},
             },
             "org": {
                 "id": "00000000-0000-0000-0000-000000000000",
