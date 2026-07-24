@@ -374,18 +374,26 @@ async def list_field_values(
     org_id: uuid.UUID,
     event_type: str,
     field: str,
+    template_id: str | None = None,
 ) -> list[EnumOption]:
     """Return the caller org's live options for one enum-typed field
     on one event.
 
     Backs the ``POST /event-types/{event}/field-values`` endpoint.
+    Pack filtering (``tasks/automation-conditions/`` Step 7): an
+    event whose ``pack_id`` doesn't match the caller org's
+    ``template_id`` is treated as unknown (raises
+    :class:`FieldNotFound`, router maps to 404) — leaks nothing
+    about the pack's existence to non-installers.
+
     Raises:
       * :class:`event_catalog.get_entry` returning ``None`` → caller
         (router) maps to a 404 ``event_not_found`` — no exception here
         because the router already has a clean way to signal it via
         the endpoint's path resolution.
       * :class:`FieldNotFound` when ``field`` isn't in the event's
-        ``condition_fields`` → 404.
+        ``condition_fields`` → 404. Also raised when the event's
+        ``pack_id`` doesn't match the caller's ``template_id``.
       * :class:`FieldNotEnum` when the matched field's type isn't
         ``enum`` → 422 (e.g. customer picked a currency or text field).
       * :class:`ResolverNotRegistered` when the field's
@@ -396,10 +404,13 @@ async def list_field_values(
     configured — set them up under Settings → …" hint on ``[]``.
     """
     entry = event_catalog.get_entry(event_type)
-    if entry is None:
+    if entry is None or not event_catalog.is_visible_to(entry, template_id):
         # Signalled by the router via a path-level 404 before this
         # call in practice — but service-layer guard keeps the
         # function safe if called directly (dispatcher, tests, etc.).
+        # Pack-not-installed reads as "unknown event" here on
+        # purpose so the endpoint leaks nothing about pack existence
+        # to non-installers.
         raise FieldNotFound(event_type=event_type, field=field)
 
     spec = next((s for s in entry.condition_fields if s.path == field), None)
@@ -440,11 +451,20 @@ async def list_event_types_with_custom_fields(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
+    template_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Assemble the full ``/event-types`` response — base catalog +
     the caller org's custom fields appended to every event whose
     payload carries a ``custom_data`` mount
-    (``tasks/automation-conditions/`` Step 6).
+    (``tasks/automation-conditions/`` Step 6), filtered by the
+    caller org's installed pack (``tasks/automation-conditions/``
+    Step 7).
+
+    Pack filtering: an entry with ``pack_id=None`` (core) is visible
+    to every org; an entry with ``pack_id="<pack>"`` is visible only
+    to orgs whose ``template_id`` matches. Same predicate as the
+    sidebar registry filter — an org sees exactly the events it has
+    the surface to trigger from.
 
     One batched SQL round-trip: every entity type referenced anywhere
     in ``_CUSTOM_DATA_MOUNTS`` gets its definitions read in a single
@@ -475,6 +495,8 @@ async def list_event_types_with_custom_fields(
 
     out: list[dict[str, Any]] = []
     for entry in event_catalog.list_catalog():
+        if not event_catalog.is_visible_to(entry, template_id):
+            continue
         specs = list(entry.condition_fields)
         for entity_type, mount_path in custom_field_bridge.mounts_for(entry.event_type):
             for definition in defs_by_entity.get(entity_type, []):
@@ -486,6 +508,7 @@ async def list_event_types_with_custom_fields(
                 "description": entry.description,
                 "sample_payload": entry.sample_payload,
                 "condition_fields": specs,
+                "pack_id": entry.pack_id,
             }
         )
     return out
@@ -498,6 +521,7 @@ async def preview_matches(
     event_type: str,
     conditions_ast: dict[str, Any],
     window_days: int = 7,
+    template_id: str | None = None,
 ) -> dict[str, Any]:
     """Count historical events in the last ``window_days`` that would
     match the customer's draft ``conditions`` if it were saved as an
@@ -540,8 +564,12 @@ async def preview_matches(
 
     # Fast-path 404: caller (router) already checks the catalog but
     # a service-level guard keeps this function safe when called
-    # from tests / scripts.
-    if event_catalog.get_entry(event_type) is None:
+    # from tests / scripts. Pack filtering (step-7): treat a
+    # not-visible entry (belongs to a pack the caller org didn't
+    # install) as if the event didn't exist at all — same rationale
+    # as list_field_values.
+    entry = event_catalog.get_entry(event_type)
+    if entry is None or not event_catalog.is_visible_to(entry, template_id):
         return {
             "matched": 0,
             "scanned": 0,

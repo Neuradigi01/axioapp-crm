@@ -18,6 +18,7 @@ RBAC rows exist before any role tries to be granted them.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import logging
 import pkgutil
 import re
@@ -245,8 +246,98 @@ def _extract_pack_id(path: str) -> str | None:
     return None
 
 
+def _walk_pack_event_catalog_files() -> list[tuple[str, str]]:
+    """Every pack's ``event_catalog.py`` files paired with the
+    pack slug that owns them (``tasks/automation-conditions/``
+    Step 7).
+
+    Looks in two places per pack:
+      * ``src.app.packs.<pack>.event_catalog`` — pack-level file for
+        events that span multiple pack modules.
+      * ``src.app.packs.<pack>.modules.<mod>.event_catalog`` —
+        module-level file for events scoped to one pack module.
+
+    A pack can use either or both. Missing files are silently
+    skipped (``ModuleNotFoundError``) since ``event_catalog.py``
+    is optional — a pack that doesn't publish any custom events
+    just doesn't register.
+    """
+    try:
+        packs = importlib.import_module(_PACKS_PACKAGE)
+    except ModuleNotFoundError:
+        return []
+
+    found: list[tuple[str, str]] = []
+    for pack_info in pkgutil.iter_modules(packs.__path__, prefix=f"{_PACKS_PACKAGE}."):
+        if not pack_info.ispkg:
+            continue
+        pack_id = pack_info.name.rsplit(".", 1)[-1]
+        # Pack-level event_catalog.py (optional). find_spec returns
+        # None when the child module doesn't exist; only raises when
+        # the parent is unimportable (already handled by the outer
+        # iter_modules walk).
+        pack_level = f"{pack_info.name}.event_catalog"
+        try:
+            spec = importlib.util.find_spec(pack_level)
+        except (ModuleNotFoundError, ImportError):
+            spec = None
+        if spec is not None:
+            found.append((pack_level, pack_id))
+        # Per-module event_catalog.py files.
+        modules_pkg_name = f"{pack_info.name}.modules"
+        try:
+            modules_pkg = importlib.import_module(modules_pkg_name)
+        except ModuleNotFoundError:
+            continue
+        for mod_info in pkgutil.iter_modules(modules_pkg.__path__, prefix=f"{modules_pkg_name}."):
+            if not mod_info.ispkg:
+                continue
+            candidate = f"{mod_info.name}.event_catalog"
+            try:
+                spec = importlib.util.find_spec(candidate)
+            except (ModuleNotFoundError, ImportError):
+                spec = None
+            if spec is not None:
+                found.append((candidate, pack_id))
+    return found
+
+
+def _import_pack_event_catalogs() -> None:
+    """Import every pack's ``event_catalog.py`` inside a pack-scoped
+    ContextVar so registrations auto-tag with the pack slug.
+
+    Import failures re-raise so a broken pack fails app startup
+    loud — a silently-missing pack section in the automation
+    picker would confuse operators without any actionable signal.
+    """
+    from src.app.core.automation._pack_context import (
+        reset_current_pack,
+        set_current_pack,
+    )
+
+    for path, pack_id in _walk_pack_event_catalog_files():
+        token = set_current_pack(pack_id)
+        try:
+            importlib.import_module(path)
+        except Exception:
+            logger.exception(
+                "failed importing pack event_catalog %s (pack=%s) — app startup will fail",
+                path,
+                pack_id,
+            )
+            reset_current_pack(token)
+            raise
+        else:
+            reset_current_pack(token)
+
+
 def discover_modules() -> list[ModuleDescriptor]:
     """Find every `module.py` under core + packs, register their MODULEs.
+
+    Also imports every pack's ``event_catalog.py`` (``tasks/automation-
+    conditions/`` Step 7) inside a pack-scoped ContextVar so the
+    automation catalog + resolver registries pick up pack-owned
+    entries with the correct ``pack_id`` for tenant filtering.
 
     Idempotent: callers (lifespan + dev refresh endpoint) `clear()`
     first, then call this. Returns the registered descriptors in
@@ -271,4 +362,5 @@ def discover_modules() -> list[ModuleDescriptor]:
         if pack_id is not None and descriptor.pack_id != pack_id:
             descriptor = replace(descriptor, pack_id=pack_id)
         registry.register(descriptor)
+    _import_pack_event_catalogs()
     return registry.list()

@@ -50,6 +50,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.automation._pack_context import get_current_pack
 from src.app.core.billing.models import InvoiceStatus, PaymentMethod
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.leads.models import LeadSource, LeadStatus
@@ -100,6 +101,15 @@ _REGISTRY: dict[str, EnumResolver] = {}
 # without needing to register each one individually at boot.
 _WILDCARD_REGISTRY: dict[str, EnumResolver] = {}
 
+# Per-key pack ownership (tasks/automation-conditions/ Step 7). None
+# for core resolvers (visible to every org); pack slug (e.g. "furniture")
+# for pack-registered resolvers. Auto-populated from the pack-import
+# ContextVar so pack files don't need to hardcode their own slug.
+# Wildcard entries live under the same prefix keys as
+# _WILDCARD_REGISTRY (the trailing ``*`` is stripped for storage).
+_PACK_OWNERS: dict[str, str | None] = {}
+_WILDCARD_PACK_OWNERS: dict[str, str | None] = {}
+
 
 def register_resolver(key: str, fn: EnumResolver, *, wildcard: bool = False) -> None:
     """Register a resolver under ``key``.
@@ -116,9 +126,16 @@ def register_resolver(key: str, fn: EnumResolver, *, wildcard: bool = False) -> 
     ``custom_field_options:*`` handler uses this to serve the
     per-org-per-field-key lookups without pre-registering every
     combination.
+
+    Pack ownership (tasks/automation-conditions/ Step 7): if this
+    call runs during a pack's ``event_catalog.py`` import (the
+    module-registry walker sets the ContextVar for the duration),
+    the registered key gets auto-tagged with the pack slug. Core
+    resolvers stay ``None``. Query via :func:`pack_owner_for`.
     """
     if not key:
         raise ValueError("resolver key must be non-empty")
+    owner = get_current_pack()
     if wildcard:
         if not key.endswith("*"):
             raise ValueError(f"wildcard resolver key {key!r} must end with '*'")
@@ -133,6 +150,7 @@ def register_resolver(key: str, fn: EnumResolver, *, wildcard: bool = False) -> 
                 f"or reuse the same resolver function."
             )
         _WILDCARD_REGISTRY[prefix] = fn
+        _WILDCARD_PACK_OWNERS[prefix] = owner
         return
     existing = _REGISTRY.get(key)
     if existing is not None and existing is not fn:
@@ -142,6 +160,7 @@ def register_resolver(key: str, fn: EnumResolver, *, wildcard: bool = False) -> 
             f"resolver function."
         )
     _REGISTRY[key] = fn
+    _PACK_OWNERS[key] = owner
 
 
 def get_resolver(key: str) -> EnumResolver | None:
@@ -180,9 +199,30 @@ def _unregister(key: str) -> None:
     """Test helper — drop a previously registered resolver (exact
     or wildcard). Wildcard keys must include the trailing ``*``."""
     if key.endswith("*"):
-        _WILDCARD_REGISTRY.pop(key[:-1], None)
+        prefix = key[:-1]
+        _WILDCARD_REGISTRY.pop(prefix, None)
+        _WILDCARD_PACK_OWNERS.pop(prefix, None)
         return
     _REGISTRY.pop(key, None)
+    _PACK_OWNERS.pop(key, None)
+
+
+def pack_owner_for(key: str) -> str | None:
+    """Return the pack slug that registered ``key`` (or ``None`` for
+    core-owned + unknown keys). Exact keys checked first, then the
+    longest matching wildcard prefix. Callers use this to filter
+    the ``/field-values`` endpoint by the caller org's ``template_id``
+    (tasks/automation-conditions/ Step 7).
+    """
+    if key in _PACK_OWNERS:
+        return _PACK_OWNERS[key]
+    best_prefix = ""
+    for prefix in _WILDCARD_REGISTRY:
+        if key.startswith(prefix) and len(prefix) > len(best_prefix):
+            best_prefix = prefix
+    if best_prefix:
+        return _WILDCARD_PACK_OWNERS.get(best_prefix)
+    return None
 
 
 # --- static resolvers -----------------------------------------------
@@ -410,6 +450,7 @@ __all__ = [
     "_unregister",
     "get_resolver",
     "list_registered_keys",
+    "pack_owner_for",
     "register_resolver",
     "resolve_appointment_purposes",
     "resolve_channels",

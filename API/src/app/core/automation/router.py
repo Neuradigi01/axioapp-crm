@@ -61,8 +61,20 @@ from src.app.core.automation.schemas import (
     TriggerUpdate,
 )
 from src.app.core.conversations.models import ConversationChannel
+from src.app.core.tenants.data_access import get_organization_by_id
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
+
+
+async def _org_template_id(db: AsyncSession, org_id: uuid.UUID) -> str | None:
+    """Look up the caller org's installed-pack slug (``template_id``)
+    once per request. Cached for the request via FastAPI's
+    dependency-injection scope. Returns ``None`` for orgs without an
+    installed pack — such orgs see only core events.
+    """
+    org = await get_organization_by_id(db, org_id)
+    return org.template_id if org is not None else None
+
 
 router = APIRouter(prefix="/automations", tags=["Automations"])
 
@@ -345,11 +357,17 @@ async def list_event_types_endpoint(
     Per event, ``condition_fields`` is the base catalog's spec list
     (code-owned per step-1) plus the caller org's custom fields for
     every entity the event mounts a ``custom_data`` on (step-6).
+    Response is filtered to the caller org's installed pack
+    (step-7) — core events + only-this-org's-pack events.
     Runs a single batched SQL round-trip to pull all
     ``tbl_custom_field_definitions`` rows across every mounted
-    entity type in one shot.
+    entity type in one shot, plus a tiny org lookup for the
+    template_id gate.
     """
-    entries = await automation_service.list_event_types_with_custom_fields(db, org_id=user.org_id)
+    template_id = await _org_template_id(db, user.org_id)
+    entries = await automation_service.list_event_types_with_custom_fields(
+        db, org_id=user.org_id, template_id=template_id
+    )
     return [
         EventCatalogEntry(
             event_type=entry["event_type"],
@@ -396,10 +414,13 @@ async def list_field_values_endpoint(
     the event or field isn't in the catalog; 422 when the field
     isn't of enum type.
     """
-    # Fast 404 when the event isn't in the catalog — avoids raising
-    # + catching FieldNotFound in the service path for the common
-    # "typo in URL" case.
-    if event_catalog.get_entry(event_type) is None:
+    # Fast 404 when the event isn't in the catalog OR isn't visible
+    # to the caller's installed pack (step-7). Same status code on
+    # purpose — the endpoint leaks nothing about pack existence to
+    # non-installers.
+    template_id = await _org_template_id(db, user.org_id)
+    entry = event_catalog.get_entry(event_type)
+    if entry is None or not event_catalog.is_visible_to(entry, template_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
@@ -413,6 +434,7 @@ async def list_field_values_endpoint(
             org_id=user.org_id,
             event_type=event_type,
             field=payload.field,
+            template_id=template_id,
         )
     except AutomationError as exc:
         raise _automation_http_map(exc) from exc
@@ -449,7 +471,9 @@ async def preview_matches_endpoint(
     whether their filter is too tight vs. the org just hasn't logged
     any events yet.
     """
-    if event_catalog.get_entry(event_type) is None:
+    template_id = await _org_template_id(db, user.org_id)
+    entry = event_catalog.get_entry(event_type)
+    if entry is None or not event_catalog.is_visible_to(entry, template_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
@@ -464,6 +488,7 @@ async def preview_matches_endpoint(
             event_type=event_type,
             conditions_ast=payload.conditions,
             window_days=payload.window_days,
+            template_id=template_id,
         )
     except AutomationError as exc:
         raise _automation_http_map(exc) from exc

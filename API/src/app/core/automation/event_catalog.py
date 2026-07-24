@@ -46,9 +46,10 @@ Condition fields (``tasks/automation-conditions/`` Step 1):
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
+from src.app.core.automation._pack_context import get_current_pack
 from src.app.core.automation.field_specs import (
     GROUP_APPOINTMENT,
     GROUP_CONTACT,
@@ -66,19 +67,40 @@ from src.app.core.automation.field_specs import (
 
 @dataclass(frozen=True, slots=True)
 class CatalogEntry:
-    """One row in the discovery catalog."""
+    """One row in the discovery catalog.
+
+    ``pack_id`` (tasks/automation-conditions/ Step 7) is ``None`` for
+    core events (visible to every org) and set to the pack slug for
+    events registered by a pack's ``event_catalog.py``. The service
+    layer filters the ``/event-types`` response by the caller org's
+    ``template_id`` so a pack's events only surface for orgs that
+    installed the pack. Auto-populated by :func:`_register` from the
+    pack-import context — pack files don't need to hardcode their
+    own slug on every registration.
+    """
 
     event_type: str
     label: str
     description: str
     sample_payload: dict[str, Any]
     condition_fields: tuple[FieldSpec, ...] = field(default_factory=tuple)
+    pack_id: str | None = None
 
 
 _CATALOG: dict[str, CatalogEntry] = {}
 
 
 def _register(entry: CatalogEntry) -> None:
+    # Auto-tag pack registrations with the pack slug from the
+    # import-context ContextVar. The module-registry walker
+    # (`core/module_registry.py:_discover_pack_event_catalogs`) sets
+    # the context before importing each pack's `event_catalog.py`.
+    # Core registrations run outside any pack import, so the context
+    # is None and the entry stays untouched.
+    current_pack = get_current_pack()
+    if current_pack is not None and entry.pack_id is None:
+        entry = replace(entry, pack_id=current_pack)
+
     # Drift guard — every declared FieldSpec path must resolve into
     # the entry's sample_payload. Catches ``lead.stage`` vs
     # ``lead.pipeline_stage`` typos the moment code lands, before a
@@ -1098,9 +1120,30 @@ def is_known(event_type: str) -> bool:
     return event_type in _CATALOG
 
 
+def is_visible_to(entry: CatalogEntry, template_id: str | None) -> bool:
+    """True when this entry is visible to an org whose installed
+    pack is ``template_id`` (``tasks/automation-conditions/`` Step 7).
+
+    Core entries (``pack_id is None``) are visible to every org.
+    Pack entries are visible only to orgs whose ``template_id``
+    matches the entry's ``pack_id``. Passing ``template_id=None``
+    matches an org with no installed pack — such orgs see only
+    core entries.
+
+    Matches the sidebar-registry filter behaviour in
+    :meth:`ModuleRegistry.list_for_user` — same predicate, different
+    registry — so operators experience consistent "what my org
+    has" gating across the sidebar + the automation picker.
+    """
+    if entry.pack_id is None:
+        return True
+    return entry.pack_id == template_id
+
+
 __all__ = [
     "CatalogEntry",
     "get_entry",
     "is_known",
+    "is_visible_to",
     "list_catalog",
 ]
