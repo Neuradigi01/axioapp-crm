@@ -96,9 +96,7 @@ async def hydrate_contacts_by_ids(
     DAL query filters by `org_id` in the WHERE clause; ids from
     another tenant simply don't come back.
     """
-    return await data_access.list_contacts_by_ids_in_org(
-        session, ids=ids, org_id=org_id
-    )
+    return await data_access.list_contacts_by_ids_in_org(session, ids=ids, org_id=org_id)
 
 
 async def list_contact_custom_field_defs(session: AsyncSession):
@@ -163,7 +161,69 @@ async def create_contact(
         entity_id=contact.id,
         after=_snapshot(contact),
     )
+    await _publish_contact_created(session=session, org_id=org_id, contact=contact)
     return contact
+
+
+async def _publish_contact_created(
+    *,
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    contact: Contact,
+) -> None:
+    """Publish ``contact.created`` (``tasks/automation-conditions/``
+    follow-up — unlocks the welcome-message flow every CRM operator
+    wants).
+
+    Same fire-and-forget try/except pattern as the other publishers
+    (``leads._publish_lead_created`` / ``appointments._publish_appointment_booked``)
+    — a bus / subscriber failure cannot roll back the freshly-committed
+    contact. Event-id ``contact_created:{contact.id}`` deduplicates
+    on retry.
+    """
+    try:
+        from sqlalchemy import select as _select
+
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+
+        org = (
+            await session.execute(_select(Organization).where(Organization.id == org_id))
+        ).scalar_one_or_none()
+
+        payload: dict[str, Any] = {
+            "contact_id": str(contact.id),
+            "source": contact.source.value if contact.source else None,
+            "contact": {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "email": contact.email,
+                "phone": contact.phone,
+                "source": contact.source.value if contact.source else None,
+                "custom_data": contact.custom_data or {},
+            },
+        }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+            }
+
+        await events_publish(
+            "contact.created",
+            payload,
+            org_id=org_id,
+            event_id=f"contact_created:{contact.id}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "contacts.create publish_contact_created_failed org=%s contact=%s",
+            org_id,
+            contact.id,
+        )
 
 
 async def update_contact(
@@ -294,12 +354,8 @@ async def merge_contacts(
             detail="cannot merge a contact into itself",
         )
 
-    primary = ensure_found(
-        await data_access.get_contact(session, primary_id), entity="contact"
-    )
-    secondary = ensure_found(
-        await data_access.get_contact(session, secondary_id), entity="contact"
-    )
+    primary = ensure_found(await data_access.get_contact(session, primary_id), entity="contact")
+    secondary = ensure_found(await data_access.get_contact(session, secondary_id), entity="contact")
     if primary.org_id != org_id or secondary.org_id != org_id:
         # Belt-and-suspenders — the ORM tenant filter should have
         # already returned 404 for a cross-tenant id, but check
@@ -656,9 +712,7 @@ async def bulk_reassign_contacts(
     # single `WHERE id IN (:ids)` read. Activity inserts stay per-row
     # (each contact needs its own timeline entry) but there's no reason
     # the SELECTs should be N.
-    contacts = await data_access.list_contacts_by_ids_in_org(
-        session, ids=ids, org_id=org_id
-    )
+    contacts = await data_access.list_contacts_by_ids_in_org(session, ids=ids, org_id=org_id)
 
     reassigned = 0
     for contact in contacts:

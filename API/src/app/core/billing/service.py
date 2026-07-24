@@ -367,6 +367,15 @@ async def void(
         after={"reason": reason},
         user_id=user_id,
     )
+    # tasks/automation-conditions/ follow-up — invoice.voided
+    # unlocks "sorry we voided" apology emails / accounting reconciliation
+    await _publish_invoice_event(
+        session=session,
+        inv=inv,
+        event_type="invoice.voided",
+        event_id_prefix="invoice_voided",
+        extra={"reason": reason} if reason else None,
+    )
     return inv
 
 

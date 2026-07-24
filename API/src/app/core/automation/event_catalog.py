@@ -1099,6 +1099,589 @@ _register(
 )
 
 
+# --- Contacts (Step-7 follow-up: new events) --------------------------
+
+
+_register(
+    CatalogEntry(
+        event_type="contact.created",
+        label="Contact created",
+        description=(
+            "A new contact is created via any surface — staff form, "
+            "walk-in check-in, embed widget, ad-form webhook, bulk "
+            "import. Fires once from ``core.contacts.service.create_contact`` "
+            "after commit; ``event_id=contact_created:{contact_id}`` "
+            "deduplicates retries. Enables the classic welcome-message "
+            "flow every CRM operator wants."
+        ),
+        sample_payload={
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "source": "widget",
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+                "source": "widget",
+                "custom_data": {},
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
+        },
+        condition_fields=(
+            FieldSpec(
+                path="source",
+                label="Source",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+                help_text="Where the contact came from (e.g. widget, walk_in, bulk_import).",
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+            FieldSpec(
+                path="contact.phone",
+                label="Phone",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
+    )
+)
+
+
+# --- Appointment lifecycle (Step-7 follow-up) ------------------------
+
+# Shared sample_payload for the 4 lifecycle events — same envelope
+# shape as appointment.booked; each event carries the current
+# `status` in the nested `appointment` dict + a few extras where
+# relevant (reschedule adds from_scheduled_at + to_scheduled_at;
+# cancelled + no_show optionally carry a reason).
+_APPT_LIFECYCLE_SAMPLE_PAYLOAD: dict[str, Any] = {
+    "appointment_id": "00000000-0000-0000-0000-000000000000",
+    "contact_id": "00000000-0000-0000-0000-000000000000",
+    "scheduled_at": "2026-07-01T10:00:00+05:30",
+    "location": "Bengaluru Showroom",
+    "appointment": {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "title": "Showroom walk-through",
+        "purpose": "showroom_visit",
+        "scheduled_at": "2026-07-01T10:00:00+05:30",
+        "duration_min": 60,
+        "location": "Bengaluru Showroom",
+        "status": "cancelled",
+        "custom_data": {},
+    },
+    "contact": {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "full_name": "Asha Mehta",
+        "email": "asha@example.com",
+        "phone": "+919876543210",
+        "custom_data": {},
+    },
+    "org": {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "name": "Demo Workspace",
+        "slug": "demo-workspace",
+    },
+}
+
+_APPT_LIFECYCLE_FIELDS: tuple[FieldSpec, ...] = (
+    FieldSpec(
+        path="appointment.purpose",
+        label="Purpose",
+        type=FieldType.enum,
+        group=GROUP_APPOINTMENT,
+        enum_resolver="appointment_purposes",
+    ),
+    FieldSpec(
+        path="location",
+        label="Location",
+        type=FieldType.text,
+        group=GROUP_APPOINTMENT,
+    ),
+    FieldSpec(
+        path="contact.email",
+        label="Email",
+        type=FieldType.text,
+        group=GROUP_CONTACT,
+    ),
+)
+
+
+_register(
+    CatalogEntry(
+        event_type="appointment.cancelled",
+        label="Appointment cancelled",
+        description=(
+            "Customer or staff cancelled a scheduled appointment. Fires "
+            "from PATCH /appointments/{id} status transition OR from "
+            "the bulk-cancel endpoint. ``event_id=appointment_cancelled:{id}`` "
+            "deduplicates replays. Enables the rescue flow — auto "
+            "WhatsApp: 'Sorry we missed you, can we reschedule?'"
+        ),
+        sample_payload=_APPT_LIFECYCLE_SAMPLE_PAYLOAD,
+        condition_fields=_APPT_LIFECYCLE_FIELDS,
+    )
+)
+_register(
+    CatalogEntry(
+        event_type="appointment.no_show",
+        label="Appointment no-show",
+        description=(
+            "Appointment slot passed without the customer showing up. "
+            "Fires from PATCH /appointments/{id} when staff mark the "
+            "row as ``no_show``. Enables the silent-loss rescue flow — "
+            "chase for a rebook before the lead cools."
+        ),
+        sample_payload={
+            **_APPT_LIFECYCLE_SAMPLE_PAYLOAD,
+            "appointment": {**_APPT_LIFECYCLE_SAMPLE_PAYLOAD["appointment"], "status": "no_show"},
+        },
+        condition_fields=_APPT_LIFECYCLE_FIELDS,
+    )
+)
+_register(
+    CatalogEntry(
+        event_type="appointment.completed",
+        label="Appointment completed",
+        description=(
+            "Staff marks a scheduled appointment as ``completed``. "
+            "Enables post-visit flows — review request, next-step nudge, "
+            "quote follow-up."
+        ),
+        sample_payload={
+            **_APPT_LIFECYCLE_SAMPLE_PAYLOAD,
+            "appointment": {**_APPT_LIFECYCLE_SAMPLE_PAYLOAD["appointment"], "status": "completed"},
+        },
+        condition_fields=_APPT_LIFECYCLE_FIELDS,
+    )
+)
+_register(
+    CatalogEntry(
+        event_type="appointment.rescheduled",
+        label="Appointment rescheduled",
+        description=(
+            "Appointment's ``scheduled_at`` shifted to a new slot. Fires "
+            "from ``core.appointments.service.reschedule_appointment``. "
+            "``event_id`` includes the new slot ISO so multiple "
+            "reschedules on the same appointment dedupe per-slot rather "
+            "than collapsing into one fire."
+        ),
+        sample_payload={
+            **_APPT_LIFECYCLE_SAMPLE_PAYLOAD,
+            "from_scheduled_at": "2026-07-01T10:00:00+05:30",
+            "to_scheduled_at": "2026-07-02T14:00:00+05:30",
+            "reason": "Customer requested",
+            "appointment": {
+                **_APPT_LIFECYCLE_SAMPLE_PAYLOAD["appointment"],
+                "status": "scheduled",
+                "from_scheduled_at": "2026-07-01T10:00:00+05:30",
+                "to_scheduled_at": "2026-07-02T14:00:00+05:30",
+                "reason": "Customer requested",
+            },
+        },
+        condition_fields=_APPT_LIFECYCLE_FIELDS,
+    )
+)
+
+
+# --- Walk-ins (Step-7 follow-up) -------------------------------------
+
+
+_register(
+    CatalogEntry(
+        event_type="walk_in.converted",
+        label="Walk-in converted to lead",
+        description=(
+            "A shop-floor walk-in is converted to a lead. Fires from "
+            "``core.walk_ins.service.convert_walk_in_to_lead`` after "
+            "commit. Enables handoff flows — auto WhatsApp to the "
+            "customer once a rep formally captures them as a lead."
+        ),
+        sample_payload={
+            "walk_in_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "lead_id": "00000000-0000-0000-0000-000000000000",
+            "walk_in": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "assigned_to_id": "00000000-0000-0000-0000-000000000000",
+                "budget": "150000.00",
+            },
+            "lead": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "source": "walk_in",
+                "pipeline_stage": "new",
+                "custom_data": {},
+            },
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+                "custom_data": {},
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
+        },
+        condition_fields=(
+            FieldSpec(
+                path="walk_in.assigned_to_id",
+                label="Assigned to",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="users",
+            ),
+            FieldSpec(
+                path="lead.pipeline_stage",
+                label="Stage",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="pipeline_stages",
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
+    )
+)
+
+
+# --- Billing (Step-7 follow-up: void + overdue escalation) -----------
+
+
+_register(
+    CatalogEntry(
+        event_type="invoice.voided",
+        label="Invoice voided",
+        description=(
+            "An invoice is voided (cancelled after issue). Fires from "
+            "``core.billing.service.void``. Enables apology emails to "
+            "the customer + accounting-team reconciliation alerts."
+        ),
+        sample_payload={
+            "invoice_id": "00000000-0000-0000-0000-000000000000",
+            "contact_id": "00000000-0000-0000-0000-000000000000",
+            "total_amount": "45000.00",
+            "currency": "INR",
+            "reason": "Duplicate invoice",
+            "invoice": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "number": 4021,
+                "total_amount": "45000.00",
+                "currency": "INR",
+                "issued_at": "2026-06-29T12:00:00+00:00",
+                "reason": "Duplicate invoice",
+            },
+            "contact": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "full_name": "Asha Mehta",
+                "email": "asha@example.com",
+                "phone": "+919876543210",
+                "custom_data": {},
+            },
+            "org": {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "Demo Workspace",
+                "slug": "demo-workspace",
+            },
+        },
+        condition_fields=(
+            FieldSpec(
+                path="invoice.total_amount",
+                label="Total amount",
+                type=FieldType.currency,
+                group=GROUP_INVOICE,
+            ),
+            FieldSpec(
+                path="invoice.currency",
+                label="Currency",
+                type=FieldType.text,
+                group=GROUP_INVOICE,
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
+    )
+)
+
+# Shared sample payload + condition fields for the two additional
+# overdue tiers — same envelope as invoice.overdue_7d, days_overdue
+# distinguishes them.
+_OVERDUE_SAMPLE_PAYLOAD: dict[str, Any] = {
+    "invoice_id": "00000000-0000-0000-0000-000000000000",
+    "contact_id": "00000000-0000-0000-0000-000000000000",
+    "total_amount": "45000.00",
+    "currency": "INR",
+    "issued_at": "2026-06-12T12:00:00+00:00",
+    "days_overdue": 14,
+    "invoice": {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "number": 4021,
+        "total_amount": "45000.00",
+        "currency": "INR",
+        "issued_at": "2026-06-12T12:00:00+00:00",
+    },
+    "contact": {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "full_name": "Asha Mehta",
+        "email": "asha@example.com",
+        "phone": "+919876543210",
+        "custom_data": {},
+    },
+    "org": {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "name": "Demo Workspace",
+        "slug": "demo-workspace",
+    },
+}
+
+_OVERDUE_FIELDS: tuple[FieldSpec, ...] = (
+    FieldSpec(
+        path="days_overdue",
+        label="Days overdue",
+        type=FieldType.number,
+        group=GROUP_INVOICE,
+    ),
+    FieldSpec(
+        path="invoice.total_amount",
+        label="Total amount",
+        type=FieldType.currency,
+        group=GROUP_INVOICE,
+    ),
+    FieldSpec(
+        path="invoice.currency",
+        label="Currency",
+        type=FieldType.text,
+        group=GROUP_INVOICE,
+    ),
+    FieldSpec(
+        path="contact.email",
+        label="Email",
+        type=FieldType.text,
+        group=GROUP_CONTACT,
+    ),
+)
+
+_register(
+    CatalogEntry(
+        event_type="invoice.overdue_14d",
+        label="Invoice overdue (14d)",
+        description=(
+            "Daily Celery beat sweep finds ``issued`` invoices whose "
+            "``issued_at`` is more than 14 days ago. "
+            "``event_id=invoice_overdue_14d:{invoice_id}`` deduplicates "
+            "across daily ticks so each invoice fires this tier at "
+            "most once. Escalation-ladder second rung (7d is polite; "
+            "14d is a firmer nudge)."
+        ),
+        sample_payload={**_OVERDUE_SAMPLE_PAYLOAD, "days_overdue": 14},
+        condition_fields=_OVERDUE_FIELDS,
+    )
+)
+_register(
+    CatalogEntry(
+        event_type="invoice.overdue_30d",
+        label="Invoice overdue (30d)",
+        description=(
+            "Daily Celery beat sweep finds ``issued`` invoices whose "
+            "``issued_at`` is more than 30 days ago. Final rung of the "
+            "escalation ladder — warning-tone copy, manager CC. "
+            "``event_id=invoice_overdue_30d:{invoice_id}`` deduplicates."
+        ),
+        sample_payload={
+            **_OVERDUE_SAMPLE_PAYLOAD,
+            "days_overdue": 30,
+            "issued_at": "2026-05-29T12:00:00+00:00",
+        },
+        condition_fields=_OVERDUE_FIELDS,
+    )
+)
+
+
+# --- Reviews (Step-7 follow-up) --------------------------------------
+
+
+_REVIEW_SAMPLE_PAYLOAD: dict[str, Any] = {
+    "review_id": "00000000-0000-0000-0000-000000000000",
+    "contact_id": "00000000-0000-0000-0000-000000000000",
+    "rating": 5,
+    "review": {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "rating": 5,
+        "status": "replied",
+        "source": "google",
+    },
+    "contact": {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "full_name": "Asha Mehta",
+        "email": "asha@example.com",
+        "phone": "+919876543210",
+    },
+    "org": {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "name": "Demo Workspace",
+        "slug": "demo-workspace",
+    },
+}
+
+
+_register(
+    CatalogEntry(
+        event_type="review.replied",
+        label="Review replied",
+        description=(
+            "Staff replied to a customer review. Fires from "
+            "``core.reviews.service.reply_to_review``. Enables "
+            "thank-you-for-the-feedback acknowledgements + reply-visibility "
+            "notifications to the reviewing contact."
+        ),
+        sample_payload={
+            **_REVIEW_SAMPLE_PAYLOAD,
+            "reply_preview": "Thanks so much for the kind words!",
+        },
+        condition_fields=(
+            FieldSpec(
+                path="review.rating",
+                label="Rating",
+                type=FieldType.number,
+                group=GROUP_CONTACT,
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
+    )
+)
+_register(
+    CatalogEntry(
+        event_type="review.escalated",
+        label="Review escalated",
+        description=(
+            "A review was escalated to a manager for handling (usually "
+            "a negative review needing intervention). Fires from "
+            "``core.reviews.service.escalate_review``. Enables internal "
+            "manager alerts + SLA-timer flows for high-touch response."
+        ),
+        sample_payload={
+            **_REVIEW_SAMPLE_PAYLOAD,
+            "review": {**_REVIEW_SAMPLE_PAYLOAD["review"], "status": "escalated", "rating": 1},
+            "rating": 1,
+            "reason": "Customer complaint about product quality",
+        },
+        condition_fields=(
+            FieldSpec(
+                path="review.rating",
+                label="Rating",
+                type=FieldType.number,
+                group=GROUP_CONTACT,
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
+    )
+)
+
+
+# --- Email tracking (Step-7 follow-up) -------------------------------
+
+
+_EMAIL_TRACKING_SAMPLE_PAYLOAD: dict[str, Any] = {
+    "message_id": "00000000-0000-0000-0000-000000000000",
+    "contact_id": "00000000-0000-0000-0000-000000000000",
+    "contact": {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "full_name": "Asha Mehta",
+        "email": "asha@example.com",
+        "phone": "+919876543210",
+    },
+    "org": {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "name": "Demo Workspace",
+        "slug": "demo-workspace",
+    },
+}
+
+
+_register(
+    CatalogEntry(
+        event_type="email.opened",
+        label="Email opened",
+        description=(
+            "Customer opened a tracked email — the tracking pixel loaded. "
+            "Fires from ``core.email.tracking.router._record_open``. "
+            "``event_id=email_opened:{message_id}`` deduplicates the "
+            "many re-renders (email client rehydrations, forwarded "
+            "threads) into a single automation run per message. "
+            "Enables high-intent alerts — 'customer opened your quote'."
+        ),
+        sample_payload=_EMAIL_TRACKING_SAMPLE_PAYLOAD,
+        condition_fields=(
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
+    )
+)
+_register(
+    CatalogEntry(
+        event_type="email.clicked",
+        label="Email link clicked",
+        description=(
+            "Customer clicked a tracked link in an email. Fires from "
+            "``core.email.tracking.router._record_click``. Higher-intent "
+            "signal than ``email.opened`` — customer took an action. "
+            "``target_url`` carries the URL they clicked. "
+            "``event_id=email_clicked:{message_id}`` deduplicates."
+        ),
+        sample_payload={
+            **_EMAIL_TRACKING_SAMPLE_PAYLOAD,
+            "target_url": "https://example.com/quote/abc",
+        },
+        condition_fields=(
+            FieldSpec(
+                path="target_url",
+                label="Target URL",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
+    )
+)
+
+
 # --- Public API -----------------------------------------------------
 
 

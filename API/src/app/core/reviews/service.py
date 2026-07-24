@@ -202,6 +202,12 @@ async def reply_to_review(
             user_id=user_id,
             org_id=review.org_id,
         )
+    await _publish_review_lifecycle_event(
+        session=session,
+        review=review,
+        event_type="review.replied",
+        extras={"reply_preview": payload.text[:160]},
+    )
     return review
 
 
@@ -225,7 +231,91 @@ async def escalate_review(
         after={**_snapshot(review), "reason": payload.reason},
         user_id=user_id,
     )
+    await _publish_review_lifecycle_event(
+        session=session,
+        review=review,
+        event_type="review.escalated",
+        extras={"reason": payload.reason},
+    )
     return review
+
+
+async def _publish_review_lifecycle_event(
+    *,
+    session: AsyncSession,
+    review: Review,
+    event_type: str,
+    extras: dict[str, Any] | None = None,
+) -> None:
+    """Publish a ``review.<verb>`` event (``tasks/automation-conditions/``
+    follow-up — review.replied for customer acknowledgement /
+    review.escalated for manager alerts).
+
+    Same fire-and-forget try/except pattern as the other lifecycle
+    publishers. Event-id ``<slug>:{review.id}`` deduplicates on
+    retry — a review only gets one "first replied" and one "first
+    escalated" event fire regardless of subsequent edits.
+    """
+    try:
+        from sqlalchemy import select as _select
+
+        from src.app.core.contacts.models import Contact
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+
+        contact = None
+        if review.contact_id is not None:
+            contact = (
+                await session.execute(_select(Contact).where(Contact.id == review.contact_id))
+            ).scalar_one_or_none()
+        org = (
+            await session.execute(_select(Organization).where(Organization.id == review.org_id))
+        ).scalar_one_or_none()
+
+        payload: dict[str, Any] = {
+            "review_id": str(review.id),
+            "contact_id": str(review.contact_id) if review.contact_id else None,
+            "rating": review.rating,
+            "review": {
+                "id": str(review.id),
+                "rating": review.rating,
+                "status": review.status.value,
+                "source": review.source.value if review.source else None,
+            },
+        }
+        if extras:
+            payload.update(extras)
+            payload["review"].update(extras)
+        if contact is not None:
+            payload["contact"] = {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "email": contact.email,
+                "phone": contact.phone,
+            }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+            }
+
+        slug = event_type.replace(".", "_")
+        await events_publish(
+            event_type,
+            payload,
+            org_id=review.org_id,
+            event_id=f"{slug}:{review.id}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "reviews publish_%s_failed org=%s review=%s",
+            event_type.replace(".", "_"),
+            review.org_id,
+            review.id,
+        )
 
 
 # --- stats ----------------------------------------------------------------

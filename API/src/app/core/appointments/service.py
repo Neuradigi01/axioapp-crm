@@ -83,9 +83,7 @@ def _snapshot(a: Appointment) -> dict[str, Any]:
 # (``reconcile_pending``) catches drift from missed hooks.
 
 
-async def _resolve_user_login_id(
-    session: AsyncSession, user_uuid: Any
-) -> int | None:
+async def _resolve_user_login_id(session: AsyncSession, user_uuid: Any) -> int | None:
     """Translate the app-wide UUID identifier (as stored on
     ``tbl_appointments.assigned_to_id``) into the BIGINT
     ``tbl_user_login.id`` used by the Google Calendar token row.
@@ -144,8 +142,7 @@ async def _dispatch_calendar_sync(
         import logging
 
         logging.getLogger(__name__).exception(
-            "appointments._dispatch_calendar_sync failed appointment=%s "
-            "user=%s",
+            "appointments._dispatch_calendar_sync failed appointment=%s user=%s",
             appointment_id,
             user_id,
         )
@@ -462,6 +459,7 @@ async def update_appointment(
     # when a reassignment happens.
     old_scheduled = appt.scheduled_at
     old_assigned_to_id = appt.assigned_to_id
+    old_status = appt.status
     for key, value in changes.items():
         setattr(appt, key, value)
     await session.commit()
@@ -474,6 +472,30 @@ async def update_appointment(
         before=before,
         after=_snapshot(appt),
     )
+
+    # Status-transition events for the automation catalog
+    # (``tasks/automation-conditions/`` follow-up). Fired once per
+    # transition, keyed on ``event_id=<slug>:{appt.id}`` so replays
+    # of the same PATCH don't refire.
+    _APPT_STATUS_EVENT_MAP = {
+        AppointmentStatus.cancelled: "appointment.cancelled",
+        AppointmentStatus.no_show: "appointment.no_show",
+        AppointmentStatus.completed: "appointment.completed",
+    }
+    if (
+        "status" in changes
+        and changes["status"] is not None
+        and appt.status != old_status
+        and appt.status in _APPT_STATUS_EVENT_MAP
+    ):
+        ctx = get_context()
+        if ctx.org_id is not None:
+            await _publish_appointment_lifecycle_event(
+                session=session,
+                org_id=ctx.org_id,
+                appt=appt,
+                event_type=_APPT_STATUS_EVENT_MAP[appt.status],
+            )
     if "scheduled_at" in changes and appt.scheduled_at != old_scheduled:
         await activities.log(
             entity_type="contact",
@@ -692,6 +714,19 @@ async def reschedule_appointment(
     await session.commit()
     await session.refresh(appt)
 
+    # tasks/automation-conditions/ follow-up — appointment.rescheduled
+    await _publish_appointment_lifecycle_event(
+        session=session,
+        org_id=org_id,
+        appt=appt,
+        event_type="appointment.rescheduled",
+        extras={
+            "from_scheduled_at": old_at.isoformat(),
+            "to_scheduled_at": scheduled_at.isoformat(),
+            "reason": reason,
+        },
+    )
+
     await audit.log(
         "appointments.rescheduled",
         entity_type=_APPT_ENTITY,
@@ -884,6 +919,24 @@ async def bulk_cancel_appointments(
         cancelled += 1
 
     await session.commit()
+
+    # tasks/automation-conditions/ follow-up — appointment.cancelled
+    # for each bulk-cancelled row. Fire AFTER commit so a bus failure
+    # can't roll back the cancellations. Fired individually since the
+    # event carries per-appointment payload (recipient resolvers need
+    # the specific contact / assignee for each fire).
+    if cancelled:
+        for appt_id in ids:
+            appt = await get_appointment(session, appt_id)
+            if appt is not None and appt.status == AppointmentStatus.cancelled:
+                await _publish_appointment_lifecycle_event(
+                    session=session,
+                    org_id=org_id,
+                    appt=appt,
+                    event_type="appointment.cancelled",
+                    extras={"reason": reason} if reason else None,
+                )
+
     return cancelled, skipped
 
 
@@ -963,6 +1016,99 @@ async def _publish_appointment_booked(
 
         logging.getLogger(__name__).exception(
             "appointments.create publish_appointment_booked_failed org=%s appt=%s",
+            org_id,
+            appt.id,
+        )
+
+
+async def _publish_appointment_lifecycle_event(
+    *,
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    appt: Appointment,
+    event_type: str,
+    extras: dict[str, Any] | None = None,
+) -> None:
+    """Publish an ``appointment.<verb>`` lifecycle event
+    (``tasks/automation-conditions/`` follow-up — cancelled /
+    no_show / completed / rescheduled).
+
+    Mirrors :func:`_publish_appointment_booked` — same envelope
+    shape, same contact + org snapshot, same try/except firewall
+    around the whole body so a bus / subscriber failure cannot
+    roll back the just-committed state transition. ``extras`` folds
+    into the top-level payload and the nested ``appointment`` dict
+    so subscribers can read either path (e.g. ``{{ from_slot }}``
+    or ``{{ appointment.from_slot }}`` for reschedule reasons).
+
+    Event-id shape matches ``_publish_appointment_booked``:
+    ``<slug>:{appt.id}`` — one-fire-per-appointment for the terminal
+    verbs (cancelled / no_show / completed); reschedule appends a
+    timestamp so multiple reschedules on the same appointment
+    dedupe per-slot without collapsing.
+    """
+    try:
+        from sqlalchemy import select as _select
+
+        from src.app.core.contacts.models import Contact
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+
+        contact = (
+            await session.execute(_select(Contact).where(Contact.id == appt.contact_id))
+        ).scalar_one_or_none()
+        org = (
+            await session.execute(_select(Organization).where(Organization.id == org_id))
+        ).scalar_one_or_none()
+
+        payload: dict[str, Any] = {
+            "appointment_id": str(appt.id),
+            "contact_id": str(appt.contact_id),
+            "scheduled_at": appt.scheduled_at.isoformat(),
+            "location": appt.location,
+            "appointment": {
+                "id": str(appt.id),
+                "title": appt.title,
+                "purpose": appt.purpose,
+                "scheduled_at": appt.scheduled_at.isoformat(),
+                "duration_min": appt.duration_min,
+                "location": appt.location,
+                "status": appt.status.value,
+            },
+        }
+        if extras:
+            payload.update(extras)
+            payload["appointment"].update(extras)
+        if contact is not None:
+            payload["contact"] = {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "email": contact.email,
+                "phone": contact.phone,
+            }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+            }
+
+        # Reschedule can happen multiple times per appointment — key
+        # the event_id on the new slot so each reschedule dedupes
+        # per-slot rather than collapsing into a single fire.
+        if event_type == "appointment.rescheduled":
+            event_id = f"appointment_rescheduled:{appt.id}:{appt.scheduled_at.isoformat()}"
+        else:
+            slug = event_type.replace(".", "_")
+            event_id = f"{slug}:{appt.id}"
+
+        await events_publish(event_type, payload, org_id=org_id, event_id=event_id)
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "appointments publish_%s_failed org=%s appt=%s",
+            event_type.replace(".", "_"),
             org_id,
             appt.id,
         )

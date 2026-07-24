@@ -66,6 +66,7 @@ _CUSTOM_DATA_MOUNTS: dict[str, tuple[tuple[str, str], ...]] = {
     "lead.score_threshold": (("lead", "lead.custom_data"),),
     "lead.stale_30d": (("lead", "lead.custom_data"),),
     "contact.birthday": (("contact", "contact.custom_data"),),
+    "contact.created": (("contact", "contact.custom_data"),),
     "appointment.booked": (
         ("appointment", "appointment.custom_data"),
         ("contact", "contact.custom_data"),
@@ -78,11 +79,37 @@ _CUSTOM_DATA_MOUNTS: dict[str, tuple[tuple[str, str], ...]] = {
         ("appointment", "appointment.custom_data"),
         ("contact", "contact.custom_data"),
     ),
+    # Step-7-follow-up appointment lifecycle events — same envelope
+    # shape as booked/reminder, custom_data on both entity dicts.
+    "appointment.cancelled": (
+        ("appointment", "appointment.custom_data"),
+        ("contact", "contact.custom_data"),
+    ),
+    "appointment.no_show": (
+        ("appointment", "appointment.custom_data"),
+        ("contact", "contact.custom_data"),
+    ),
+    "appointment.completed": (
+        ("appointment", "appointment.custom_data"),
+        ("contact", "contact.custom_data"),
+    ),
+    "appointment.rescheduled": (
+        ("appointment", "appointment.custom_data"),
+        ("contact", "contact.custom_data"),
+    ),
+    # Step-7-follow-up walk_in.converted — contact + lead both carry
+    # custom_data since the walk-in-to-lead conversion produces both.
+    "walk_in.converted": (
+        ("contact", "contact.custom_data"),
+        ("lead", "lead.custom_data"),
+    ),
+    # Step-7-follow-up invoice events — the invoice module doesn't
+    # have a custom_data column on the invoice itself, but the
+    # contact snapshot carries one so we mount contact's here.
+    "invoice.voided": (("contact", "contact.custom_data"),),
+    "invoice.overdue_14d": (("contact", "contact.custom_data"),),
+    "invoice.overdue_30d": (("contact", "contact.custom_data"),),
 }
-# NOTE: ``contact.created`` isn't in the base catalog today so it's
-# excluded from the mount map. Add it here the moment step-1's
-# ``_register(...)`` gains that entry — the coverage pin will
-# remind us.
 
 
 # Custom-field FieldType (owned by core/custom_fields) → automation

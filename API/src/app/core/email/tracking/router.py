@@ -158,6 +158,16 @@ async def _record_open(request: Request, *, message_id: uuid.UUID) -> None:
                 )
                 session.add(row)
                 await session.commit()
+                # tasks/automation-conditions/ follow-up — email.opened
+                # enables "customer opened your quote" alert flows.
+                # Fire-and-forget inside the tenant context we already
+                # set; publish failures never break the pixel response.
+                await _publish_email_tracking_event(
+                    session,
+                    message_id=message_id,
+                    org_id=org_id,
+                    event_type="email.opened",
+                )
             finally:
                 reset_context(token)
     except Exception:
@@ -189,10 +199,107 @@ async def _record_click(
                 )
                 session.add(row)
                 await session.commit()
+                await _publish_email_tracking_event(
+                    session,
+                    message_id=message_id,
+                    org_id=org_id,
+                    event_type="email.clicked",
+                    extras={"target_url": target_url[:2048]},
+                )
             finally:
                 reset_context(token)
     except Exception:
         log.exception("tracking._record_click failed for message=%s", message_id)
+
+
+async def _publish_email_tracking_event(
+    session: AsyncSession,
+    *,
+    message_id: uuid.UUID,
+    org_id: uuid.UUID,
+    event_type: str,
+    extras: dict | None = None,
+) -> None:
+    """Publish ``email.opened`` / ``email.clicked``
+    (``tasks/automation-conditions/`` follow-up).
+
+    Reads (org_id, contact_id, conversation_id) from the message
+    row so subscribers get the contact snapshot needed for
+    recipient-resolver dispatch. Same fire-and-forget try/except
+    pattern as the other lifecycle publishers. Never raises —
+    caller (_record_open / _record_click) treats publish as
+    best-effort alongside the row insert.
+
+    Event-id ``<slug>:{message_id}`` deduplicates per-message —
+    the tracking pixel can fire many times from the same email
+    (email client re-renders, forwarded threads); the dispatcher
+    absorbs those into a single automation run per message.
+    """
+    try:
+        from sqlalchemy import text as _sql_text
+
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+
+        # Resolve contact via the messages → conversations join.
+        contact_row = (
+            (
+                await session.execute(
+                    _sql_text(
+                        """
+                    SELECT c.id, c.full_name, c.email, c.phone
+                    FROM tbl_messages m
+                    JOIN tbl_conversations conv ON conv.id = m.conversation_id
+                    JOIN tbl_contacts c ON c.id = conv.contact_id
+                    WHERE m.id = :mid
+                    """
+                    ),
+                    {"mid": str(message_id)},
+                )
+            )
+            .mappings()
+            .first()
+        )
+
+        from sqlalchemy import select as _select
+
+        org = (
+            await session.execute(_select(Organization).where(Organization.id == org_id))
+        ).scalar_one_or_none()
+
+        payload: dict = {
+            "message_id": str(message_id),
+            "contact_id": str(contact_row["id"]) if contact_row else None,
+        }
+        if extras:
+            payload.update(extras)
+        if contact_row is not None:
+            payload["contact"] = {
+                "id": str(contact_row["id"]),
+                "full_name": contact_row["full_name"],
+                "email": contact_row["email"],
+                "phone": contact_row["phone"],
+            }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+            }
+
+        slug = event_type.replace(".", "_")
+        await events_publish(
+            event_type,
+            payload,
+            org_id=org_id,
+            event_id=f"{slug}:{message_id}",
+        )
+    except Exception:
+        log.exception(
+            "tracking publish_%s_failed message=%s",
+            event_type.replace(".", "_"),
+            message_id,
+        )
 
 
 async def _resolve_contact_from_message(

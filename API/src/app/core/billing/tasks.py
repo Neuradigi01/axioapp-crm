@@ -59,21 +59,29 @@ except ImportError:  # pragma: no cover — celery absent in dev shells
 logger = logging.getLogger(__name__)
 
 
-# Default overdue threshold. The seeded "Invoice Overdue 7d" trigger
-# binds to the ``invoice.overdue_7d`` event_type so changing this
-# constant means the publisher + the seeded trigger event_type must
-# move together. Future variations (14d / 30d) would land as
-# additional events.
-_OVERDUE_DAYS = 7
+# Overdue thresholds. Each tier is a distinct automation event so
+# operators can build an escalation ladder — a polite nudge at 7d,
+# a firmer reminder at 14d, a warning-tone final notice at 30d. The
+# beat sweep fires all three (see :func:`scan_for_overdue`); the
+# dispatcher's ``(trigger_id, event_id)`` uniqueness on
+# ``tbl_automation_runs`` deduplicates daily re-scans so each invoice
+# fires each tier at most once (the ``event_id=f"invoice_overdue_{tier}d:{id}"``
+# carries the tier).
+_OVERDUE_TIERS: tuple[tuple[int, str], ...] = (
+    (7, "invoice.overdue_7d"),
+    (14, "invoice.overdue_14d"),
+    (30, "invoice.overdue_30d"),
+)
 
 
 @_shared_task(
     name="src.app.core.billing.tasks.scan_for_overdue",
 )
 def scan_for_overdue() -> dict[str, Any]:
-    """Beat-scheduled sweep — fires ``invoice.overdue_7d`` for every
-    ``issued`` invoice older than 7 days. Returns a small summary
-    ``{found, published}`` for the worker logs."""
+    """Beat-scheduled sweep — fires ``invoice.overdue_{7,14,30}d`` for
+    every ``issued`` invoice whose age crosses each threshold.
+    Returns a per-tier summary ``{found_7d, published_7d, found_14d, ...}``
+    for the worker logs."""
     return asyncio.run(_scan_for_overdue_async())
 
 
@@ -81,29 +89,33 @@ async def _scan_for_overdue_async() -> dict[str, Any]:
     from src.app.core.billing import data_access as _da
     from src.app.shared.db import async_session
 
-    published = 0
-
+    summary: dict[str, int] = {}
     async with async_session() as session:
-        overdue = await _da.find_overdue(session, days_overdue=_OVERDUE_DAYS)
-        for inv in overdue:
-            ok = await _publish_overdue(session, inv=inv)
-            if ok:
-                published += 1
+        for days, event_type in _OVERDUE_TIERS:
+            overdue = await _da.find_overdue(session, days_overdue=days)
+            published = 0
+            for inv in overdue:
+                ok = await _publish_overdue(session, inv=inv, days=days, event_type=event_type)
+                if ok:
+                    published += 1
+            summary[f"found_{days}d"] = len(overdue)
+            summary[f"published_{days}d"] = published
 
-    logger.info(
-        "billing.scan_for_overdue done found=%d published=%d",
-        len(overdue),
-        published,
-    )
-    return {"found": len(overdue), "published": published}
+    logger.info("billing.scan_for_overdue done %s", summary)
+    return summary
 
 
-async def _publish_overdue(session, *, inv) -> bool:
-    """Build the ``invoice.overdue_7d`` envelope + publish via the
-    bus. Sets a request context for the dispatcher subscriber so its
-    session opens with the right tenant scope; returns True when the
-    publish completed (subscriber outcomes are absorbed by the bus +
-    logged)."""
+async def _publish_overdue(
+    session, *, inv, days: int = 7, event_type: str = "invoice.overdue_7d"
+) -> bool:
+    """Build the ``invoice.overdue_<days>d`` envelope + publish via
+    the bus. Sets a request context for the dispatcher subscriber so
+    its session opens with the right tenant scope; returns True when
+    the publish completed (subscriber outcomes are absorbed by the
+    bus + logged).
+
+    ``days`` + ``event_type`` are keyword-optional to preserve the
+    original single-tier call signature — v2 callers pass both."""
     try:
         from datetime import datetime
 
@@ -163,11 +175,12 @@ async def _publish_overdue(session, *, inv) -> bool:
 
         token = set_context(RequestContext(org_id=inv.org_id, user_id=None))
         try:
+            slug = event_type.replace(".", "_")
             await events_publish(
-                "invoice.overdue_7d",
+                event_type,
                 payload,
                 org_id=inv.org_id,
-                event_id=f"invoice_overdue_7d:{inv.id}",
+                event_id=f"{slug}:{inv.id}",
             )
         finally:
             reset_context(token)

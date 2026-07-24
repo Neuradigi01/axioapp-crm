@@ -148,14 +148,8 @@ async def update_walk_in(
     before = _snapshot(walk_in)
     changes = payload.model_dump(exclude_unset=True)
 
-    if (
-        "assigned_to_id" in changes
-        and changes["assigned_to_id"] is not None
-        and org_id is not None
-    ):
-        await _assert_user_in_org(
-            session, org_id=org_id, user_uuid=changes["assigned_to_id"]
-        )
+    if "assigned_to_id" in changes and changes["assigned_to_id"] is not None and org_id is not None:
+        await _assert_user_in_org(session, org_id=org_id, user_uuid=changes["assigned_to_id"])
 
     # State-machine enforcement: only allow status transitions declared
     # in `ALLOWED_TRANSITIONS`. Identity transitions (X → X) are no-ops
@@ -588,10 +582,8 @@ async def convert_walk_in_to_lead(
     try:
         follow_up = Task(
             org_id=org_id,
-            title=f"Follow up on new lead (from walk-in)",
-            description=(
-                (notes or "").strip() or "Auto-created when the walk-in was converted."
-            ),
+            title="Follow up on new lead (from walk-in)",
+            description=((notes or "").strip() or "Auto-created when the walk-in was converted."),
             due_at=datetime.now(UTC) + timedelta(days=1),
             assigned_to_id=walk_in.assigned_to_id or actor_user_id,
             related_entity_type="lead",
@@ -622,6 +614,72 @@ async def convert_walk_in_to_lead(
             "contact_id": str(contact_id),
         },
     )
+
+    # tasks/automation-conditions/ follow-up — walk_in.converted
+    # unlocks the "handoff nudge" flow (auto WhatsApp to the walk-in
+    # contact once the rep creates the lead). Fire-and-forget with
+    # try/except so a bus / subscriber failure cannot roll back the
+    # freshly-committed conversion.
+    try:
+        from sqlalchemy import select as _select
+
+        from src.app.core.contacts.models import Contact
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+
+        contact = (
+            await session.execute(_select(Contact).where(Contact.id == contact_id))
+        ).scalar_one_or_none()
+        org = (
+            await session.execute(_select(Organization).where(Organization.id == org_id))
+        ).scalar_one_or_none()
+
+        payload: dict[str, Any] = {
+            "walk_in_id": str(walk_in.id),
+            "contact_id": str(contact_id),
+            "lead_id": str(lead.id),
+            "walk_in": {
+                "id": str(walk_in.id),
+                "assigned_to_id": (str(walk_in.assigned_to_id) if walk_in.assigned_to_id else None),
+                "budget": str(walk_in.budget) if walk_in.budget else None,
+            },
+            "lead": {
+                "id": str(lead.id),
+                "source": lead.source.value,
+                "pipeline_stage": lead.pipeline_stage,
+                "custom_data": lead.custom_data or {},
+            },
+        }
+        if contact is not None:
+            payload["contact"] = {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "email": contact.email,
+                "phone": contact.phone,
+                "custom_data": contact.custom_data or {},
+            }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+            }
+
+        await events_publish(
+            "walk_in.converted",
+            payload,
+            org_id=org_id,
+            event_id=f"walk_in_converted:{walk_in.id}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "walk_ins.convert publish_walk_in_converted_failed org=%s walk_in=%s lead=%s",
+            org_id,
+            walk_in.id,
+            lead.id,
+        )
 
     return walk_in, contact_id, lead.id
 
@@ -689,9 +747,7 @@ async def walk_ins_rollup(
         "avg_duration_min": (
             float(row.avg_duration_min) if row.avg_duration_min is not None else None
         ),
-        "avg_wait_min": (
-            float(row.avg_wait_min) if row.avg_wait_min is not None else None
-        ),
+        "avg_wait_min": (float(row.avg_wait_min) if row.avg_wait_min is not None else None),
     }
 
 
