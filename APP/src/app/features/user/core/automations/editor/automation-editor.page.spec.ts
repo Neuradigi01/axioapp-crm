@@ -57,6 +57,16 @@ describe('AutomationEditorPageComponent', () => {
           sample_payload: {
             user: { full_name: 'Asha', email: 'asha@x.com' },
           },
+          condition_fields: [
+            {
+              path: 'user.email',
+              label: 'Email',
+              type: 'text' as const,
+              group: 'User',
+              enum_resolver: null,
+              help_text: null,
+            },
+          ],
         },
         {
           event_type: 'lead.created',
@@ -66,6 +76,24 @@ describe('AutomationEditorPageComponent', () => {
             contact: { full_name: 'Asha', email: 'asha@x.com' },
             source: 'widget',
           },
+          condition_fields: [
+            {
+              path: 'source',
+              label: 'Source',
+              type: 'enum' as const,
+              group: 'Lead',
+              enum_resolver: 'lead_sources',
+              help_text: null,
+            },
+            {
+              path: 'lead.budget',
+              label: 'Budget',
+              type: 'currency' as const,
+              group: 'Lead',
+              enum_resolver: null,
+              help_text: null,
+            },
+          ],
         },
       ]),
     );
@@ -182,6 +210,48 @@ describe('AutomationEditorPageComponent', () => {
     cmp.save();
     expect(apiSpy.create).toHaveBeenCalled();
     expect(apiSpy.update).not.toHaveBeenCalled();
+  });
+
+  it('conditionFields tracks the selected event via toSignal(valueChanges)', () => {
+    // Regression pin for the pre-existing bug: FormControl.value is
+    // not a signal, so reading it inside computed(...) never
+    // re-fires on setValue. Step-3 routes valueChanges through
+    // toSignal so switching the event reliably refreshes the
+    // condition builder's field list.
+    const fixture = makeFixture();
+    const cmp = fixture.componentInstance as unknown as {
+      form: { controls: { event_type: { setValue: (v: string) => void } } };
+      conditionFields: () => Array<{ path: string; type: string }>;
+    };
+    fixture.detectChanges();
+    // Before any event is picked → empty.
+    expect(cmp.conditionFields().length).toBe(0);
+    // Pick lead.created → 2 fields (source enum + budget currency).
+    cmp.form.controls.event_type.setValue('lead.created');
+    fixture.detectChanges();
+    expect(cmp.conditionFields().length).toBe(2);
+    expect(cmp.conditionFields().map((f) => f.path)).toEqual(['source', 'lead.budget']);
+    // Switch to user.signed_up → 1 field.
+    cmp.form.controls.event_type.setValue('user.signed_up');
+    fixture.detectChanges();
+    expect(cmp.conditionFields().length).toBe(1);
+    expect(cmp.conditionFields()[0].path).toBe('user.email');
+  });
+
+  it('selectedEntry re-fires when event_type changes (dropdown-only builder regression)', () => {
+    const fixture = makeFixture();
+    const cmp = fixture.componentInstance as unknown as {
+      form: { controls: { event_type: { setValue: (v: string) => void } } };
+      selectedEntry: () => { event_type: string; label: string } | null;
+    };
+    fixture.detectChanges();
+    expect(cmp.selectedEntry()).toBeNull();
+    cmp.form.controls.event_type.setValue('lead.created');
+    fixture.detectChanges();
+    expect(cmp.selectedEntry()?.event_type).toBe('lead.created');
+    cmp.form.controls.event_type.setValue('user.signed_up');
+    fixture.detectChanges();
+    expect(cmp.selectedEntry()?.event_type).toBe('user.signed_up');
   });
 
   it('runDryRun calls the api with parsed JSON payload', () => {

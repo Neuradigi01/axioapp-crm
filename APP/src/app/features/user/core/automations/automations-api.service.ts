@@ -116,11 +116,43 @@ export interface RunListQuery {
   offset?: number;
 }
 
+/**
+ * Filter-field metadata surfaced by the backend for the customer-
+ * friendly condition builder (tasks/automation-conditions/ Step 1).
+ * `enum_resolver` names a resolver key from step-2's registry —
+ * `null` on non-enum types.
+ */
+export type FieldSpecType =
+  | 'text'
+  | 'number'
+  | 'currency'
+  | 'date'
+  | 'datetime'
+  | 'boolean'
+  | 'enum';
+
+export interface FieldSpec {
+  path: string;
+  label: string;
+  type: FieldSpecType;
+  group: string;
+  enum_resolver: string | null;
+  help_text: string | null;
+}
+
 export interface EventCatalogEntry {
   event_type: string;
   label: string;
   description: string;
   sample_payload: Record<string, unknown>;
+  condition_fields: FieldSpec[];
+}
+
+/** One row in the value dropdown returned by step-2's live enum
+ *  resolver endpoint. Matches `core.automation.enum_resolvers.EnumOption`. */
+export interface EnumOption {
+  value: string;
+  label: string;
 }
 
 export interface DryRunResult {
@@ -186,6 +218,21 @@ export class AutomationsApiService {
 
   listEventTypes(): Observable<EventCatalogEntry[]> {
     return this.http.get<EventCatalogEntry[]>(`${this.base}/event-types`);
+  }
+
+  /** tasks/automation-conditions/ Step 2 — fetch the caller org's
+   *  live options for one enum-typed field on one event. Powers the
+   *  condition-builder's Value dropdown for pipeline stages / lead
+   *  sources / users / etc. Errors:
+   *    - 404 `automation.event_not_found` — event isn't in the catalog.
+   *    - 404 `automation.field_not_found` — field isn't in the event's `condition_fields`.
+   *    - 422 `automation.field_not_enum`  — field's type isn't `enum`.
+   *  Zero-rows is NOT an error — the frontend renders a "no options" hint. */
+  listFieldValues(eventType: string, field: string): Observable<EnumOption[]> {
+    return this.http.post<EnumOption[]>(
+      `${this.base}/event-types/${encodeURIComponent(eventType)}/field-values`,
+      { field },
+    );
   }
 
   /** Step 8 — run the dispatcher path against a paste-in payload

@@ -152,6 +152,8 @@
           <div class="mt-2">
             <app-condition-builder
               [(conditions)]="conditions"
+              [conditionFields]="conditionFields()"
+              [eventType]="selectedEntry()?.event_type ?? ''"
               [samplePayload]="samplePayload()"
               [disabled]="!canWrite()"
             />

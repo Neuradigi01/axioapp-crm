@@ -1,10 +1,31 @@
-<div class="space-y-2">
-  @if (rules().length === 0) {
+<div class="space-y-3">
+  <!-- Empty-catalog fallback: no event picked yet OR the event's
+       catalog entry doesn't declare condition_fields. Nudges the
+       operator into Advanced mode so they still have an escape hatch. -->
+  @if (emptyCatalog()) {
+    <div
+      class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-3 text-center text-xs text-zinc-600"
+    >
+      <p>This event's payload isn't catalogued yet — the friendly picker has nothing to show.</p>
+      <button
+        type="button"
+        (click)="toggleAdvancedMode()"
+        [disabled]="disabled()"
+        class="mt-2 inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+      >
+        <lucide-icon name="chevrons-up-down" size="12" />
+        Use Advanced mode
+      </button>
+    </div>
+  }
+
+  @if (rules().length === 0 && !emptyCatalog()) {
     <p class="text-xs text-zinc-500 italic">
       No conditions — this trigger fires on every matching event.
     </p>
   }
 
+  <!-- Datalist for Advanced/legacy rows only. -->
   <datalist id="field-suggestions-condition-builder">
     @for (path of fieldSuggestions(); track path) {
       <option [value]="path"></option>
@@ -12,47 +33,258 @@
   </datalist>
 
   @for (rule of rules(); track $index; let i = $index; let last = $last) {
-    <div class="flex items-center gap-2">
-      <input
-        type="text"
-        list="field-suggestions-condition-builder"
-        [value]="rule.field"
-        (input)="onFieldChange(i, $any($event.target).value)"
-        [disabled]="disabled()"
-        placeholder="e.g. contact.email"
-        class="flex-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-mono focus:border-zinc-500 focus:outline-none disabled:opacity-50"
-      />
-      <select
-        [value]="rule.op"
-        (change)="onOpChange(i, $any($event.target).value)"
-        [disabled]="disabled()"
-        class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs focus:border-zinc-500 focus:outline-none disabled:opacity-50"
-      >
-        @for (op of OP_OPTIONS; track op.value) {
-          <option [value]="op.value">{{ op.label }}</option>
-        }
-      </select>
-      @if (opNeedsValue(rule.op)) {
-        <input
-          type="text"
-          [value]="rule.value"
-          (input)="onValueChange(i, $any($event.target).value)"
-          [disabled]="disabled()"
-          placeholder="value"
-          class="flex-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs focus:border-zinc-500 focus:outline-none disabled:opacity-50"
-        />
+    <div class="rounded-md border border-zinc-200 bg-zinc-50/50 p-3 hover:bg-zinc-50">
+      @if (ruleIsAdvanced(i)) {
+        <!-- Advanced / legacy row layout — free-text field-path
+             + full operator set + free-text value. Same as v1's
+             three-input grid, plus an amber "Custom" pill so the
+             operator sees this rule reads outside the catalog. -->
+        <div class="mb-2 flex items-center gap-2">
+          <span
+            class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800"
+          >
+            <lucide-icon name="alert-triangle" class="h-2.5 w-2.5" />
+            Custom (advanced)
+          </span>
+        </div>
+        <div class="grid grid-cols-1 items-end gap-2 md:grid-cols-[1fr_180px_1fr_28px]">
+          <label class="block">
+            <span class="text-[10px] font-medium uppercase text-zinc-500">Field path</span>
+            <input
+              type="text"
+              list="field-suggestions-condition-builder"
+              [value]="rule.field === CUSTOM_PATH ? '' : rule.field"
+              (input)="onFieldChange(i, $any($event.target).value)"
+              [disabled]="disabled()"
+              placeholder="e.g. lead.custom_data.tier"
+              class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-xs focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+            />
+          </label>
+          <label class="block">
+            <span class="text-[10px] font-medium uppercase text-zinc-500">Operator</span>
+            <select
+              [value]="rule.op"
+              (change)="onOpChange(i, $any($event.target).value)"
+              [disabled]="disabled()"
+              class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+            >
+              @for (op of opChoicesFor(i); track op.value) {
+                <option [value]="op.value">{{ op.label }}</option>
+              }
+            </select>
+          </label>
+          @if (opNeedsValue(rule.op)) {
+            <label class="block">
+              <span class="text-[10px] font-medium uppercase text-zinc-500">Value</span>
+              <input
+                type="text"
+                [value]="rule.value"
+                (input)="onValueChange(i, $any($event.target).value)"
+                [disabled]="disabled()"
+                placeholder="value"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+              />
+            </label>
+          } @else {
+            <span class="hidden md:block"></span>
+          }
+          <button
+            type="button"
+            (click)="removeRule(i)"
+            [disabled]="disabled()"
+            class="mt-5 flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:bg-white hover:text-rose-600 disabled:opacity-50"
+            aria-label="Remove rule"
+          >
+            <lucide-icon name="x" class="h-4 w-4" />
+          </button>
+        </div>
       } @else {
-        <span class="flex-1 px-2 py-1 text-xs text-zinc-400 italic"> (no value needed) </span>
+        <!-- Standard row layout — grouped Field dropdown +
+             type-filtered Op dropdown + type-aware Value input. -->
+        <div class="grid grid-cols-1 items-end gap-2 md:grid-cols-[1fr_180px_1fr_28px]">
+          <label class="block">
+            <span class="text-[10px] font-medium uppercase text-zinc-500">Field</span>
+            <select
+              [value]="rule.field"
+              (change)="onFieldChange(i, $any($event.target).value)"
+              [disabled]="disabled()"
+              class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+            >
+              @if (!rule.field) {
+                <option value="">— pick a field —</option>
+              }
+              @for (group of groupedFields(); track group.group) {
+                <optgroup [label]="'── ' + group.group + ' ──'">
+                  @for (opt of group.options; track opt.path) {
+                    <option [value]="opt.path">{{ opt.label }}</option>
+                  }
+                </optgroup>
+              }
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-[10px] font-medium uppercase text-zinc-500">Operator</span>
+            <select
+              [value]="rule.op"
+              (change)="onOpChange(i, $any($event.target).value)"
+              [disabled]="disabled() || !rule.field"
+              class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+            >
+              @for (op of opChoicesFor(i); track op.value) {
+                <option [value]="op.value">{{ op.label }}</option>
+              }
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-[10px] font-medium uppercase text-zinc-500">Value</span>
+            @if (!opNeedsValue(rule.op)) {
+              <span class="mt-0.5 block px-2 py-1.5 text-xs text-zinc-400 italic">
+                (no value needed)
+              </span>
+            } @else if (ruleFieldType(i) === 'enum' && !isMultiSelectOp(rule.op)) {
+              @if (valuePoolFor(rule); as pool) {
+                @if (pool.length === 0) {
+                  <span
+                    class="mt-0.5 block rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800"
+                  >
+                    No options configured yet.
+                  </span>
+                } @else {
+                  <select
+                    [value]="rule.value"
+                    (change)="onValueChange(i, $any($event.target).value)"
+                    [disabled]="disabled()"
+                    class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+                  >
+                    <option value="">— pick a value —</option>
+                    @for (opt of pool; track opt.value) {
+                      <option [value]="opt.value">{{ opt.label }}</option>
+                    }
+                  </select>
+                }
+              } @else {
+                <span class="mt-0.5 block px-2 py-1.5 text-xs text-zinc-400 italic">
+                  Loading options…
+                </span>
+              }
+            } @else if (ruleFieldType(i) === 'enum' && isMultiSelectOp(rule.op)) {
+              <div
+                class="mt-0.5 flex min-h-[34px] flex-wrap items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1"
+              >
+                @for (token of tokensFor(rule); track token) {
+                  <span
+                    class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] text-zinc-800"
+                  >
+                    {{ tokenLabel(rule, token) }}
+                    <button
+                      type="button"
+                      (click)="removeToken(i, token)"
+                      [disabled]="disabled()"
+                      class="text-zinc-500 hover:text-rose-600 disabled:opacity-50"
+                      aria-label="Remove tag"
+                    >
+                      <lucide-icon name="x" class="h-2.5 w-2.5" />
+                    </button>
+                  </span>
+                }
+                @if (valuePoolFor(rule); as pool) {
+                  <select
+                    #tagAdder
+                    (change)="addToken(i, tagAdder.value); tagAdder.value = ''"
+                    [disabled]="disabled() || pool.length === 0"
+                    class="flex-1 border-0 bg-transparent px-1 py-0.5 text-sm focus:outline-none disabled:opacity-50"
+                  >
+                    <option value="">
+                      {{ pool.length === 0 ? 'No options' : 'Add value…' }}
+                    </option>
+                    @for (opt of pool; track opt.value) {
+                      @if (!tokensFor(rule).includes(opt.value)) {
+                        <option [value]="opt.value">{{ opt.label }}</option>
+                      }
+                    }
+                  </select>
+                }
+              </div>
+            } @else if (ruleFieldType(i) === 'boolean') {
+              <div class="mt-0.5 inline-flex rounded-md border border-zinc-300 bg-white p-0.5">
+                <button
+                  type="button"
+                  (click)="onBooleanChange(i, true)"
+                  [disabled]="disabled()"
+                  [class]="rule.value === 'true' ? 'bg-zinc-900 text-white' : 'text-zinc-700'"
+                  class="rounded px-3 py-1 text-xs font-medium disabled:opacity-50"
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  (click)="onBooleanChange(i, false)"
+                  [disabled]="disabled()"
+                  [class]="rule.value === 'false' ? 'bg-zinc-900 text-white' : 'text-zinc-700'"
+                  class="rounded px-3 py-1 text-xs font-medium disabled:opacity-50"
+                >
+                  No
+                </button>
+              </div>
+            } @else if (ruleFieldType(i) === 'number') {
+              <input
+                type="number"
+                [value]="rule.value"
+                (input)="onValueChange(i, $any($event.target).value)"
+                [disabled]="disabled()"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+              />
+            } @else if (ruleFieldType(i) === 'currency') {
+              <div class="relative mt-0.5">
+                <span class="absolute inset-y-0 left-2 flex items-center text-sm text-zinc-500">
+                  {{ CURRENCY_SYMBOL }}
+                </span>
+                <input
+                  type="number"
+                  [value]="rule.value"
+                  (input)="onValueChange(i, $any($event.target).value)"
+                  [disabled]="disabled()"
+                  class="block w-full rounded-md border border-zinc-300 bg-white py-1.5 pl-6 pr-2 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+                />
+              </div>
+            } @else if (ruleFieldType(i) === 'date') {
+              <input
+                type="date"
+                [value]="rule.value"
+                (input)="onValueChange(i, $any($event.target).value)"
+                [disabled]="disabled()"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+              />
+            } @else if (ruleFieldType(i) === 'datetime') {
+              <input
+                type="datetime-local"
+                [value]="rule.value"
+                (input)="onValueChange(i, $any($event.target).value)"
+                [disabled]="disabled()"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+              />
+            } @else {
+              <input
+                type="text"
+                [value]="rule.value"
+                (input)="onValueChange(i, $any($event.target).value)"
+                [disabled]="disabled()"
+                placeholder="value"
+                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+              />
+            }
+          </label>
+          <button
+            type="button"
+            (click)="removeRule(i)"
+            [disabled]="disabled()"
+            class="mt-5 flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:bg-white hover:text-rose-600 disabled:opacity-50"
+            aria-label="Remove rule"
+          >
+            <lucide-icon name="x" class="h-4 w-4" />
+          </button>
+        </div>
       }
-      <button
-        type="button"
-        (click)="removeRule(i)"
-        [disabled]="disabled()"
-        class="rounded-md border border-zinc-300 bg-white p-1 text-zinc-500 hover:bg-zinc-50 disabled:opacity-50"
-        aria-label="Remove rule"
-      >
-        <lucide-icon name="x" size="12" />
-      </button>
     </div>
     @if (!last) {
       <div class="ml-1 flex items-center gap-2 text-[10px] uppercase tracking-wider text-zinc-400">
@@ -70,13 +302,33 @@
     }
   }
 
-  <button
-    type="button"
-    (click)="addRule()"
-    [disabled]="disabled()"
-    class="inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
-  >
-    <lucide-icon name="plus" size="12" />
-    Add condition
-  </button>
+  <div class="flex items-center gap-3">
+    <button
+      type="button"
+      (click)="addRule()"
+      [disabled]="disabled() || emptyCatalog()"
+      class="inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+    >
+      <lucide-icon name="plus" size="12" />
+      Add condition
+    </button>
+    <button
+      type="button"
+      (click)="advancedMode() ? addAdvancedRule() : toggleAdvancedMode()"
+      [disabled]="disabled()"
+      class="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-900 disabled:opacity-50"
+    >
+      <lucide-icon name="chevrons-up-down" size="12" />
+      {{ advancedMode() ? 'Add advanced rule' : 'Show advanced' }}
+    </button>
+  </div>
+
+  <!-- Plain-English preview so the customer eyeballs intent
+       before saving. -->
+  @if (rules().length > 0) {
+    <div class="mt-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+      <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Preview</p>
+      <p class="mt-1 text-sm text-zinc-800">{{ sentencePreview() }}</p>
+    </div>
+  }
 </div>
