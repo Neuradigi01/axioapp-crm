@@ -115,7 +115,11 @@ Estimated total: ~4–5 days for v1 (steps 1, 2, 3, 4, 6, 7). Step 5 adds ~1 day
 
 ## Rollback strategy
 
-Every step ships behind a feature flag `automation_conditions.friendly_builder_enabled` (default `false` at rollout, flipped to `true` per-tenant once QA passes). Flipping the flag off reverts to the current free-text builder verbatim — the underlying JSON contract never changed, so stored triggers keep firing regardless of which builder authored them.
+No feature flag. The customer-friendly builder ships on for every tenant the moment step-3's frontend rewrite lands — the whole point of this track is to give customers a good UI, and gating it behind a default-off flag fights that goal.
+
+Rollback insurance comes from the JSON contract, not a flag: the `conditions` JSONB shape stored on `tbl_automation_triggers` is unchanged, so if step-3's UI ever ships broken, reverting the frontend commit (or serving the previous bundle) instantly restores the old free-text builder. Every stored trigger keeps firing regardless of which builder authored it.
+
+Backend endpoints (`/event-types` extended in step-1, `/field-values` new in step-2) are additive — old frontends ignore the extra JSON keys, so shipping the backend ahead of the frontend is a no-op for anyone still on the old bundle.
 
 ## Notes for the AI implementing
 

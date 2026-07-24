@@ -14,16 +14,15 @@ Four coverage pins guard against drift as the catalog grows:
    set (populated by step-2) or a pack-owned key. Step-1 only knows
    the built-in list; step-7 extends the assertion for pack keys.
 
-Two behaviour tests for the ``_register`` drift guard + the feature
-flag round the file out — ``_register`` must raise loudly on a bad
-path, and the ``/event-types`` endpoint must respect the flag.
+One drift-guard behaviour test and one endpoint shape test round the
+file out — ``_register`` must raise loudly on a bad path, and the
+``/event-types`` endpoint must serialise ``condition_fields`` for
+the frontend to consume.
 """
 
 from __future__ import annotations
 
-import os
 import uuid
-from unittest import mock
 
 import pytest
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -32,7 +31,6 @@ from src.app.core.automation import event_catalog
 from src.app.core.automation.field_specs import FieldSpec, FieldType, path_resolves
 from src.app.core.permissions.models import RolePermission
 from src.app.core.permissions.service import register_permission
-
 
 # Built-in resolver keys step-1 knows about. Step-2's registry lands
 # them concretely; until then we keep the list here so the coverage
@@ -68,7 +66,8 @@ def test_every_catalog_entry_has_condition_fields():
             misses.append(entry.event_type)
     assert not misses, (
         f"{len(misses)} catalog entries lack condition_fields: {misses}. "
-        f"Add specs before turning the friendly-builder flag on."
+        f"Every event MUST declare its filter fields — the frontend consumes "
+        f"them to render the condition-builder dropdown."
     )
 
 
@@ -149,7 +148,7 @@ def test_register_raises_on_bad_path():
     assert "__pin__.bad_path" not in event_catalog._CATALOG  # noqa: SLF001
 
 
-# --- feature-flag gating on /event-types ----------------------------
+# --- /event-types wire shape ----------------------------------------
 
 
 _AUTOMATION_KEYS = ("automations.read",)
@@ -181,9 +180,11 @@ async def _login(layered_client, *, org_slug: str, email: str, password: str) ->
 
 
 @pytest.mark.asyncio
-async def test_event_types_endpoint_hides_condition_fields_when_flag_off(
-    layered_client, seeded_admin
-):
+async def test_event_types_endpoint_serialises_condition_fields(layered_client, seeded_admin):
+    """Every catalog entry ships its ``condition_fields`` on the wire
+    so the customer-friendly builder can render dropdowns. Spot-check
+    both an enum field (pipeline_stage) and a non-enum currency
+    field (budget) on the most variable-rich event."""
     await _grant_keys(seeded_admin["role"].id, *_AUTOMATION_KEYS)
     token = await _login(
         layered_client,
@@ -191,39 +192,12 @@ async def test_event_types_endpoint_hides_condition_fields_when_flag_off(
         email=seeded_admin["user"].email,
         password=seeded_admin["password"],
     )
-    with mock.patch.dict(os.environ, {"AUTOMATION_CONDITIONS_FRIENDLY_BUILDER_ENABLED": "false"}):
-        resp = await layered_client.get(
-            "/api/v1/automations/event-types",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-    assert resp.status_code == 200
-    entries = resp.json()
-    assert entries, "catalog is empty — expected at least one entry"
-    for entry in entries:
-        assert entry["condition_fields"] == [], (
-            f"flag off but {entry['event_type']} still shipped condition_fields"
-        )
-
-
-@pytest.mark.asyncio
-async def test_event_types_endpoint_returns_condition_fields_when_flag_on(
-    layered_client, seeded_admin
-):
-    await _grant_keys(seeded_admin["role"].id, *_AUTOMATION_KEYS)
-    token = await _login(
-        layered_client,
-        org_slug=seeded_admin["org"].slug,
-        email=seeded_admin["user"].email,
-        password=seeded_admin["password"],
+    resp = await layered_client.get(
+        "/api/v1/automations/event-types",
+        headers={"Authorization": f"Bearer {token}"},
     )
-    with mock.patch.dict(os.environ, {"AUTOMATION_CONDITIONS_FRIENDLY_BUILDER_ENABLED": "true"}):
-        resp = await layered_client.get(
-            "/api/v1/automations/event-types",
-            headers={"Authorization": f"Bearer {token}"},
-        )
     assert resp.status_code == 200
     entries = {e["event_type"]: e for e in resp.json()}
-    # Spot-check the most variable-rich event.
     lead_created = entries["lead.created"]
     assert lead_created["condition_fields"], "lead.created lost its condition_fields"
     paths = {spec["path"]: spec for spec in lead_created["condition_fields"]}
@@ -232,7 +206,6 @@ async def test_event_types_endpoint_returns_condition_fields_when_flag_on(
     assert stage["type"] == "enum"
     assert stage["enum_resolver"] == "pipeline_stages"
     assert stage["group"] == "Lead"
-    # Non-enum sanity: currency field has no resolver.
     budget = paths.get("lead.budget")
     assert budget is not None
     assert budget["type"] == "currency"
