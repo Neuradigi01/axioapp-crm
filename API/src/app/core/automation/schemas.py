@@ -96,3 +96,30 @@ class RunRead(BaseModel):
     scheduled_at: datetime
     dispatched_at: datetime | None
     completed_at: datetime | None
+
+
+# --- tasks/automation-conditions/ Step 2 ----------------------------
+
+
+class FieldValuesRequest(BaseModel):
+    """``POST /automations/event-types/{event}/field-values`` body.
+
+    ``field`` is the dot-path the customer just picked in the
+    condition builder's field dropdown (e.g. ``"lead.pipeline_stage"``).
+    Must match one of the event's ``condition_fields`` entries — the
+    service raises :class:`FieldNotFound` otherwise.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    field: str = Field(min_length=1, max_length=200)
+
+
+class EnumOptionOut(BaseModel):
+    """One row in the value-dropdown response. Matches
+    :class:`core.automation.enum_resolvers.EnumOption` on the wire."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: str
+    label: str

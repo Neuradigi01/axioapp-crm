@@ -73,10 +73,65 @@ class MissingTemplateForChannel(AutomationError):
         self.template_channel = template_channel
 
 
+# --- tasks/automation-conditions/ Step 2 ----------------------------
+
+
+class FieldNotFound(AutomationError):
+    """Customer's ``field-values`` request references a field path
+    that isn't in the event's ``condition_fields`` spec. Router maps
+    to 404."""
+
+    code = "automation.field_not_found"
+
+    def __init__(self, *, event_type: str, field: str) -> None:
+        super().__init__(
+            f"field {field!r} is not declared on event {event_type!r}'s condition_fields"
+        )
+        self.event_type = event_type
+        self.field = field
+
+
+class FieldNotEnum(AutomationError):
+    """Customer's ``field-values`` request references a field whose
+    type is not ``enum`` (e.g. a text or currency field, which
+    doesn't have a value pool to lookup). Router maps to 422."""
+
+    code = "automation.field_not_enum"
+
+    def __init__(self, *, event_type: str, field: str, field_type: str) -> None:
+        super().__init__(
+            f"field {field!r} on event {event_type!r} has type {field_type!r}, "
+            f"not 'enum' — only enum fields have a value pool to look up."
+        )
+        self.event_type = event_type
+        self.field = field
+        self.field_type = field_type
+
+
+class ResolverNotRegistered(AutomationError):
+    """A ``FieldSpec.enum_resolver`` key doesn't have a matching entry
+    in the resolver registry. This is a code bug — the
+    ``test_every_field_spec_resolver_key_is_registered`` pin should
+    catch it before deploy. Router maps to 500."""
+
+    code = "automation.resolver_not_registered"
+
+    def __init__(self, resolver_key: str) -> None:
+        super().__init__(
+            f"enum_resolver key {resolver_key!r} is not registered — "
+            f"add a matching register_resolver(...) call in "
+            f"core.automation.enum_resolvers (or a pack's event_catalog.py)."
+        )
+        self.resolver_key = resolver_key
+
+
 __all__ = [
     "AutomationError",
     "DuplicateTriggerName",
+    "FieldNotEnum",
+    "FieldNotFound",
     "InvalidCondition",
     "MissingTemplateForChannel",
+    "ResolverNotRegistered",
     "TriggerNotFound",
 ]

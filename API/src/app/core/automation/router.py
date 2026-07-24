@@ -36,8 +36,11 @@ from src.app.core.automation import service as automation_service
 from src.app.core.automation.exceptions import (
     AutomationError,
     DuplicateTriggerName,
+    FieldNotEnum,
+    FieldNotFound,
     InvalidCondition,
     MissingTemplateForChannel,
+    ResolverNotRegistered,
     TriggerNotFound,
 )
 from src.app.core.automation.field_specs import FieldType
@@ -48,6 +51,8 @@ from src.app.core.automation.permissions import (
     PERM_WRITE,
 )
 from src.app.core.automation.schemas import (
+    EnumOptionOut,
+    FieldValuesRequest,
     RunRead,
     TriggerCreate,
     TriggerRead,
@@ -113,7 +118,7 @@ class EventCatalogEntry(BaseModel):
 
 
 def _automation_http_map(exc: AutomationError) -> HTTPException:
-    if isinstance(exc, TriggerNotFound):
+    if isinstance(exc, (TriggerNotFound, FieldNotFound)):
         return HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": exc.code, "message": str(exc)},
@@ -123,9 +128,16 @@ def _automation_http_map(exc: AutomationError) -> HTTPException:
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": exc.code, "message": str(exc)},
         )
-    if isinstance(exc, (InvalidCondition, MissingTemplateForChannel)):
+    if isinstance(exc, (InvalidCondition, MissingTemplateForChannel, FieldNotEnum)):
         return HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": exc.code, "message": str(exc)},
+        )
+    if isinstance(exc, ResolverNotRegistered):
+        # Code bug — pin-test should have caught it before deploy. 500
+        # so ops notice; ``detail.code`` preserved for structured error.
+        return HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"code": exc.code, "message": str(exc)},
         )
     return HTTPException(
@@ -348,6 +360,59 @@ async def list_event_types_endpoint(
         )
         for entry in event_catalog.list_catalog()
     ]
+
+
+@router.post(
+    "/event-types/{event_type}/field-values",
+    response_model=list[EnumOptionOut],
+)
+async def list_field_values_endpoint(
+    event_type: str,
+    payload: FieldValuesRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_READ)),
+) -> list[EnumOptionOut]:
+    """Return the caller org's live options for one enum-typed field
+    on one event (``tasks/automation-conditions/`` Step 2).
+
+    Fires from the condition builder whenever the customer picks a
+    new enum field in the "Only if" dropdown — the frontend uses
+    the response to populate the Value dropdown with the org's
+    actual pipeline stages / lead sources / users / etc.
+
+    Empty list is a valid response (org hasn't configured any
+    values yet — frontend renders the "no options" hint). 404 when
+    the event or field isn't in the catalog; 422 when the field
+    isn't of enum type.
+    """
+    # Fast 404 when the event isn't in the catalog — avoids raising
+    # + catching FieldNotFound in the service path for the common
+    # "typo in URL" case.
+    if event_catalog.get_entry(event_type) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "automation.event_not_found",
+                "message": f"event type {event_type!r} is not in the catalog",
+            },
+        )
+    try:
+        options = await automation_service.list_field_values(
+            db,
+            org_id=user.org_id,
+            event_type=event_type,
+            field=payload.field,
+        )
+    except AutomationError as exc:
+        raise _automation_http_map(exc) from exc
+
+    # Small private cache so repeat picks of the same field across
+    # editor tabs don't re-hit the resolver — pool values change
+    # rarely (adding a pipeline stage is a Settings action). The
+    # frontend also caches in-session (step-3).
+    response.headers["Cache-Control"] = "private, max-age=60"
+    return [EnumOptionOut(value=o.value, label=o.label) for o in options]
 
 
 # --- per-contact run list + retry + run-now (Step 9) ---------------

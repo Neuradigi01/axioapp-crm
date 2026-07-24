@@ -27,31 +27,10 @@ import uuid
 import pytest
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from src.app.core.automation import event_catalog
+from src.app.core.automation import enum_resolvers, event_catalog
 from src.app.core.automation.field_specs import FieldSpec, FieldType, path_resolves
 from src.app.core.permissions.models import RolePermission
 from src.app.core.permissions.service import register_permission
-
-# Built-in resolver keys step-1 knows about. Step-2's registry lands
-# them concretely; until then we keep the list here so the coverage
-# pin can validate every FieldSpec's enum_resolver references a real
-# key. Step-7 extends this with pack-owned keys.
-_BUILTIN_RESOLVERS: frozenset[str] = frozenset(
-    {
-        "pipeline_stages",
-        "lead_sources",
-        "lead_statuses",
-        "users",
-        "users_roles",
-        "tags",
-        "appointment_purposes",
-        "invoice_statuses",
-        "payment_methods",
-        "direction_updown",
-        "channels",
-    }
-)
-
 
 # --- coverage pins ---------------------------------------------------
 
@@ -99,23 +78,25 @@ def test_field_spec_paths_resolve_in_sample_payload():
     assert not problems, f"FieldSpec paths that don't resolve into sample_payload: {problems}"
 
 
-def test_every_enum_resolver_is_registered_or_builtin():
-    """Step-1 only knows the built-in resolver keys. Once step-7
-    lands, this test's assertion extends to include pack-registered
-    keys. Failing here is a genuine drift — either add the resolver
-    to step-2's registry or fix the FieldSpec to point at an
-    existing key."""
+def test_every_enum_resolver_is_registered():
+    """Every ``FieldSpec.enum_resolver`` key must resolve to a real
+    callable in step-2's registry. Fails when a FieldSpec references
+    a key that no module registers — a code bug that would otherwise
+    surface only at request time as a 500 from the
+    ``/field-values`` endpoint."""
+    registered = set(enum_resolvers.list_registered_keys())
     unknown: list[str] = []
     for entry in event_catalog.list_catalog():
         for spec in entry.condition_fields:
             if spec.enum_resolver is None:
                 continue
-            if spec.enum_resolver not in _BUILTIN_RESOLVERS:
+            if spec.enum_resolver not in registered:
                 unknown.append(f"{entry.event_type}:{spec.path} -> {spec.enum_resolver!r}")
     assert not unknown, (
-        f"FieldSpec references resolver keys not in _BUILTIN_RESOLVERS: {unknown}. "
-        f"Either register them in step-2's enum_resolvers module or update "
-        f"_BUILTIN_RESOLVERS in this test to include a new built-in."
+        f"FieldSpec references resolver keys not in the registry: {unknown}. "
+        f"Register them in core.automation.enum_resolvers (or a pack's "
+        f"event_catalog.py for pack-owned keys per step-7). Currently "
+        f"registered: {sorted(registered)}"
     )
 
 

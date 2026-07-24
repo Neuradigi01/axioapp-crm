@@ -25,6 +25,12 @@ See ``tasks/automation-engine/README.md`` for the full plan."""
 # load time so every FastAPI worker registers the dispatcher once
 # without main.py needing a dedicated wiring line. The conversations
 # adapters follow the same pattern.
+# tasks/automation-conditions/ Step 2 — side-effect import so every
+# built-in enum resolver registers with the module-level registry
+# before the app serves its first ``/field-values`` request. Kept
+# below the dispatcher import for load-order clarity (both are
+# side-effect imports; neither has actual runtime deps on the other).
+from src.app.core.automation import enum_resolvers  # noqa: F401 — import side-effect
 from src.app.core.automation.dispatcher import register_bus_subscriber
 
 register_bus_subscriber()

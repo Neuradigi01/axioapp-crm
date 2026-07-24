@@ -44,12 +44,17 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.automation import conditions, data_access
+from src.app.core.automation import conditions, data_access, enum_resolvers, event_catalog
+from src.app.core.automation.enum_resolvers import EnumOption
 from src.app.core.automation.exceptions import (
     DuplicateTriggerName,
+    FieldNotEnum,
+    FieldNotFound,
     MissingTemplateForChannel,
+    ResolverNotRegistered,
     TriggerNotFound,
 )
+from src.app.core.automation.field_specs import FieldType
 from src.app.core.automation.models import AutomationTrigger
 from src.app.core.automation.schemas import TriggerCreate, TriggerUpdate
 from src.app.core.conversations.models import ConversationChannel
@@ -359,12 +364,72 @@ async def _set_enabled(
     return trigger
 
 
+# --- tasks/automation-conditions/ Step 2 ----------------------------
+
+
+async def list_field_values(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    event_type: str,
+    field: str,
+) -> list[EnumOption]:
+    """Return the caller org's live options for one enum-typed field
+    on one event.
+
+    Backs the ``POST /event-types/{event}/field-values`` endpoint.
+    Raises:
+      * :class:`event_catalog.get_entry` returning ``None`` → caller
+        (router) maps to a 404 ``event_not_found`` — no exception here
+        because the router already has a clean way to signal it via
+        the endpoint's path resolution.
+      * :class:`FieldNotFound` when ``field`` isn't in the event's
+        ``condition_fields`` → 404.
+      * :class:`FieldNotEnum` when the matched field's type isn't
+        ``enum`` → 422 (e.g. customer picked a currency or text field).
+      * :class:`ResolverNotRegistered` when the field's
+        ``enum_resolver`` key has no registered callable → 500 (code
+        bug; pin-test catches it before deploy).
+
+    Zero-rows is NOT an error — the frontend renders a "no options
+    configured — set them up under Settings → …" hint on ``[]``.
+    """
+    entry = event_catalog.get_entry(event_type)
+    if entry is None:
+        # Signalled by the router via a path-level 404 before this
+        # call in practice — but service-layer guard keeps the
+        # function safe if called directly (dispatcher, tests, etc.).
+        raise FieldNotFound(event_type=event_type, field=field)
+
+    spec = next((s for s in entry.condition_fields if s.path == field), None)
+    if spec is None:
+        raise FieldNotFound(event_type=event_type, field=field)
+
+    if spec.type is not FieldType.enum:
+        raise FieldNotEnum(
+            event_type=event_type,
+            field=field,
+            field_type=spec.type.value,
+        )
+
+    # FieldSpec.__post_init__ guarantees enum_resolver is set when
+    # type is enum, so this cast is safe.
+    resolver_key = spec.enum_resolver
+    assert resolver_key is not None
+    resolver = enum_resolvers.get_resolver(resolver_key)
+    if resolver is None:
+        raise ResolverNotRegistered(resolver_key)
+
+    return await resolver(session, org_id)
+
+
 __all__ = [
     "create_trigger",
     "delete_trigger",
     "disable_trigger",
     "enable_trigger",
     "get_trigger",
+    "list_field_values",
     "list_triggers",
     "match_triggers",
     "update_trigger",
