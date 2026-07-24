@@ -171,6 +171,36 @@ export class AutomationEditorPageComponent {
     () => this.selectedEntry()?.condition_fields ?? [],
   );
 
+  /** Paths in the loaded trigger's conditions that AREN'T declared
+   *  by the current event's `condition_fields` (tasks/automation-
+   *  conditions/ Step 4). Drives the top-of-page deprecation
+   *  banner + informs the operator that the trigger still fires but
+   *  is filtering on a retired field name. Walks the AST including
+   *  nested `all` / `any` branches. */
+  protected readonly legacyRulePaths = computed<string[]>(() => {
+    const knownPaths = new Set(this.conditionFields().map((f) => f.path));
+    if (knownPaths.size === 0) return [];
+    const found: string[] = [];
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return;
+      const n = node as Record<string, unknown>;
+      if ('all' in n && Array.isArray(n['all'])) {
+        for (const child of n['all'] as unknown[]) walk(child);
+        return;
+      }
+      if ('any' in n && Array.isArray(n['any'])) {
+        for (const child of n['any'] as unknown[]) walk(child);
+        return;
+      }
+      if ('field' in n && 'op' in n) {
+        const field = String(n['field'] ?? '');
+        if (field && !knownPaths.has(field)) found.push(field);
+      }
+    };
+    walk(this.conditions());
+    return found;
+  });
+
   protected readonly channelLocked = computed<boolean>(() => this.trigger() !== null);
 
   constructor() {

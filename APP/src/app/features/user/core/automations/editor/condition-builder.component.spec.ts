@@ -70,6 +70,10 @@ interface BuilderProbe {
   toggleConjunction(): void;
   sentencePreview(): string;
   valuePools(): Map<string, EnumOption[]>;
+  advancedMode(): boolean;
+  toggleAdvancedMode(): void;
+  ruleIsAdvanced(index: number): boolean;
+  ruleIsLegacy(index: number): boolean;
 }
 
 describe('ConditionBuilderComponent', () => {
@@ -192,5 +196,115 @@ describe('ConditionBuilderComponent', () => {
     expect(preview).toContain('AND');
     expect(preview).toContain("Lead's Budget is at least");
     expect(preview).toContain('₹');
+  });
+
+  // --- Step 4: legacy paths compatibility ----------------------------
+
+  /**
+   * Fixture: preload a trigger whose ``conditions`` reference a
+   * field path (``lead.custom_widget_id``) not in the current
+   * catalog. Builder must:
+   *   * auto-engage Advanced mode so the row stays visible,
+   *   * classify the row as Legacy (not Advanced),
+   *   * preserve the AST byte-identically on a save-without-touch.
+   */
+  const LEGACY_AST = {
+    field: 'lead.custom_widget_id',
+    op: 'eq' as const,
+    value: 'banner_v2',
+  };
+
+  function makeLegacyFixture(): ComponentFixture<ConditionBuilderComponent> {
+    apiSpy = jasmine.createSpyObj<AutomationsApiService>('AutomationsApiService', [
+      'listFieldValues',
+    ]);
+    apiSpy.listFieldValues.and.returnValue(of(STAGE_OPTIONS));
+
+    TestBed.configureTestingModule({
+      imports: [ConditionBuilderComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: AutomationsApiService, useValue: apiSpy },
+      ],
+    });
+
+    const fixture = TestBed.createComponent(ConditionBuilderComponent);
+    fixture.componentRef.setInput('conditionFields', FIXTURE_FIELDS);
+    fixture.componentRef.setInput('eventType', 'lead.created');
+    fixture.componentRef.setInput('conditions', LEGACY_AST);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('loading a trigger with a legacy path auto-engages Advanced mode', () => {
+    const fixture = makeLegacyFixture();
+    const cmp = probe(fixture);
+    expect(cmp.advancedMode()).toBe(true);
+    expect(cmp.rules().length).toBe(1);
+    expect(cmp.ruleIsAdvanced(0)).toBe(true);
+    expect(cmp.ruleIsLegacy(0)).toBe(true);
+  });
+
+  it('loading + saving a legacy trigger without touching it produces byte-identical conditions', () => {
+    const fixture = makeLegacyFixture();
+    const cmp = fixture.componentInstance;
+    // The two-way `conditions` model was emitted at least once by
+    // the hydrate effect — read it back and verify it's structurally
+    // identical to the input. Byte-identical means every key + every
+    // value + every type preserved (string stays string, number
+    // stays number).
+    const emitted = cmp.conditions();
+    expect(emitted).toEqual(LEGACY_AST);
+    // Property-key order preserved too (JSON.stringify catches
+    // insertion-order drift for the byte-level assertion).
+    expect(JSON.stringify(emitted)).toBe(JSON.stringify(LEGACY_AST));
+  });
+
+  it('mixes one standard and one legacy rule in a single trigger', () => {
+    const mixedAst = {
+      all: [
+        { field: 'lead.pipeline_stage', op: 'eq' as const, value: 'won' },
+        { field: 'lead.custom_widget_id', op: 'eq' as const, value: 'banner_v2' },
+      ],
+    };
+    apiSpy = jasmine.createSpyObj<AutomationsApiService>('AutomationsApiService', [
+      'listFieldValues',
+    ]);
+    apiSpy.listFieldValues.and.returnValue(of(STAGE_OPTIONS));
+    TestBed.configureTestingModule({
+      imports: [ConditionBuilderComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: AutomationsApiService, useValue: apiSpy },
+      ],
+    });
+    const fixture = TestBed.createComponent(ConditionBuilderComponent);
+    fixture.componentRef.setInput('conditionFields', FIXTURE_FIELDS);
+    fixture.componentRef.setInput('eventType', 'lead.created');
+    fixture.componentRef.setInput('conditions', mixedAst);
+    fixture.detectChanges();
+    const cmp = probe(fixture);
+    expect(cmp.rules().length).toBe(2);
+    expect(cmp.ruleIsLegacy(0)).toBe(false);
+    expect(cmp.ruleIsAdvanced(0)).toBe(false);
+    expect(cmp.ruleIsLegacy(1)).toBe(true);
+    expect(cmp.ruleIsAdvanced(1)).toBe(true);
+    // Save-without-touch preserves the whole tree.
+    expect(fixture.componentInstance.conditions()).toEqual(mixedAst);
+  });
+
+  it('toggling Advanced off keeps legacy rules in the emitted AST', () => {
+    const fixture = makeLegacyFixture();
+    const cmp = probe(fixture);
+    expect(cmp.advancedMode()).toBe(true);
+    // Operator turns Advanced off — the UI stops showing the row
+    // (verified via cmp.advancedMode() = false + template branch)
+    // but the AST must still carry it so a save doesn't drop it.
+    cmp.toggleAdvancedMode();
+    expect(cmp.advancedMode()).toBe(false);
+    expect(cmp.rules().length).toBe(1);
+    expect(fixture.componentInstance.conditions()).toEqual(LEGACY_AST);
   });
 });

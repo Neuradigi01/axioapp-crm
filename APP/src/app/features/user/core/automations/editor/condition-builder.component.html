@@ -37,15 +37,33 @@
       @if (ruleIsAdvanced(i)) {
         <!-- Advanced / legacy row layout — free-text field-path
              + full operator set + free-text value. Same as v1's
-             three-input grid, plus an amber "Custom" pill so the
-             operator sees this rule reads outside the catalog. -->
+             three-input grid, plus an amber pill so the operator
+             knows this rule reads outside the standard catalog.
+             Two flavours (tasks/automation-conditions/ Step 4):
+               * Custom (legacy) — loaded rule whose path isn't in
+                 the current catalog; the field survived a code
+                 change that renamed / retired the underlying key.
+               * Custom (advanced) — operator explicitly added a
+                 Custom row via "+ Add advanced rule" to reference
+                 a path outside the friendly picker. -->
         <div class="mb-2 flex items-center gap-2">
-          <span
-            class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800"
-          >
-            <lucide-icon name="alert-triangle" class="h-2.5 w-2.5" />
-            Custom (advanced)
-          </span>
+          @if (ruleIsLegacy(i)) {
+            <span
+              class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800"
+              title="This field isn't in the current picker. Editing continues to work, but consider migrating to a standard field."
+            >
+              <lucide-icon name="alert-triangle" class="h-2.5 w-2.5" />
+              Custom (legacy)
+            </span>
+          } @else {
+            <span
+              class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700"
+              title="Advanced row — you're referencing a path outside the friendly picker."
+            >
+              <lucide-icon name="chevrons-up-down" class="h-2.5 w-2.5" />
+              Custom (advanced)
+            </span>
+          }
         </div>
         <div class="grid grid-cols-1 items-end gap-2 md:grid-cols-[1fr_180px_1fr_28px]">
           <label class="block">

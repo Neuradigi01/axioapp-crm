@@ -85,6 +85,14 @@ interface Rule {
   /** String for scalar ops, comma-separated for `in` / `not_in`
    *  before the AST-emit converts it to `string[]`. */
   value: string;
+  /** Snapshot of the raw AST leaf this rule was hydrated from —
+   *  used for byte-identical round-trip preservation
+   *  (tasks/automation-conditions/ Step 4). If the operator never
+   *  edits the rule, `emitConditions` returns this original leaf
+   *  verbatim, so a legacy trigger's stored JSONB survives a
+   *  load-and-save with no drift. Set to `null` on any mutation
+   *  (field / op / value change) and on newly-added rules. */
+  original: Record<string, unknown> | null;
 }
 
 interface OpChoice {
@@ -380,7 +388,7 @@ export class ConditionBuilderComponent {
     // to Advanced mode's custom path.
     const first = this.conditionFields()[0];
     const seedField = first?.path ?? '';
-    const fresh: Rule = { field: seedField, op: 'eq', value: '' };
+    const fresh: Rule = { field: seedField, op: 'eq', value: '', original: null };
     this.rules.update((rs) => [...rs, fresh]);
     if (seedField) this.maybeFetchValues(seedField);
     this.emitConditions();
@@ -389,7 +397,7 @@ export class ConditionBuilderComponent {
   protected addAdvancedRule(): void {
     if (this.disabled()) return;
     this.advancedMode.set(true);
-    this.rules.update((rs) => [...rs, { field: CUSTOM_PATH, op: 'eq', value: '' }]);
+    this.rules.update((rs) => [...rs, { field: CUSTOM_PATH, op: 'eq', value: '', original: null }]);
     this.emitConditions();
   }
 
@@ -404,7 +412,7 @@ export class ConditionBuilderComponent {
     this.rules.update((rs) =>
       rs.map((r, i) => {
         if (i !== index) return r;
-        const next: Rule = { ...r, field: value };
+        const next: Rule = { ...r, field: value, original: null };
         // If the new field's type doesn't permit the current op,
         // reset to `eq` so the emitted AST stays valid.
         const type = this.fieldTypeFor(value);
@@ -423,7 +431,7 @@ export class ConditionBuilderComponent {
     this.rules.update((rs) =>
       rs.map((r, i) => {
         if (i !== index) return r;
-        const next: Rule = { ...r, op: value };
+        const next: Rule = { ...r, op: value, original: null };
         // Op switch that changes the value shape (single ↔ multi
         // select for enum fields) → clear so we don't ship a
         // half-typed value.
@@ -438,14 +446,16 @@ export class ConditionBuilderComponent {
 
   protected onValueChange(index: number, value: string): void {
     if (this.disabled()) return;
-    this.rules.update((rs) => rs.map((r, i) => (i === index ? { ...r, value } : r)));
+    this.rules.update((rs) =>
+      rs.map((r, i) => (i === index ? { ...r, value, original: null } : r)),
+    );
     this.emitConditions();
   }
 
   protected onTagsChange(index: number, tokens: string[]): void {
     if (this.disabled()) return;
     this.rules.update((rs) =>
-      rs.map((r, i) => (i === index ? { ...r, value: tokens.join(',') } : r)),
+      rs.map((r, i) => (i === index ? { ...r, value: tokens.join(','), original: null } : r)),
     );
     this.emitConditions();
   }
@@ -453,7 +463,9 @@ export class ConditionBuilderComponent {
   protected onBooleanChange(index: number, value: boolean): void {
     if (this.disabled()) return;
     this.rules.update((rs) =>
-      rs.map((r, i) => (i === index ? { ...r, value: value ? 'true' : 'false' } : r)),
+      rs.map((r, i) =>
+        i === index ? { ...r, value: value ? 'true' : 'false', original: null } : r,
+      ),
     );
     this.emitConditions();
   }
@@ -483,6 +495,19 @@ export class ConditionBuilderComponent {
     if (r.field === CUSTOM_PATH) return true;
     // Legacy path — field selected but not in the current catalog.
     return !!r.field && !this.fieldsByPath().has(r.field);
+  }
+
+  /** Legacy = rule was hydrated from a stored AST leaf whose field
+   *  path isn't in the current catalog. Distinct from Advanced =
+   *  operator explicitly added a Custom row via "Add advanced rule"
+   *  (which uses the CUSTOM_PATH sentinel). Drives the pill label +
+   *  the editor page's deprecation banner. */
+  protected ruleIsLegacy(index: number): boolean {
+    const r = this.rules()[index];
+    if (!r) return false;
+    if (r.field === CUSTOM_PATH) return false;
+    if (!r.field) return false;
+    return !this.fieldsByPath().has(r.field);
   }
 
   /** Op choices for the rule's field. */
@@ -644,6 +669,12 @@ export class ConditionBuilderComponent {
                   : Array.isArray(value)
                     ? value.join(',')
                     : String(value),
+          // Snapshot the raw leaf so an untouched round-trip emits
+          // it verbatim — matters most for legacy rules where the
+          // stored shape may not match what a re-emit would produce
+          // (e.g. numeric value stored as int vs. hydrated as
+          // string). Cleared to null on any mutator call.
+          original: { ...n },
         });
       }
     }
@@ -665,6 +696,13 @@ export class ConditionBuilderComponent {
   }
 
   private ruleToLeaf(rule: Rule): Record<string, unknown> {
+    // Byte-identical round-trip preservation for legacy rules
+    // (tasks/automation-conditions/ Step 4). If the rule was
+    // hydrated from an AST leaf and the operator hasn't touched it,
+    // emit the original leaf verbatim so a save-without-edit
+    // produces the same JSONB that was loaded.
+    if (rule.original !== null) return { ...rule.original };
+
     const path = rule.field === CUSTOM_PATH ? '' : rule.field;
     const out: Record<string, unknown> = { field: path.trim(), op: rule.op };
     if (!this.opNeedsValue(rule.op)) return out;

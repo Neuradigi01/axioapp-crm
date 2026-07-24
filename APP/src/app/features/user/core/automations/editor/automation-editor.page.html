@@ -149,6 +149,31 @@
             Add conditions to filter which events trigger this automation. Leave empty to fire on
             every matching event.
           </p>
+          <!-- tasks/automation-conditions/ Step 4 — deprecation
+               banner. Renders when the loaded trigger's conditions
+               reference field paths that aren't declared by the
+               current event's condition_fields. Automation still
+               fires (evaluator tolerates unknown paths as no-match
+               when the publisher stops emitting them; when the
+               publisher still emits, the condition still matches),
+               but the operator sees a nudge to migrate. -->
+          @if (legacyRulePaths().length > 0) {
+            <div
+              class="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+            >
+              <p class="flex items-start gap-1.5">
+                <lucide-icon name="alert-triangle" class="mt-0.5 h-3 w-3 shrink-0" />
+                <span>
+                  <strong>{{ legacyRulePaths().length }}</strong>
+                  {{ legacyRulePaths().length === 1 ? 'field' : 'fields' }} on this trigger
+                  {{ legacyRulePaths().length === 1 ? 'uses' : 'use' }} an old name (<code
+                    class="rounded bg-white px-1 font-mono text-[11px]"
+                    >{{ legacyRulePaths().join(', ') }}</code
+                  >). Automation still works.
+                </span>
+              </p>
+            </div>
+          }
           <div class="mt-2">
             <app-condition-builder
               [(conditions)]="conditions"
