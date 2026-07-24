@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -123,3 +123,42 @@ class EnumOptionOut(BaseModel):
 
     value: str
     label: str
+
+
+# --- tasks/automation-conditions/ Step 5 ----------------------------
+
+
+class PreviewMatchesRequest(BaseModel):
+    """``POST /automations/event-types/{event}/preview-matches`` body.
+
+    Same AST shape the editor emits for ``TriggerCreate.conditions``.
+    ``window_days`` bounds the historical scan — the editor's default
+    is 7 (matches the copy under the sentence preview: "in the last
+    7 days"). Max 30 days as a cheap DoS cap.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    conditions: dict[str, Any] = Field(default_factory=dict)
+    window_days: int = Field(default=7, ge=1, le=30)
+
+
+class PreviewMatchesResponse(BaseModel):
+    """Wire shape for the matched-events preview response.
+
+    ``source`` distinguishes the honest "we scanned N runs" case
+    from "we have no historical data for this event type" — the
+    frontend renders a "no historical events available for preview"
+    hint on ``'none'`` instead of a misleading zero-count. ``matched``
+    + ``scanned`` are always populated (both zero for ``source='none'``).
+    ``truncated=True`` when the scan hit the 500-row cap; the
+    frontend renders "at least N" instead of the exact count.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    matched: int
+    scanned: int
+    window_days: int
+    source: Literal["runs", "none"]
+    truncated: bool = False

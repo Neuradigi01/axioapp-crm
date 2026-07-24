@@ -155,6 +155,24 @@ export interface EnumOption {
   label: string;
 }
 
+/** Response shape for step-5's matched-events preview
+ *  (`POST /event-types/{event}/preview-matches`).
+ *
+ *  - `source: 'runs'` — scanned `tbl_automation_runs`; `matched` is
+ *    exact unless `truncated`.
+ *  - `source: 'none'` — no historical rows in the window; frontend
+ *    renders the "no historical events available" hint instead of
+ *    a misleading zero-count.
+ *  - `truncated: true` — hit the 500-row cap; render "at least N".
+ */
+export interface PreviewMatchesResult {
+  matched: number;
+  scanned: number;
+  window_days: number;
+  source: 'runs' | 'none';
+  truncated: boolean;
+}
+
 export interface DryRunResult {
   would_match: boolean;
   skip_reason: string | null;
@@ -232,6 +250,22 @@ export class AutomationsApiService {
     return this.http.post<EnumOption[]>(
       `${this.base}/event-types/${encodeURIComponent(eventType)}/field-values`,
       { field },
+    );
+  }
+
+  /** tasks/automation-conditions/ Step 5 — count how many
+   *  historical events in the last `windowDays` would match the
+   *  customer's draft condition. Informational only; no dispatch,
+   *  no side effects. Fires from the condition builder on a
+   *  debounced AST change. */
+  previewMatches(
+    eventType: string,
+    conditions: Record<string, unknown>,
+    windowDays: number = 7,
+  ): Observable<PreviewMatchesResult> {
+    return this.http.post<PreviewMatchesResult>(
+      `${this.base}/event-types/${encodeURIComponent(eventType)}/preview-matches`,
+      { conditions, window_days: windowDays },
     );
   }
 

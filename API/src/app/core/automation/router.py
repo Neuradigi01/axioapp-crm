@@ -53,6 +53,8 @@ from src.app.core.automation.permissions import (
 from src.app.core.automation.schemas import (
     EnumOptionOut,
     FieldValuesRequest,
+    PreviewMatchesRequest,
+    PreviewMatchesResponse,
     RunRead,
     TriggerCreate,
     TriggerRead,
@@ -413,6 +415,57 @@ async def list_field_values_endpoint(
     # frontend also caches in-session (step-3).
     response.headers["Cache-Control"] = "private, max-age=60"
     return [EnumOptionOut(value=o.value, label=o.label) for o in options]
+
+
+@router.post(
+    "/event-types/{event_type}/preview-matches",
+    response_model=PreviewMatchesResponse,
+)
+async def preview_matches_endpoint(
+    event_type: str,
+    payload: PreviewMatchesRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_READ)),
+) -> PreviewMatchesResponse:
+    """Preview how many historical events in the last ``window_days``
+    would match the customer's draft condition — informational only,
+    no dispatch, no side effects (``tasks/automation-conditions/``
+    Step 5).
+
+    Fires from the condition builder on a 500 ms debounce as the
+    operator authors. Response drives the "This condition would have
+    matched N events in the last 7 days" line under the sentence
+    preview. Zero matches / no historical data / truncated scans
+    each get a distinct render on the frontend so the customer knows
+    whether their filter is too tight vs. the org just hasn't logged
+    any events yet.
+    """
+    if event_catalog.get_entry(event_type) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "automation.event_not_found",
+                "message": f"event type {event_type!r} is not in the catalog",
+            },
+        )
+    try:
+        result = await automation_service.preview_matches(
+            db,
+            org_id=user.org_id,
+            event_type=event_type,
+            conditions_ast=payload.conditions,
+            window_days=payload.window_days,
+        )
+    except AutomationError as exc:
+        raise _automation_http_map(exc) from exc
+
+    # Short cache — the operator is actively authoring, so a stale
+    # count from 60s ago would be misleading. 15s is enough to
+    # deduplicate the debounce burst on a fast typer without
+    # hiding fresh runs from a manual test dispatch.
+    response.headers["Cache-Control"] = "private, max-age=15"
+    return PreviewMatchesResponse(**result)
 
 
 # --- per-contact run list + retry + run-now (Step 9) ---------------

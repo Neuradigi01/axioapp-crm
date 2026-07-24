@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
@@ -423,6 +424,99 @@ async def list_field_values(
     return await resolver(session, org_id)
 
 
+async def preview_matches(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    event_type: str,
+    conditions_ast: dict[str, Any],
+    window_days: int = 7,
+) -> dict[str, Any]:
+    """Count historical events in the last ``window_days`` that would
+    match the customer's draft ``conditions`` if it were saved as an
+    automation trigger (``tasks/automation-conditions/`` Step 5).
+
+    Reads from ``tbl_automation_runs.event_payload`` — cheapest data
+    source, already indexed. Runs the SAME
+    :func:`core.automation.conditions.evaluate` the live dispatcher
+    uses, so preview numbers match reality once the trigger goes
+    live. No side effects, no writes.
+
+    Raises :class:`~core.automation.exceptions.InvalidCondition` if
+    the AST is structurally broken — the router surfaces that as a
+    422 so the customer sees the shape complaint immediately (no
+    silent 0-match, which would look like "your filter is wrong").
+
+    Returns a dict matching :class:`PreviewMatchesResponse`:
+
+    * ``matched`` — count of payloads that satisfy the AST.
+    * ``scanned`` — total payloads considered (may be less than the
+      window's true event count if truncated).
+    * ``window_days`` — echoed back for the frontend to display.
+    * ``source`` — ``'runs'`` when we read from the runs table,
+      ``'none'`` when the org has zero runs in the window (so the
+      frontend can render a "no historical events available" hint
+      rather than a misleading "matched 0").
+    * ``truncated`` — ``True`` when the row cap fired and the real
+      total is at least ``scanned``.
+
+    Note on undercount: a brand-new event type with no active triggers
+    yet has no rows in ``tbl_automation_runs`` and reports
+    ``source='none'``, even if the publisher is emitting the event.
+    Audit-log fallback is a future step (see step-5 MD "Out of scope"
+    — deferred until ``tasks/audit-log/`` lands with a stable
+    ``tbl_audit_log`` shape).
+    """
+    # Validate the AST up-front so the customer sees a structural
+    # error instead of a "we couldn't compute your preview" mystery.
+    conditions.validate(conditions_ast)
+
+    # Fast-path 404: caller (router) already checks the catalog but
+    # a service-level guard keeps this function safe when called
+    # from tests / scripts.
+    if event_catalog.get_entry(event_type) is None:
+        return {
+            "matched": 0,
+            "scanned": 0,
+            "window_days": window_days,
+            "source": "none",
+            "truncated": False,
+        }
+
+    since = datetime.now(UTC) - timedelta(days=window_days)
+    # limit=501 → we scan 501 rows and know the true total is >500
+    # if the last one comes back. Row-cap is a soft DoS defense —
+    # 500 payloads through the evaluator take milliseconds; more
+    # would still work, but we'd rather report "at least 500" than
+    # spend budget on an unbounded scan.
+    payloads = await data_access.list_recent_event_payloads(
+        session,
+        org_id=org_id,
+        event_type=event_type,
+        since=since,
+        limit=501,
+    )
+    if not payloads:
+        return {
+            "matched": 0,
+            "scanned": 0,
+            "window_days": window_days,
+            "source": "none",
+            "truncated": False,
+        }
+
+    truncated = len(payloads) > 500
+    to_scan = payloads[:500] if truncated else payloads
+    matched = sum(1 for p in to_scan if conditions.evaluate(conditions_ast, p))
+    return {
+        "matched": matched,
+        "scanned": len(to_scan),
+        "window_days": window_days,
+        "source": "runs",
+        "truncated": truncated,
+    }
+
+
 __all__ = [
     "create_trigger",
     "delete_trigger",
@@ -432,5 +526,6 @@ __all__ = [
     "list_field_values",
     "list_triggers",
     "match_triggers",
+    "preview_matches",
     "update_trigger",
 ]

@@ -1,13 +1,14 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { of, throwError } from 'rxjs';
 
 import {
   AutomationsApiService,
   EnumOption,
   FieldSpec,
   FieldSpecType,
+  PreviewMatchesResult,
 } from '../automations-api.service';
 import { ConditionBuilderComponent } from './condition-builder.component';
 
@@ -74,6 +75,9 @@ interface BuilderProbe {
   toggleAdvancedMode(): void;
   ruleIsAdvanced(index: number): boolean;
   ruleIsLegacy(index: number): boolean;
+  previewResult(): PreviewMatchesResult | null;
+  previewLoading(): boolean;
+  previewError(): boolean;
 }
 
 describe('ConditionBuilderComponent', () => {
@@ -307,4 +311,71 @@ describe('ConditionBuilderComponent', () => {
     expect(cmp.rules().length).toBe(1);
     expect(fixture.componentInstance.conditions()).toEqual(LEGACY_AST);
   });
+
+  // --- Step 5: matched-events preview count --------------------------
+
+  const PREVIEW_RUNS: PreviewMatchesResult = {
+    matched: 3,
+    scanned: 5,
+    window_days: 7,
+    source: 'runs',
+    truncated: false,
+  };
+
+  it('debounces AST changes at 500ms then fires previewMatches once', fakeAsync(() => {
+    const fixture = makeFixture();
+    apiSpy.previewMatches = jasmine
+      .createSpy<AutomationsApiService['previewMatches']>('previewMatches')
+      .and.returnValue(of(PREVIEW_RUNS));
+    const cmp = probe(fixture);
+    // Simulate a fast typer — three AST mutations inside the
+    // debounce window. Only the last should fire the endpoint.
+    cmp.addRule();
+    cmp.onFieldChange(0, 'lead.pipeline_stage');
+    cmp.onValueChange(0, 'w');
+    cmp.onValueChange(0, 'wo');
+    cmp.onValueChange(0, 'won');
+    tick(200);
+    expect(apiSpy.previewMatches).not.toHaveBeenCalled();
+    tick(500);
+    expect(apiSpy.previewMatches).toHaveBeenCalledTimes(1);
+    expect(cmp.previewResult()).toEqual(PREVIEW_RUNS);
+    expect(cmp.previewLoading()).toBe(false);
+  }));
+
+  it('surfaces source="none" honestly (frontend renders "no historical events" hint)', fakeAsync(() => {
+    const fixture = makeFixture();
+    const noneResult: PreviewMatchesResult = {
+      matched: 0,
+      scanned: 0,
+      window_days: 7,
+      source: 'none',
+      truncated: false,
+    };
+    apiSpy.previewMatches = jasmine
+      .createSpy<AutomationsApiService['previewMatches']>('previewMatches')
+      .and.returnValue(of(noneResult));
+    const cmp = probe(fixture);
+    cmp.addRule();
+    cmp.onFieldChange(0, 'lead.pipeline_stage');
+    cmp.onValueChange(0, 'won');
+    tick(500);
+    expect(cmp.previewResult()?.source).toBe('none');
+    expect(cmp.previewError()).toBe(false);
+  }));
+
+  it('errors are swallowed into previewError so Save stays available', fakeAsync(() => {
+    const fixture = makeFixture();
+    apiSpy.previewMatches = jasmine
+      .createSpy<AutomationsApiService['previewMatches']>('previewMatches')
+      .and.returnValue(throwError(() => new Error('boom')));
+    const cmp = probe(fixture);
+    cmp.addRule();
+    cmp.onFieldChange(0, 'lead.pipeline_stage');
+    cmp.onValueChange(0, 'won');
+    tick(500);
+    expect(cmp.previewError()).toBe(true);
+    expect(cmp.previewLoading()).toBe(false);
+    expect(cmp.previewResult()).toBeNull();
+  }));
 });

@@ -10,14 +10,16 @@ import {
   model,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
+import { catchError, combineLatest, debounceTime, of, switchMap } from 'rxjs';
 
 import {
   AutomationsApiService,
   EnumOption,
   FieldSpec,
   FieldSpecType,
+  PreviewMatchesResult,
 } from '../automations-api.service';
 
 /**
@@ -277,6 +279,14 @@ export class ConditionBuilderComponent {
   protected readonly valuePools = signal<Map<string, EnumOption[]>>(new Map());
   private readonly inflightFetches = new Set<string>();
 
+  /** Matched-events preview state (tasks/automation-conditions/
+   *  Step 5). `null` before the first fetch fires or after an
+   *  error; the loading flag guards the "Checking…" render while
+   *  the debounced request is in flight. */
+  protected readonly previewResult = signal<PreviewMatchesResult | null>(null);
+  protected readonly previewLoading = signal<boolean>(false);
+  protected readonly previewError = signal<boolean>(false);
+
   // --- computed derivatives ------------------------------------
 
   /** Sorted groups + fields for the `<optgroup>`-rendered dropdown. */
@@ -377,7 +387,48 @@ export class ConditionBuilderComponent {
       this.eventType();
       this.valuePools.set(new Map());
       this.inflightFetches.clear();
+      // Also invalidate the previous event's preview count — a
+      // count from `lead.created` is nonsense once the operator
+      // switched to `contact.created`.
+      this.previewResult.set(null);
+      this.previewError.set(false);
     });
+
+    // Matched-events preview (tasks/automation-conditions/ Step 5).
+    // Debounce AST + event-type changes at 500 ms so a fast typer
+    // doesn't burn a request per keystroke. Skip when there's no
+    // event picked yet (the endpoint would 404) and when the AST
+    // has zero rules (a zero-condition trigger fires on every
+    // event — showing "would have matched 3 events" for an empty
+    // filter would be noise, not signal). Errors are swallowed and
+    // surfaced via `previewError` so the render stays subtle
+    // ("Preview unavailable") without blocking Save.
+    combineLatest([toObservable(this.conditions), toObservable(this.eventType)])
+      .pipe(
+        debounceTime(500),
+        switchMap(([conditions, eventType]) => {
+          if (!eventType || !conditions || Object.keys(conditions).length === 0) {
+            this.previewResult.set(null);
+            this.previewLoading.set(false);
+            this.previewError.set(false);
+            return of(null);
+          }
+          this.previewLoading.set(true);
+          this.previewError.set(false);
+          return this.api.previewMatches(eventType, conditions).pipe(
+            catchError(() => {
+              this.previewError.set(true);
+              this.previewLoading.set(false);
+              return of(null);
+            }),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => {
+        this.previewLoading.set(false);
+        if (result !== null) this.previewResult.set(result);
+      });
   }
 
   // --- rule-level handlers ------------------------------------

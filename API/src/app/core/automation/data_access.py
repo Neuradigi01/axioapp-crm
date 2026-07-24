@@ -249,6 +249,51 @@ async def list_runs(
     return list(rows), int(total)
 
 
+async def list_recent_event_payloads(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    event_type: str,
+    since: datetime,
+    limit: int = 501,
+) -> list[dict]:
+    """Pull recent ``event_payload`` JSONBs for the matched-events
+    preview (``tasks/automation-conditions/`` Step 5).
+
+    Joins ``tbl_automation_runs`` to ``tbl_automation_triggers`` on
+    ``trigger_id`` so the caller can filter by the ORIGINATING event
+    type — runs don't carry ``event_type`` themselves. Returns the
+    payloads (not full ``AutomationRun`` rows) since the caller only
+    needs them for the in-memory evaluator sweep.
+
+    Newest-first ordering matches the operator's intuition ("what
+    happened in the last week?"). ``limit`` defaults to 501 so the
+    service can detect the "truncated" case cleanly — if 501 rows
+    come back, the org has more than 500 in the window and the
+    preview response flips ``truncated=true``.
+
+    NOTE: this reflects only events that already triggered at least
+    one automation (runs table = post-dispatch record). A brand-new
+    event type with no active triggers reads 0 here — the service
+    reports ``source='none'`` in that case so the frontend can render
+    the "no historical events available for preview" hint honestly
+    rather than a misleading zero-count.
+    """
+    stmt = (
+        select(AutomationRun.event_payload)
+        .join(AutomationTrigger, AutomationTrigger.id == AutomationRun.trigger_id)
+        .where(
+            AutomationRun.org_id == org_id,
+            AutomationTrigger.event_type == event_type,
+            AutomationRun.scheduled_at >= since,
+        )
+        .order_by(AutomationRun.scheduled_at.desc())
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    return [row for row in result.scalars().all()]
+
+
 async def count_marketing_runs_for_contact(
     session: AsyncSession,
     *,
