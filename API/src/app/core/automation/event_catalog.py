@@ -19,7 +19,8 @@ Adding a new event:
 
 1. Pick a string key in ``<domain>.<verb>`` shape (matches
    :mod:`core.events.bus`).
-2. Add a ``CatalogEntry`` here.
+2. Add a ``CatalogEntry`` here — include ``condition_fields`` so the
+   customer-friendly builder can render its dropdown (see below).
 3. The emit call lands in the matching step (5 / 6 / 10 / 11 / 12).
 
 The catalog is the **contract** between publishers and the
@@ -32,12 +33,35 @@ this module exposes the subset that automation triggers can
 actually subscribe to today (Step 5/6 ship `user.signed_up` +
 `lead.created`; later steps add appointments / quotes / invoices /
 birthdays / stale-lead).
+
+Condition fields (``tasks/automation-conditions/`` Step 1):
+    Each entry ships a ``condition_fields`` tuple of
+    :class:`~core.automation.field_specs.FieldSpec` — the fields the
+    "Only if" builder's dropdown surfaces for that event. Every
+    field's ``path`` MUST resolve into the entry's ``sample_payload``
+    (drift guard raises at import time otherwise). Enum fields
+    declare an ``enum_resolver`` key that step-2's live registry
+    dispatches to at request time.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
+
+from src.app.core.automation.field_specs import (
+    GROUP_APPOINTMENT,
+    GROUP_CONTACT,
+    GROUP_INVOICE,
+    GROUP_LEAD,
+    GROUP_ORG,
+    GROUP_QUOTE,
+    GROUP_TRANSITION,
+    GROUP_USER,
+    FieldSpec,
+    FieldType,
+    path_resolves,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,12 +72,27 @@ class CatalogEntry:
     label: str
     description: str
     sample_payload: dict[str, Any]
+    condition_fields: tuple[FieldSpec, ...] = field(default_factory=tuple)
 
 
 _CATALOG: dict[str, CatalogEntry] = {}
 
 
 def _register(entry: CatalogEntry) -> None:
+    # Drift guard — every declared FieldSpec path must resolve into
+    # the entry's sample_payload. Catches ``lead.stage`` vs
+    # ``lead.pipeline_stage`` typos the moment code lands, before a
+    # customer picks the wrong field and the runtime evaluator
+    # silently no-matches every event.
+    for spec in entry.condition_fields:
+        if not path_resolves(entry.sample_payload, spec.path):
+            raise ValueError(
+                f"FieldSpec drift: event {entry.event_type!r} declares "
+                f"path {spec.path!r} but that path does not resolve into "
+                f"sample_payload. Update the spec or the payload so they "
+                f"match — the customer-friendly condition builder relies "
+                f"on this invariant."
+            )
     _CATALOG[entry.event_type] = entry
 
 
@@ -85,6 +124,13 @@ _register(
             },
             "signed_up_at": "2026-06-29T12:30:00+00:00",
         },
+        condition_fields=(
+            FieldSpec(path="user.email", label="Email", type=FieldType.text, group=GROUP_USER),
+            FieldSpec(
+                path="user.full_name", label="Full name", type=FieldType.text, group=GROUP_USER
+            ),
+            FieldSpec(path="org.slug", label="Org slug", type=FieldType.text, group=GROUP_ORG),
+        ),
     )
 )
 _register(
@@ -96,6 +142,21 @@ _register(
             "user": {"email": "invitee@example.com"},
             "invited_by_user_id": "00000000-0000-0000-0000-000000000000",
         },
+        condition_fields=(
+            FieldSpec(
+                path="user.email",
+                label="Invitee email",
+                type=FieldType.text,
+                group=GROUP_USER,
+            ),
+            FieldSpec(
+                path="invited_by_user_id",
+                label="Invited by",
+                type=FieldType.enum,
+                group=GROUP_USER,
+                enum_resolver="users",
+            ),
+        ),
     )
 )
 _register(
@@ -110,6 +171,12 @@ _register(
                 "email": "rahul@example.com",
             },
         },
+        condition_fields=(
+            FieldSpec(path="user.email", label="Email", type=FieldType.text, group=GROUP_USER),
+            FieldSpec(
+                path="user.full_name", label="Full name", type=FieldType.text, group=GROUP_USER
+            ),
+        ),
     )
 )
 
@@ -157,6 +224,55 @@ _register(
                 "slug": "demo-workspace",
             },
         },
+        condition_fields=(
+            FieldSpec(
+                path="source",
+                label="Source",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="lead_sources",
+            ),
+            FieldSpec(
+                path="lead.pipeline_stage",
+                label="Stage",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="pipeline_stages",
+            ),
+            FieldSpec(
+                path="lead.status",
+                label="Status",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="lead_statuses",
+            ),
+            FieldSpec(
+                path="lead.assigned_to_id",
+                label="Assigned to",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="users",
+                help_text="Empty when the lead is unassigned — use 'is empty' to filter.",
+            ),
+            FieldSpec(
+                path="lead.budget",
+                label="Budget",
+                type=FieldType.currency,
+                group=GROUP_LEAD,
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+            FieldSpec(
+                path="contact.phone",
+                label="Phone",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
     )
 )
 _register(
@@ -213,6 +329,47 @@ _register(
                 "slug": "demo-workspace",
             },
         },
+        condition_fields=(
+            FieldSpec(
+                path="to_user_id",
+                label="Assigned to (new)",
+                type=FieldType.enum,
+                group=GROUP_TRANSITION,
+                enum_resolver="users",
+            ),
+            FieldSpec(
+                path="from_user_id",
+                label="Assigned to (previous)",
+                type=FieldType.enum,
+                group=GROUP_TRANSITION,
+                enum_resolver="users",
+                help_text=(
+                    "Empty on a first-time assignment — use 'is empty' to "
+                    "target only fresh assignments."
+                ),
+            ),
+            FieldSpec(
+                path="lead.pipeline_stage",
+                label="Stage",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="pipeline_stages",
+            ),
+            FieldSpec(
+                path="lead.source",
+                label="Source",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="lead_sources",
+            ),
+            FieldSpec(
+                path="lead.status",
+                label="Status",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="lead_statuses",
+            ),
+        ),
     )
 )
 _register(
@@ -226,6 +383,22 @@ _register(
             "to_status": "qualified",
             "contact": {"first_name": "Asha"},
         },
+        condition_fields=(
+            FieldSpec(
+                path="to_status",
+                label="New stage",
+                type=FieldType.enum,
+                group=GROUP_TRANSITION,
+                enum_resolver="pipeline_stages",
+            ),
+            FieldSpec(
+                path="from_status",
+                label="Previous stage",
+                type=FieldType.enum,
+                group=GROUP_TRANSITION,
+                enum_resolver="pipeline_stages",
+            ),
+        ),
     )
 )
 _register(
@@ -239,6 +412,28 @@ _register(
             "direction": "up",
             "contact": {"first_name": "Asha"},
         },
+        condition_fields=(
+            FieldSpec(
+                path="lead.score",
+                label="Score",
+                type=FieldType.number,
+                group=GROUP_LEAD,
+            ),
+            FieldSpec(
+                path="threshold",
+                label="Threshold crossed",
+                type=FieldType.number,
+                group=GROUP_LEAD,
+            ),
+            FieldSpec(
+                path="direction",
+                label="Direction",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="direction_updown",
+                help_text="'up' when the score just crossed above the threshold, 'down' when below.",
+            ),
+        ),
     )
 )
 _register(
@@ -269,6 +464,26 @@ _register(
                 "slug": "demo-workspace",
             },
         },
+        condition_fields=(
+            FieldSpec(
+                path="age_turning",
+                label="Age turning",
+                type=FieldType.number,
+                group=GROUP_CONTACT,
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+            FieldSpec(
+                path="contact.phone",
+                label="Phone",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
     )
 )
 _register(
@@ -306,6 +521,41 @@ _register(
                 "slug": "demo-workspace",
             },
         },
+        condition_fields=(
+            FieldSpec(
+                path="days_since_last_activity",
+                label="Days since last activity",
+                type=FieldType.number,
+                group=GROUP_LEAD,
+            ),
+            FieldSpec(
+                path="lead.pipeline_stage",
+                label="Stage",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="pipeline_stages",
+            ),
+            FieldSpec(
+                path="lead.status",
+                label="Status",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="lead_statuses",
+            ),
+            FieldSpec(
+                path="lead.assigned_to_id",
+                label="Assigned to",
+                type=FieldType.enum,
+                group=GROUP_LEAD,
+                enum_resolver="users",
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
     )
 )
 
@@ -352,6 +602,33 @@ _register(
                 "slug": "demo-workspace",
             },
         },
+        condition_fields=(
+            FieldSpec(
+                path="appointment.purpose",
+                label="Purpose",
+                type=FieldType.enum,
+                group=GROUP_APPOINTMENT,
+                enum_resolver="appointment_purposes",
+            ),
+            FieldSpec(
+                path="location",
+                label="Location",
+                type=FieldType.text,
+                group=GROUP_APPOINTMENT,
+            ),
+            FieldSpec(
+                path="appointment.duration_min",
+                label="Duration (minutes)",
+                type=FieldType.number,
+                group=GROUP_APPOINTMENT,
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
     )
 )
 _register(
@@ -388,6 +665,27 @@ _register(
                 "slug": "demo-workspace",
             },
         },
+        condition_fields=(
+            FieldSpec(
+                path="appointment.purpose",
+                label="Purpose",
+                type=FieldType.enum,
+                group=GROUP_APPOINTMENT,
+                enum_resolver="appointment_purposes",
+            ),
+            FieldSpec(
+                path="location",
+                label="Location",
+                type=FieldType.text,
+                group=GROUP_APPOINTMENT,
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
     )
 )
 _register(
@@ -424,6 +722,27 @@ _register(
                 "slug": "demo-workspace",
             },
         },
+        condition_fields=(
+            FieldSpec(
+                path="appointment.purpose",
+                label="Purpose",
+                type=FieldType.enum,
+                group=GROUP_APPOINTMENT,
+                enum_resolver="appointment_purposes",
+            ),
+            FieldSpec(
+                path="location",
+                label="Location",
+                type=FieldType.text,
+                group=GROUP_APPOINTMENT,
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
     )
 )
 
@@ -465,6 +784,27 @@ _register(
                 "slug": "demo-workspace",
             },
         },
+        condition_fields=(
+            FieldSpec(
+                path="quote.total_amount",
+                label="Total amount",
+                type=FieldType.currency,
+                group=GROUP_QUOTE,
+            ),
+            FieldSpec(
+                path="quote.currency",
+                label="Currency",
+                type=FieldType.text,
+                group=GROUP_QUOTE,
+                help_text="ISO 4217 code — e.g. INR, USD.",
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
     )
 )
 _register(
@@ -498,6 +838,26 @@ _register(
                 "slug": "demo-workspace",
             },
         },
+        condition_fields=(
+            FieldSpec(
+                path="quote.total_amount",
+                label="Total amount",
+                type=FieldType.currency,
+                group=GROUP_QUOTE,
+            ),
+            FieldSpec(
+                path="quote.currency",
+                label="Currency",
+                type=FieldType.text,
+                group=GROUP_QUOTE,
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
     )
 )
 _register(
@@ -537,6 +897,32 @@ _register(
                 "slug": "demo-workspace",
             },
         },
+        condition_fields=(
+            FieldSpec(
+                path="invoice.total_amount",
+                label="Total amount",
+                type=FieldType.currency,
+                group=GROUP_INVOICE,
+            ),
+            FieldSpec(
+                path="invoice.currency",
+                label="Currency",
+                type=FieldType.text,
+                group=GROUP_INVOICE,
+            ),
+            FieldSpec(
+                path="invoice.number",
+                label="Invoice number",
+                type=FieldType.number,
+                group=GROUP_INVOICE,
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
     )
 )
 _register(
@@ -577,6 +963,33 @@ _register(
                 "slug": "demo-workspace",
             },
         },
+        condition_fields=(
+            FieldSpec(
+                path="invoice.total_amount",
+                label="Total amount",
+                type=FieldType.currency,
+                group=GROUP_INVOICE,
+            ),
+            FieldSpec(
+                path="invoice.currency",
+                label="Currency",
+                type=FieldType.text,
+                group=GROUP_INVOICE,
+            ),
+            FieldSpec(
+                path="payment_method",
+                label="Payment method",
+                type=FieldType.enum,
+                group=GROUP_INVOICE,
+                enum_resolver="payment_methods",
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
     )
 )
 _register(
@@ -616,6 +1029,32 @@ _register(
                 "slug": "demo-workspace",
             },
         },
+        condition_fields=(
+            FieldSpec(
+                path="days_overdue",
+                label="Days overdue",
+                type=FieldType.number,
+                group=GROUP_INVOICE,
+            ),
+            FieldSpec(
+                path="invoice.total_amount",
+                label="Total amount",
+                type=FieldType.currency,
+                group=GROUP_INVOICE,
+            ),
+            FieldSpec(
+                path="invoice.currency",
+                label="Currency",
+                type=FieldType.text,
+                group=GROUP_INVOICE,
+            ),
+            FieldSpec(
+                path="contact.email",
+                label="Email",
+                type=FieldType.text,
+                group=GROUP_CONTACT,
+            ),
+        ),
     )
 )
 

@@ -23,6 +23,7 @@ shapes: 404 / 409 / 422 cover :class:`TriggerNotFound`,
 
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import UTC, datetime
 
@@ -40,6 +41,7 @@ from src.app.core.automation.exceptions import (
     MissingTemplateForChannel,
     TriggerNotFound,
 )
+from src.app.core.automation.field_specs import FieldType
 from src.app.core.automation.models import AutomationRunStatus
 from src.app.core.automation.permissions import (
     PERM_READ,
@@ -55,6 +57,20 @@ from src.app.core.automation.schemas import (
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
+
+
+def _friendly_builder_enabled() -> bool:
+    """Read the customer-friendly-condition-builder feature flag.
+
+    Env-driven (``AUTOMATION_CONDITIONS_FRIENDLY_BUILDER_ENABLED``) so
+    the rollout is a config change, not a DB migration. When ``false``
+    the catalog serialises with ``condition_fields: []`` on every
+    entry — the frontend falls back to the free-text builder verbatim,
+    stored triggers keep firing unchanged.
+    """
+    raw = os.getenv("AUTOMATION_CONDITIONS_FRIENDLY_BUILDER_ENABLED", "")
+    return raw.strip().lower() == "true"
+
 
 router = APIRouter(prefix="/automations", tags=["Automations"])
 
@@ -76,6 +92,26 @@ class RunListResponse(BaseModel):
     offset: int
 
 
+class FieldSpecOut(BaseModel):
+    """Customer-friendly builder metadata for one filterable field
+    on an event (``tasks/automation-conditions/`` Step 1).
+
+    Values for ``enum`` fields are NOT included here — the frontend
+    fetches them per-request via step-2's live resolver so a
+    customer's dropdown always shows their org's actual pipeline
+    stages / lead sources / users, not a hardcoded list.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+    label: str
+    type: FieldType
+    group: str
+    enum_resolver: str | None = None
+    help_text: str | None = None
+
+
 class EventCatalogEntry(BaseModel):
     """Wire shape for the discovery endpoint — one row per event."""
 
@@ -85,6 +121,7 @@ class EventCatalogEntry(BaseModel):
     label: str
     description: str
     sample_payload: dict
+    condition_fields: list[FieldSpecOut] = []
 
 
 # --- exception mapping ----------------------------------------------
@@ -302,13 +339,36 @@ async def list_event_types_endpoint(
     _user: User = Depends(require_permissions(PERM_READ)),
 ) -> list[EventCatalogEntry]:
     """Discovery catalog — feeds the trigger editor's event picker
-    + the variable-hint side panel. Static per-deploy (no DB hit)."""
+    + the variable-hint side panel. Static per-deploy (no DB hit).
+
+    ``condition_fields`` on each entry is gated behind the
+    ``AUTOMATION_CONDITIONS_FRIENDLY_BUILDER_ENABLED`` env flag —
+    when off, every entry returns an empty ``condition_fields`` list
+    so the frontend falls back to the free-text builder verbatim
+    (backwards-compatible; stored triggers keep firing unchanged).
+    """
+    friendly_enabled = _friendly_builder_enabled()
     return [
         EventCatalogEntry(
             event_type=entry.event_type,
             label=entry.label,
             description=entry.description,
             sample_payload=entry.sample_payload,
+            condition_fields=(
+                [
+                    FieldSpecOut(
+                        path=spec.path,
+                        label=spec.label,
+                        type=spec.type,
+                        group=spec.group,
+                        enum_resolver=spec.enum_resolver,
+                        help_text=spec.help_text,
+                    )
+                    for spec in entry.condition_fields
+                ]
+                if friendly_enabled
+                else []
+            ),
         )
         for entry in event_catalog.list_catalog()
     ]

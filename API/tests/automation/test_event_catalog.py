@@ -61,6 +61,18 @@ def test_every_entry_has_label_description_and_payload():
         assert entry.sample_payload, f"empty sample_payload for {entry.event_type}"
 
 
+def test_catalog_entry_carries_condition_fields_shape():
+    """tasks/automation-conditions/ Step 1 — every entry ships a
+    ``condition_fields`` tuple of :class:`FieldSpec`. Deeper coverage
+    lives in ``test_field_spec_coverage.py``; this test pins the
+    shape extension so a refactor can't drop the attribute."""
+    lead_created = event_catalog.get_entry("lead.created")
+    assert lead_created is not None
+    assert hasattr(lead_created, "condition_fields")
+    assert isinstance(lead_created.condition_fields, tuple)
+    assert lead_created.condition_fields, "lead.created lost its condition_fields"
+
+
 def test_lead_created_payload_has_contact_and_lead_keys():
     """The `lead.created` event is the most variable-rich event in
     the v1 catalog — pin its sample_payload shape so the editor's
