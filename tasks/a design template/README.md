@@ -145,7 +145,7 @@ Grouped into 5 tracks. Each step is independently reviewable; pause/report after
 |---|-------|--------|--------|
 | 19 | [Accounts (login / register / 2FA / forgot / reset / onboarding) realign](step-19-accounts-realign.md) | COMPLETED | ~1 day |
 | 20 | [Admin panel visual refresh (scope override)](step-20-admin-refresh.md) | COMPLETED | ~1 day |
-| 21 | [Error + Access Denied + shared micro-pages](step-21-error-pages.md) | Pending | ~¼ day |
+| 21 | [Error + Access Denied + shared micro-pages](step-21-error-pages.md) | COMPLETED | ~¼ day |
 | 22 | [Polish pass + a11y audit + reduced-motion check](step-22-polish-a11y.md) | Pending | ~½ day |
 
 **Total: ~15–18 working days.** Steps 1–7 are hard blockers for everything after them (page steps depend on tokens + shell + primitives). Steps 8–18 can run in any order once foundations land; Track 5 closes.

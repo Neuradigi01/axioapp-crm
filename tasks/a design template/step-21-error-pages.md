@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the small non-feature pages: 404 / error page, `/user/access-denied` (from RBAC track), and any other "meta" pages (maintenance, coming-soon).
 **Track:** Design Refresh — Track 5 (Auth + admin + polish)
-**Status:** Pending
+**Status:** COMPLETED — 1 file swept: `access-denied.page.html`. No separate `error/` folder exists in this repo (404 handling is routed elsewhere / falls back to router default). Access-denied page now uses AIXO semantic tokens with shield/lock icon layout. `ng build` green.
 **Depends on:** Steps 1, 5
 
 ---
