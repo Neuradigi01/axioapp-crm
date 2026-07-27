@@ -2,7 +2,7 @@
 
 **Goal:** Switch the theme mechanism from "swap stylesheet + toggle `.dark-theme` on `<body>`" to "set `data-theme` attribute on `<html>`". Add a visible toggle in the header (three states: light / dark / system). Kill FOUC with an inline pre-boot script.
 **Track:** Design Refresh — Track 1 (Foundation)
-**Status:** Pending
+**Status:** COMPLETED — `ThemeService` writes `data-theme` on `<html>`; Tailwind `darkMode` switched to attribute selector; pre-hydration script kills FOUC. Header carries a 3-icon segmented theme toggle (sun/moon/monitor). `Sun` / `Moon` / `Monitor` registered in `app.config.ts`. `ng build` green.
 **Depends on:** Step 1
 
 ---

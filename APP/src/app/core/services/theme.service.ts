@@ -70,8 +70,7 @@ export class ThemeService {
     this.setStylesheetEnabled(THEME_LIGHT, theme === THEME_LIGHT);
     this.setStylesheetEnabled(THEME_DARK, theme === THEME_DARK);
 
-    document.body.classList.remove('light-theme', 'dark-theme');
-    document.body.classList.add(`${theme}-theme`);
+    document.documentElement.setAttribute('data-theme', theme);
   }
 
   private setStylesheetEnabled(bundleName: string, enabled: boolean): void {

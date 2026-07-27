@@ -106,7 +106,7 @@ Grouped into 5 tracks. Each step is independently reviewable; pause/report after
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
 | 1 | [Tokens + Tailwind semantic wiring](step-01-tokens-and-tailwind-wiring.md) | COMPLETED | ~½ day |
-| 2 | [ThemeService migration + toggle UI](step-02-theme-service-and-toggle.md) | Pending | ~½ day |
+| 2 | [ThemeService migration + toggle UI](step-02-theme-service-and-toggle.md) | COMPLETED | ~½ day |
 
 ### Track 2 — App shell
 

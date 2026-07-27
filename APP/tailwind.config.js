@@ -9,15 +9,12 @@ module.exports = {
     './src/app/features/accounts/onboarding/**/*.{html,ts}',
     './src/app/staff-portal/**/*.{html,ts}',
   ],
-  // Class-based dark mode wired to the app's existing theme service
-  // (`body.dark-theme` is toggled by `ThemeService`, see
-  // core/services/theme.service.ts). Lets `dark:` variants on Tailwind
-  // classes activate exactly when the in-app theme toggle flips —
-  // not the OS-level `prefers-color-scheme` (the default).
-  // Step 2 of the design refresh will switch this to
-  // `['selector', '[data-theme="dark"]']`; keeping the class selector
-  // here so this step is additive-only.
-  darkMode: ['class', '.dark-theme'],
+  // Attribute-based dark mode. `[data-theme="dark"]` is set on <html> by
+  // `ThemeService` (core/services/theme.service.ts) and by the inline
+  // pre-hydration script in index.html. `dark:` variants activate
+  // whenever the AIXO token layer flips dark — the two mechanisms share
+  // the same trigger, so tokens and Tailwind stay in lockstep.
+  darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {
       // AIXO semantic colors — resolve from CSS variables defined in

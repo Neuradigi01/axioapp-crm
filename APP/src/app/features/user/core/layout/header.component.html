@@ -20,6 +20,58 @@
   </div>
 
   <div class="ml-auto flex items-center gap-2">
+    <div
+      class="inline-flex items-center rounded-md border border-zinc-200 bg-zinc-50 p-0.5"
+      role="radiogroup"
+      aria-label="Theme"
+    >
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="themeChoice() === 'light'"
+        class="inline-flex h-7 w-7 items-center justify-center rounded transition"
+        [class.bg-white]="themeChoice() === 'light'"
+        [class.text-zinc-900]="themeChoice() === 'light'"
+        [class.shadow-sm]="themeChoice() === 'light'"
+        [class.text-zinc-500]="themeChoice() !== 'light'"
+        [class.hover:text-zinc-700]="themeChoice() !== 'light'"
+        (click)="pickTheme('light')"
+        aria-label="Light theme"
+      >
+        <lucide-icon name="sun" class="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="themeChoice() === 'dark'"
+        class="inline-flex h-7 w-7 items-center justify-center rounded transition"
+        [class.bg-white]="themeChoice() === 'dark'"
+        [class.text-zinc-900]="themeChoice() === 'dark'"
+        [class.shadow-sm]="themeChoice() === 'dark'"
+        [class.text-zinc-500]="themeChoice() !== 'dark'"
+        [class.hover:text-zinc-700]="themeChoice() !== 'dark'"
+        (click)="pickTheme('dark')"
+        aria-label="Dark theme"
+      >
+        <lucide-icon name="moon" class="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="themeChoice() === 'system'"
+        class="inline-flex h-7 w-7 items-center justify-center rounded transition"
+        [class.bg-white]="themeChoice() === 'system'"
+        [class.text-zinc-900]="themeChoice() === 'system'"
+        [class.shadow-sm]="themeChoice() === 'system'"
+        [class.text-zinc-500]="themeChoice() !== 'system'"
+        [class.hover:text-zinc-700]="themeChoice() !== 'system'"
+        (click)="pickTheme('system')"
+        aria-label="Match system theme"
+      >
+        <lucide-icon name="monitor" class="h-3.5 w-3.5" />
+      </button>
+    </div>
+
     <div class="relative">
       <button
         type="button"
