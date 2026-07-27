@@ -48,7 +48,7 @@
       } @else {
         @if (error()) {
           <div
-            class="mb-3 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+            class="mb-3 flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400"
           >
             <lucide-icon
               name="alert-triangle"
@@ -116,7 +116,7 @@
     <footer class="flex items-center justify-between gap-2 border-t border-subtle px-5 py-3">
       <button
         type="button"
-        class="text-xs font-medium text-blue-600 hover:text-blue-700"
+        class="text-xs font-medium text-blue-600 hover:text-blue-400"
         (click)="applyDefaults()"
       >
         Use defaults

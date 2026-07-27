@@ -49,7 +49,7 @@
         <div class="mb-2 flex items-center gap-2">
           @if (ruleIsLegacy(i)) {
             <span
-              class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800"
+              class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400"
               title="This field isn't in the current picker. Editing continues to work, but consider migrating to a standard field."
             >
               <lucide-icon name="alert-triangle" class="h-2.5 w-2.5" />
@@ -163,7 +163,7 @@
               @if (valuePoolFor(rule); as pool) {
                 @if (pool.length === 0) {
                   <span
-                    class="mt-0.5 block rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800"
+                    class="mt-0.5 block rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-400"
                   >
                     No options configured yet.
                   </span>
@@ -370,7 +370,7 @@
             in the last {{ r.window_days }} days. Consider tightening the filter.
           </p>
         } @else if (r.matched === 0) {
-          <p class="mt-1.5 text-[11px] text-amber-700">
+          <p class="mt-1.5 text-[11px] text-amber-400">
             This condition would not have matched any events in the last {{ r.window_days }}
             days. Double-check the field labels + values.
           </p>

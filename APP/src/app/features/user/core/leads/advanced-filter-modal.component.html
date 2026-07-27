@@ -91,7 +91,7 @@
                   [attr.aria-label]="'Values for clause ' + row.id"
                 />
               } @else if (isRangeOp(row.op)) {
-                <div class="grid grid-cols-2 gap-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input
                     [type]="inputTypeFor(row.field)"
                     [value]="row.value"
@@ -137,7 +137,7 @@
             <button
               type="button"
               (click)="onRemoveRow(row.id)"
-              class="self-center rounded-md p-1.5 text-faint hover:bg-rose-50 hover:text-rose-600"
+              class="self-center rounded-md p-1.5 text-faint hover:bg-red-500/10 hover:text-rose-600"
               [attr.aria-label]="'Remove clause ' + row.id"
             >
               <lucide-icon name="trash-2" class="h-4 w-4" />

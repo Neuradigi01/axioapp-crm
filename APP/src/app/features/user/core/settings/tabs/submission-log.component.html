@@ -3,14 +3,14 @@
   @if (summaryLoading()) {
     <p class="text-sm text-muted">Loading summary…</p>
   } @else if (summaryError(); as err) {
-    <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    <p class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
       {{ err }}
     </p>
   } @else if (summary(); as s) {
-    <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
       <div class="rounded-md border border-subtle bg-surface p-4">
         <p class="text-[11px] font-medium uppercase tracking-wide text-muted">Accepted</p>
-        <p class="mt-1 text-2xl font-semibold text-emerald-700">{{ countOf(s, 'accepted') }}</p>
+        <p class="mt-1 text-2xl font-semibold text-emerald-400">{{ countOf(s, 'accepted') }}</p>
         <p class="text-[10px] text-faint">Last 30 days</p>
       </div>
       <div class="rounded-md border border-subtle bg-surface p-4">
@@ -20,12 +20,12 @@
       </div>
       <div class="rounded-md border border-subtle bg-surface p-4">
         <p class="text-[11px] font-medium uppercase tracking-wide text-muted">Rate-limited</p>
-        <p class="mt-1 text-2xl font-semibold text-amber-700">{{ countOf(s, 'rate_limited') }}</p>
+        <p class="mt-1 text-2xl font-semibold text-amber-400">{{ countOf(s, 'rate_limited') }}</p>
         <p class="text-[10px] text-faint">per-key · per-IP</p>
       </div>
       <div class="rounded-md border border-subtle bg-surface p-4">
         <p class="text-[11px] font-medium uppercase tracking-wide text-muted">Errors</p>
-        <p class="mt-1 text-2xl font-semibold text-red-700">{{ countOf(s, 'invalid_payload') }}</p>
+        <p class="mt-1 text-2xl font-semibold text-red-400">{{ countOf(s, 'invalid_payload') }}</p>
         <p class="text-[10px] text-faint">forged · stale config</p>
       </div>
     </div>
@@ -83,7 +83,7 @@
     @if (listLoading()) {
       <p class="text-sm text-muted">Loading log…</p>
     } @else if (listError(); as err) {
-      <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      <p class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
         {{ err }}
       </p>
     } @else if (listResponse(); as resp) {

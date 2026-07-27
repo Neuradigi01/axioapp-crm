@@ -49,7 +49,9 @@
       <p class="mt-2 text-xs text-red-600">A title is required.</p>
     }
     @if (addError(); as err) {
-      <p class="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+      <p
+        class="mt-2 rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"
+      >
         {{ err }}
       </p>
     }
@@ -63,7 +65,7 @@
 
   <!-- Body -->
   @if (loadError(); as err) {
-    <div class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+    <div class="rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 border-red-500/20">
       {{ err }}
     </div>
   } @else if (loading() && items().length === 0) {
@@ -118,7 +120,7 @@
               </span>
               @if (isOverdue(task)) {
                 <span
-                  class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-red-200"
+                  class="inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-400 ring-1 border-red-500/20"
                 >
                   Overdue
                 </span>
@@ -140,7 +142,7 @@
             <button
               type="button"
               (click)="onDelete(task)"
-              class="rounded-md p-1 text-faint hover:bg-red-50 hover:text-red-700"
+              class="rounded-md p-1 text-faint hover:bg-red-500/10 hover:text-red-400"
               title="Delete task"
               aria-label="Delete task"
             >

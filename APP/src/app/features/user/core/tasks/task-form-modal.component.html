@@ -54,7 +54,7 @@
       </label>
     }
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       @if (!isHidden('due_at')) {
         <label class="block text-sm">
           <span class="mb-1 block text-xs font-medium text-muted">
@@ -144,7 +144,7 @@
       </span>
       @if (selectedContact(); as c) {
         <div
-          class="flex items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200"
+          class="flex items-center justify-between gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-300 ring-1 border-amber-500/20"
         >
           <div>
             <p class="font-medium">{{ c.full_name }}</p>
@@ -158,7 +158,7 @@
           <button
             type="button"
             (click)="clearContact()"
-            class="rounded-md border border-amber-300 bg-surface px-2 py-1 text-[11px] font-medium text-amber-900 hover:bg-amber-100"
+            class="rounded-md border border-amber-300 bg-surface px-2 py-1 text-[11px] font-medium text-amber-300 hover:bg-amber-500/10"
           >
             Change
           </button>
@@ -220,7 +220,7 @@
     }
 
     @if (error(); as err) {
-      <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      <div class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
         {{ err }}
       </div>
     }

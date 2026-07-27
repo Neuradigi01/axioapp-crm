@@ -149,13 +149,13 @@
 
   @if (viewingVersion() !== null) {
     <div
-      class="px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-900 text-xs flex items-center gap-2"
+      class="px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-300 text-xs flex items-center gap-2"
     >
       <lucide-icon name="history" class="w-3.5 h-3.5"></lucide-icon>
       Previewing version <strong>v{{ viewingVersion() }}</strong> — read-only.
       <button
         type="button"
-        class="ml-2 px-2 py-0.5 rounded bg-surface border border-amber-300 text-amber-900 hover:bg-amber-100"
+        class="ml-2 px-2 py-0.5 rounded bg-surface border border-amber-300 text-amber-300 hover:bg-amber-500/10"
         (click)="backToCurrentFromVersion()"
       >
         Back to current
@@ -164,7 +164,7 @@
   }
 
   @if (error()) {
-    <div class="px-4 py-2 bg-rose-50 border-b border-rose-200 text-rose-800 text-xs">
+    <div class="px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-red-400 text-xs">
       {{ error() }}
     </div>
   }
@@ -175,8 +175,9 @@
 
   <!-- Main 3-column layout -->
   <div class="flex-1 flex min-h-0">
-    <!-- Left palette -->
-    <aside class="w-[300px] shrink-0">
+    <!-- Left palette. Hidden below md so the canvas gets full width;
+         mobile users can horizontally scroll and pan-drag nodes. -->
+    <aside class="hidden w-[300px] shrink-0 md:block">
       <app-node-palette />
     </aside>
 
@@ -306,8 +307,11 @@
       }
     </main>
 
-    <!-- Right drawer — version history (Step 17) / typed node editor (Step 15) / test-fire trace -->
-    <aside class="w-[440px] shrink-0 bg-surface border-l border-subtle flex flex-col">
+    <!-- Right drawer — version history (Step 17) / typed node editor (Step 15) / test-fire trace.
+         On mobile becomes a bottom sheet-style full-width panel. -->
+    <aside
+      class="w-full shrink-0 bg-surface border-t md:border-t-0 md:border-l border-subtle flex flex-col md:w-[440px]"
+    >
       @if (showVersionDrawer() && state.workflowId(); as wfId) {
         <app-version-history-drawer
           [workflowId]="wfId"
@@ -343,7 +347,7 @@
                     @if (hop.skip_reason) {
                       <div class="text-rose-600 text-[10px]">skipped: {{ hop.skip_reason }}</div>
                     } @else {
-                      <div class="text-emerald-700 text-[10px]">
+                      <div class="text-emerald-400 text-[10px]">
                         would execute
                         @if (hop.edge_label) {
                           — next: {{ hop.edge_label }}

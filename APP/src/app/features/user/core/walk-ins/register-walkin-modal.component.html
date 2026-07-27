@@ -105,7 +105,7 @@
 
         @if (hasMatch() && matchedContact(); as c) {
           <div
-            class="mt-3 flex items-start gap-2 rounded-md bg-sky-50 px-3 py-2 text-xs text-sky-800 ring-1 ring-sky-200"
+            class="mt-3 flex items-start gap-2 rounded-md bg-sky-500/10 px-3 py-2 text-xs text-sky-800 ring-1 ring-sky-200"
           >
             <div class="flex-1">
               <p class="font-medium">Existing customer: {{ c.full_name }}</p>
@@ -116,7 +116,7 @@
             <button
               type="button"
               (click)="useMatchedContact()"
-              class="rounded-md border border-sky-300 bg-surface px-2 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100"
+              class="rounded-md border border-sky-300 bg-surface px-2 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-500/10"
             >
               Use this
             </button>
@@ -244,7 +244,9 @@
         <h3 class="text-xs font-semibold uppercase tracking-wide text-muted">Custom</h3>
         <div class="mt-3">
           @if (fieldsError(); as err) {
-            <p class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+            <p
+              class="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"
+            >
               {{ err }}
             </p>
           } @else if (fields().length === 0 && !fieldsLoading()) {
@@ -266,7 +268,9 @@
       </section>
 
       @if (submitError$(); as err) {
-        <div class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+        <div
+          class="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"
+        >
           {{ err }}
         </div>
       }

@@ -1,6 +1,8 @@
 <div>
   @if (error(); as err) {
-    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div
+      class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+    >
       {{ err }}
     </div>
   }
@@ -17,7 +19,7 @@
           <p class="mt-1 text-sm text-muted">
             @if (enabled()) {
               Currently
-              <span class="font-medium text-emerald-700">ON</span>
+              <span class="font-medium text-emerald-400">ON</span>
               @if (method()) {
                 — using <span class="font-medium">{{ method() }}</span
                 >.
@@ -27,7 +29,7 @@
               Your account asks for a second factor every time you sign in.
             } @else {
               Currently
-              <span class="font-medium text-amber-700">OFF</span>
+              <span class="font-medium text-amber-400">OFF</span>
               — your account is protected by password only. Adding 2FA is the single biggest
               improvement you can make to your account security.
             }
@@ -35,10 +37,10 @@
         </div>
         <span
           class="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium"
-          [class.bg-emerald-100]="enabled()"
-          [class.text-emerald-800]="enabled()"
-          [class.bg-amber-100]="!enabled()"
-          [class.text-amber-800]="!enabled()"
+          [class.bg-emerald-500/10]="enabled()"
+          [class.text-emerald-400]="enabled()"
+          [class.bg-amber-500/10]="!enabled()"
+          [class.text-amber-400]="!enabled()"
         >
           {{ enabled() ? 'ON' : 'OFF' }}
         </span>

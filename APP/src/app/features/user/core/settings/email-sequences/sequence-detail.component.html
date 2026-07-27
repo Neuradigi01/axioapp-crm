@@ -41,13 +41,13 @@
   </header>
 
   @if (loadError(); as err) {
-    <div class="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+    <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
       <p class="font-medium">Couldn't load sequence</p>
       <p class="mt-1 text-xs">{{ err }}</p>
     </div>
   }
   @if (inlineError(); as err) {
-    <div class="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+    <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
       {{ err }}
     </div>
   }

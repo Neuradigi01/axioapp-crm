@@ -26,7 +26,7 @@
   </header>
 
   @if (loadError()) {
-    <div class="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+    <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
       {{ loadError() }}
     </div>
   }
@@ -101,7 +101,7 @@
               <td class="px-4 py-2 text-sm">
                 @if (g.is_dynamic) {
                   <span
-                    class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200"
+                    class="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-xs font-medium text-indigo-400 ring-1 ring-indigo-200"
                   >
                     <lucide-icon name="refresh-cw" class="h-3 w-3" />
                     Dynamic
@@ -132,7 +132,7 @@
                 </button>
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-surface px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                  class="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-surface px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10"
                   (click)="onDeleteClick(g)"
                 >
                   <lucide-icon name="trash-2" class="h-3 w-3" />
@@ -195,7 +195,7 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/50 px-4">
     <div class="w-full max-w-md rounded-lg bg-surface p-5 shadow-xl">
       <header class="mb-3 flex items-start gap-3">
-        <span class="rounded-full bg-rose-100 p-2 text-rose-600">
+        <span class="rounded-full bg-red-500/10 p-2 text-rose-600">
           <lucide-icon name="alert-triangle" class="h-5 w-5" />
         </span>
         <div>

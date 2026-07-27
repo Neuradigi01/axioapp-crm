@@ -1,5 +1,5 @@
 @if (loadError(); as err) {
-  <p class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+  <p class="rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 border-red-500/20">
     {{ err }}
   </p>
 } @else if (loading()) {
@@ -34,13 +34,13 @@
             </h3>
             @if (stage.is_won) {
               <span
-                class="ml-1 inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+                class="ml-1 inline-flex items-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 border-emerald-500/20"
               >
                 won
               </span>
             } @else if (stage.is_lost) {
               <span
-                class="ml-1 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-red-200"
+                class="ml-1 inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-400 ring-1 border-red-500/20"
               >
                 lost
               </span>

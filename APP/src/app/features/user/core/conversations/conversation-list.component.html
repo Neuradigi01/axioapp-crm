@@ -13,7 +13,7 @@
         class="block w-full rounded-md border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       />
     </div>
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
       <select
         (change)="onChannelChange($event)"
         class="rounded-md border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
@@ -31,7 +31,7 @@
         }
       </select>
     </div>
-    <div class="grid grid-cols-4 gap-1">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-1">
       @for (m of assigneeModes; track m.value) {
         <button
           type="button"
@@ -126,13 +126,13 @@
                   <span class="capitalize">{{ c.status }}</span>
                   @if (c.ai_handling) {
                     <span
-                      class="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700"
+                      class="rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-medium text-violet-700"
                     >
                       AI Handled
                     </span>
                   } @else {
                     <span
-                      class="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
+                      class="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400"
                     >
                       Needs Human
                     </span>

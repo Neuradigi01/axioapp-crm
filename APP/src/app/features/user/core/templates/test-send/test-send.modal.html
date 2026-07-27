@@ -51,7 +51,7 @@
 
       @if (result(); as r) {
         <div
-          class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"
+          class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400"
         >
           <p class="font-medium">
             <lucide-icon name="check" size="12" class="mr-1 inline" />
@@ -65,13 +65,15 @@
               Provider ID: <code class="font-mono">{{ r.channel_message_id }}</code>
             </p>
           }
-          <p class="mt-1 text-[10px] text-emerald-700">
+          <p class="mt-1 text-[10px] text-emerald-400">
             Check the recipient's inbox / WhatsApp to confirm delivery.
           </p>
         </div>
       }
       @if (error(); as e) {
-        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+        >
           {{ e }}
         </div>
       }

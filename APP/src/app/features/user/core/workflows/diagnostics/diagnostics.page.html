@@ -80,7 +80,7 @@
         }
       </button>
       @if (error()) {
-        <span class="text-xs text-rose-700">{{ error() }}</span>
+        <span class="text-xs text-red-400">{{ error() }}</span>
       }
     </div>
   </section>
@@ -110,9 +110,9 @@
               <span
                 class="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-semibold"
                 [class.bg-emerald-200]="entry.eligible"
-                [class.text-emerald-900]="entry.eligible"
+                [class.text-emerald-300]="entry.eligible"
                 [class.bg-rose-200]="!entry.eligible"
-                [class.text-rose-900]="!entry.eligible"
+                [class.text-red-300]="!entry.eligible"
               >
                 {{ entry.eligible ? '✓' : '✗' }}
               </span>

@@ -7,7 +7,9 @@
   </a>
 
   @if (loadError(); as err) {
-    <div class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div
+      class="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+    >
       {{ err }}
     </div>
   }
@@ -65,66 +67,66 @@
       <app-campaign-analytics-tab [campaignId]="id" />
     } @else {
       @if (stats(); as s) {
-        <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+        <div class="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
           <div class="rounded-lg border border-subtle bg-surface p-3 text-center">
             <div class="text-[10px] uppercase tracking-wide text-muted">Audience</div>
             <div class="mt-1 text-xl font-semibold text-default">{{ s.audience_size }}</div>
           </div>
-          <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
-            <div class="text-[10px] uppercase tracking-wide text-amber-700">Queued</div>
-            <div class="mt-1 text-xl font-semibold text-amber-900">{{ s.queued }}</div>
+          <div class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-amber-400">Queued</div>
+            <div class="mt-1 text-xl font-semibold text-amber-300">{{ s.queued }}</div>
           </div>
-          <div class="rounded-lg border border-sky-200 bg-sky-50 p-3 text-center">
+          <div class="rounded-lg border border-sky-200 bg-sky-500/10 p-3 text-center">
             <div class="text-[10px] uppercase tracking-wide text-sky-700">Sent</div>
             <div class="mt-1 text-xl font-semibold text-sky-900">{{ s.sent }}</div>
           </div>
-          <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center">
-            <div class="text-[10px] uppercase tracking-wide text-emerald-700">Delivered</div>
-            <div class="mt-1 text-xl font-semibold text-emerald-900">{{ s.delivered }}</div>
+          <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-emerald-400">Delivered</div>
+            <div class="mt-1 text-xl font-semibold text-emerald-300">{{ s.delivered }}</div>
             @if (deliveryRate() !== null) {
-              <div class="text-[10px] text-emerald-700">{{ deliveryRate() }}% of sent</div>
+              <div class="text-[10px] text-emerald-400">{{ deliveryRate() }}% of sent</div>
             }
           </div>
           <!-- Campaigns v1 Step 05 — WA campaigns show Read; Email campaigns
                swap it for Opened + Clicked + Bounced. -->
           @if (isEmailCampaign()) {
-            <div class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-center">
+            <div class="rounded-lg border border-violet-200 bg-violet-500/10 p-3 text-center">
               <div class="text-[10px] uppercase tracking-wide text-violet-700">Opened</div>
               <div class="mt-1 text-xl font-semibold text-violet-900">{{ s.opened }}</div>
               <div class="text-[10px] text-violet-700">pixel</div>
             </div>
-            <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-center">
-              <div class="text-[10px] uppercase tracking-wide text-indigo-700">Clicked</div>
-              <div class="mt-1 text-xl font-semibold text-indigo-900">{{ s.clicked }}</div>
-              <div class="text-[10px] text-indigo-700">first click</div>
+            <div class="rounded-lg border border-indigo-200 bg-indigo-500/10 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-indigo-400">Clicked</div>
+              <div class="mt-1 text-xl font-semibold text-indigo-300">{{ s.clicked }}</div>
+              <div class="text-[10px] text-indigo-400">first click</div>
             </div>
-            <div class="rounded-lg border border-orange-200 bg-orange-50 p-3 text-center">
-              <div class="text-[10px] uppercase tracking-wide text-orange-700">Bounced</div>
-              <div class="mt-1 text-xl font-semibold text-orange-900">{{ s.bounced }}</div>
-              <div class="text-[10px] text-orange-700">hard / soft</div>
+            <div class="rounded-lg border border-orange-500/20 bg-orange-500/10 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-orange-400">Bounced</div>
+              <div class="mt-1 text-xl font-semibold text-orange-300">{{ s.bounced }}</div>
+              <div class="text-[10px] text-orange-400">hard / soft</div>
             </div>
           } @else {
-            <div class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-center">
+            <div class="rounded-lg border border-violet-200 bg-violet-500/10 p-3 text-center">
               <div class="text-[10px] uppercase tracking-wide text-violet-700">Read</div>
               <div class="mt-1 text-xl font-semibold text-violet-900">{{ s.read }}</div>
               @if (readRate() !== null) {
                 <div class="text-[10px] text-violet-700">{{ readRate() }}% of delivered</div>
               }
             </div>
-            <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-center">
-              <div class="text-[10px] uppercase tracking-wide text-rose-700">Failed</div>
-              <div class="mt-1 text-xl font-semibold text-rose-900">{{ s.failed }}</div>
+            <div class="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-red-400">Failed</div>
+              <div class="mt-1 text-xl font-semibold text-red-300">{{ s.failed }}</div>
               @if (failureRate() !== null) {
-                <div class="text-[10px] text-rose-700">{{ failureRate() }}% of attempts</div>
+                <div class="text-[10px] text-red-400">{{ failureRate() }}% of attempts</div>
               }
             </div>
           }
           @if (isEmailCampaign()) {
-            <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-center">
-              <div class="text-[10px] uppercase tracking-wide text-rose-700">Failed</div>
-              <div class="mt-1 text-xl font-semibold text-rose-900">{{ s.failed }}</div>
+            <div class="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-red-400">Failed</div>
+              <div class="mt-1 text-xl font-semibold text-red-300">{{ s.failed }}</div>
               @if (failureRate() !== null) {
-                <div class="text-[10px] text-rose-700">{{ failureRate() }}% of attempts</div>
+                <div class="text-[10px] text-red-400">{{ failureRate() }}% of attempts</div>
               }
             </div>
           }
@@ -257,7 +259,7 @@
                   <td class="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-muted">
                     {{ m.channel_message_id || '—' }}
                   </td>
-                  <td class="max-w-xs px-3 py-2 text-xs text-rose-700">
+                  <td class="max-w-xs px-3 py-2 text-xs text-red-400">
                     @if (m.error) {
                       <span class="line-clamp-1">{{ m.error }}</span>
                     } @else {

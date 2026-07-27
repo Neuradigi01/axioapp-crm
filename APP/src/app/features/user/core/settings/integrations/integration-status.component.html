@@ -23,7 +23,7 @@
   </header>
 
   @if (error()) {
-    <p class="text-xs text-rose-700">Could not load status: {{ error() }}</p>
+    <p class="text-xs text-red-400">Could not load status: {{ error() }}</p>
   } @else {
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       @for (p of providers(); track p.provider) {
@@ -50,8 +50,8 @@
             </span>
           </div>
           <div class="mt-1 flex items-center gap-3 text-xs">
-            <span class="text-emerald-700"> {{ p.deliveries_24h_accepted }} ok </span>
-            <span class="text-rose-700"> {{ p.deliveries_24h_failed }} failed </span>
+            <span class="text-emerald-400"> {{ p.deliveries_24h_accepted }} ok </span>
+            <span class="text-red-400"> {{ p.deliveries_24h_failed }} failed </span>
             <span class="text-faint">· last 24h</span>
           </div>
         </div>
@@ -61,7 +61,7 @@
     @if (dlqOpenTotal() > 0) {
       <button
         type="button"
-        class="mt-3 flex w-full items-center justify-between rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 hover:bg-amber-100"
+        class="mt-3 flex w-full items-center justify-between rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-300 hover:bg-amber-500/10"
         (click)="onOpenDlq()"
       >
         <span class="flex items-center gap-2">
@@ -71,7 +71,7 @@
             need attention
           </span>
         </span>
-        <span class="text-xs text-amber-700 underline"> View DLQ </span>
+        <span class="text-xs text-amber-400 underline"> View DLQ </span>
       </button>
     }
   }

@@ -55,7 +55,7 @@
               }
             </select>
             @if (transferCandidates().length === 0) {
-              <p class="mt-1 text-xs text-rose-700">
+              <p class="mt-1 text-xs text-red-400">
                 No active teammates available. Reassign manually before deactivating.
               </p>
             }
@@ -71,7 +71,7 @@
           </p>
         } @else {
           <p
-            class="rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200"
+            class="rounded-md bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400 ring-1 border-emerald-500/20"
           >
             User has no open records. Safe to deactivate.
           </p>
@@ -95,13 +95,17 @@
         </div>
       } @else if (error()) {
         <!-- Counts load failed; error surface only -->
-        <div class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+        <div
+          class="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"
+        >
           {{ error() }}
         </div>
       }
 
       @if (counts() && error(); as err) {
-        <div class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+        <div
+          class="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"
+        >
           {{ err }}
         </div>
       }

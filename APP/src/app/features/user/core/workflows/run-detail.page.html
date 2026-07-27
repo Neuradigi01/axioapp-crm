@@ -32,12 +32,12 @@
   @if (loading()) {
     <div class="px-6 py-12 text-center text-sm text-muted">Loading run timeline…</div>
   } @else if (error()) {
-    <div class="px-6 py-12 text-center text-sm text-rose-700">{{ error() }}</div>
+    <div class="px-6 py-12 text-center text-sm text-red-400">{{ error() }}</div>
   } @else if (detail(); as d) {
     <!-- Header card -->
     <section class="px-6 py-4">
       <div class="bg-surface rounded-lg border border-subtle px-4 py-3">
-        <dl class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <dl class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
           <div>
             <dt class="text-muted">Started</dt>
             <dd class="text-default">
@@ -71,7 +71,7 @@
           </div>
         </dl>
         @if (d.run.error) {
-          <p class="mt-3 text-xs text-rose-700">Run error: {{ d.run.error }}</p>
+          <p class="mt-3 text-xs text-red-400">Run error: {{ d.run.error }}</p>
         }
       </div>
     </section>
@@ -112,7 +112,7 @@
                       · → {{ step.output_edge_label }}
                     }
                     @if (step.skip_reason) {
-                      · <span class="text-amber-700">{{ step.skip_reason }}</span>
+                      · <span class="text-amber-400">{{ step.skip_reason }}</span>
                     }
                   </div>
                 </div>
@@ -130,15 +130,15 @@
                   @if (step.error) {
                     <div class="mt-3">
                       <h4 class="text-[10px] uppercase tracking-wide text-rose-600 mb-1">Error</h4>
-                      <p class="text-xs text-rose-800 font-mono">{{ step.error }}</p>
+                      <p class="text-xs text-red-400 font-mono">{{ step.error }}</p>
                     </div>
                   }
                   @if (step.skip_reason) {
                     <div class="mt-3">
-                      <h4 class="text-[10px] uppercase tracking-wide text-amber-700 mb-1">
+                      <h4 class="text-[10px] uppercase tracking-wide text-amber-400 mb-1">
                         Why was this skipped?
                       </h4>
-                      <p class="text-xs text-amber-900">
+                      <p class="text-xs text-amber-300">
                         Skip reason:
                         <span class="font-mono">{{ step.skip_reason }}</span>
                       </p>

@@ -19,7 +19,7 @@
              or the assignee hasn't connected Calendar). -->
         @if (a.google_calendar_event_id) {
           <span
-            class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200"
+            class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-medium text-emerald-400 ring-1 ring-inset border-emerald-500/20"
             title="Mirrored into the assignee's Google Calendar"
           >
             <lucide-icon name="calendar" class="h-2.5 w-2.5" aria-hidden="true"></lucide-icon>
@@ -61,7 +61,7 @@
         <button
           type="button"
           (click)="markCompleted.emit()"
-          class="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+          class="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-emerald-400 hover:bg-emerald-500/10"
         >
           <lucide-icon name="check-circle-2" class="h-3.5 w-3.5" />
           Mark completed
@@ -71,7 +71,7 @@
         <button
           type="button"
           (click)="cancelAppt.emit()"
-          class="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-red-700 hover:bg-red-50"
+          class="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-red-400 hover:bg-red-500/10"
         >
           <lucide-icon name="x-circle" class="h-3.5 w-3.5" />
           Cancel

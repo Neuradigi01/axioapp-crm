@@ -4,7 +4,7 @@
        is the preferred surface for new templates (all channels in one
        place + a unified review workflow). Removed in a follow-up
        cleanup PR once operators have switched. -->
-  <div class="border-b border-blue-200 bg-blue-50 px-6 py-2 text-xs text-blue-900">
+  <div class="border-b border-blue-500/20 bg-blue-500/10 px-6 py-2 text-xs text-blue-300">
     <a
       [routerLink]="['/user/templates']"
       [queryParams]="{ channel: 'whatsapp' }"
@@ -13,7 +13,7 @@
       <lucide-icon name="arrow-right" size="12" />
       Open in the new central template library
     </a>
-    <span class="ml-2 text-blue-700">
+    <span class="ml-2 text-blue-400">
       — all channels (WhatsApp, Email, SMS, …) live there now. This page is kept around for one
       release.
     </span>
@@ -66,7 +66,7 @@
     }
     @if (loadError(); as err) {
       <div
-        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+        class="mt-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
       >
         {{ err }}
       </div>
@@ -197,7 +197,7 @@
                     </p>
                     @if (row.submission_status === 'rejected' && row.rejection_reason) {
                       <p
-                        class="mt-1 inline-flex items-center gap-1 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700"
+                        class="mt-1 inline-flex items-center gap-1 rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-400"
                       >
                         <lucide-icon name="alert-triangle" size="10" />
                         {{ row.rejection_reason }}
@@ -274,7 +274,7 @@
                           type="button"
                           (click)="confirmDelete(row)"
                           [disabled]="busyRowId() === row.id"
-                          class="rounded p-1 text-rose-500 hover:bg-rose-50 disabled:opacity-50"
+                          class="rounded p-1 text-rose-500 hover:bg-red-500/10 disabled:opacity-50"
                           title="Delete"
                           aria-label="Delete"
                         >

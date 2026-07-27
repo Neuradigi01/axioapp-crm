@@ -12,15 +12,15 @@
     @if (callbackBanner(); as b) {
       <div
         class="flex items-start justify-between gap-3 rounded-md border p-3 text-sm"
-        [class.border-emerald-200]="b.kind === 'success'"
-        [class.bg-emerald-50]="b.kind === 'success'"
-        [class.text-emerald-900]="b.kind === 'success'"
-        [class.border-amber-200]="b.kind === 'warn'"
-        [class.bg-amber-50]="b.kind === 'warn'"
-        [class.text-amber-900]="b.kind === 'warn'"
-        [class.border-rose-200]="b.kind === 'error'"
-        [class.bg-rose-50]="b.kind === 'error'"
-        [class.text-rose-900]="b.kind === 'error'"
+        [class.border-emerald-500/20]="b.kind === 'success'"
+        [class.bg-emerald-500/10]="b.kind === 'success'"
+        [class.text-emerald-300]="b.kind === 'success'"
+        [class.border-amber-500/20]="b.kind === 'warn'"
+        [class.bg-amber-500/10]="b.kind === 'warn'"
+        [class.text-amber-300]="b.kind === 'warn'"
+        [class.border-red-500/20]="b.kind === 'error'"
+        [class.bg-red-500/10]="b.kind === 'error'"
+        [class.text-red-300]="b.kind === 'error'"
       >
         <div class="flex items-start gap-2">
           @if (b.kind === 'success') {
@@ -67,7 +67,7 @@
         Loading integrations…
       </p>
     } @else if (loadError()) {
-      <div class="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+      <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
         Could not load integrations: {{ loadError() }}
       </div>
     } @else {
@@ -126,14 +126,14 @@
             @if (dlqTotal()! > 0) {
               <button
                 type="button"
-                class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100"
+                class="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 ring-1 border-amber-500/20 hover:bg-amber-500/10"
                 (click)="toggleDlq()"
               >
                 {{ dlqTotal() }} payload{{ dlqTotal() === 1 ? '' : 's' }} total · view table
               </button>
             } @else {
               <span
-                class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+                class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20"
               >
                 All clear
               </span>

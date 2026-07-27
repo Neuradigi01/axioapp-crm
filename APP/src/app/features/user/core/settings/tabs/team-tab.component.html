@@ -45,7 +45,7 @@
           <button
             type="button"
             (click)="openTransferModal()"
-            class="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100"
+            class="rounded-md border border-amber-300 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-300 hover:bg-amber-500/10"
           >
             Transfer ownership
           </button>
@@ -64,7 +64,7 @@
 
     @if (transferSuccess(); as msg) {
       <div
-        class="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+        class="mb-3 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400"
       >
         {{ msg }}
       </div>
@@ -72,7 +72,7 @@
 
     @if (loadError(); as err) {
       <div
-        class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+        class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
       >
         {{ err }}
       </div>
@@ -136,7 +136,7 @@
                 @if (rowError(); as e) {
                   @if (e.id === u.id) {
                     <div
-                      class="rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700"
+                      class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-400"
                     >
                       {{ e.message }}
                     </div>
@@ -180,7 +180,7 @@
                   </span>
                   @if (!u.is_active) {
                     <span
-                      class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700 ring-1 ring-rose-200"
+                      class="inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-400 ring-1 border-red-500/20"
                     >
                       Inactive
                     </span>
@@ -201,12 +201,12 @@
                       class="rounded-md border px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
                       [class.border-rose-300]="u.is_active"
                       [class.bg-surface]="u.is_active"
-                      [class.text-rose-700]="u.is_active"
-                      [class.hover:bg-rose-50]="u.is_active"
+                      [class.text-red-400]="u.is_active"
+                      [class.hover:bg-red-500/10]="u.is_active"
                       [class.border-emerald-300]="!u.is_active"
-                      [class.bg-emerald-50]="!u.is_active"
-                      [class.text-emerald-700]="!u.is_active"
-                      [class.hover:bg-emerald-100]="!u.is_active"
+                      [class.bg-emerald-500/10]="!u.is_active"
+                      [class.text-emerald-400]="!u.is_active"
+                      [class.hover:bg-emerald-500/10]="!u.is_active"
                     >
                       {{ savingId() === u.id ? '…' : u.is_active ? 'Deactivate' : 'Activate' }}
                     </button>
@@ -216,7 +216,7 @@
               @if (rowError(); as e) {
                 @if (e.id === u.id) {
                   <div
-                    class="border-t border-rose-200 bg-rose-50 px-4 py-1.5 text-xs text-rose-700"
+                    class="border-t border-red-500/20 bg-red-500/10 px-4 py-1.5 text-xs text-red-400"
                   >
                     {{ e.message }}
                   </div>
@@ -237,7 +237,7 @@
         </h3>
         @if (invitationsError(); as err) {
           <div
-            class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+            class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
           >
             {{ err }}
           </div>
@@ -259,7 +259,7 @@
                   type="button"
                   (click)="revokeInvite(inv)"
                   [disabled]="revokingInviteId() === inv.id"
-                  class="rounded-md border border-rose-300 bg-surface px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="rounded-md border border-rose-300 bg-surface px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {{ revokingInviteId() === inv.id ? 'Revoking…' : 'Revoke' }}
                 </button>
@@ -278,7 +278,7 @@
           @if (lastInviteLink()) {
             <div class="space-y-3">
               <div
-                class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700"
+                class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400"
               >
                 Invitation sent. The recipient will receive an email with the accept link. (Dev:
                 copy it below.)
@@ -333,7 +333,7 @@
 
               @if (inviteError(); as e) {
                 <div
-                  class="rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700"
+                  class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-400"
                 >
                   {{ e }}
                 </div>
@@ -379,7 +379,9 @@
         </div>
 
         <form [formGroup]="transferForm" (ngSubmit)="submitTransfer()" class="space-y-4 px-5 py-4">
-          <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          <div
+            class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+          >
             <strong class="font-semibold">Warning:</strong> after transfer, you immediately lose
             Owner permissions and the recipient gains them.
             <span class="block mt-1">This cannot be undone without their cooperation.</span>
@@ -434,7 +436,7 @@
 
           @if (transferError(); as err) {
             <div
-              class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+              class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
             >
               {{ err }}
             </div>

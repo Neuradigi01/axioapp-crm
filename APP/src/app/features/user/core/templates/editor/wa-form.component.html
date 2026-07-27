@@ -26,16 +26,16 @@
           type="button"
           (click)="pickCategory(cat.value)"
           [disabled]="disabled()"
-          class="rounded-lg border p-3 text-left transition disabled:opacity-50"
-          [class.border-emerald-500]="form().controls.category.value === cat.value"
-          [class.bg-emerald-50]="form().controls.category.value === cat.value"
-          [class.ring-1]="form().controls.category.value === cat.value"
-          [class.ring-emerald-500]="form().controls.category.value === cat.value"
+          class="min-w-0 rounded-lg border-2 bg-surface p-3 text-left transition disabled:opacity-50"
+          [class.border-accent]="form().controls.category.value === cat.value"
+          [class.bg-accent-soft]="form().controls.category.value === cat.value"
           [class.border-subtle]="form().controls.category.value !== cat.value"
-          [class.hover:border-subtle]="form().controls.category.value !== cat.value"
+          [class.hover:border-muted]="form().controls.category.value !== cat.value"
         >
-          <div class="text-sm font-semibold text-default">{{ cat.label }}</div>
-          <p class="mt-1 text-xs text-muted">{{ cat.blurb }}</p>
+          <div class="break-words text-[13px] font-semibold leading-tight text-default">
+            {{ cat.label }}
+          </div>
+          <p class="mt-1 break-words text-xs leading-snug text-muted">{{ cat.blurb }}</p>
         </button>
       }
     </div>
@@ -74,7 +74,7 @@
         </label>
       } @else if (form().controls.header_type.value) {
         <p
-          class="self-center rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800"
+          class="self-center rounded border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-400"
         >
           Upload the sample {{ form().controls.header_type.value }} on the Submit-to-Meta page.
         </p>
@@ -203,7 +203,7 @@
             type="button"
             (click)="removeButton($index)"
             [disabled]="disabled()"
-            class="mt-4 flex h-6 w-6 items-center justify-center rounded text-rose-500 hover:bg-rose-50 disabled:opacity-50"
+            class="mt-4 flex h-6 w-6 items-center justify-center rounded text-rose-500 hover:bg-red-500/10 disabled:opacity-50"
             aria-label="Remove button"
             title="Remove"
           >

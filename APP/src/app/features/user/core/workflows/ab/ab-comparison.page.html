@@ -26,27 +26,27 @@
     <div class="px-6 py-12 text-center text-sm text-muted">Loading comparison…</div>
   } @else if (error()) {
     <div class="px-6 py-12 text-center">
-      <p class="text-rose-700 text-sm">{{ error() }}</p>
+      <p class="text-red-400 text-sm">{{ error() }}</p>
     </div>
   } @else if (stats(); as s) {
     <!-- Verdict banner -->
     <section class="px-6 py-4 border-b border-subtle bg-surface">
       <div
         class="rounded-lg px-4 py-3 flex items-center gap-3"
-        [class.bg-emerald-50]="winnerCalled()"
+        [class.bg-emerald-500/10]="winnerCalled()"
         [class.border]="winnerCalled()"
-        [class.border-emerald-200]="winnerCalled()"
-        [class.bg-sky-50]="!winnerCalled()"
+        [class.border-emerald-500/20]="winnerCalled()"
+        [class.bg-sky-500/10]="!winnerCalled()"
         [class.border]="!winnerCalled()"
         [class.border-sky-200]="!winnerCalled()"
       >
         @if (winnerCalled()) {
           <lucide-icon name="trophy" class="w-5 h-5 text-emerald-600"></lucide-icon>
           <div class="flex-1">
-            <div class="text-sm font-semibold text-emerald-900">
+            <div class="text-sm font-semibold text-emerald-300">
               Winner: {{ aIsWinner() ? 'Variant A' : 'Variant B' }}
             </div>
-            <div class="text-xs text-emerald-800">
+            <div class="text-xs text-emerald-400">
               Decided {{ s.decided_at | date: 'medium' }} · significance: {{ significanceLabel() }}.
             </div>
           </div>
@@ -78,12 +78,12 @@
         class="bg-surface rounded-lg shadow-sm border p-5"
         [class.border-emerald-300]="aIsWinner()"
         [class.ring-2]="aIsWinner()"
-        [class.ring-emerald-200]="aIsWinner()"
+        [class.border-emerald-500/20]="aIsWinner()"
         [class.border-subtle]="!aIsWinner()"
       >
         <header class="flex items-center gap-2 mb-3">
           <span
-            class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-sky-100 text-sky-700 text-xs font-semibold"
+            class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-sky-500/10 text-sky-700 text-xs font-semibold"
           >
             A
           </span>
@@ -117,7 +117,7 @@
             />
           </svg>
 
-          <dl class="grid grid-cols-2 gap-2 text-xs">
+          <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             <div>
               <dt class="text-muted">Status</dt>
               <dd class="text-default capitalize">
@@ -147,12 +147,12 @@
         class="bg-surface rounded-lg shadow-sm border p-5"
         [class.border-emerald-300]="bIsWinner()"
         [class.ring-2]="bIsWinner()"
-        [class.ring-emerald-200]="bIsWinner()"
+        [class.border-emerald-500/20]="bIsWinner()"
         [class.border-subtle]="!bIsWinner()"
       >
         <header class="flex items-center gap-2 mb-3">
           <span
-            class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-violet-100 text-violet-700 text-xs font-semibold"
+            class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-violet-500/10 text-violet-700 text-xs font-semibold"
           >
             B
           </span>
@@ -186,7 +186,7 @@
             />
           </svg>
 
-          <dl class="grid grid-cols-2 gap-2 text-xs">
+          <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             <div>
               <dt class="text-muted">Status</dt>
               <dd class="text-default capitalize">
@@ -218,13 +218,13 @@
         <header class="px-4 py-3 border-b border-subtle">
           <h3 class="text-sm font-semibold text-default">Comparison</h3>
         </header>
-        <div class="px-4 py-3 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+        <div class="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
           <div>
             <dt class="text-muted">Relative lift (B vs A)</dt>
             <dd
               class="text-base font-semibold mt-0.5"
-              [class.text-emerald-700]="liftPct() > 0"
-              [class.text-rose-700]="liftPct() < 0"
+              [class.text-emerald-400]="liftPct() > 0"
+              [class.text-red-400]="liftPct() < 0"
               [class.text-default]="liftPct() === 0"
             >
               {{ liftPct() >= 0 ? '+' : '' }}{{ liftPct() | number: '1.1-1' }}%

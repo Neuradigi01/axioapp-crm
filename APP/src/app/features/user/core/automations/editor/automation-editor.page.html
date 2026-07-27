@@ -80,14 +80,14 @@
 
     @if (loadError(); as err) {
       <div
-        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+        class="mt-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
       >
         {{ err }}
       </div>
     }
     @if (saveError(); as err) {
       <div
-        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+        class="mt-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
       >
         {{ err }}
       </div>
@@ -159,7 +159,7 @@
                but the operator sees a nudge to migrate. -->
           @if (legacyRulePaths().length > 0) {
             <div
-              class="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+              class="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
             >
               <p class="flex items-start gap-1.5">
                 <lucide-icon name="alert-triangle" class="mt-0.5 h-3 w-3 shrink-0" />
@@ -300,7 +300,7 @@
           </p>
           @if (!trigger()) {
             <p
-              class="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800"
+              class="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-400"
             >
               Save the automation first; then click Save &amp; Test.
             </p>
@@ -379,11 +379,11 @@
           <div class="mt-3 rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs">
             <p class="flex items-center gap-1 font-medium">
               @if (r.would_match && !r.skip_reason) {
-                <span class="text-emerald-700">✓ Would match + send</span>
+                <span class="text-emerald-400">✓ Would match + send</span>
               } @else if (r.would_match && r.skip_reason) {
-                <span class="text-amber-700">⚠ Matched but skipped — {{ r.skip_reason }}</span>
+                <span class="text-amber-400">⚠ Matched but skipped — {{ r.skip_reason }}</span>
               } @else {
-                <span class="text-rose-700"
+                <span class="text-red-400"
                   >✗ Would not fire — {{ r.skip_reason ?? 'condition failed' }}</span
                 >
               }

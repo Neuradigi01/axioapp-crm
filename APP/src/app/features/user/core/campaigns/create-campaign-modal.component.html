@@ -9,7 +9,7 @@
     </header>
 
     <form [formGroup]="form" (ngSubmit)="save()" class="space-y-3">
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label class="block text-sm">
           <span class="block text-xs font-medium text-muted">Name</span>
           <input
@@ -35,12 +35,12 @@
       @if (isWhatsAppChannel() && capacity(); as c) {
         <div
           class="rounded-md border p-3 text-xs"
-          [class.border-emerald-200]="capacityBand() === 'green'"
-          [class.bg-emerald-50]="capacityBand() === 'green'"
-          [class.border-amber-200]="capacityBand() === 'amber'"
-          [class.bg-amber-50]="capacityBand() === 'amber'"
-          [class.border-rose-200]="capacityBand() === 'red'"
-          [class.bg-rose-50]="capacityBand() === 'red'"
+          [class.border-emerald-500/20]="capacityBand() === 'green'"
+          [class.bg-emerald-500/10]="capacityBand() === 'green'"
+          [class.border-amber-500/20]="capacityBand() === 'amber'"
+          [class.bg-amber-500/10]="capacityBand() === 'amber'"
+          [class.border-red-500/20]="capacityBand() === 'red'"
+          [class.bg-red-500/10]="capacityBand() === 'red'"
           [class.border-subtle]="capacityBand() === null"
           [class.bg-surface-2]="capacityBand() === null"
         >
@@ -85,7 +85,7 @@
       <fieldset class="rounded-md border border-subtle p-3 space-y-3">
         <legend class="px-1 text-xs font-medium text-muted">Audience</legend>
         <!-- 3-mode radio toggle (Step 3.5.9) -->
-        <div class="grid grid-cols-3 gap-2 text-xs">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
           <button
             type="button"
             class="rounded-md border p-2 text-left transition"
@@ -124,7 +124,7 @@
         @if (audienceMode() === 'group') {
           @if (groups().length === 0 && groupsLoaded()) {
             <div
-              class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800"
+              class="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-400"
             >
               No saved groups yet.
               <a routerLink="/user/contacts/groups/new" class="font-medium underline">
@@ -150,7 +150,7 @@
         }
 
         @if (audienceMode() === 'filter') {
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             <label class="block text-sm">
               <span class="block text-[10px] text-muted">Search (q)</span>
               <input
@@ -335,12 +335,12 @@
         @if (audienceQuotaWarning(); as w) {
           <div
             class="rounded-md border px-2 py-1.5 text-xs"
-            [class.border-rose-200]="w.kind === 'error'"
-            [class.bg-rose-50]="w.kind === 'error'"
-            [class.text-rose-700]="w.kind === 'error'"
-            [class.border-amber-200]="w.kind === 'warning'"
-            [class.bg-amber-50]="w.kind === 'warning'"
-            [class.text-amber-800]="w.kind === 'warning'"
+            [class.border-red-500/20]="w.kind === 'error'"
+            [class.bg-red-500/10]="w.kind === 'error'"
+            [class.text-red-400]="w.kind === 'error'"
+            [class.border-amber-500/20]="w.kind === 'warning'"
+            [class.bg-amber-500/10]="w.kind === 'warning'"
+            [class.text-amber-400]="w.kind === 'warning'"
           >
             {{ w.message }}
           </div>
@@ -354,7 +354,7 @@
       @if (isEmailChannel()) {
         @if (orgAddressMissing()) {
           <div
-            class="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"
+            class="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400"
           >
             <lucide-icon
               name="alert-triangle"
@@ -386,7 +386,7 @@
             </div>
           } @else if (emailAccounts() !== null && emailAccounts()!.length === 0) {
             <div
-              class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800"
+              class="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-400"
             >
               No verified sender mailbox. Connect one in
               <a routerLink="/user/settings/email" class="font-medium underline">
@@ -395,7 +395,7 @@
               first, then come back to send an Email campaign.
             </div>
           } @else {
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label class="block text-sm">
                 <span class="block text-xs font-medium text-muted">
                   Send from mailbox
@@ -521,7 +521,7 @@
                 [disabled]="!isRowSelectable(t)"
                 (click)="onRowClick(t)"
                 class="relative flex w-full items-start justify-between gap-3 border-l-4 px-3 py-2 text-left transition"
-                [class.bg-emerald-50]="selectedTemplateId() === t.id"
+                [class.bg-emerald-500/10]="selectedTemplateId() === t.id"
                 [class.border-emerald-600]="selectedTemplateId() === t.id"
                 [class.border-transparent]="selectedTemplateId() !== t.id"
                 [class.hover:bg-surface-2]="isRowSelectable(t) && selectedTemplateId() !== t.id"
@@ -559,12 +559,12 @@
 
           @if (selectedTemplate(); as t) {
             <!-- Preview -->
-            <div class="rounded-md border border-emerald-200 bg-emerald-50/40 p-3">
+            <div class="rounded-md border border-emerald-500/20 bg-emerald-500/10/40 p-3">
               <div
-                class="mb-1.5 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-emerald-800"
+                class="mb-1.5 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-emerald-400"
               >
                 <span>Selected template preview</span>
-                <span class="normal-case tracking-normal text-emerald-700">{{ t.name }}</span>
+                <span class="normal-case tracking-normal text-emerald-400">{{ t.name }}</span>
               </div>
               @if (t.subject) {
                 <div class="mb-1 text-sm font-semibold text-default">{{ t.subject }}</div>
@@ -624,7 +624,7 @@
         </div>
       } @else if (templatesLoaded() && templates().length === 0) {
         <div
-          class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+          class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
         >
           @if (isWhatsAppChannel()) {
             No WhatsApp templates yet. Create one in
@@ -728,7 +728,9 @@
       }
 
       @if (submitError(); as err) {
-        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+        >
           {{ err }}
         </div>
       }

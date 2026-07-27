@@ -1,12 +1,12 @@
 <div
   [class]="
     'border-t border-subtle px-4 py-3 transition-colors ' +
-    (isNoteMode() ? 'bg-amber-50' : 'bg-surface')
+    (isNoteMode() ? 'bg-amber-500/10' : 'bg-surface')
   "
   (dragover)="onDragOver($event)"
   (dragleave)="onDragLeave($event)"
   (drop)="onDrop($event)"
-  [class.bg-emerald-50]="isDragging() && canAttachMedia()"
+  [class.bg-emerald-500/10]="isDragging() && canAttachMedia()"
 >
   <!-- Mode toggle (Reply / Note) — Step 13 -->
   <div
@@ -39,7 +39,7 @@
     <div class="mb-2 flex flex-wrap gap-1">
       @for (m of mentions(); track m.userId) {
         <span
-          class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200"
+          class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400 ring-1 border-amber-500/20"
         >
           @{{ m.displayName }}
           <button
@@ -57,7 +57,7 @@
 
   @if (templateError(); as err) {
     <div
-      class="mb-2 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800"
+      class="mb-2 flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 p-2 text-xs text-red-400"
     >
       <lucide-icon
         name="alert-triangle"
@@ -68,7 +68,7 @@
       <span class="flex-1">{{ err }}</span>
       <button
         type="button"
-        class="text-rose-700 hover:text-rose-900"
+        class="text-red-400 hover:text-red-300"
         aria-label="Dismiss"
         (click)="dismissTemplateError()"
       >
@@ -79,7 +79,7 @@
 
   @if (mediaError(); as merr) {
     <div
-      class="mb-2 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800"
+      class="mb-2 flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 p-2 text-xs text-red-400"
     >
       <lucide-icon
         name="alert-triangle"
@@ -90,7 +90,7 @@
       <span class="flex-1">{{ merr }}</span>
       <button
         type="button"
-        class="text-rose-700 hover:text-rose-900"
+        class="text-red-400 hover:text-red-300"
         aria-label="Dismiss"
         (click)="dismissMediaError()"
       >
@@ -228,7 +228,7 @@
         [class]="
           'block min-h-[2.5rem] w-full resize-none rounded-md border px-3 py-2 text-sm placeholder-zinc-400 shadow-sm focus:outline-none focus:ring-1 disabled:bg-surface-2 disabled:text-muted ' +
           (isNoteMode()
-            ? 'border-amber-300 bg-amber-50 focus:border-amber-500 focus:ring-amber-500'
+            ? 'border-amber-300 bg-amber-500/10 focus:border-amber-500 focus:ring-amber-500'
             : 'border-subtle bg-surface focus:border-muted focus:ring-accent')
         "
       ></textarea>
@@ -273,7 +273,7 @@
         [class]="
           'rounded-md px-3 py-1.5 text-xs font-medium transition ' +
           (aiHandling
-            ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+            ? 'bg-violet-500/10 text-violet-700 hover:bg-violet-200'
             : 'border border-subtle bg-surface text-default hover:bg-surface-2')
         "
       >
@@ -318,7 +318,7 @@
       (click)="$event.stopPropagation()"
     >
       <p class="mb-2 text-sm font-semibold text-default">Share a location</p>
-      <div class="mb-2 grid grid-cols-2 gap-2 text-xs">
+      <div class="mb-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
         <label>
           <span class="mb-1 block font-medium text-default">Latitude</span>
           <input

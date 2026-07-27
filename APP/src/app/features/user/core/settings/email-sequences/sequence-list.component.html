@@ -38,7 +38,7 @@
 
   @if (inlineError(); as err) {
     <div
-      class="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+      class="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400"
     >
       <lucide-icon
         name="alert-triangle"
@@ -54,7 +54,7 @@
     @if (loadError(); as err) {
       <div class="px-6 py-10 text-center">
         <div
-          class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-rose-600 ring-1 ring-rose-200"
+          class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10 text-rose-600 ring-1 border-red-500/20"
         >
           <lucide-icon name="alert-triangle" size="18" aria-hidden="true"></lucide-icon>
         </div>
@@ -140,7 +140,7 @@
                   @if (stats()[s.id]; as st) {
                     <span class="inline-flex items-center gap-2 text-muted">
                       <span
-                        ><span class="font-semibold text-emerald-700">{{ st.active }}</span>
+                        ><span class="font-semibold text-emerald-400">{{ st.active }}</span>
                         active</span
                       >
                       <span class="text-faint">·</span>
@@ -151,7 +151,7 @@
                       @if (st.paused_on_reply > 0) {
                         <span class="text-faint">·</span>
                         <span
-                          ><span class="font-semibold text-amber-700">{{
+                          ><span class="font-semibold text-amber-400">{{
                             st.paused_on_reply
                           }}</span>
                           paused</span
@@ -209,14 +209,14 @@
     (click)="cancelDelete()"
   >
     <div
-      class="w-full max-w-sm rounded-xl border border-subtle bg-surface p-6 shadow-xl"
+      class="w-full max-w- rounded-xl border border-subtle bg-surface p-4 md:p-6 shadow-xl"
       role="dialog"
       aria-modal="true"
       (click)="$event.stopPropagation()"
     >
       <div class="flex items-start gap-3">
         <div
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600 ring-1 ring-rose-200"
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-rose-600 ring-1 border-red-500/20"
         >
           <lucide-icon name="trash-2" size="20" aria-hidden="true"></lucide-icon>
         </div>

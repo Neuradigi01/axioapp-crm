@@ -48,7 +48,7 @@
 
       @if (loadError(); as err) {
         <div
-          class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+          class="mt-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
         >
           {{ err }}
         </div>
@@ -271,7 +271,7 @@
                       }
                       @if (row.is_system_default) {
                         <span
-                          class="rounded bg-indigo-100 px-1.5 py-0.5 font-medium text-indigo-700"
+                          class="rounded bg-indigo-500/10 px-1.5 py-0.5 font-medium text-indigo-400"
                           title="System-default workflow — installed automatically on org create. Can be paused but not archived."
                         >
                           System
@@ -281,7 +281,7 @@
                         <a
                           [routerLink]="['/user/workflows', row.id, 'ab-compare']"
                           (click)="$event.stopPropagation()"
-                          class="inline-flex items-center gap-1 rounded bg-sky-100 px-1.5 py-0.5 text-sky-700 hover:bg-sky-200"
+                          class="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 text-sky-700 hover:bg-sky-200"
                           [title]="
                             row.ab_test_decided_at
                               ? 'A/B winner picked — view comparison'

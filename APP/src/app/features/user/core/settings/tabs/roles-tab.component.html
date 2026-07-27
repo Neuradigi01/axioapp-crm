@@ -1,6 +1,8 @@
 <div>
   @if (loadError(); as err) {
-    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div
+      class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+    >
       {{ err }}
     </div>
   }
@@ -55,7 +57,7 @@
         </div>
         @if (templateError(); as err) {
           <div
-            class="mb-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+            class="mb-2 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
           >
             {{ err }}
           </div>
@@ -104,7 +106,7 @@
                 <p class="truncate text-sm font-medium text-default">{{ r.name }}</p>
                 @if (r.is_system) {
                   <span
-                    class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200"
+                    class="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400 ring-1 border-blue-500/20"
                   >
                     System
                   </span>
@@ -136,7 +138,7 @@
                         ' member(s) still use this role. Reassign them first.'
                       : 'Delete role'
                   "
-                  class="rounded-md border border-rose-300 bg-surface px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="rounded-md border border-rose-300 bg-surface px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Delete
                 </button>
@@ -155,7 +157,7 @@
             {{ isReadOnly() ? 'View role' : 'Edit role' }}: {{ r.name }}
             @if (r.is_system) {
               <span
-                class="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200"
+                class="ml-2 inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400 ring-1 border-blue-500/20"
               >
                 System (read-only)
               </span>
@@ -225,7 +227,9 @@
       </div>
 
       @if (editorError(); as err) {
-        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+        >
           {{ err }}
         </div>
       }

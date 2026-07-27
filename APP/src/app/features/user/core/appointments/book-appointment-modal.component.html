@@ -224,7 +224,9 @@
 
       <!-- Errors / conflicts -->
       @if (conflicts().length > 0) {
-        <div class="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+        <div
+          class="mt-4 rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"
+        >
           <p class="font-semibold">Time conflict</p>
           <p class="mt-1">{{ submitError$() ?? 'Conflicts with the following appointments:' }}</p>
           <ul class="mt-1.5 list-inside list-disc">
@@ -237,7 +239,9 @@
           </p>
         </div>
       } @else if (submitError$(); as err) {
-        <div class="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+        <div
+          class="mt-4 rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"
+        >
           {{ err }}
         </div>
       }

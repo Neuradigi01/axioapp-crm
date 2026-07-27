@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-5xl p-6">
+<div class="mx-auto max-w- p-4 md:p-4 md:p-6">
   <a
     routerLink="/user/leads"
     class="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-default"
@@ -8,7 +8,9 @@
   </a>
 
   @if (loadError(); as err) {
-    <div class="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+    <div
+      class="mt-4 rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 border-red-500/20"
+    >
       {{ err }}
     </div>
   } @else if (loading() || lead() === null) {
@@ -51,17 +53,17 @@
                 <dd>
                   @if (l.status === 'won') {
                     <span
-                      class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+                      class="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20"
                       >Won</span
                     >
                   } @else if (l.status === 'lost') {
                     <span
-                      class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
+                      class="inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-400 ring-1 border-red-500/20"
                       >Lost</span
                     >
                   } @else {
                     <span
-                      class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-200"
+                      class="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400 ring-1 border-blue-500/20"
                       >Active</span
                     >
                   }
@@ -115,7 +117,7 @@
           <button
             type="button"
             (click)="onDelete()"
-            class="rounded-md border border-red-200 bg-surface px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+            class="rounded-md border border-red-500/20 bg-surface px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-500/10"
           >
             Delete
           </button>
@@ -288,7 +290,7 @@
                               </a>
                               <a
                                 [appWhatsappLink]="c.phone"
-                                class="inline-flex items-center text-emerald-600 hover:text-emerald-800"
+                                class="inline-flex items-center text-emerald-600 hover:text-emerald-400"
                                 title="Open in WhatsApp"
                               >
                                 <lucide-icon name="message-circle" class="h-3.5 w-3.5" />
@@ -333,7 +335,7 @@
                   <a
                     [routerLink]="['/user/walk-ins']"
                     [queryParams]="{ view: l.source_walk_in_id }"
-                    class="mt-3 inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
+                    class="mt-3 inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20 hover:bg-emerald-500/10"
                     title="Open the walk-in that produced this lead"
                   >
                     <lucide-icon name="footprints" class="h-3.5 w-3.5" />

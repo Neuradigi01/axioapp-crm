@@ -34,12 +34,12 @@
   @if (loading()) {
     <div class="px-6 py-12 text-center text-sm text-muted">Loading analytics…</div>
   } @else if (error()) {
-    <div class="px-6 py-12 text-center text-sm text-rose-700">
+    <div class="px-6 py-12 text-center text-sm text-red-400">
       {{ error() }}
     </div>
   } @else if (analytics(); as a) {
     <!-- KPI cards -->
-    <section class="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+    <section class="px-6 py-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
       <div class="bg-surface rounded-lg border border-subtle p-4">
         <div class="text-[10px] uppercase tracking-wide text-muted">Enrolled</div>
         <div class="text-2xl font-semibold text-default mt-1">
@@ -62,7 +62,7 @@
       </div>
       <div class="bg-surface rounded-lg border border-subtle p-4">
         <div class="text-[10px] uppercase tracking-wide text-muted">Goal rate</div>
-        <div class="text-2xl font-semibold text-emerald-700 mt-1">
+        <div class="text-2xl font-semibold text-emerald-400 mt-1">
           {{ a.totals.conversion_rate | percent: '1.1-2' }}
         </div>
         <div class="text-[11px] text-muted mt-1">
@@ -135,12 +135,12 @@
                 <div class="h-full bg-sky-500" [style.width.%]="funnelBarPct(row)"></div>
               </div>
               <div class="mt-1 flex items-center gap-3 text-[10px] text-muted">
-                <span class="text-emerald-700">✓ {{ row.completed_count | number }}</span>
+                <span class="text-emerald-400">✓ {{ row.completed_count | number }}</span>
                 @if (row.skipped_count > 0) {
-                  <span class="text-amber-700">⊝ {{ row.skipped_count | number }} skipped</span>
+                  <span class="text-amber-400">⊝ {{ row.skipped_count | number }} skipped</span>
                 }
                 @if (row.errored_count > 0) {
-                  <span class="text-rose-700">⚠ {{ row.errored_count | number }} errored</span>
+                  <span class="text-red-400">⚠ {{ row.errored_count | number }} errored</span>
                 }
               </div>
             </button>
@@ -168,22 +168,22 @@
         <div class="px-4 py-3">
           @if (drawerNode(); as node) {
             <p class="text-[11px] text-muted mb-2">{{ node.node_type }}</p>
-            <dl class="grid grid-cols-2 gap-2 text-xs mb-3">
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mb-3">
               <div>
                 <dt class="text-muted">Total</dt>
                 <dd class="text-default font-medium">{{ node.total | number }}</dd>
               </div>
               <div>
                 <dt class="text-muted">Completed</dt>
-                <dd class="text-emerald-700 font-medium">{{ node.completed_count | number }}</dd>
+                <dd class="text-emerald-400 font-medium">{{ node.completed_count | number }}</dd>
               </div>
               <div>
                 <dt class="text-muted">Skipped</dt>
-                <dd class="text-amber-700 font-medium">{{ node.skipped_count | number }}</dd>
+                <dd class="text-amber-400 font-medium">{{ node.skipped_count | number }}</dd>
               </div>
               <div>
                 <dt class="text-muted">Errored</dt>
-                <dd class="text-rose-700 font-medium">{{ node.errored_count | number }}</dd>
+                <dd class="text-red-400 font-medium">{{ node.errored_count | number }}</dd>
               </div>
             </dl>
             <h4 class="text-[11px] font-semibold text-muted mb-1">Skip reasons</h4>
@@ -227,11 +227,11 @@
                 <tr>
                   <td class="px-4 py-2 capitalize">{{ m.channel }}</td>
                   <td class="px-4 py-2 text-right">{{ m.total | number }}</td>
-                  <td class="px-4 py-2 text-right text-emerald-700">
+                  <td class="px-4 py-2 text-right text-emerald-400">
                     {{ m.delivered | number }}
                   </td>
-                  <td class="px-4 py-2 text-right text-amber-700">{{ m.skipped | number }}</td>
-                  <td class="px-4 py-2 text-right text-rose-700">{{ m.errored | number }}</td>
+                  <td class="px-4 py-2 text-right text-amber-400">{{ m.skipped | number }}</td>
+                  <td class="px-4 py-2 text-right text-red-400">{{ m.errored | number }}</td>
                   <td class="px-4 py-2 text-right">{{ m.delivery_rate | percent: '1.1-1' }}</td>
                 </tr>
               } @empty {

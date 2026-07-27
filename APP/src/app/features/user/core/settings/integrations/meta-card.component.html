@@ -5,7 +5,7 @@
   <header class="flex items-start justify-between gap-4">
     <div class="flex items-start gap-3">
       <span
-        class="flex h-10 w-10 items-center justify-center rounded-md bg-indigo-50 font-bold text-indigo-700"
+        class="flex h-10 w-10 items-center justify-center rounded-md bg-indigo-500/10 font-bold text-indigo-400"
         aria-hidden="true"
       >
         M
@@ -36,19 +36,19 @@
         </span>
       } @else if (integration()?.status === 'connected') {
         <span
-          class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+          class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20"
         >
           Connected
         </span>
       } @else if (integration()?.status === 'expired') {
         <span
-          class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200"
+          class="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 ring-1 border-amber-500/20"
         >
           Reconnect required
         </span>
       } @else {
         <span
-          class="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
+          class="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-400 ring-1 border-red-500/20"
         >
           Error
         </span>
@@ -58,7 +58,7 @@
 
   @if (inlineError(); as err) {
     <div
-      class="mt-4 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+      class="mt-4 flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400"
     >
       <lucide-icon
         name="alert-triangle"
@@ -71,10 +71,12 @@
   }
 
   @if (needsReconnect()) {
-    <div class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+    <div
+      class="mt-4 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-300"
+    >
       <p class="font-medium">Your Meta connection has expired or was revoked.</p>
       @if (integration()?.last_error) {
-        <p class="mt-1 text-xs text-amber-700">
+        <p class="mt-1 text-xs text-amber-400">
           {{ integration()?.last_error }}
         </p>
       }
@@ -84,7 +86,9 @@
       </p>
     </div>
   } @else if (tokenExpiringSoon()) {
-    <div class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+    <div
+      class="mt-4 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-300"
+    >
       <p>
         Token expires in
         <strong>{{ daysToExpiry() }} day{{ daysToExpiry() === 1 ? '' : 's' }}</strong
@@ -165,7 +169,7 @@
         @if (!pagesLoaded() && !pagesLoading()) {
           <button
             type="button"
-            class="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+            class="text-xs font-medium text-indigo-600 hover:text-indigo-400"
             (click)="loadPages()"
           >
             Load
@@ -215,7 +219,7 @@
             <div class="flex items-center gap-2">
               @if (pageSubscribedMap()[page.page_id]) {
                 <span
-                  class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+                  class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20"
                 >
                   <lucide-icon name="check" size="12" aria-hidden="true"></lucide-icon>
                   Subscribed

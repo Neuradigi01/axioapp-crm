@@ -1,6 +1,8 @@
 <div>
   @if (loadError(); as err) {
-    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div
+      class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+    >
       {{ err }}
     </div>
   }
@@ -128,7 +130,7 @@
 
       <section>
         <h3 class="mb-2 text-sm font-semibold text-default">Locale &amp; fiscal</h3>
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-4">
           <label class="block text-sm">
             <span class="block text-xs font-medium text-muted">Currency</span>
             <input
@@ -166,13 +168,15 @@
       </section>
 
       @if (saveError(); as err) {
-        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+        >
           {{ err }}
         </div>
       }
       @if (saveOk()) {
         <div
-          class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700"
+          class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400"
         >
           Saved.
         </div>

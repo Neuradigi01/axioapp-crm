@@ -3,7 +3,7 @@
     @if (loading()) {
       <p class="text-sm text-muted">Loading your profile…</p>
     } @else if (error()) {
-      <h1 class="text-2xl font-semibold text-rose-700">Something went wrong</h1>
+      <h1 class="text-2xl font-semibold text-red-400">Something went wrong</h1>
       <p class="mt-2 text-sm text-muted">{{ error() }}</p>
     } @else if (user(); as u) {
       <h1 class="text-2xl font-semibold text-default">Welcome, {{ u.full_name }}</h1>

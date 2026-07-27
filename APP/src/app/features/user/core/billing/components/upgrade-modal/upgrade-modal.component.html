@@ -43,7 +43,7 @@
           </div>
         } @else if (plansError()) {
           <p
-            class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+            class="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
           >
             Couldn't load the plan list. Please close this dialog and try again.
           </p>
@@ -57,7 +57,7 @@
                 <label
                   class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
                   [class.border-blue-600]="selectedPlan() === plan.code"
-                  [class.bg-blue-50]="selectedPlan() === plan.code"
+                  [class.bg-blue-500/10]="selectedPlan() === plan.code"
                   [class.dark:bg-blue-950]="selectedPlan() === plan.code"
                   [class.border-subtle]="selectedPlan() !== plan.code"
                   [class.dark:border-slate-700]="selectedPlan() !== plan.code"
@@ -179,7 +179,7 @@
 
           @if (submitError(); as msg) {
             <p
-              class="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+              class="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
               role="alert"
             >
               {{ msg }}

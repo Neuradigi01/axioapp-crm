@@ -1,18 +1,18 @@
 @if (stats(); as s) {
   <div
     class="px-4 py-2 border-b text-xs flex items-center gap-3"
-    [class.bg-sky-50]="!winnerCalled()"
+    [class.bg-sky-500/10]="!winnerCalled()"
     [class.border-sky-200]="!winnerCalled()"
     [class.text-sky-900]="!winnerCalled()"
-    [class.bg-emerald-50]="winnerCalled()"
-    [class.border-emerald-200]="winnerCalled()"
-    [class.text-emerald-900]="winnerCalled()"
+    [class.bg-emerald-500/10]="winnerCalled()"
+    [class.border-emerald-500/20]="winnerCalled()"
+    [class.text-emerald-300]="winnerCalled()"
     [class.animate-pulse]="winnerCalled()"
   >
     @if (winnerCalled()) {
       <lucide-icon name="trophy" class="w-4 h-4 text-emerald-600"></lucide-icon>
       <span class="font-semibold">{{ winnerLabel() }} won.</span>
-      <span class="text-emerald-800"> Decided {{ s.decided_at | date: 'medium' }}. </span>
+      <span class="text-emerald-400"> Decided {{ s.decided_at | date: 'medium' }}. </span>
     } @else {
       <lucide-icon name="beaker" class="w-4 h-4 text-sky-600"></lucide-icon>
       <span class="font-semibold">A/B test running.</span>
@@ -46,7 +46,7 @@
     @if (!winnerCalled()) {
       <button
         type="button"
-        class="px-2 py-0.5 rounded text-[11px] text-rose-700 hover:bg-rose-100"
+        class="px-2 py-0.5 rounded text-[11px] text-red-400 hover:bg-red-500/10"
         (click)="unpair.emit()"
       >
         Cancel test
@@ -58,7 +58,7 @@
     Loading A/B stats…
   </div>
 } @else if (error()) {
-  <div class="px-4 py-2 border-b bg-rose-50 border-rose-200 text-[11px] text-rose-800">
+  <div class="px-4 py-2 border-b bg-red-500/10 border-red-500/20 text-[11px] text-red-400">
     {{ error() }}
   </div>
 }

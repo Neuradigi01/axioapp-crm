@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-4xl p-6 space-y-6">
+<div class="mx-auto max-w-4xl p-4 md:p-6 space-y-6">
   <header class="space-y-1">
     <nav class="flex items-center gap-1 text-xs text-muted">
       <a routerLink="/user/contacts" class="hover:text-default">Contacts</a>
@@ -84,7 +84,7 @@
           class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed bg-surface px-4 py-10 text-center transition"
           [class.border-subtle]="!dragOver()"
           [class.border-indigo-400]="dragOver()"
-          [class.bg-indigo-50]="dragOver()"
+          [class.bg-indigo-500/10]="dragOver()"
           (dragover)="onDragOver($event)"
           (dragleave)="onDragLeave($event)"
           (drop)="onDrop($event)"
@@ -106,7 +106,9 @@
       }
 
       @if (uploadError(); as msg) {
-        <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+        >
           {{ msg }}
         </div>
       }
@@ -203,7 +205,7 @@
 
       @if (!fullNameMapped()) {
         <div
-          class="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          class="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-400"
         >
           <lucide-icon name="alert-triangle" class="mt-0.5 h-4 w-4" />
           <div>
@@ -257,7 +259,9 @@
       </div>
 
       @if (dryRunError(); as msg) {
-        <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+        >
           {{ msg }}
         </div>
       }
@@ -307,21 +311,21 @@
 
       <!-- Counts -->
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <p class="text-xs uppercase tracking-wide text-emerald-700">Will be added</p>
-          <p class="mt-1 text-2xl font-semibold text-emerald-900">
+        <div class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-emerald-400">Will be added</p>
+          <p class="mt-1 text-2xl font-semibold text-emerald-300">
             {{ result.will_insert }}
           </p>
         </div>
-        <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
-          <p class="text-xs uppercase tracking-wide text-amber-700">Duplicate phone</p>
-          <p class="mt-1 text-2xl font-semibold text-amber-900">
+        <div class="rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-amber-400">Duplicate phone</p>
+          <p class="mt-1 text-2xl font-semibold text-amber-300">
             {{ result.duplicate_phone }}
           </p>
         </div>
-        <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3">
-          <p class="text-xs uppercase tracking-wide text-red-700">Errors / skipped</p>
-          <p class="mt-1 text-2xl font-semibold text-red-900">
+        <div class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-red-400">Errors / skipped</p>
+          <p class="mt-1 text-2xl font-semibold text-red-300">
             {{ result.will_skip }}
           </p>
         </div>
@@ -375,7 +379,9 @@
       }
 
       @if (commitError(); as msg) {
-        <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+        >
           {{ msg }}
         </div>
       }
@@ -412,8 +418,10 @@
   <!-- Step 4 — Success                                                -->
   <!-- ============================================================== -->
   @if (step() === 4 && commitResult(); as outcome) {
-    <section class="space-y-5 rounded-lg border border-emerald-200 bg-surface p-8 text-center">
-      <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+    <section class="space-y-5 rounded-lg border border-emerald-500/20 bg-surface p-8 text-center">
+      <div
+        class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10"
+      >
         <lucide-icon name="check" class="h-6 w-6 text-emerald-600" />
       </div>
       <div>

@@ -17,7 +17,7 @@
     </div>
     @if (loadError(); as err) {
       <div
-        class="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+        class="mt-2 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
       >
         {{ err }}
       </div>
@@ -37,8 +37,13 @@
   }
 
   <div class="flex min-h-0 flex-1">
-    <!-- Left: list -->
-    <aside class="flex w-80 min-w-[18rem] flex-col border-r border-subtle bg-surface">
+    <!-- Left: list. Hidden on mobile once a conversation is picked so the
+         thread pane can take the full width. -->
+    <aside
+      class="flex w-full flex-col border-r border-subtle bg-surface md:w-80 md:min-w-[18rem]"
+      [class.hidden]="!!selectedId()"
+      [class.md:flex]="!!selectedId()"
+    >
       <app-conversation-list
         [items]="items()"
         [loading]="loading()"
@@ -54,8 +59,13 @@
       />
     </aside>
 
-    <!-- Right: thread + compose -->
-    <section class="flex min-w-0 flex-1 flex-col bg-surface-2">
+    <!-- Right: thread + compose. Hidden on mobile when nothing selected so
+         the list can take the full width. -->
+    <section
+      class="flex min-w-0 flex-1 flex-col bg-surface-2"
+      [class.hidden]="!selectedId()"
+      [class.md:flex]="!selectedId()"
+    >
       @if (selectedConversation(); as conv) {
         <app-chat-thread
           [conversation]="conv"

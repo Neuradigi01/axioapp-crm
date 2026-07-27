@@ -28,7 +28,7 @@
         </div>
       } @else if (loadError(); as err) {
         <div
-          class="mx-5 my-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+          class="mx-5 my-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
         >
           {{ err }}
         </div>
@@ -44,7 +44,7 @@
                     v{{ v.version }}
                     @if (v.version === template().current_version) {
                       <span
-                        class="ml-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 ring-1 ring-blue-200"
+                        class="ml-1 rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-400 ring-1 border-blue-500/20"
                       >
                         Current
                       </span>
@@ -90,7 +90,7 @@
 
       @if (restoreError(); as err) {
         <div
-          class="mx-5 my-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+          class="mx-5 my-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
         >
           {{ err }}
         </div>

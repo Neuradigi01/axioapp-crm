@@ -34,7 +34,7 @@
 
   <!-- ================= Stat cards ================= -->
   @let s = stats();
-  <div class="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+  <div class="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:grid-cols-4">
     <div class="rounded-xl border border-subtle bg-surface px-5 py-4">
       <div class="text-[11px] font-semibold uppercase tracking-wider text-muted">
         Sent this month
@@ -64,7 +64,9 @@
   </div>
 
   @if (loadError(); as err) {
-    <div class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div
+      class="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+    >
       {{ err }}
     </div>
   }
@@ -343,7 +345,7 @@
                         type="button"
                         (click)="remove(c)"
                         [disabled]="busyId() === c.id"
-                        class="rounded p-1 text-rose-500 hover:bg-rose-50 disabled:opacity-50"
+                        class="rounded p-1 text-rose-500 hover:bg-red-500/10 disabled:opacity-50"
                         title="Delete"
                       >
                         ✕

@@ -2,7 +2,7 @@
   <div class="mb-3 flex items-center justify-between gap-3">
     <p class="text-sm text-muted">
       Recent sign-ins to your account. The session you're using is marked
-      <span class="font-medium text-emerald-700">"This session"</span>. Sign out of any others if
+      <span class="font-medium text-emerald-400">"This session"</span>. Sign out of any others if
       they look unfamiliar.
     </p>
     <button type="button" class="shrink-0 text-xs text-muted hover:text-default" (click)="reload()">
@@ -11,7 +11,9 @@
   </div>
 
   @if (error(); as err) {
-    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div
+      class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+    >
       {{ err }}
     </div>
   }
@@ -48,7 +50,7 @@
         </thead>
         <tbody class="divide-y divide-subtle">
           @for (s of sessions(); track s.id) {
-            <tr [class.bg-emerald-50]="s.is_current">
+            <tr [class.bg-emerald-500/10]="s.is_current">
               <td class="px-3 py-2 text-default">
                 {{ s.created_at | date: 'medium' }}
               </td>
@@ -60,15 +62,15 @@
               </td>
               <td class="px-3 py-2 text-xs">
                 @if (s.is_current) {
-                  <span class="rounded bg-emerald-100 px-2 py-0.5 text-emerald-800"
+                  <span class="rounded bg-emerald-500/10 px-2 py-0.5 text-emerald-400"
                     >This session</span
                   >
                 } @else if (s.revoked_at) {
                   <span class="rounded bg-surface-2 px-2 py-0.5 text-muted">Signed out</span>
                 } @else if (isActive(s)) {
-                  <span class="rounded bg-blue-100 px-2 py-0.5 text-blue-800">Active</span>
+                  <span class="rounded bg-blue-500/10 px-2 py-0.5 text-blue-400">Active</span>
                 } @else {
-                  <span class="rounded bg-amber-100 px-2 py-0.5 text-amber-800">Expired</span>
+                  <span class="rounded bg-amber-500/10 px-2 py-0.5 text-amber-400">Expired</span>
                 }
               </td>
               <td class="px-3 py-2 text-right">
@@ -77,7 +79,7 @@
                     type="button"
                     (click)="revoke(s)"
                     [disabled]="revokingId() === s.id"
-                    class="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-50"
+                    class="text-xs text-rose-600 hover:text-red-400 disabled:opacity-50"
                   >
                     {{ revokingId() === s.id ? 'Signing out…' : 'Sign out' }}
                   </button>

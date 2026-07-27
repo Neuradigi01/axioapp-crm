@@ -5,7 +5,7 @@
     @switch (status()) {
       @case ('polling') {
         <div
-          class="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"
+          class="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-500/20 border-t-blue-600"
         ></div>
         <h1 class="mt-4 text-lg font-semibold text-default dark:text-slate-100">
           Confirming your payment…
@@ -16,7 +16,7 @@
       }
       @case ('completed') {
         <div
-          class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-2xl text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300"
+          class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-2xl text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300"
           aria-hidden="true"
         >
           ✓
@@ -30,7 +30,7 @@
       }
       @case ('timeout') {
         <div
-          class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-2xl text-amber-600 dark:bg-amber-950 dark:text-amber-300"
+          class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-2xl text-amber-600 dark:bg-amber-950 dark:text-amber-300"
           aria-hidden="true"
         >
           ⏱

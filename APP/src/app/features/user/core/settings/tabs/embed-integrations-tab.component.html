@@ -39,7 +39,7 @@
       @if (loading()) {
         <p class="text-sm text-muted">Loading…</p>
       } @else if (loadError(); as err) {
-        <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {{ err }}
         </p>
       } @else {
@@ -104,7 +104,7 @@
                             type="button"
                             (click)="revoke(k)"
                             [disabled]="revokingId() === k.id"
-                            class="text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
+                            class="text-xs text-red-600 hover:text-red-400 disabled:opacity-50"
                           >
                             {{ revokingId() === k.id ? 'Revoking…' : 'Revoke' }}
                           </button>
@@ -146,7 +146,7 @@
                           <code class="text-xs text-muted">{{ f.key }}</code>
                           @if (f.field_source === 'custom') {
                             <span
-                              class="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-medium text-indigo-700"
+                              class="rounded-full bg-indigo-500/10 px-1.5 py-0.5 text-[9px] font-medium text-indigo-400"
                               >CUSTOM · {{ f.entity }}</span
                             >
                           }
@@ -202,7 +202,7 @@
                           type="button"
                           (click)="removeField(i)"
                           title="Remove this field from the widget"
-                          class="rounded p-1 text-faint hover:bg-red-50 hover:text-red-600"
+                          class="rounded p-1 text-faint hover:bg-red-500/10 hover:text-red-600"
                         >
                           <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
                         </button>
@@ -243,7 +243,7 @@
                     <p class="text-xs text-muted">Loading…</p>
                   } @else if (pickerError(); as err) {
                     <p
-                      class="rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-700"
+                      class="rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1.5 text-xs text-red-400"
                     >
                       {{ err }}
                     </p>
@@ -484,7 +484,7 @@
 
             @if (saveError(); as err) {
               <div
-                class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+                class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
               >
                 {{ err }}
               </div>

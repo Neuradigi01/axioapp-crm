@@ -7,7 +7,7 @@
       Calls
     </div>
     @if (listError(); as err) {
-      <div class="px-3 py-2 text-xs text-rose-700">{{ err }}</div>
+      <div class="px-3 py-2 text-xs text-red-400">{{ err }}</div>
     }
     @if (callsLoading()) {
       <div class="px-3 py-6 text-center text-sm text-muted">Loading…</div>
@@ -91,7 +91,7 @@
           </div>
           @if (saveError(); as err) {
             <div
-              class="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+              class="mt-2 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
             >
               {{ err }}
             </div>

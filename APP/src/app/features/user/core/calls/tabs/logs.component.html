@@ -16,7 +16,9 @@
   </div>
 
   @if (loadError(); as err) {
-    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div
+      class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+    >
       {{ err }}
     </div>
   }
@@ -67,8 +69,8 @@
                   [class]="
                     'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ' +
                     (c.direction === 'out'
-                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                      : 'bg-sky-50 text-sky-700 ring-sky-200')
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : 'bg-sky-500/10 text-sky-700 ring-sky-200')
                   "
                 >
                   {{ c.direction === 'out' ? '↗ Outgoing' : '↘ Incoming' }}

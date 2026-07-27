@@ -1,6 +1,8 @@
 <section>
   @if (!canManage()) {
-    <div class="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
+    <div
+      class="rounded-md bg-amber-500/10 px-4 py-3 text-sm text-amber-400 ring-1 border-amber-500/20"
+    >
       You don't have permission to manage standard-field overrides (<code class="font-mono"
         >settings.standard_fields.manage</code
       >). Ask an Owner or Admin to grant access.
@@ -38,7 +40,9 @@
     </div>
 
     @if (error(); as e) {
-      <div class="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+      <div
+        class="mb-4 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400 ring-1 border-red-500/20"
+      >
         {{ e }}
       </div>
     }

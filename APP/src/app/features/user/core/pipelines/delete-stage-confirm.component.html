@@ -14,9 +14,11 @@
     </header>
 
     <div class="space-y-3 px-4 py-4">
-      <div class="flex items-start gap-2 rounded bg-amber-50 px-3 py-2 ring-1 ring-amber-200">
-        <span class="text-base leading-none text-amber-700">⚠</span>
-        <p class="text-xs text-amber-800">
+      <div
+        class="flex items-start gap-2 rounded bg-amber-500/10 px-3 py-2 ring-1 border-amber-500/20"
+      >
+        <span class="text-base leading-none text-amber-400">⚠</span>
+        <p class="text-xs text-amber-400">
           {{ cardsInStage() }} {{ cardsInStage() === 1 ? 'lead is' : 'leads are' }} currently in
           this stage. Move {{ cardsInStage() === 1 ? 'it' : 'them' }} to:
         </p>

@@ -32,12 +32,12 @@
       <!-- Mode toggle -->
       <fieldset class="rounded-md border border-subtle p-3">
         <legend class="px-1 text-xs font-medium text-muted">Mode</legend>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button
             type="button"
             class="rounded-md border p-3 text-left transition"
             [class.border-indigo-500]="mode() === 'dynamic'"
-            [class.bg-indigo-50]="mode() === 'dynamic'"
+            [class.bg-indigo-500/10]="mode() === 'dynamic'"
             [class.border-subtle]="mode() !== 'dynamic'"
             [class.opacity-50]="isEdit() && mode() !== 'dynamic'"
             [disabled]="isEdit()"
@@ -100,7 +100,7 @@
           <legend class="px-1 text-xs font-medium text-muted">
             Filter — same shape as the Contacts list
           </legend>
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             <label class="block text-sm">
               <span class="block text-[10px] text-muted">Search (q)</span>
               <input
@@ -232,7 +232,9 @@
       </div>
 
       @if (submitError(); as err) {
-        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+        >
           {{ err }}
         </div>
       }

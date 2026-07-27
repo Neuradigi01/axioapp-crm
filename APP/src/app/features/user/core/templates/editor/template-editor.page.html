@@ -65,7 +65,7 @@
             type="button"
             (click)="submitForReview()"
             [disabled]="transitioning() !== null"
-            class="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
           >
             @if (transitioning() === 'submit') {
               <lucide-icon name="loader-2" size="12" class="animate-spin" />
@@ -79,7 +79,7 @@
           <button
             type="button"
             (click)="openReviewModal()"
-            class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
+            class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/10"
           >
             <lucide-icon name="check" size="12" />
             Review
@@ -105,7 +105,7 @@
             type="button"
             (click)="submitToMeta()"
             [disabled]="transitioning() !== null"
-            class="inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-500/10 px-3 py-1.5 text-sm font-medium text-violet-800 hover:bg-violet-500/10 disabled:opacity-50"
             title="Submit this template to Meta for WhatsApp Business approval"
           >
             @if (transitioning() === 'submit_external') {
@@ -137,7 +137,7 @@
             type="button"
             (click)="resubmitTemplate()"
             [disabled]="transitioning() !== null"
-            class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-800 hover:bg-rose-100 disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
             title="Move back to draft so you can edit + re-submit to Meta"
           >
             @if (transitioning() === 'resubmit') {
@@ -184,7 +184,7 @@
 
     @if (locked()) {
       <div
-        class="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+        class="mt-3 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400"
       >
         <strong>Locked for review.</strong>
         This template is in
@@ -195,7 +195,7 @@
     }
     @if (template()?.external_status === 'rejected') {
       <div
-        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800"
+        class="mt-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
       >
         <strong>Meta rejected this template.</strong>
         @if (rejectionReason(); as reason) {
@@ -203,7 +203,7 @@
         } @else {
           No reason was supplied by Meta. Click Refresh status to re-check.
         }
-        <div class="mt-1 text-xs text-rose-700">
+        <div class="mt-1 text-xs text-red-400">
           Click <strong>Resubmit</strong> to reset to draft, fix the issue, and submit again.
         </div>
       </div>
@@ -211,14 +211,14 @@
 
     @if (loadError(); as err) {
       <div
-        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+        class="mt-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
       >
         {{ err }}
       </div>
     }
     @if (saveError(); as err) {
       <div
-        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+        class="mt-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
       >
         {{ err }}
       </div>

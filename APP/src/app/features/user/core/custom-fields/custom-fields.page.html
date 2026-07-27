@@ -30,7 +30,7 @@
   </header>
 
   @if (loadError()) {
-    <div class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+    <div class="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400 ring-1 border-red-500/20">
       {{ loadError() }}
     </div>
   }
@@ -106,7 +106,7 @@
               @if (field.source === 'user') {
                 <button
                   type="button"
-                  class="text-xs font-medium text-red-600 hover:text-red-800"
+                  class="text-xs font-medium text-red-600 hover:text-red-400"
                   (click)="onDelete(field)"
                 >
                   Delete

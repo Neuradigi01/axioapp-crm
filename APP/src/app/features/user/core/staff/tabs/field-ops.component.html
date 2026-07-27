@@ -13,14 +13,14 @@
     </a>
   </div>
 
-  <div class="grid grid-cols-3 gap-3">
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
     <div class="rounded-lg border border-subtle bg-surface p-3 shadow-sm">
       <p class="text-[11px] uppercase tracking-wide text-muted">Open</p>
       <p class="mt-1 text-xl font-semibold text-default">{{ counts().open }}</p>
     </div>
     <div class="rounded-lg border border-subtle bg-surface p-3 shadow-sm">
       <p class="text-[11px] uppercase tracking-wide text-muted">Completed</p>
-      <p class="mt-1 text-xl font-semibold text-emerald-700">{{ counts().done }}</p>
+      <p class="mt-1 text-xl font-semibold text-emerald-400">{{ counts().done }}</p>
     </div>
     <div class="rounded-lg border border-subtle bg-surface p-3 shadow-sm">
       <p class="text-[11px] uppercase tracking-wide text-muted">Total</p>
@@ -29,7 +29,9 @@
   </div>
 
   @if (loadError(); as err) {
-    <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">{{ err }}</p>
+    <p class="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400 ring-1 border-red-500/20">
+      {{ err }}
+    </p>
   } @else if (loading() && visits().length === 0) {
     <div class="space-y-2 animate-pulse">
       @for (i of [0, 1, 2]; track i) {
@@ -74,7 +76,7 @@
               <td class="px-3 py-2">
                 @if (v.completed_at) {
                   <span
-                    class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+                    class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 border-emerald-500/20"
                   >
                     <lucide-icon name="check" class="h-3 w-3" />
                     Completed

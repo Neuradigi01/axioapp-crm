@@ -30,7 +30,7 @@
   </header>
 
   @if (error()) {
-    <p class="mb-2 text-xs text-rose-700">{{ error() }}</p>
+    <p class="mb-2 text-xs text-red-400">{{ error() }}</p>
   }
 
   @if (!loading() && rows().length === 0) {
@@ -74,7 +74,7 @@
                 @switch (rowStatus(row)) {
                   @case ('replayed') {
                     <span
-                      class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+                      class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20"
                     >
                       <lucide-icon name="check" size="12" aria-hidden="true"></lucide-icon>
                       Replayed
