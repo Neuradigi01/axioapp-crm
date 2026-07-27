@@ -2,13 +2,13 @@
   <div class="fixed inset-0 z-40" (click)="dismiss.emit()" aria-hidden="true"></div>
   <div
     role="dialog"
-    class="fixed left-1/2 top-1/2 z-50 w-72 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-3 shadow-xl ring-1 ring-zinc-200"
+    class="fixed left-1/2 top-1/2 z-50 w-72 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface p-3 shadow-xl ring-1 border-subtle"
     (click)="$event.stopPropagation()"
   >
-    <header class="border-b border-zinc-200 pb-2">
-      <h3 class="text-sm font-semibold text-zinc-900">{{ a.title }}</h3>
+    <header class="border-b border-subtle pb-2">
+      <h3 class="text-sm font-semibold text-default">{{ a.title }}</h3>
       <div class="mt-0.5 flex items-center gap-2">
-        <p class="text-[10px] uppercase tracking-wide text-zinc-500">
+        <p class="text-[10px] uppercase tracking-wide text-muted">
           {{ a.status }}
         </p>
         <!-- tasks/google-calendar-sync Step 5 — per-appointment sync
@@ -27,7 +27,7 @@
           </span>
         } @else {
           <span
-            class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-600 ring-1 ring-inset ring-zinc-200"
+            class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-1.5 py-0.5 text-[9px] font-medium text-muted ring-1 ring-inset border-subtle"
             title="Sync pending or the assignee hasn't connected Google Calendar"
           >
             <lucide-icon name="calendar" class="h-2.5 w-2.5" aria-hidden="true"></lucide-icon>
@@ -41,7 +41,7 @@
         <button
           type="button"
           (click)="reassign.emit()"
-          class="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          class="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-default hover:bg-surface-2"
         >
           <lucide-icon name="user-cog" class="h-3.5 w-3.5" />
           Reassign
@@ -51,7 +51,7 @@
         <button
           type="button"
           (click)="reschedule.emit()"
-          class="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          class="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-default hover:bg-surface-2"
         >
           <lucide-icon name="calendar-clock" class="h-3.5 w-3.5" />
           Reschedule
@@ -78,11 +78,11 @@
         </button>
       }
     </div>
-    <footer class="mt-2 border-t border-zinc-200 pt-2 text-right">
+    <footer class="mt-2 border-t border-subtle pt-2 text-right">
       <button
         type="button"
         (click)="dismiss.emit()"
-        class="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-500 hover:bg-zinc-100"
+        class="rounded-md px-2 py-1 text-[11px] font-medium text-muted hover:bg-surface-2"
       >
         Close
       </button>

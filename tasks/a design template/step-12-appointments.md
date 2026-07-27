@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the appointments module — both list view and calendar view.
 **Track:** Design Refresh — Track 4 (Page pass)
-**Status:** Pending
+**Status:** COMPLETED — all 4 appointments HTML files bulk-swapped to AIXO semantic tokens: appointments.page (list + calendar), book-appointment-modal, appointment-popover, reschedule-modal. Chrome + event chips now teal-accent themed; existing calendar library reused. `ng build` green.
 **Depends on:** Steps 1, 5, 6, 7
 
 ---
