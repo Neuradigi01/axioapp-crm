@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the shared button, input, select, textarea, toggle, checkbox, and radio primitives so every form in the app inherits the AIXO look automatically.
 **Track:** Design Refresh — Track 3 (Shared primitives)
-**Status:** Pending
+**Status:** COMPLETED — `.btn` / `.input` / `.textarea` / `.select` / `.field` / `.checkbox` / `.radio` / `.toggle` / `.kbd` layer landed in `aixo-components.scss`. Body font-family flipped to Inter via `--font-ui`. Material system tokens (form-field / slide-toggle / checkbox / radio) repointed to AIXO accent. Dynamic-form field renderer restyled to use the new primitives. `ng build` green.
 **Depends on:** Step 1
 
 ---

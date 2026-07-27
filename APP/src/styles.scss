@@ -6,6 +6,7 @@
 
 @use '@angular/material' as mat;
 @use 'styles/aixo-tokens';
+@use 'styles/aixo-components';
 
 // Variable-font families for the AIXO design system. Loaded via @import
 // (not @use) because they're CSS files, not Sass modules — must sit after
@@ -41,12 +42,13 @@ html {
 }
 
 body {
-  background-color: var(--page-bg);
-  color: var(--page-text);
-  font-family: var(--font-family-primary);
-  font: var(--mat-sys-body-medium);
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
   margin: 0;
   height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transition:
     background-color var(--transition-normal),
     color var(--transition-normal);
@@ -76,10 +78,65 @@ body {
 // ---------------------------------------------------------------------------
 // Material Component Overrides
 // ---------------------------------------------------------------------------
+// Point Material's system tokens at the AIXO palette so `mat-*` components
+// (form-field, slide-toggle, checkbox, radio, ripple) pick up the AIXO
+// accent instead of the built-in Azure blue.
+:root {
+  --mat-sys-primary: var(--accent);
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: var(--accent-soft);
+  --mat-sys-on-primary-container: var(--accent);
+}
+
 .mat-mdc-card {
   background-color: var(--mat-card-background-color) !important;
   border: var(--mat-card-border) !important;
   box-shadow: var(--mat-card-box-shadow) !important;
+}
+
+// mat-form-field container background + text tokens repointed at AIXO
+// tokens so filled/outlined fields look like the AIXO `.input` primitive.
+.mat-mdc-form-field {
+  --mdc-filled-text-field-container-color: var(--bg);
+  --mdc-outlined-text-field-outline-color: var(--border);
+  --mdc-outlined-text-field-hover-outline-color: var(--text-faint);
+  --mdc-outlined-text-field-focus-outline-color: var(--accent);
+  --mdc-filled-text-field-label-text-color: var(--text-muted);
+  --mdc-outlined-text-field-label-text-color: var(--text-muted);
+  --mdc-filled-text-field-input-text-color: var(--text);
+  --mdc-outlined-text-field-input-text-color: var(--text);
+  --mdc-filled-text-field-caret-color: var(--accent);
+  --mdc-outlined-text-field-caret-color: var(--accent);
+}
+
+// Slide-toggle / checkbox / radio — track + fill point at accent.
+.mat-mdc-slide-toggle {
+  --mdc-switch-selected-track-color: var(--accent);
+  --mdc-switch-selected-hover-track-color: var(--accent);
+  --mdc-switch-selected-focus-track-color: var(--accent);
+  --mdc-switch-selected-pressed-track-color: var(--accent);
+  --mdc-switch-unselected-track-color: var(--bg);
+  --mdc-switch-unselected-hover-track-color: var(--bg);
+  --mdc-switch-selected-handle-color: #ffffff;
+  --mdc-switch-selected-hover-handle-color: #ffffff;
+}
+
+.mat-mdc-checkbox {
+  --mdc-checkbox-selected-icon-color: var(--accent);
+  --mdc-checkbox-selected-hover-icon-color: var(--accent);
+  --mdc-checkbox-selected-focus-icon-color: var(--accent);
+  --mdc-checkbox-selected-pressed-icon-color: var(--accent);
+  --mdc-checkbox-unselected-icon-color: var(--border);
+  --mdc-checkbox-unselected-hover-icon-color: var(--text-faint);
+}
+
+.mat-mdc-radio-button {
+  --mdc-radio-selected-icon-color: var(--accent);
+  --mdc-radio-selected-hover-icon-color: var(--accent);
+  --mdc-radio-selected-focus-icon-color: var(--accent);
+  --mdc-radio-selected-pressed-icon-color: var(--accent);
+  --mdc-radio-unselected-icon-color: var(--border);
+  --mdc-radio-unselected-hover-icon-color: var(--text-faint);
 }
 
 // ---------------------------------------------------------------------------
