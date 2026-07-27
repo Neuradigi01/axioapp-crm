@@ -1,7 +1,7 @@
 <div class="mx-auto max-w-5xl p-6">
   <a
     routerLink="/user/leads"
-    class="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-700"
+    class="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-default"
   >
     <lucide-icon name="chevron-left" class="h-3.5 w-3.5" />
     Back to leads
@@ -12,31 +12,31 @@
       {{ err }}
     </div>
   } @else if (loading() || lead() === null) {
-    <div class="mt-4 animate-pulse rounded-lg bg-white p-6 shadow-sm ring-1 ring-zinc-200">
+    <div class="mt-4 animate-pulse rounded-lg bg-surface p-6 shadow-sm ring-1 border-subtle">
       <div class="flex items-center gap-4">
-        <div class="h-14 w-14 rounded-full bg-zinc-200"></div>
+        <div class="h-14 w-14 rounded-full bg-surface-2"></div>
         <div class="flex-1">
-          <div class="h-4 w-40 rounded bg-zinc-200"></div>
-          <div class="mt-2 h-3 w-64 rounded bg-zinc-100"></div>
+          <div class="h-4 w-40 rounded bg-surface-2"></div>
+          <div class="mt-2 h-3 w-64 rounded bg-surface-2"></div>
         </div>
       </div>
     </div>
   } @else {
     @let l = lead()!;
     <!-- Header card -->
-    <section class="mt-4 rounded-lg bg-white p-6 shadow-sm ring-1 ring-zinc-200">
+    <section class="mt-4 rounded-lg bg-surface p-6 shadow-sm ring-1 border-subtle">
       <div class="flex items-start justify-between gap-4">
         <div class="flex items-start gap-4">
           <span
-            class="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-base font-semibold text-white"
+            class="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-base font-semibold text-white"
           >
             {{ initials(headerTitle()) }}
           </span>
           <div>
-            <h1 class="text-lg font-semibold text-zinc-900">{{ headerTitle() }}</h1>
-            <dl class="mt-1 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-zinc-600">
+            <h1 class="text-lg font-semibold text-default">{{ headerTitle() }}</h1>
+            <dl class="mt-1 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted">
               <div class="flex items-center gap-1">
-                <dt class="font-medium text-zinc-500">Stage</dt>
+                <dt class="font-medium text-muted">Stage</dt>
                 <dd>
                   <span
                     class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1"
@@ -47,7 +47,7 @@
                 </dd>
               </div>
               <div class="flex items-center gap-1">
-                <dt class="font-medium text-zinc-500">Status</dt>
+                <dt class="font-medium text-muted">Status</dt>
                 <dd>
                   @if (l.status === 'won') {
                     <span
@@ -68,29 +68,29 @@
                 </dd>
               </div>
               <div class="flex items-center gap-1">
-                <dt class="font-medium text-zinc-500">Source</dt>
+                <dt class="font-medium text-muted">Source</dt>
                 <dd>
                   <span
-                    class="inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+                    class="inline-flex items-center rounded-md bg-surface-2 px-1.5 py-0.5 text-xs font-medium text-default ring-1 border-subtle"
                   >
                     {{ l.source }}
                   </span>
                 </dd>
               </div>
               <div class="flex items-center gap-1">
-                <dt class="font-medium text-zinc-500">Owner</dt>
+                <dt class="font-medium text-muted">Owner</dt>
                 <dd>
                   @if (l.assigned_to_id) {
                     {{ ownerLabel(l.assigned_to_id) }}
                   } @else {
-                    <span class="text-zinc-400">Unassigned</span>
+                    <span class="text-faint">Unassigned</span>
                   }
                 </dd>
                 @if (canReassign()) {
                   <button
                     type="button"
                     (click)="openReassign()"
-                    class="ml-1 inline-flex items-center rounded p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                    class="ml-1 inline-flex items-center rounded p-0.5 text-faint hover:bg-surface-2 hover:text-default focus:outline-none focus:ring-1 focus:ring-zinc-400"
                     aria-label="Reassign owner"
                   >
                     <lucide-icon name="pencil" class="h-3 w-3" />
@@ -98,7 +98,7 @@
                 }
               </div>
               <div class="flex items-center gap-1">
-                <dt class="font-medium text-zinc-500">Last activity</dt>
+                <dt class="font-medium text-muted">Last activity</dt>
                 <dd>{{ l.last_activity_at | relativeTime }}</dd>
               </div>
             </dl>
@@ -108,14 +108,14 @@
           <button
             type="button"
             (click)="openEdit()"
-            class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
           >
             Edit
           </button>
           <button
             type="button"
             (click)="onDelete()"
-            class="rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+            class="rounded-md border border-red-200 bg-surface px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
           >
             Delete
           </button>
@@ -124,7 +124,7 @@
     </section>
 
     <!-- Tabs -->
-    <nav class="mt-6 flex gap-1 border-b border-zinc-200" role="tablist">
+    <nav class="mt-6 flex gap-1 border-b border-subtle" role="tablist">
       @for (tab of tabs; track tab.id) {
         <button
           type="button"
@@ -132,10 +132,10 @@
           [attr.aria-selected]="activeTab() === tab.id"
           (click)="setTab(tab.id)"
           class="-mb-px border-b-2 px-3 py-2 text-sm font-medium transition"
-          [class.border-zinc-900]="activeTab() === tab.id"
-          [class.text-zinc-900]="activeTab() === tab.id"
+          [class.border-accent]="activeTab() === tab.id"
+          [class.text-default]="activeTab() === tab.id"
           [class.border-transparent]="activeTab() !== tab.id"
-          [class.text-zinc-500]="activeTab() !== tab.id"
+          [class.text-muted]="activeTab() !== tab.id"
         >
           {{ tab.label }}
         </button>
@@ -146,14 +146,14 @@
     <section class="mt-5">
       @switch (activeTab()) {
         @case ('tasks') {
-          <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
+          <div class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
             <app-tasks-panel [entityType]="'lead'" [entityId]="l.id" />
           </div>
         }
         @case ('activities') {
           <div class="space-y-6">
-            <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-              <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Add note</h2>
+            <div class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
+              <h2 class="text-xs font-semibold uppercase tracking-wide text-muted">Add note</h2>
               <div class="mt-3">
                 <app-add-note
                   [entityType]="'lead'"
@@ -162,8 +162,8 @@
                 />
               </div>
             </div>
-            <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-              <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Timeline</h2>
+            <div class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
+              <h2 class="text-xs font-semibold uppercase tracking-wide text-muted">Timeline</h2>
               <div class="mt-3">
                 <app-activity-timeline [entityType]="'lead'" [entityId]="l.id" />
               </div>
@@ -174,60 +174,58 @@
           <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <!-- Left column: Lead standard + custom fields. -->
             <div class="space-y-4 lg:col-span-2">
-              <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-                <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                  Standard
-                </h2>
+              <div class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
+                <h2 class="text-xs font-semibold uppercase tracking-wide text-muted">Standard</h2>
                 <dl class="mt-3 space-y-2 text-sm">
                   <div class="flex justify-between gap-3">
-                    <dt class="text-zinc-500">Pipeline stage</dt>
-                    <dd class="text-zinc-900">{{ l.pipeline_stage }}</dd>
+                    <dt class="text-muted">Pipeline stage</dt>
+                    <dd class="text-default">{{ l.pipeline_stage }}</dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="text-zinc-500">Status</dt>
-                    <dd class="text-zinc-900">{{ l.status }}</dd>
+                    <dt class="text-muted">Status</dt>
+                    <dd class="text-default">{{ l.status }}</dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="text-zinc-500">Source</dt>
-                    <dd class="text-zinc-900">{{ l.source }}</dd>
+                    <dt class="text-muted">Source</dt>
+                    <dd class="text-default">{{ l.source }}</dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="text-zinc-500">Budget</dt>
-                    <dd class="text-zinc-900">{{ formatBudget(l.budget) }}</dd>
+                    <dt class="text-muted">Budget</dt>
+                    <dd class="text-default">{{ formatBudget(l.budget) }}</dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="text-zinc-500">Expected close</dt>
-                    <dd class="text-zinc-900">{{ l.expected_close_date ?? '—' }}</dd>
+                    <dt class="text-muted">Expected close</dt>
+                    <dd class="text-default">{{ l.expected_close_date ?? '—' }}</dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="text-zinc-500">Lead score</dt>
-                    <dd class="text-zinc-900">{{ l.lead_score }}</dd>
+                    <dt class="text-muted">Lead score</dt>
+                    <dd class="text-default">{{ l.lead_score }}</dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="text-zinc-500">Owner</dt>
-                    <dd class="text-zinc-900">
+                    <dt class="text-muted">Owner</dt>
+                    <dd class="text-default">
                       @if (l.assigned_to_id) {
                         {{ ownerLabel(l.assigned_to_id) }}
                       } @else {
-                        <span class="text-zinc-400">Unassigned</span>
+                        <span class="text-faint">Unassigned</span>
                       }
                     </dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="text-zinc-500">Last activity</dt>
-                    <dd class="text-zinc-900">{{ l.last_activity_at | relativeTime }}</dd>
+                    <dt class="text-muted">Last activity</dt>
+                    <dd class="text-default">{{ l.last_activity_at | relativeTime }}</dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="text-zinc-500">Created</dt>
-                    <dd class="text-zinc-900">{{ l.created_at | relativeTime }}</dd>
+                    <dt class="text-muted">Created</dt>
+                    <dd class="text-default">{{ l.created_at | relativeTime }}</dd>
                   </div>
                   @if (l.status === 'lost' && l.lost_reason) {
                     <div class="flex justify-between gap-3">
-                      <dt class="text-zinc-500">Lost reason</dt>
-                      <dd class="text-zinc-900">
+                      <dt class="text-muted">Lost reason</dt>
+                      <dd class="text-default">
                         {{ l.lost_reason }}
                         @if (l.lost_reason_other) {
-                          <span class="text-zinc-500"> — {{ l.lost_reason_other }}</span>
+                          <span class="text-muted"> — {{ l.lost_reason_other }}</span>
                         }
                       </dd>
                     </div>
@@ -235,16 +233,16 @@
                 </dl>
               </div>
 
-              <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-                <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Custom</h2>
+              <div class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
+                <h2 class="text-xs font-semibold uppercase tracking-wide text-muted">Custom</h2>
                 @if (customFields().length === 0) {
-                  <p class="mt-3 text-xs text-zinc-500">No custom fields defined.</p>
+                  <p class="mt-3 text-xs text-muted">No custom fields defined.</p>
                 } @else {
                   <dl class="mt-3 space-y-2 text-sm">
                     @for (entry of customFields(); track entry.label) {
                       <div class="flex justify-between gap-3">
-                        <dt class="text-zinc-500">{{ entry.label }}</dt>
-                        <dd class="text-zinc-900">{{ entry.value }}</dd>
+                        <dt class="text-muted">{{ entry.label }}</dt>
+                        <dd class="text-default">{{ entry.value }}</dd>
                       </div>
                     }
                   </dl>
@@ -254,37 +252,37 @@
 
             <!-- Right column: Linked contact card + Source attribution. -->
             <aside class="space-y-4">
-              <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-                <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contact</h2>
+              <div class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
+                <h2 class="text-xs font-semibold uppercase tracking-wide text-muted">Contact</h2>
                 @if (contact(); as c) {
                   <div class="mt-3">
                     <div class="flex items-center gap-3">
                       <span
-                        class="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white"
+                        class="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white"
                       >
                         {{ initials(c.full_name) }}
                       </span>
                       <div class="min-w-0 flex-1">
                         <a
                           [routerLink]="['/user/contacts', c.id]"
-                          class="block truncate text-sm font-medium text-zinc-900 hover:underline"
+                          class="block truncate text-sm font-medium text-default hover:underline"
                         >
                           {{ c.full_name }}
                         </a>
                         @if (c.source) {
-                          <p class="text-xs text-zinc-500">{{ c.source }}</p>
+                          <p class="text-xs text-muted">{{ c.source }}</p>
                         }
                       </div>
                     </div>
                     <dl class="mt-4 space-y-2 text-sm">
                       <div class="flex items-center justify-between gap-3">
-                        <dt class="text-zinc-500">Phone</dt>
+                        <dt class="text-muted">Phone</dt>
                         <dd>
                           @if (c.phone) {
                             <span class="flex items-center gap-2">
                               <a
                                 [appPhoneLink]="c.phone"
-                                class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                                class="text-default hover:text-default hover:underline"
                               >
                                 {{ c.phone }}
                               </a>
@@ -297,34 +295,34 @@
                               </a>
                             </span>
                           } @else {
-                            <span class="text-zinc-400">—</span>
+                            <span class="text-faint">—</span>
                           }
                         </dd>
                       </div>
                       <div class="flex items-center justify-between gap-3">
-                        <dt class="text-zinc-500">Email</dt>
+                        <dt class="text-muted">Email</dt>
                         <dd>
                           @if (c.email) {
                             <a
                               [appMailLink]="c.email"
-                              class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                              class="text-default hover:text-default hover:underline"
                             >
                               {{ c.email }}
                             </a>
                           } @else {
-                            <span class="text-zinc-400">—</span>
+                            <span class="text-faint">—</span>
                           }
                         </dd>
                       </div>
                     </dl>
                   </div>
                 } @else {
-                  <p class="mt-3 text-xs text-zinc-500">Could not load contact.</p>
+                  <p class="mt-3 text-xs text-muted">Could not load contact.</p>
                 }
               </div>
 
-              <div class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-                <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              <div class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
+                <h2 class="text-xs font-semibold uppercase tracking-wide text-muted">
                   Source attribution
                 </h2>
                 <!-- W6 — walk-in origin. When the lead was created from
@@ -344,7 +342,7 @@
                 }
                 @if (attributionEntries().length === 0) {
                   @if (!l.source_walk_in_id) {
-                    <p class="mt-3 text-xs text-zinc-500">
+                    <p class="mt-3 text-xs text-muted">
                       Captured directly — no attribution metadata.
                     </p>
                   }
@@ -352,8 +350,8 @@
                   <dl class="mt-3 space-y-2 text-sm">
                     @for (entry of attributionEntries(); track entry.key) {
                       <div class="flex justify-between gap-3">
-                        <dt class="truncate text-zinc-500">{{ entry.key }}</dt>
-                        <dd class="truncate font-mono text-xs text-zinc-700" [title]="entry.value">
+                        <dt class="truncate text-muted">{{ entry.key }}</dt>
+                        <dd class="truncate font-mono text-xs text-default" [title]="entry.value">
                           {{ entry.value }}
                         </dd>
                       </div>
@@ -366,7 +364,7 @@
         }
         @default {
           <div
-            class="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-6 py-10 text-center text-sm text-zinc-500"
+            class="rounded-lg border border-dashed border-subtle bg-surface-2 px-6 py-10 text-center text-sm text-muted"
           >
             @if (placeholderForActiveTab() === 'later') {
               Coming in a future step.

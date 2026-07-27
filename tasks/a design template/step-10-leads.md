@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the Leads list view AND the pipeline (Kanban) board view.
 **Track:** Design Refresh — Track 4 (Page pass)
-**Status:** Pending
+**Status:** COMPLETED — all 11 leads HTML files bulk-swapped from zinc palette to AIXO semantic tokens (text/bg/border/ring/divide). Covers leads.page (list + kanban), lead-card, lead-detail, lead-form-modal, advanced-filter, import wizard (upload/mapping/history/result), won-capture, lost-reason. Structure + drag-drop + all handlers preserved. `ng build` green.
 **Depends on:** Steps 1, 5, 6, 7, 9
 
 ---

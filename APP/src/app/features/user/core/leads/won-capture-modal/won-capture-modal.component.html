@@ -4,10 +4,10 @@
   aria-modal="true"
   aria-labelledby="won-capture-title"
 >
-  <div class="w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
-    <div class="border-b border-zinc-200 px-5 py-3">
-      <h2 id="won-capture-title" class="text-sm font-semibold text-zinc-900">Mark deal as Won</h2>
-      <p class="mt-1 text-xs text-zinc-500">
+  <div class="w-full max-w-md rounded-lg bg-surface shadow-xl ring-1 border-subtle">
+    <div class="border-b border-subtle px-5 py-3">
+      <h2 id="won-capture-title" class="text-sm font-semibold text-default">Mark deal as Won</h2>
+      <p class="mt-1 text-xs text-muted">
         Optional close details help the sales reports. Skip if you don't have them yet — you can
         fill them in later from the lead detail page.
       </p>
@@ -15,16 +15,16 @@
 
     <div class="space-y-3 px-5 py-4 text-xs">
       <label class="block">
-        <span class="font-medium text-zinc-700">
+        <span class="font-medium text-default">
           Closed amount
-          <span class="ml-1 text-zinc-400">({{ currency }})</span>
+          <span class="ml-1 text-faint">({{ currency }})</span>
         </span>
         <input
           type="text"
           inputmode="decimal"
           [formControl]="valueControl"
           placeholder="e.g. 50000"
-          class="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         @if (valueControl.invalid && valueControl.dirty) {
           <span class="mt-1 block text-xs text-red-600"
@@ -34,22 +34,22 @@
       </label>
 
       <label class="block">
-        <span class="font-medium text-zinc-700">Close date</span>
+        <span class="font-medium text-default">Close date</span>
         <input
           type="date"
           [formControl]="closeDateControl"
-          class="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </label>
 
       <label class="block">
-        <span class="font-medium text-zinc-700">Reason / notes</span>
+        <span class="font-medium text-default">Reason / notes</span>
         <input
           type="text"
           maxlength="64"
           [formControl]="reasonControl"
           placeholder="e.g. Referral · Existing customer · Landing page"
-          class="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </label>
 
@@ -58,11 +58,11 @@
       }
     </div>
 
-    <div class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3">
+    <div class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-5 py-3">
       <button
         type="button"
         (click)="cancel.emit()"
-        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         [disabled]="_submitting()"
       >
         Cancel
@@ -70,7 +70,7 @@
       <button
         type="button"
         (click)="onSkip()"
-        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-muted hover:bg-surface-2"
         [disabled]="_submitting()"
         title="Mark won without recording details"
       >
