@@ -7,6 +7,11 @@
 @use '@angular/material' as mat;
 @use 'styles/aixo-tokens';
 @use 'styles/aixo-components';
+// Legacy semantic-token mappings (--page-bg, --surface-1, --border-color etc.)
+// scoped by [data-theme] on <html> so they swap alongside AIXO tokens.
+// Both files are always loaded — the selector picks the active palette.
+@use 'styles/dark';
+@use 'styles/light';
 
 // Variable-font families for the AIXO design system. Loaded via @import
 // (not @use) because they're CSS files, not Sass modules — must sit after

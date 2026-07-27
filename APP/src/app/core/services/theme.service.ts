@@ -66,28 +66,10 @@ export class ThemeService {
 
   private applyTheme(theme: Theme): void {
     this.currentTheme = theme;
-
-    this.setStylesheetEnabled(THEME_LIGHT, theme === THEME_LIGHT);
-    this.setStylesheetEnabled(THEME_DARK, theme === THEME_DARK);
-
+    // Single source of truth: `[data-theme]` attribute on <html>.
+    // Both `aixo-tokens.scss` and the legacy `light.scss` / `dark.scss`
+    // (loaded together into styles.scss) key off this attribute.
     document.documentElement.setAttribute('data-theme', theme);
-  }
-
-  private setStylesheetEnabled(bundleName: string, enabled: boolean): void {
-    let link = document.querySelector(
-      `link[rel="stylesheet"][href*="${bundleName}"]`,
-    ) as HTMLLinkElement | null;
-
-    if (!link && enabled) {
-      link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = `${bundleName}.css`;
-      document.head.appendChild(link);
-    }
-
-    if (link) {
-      link.disabled = !enabled;
-    }
   }
 
   private getSystemPreference(): Theme {

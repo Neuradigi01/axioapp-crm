@@ -57,14 +57,17 @@ if [ -n "$FE_FILES" ]; then
     echo "pre-commit: APP/node_modules missing ('npm ci') — skipping frontend checks (CI will enforce)."
   else
     REL=$(printf '%s\n' "$FE_FILES" | sed 's#^APP/##')
+    # xargs -n 20 batches file paths so Windows CMD's 8191-char command-line
+    # limit doesn't blow up on large multi-file commits (e.g. token sweeps).
+    # xargs propagates non-zero if any batch fails.
     echo "pre-commit: prettier --check (staged frontend)"
-    if ! ( cd "$APP_DIR" && npx --no-install prettier --check $REL ); then
+    if ! ( cd "$APP_DIR" && printf '%s\n' "$REL" | xargs -n 20 npx --no-install prettier --check ); then
       echo "  ✗ formatting — run 'run lint-fix' (or 'npx prettier --write')."; FAIL=1
     fi
     FE_LINT=$(printf '%s\n' "$REL" | grep -E '\.(ts|html)$' || true)
     if [ -n "$FE_LINT" ]; then
       echo "pre-commit: eslint (staged frontend, errors only)"
-      if ! ( cd "$APP_DIR" && npx --no-install eslint --quiet $FE_LINT ); then
+      if ! ( cd "$APP_DIR" && printf '%s\n' "$FE_LINT" | xargs -n 20 npx --no-install eslint --quiet ); then
         echo "  ✗ lint errors — fix above."; FAIL=1
       fi
     fi

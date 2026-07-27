@@ -18,17 +18,15 @@
       >
         {{ wsInitial() }}
       </span>
-      <span class="min-w-0 flex-1 md:hidden" [class.md:flex]="expanded()">
-        <span class="flex flex-col items-start" [class.md:hidden]="!expanded()">
-          <span class="truncate font-display text-sm font-semibold leading-tight">
-            {{ org()?.name ?? 'Core CRM' }}
-          </span>
-          @if (org(); as o) {
-            <span class="truncate text-[11px] text-faint leading-tight">
-              {{ o.template_id }}
-            </span>
-          }
+      <span class="flex min-w-0 flex-1 flex-col items-start" [class.md:hidden]="!expanded()">
+        <span class="truncate font-display text-sm font-semibold leading-tight">
+          {{ org()?.name ?? 'Core CRM' }}
         </span>
+        @if (org(); as o) {
+          <span class="truncate text-[11px] leading-tight text-faint">
+            {{ o.template_id }}
+          </span>
+        }
       </span>
       <lucide-icon
         name="chevrons-up-down"
@@ -108,8 +106,8 @@
       <p class="px-2 py-1 text-xs text-red-500">{{ error() }}</p>
     } @else {
       <div
-        class="mb-1 px-2 pt-2 text-[11px] font-semibold uppercase tracking-[.06em] text-faint md:hidden"
-        [class.md:block]="expanded()"
+        class="mb-1 px-2 pt-2 text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+        [class.md:hidden]="!expanded()"
       >
         Menu
       </div>
@@ -125,7 +123,7 @@
               (click)="close.emit()"
             >
               <lucide-icon [name]="m.icon" class="h-4 w-4 shrink-0" />
-              <span class="truncate md:hidden" [class.md:inline]="expanded()">
+              <span class="truncate" [class.md:hidden]="!expanded()">
                 {{ m.name }}
               </span>
             </a>
@@ -150,13 +148,11 @@
       >
         {{ userInitial() }}
       </span>
-      <span class="min-w-0 flex-1 md:hidden" [class.md:flex]="expanded()">
-        <span class="flex flex-col items-start" [class.md:hidden]="!expanded()">
-          <span class="truncate text-sm font-medium text-default leading-tight">
-            {{ roleName() || 'Profile' }}
-          </span>
-          <span class="truncate text-[11px] text-faint leading-tight">View settings</span>
+      <span class="flex min-w-0 flex-1 flex-col items-start" [class.md:hidden]="!expanded()">
+        <span class="truncate text-sm font-medium leading-tight text-default">
+          {{ roleName() || 'Profile' }}
         </span>
+        <span class="truncate text-[11px] leading-tight text-faint">View settings</span>
       </span>
     </a>
   </div>
