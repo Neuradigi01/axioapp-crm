@@ -40,7 +40,7 @@
           {{ s.label }}
         </span>
         @if (s.n < 3) {
-          <lucide-icon name="chevron-right" class="h-3 w-3 text-zinc-300" />
+          <lucide-icon name="chevron-right" class="h-3 w-3 text-faint" />
         }
       </li>
     }
@@ -162,7 +162,7 @@
               <th class="px-3 py-2 text-left font-medium">Map to</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-zinc-200">
+          <tbody class="divide-y divide-subtle">
             @for (col of meta.headers; track col) {
               <tr>
                 <td class="px-3 py-2 align-top">
@@ -182,8 +182,8 @@
                     [class.focus:border-red-500]="duplicateTargets().has(mapping()[col])"
                     [class.focus:ring-red-500]="duplicateTargets().has(mapping()[col])"
                     [class.border-subtle]="!duplicateTargets().has(mapping()[col])"
-                    [class.focus:border-zinc-500]="!duplicateTargets().has(mapping()[col])"
-                    [class.focus:ring-zinc-500]="!duplicateTargets().has(mapping()[col])"
+                    [class.focus:border-muted]="!duplicateTargets().has(mapping()[col])"
+                    [class.focus:ring-accent]="!duplicateTargets().has(mapping()[col])"
                   >
                     @for (t of fieldTargets; track t.value) {
                       <option [value]="t.value">{{ t.label }}</option>
@@ -223,7 +223,7 @@
             type="checkbox"
             [checked]="createGroup()"
             (change)="onCreateGroupChange($event)"
-            class="mt-0.5 h-4 w-4 rounded border-subtle text-default focus:ring-zinc-500"
+            class="mt-0.5 h-4 w-4 rounded border-subtle text-default focus:ring-accent"
           />
           <span>
             <span class="font-medium">Create a group from this import</span>
@@ -247,7 +247,7 @@
               (input)="onGroupNameInput($event)"
               maxlength="255"
               placeholder="e.g. Q3 Sales Leads"
-              class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
             @if (groupNameRequired()) {
               <p class="mt-1 text-xs text-red-600">Group name is required.</p>
@@ -346,7 +346,7 @@
                   <th class="px-3 py-2 text-left font-medium">Reason</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-zinc-200">
+              <tbody class="divide-y divide-subtle">
                 @for (e of visibleErrors(); track e.row) {
                   <tr>
                     <td class="px-3 py-2 text-default">{{ e.row }}</td>

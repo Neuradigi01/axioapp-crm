@@ -15,7 +15,7 @@
           <span class="block text-xs font-medium text-muted">Direction</span>
           <select
             formControlName="direction"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           >
             <option value="out">Outgoing</option>
             <option value="in">Incoming</option>
@@ -26,7 +26,7 @@
           <input
             type="datetime-local"
             formControlName="started_at"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </label>
       </div>
@@ -38,14 +38,14 @@
             type="number"
             min="0"
             formControlName="duration_sec"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </label>
         <label class="block text-sm">
           <span class="block text-xs font-medium text-muted">Outcome</span>
           <select
             formControlName="outcome_id"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           >
             <option [ngValue]="null">— Not set —</option>
             @for (o of outcomes; track o.id) {
@@ -60,7 +60,7 @@
         <textarea
           rows="3"
           formControlName="notes"
-          class="mt-1 block w-full resize-none rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 block w-full resize-none rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         ></textarea>
       </label>
 
@@ -93,9 +93,9 @@
             (dragover)="onDragOver($event)"
             (dragleave)="onDragLeave()"
             (drop)="onDrop($event)"
-            [class.border-zinc-500]="dragActive()"
+            [class.border-muted]="dragActive()"
             [class.bg-surface-2]="dragActive()"
-            class="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-subtle bg-surface px-3 py-4 text-center text-xs text-muted transition hover:border-zinc-400 hover:bg-surface-2"
+            class="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-subtle bg-surface px-3 py-4 text-center text-xs text-muted transition hover:border-subtle hover:bg-surface-2"
           >
             <lucide-icon
               name="upload-cloud"

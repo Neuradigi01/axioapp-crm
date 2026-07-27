@@ -34,6 +34,12 @@ module.exports = {
       },
       borderColor: {
         subtle: 'var(--border)',
+        muted: 'var(--text-muted)',
+        accent: 'var(--accent)',
+      },
+      ringColor: {
+        accent: 'var(--accent)',
+        subtle: 'var(--border)',
       },
       fontFamily: {
         ui: [

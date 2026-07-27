@@ -6,7 +6,7 @@
       [ngModel]="title()"
       (ngModelChange)="onTitleChange($event)"
       placeholder="e.g. Discovery call"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     />
     @if (!title().trim()) {
       <p class="text-[10px] text-rose-600 mt-1">Title is required.</p>
@@ -17,7 +17,7 @@
     <select
       [ngModel]="assignee()"
       (ngModelChange)="onAssigneeChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     >
       <option value="lead.owner">Lead owner</option>
       <option value="contact.assigned_to">Contact's assigned rep</option>
@@ -32,7 +32,7 @@
         min="0"
         [ngModel]="scheduleInHours()"
         (ngModelChange)="onScheduleChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       />
     </div>
     <div>
@@ -42,7 +42,7 @@
         min="5"
         [ngModel]="durationMinutes()"
         (ngModelChange)="onDurationChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       />
     </div>
   </div>

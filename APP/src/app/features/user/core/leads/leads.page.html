@@ -136,7 +136,7 @@
     <select
       [value]="noActivityFilter()"
       (change)="setNoActivity($any($event.target).value)"
-      class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       aria-label="No activity filter"
     >
       <option value="">Any activity</option>
@@ -150,7 +150,7 @@
     <select
       [value]="sortKey() + ':' + sortOrder()"
       (change)="setSort($any($event.target).value)"
-      class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       aria-label="Sort"
     >
       <option value="created_at:desc">Newest first</option>
@@ -346,7 +346,7 @@
           type="search"
           [formControl]="searchControl"
           placeholder="Search by contact name, phone, or email…"
-          class="block w-full rounded-md border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="block w-full rounded-md border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </div>
     </div>
@@ -355,7 +355,7 @@
       <select
         id="leads_source"
         [formControl]="sourceControl"
-        class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       >
         <option value="">All sources</option>
         @for (s of sourceOptions(); track s) {
@@ -369,7 +369,7 @@
         <select
           id="leads_assignee"
           [formControl]="assigneeControl"
-          class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         >
           <option value="">All owners</option>
           <option value="me">Me</option>
@@ -509,7 +509,7 @@
                 <td class="w-10 px-3 py-2.5 align-top">
                   <input
                     type="checkbox"
-                    class="h-4 w-4 cursor-pointer rounded border-subtle text-default focus:ring-zinc-500"
+                    class="h-4 w-4 cursor-pointer rounded border-subtle text-default focus:ring-accent"
                     [checked]="isSelected(lead.id)"
                     (click)="toggleRow(lead.id, $event)"
                     (change)="$event.stopPropagation()"
@@ -647,7 +647,7 @@
             <select
               [value]="state.pageSize()"
               (change)="onPageSizeChange($any($event.target).value)"
-              class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               aria-label="Page size"
             >
               @for (n of pageSizeOptions; track n) {
@@ -804,13 +804,13 @@
             [value]="saveViewName()"
             (input)="onSaveViewNameInput($any($event.target).value)"
             placeholder="e.g. Hot qualified"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </label>
         <label class="flex items-center gap-2 text-xs text-default">
           <input
             type="checkbox"
-            class="h-4 w-4 rounded border-subtle text-default focus:ring-zinc-500"
+            class="h-4 w-4 rounded border-subtle text-default focus:ring-accent"
             [checked]="saveViewShared()"
             (change)="onSaveViewSharedChange($any($event.target).checked)"
           />

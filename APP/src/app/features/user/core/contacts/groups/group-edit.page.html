@@ -1,10 +1,10 @@
 <div class="p-6 max-w-3xl">
   <header class="mb-5 flex items-center justify-between">
     <div>
-      <h1 class="text-xl font-semibold text-zinc-900">
+      <h1 class="text-xl font-semibold text-default">
         {{ isEdit() ? 'Edit group' : 'New group' }}
       </h1>
-      <p class="mt-1 text-sm text-zinc-600">
+      <p class="mt-1 text-sm text-muted">
         @if (isEdit()) {
           Update the group's name, description, and member set. Mode (Dynamic / Static) is locked
           after creation — delete and recreate to switch.
@@ -15,7 +15,7 @@
     </div>
     <a
       routerLink="/user/contacts/groups"
-      class="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+      class="inline-flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
     >
       <lucide-icon name="arrow-left" class="h-4 w-4" />
       Back to list
@@ -23,49 +23,49 @@
   </header>
 
   @if (loading()) {
-    <p class="flex items-center gap-2 text-sm text-zinc-500">
+    <p class="flex items-center gap-2 text-sm text-muted">
       <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
       Loading group…
     </p>
   } @else {
     <form [formGroup]="form" (ngSubmit)="save()" class="space-y-5">
       <!-- Mode toggle -->
-      <fieldset class="rounded-md border border-zinc-200 p-3">
-        <legend class="px-1 text-xs font-medium text-zinc-600">Mode</legend>
+      <fieldset class="rounded-md border border-subtle p-3">
+        <legend class="px-1 text-xs font-medium text-muted">Mode</legend>
         <div class="grid grid-cols-2 gap-2">
           <button
             type="button"
             class="rounded-md border p-3 text-left transition"
             [class.border-indigo-500]="mode() === 'dynamic'"
             [class.bg-indigo-50]="mode() === 'dynamic'"
-            [class.border-zinc-300]="mode() !== 'dynamic'"
+            [class.border-subtle]="mode() !== 'dynamic'"
             [class.opacity-50]="isEdit() && mode() !== 'dynamic'"
             [disabled]="isEdit()"
             (click)="onModeChange('dynamic')"
           >
             <div class="flex items-center gap-2">
               <lucide-icon name="refresh-cw" class="h-4 w-4" />
-              <span class="font-medium text-zinc-900">Dynamic</span>
+              <span class="font-medium text-default">Dynamic</span>
             </div>
-            <p class="mt-1 text-xs text-zinc-600">
+            <p class="mt-1 text-xs text-muted">
               Filter-based; recomputes on every send. New matching contacts auto-include.
             </p>
           </button>
           <button
             type="button"
             class="rounded-md border p-3 text-left transition"
-            [class.border-zinc-700]="mode() === 'static'"
-            [class.bg-zinc-100]="mode() === 'static'"
-            [class.border-zinc-300]="mode() !== 'static'"
+            [class.border-muted]="mode() === 'static'"
+            [class.bg-surface-2]="mode() === 'static'"
+            [class.border-subtle]="mode() !== 'static'"
             [class.opacity-50]="isEdit() && mode() !== 'static'"
             [disabled]="isEdit()"
             (click)="onModeChange('static')"
           >
             <div class="flex items-center gap-2">
               <lucide-icon name="pin" class="h-4 w-4" />
-              <span class="font-medium text-zinc-900">Static</span>
+              <span class="font-medium text-default">Static</span>
             </div>
-            <p class="mt-1 text-xs text-zinc-600">
+            <p class="mt-1 text-xs text-muted">
               Fixed contact list; frozen at save. New matching contacts do NOT auto-include.
             </p>
           </button>
@@ -75,20 +75,20 @@
       <!-- Basics -->
       <div class="grid grid-cols-1 gap-3">
         <label class="block text-sm">
-          <span class="block text-xs font-medium text-zinc-600">Name</span>
+          <span class="block text-xs font-medium text-muted">Name</span>
           <input
             type="text"
             formControlName="name"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             placeholder="Walk-in Sofa Shoppers"
           />
         </label>
         <label class="block text-sm">
-          <span class="block text-xs font-medium text-zinc-600"> Description (optional) </span>
+          <span class="block text-xs font-medium text-muted"> Description (optional) </span>
           <textarea
             rows="2"
             formControlName="description"
-            class="mt-1 block w-full resize-none rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full resize-none rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             placeholder="Q4 retention target — repeat campaigns"
           ></textarea>
         </label>
@@ -96,36 +96,36 @@
 
       <!-- Dynamic mode: filter inputs -->
       @if (mode() === 'dynamic') {
-        <fieldset class="rounded-md border border-zinc-200 p-3">
-          <legend class="px-1 text-xs font-medium text-zinc-600">
+        <fieldset class="rounded-md border border-subtle p-3">
+          <legend class="px-1 text-xs font-medium text-muted">
             Filter — same shape as the Contacts list
           </legend>
           <div class="grid grid-cols-3 gap-2">
             <label class="block text-sm">
-              <span class="block text-[10px] text-zinc-500">Search (q)</span>
+              <span class="block text-[10px] text-muted">Search (q)</span>
               <input
                 type="text"
                 formControlName="filter_q"
                 placeholder="name / phone / email"
-                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm"
+                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm"
               />
             </label>
             <label class="block text-sm">
-              <span class="block text-[10px] text-zinc-500">Source</span>
+              <span class="block text-[10px] text-muted">Source</span>
               <input
                 type="text"
                 formControlName="filter_source"
                 placeholder="walk-in"
-                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm"
+                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm"
               />
             </label>
             <label class="block text-sm">
-              <span class="block text-[10px] text-zinc-500">Tag</span>
+              <span class="block text-[10px] text-muted">Tag</span>
               <input
                 type="text"
                 formControlName="filter_tag"
                 placeholder="vip"
-                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm"
+                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm"
               />
             </label>
           </div>
@@ -134,44 +134,44 @@
 
       <!-- Static mode: contact picker -->
       @if (mode() === 'static') {
-        <fieldset class="rounded-md border border-zinc-200 p-3">
-          <legend class="px-1 text-xs font-medium text-zinc-600">
+        <fieldset class="rounded-md border border-subtle p-3">
+          <legend class="px-1 text-xs font-medium text-muted">
             Members ({{ selectedContacts().length + hiddenExistingIds().size }})
           </legend>
 
           <label class="block text-sm">
-            <span class="block text-xs text-zinc-600"> Search contacts to add </span>
+            <span class="block text-xs text-muted"> Search contacts to add </span>
             <input
               type="text"
               formControlName="contact_search"
               placeholder="Type a name, phone, or email…"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </label>
 
           @if (searchLoading()) {
-            <p class="mt-2 flex items-center gap-2 text-xs text-zinc-500">
+            <p class="mt-2 flex items-center gap-2 text-xs text-muted">
               <lucide-icon name="loader-2" class="h-3 w-3 animate-spin" />
               Searching…
             </p>
           }
 
           @if (searchResults().length > 0) {
-            <ul class="mt-2 max-h-48 overflow-y-auto rounded-md border border-zinc-200 bg-white">
+            <ul class="mt-2 max-h-48 overflow-y-auto rounded-md border border-subtle bg-surface">
               @for (c of searchResults(); track c.id) {
                 <li>
                   <button
                     type="button"
-                    class="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-zinc-50"
+                    class="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-surface-2"
                     (click)="onContactSelect(c)"
                   >
                     <span>
-                      <span class="font-medium text-zinc-900">{{ c.full_name }}</span>
+                      <span class="font-medium text-default">{{ c.full_name }}</span>
                       @if (c.phone) {
-                        <span class="ml-2 font-mono text-xs text-zinc-500">{{ c.phone }}</span>
+                        <span class="ml-2 font-mono text-xs text-muted">{{ c.phone }}</span>
                       }
                     </span>
-                    <lucide-icon name="plus" class="h-3 w-3 text-zinc-400" />
+                    <lucide-icon name="plus" class="h-3 w-3 text-faint" />
                   </button>
                 </li>
               }
@@ -182,12 +182,12 @@
             <div class="mt-3 flex flex-wrap gap-2">
               @for (c of selectedContacts(); track c.id) {
                 <span
-                  class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-800 ring-1 ring-zinc-200"
+                  class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-xs text-default ring-1 border-subtle"
                 >
                   {{ c.full_name }}
                   <button
                     type="button"
-                    class="text-zinc-500 hover:text-rose-600"
+                    class="text-muted hover:text-rose-600"
                     (click)="onContactRemove(c.id)"
                     aria-label="Remove"
                   >
@@ -197,7 +197,7 @@
               }
               @if (hiddenExistingIds().size > 0) {
                 <span
-                  class="inline-flex items-center rounded-full bg-zinc-50 px-2 py-0.5 text-xs text-zinc-500 ring-1 ring-zinc-200"
+                  class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs text-muted ring-1 border-subtle"
                   title="Existing members not shown as chips — preserved on save"
                 >
                   + {{ hiddenExistingIds().size }} more existing member{{
@@ -207,7 +207,7 @@
               }
             </div>
           } @else {
-            <p class="mt-2 text-xs text-zinc-500">
+            <p class="mt-2 text-xs text-muted">
               No members selected yet. An empty static group is legal but won't send to anyone.
             </p>
           }
@@ -215,17 +215,17 @@
       }
 
       <!-- Live audience-size preview -->
-      <div class="flex items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3">
-        <lucide-icon name="users" class="h-4 w-4 text-zinc-500" />
+      <div class="flex items-center gap-3 rounded-md border border-subtle bg-surface-2 p-3">
+        <lucide-icon name="users" class="h-4 w-4 text-muted" />
         @if (previewLoading()) {
-          <span class="text-sm text-zinc-500">Counting…</span>
+          <span class="text-sm text-muted">Counting…</span>
         } @else if (previewCount() !== null) {
-          <span class="text-sm text-zinc-800">
+          <span class="text-sm text-default">
             <span class="font-medium">{{ previewCount() }}</span>
             {{ previewCount() === 1 ? 'contact' : 'contacts' }} will be in this group.
           </span>
         } @else {
-          <span class="text-sm text-zinc-500">
+          <span class="text-sm text-muted">
             Add a filter or pick members to see the audience size.
           </span>
         }
@@ -240,14 +240,14 @@
       <div class="flex items-center justify-end gap-2 pt-2">
         <a
           routerLink="/user/contacts/groups"
-          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         >
           Cancel
         </a>
         <button
           type="submit"
           [disabled]="submitting() || form.invalid"
-          class="inline-flex items-center gap-2 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:opacity-50"
         >
           @if (submitting()) {
             <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />

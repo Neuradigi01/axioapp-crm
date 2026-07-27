@@ -9,7 +9,7 @@
           <lucide-icon name="arrow-left" size="12" />
           Back to list
         </a>
-        <span class="text-zinc-300">·</span>
+        <span class="text-faint">·</span>
         <h1 class="text-lg font-semibold text-default">
           @if (template(); as t) {
             {{ t.name }}
@@ -239,7 +239,7 @@
               type="text"
               formControlName="name"
               maxlength="120"
-              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
               [class.border-rose-400]="waNameInvalid()"
               placeholder="e.g. welcome_lead"
             />
@@ -269,7 +269,7 @@
             <span class="text-xs font-medium text-default">Channel</span>
             <select
               formControlName="channel"
-              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
             >
               <option value="">— Pick a channel —</option>
               <option value="email">Email</option>

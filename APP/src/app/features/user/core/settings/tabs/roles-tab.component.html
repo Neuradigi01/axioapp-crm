@@ -181,7 +181,7 @@
           autocomplete="off"
           [attr.readonly]="isReadOnly() ? '' : null"
           [class.bg-surface-2]="isReadOnly()"
-          class="w-full max-w-md rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          class="w-full max-w-md rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
         />
       </label>
 
@@ -208,7 +208,7 @@
                       [checked]="isChecked(p.key)"
                       [disabled]="isReadOnly()"
                       (change)="toggleKey(p.key, $any($event.target).checked)"
-                      class="mt-0.5 h-4 w-4 rounded border-subtle text-default focus:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      class="mt-0.5 h-4 w-4 rounded border-subtle text-default focus:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     <span class="min-w-0">
                       <span class="block font-mono text-xs text-default">{{ p.key }}</span>

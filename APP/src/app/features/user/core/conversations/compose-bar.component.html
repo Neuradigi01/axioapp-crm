@@ -101,7 +101,7 @@
 
   @if (replyingTo; as r) {
     <div
-      class="mb-2 flex items-center gap-2 rounded-md border-l-2 border-zinc-400 bg-surface-2 px-2 py-1 text-xs text-default"
+      class="mb-2 flex items-center gap-2 rounded-md border-l-2 border-subtle bg-surface-2 px-2 py-1 text-xs text-default"
     >
       <lucide-icon
         name="corner-up-left"
@@ -229,7 +229,7 @@
           'block min-h-[2.5rem] w-full resize-none rounded-md border px-3 py-2 text-sm placeholder-zinc-400 shadow-sm focus:outline-none focus:ring-1 disabled:bg-surface-2 disabled:text-muted ' +
           (isNoteMode()
             ? 'border-amber-300 bg-amber-50 focus:border-amber-500 focus:ring-amber-500'
-            : 'border-subtle bg-surface focus:border-zinc-500 focus:ring-zinc-500')
+            : 'border-subtle bg-surface focus:border-muted focus:ring-accent')
         "
       ></textarea>
       @if (mentionOpen() && isNoteMode()) {

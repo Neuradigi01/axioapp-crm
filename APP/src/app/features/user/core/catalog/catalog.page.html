@@ -69,7 +69,7 @@
           type="search"
           [formControl]="searchControl"
           placeholder="Search by name or SKU…"
-          class="block w-full rounded-md border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="block w-full rounded-md border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </div>
     </div>
@@ -82,7 +82,7 @@
       <select
         id="cat_category"
         [formControl]="categoryControl"
-        class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       >
         <option value="">All categories</option>
         @for (c of categoryOptions(); track c.id) {
@@ -119,7 +119,7 @@
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       @for (item of items(); track item.id) {
         <article
-          class="cursor-pointer rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle transition hover:ring-zinc-400"
+          class="cursor-pointer rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle transition hover:ring-accent"
           (click)="openView(item)"
         >
           <div class="flex items-start gap-3">

@@ -83,7 +83,7 @@
         <button
           type="button"
           (click)="clearSelection()"
-          class="text-[12px] font-medium text-zinc-300 hover:text-white"
+          class="text-[12px] font-medium text-faint hover:text-white"
         >
           Clear
         </button>
@@ -224,7 +224,7 @@
                   [checked]="allVisibleSelected()"
                   [indeterminate]="someVisibleSelected()"
                   (change)="toggleAll()"
-                  class="h-3.5 w-3.5 cursor-pointer rounded border-subtle text-default focus:ring-zinc-500"
+                  class="h-3.5 w-3.5 cursor-pointer rounded border-subtle text-default focus:ring-accent"
                   aria-label="Select all visible campaigns"
                 />
               </th>
@@ -249,7 +249,7 @@
                     type="checkbox"
                     [checked]="isSelected(c.id)"
                     (change)="toggleRow(c.id)"
-                    class="mt-1 h-3.5 w-3.5 cursor-pointer rounded border-subtle text-default focus:ring-zinc-500"
+                    class="mt-1 h-3.5 w-3.5 cursor-pointer rounded border-subtle text-default focus:ring-accent"
                     [attr.aria-label]="'Select ' + c.name"
                   />
                 </td>

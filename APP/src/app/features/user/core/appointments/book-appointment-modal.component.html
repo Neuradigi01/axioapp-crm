@@ -37,7 +37,7 @@
               (blur)="onContactBlur()"
               placeholder="Search contacts by name, phone, or email…"
               autocomplete="off"
-              class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
             @if (contactSearchOpen() && contactResults().length > 0) {
               <ul
@@ -76,7 +76,7 @@
                 [attr.placeholder]="
                   stdField('title')?.placeholder ?? 'e.g. Showroom visit · sofa selection'
                 "
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               @if (form.controls.title.touched && form.controls.title.invalid) {
                 <p class="mt-1 text-xs text-red-600">A title is required.</p>
@@ -102,7 +102,7 @@
                 [attr.placeholder]="
                   stdField('purpose')?.placeholder ?? 'showroom_visit, measurement, delivery, …'
                 "
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               @if (stdField('purpose')?.help_text; as help) {
                 <p class="mt-1 text-xs text-muted">{{ help }}</p>
@@ -123,7 +123,7 @@
                 type="text"
                 formControlName="location"
                 [attr.placeholder]="stdField('location')?.placeholder ?? 'Banjara Hills branch'"
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               @if (stdField('location')?.help_text; as help) {
                 <p class="mt-1 text-xs text-muted">{{ help }}</p>
@@ -142,7 +142,7 @@
             <select
               id="ba_assignee"
               formControlName="assigned_to_id"
-              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             >
               @if (users().length === 0) {
                 <!-- /users hasn't loaded yet (or failed); render just
@@ -176,7 +176,7 @@
                 id="ba_at"
                 type="datetime-local"
                 formControlName="scheduled_at"
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               @if (form.controls.scheduled_at.touched && form.controls.scheduled_at.invalid) {
                 <p class="mt-1 text-xs text-red-600">Pick a date and time.</p>
@@ -201,7 +201,7 @@
                 [attr.step]="stdField('duration_min')?.step_value ?? 1"
                 formControlName="duration_min"
                 [attr.placeholder]="stdField('duration_min')?.placeholder"
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               @if (form.controls.duration_min.touched && form.controls.duration_min.invalid) {
                 <p class="mt-1 text-xs text-red-600">
@@ -257,7 +257,7 @@
         type="button"
         [disabled]="!canSubmit()"
         (click)="onSubmit()"
-        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-zinc-400"
+        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-surface-2"
       >
         Book
       </button>

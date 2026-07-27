@@ -5,7 +5,7 @@
       <h1 class="text-2xl font-semibold text-default">Tasks</h1>
       <p class="mt-1 flex items-center gap-3 text-xs text-muted">
         <span class="inline-flex items-center gap-1.5">
-          <span class="h-2 w-2 rounded-full bg-zinc-400"></span>
+          <span class="h-2 w-2 rounded-full bg-surface-2"></span>
           {{ headlineCounts().open }} open
         </span>
         <span class="inline-flex items-center gap-1.5">
@@ -50,7 +50,7 @@
       @if (showAssigneeDropdown()) {
         <select
           [formControl]="assigneeControl"
-          class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-xs text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-xs text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           aria-label="Filter by assignee"
         >
           <option value="">All owners</option>
@@ -123,7 +123,7 @@
         [formControl]="searchCtrl"
         type="text"
         placeholder="Search tasks…"
-        class="w-full max-w-xs rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none sm:w-64"
+        class="w-full max-w-xs rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none sm:w-64"
       />
     </div>
   </div>
@@ -211,7 +211,7 @@
               <td class="px-3 py-2 align-middle" (click)="$event.stopPropagation()">
                 <input
                   type="checkbox"
-                  class="h-4 w-4 cursor-pointer rounded border-subtle text-default focus:ring-zinc-500"
+                  class="h-4 w-4 cursor-pointer rounded border-subtle text-default focus:ring-accent"
                   [checked]="isSelected(t.id)"
                   (click)="toggleRow(t.id, $event)"
                   [attr.aria-label]="'Select task ' + t.title"
@@ -224,7 +224,7 @@
                   [checked]="t.status === 'done'"
                   [disabled]="togglingId() !== null"
                   (change)="toggleComplete(t, $any($event.target).checked)"
-                  class="h-4 w-4 rounded border-subtle text-default focus:ring-zinc-500 disabled:cursor-not-allowed"
+                  class="h-4 w-4 rounded border-subtle text-default focus:ring-accent disabled:cursor-not-allowed"
                   aria-label="Mark task complete"
                 />
               </td>
@@ -452,13 +452,13 @@
           [formControl]="saveViewName"
           placeholder="e.g. My overdue high-priority"
           maxlength="80"
-          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
         />
       </label>
       <label class="flex items-center gap-2 text-xs text-default">
         <input
           type="checkbox"
-          class="h-4 w-4 rounded border-subtle text-default focus:ring-zinc-500"
+          class="h-4 w-4 rounded border-subtle text-default focus:ring-accent"
           [checked]="saveViewShared()"
           (change)="saveViewShared.set($any($event.target).checked)"
         />

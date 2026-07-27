@@ -30,7 +30,7 @@
           [ngModel]="siblingId()"
           (ngModelChange)="siblingId.set($event)"
           name="siblingId"
-          class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+          class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
         >
           <option value="">— pick a draft —</option>
           @for (d of eligibleDrafts(); track d.id) {
@@ -80,7 +80,7 @@
           [ngModel]="metric()"
           (ngModelChange)="metric.set($event)"
           name="metric"
-          class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+          class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
         >
           @for (m of metrics; track m.value) {
             <option [value]="m.value">{{ m.label }}</option>
@@ -99,7 +99,7 @@
           [ngModel]="minRuns()"
           (ngModelChange)="minRuns.set($event)"
           name="minRuns"
-          class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+          class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
         />
         <p class="text-[10px] text-muted mt-1">
           Default 50. For conversion rates under 5%, bump to 200+ so the z-test has enough signal.

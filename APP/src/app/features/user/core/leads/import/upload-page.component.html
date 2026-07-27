@@ -81,7 +81,7 @@
       id="import-platform"
       [value]="sourcePlatform()"
       (change)="onPlatformChange($event)"
-      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
     >
       @for (p of platforms; track p.value) {
         <option [value]="p.value">{{ p.label }}</option>
@@ -103,7 +103,7 @@
       [value]="name()"
       (input)="onNameInput($event)"
       placeholder="Auto-named from the filename if left blank"
-      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
     />
   </div>
 

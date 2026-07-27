@@ -75,7 +75,7 @@
               (input)="onFieldChange(i, $any($event.target).value)"
               [disabled]="disabled()"
               placeholder="e.g. lead.custom_data.tier"
-              class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 font-mono text-xs focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+              class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 font-mono text-xs focus:border-muted focus:outline-none disabled:opacity-50"
             />
           </label>
           <label class="block">
@@ -84,7 +84,7 @@
               [value]="rule.op"
               (change)="onOpChange(i, $any($event.target).value)"
               [disabled]="disabled()"
-              class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+              class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-muted focus:outline-none disabled:opacity-50"
             >
               @for (op of opChoicesFor(i); track op.value) {
                 <option [value]="op.value">{{ op.label }}</option>
@@ -100,7 +100,7 @@
                 (input)="onValueChange(i, $any($event.target).value)"
                 [disabled]="disabled()"
                 placeholder="value"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-muted focus:outline-none disabled:opacity-50"
               />
             </label>
           } @else {
@@ -126,7 +126,7 @@
               [value]="rule.field"
               (change)="onFieldChange(i, $any($event.target).value)"
               [disabled]="disabled()"
-              class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+              class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-muted focus:outline-none disabled:opacity-50"
             >
               @if (!rule.field) {
                 <option value="">— pick a field —</option>
@@ -146,7 +146,7 @@
               [value]="rule.op"
               (change)="onOpChange(i, $any($event.target).value)"
               [disabled]="disabled() || !rule.field"
-              class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+              class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-muted focus:outline-none disabled:opacity-50"
             >
               @for (op of opChoicesFor(i); track op.value) {
                 <option [value]="op.value">{{ op.label }}</option>
@@ -172,7 +172,7 @@
                     [value]="rule.value"
                     (change)="onValueChange(i, $any($event.target).value)"
                     [disabled]="disabled()"
-                    class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+                    class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-muted focus:outline-none disabled:opacity-50"
                   >
                     <option value="">— pick a value —</option>
                     @for (opt of pool; track opt.value) {
@@ -250,7 +250,7 @@
                 [value]="rule.value"
                 (input)="onValueChange(i, $any($event.target).value)"
                 [disabled]="disabled()"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-muted focus:outline-none disabled:opacity-50"
               />
             } @else if (ruleFieldType(i) === 'currency') {
               <div class="relative mt-0.5">
@@ -262,7 +262,7 @@
                   [value]="rule.value"
                   (input)="onValueChange(i, $any($event.target).value)"
                   [disabled]="disabled()"
-                  class="block w-full rounded-md border border-subtle bg-surface py-1.5 pl-6 pr-2 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+                  class="block w-full rounded-md border border-subtle bg-surface py-1.5 pl-6 pr-2 text-sm focus:border-muted focus:outline-none disabled:opacity-50"
                 />
               </div>
             } @else if (ruleFieldType(i) === 'date') {
@@ -271,7 +271,7 @@
                 [value]="rule.value"
                 (input)="onValueChange(i, $any($event.target).value)"
                 [disabled]="disabled()"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-muted focus:outline-none disabled:opacity-50"
               />
             } @else if (ruleFieldType(i) === 'datetime') {
               <input
@@ -279,7 +279,7 @@
                 [value]="rule.value"
                 (input)="onValueChange(i, $any($event.target).value)"
                 [disabled]="disabled()"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-muted focus:outline-none disabled:opacity-50"
               />
             } @else {
               <input
@@ -288,7 +288,7 @@
                 (input)="onValueChange(i, $any($event.target).value)"
                 [disabled]="disabled()"
                 placeholder="value"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-muted focus:outline-none disabled:opacity-50"
               />
             }
           </label>

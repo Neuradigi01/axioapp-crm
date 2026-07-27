@@ -26,7 +26,7 @@
         <select
           [value]="moveLeadsTo()"
           (change)="onTargetChange($any($event.target).value)"
-          class="w-full rounded border border-subtle bg-surface px-2 py-1.5 text-sm text-default focus:border-zinc-500 focus:outline-none"
+          class="w-full rounded border border-subtle bg-surface px-2 py-1.5 text-sm text-default focus:border-muted focus:outline-none"
         >
           @for (s of orderedCandidates(); track s.id) {
             <option [value]="s.key">{{ s.name }}</option>

@@ -6,7 +6,7 @@
       [ngModel]="path()"
       (ngModelChange)="onPathChange($event)"
       placeholder="e.g. lead.pipeline_stage"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     />
     @if (!path().trim()) {
       <p class="text-[10px] text-rose-600 mt-1">Path is required.</p>
@@ -23,7 +23,7 @@
             [ngModel]="c"
             (ngModelChange)="onCaseChange($index, $event)"
             placeholder="value to match"
-            class="flex-1 text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+            class="flex-1 text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
           />
           <button type="button" class="text-faint hover:text-rose-600" (click)="removeCase($index)">
             <lucide-icon name="X" class="w-3.5 h-3.5"></lucide-icon>

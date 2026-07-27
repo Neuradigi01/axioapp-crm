@@ -9,7 +9,7 @@
       [maxlength]="BODY_MAX"
       rows="6"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none"
       placeholder="Hi {{ '{' + '{' + 'contact.first_name' + '}' + '}' }}, thanks for messaging us!"
     ></textarea>
     <p class="mt-1 text-[10px] text-faint">
@@ -36,7 +36,7 @@
             formControlName="text"
             [maxlength]="QUICK_REPLY_MAX_LENGTH"
             (focus)="onFocus($event)"
-            class="block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+            class="block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
             placeholder="Tell me more"
           />
           <button

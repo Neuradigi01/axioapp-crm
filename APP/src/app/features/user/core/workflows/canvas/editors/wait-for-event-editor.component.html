@@ -4,7 +4,7 @@
     <select
       [ngModel]="eventType()"
       (ngModelChange)="onEventChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     >
       <option value="">— pick an event —</option>
       @for (e of waitableEvents; track e.type) {
@@ -27,7 +27,7 @@
         min="1"
         [ngModel]="amount()"
         (ngModelChange)="onAmountChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       />
     </div>
     <div>
@@ -35,7 +35,7 @@
       <select
         [ngModel]="unit()"
         (ngModelChange)="onUnitChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       >
         @for (u of units; track u.value) {
           <option [value]="u.value">{{ u.label }}</option>

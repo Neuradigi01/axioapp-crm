@@ -16,7 +16,7 @@
       [ngModel]="fieldKey()"
       (ngModelChange)="onFieldKeyChange($event)"
       placeholder="e.g. lead_score or custom_data.priority"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     />
     @if (!fieldKey().trim()) {
       <p class="text-[10px] text-rose-600 mt-1">Field key is required.</p>
@@ -32,7 +32,7 @@
     <select
       [ngModel]="valueSource()"
       (ngModelChange)="onValueSourceChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     >
       @for (s of valueSources; track s.value) {
         <option [value]="s.value">{{ s.label }}</option>
@@ -47,7 +47,7 @@
       [ngModel]="value()"
       (ngModelChange)="onValueChange($event)"
       placeholder="literal text, or dotted path if not literal"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     />
     @if (!value()) {
       <p class="text-[10px] text-rose-600 mt-1">Value is required.</p>

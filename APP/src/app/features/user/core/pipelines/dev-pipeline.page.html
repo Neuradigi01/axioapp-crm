@@ -54,12 +54,12 @@
     </app-pipeline-list>
   }
 
-  <section class="rounded-lg bg-accent p-4 text-zinc-100 ring-1 ring-zinc-800">
+  <section class="rounded-lg bg-accent p-4 text-default ring-1 ring-accent">
     <h2 class="text-xs font-semibold uppercase tracking-wide text-faint">
       Last <code class="font-mono">itemMoved</code> event
     </h2>
     <pre
-      class="mt-2 overflow-x-auto rounded-md bg-zinc-950 p-3 text-xs"
+      class="mt-2 overflow-x-auto rounded-md bg-app p-3 text-xs"
     ><code>{{ lastEvent() ? (lastEvent() | json) : '— no events yet —' }}</code></pre>
   </section>
 </div>

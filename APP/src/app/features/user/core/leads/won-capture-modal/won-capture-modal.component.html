@@ -24,7 +24,7 @@
           inputmode="decimal"
           [formControl]="valueControl"
           placeholder="e.g. 50000"
-          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
         @if (valueControl.invalid && valueControl.dirty) {
           <span class="mt-1 block text-xs text-red-600"
@@ -38,7 +38,7 @@
         <input
           type="date"
           [formControl]="closeDateControl"
-          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </label>
 
@@ -49,7 +49,7 @@
           maxlength="64"
           [formControl]="reasonControl"
           placeholder="e.g. Referral · Existing customer · Landing page"
-          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </label>
 

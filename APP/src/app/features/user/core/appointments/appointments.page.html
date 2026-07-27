@@ -63,7 +63,7 @@
         class="rounded-full px-3 py-1 font-medium ring-1 transition"
         [class.bg-accent]="statusFilter() === chip.id"
         [class.text-white]="statusFilter() === chip.id"
-        [class.ring-zinc-900]="statusFilter() === chip.id"
+        [class.ring-accent]="statusFilter() === chip.id"
         [class.bg-surface]="statusFilter() !== chip.id"
         [class.text-default]="statusFilter() !== chip.id"
         [class.border-subtle]="statusFilter() !== chip.id"
@@ -102,7 +102,7 @@
       <select
         [value]="sortKey() + ':' + sortOrder()"
         (change)="setSort($any($event.target).value)"
-        class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         aria-label="Sort"
       >
         <option value="scheduled_at:asc">Upcoming first</option>
@@ -116,7 +116,7 @@
 
     <select
       [formControl]="assigneeControl"
-      class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       aria-label="Owner"
     >
       <option value="">All owners</option>
@@ -271,7 +271,7 @@
                   <td class="w-10 px-3 py-3" (click)="$event.stopPropagation()">
                     <input
                       type="checkbox"
-                      class="h-4 w-4 cursor-pointer rounded border-subtle text-default focus:ring-zinc-500"
+                      class="h-4 w-4 cursor-pointer rounded border-subtle text-default focus:ring-accent"
                       [checked]="isSelected(a.id)"
                       (click)="toggleRow(a.id, $event)"
                       [attr.aria-label]="'Select appointment ' + a.title"

@@ -19,7 +19,7 @@
         <label class="block text-[10px] uppercase tracking-wide text-muted mb-1"> Contact </label>
         <input
           type="search"
-          class="w-full text-sm px-3 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+          class="w-full text-sm px-3 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
           placeholder="Search contacts by name…"
           [ngModel]="contactQuery()"
           (ngModelChange)="onSearchInput($event)"
@@ -55,7 +55,7 @@
           Event type
         </label>
         <select
-          class="w-full text-sm px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+          class="w-full text-sm px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
           [ngModel]="eventType()"
           (ngModelChange)="eventType.set($event)"
         >

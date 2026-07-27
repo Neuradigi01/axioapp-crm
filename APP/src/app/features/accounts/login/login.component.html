@@ -19,7 +19,7 @@
         type="text"
         formControlName="identifier"
         autocomplete="username"
-        class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       />
       @if (
         loginForm.controls['identifier'].invalid &&
@@ -43,7 +43,7 @@
           formControlName="password"
           [type]="pwToggle.type()"
           autocomplete="current-password"
-          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 pr-10 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 pr-10 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
         <button
           type="button"
@@ -69,7 +69,7 @@
       <input
         type="checkbox"
         formControlName="rememberMe"
-        class="h-4 w-4 rounded border-subtle text-default focus:ring-zinc-500"
+        class="h-4 w-4 rounded border-subtle text-default focus:ring-accent"
       />
       Remember me
     </label>

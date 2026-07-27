@@ -26,7 +26,7 @@
           autocomplete="off"
           maxlength="255"
           [attr.placeholder]="stdField('title')?.placeholder"
-          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
         />
         @if (stdField('title')?.help_text; as help) {
           <span class="mt-1 block text-xs text-muted">{{ help }}</span>
@@ -46,7 +46,7 @@
           formControlName="description"
           rows="2"
           [attr.placeholder]="stdField('description')?.placeholder"
-          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
         ></textarea>
         @if (stdField('description')?.help_text; as help) {
           <span class="mt-1 block text-xs text-muted">{{ help }}</span>
@@ -66,7 +66,7 @@
           <input
             type="datetime-local"
             formControlName="due_at"
-            class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+            class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
           />
           @if (stdField('due_at')?.help_text; as help) {
             <span class="mt-1 block text-xs text-muted">{{ help }}</span>
@@ -80,7 +80,7 @@
           </span>
           <select
             formControlName="priority"
-            class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+            class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
           >
             <option value="low">Low</option>
             <option value="med">Medium</option>
@@ -103,7 +103,7 @@
         </span>
         <select
           formControlName="assigned_to_id"
-          class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
         >
           @for (a of assignees; track a.id) {
             <option [value]="a.id">{{ a.full_name || a.email }}</option>
@@ -127,7 +127,7 @@
       </span>
       <select
         formControlName="followup_type"
-        class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+        class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
       >
         @for (o of followupOptions; track o.value) {
           <option [value]="o.value">{{ o.label }}</option>
@@ -170,7 +170,7 @@
           (input)="onContactSearchInput($event)"
           placeholder="Search by name, phone, or email…"
           autocomplete="off"
-          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
         />
         @if (contactResults().length > 0) {
           <ul

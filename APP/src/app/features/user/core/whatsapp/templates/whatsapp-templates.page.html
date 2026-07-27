@@ -125,7 +125,7 @@
               [class]="
                 'rounded-full px-3 py-1 text-xs font-medium ring-1 ' +
                 (activeFilter() === tab.key
-                  ? 'bg-accent text-white ring-zinc-900'
+                  ? 'bg-accent text-white ring-accent'
                   : 'bg-surface text-default border-subtle hover:bg-surface-2')
               "
             >
@@ -143,7 +143,7 @@
             [ngModel]="searchQuery()"
             (ngModelChange)="onSearchChange($event)"
             placeholder="Search by name…"
-            class="w-64 rounded-md border border-subtle bg-surface py-1.5 pl-7 pr-3 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="w-64 rounded-md border border-subtle bg-surface py-1.5 pl-7 pr-3 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
       </div>

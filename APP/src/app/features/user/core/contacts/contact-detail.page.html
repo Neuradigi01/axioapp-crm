@@ -93,7 +93,7 @@
                   <button
                     type="button"
                     (click)="openReassign()"
-                    class="ml-1 inline-flex items-center rounded p-0.5 text-faint hover:bg-surface-2 hover:text-default focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                    class="ml-1 inline-flex items-center rounded p-0.5 text-faint hover:bg-surface-2 hover:text-default focus:outline-none focus:ring-1 focus:ring-accent"
                     aria-label="Reassign owner"
                   >
                     <lucide-icon name="pencil" class="h-3 w-3" />
@@ -172,7 +172,7 @@
           [attr.aria-selected]="activeTab() === tab.id"
           (click)="setTab(tab.id)"
           class="-mb-px border-b-2 px-3 py-2 text-sm font-medium transition"
-          [class.border-zinc-900]="activeTab() === tab.id"
+          [class.border-accent]="activeTab() === tab.id"
           [class.text-default]="activeTab() === tab.id"
           [class.border-transparent]="activeTab() !== tab.id"
           [class.text-muted]="activeTab() !== tab.id"
@@ -362,7 +362,7 @@
           id="anonymise-reason"
           type="text"
           maxlength="500"
-          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           placeholder="e.g. SAR-12345 or 'customer request'"
           [value]="anonymiseReason()"
           (input)="onAnonymiseReasonInput($event)"

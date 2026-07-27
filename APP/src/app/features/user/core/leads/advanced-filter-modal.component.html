@@ -48,7 +48,7 @@
             <select
               [value]="row.field"
               (change)="onFieldChange(row.id, $any($event.target).value)"
-              class="w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               [attr.aria-label]="'Field for clause ' + row.id"
             >
               <optgroup label="Standard">
@@ -69,7 +69,7 @@
             <select
               [value]="row.op"
               (change)="onOpChange(row.id, $any($event.target).value)"
-              class="rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               [attr.aria-label]="'Operator for clause ' + row.id"
             >
               @for (op of opsFor(row.field); track op) {
@@ -87,7 +87,7 @@
                   [value]="row.valueList"
                   (input)="onValueListChange(row.id, $any($event.target).value)"
                   placeholder="comma,separated,values"
-                  class="block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  class="block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                   [attr.aria-label]="'Values for clause ' + row.id"
                 />
               } @else if (isRangeOp(row.op)) {
@@ -97,7 +97,7 @@
                     [value]="row.value"
                     (input)="onValueChange(row.id, $any($event.target).value)"
                     placeholder="from"
-                    class="block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                    class="block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                     [attr.aria-label]="'Range from for clause ' + row.id"
                   />
                   <input
@@ -105,7 +105,7 @@
                     [value]="row.valueHi"
                     (input)="onValueHiChange(row.id, $any($event.target).value)"
                     placeholder="to"
-                    class="block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                    class="block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                     [attr.aria-label]="'Range to for clause ' + row.id"
                   />
                 </div>
@@ -113,7 +113,7 @@
                 <select
                   [value]="row.value"
                   (change)="onValueChange(row.id, $any($event.target).value)"
-                  class="block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  class="block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                   [attr.aria-label]="'Value for clause ' + row.id"
                 >
                   <option value="" disabled>Pick a value…</option>
@@ -127,7 +127,7 @@
                   [value]="row.value"
                   (input)="onValueChange(row.id, $any($event.target).value)"
                   placeholder="value"
-                  class="block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  class="block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                   [attr.aria-label]="'Value for clause ' + row.id"
                 />
               }
@@ -149,7 +149,7 @@
       <button
         type="button"
         (click)="onAddRow()"
-        class="mt-3 inline-flex items-center gap-1.5 rounded-md border border-dashed border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:border-zinc-400 hover:bg-surface-2"
+        class="mt-3 inline-flex items-center gap-1.5 rounded-md border border-dashed border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:border-subtle hover:bg-surface-2"
       >
         <lucide-icon name="plus" class="h-4 w-4" />
         Add filter

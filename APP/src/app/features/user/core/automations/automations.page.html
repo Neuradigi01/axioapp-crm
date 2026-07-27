@@ -44,7 +44,7 @@
           [value]="searchQuery()"
           (input)="onSearchInput($any($event.target).value)"
           placeholder="Search name or event…"
-          class="w-64 rounded-md border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 focus:border-zinc-500 focus:outline-none"
+          class="w-64 rounded-md border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none"
         />
       </div>
 
@@ -165,7 +165,7 @@
                       (change)="onToggleEnabled(row)"
                     />
                     <span
-                      class="h-5 w-9 rounded-full bg-zinc-300 transition-colors peer-checked:bg-emerald-500 peer-disabled:opacity-50"
+                      class="h-5 w-9 rounded-full bg-surface-2 transition-colors peer-checked:bg-emerald-500 peer-disabled:opacity-50"
                     ></span>
                     <span
                       class="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-surface shadow transition-transform peer-checked:translate-x-4"

@@ -20,7 +20,7 @@
           type="text"
           [formControl]="searchCtrl"
           placeholder="Search by name…"
-          class="w-56 rounded-md border border-subtle bg-surface py-1.5 pl-7 pr-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-56 rounded-md border border-subtle bg-surface py-1.5 pl-7 pr-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </label>
       @if (canManage()) {
@@ -143,13 +143,13 @@
                         ><span class="font-semibold text-emerald-700">{{ st.active }}</span>
                         active</span
                       >
-                      <span class="text-zinc-300">·</span>
+                      <span class="text-faint">·</span>
                       <span
                         ><span class="font-semibold text-default">{{ st.completed }}</span>
                         done</span
                       >
                       @if (st.paused_on_reply > 0) {
-                        <span class="text-zinc-300">·</span>
+                        <span class="text-faint">·</span>
                         <span
                           ><span class="font-semibold text-amber-700">{{
                             st.paused_on_reply

@@ -6,7 +6,7 @@
       [ngModel]="name()"
       (ngModelChange)="onNameChange($event)"
       placeholder="e.g. Booked a demo"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     />
     @if (!name().trim()) {
       <p class="text-[10px] text-rose-600 mt-1">Goal name is required.</p>
@@ -19,7 +19,7 @@
       [ngModel]="outcomeLabel()"
       (ngModelChange)="onOutcomeChange($event)"
       placeholder="goal_reached"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500 font-mono"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted font-mono"
     />
     <p class="text-[10px] text-muted mt-1">
       Runs that terminate at this node stamp this label on

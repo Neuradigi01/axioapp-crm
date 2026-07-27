@@ -8,7 +8,7 @@
       [ngModel]="state().templateId"
       (ngModelChange)="onTemplateChange($event)"
       placeholder="template UUID"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500 font-mono"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted font-mono"
     />
     @if (!state().templateId) {
       <p class="text-[10px] text-rose-600 mt-1">Template is required.</p>
@@ -19,7 +19,7 @@
     <select
       [ngModel]="state().recipient"
       (ngModelChange)="onRecipientChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     >
       <option value="">— pick a recipient —</option>
       @for (r of recipientOptions; track r.value) {
@@ -32,7 +32,7 @@
         [ngModel]="state().customRecipient"
         (ngModelChange)="onCustomChange($event)"
         placeholder="dotted path or E.164 phone"
-        class="mt-1 w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="mt-1 w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       />
     }
   </div>
@@ -41,7 +41,7 @@
     <select
       [ngModel]="state().category"
       (ngModelChange)="onCategoryChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     >
       @for (c of categoryOptions; track c.value) {
         <option [value]="c.value">{{ c.label }}</option>

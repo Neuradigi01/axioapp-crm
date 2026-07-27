@@ -225,8 +225,8 @@
                   [class]="
                     'mb-1 rounded-md border-l-2 px-2 py-1 text-[11px] leading-tight ' +
                     (m.direction === 'out'
-                      ? 'border-subtle bg-surface/10 text-zinc-200'
-                      : 'border-zinc-400 bg-surface-2 text-muted')
+                      ? 'border-subtle bg-surface/10 text-default'
+                      : 'border-subtle bg-surface-2 text-muted')
                   "
                 >
                   <p class="truncate font-medium opacity-90">
@@ -354,7 +354,7 @@
               <p
                 [class]="
                   'mt-1 flex items-center justify-end gap-1 text-[10px] ' +
-                  (m.direction === 'out' ? 'text-zinc-300' : 'text-muted')
+                  (m.direction === 'out' ? 'text-faint' : 'text-muted')
                 "
               >
                 @if (m.direction === 'out' && m.is_ai) {

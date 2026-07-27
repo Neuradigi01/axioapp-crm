@@ -6,7 +6,7 @@
       [ngModel]="url()"
       (ngModelChange)="onUrlChange($event)"
       placeholder="https://example.com/hook"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500 font-mono"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted font-mono"
     />
     @if (!isValidUrl()) {
       <p class="text-[10px] text-rose-600 mt-1">
@@ -21,7 +21,7 @@
       <select
         [ngModel]="method()"
         (ngModelChange)="onMethodChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       >
         <option value="POST">POST</option>
         <option value="GET">GET</option>
@@ -34,7 +34,7 @@
       <select
         [ngModel]="onFailure()"
         (ngModelChange)="onFailureChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       >
         <option value="skip">Skip step</option>
         <option value="error">Error the run</option>
@@ -49,7 +49,7 @@
       [ngModel]="body()"
       (ngModelChange)="onBodyChange($event)"
       [placeholder]="bodyPlaceholder"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500 font-mono"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted font-mono"
     ></textarea>
   </div>
 
@@ -62,7 +62,7 @@
       [ngModel]="headers()"
       (ngModelChange)="onHeadersChange($event)"
       placeholder="X-API-Key: secret"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500 font-mono"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted font-mono"
     ></textarea>
   </div>
 
@@ -73,7 +73,7 @@
       [ngModel]="expectedStatuses()"
       (ngModelChange)="onStatusChange($event)"
       placeholder="200,201,202,204"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500 font-mono"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted font-mono"
     />
   </div>
 </div>

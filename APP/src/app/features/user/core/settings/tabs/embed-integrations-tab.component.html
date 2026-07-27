@@ -281,7 +281,7 @@
                             type="button"
                             (click)="addCustomField(opt)"
                             [disabled]="!opt.widget_supported"
-                            class="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-zinc-300"
+                            class="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-surface-2"
                           >
                             Add
                           </button>
@@ -516,7 +516,7 @@
               The widget JS bundle is shipped in Step 5 — for now the snippet is a preview.
             </p>
             <div class="overflow-hidden rounded-md border border-subtle bg-accent p-4">
-              <pre class="whitespace-pre-wrap break-all text-xs text-zinc-100 font-mono">{{
+              <pre class="whitespace-pre-wrap break-all text-xs text-default font-mono">{{
                 snippet()
               }}</pre>
             </div>

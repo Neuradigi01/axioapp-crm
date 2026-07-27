@@ -29,7 +29,7 @@
         type="text"
         inputmode="numeric"
         maxlength="1"
-        class="h-12 w-10 rounded-md border border-subtle bg-surface text-center text-lg font-semibold text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:bg-surface-2"
+        class="h-12 w-10 rounded-md border border-subtle bg-surface text-center text-lg font-semibold text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:cursor-not-allowed disabled:bg-surface-2"
         [value]="digit"
         [disabled]="isLoading() || isExpired"
         (input)="onDigitInput($index, $event)"

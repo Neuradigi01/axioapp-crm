@@ -7,7 +7,7 @@
         [ngModel]="tagName()"
         (ngModelChange)="onTagChange($event)"
         placeholder="e.g. hot-lead"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       />
       @if (!tagName().trim()) {
         <p class="text-[10px] text-rose-600 mt-1">Tag is required.</p>
@@ -21,7 +21,7 @@
         [ngModel]="listId()"
         (ngModelChange)="onListIdChange($event)"
         placeholder="uuid of a static contact group"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500 font-mono"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted font-mono"
       />
       @if (!listId().trim()) {
         <p class="text-[10px] text-rose-600 mt-1">Group is required.</p>
@@ -33,7 +33,7 @@
       <select
         [ngModel]="scoreMode()"
         (ngModelChange)="onScoreModeChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       >
         <option value="set">Set to literal</option>
         <option value="add">Add delta</option>
@@ -46,7 +46,7 @@
         type="number"
         [ngModel]="scoreValue()"
         (ngModelChange)="onScoreValueChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       />
     </div>
   }

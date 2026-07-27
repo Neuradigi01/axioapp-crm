@@ -67,7 +67,7 @@
           type="text"
           [formControl]="nameCtrl"
           placeholder="Designer outreach"
-          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
         <p class="mt-1 text-xs text-muted">Internal label — shown in pickers and reports.</p>
       </div>
@@ -173,7 +173,7 @@
                         type="text"
                         [formControl]="templateSearchCtrl"
                         placeholder="Search templates…"
-                        class="block w-full rounded-md border border-subtle bg-surface py-1 pl-6 pr-2 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                        class="block w-full rounded-md border border-subtle bg-surface py-1 pl-6 pr-2 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                         autofocus
                       />
                     </label>
@@ -243,7 +243,7 @@
                   max="365"
                   [value]="row.delay_days"
                   (input)="setDelay(i, $any($event.target).valueAsNumber)"
-                  class="w-16 rounded-md border border-subtle bg-surface px-2 py-1 text-right text-sm font-mono shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  class="w-16 rounded-md border border-subtle bg-surface px-2 py-1 text-right text-sm font-mono shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 <span class="text-xs text-muted">days</span>
               }

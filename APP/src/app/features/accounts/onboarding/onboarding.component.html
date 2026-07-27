@@ -25,7 +25,7 @@
               class="w-2.5 h-2.5 rounded-full transition-colors"
               [class.bg-blue-600]="currentStep() >= i"
               [class.dark:bg-blue-500]="currentStep() >= i"
-              [class.bg-gray-300]="currentStep() < i"
+              [class.bg-surface-2]="currentStep() < i"
               [class.dark:bg-slate-600]="currentStep() < i"
             ></span>
           }
@@ -186,7 +186,7 @@
             type="button"
             (click)="back()"
             [disabled]="isSubmitting()"
-            class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-default dark:text-slate-300 hover:bg-surface-2 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-default dark:text-slate-300 hover:bg-surface-2 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-accent dark:focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             ← Back
           </button>

@@ -12,7 +12,7 @@
           [class]="
             'flex items-center gap-1.5 rounded-full px-2.5 py-1 ring-1 ' +
             (step() === i + 1
-              ? 'bg-accent text-white ring-zinc-900'
+              ? 'bg-accent text-white ring-accent'
               : step() > i + 1
                 ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
                 : 'bg-surface text-muted border-subtle')
@@ -40,7 +40,7 @@
             [ngModel]="name()"
             (ngModelChange)="name.set($event)"
             placeholder="diwali_sale_2026"
-            class="w-full rounded-md border border-subtle px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="w-full rounded-md border border-subtle px-3 py-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
           @if (nameError(); as err) {
             <p class="mt-1 text-xs text-rose-600">{{ err }}</p>

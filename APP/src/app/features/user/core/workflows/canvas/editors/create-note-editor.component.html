@@ -4,7 +4,7 @@
     <select
       [ngModel]="entity()"
       (ngModelChange)="onEntityChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     >
       <option value="contact">Contact</option>
       <option value="lead">Lead</option>
@@ -17,7 +17,7 @@
       [ngModel]="body()"
       (ngModelChange)="onBodyChange($event)"
       placeholder="Note text — visible on the timeline, supports {{ '{{var}}' }} variables"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     ></textarea>
     @if (!body().trim()) {
       <p class="text-[10px] text-rose-600 mt-1">Body is required.</p>

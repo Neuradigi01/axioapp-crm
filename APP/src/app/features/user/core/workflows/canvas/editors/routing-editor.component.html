@@ -12,7 +12,7 @@
       <select
         [ngModel]="poolType()"
         (ngModelChange)="onPoolTypeChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       >
         <option value="role">By role</option>
         <option value="team">By team</option>
@@ -38,7 +38,7 @@
               ? 'team id'
               : 'uuid1,uuid2,…'
         "
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       />
       @if (!poolValue().trim()) {
         <p class="text-[10px] text-rose-600 mt-1">Pool value is required.</p>
@@ -52,7 +52,7 @@
         [ngModel]="specificUserId()"
         (ngModelChange)="onSpecificUserChange($event)"
         placeholder="uuid"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500 font-mono"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted font-mono"
       />
       @if (!specificUserId().trim()) {
         <p class="text-[10px] text-rose-600 mt-1">User UUID is required.</p>
@@ -65,7 +65,7 @@
     <select
       [ngModel]="target()"
       (ngModelChange)="onTargetChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     >
       <option value="lead.assigned_to">Lead owner</option>
       <option value="contact.assigned_to">Contact owner</option>
@@ -77,7 +77,7 @@
     <select
       [ngModel]="fallback()"
       (ngModelChange)="onFallbackChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     >
       <option value="workflow.owner">Workflow owner</option>
       <option value="leave_unassigned">Leave unassigned</option>

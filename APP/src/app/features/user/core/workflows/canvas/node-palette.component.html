@@ -12,7 +12,7 @@
         [ngModel]="query()"
         (ngModelChange)="query.set($event)"
         placeholder="Search nodes…"
-        class="w-full pl-8 pr-3 py-1.5 text-xs rounded border border-subtle focus:outline-none focus:border-zinc-500"
+        class="w-full pl-8 pr-3 py-1.5 text-xs rounded border border-subtle focus:outline-none focus:border-muted"
       />
     </div>
   </div>
@@ -30,7 +30,7 @@
                 draggable="true"
                 (dragstart)="onDragStart($event, item)"
                 [title]="item.description"
-                class="group flex items-start gap-2 px-2.5 py-2 rounded border border-subtle hover:border-zinc-400 hover:bg-surface-2 cursor-grab active:cursor-grabbing"
+                class="group flex items-start gap-2 px-2.5 py-2 rounded border border-subtle hover:border-subtle hover:bg-surface-2 cursor-grab active:cursor-grabbing"
               >
                 <lucide-icon
                   [name]="item.icon"

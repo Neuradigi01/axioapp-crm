@@ -6,7 +6,7 @@
       [ngModel]="templateId()"
       (ngModelChange)="onTemplateChange($event)"
       placeholder="template UUID"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500 font-mono"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted font-mono"
     />
     @if (!templateId()) {
       <p class="text-[10px] text-rose-600 mt-1">Template is required.</p>
@@ -19,7 +19,7 @@
       [ngModel]="amount()"
       (ngModelChange)="onAmountChange($event)"
       placeholder="literal number or dotted path (e.g. lead.budget)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     />
     @if (!amount().trim()) {
       <p class="text-[10px] text-rose-600 mt-1">Amount is required.</p>
@@ -32,7 +32,7 @@
       min="1"
       [ngModel]="expiresInDays()"
       (ngModelChange)="onExpiresChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     />
   </div>
   <label class="flex items-center gap-2 text-xs">

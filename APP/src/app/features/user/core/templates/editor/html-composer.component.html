@@ -8,7 +8,7 @@
         Insert variable:
         <select
           (change)="onInsertTag($any($event.target).value); $any($event.target).value = ''"
-          class="ml-1 rounded-md border border-subtle bg-surface px-1.5 py-0.5 text-[10px] focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="ml-1 rounded-md border border-subtle bg-surface px-1.5 py-0.5 text-[10px] focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         >
           <option value="">— pick —</option>
           @for (tag of mergeTags(); track tag.value) {

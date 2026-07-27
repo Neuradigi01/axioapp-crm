@@ -6,7 +6,7 @@
       [ngModel]="templateId()"
       (ngModelChange)="onTemplateChange($event)"
       placeholder="template UUID"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500 font-mono"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted font-mono"
     />
     @if (!templateId()) {
       <p class="text-[10px] text-rose-600 mt-1">Template is required.</p>
@@ -19,7 +19,7 @@
       [ngModel]="slackChannel()"
       (ngModelChange)="onChannelChange($event)"
       placeholder="#crm-alerts"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     />
     @if (!slackChannel().trim()) {
       <p class="text-[10px] text-rose-600 mt-1">Channel is required.</p>

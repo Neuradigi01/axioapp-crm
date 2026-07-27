@@ -16,7 +16,7 @@
         (input)="onNameInput($any($event.target).value)"
         maxlength="128"
         placeholder="e.g. Demo Scheduled"
-        class="mt-1 w-full rounded border border-subtle px-2 py-1.5 text-sm text-default focus:border-zinc-500 focus:outline-none"
+        class="mt-1 w-full rounded border border-subtle px-2 py-1.5 text-sm text-default focus:border-muted focus:outline-none"
       />
       @if (nameError(); as err) {
         <p class="mt-1 text-[11px] text-red-600">{{ err }}</p>
@@ -36,7 +36,7 @@
               [attr.aria-label]="'Use colour ' + preset"
               [attr.aria-pressed]="colorValue() === preset"
               class="h-5 w-5 rounded-full ring-2 ring-transparent transition hover:border-subtle"
-              [class.ring-zinc-900]="colorValue() === preset"
+              [class.ring-accent]="colorValue() === preset"
               [style.background-color]="preset"
             ></button>
           }
@@ -47,7 +47,7 @@
           (input)="onColorInput($any($event.target).value)"
           placeholder="#a855f7"
           maxlength="9"
-          class="w-24 rounded border border-subtle px-2 py-1 text-xs font-mono text-default focus:border-zinc-500 focus:outline-none"
+          class="w-24 rounded border border-subtle px-2 py-1 text-xs font-mono text-default focus:border-muted focus:outline-none"
         />
       </div>
       @if (!colorValid()) {
@@ -60,7 +60,7 @@
       <select
         [value]="afterStageKey() ?? ''"
         (change)="onAnchorChange($any($event.target).value)"
-        class="mt-1 w-full rounded border border-subtle bg-surface px-2 py-1.5 text-sm text-default focus:border-zinc-500 focus:outline-none"
+        class="mt-1 w-full rounded border border-subtle bg-surface px-2 py-1.5 text-sm text-default focus:border-muted focus:outline-none"
       >
         <option value="">(at the end)</option>
         @for (stage of anchorOptions(); track stage.id) {

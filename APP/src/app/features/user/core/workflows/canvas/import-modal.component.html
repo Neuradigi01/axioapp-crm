@@ -20,7 +20,7 @@
 
     <div class="px-5 py-4 space-y-3">
       <label
-        class="block px-3 py-6 text-center text-xs text-muted border-2 border-dashed border-subtle rounded cursor-pointer hover:border-zinc-500 hover:bg-surface-2"
+        class="block px-3 py-6 text-center text-xs text-muted border-2 border-dashed border-subtle rounded cursor-pointer hover:border-muted hover:bg-surface-2"
       >
         <lucide-icon name="Upload" class="w-5 h-5 mb-1 text-muted inline"></lucide-icon>
         @if (fileName()) {
@@ -52,7 +52,7 @@
             [ngModel]="overrideName()"
             (ngModelChange)="overrideName.set($event)"
             [disabled]="busy()"
-            class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+            class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
             maxlength="120"
           />
           <p class="text-[10px] text-muted mt-1">

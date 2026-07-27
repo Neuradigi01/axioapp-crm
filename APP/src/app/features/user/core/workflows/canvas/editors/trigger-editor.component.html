@@ -4,7 +4,7 @@
     <select
       [ngModel]="eventType()"
       (ngModelChange)="onEventTypeChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     >
       <option value="">— pick an event —</option>
       @for (e of eventTypes; track e.type) {
@@ -29,7 +29,7 @@
     <select
       [ngModel]="reEnrollmentRule()"
       (ngModelChange)="onReEnrollmentChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     >
       @for (opt of reEnrollmentOptions; track opt.value) {
         <option [value]="opt.value">{{ opt.label }}</option>

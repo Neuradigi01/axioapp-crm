@@ -42,7 +42,7 @@
               <button
                 type="button"
                 cdkDragHandle
-                class="cursor-grab text-zinc-300 hover:text-muted"
+                class="cursor-grab text-faint hover:text-muted"
                 title="Drag to reorder"
               >
                 <lucide-icon name="grip-vertical" size="12" />
@@ -58,7 +58,7 @@
                 (blur)="commitRename(folder)"
                 (keydown.enter)="commitRename(folder)"
                 (keydown.escape)="cancelRename()"
-                class="flex-1 rounded border border-subtle bg-surface px-1.5 py-0.5 text-sm focus:border-zinc-500 focus:outline-none"
+                class="flex-1 rounded border border-subtle bg-surface px-1.5 py-0.5 text-sm focus:border-muted focus:outline-none"
                 autofocus
               />
             } @else {

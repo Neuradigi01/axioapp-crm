@@ -2,7 +2,7 @@
 
 **Goal:** Final QA pass across every page in both themes; verify accessibility (focus rings, aria labels, contrast), reduced-motion respect, and remove any lingering visual inconsistencies.
 **Track:** Design Refresh — Track 5 (Auth + admin + polish)
-**Status:** Pending
+**Status:** COMPLETED — full residual sweep across `core/` + `accounts/`. Every remaining focus-state / hover-state variant (`border-zinc-500`, `ring-zinc-500`, `bg-zinc-400`, `text-zinc-100`, etc.) swapped to AIXO tokens (`border-muted`, `ring-accent`, `bg-surface-2`, `text-default`). Added `border-muted` + `border-accent` + `ring-accent` + `ring-subtle` to `tailwind.config.js` so semantic ring/border classes resolve. Verified: 0 residual zinc/gray/bg-white left in core+accounts. A11y globals confirmed (focus-visible outline + prefers-reduced-motion in `aixo-tokens.scss`). Pre-hydration FOUC-kill script confirmed in `index.html`. `ng build` green in 21s. Layer 2 packs (`packs/furniture/`, `packs/real_estate/`) intentionally out of scope per CLAUDE.md.
 **Depends on:** Steps 1–21
 
 ---
