@@ -1,10 +1,10 @@
 <div class="space-y-3">
   <div>
-    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Recipient</label>
+    <label class="block text-[11px] font-medium text-muted mb-1">Recipient</label>
     <select
       [ngModel]="recipient()"
       (ngModelChange)="onRecipientChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
     >
       <option value="workflow.owner">Workflow owner</option>
       <option value="lead.owner">Lead owner</option>
@@ -13,13 +13,13 @@
   </div>
 
   <div>
-    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Title</label>
+    <label class="block text-[11px] font-medium text-muted mb-1">Title</label>
     <input
       type="text"
       [ngModel]="title()"
       (ngModelChange)="onTitleChange($event)"
       placeholder="e.g. New lead waiting"
-      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
     />
     @if (!title().trim()) {
       <p class="text-[10px] text-rose-600 mt-1">Title is required.</p>
@@ -27,13 +27,13 @@
   </div>
 
   <div>
-    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Body</label>
+    <label class="block text-[11px] font-medium text-muted mb-1">Body</label>
     <textarea
       rows="3"
       [ngModel]="body()"
       (ngModelChange)="onBodyChange($event)"
       placeholder="Notification body — supports {{ '{{var}}' }} variables"
-      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
     ></textarea>
   </div>
 </div>

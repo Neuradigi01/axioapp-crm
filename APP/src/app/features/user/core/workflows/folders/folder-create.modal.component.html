@@ -1,17 +1,14 @@
-<div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40"
-  (click)="onCancel()"
->
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40" (click)="onCancel()">
   <div
-    class="w-full max-w-sm rounded-lg border border-zinc-200 bg-white shadow-xl"
+    class="w-full max-w-sm rounded-lg border border-subtle bg-surface shadow-xl"
     (click)="$event.stopPropagation()"
   >
-    <header class="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
-      <h2 class="text-sm font-semibold text-zinc-900">New folder</h2>
+    <header class="flex items-center justify-between border-b border-subtle px-4 py-3">
+      <h2 class="text-sm font-semibold text-default">New folder</h2>
       <button
         type="button"
         (click)="onCancel()"
-        class="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+        class="rounded-md p-1 text-muted hover:bg-surface-2 hover:text-default"
         aria-label="Cancel"
       >
         <lucide-icon name="x" size="14" />
@@ -20,28 +17,28 @@
 
     <form [formGroup]="form" (ngSubmit)="save()" class="space-y-3 px-4 py-3">
       <label class="block text-sm">
-        <span class="block text-xs font-medium text-zinc-600">Name</span>
+        <span class="block text-xs font-medium text-muted">Name</span>
         <input
           formControlName="name"
           maxlength="120"
           placeholder="Sales, Marketing, Onboarding…"
-          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </label>
 
       @if (parentCandidates.length > 0) {
         <label class="block text-sm">
-          <span class="block text-xs font-medium text-zinc-600">Parent folder (optional)</span>
+          <span class="block text-xs font-medium text-muted">Parent folder (optional)</span>
           <select
             formControlName="parent_folder_id"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm"
           >
             <option value="">— No parent —</option>
             @for (f of parentCandidates; track f.id) {
               <option [value]="f.id">{{ f.name }}</option>
             }
           </select>
-          <span class="mt-1 block text-[11px] text-zinc-500">
+          <span class="mt-1 block text-[11px] text-muted">
             Workflows can be nested one level deep.
           </span>
         </label>
@@ -57,14 +54,14 @@
         <button
           type="button"
           (click)="onCancel()"
-          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default hover:bg-surface-2"
         >
           Cancel
         </button>
         <button
           type="submit"
           [disabled]="form.invalid || saving()"
-          class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
         >
           @if (saving()) {
             <lucide-icon name="loader-2" size="14" class="animate-spin" />

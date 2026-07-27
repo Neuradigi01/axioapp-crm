@@ -1,19 +1,19 @@
 <div
-  class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-6"
+  class="fixed inset-0 z-50 bg-accent/40 backdrop-blur-sm flex items-center justify-center p-6"
   (click)="busy() ? null : cancel.emit()"
 >
   <form
-    class="bg-white rounded-xl border border-zinc-200 shadow-xl w-full max-w-md"
+    class="bg-surface rounded-xl border border-subtle shadow-xl w-full max-w-md"
     (click)="$event.stopPropagation()"
     (submit)="onSubmit($event)"
   >
-    <header class="px-5 py-3 border-b border-zinc-200 flex items-center gap-2">
-      <h2 class="text-sm font-semibold text-zinc-800 flex-1">
+    <header class="px-5 py-3 border-b border-subtle flex items-center gap-2">
+      <h2 class="text-sm font-semibold text-default flex-1">
         Run A/B test against “{{ primary().name }}”
       </h2>
       <button
         type="button"
-        class="text-zinc-400 hover:text-zinc-700"
+        class="text-faint hover:text-default"
         [disabled]="busy()"
         (click)="cancel.emit()"
       >
@@ -23,14 +23,14 @@
 
     <div class="px-5 py-4 space-y-3">
       <div>
-        <label class="block text-[11px] font-medium text-zinc-600 mb-1">
+        <label class="block text-[11px] font-medium text-muted mb-1">
           Sibling workflow (variant B)
         </label>
         <select
           [ngModel]="siblingId()"
           (ngModelChange)="siblingId.set($event)"
           name="siblingId"
-          class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+          class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
         >
           <option value="">— pick a draft —</option>
           @for (d of eligibleDrafts(); track d.id) {
@@ -39,52 +39,48 @@
         </select>
         @if (eligibleDrafts().length === 0) {
           <p class="text-[10px] text-rose-600 mt-1">
-            No eligible drafts found. The sibling must be a draft
-            whose trigger event matches this workflow's trigger.
+            No eligible drafts found. The sibling must be a draft whose trigger event matches this
+            workflow's trigger.
           </p>
         } @else {
-          <p class="text-[10px] text-zinc-500 mt-1">
+          <p class="text-[10px] text-muted mt-1">
             Only drafts whose triggers match this workflow are listed.
           </p>
         }
       </div>
 
       <div>
-        <label class="block text-[11px] font-medium text-zinc-600 mb-1">
-          Hold-back window
-        </label>
+        <label class="block text-[11px] font-medium text-muted mb-1"> Hold-back window </label>
         <div class="flex flex-wrap gap-1.5">
           @for (preset of holdbackPresets; track preset.seconds) {
             <button
               type="button"
               class="px-2.5 py-1 text-xs rounded-full border"
-              [class.bg-zinc-900]="holdbackSeconds() === preset.seconds"
+              [class.bg-accent]="holdbackSeconds() === preset.seconds"
               [class.text-white]="holdbackSeconds() === preset.seconds"
-              [class.border-zinc-900]="holdbackSeconds() === preset.seconds"
-              [class.bg-white]="holdbackSeconds() !== preset.seconds"
-              [class.text-zinc-700]="holdbackSeconds() !== preset.seconds"
-              [class.border-zinc-300]="holdbackSeconds() !== preset.seconds"
+              [class.border-accent]="holdbackSeconds() === preset.seconds"
+              [class.bg-surface]="holdbackSeconds() !== preset.seconds"
+              [class.text-default]="holdbackSeconds() !== preset.seconds"
+              [class.border-subtle]="holdbackSeconds() !== preset.seconds"
               (click)="holdbackSeconds.set(preset.seconds)"
             >
               {{ preset.label }}
             </button>
           }
         </div>
-        <p class="text-[10px] text-zinc-500 mt-1">
-          After the hold-back, the beat task picks a winner. Inconclusive
-          results extend the window by 50% (max 30 days total).
+        <p class="text-[10px] text-muted mt-1">
+          After the hold-back, the beat task picks a winner. Inconclusive results extend the window
+          by 50% (max 30 days total).
         </p>
       </div>
 
       <div>
-        <label class="block text-[11px] font-medium text-zinc-600 mb-1">
-          Winner metric
-        </label>
+        <label class="block text-[11px] font-medium text-muted mb-1"> Winner metric </label>
         <select
           [ngModel]="metric()"
           (ngModelChange)="metric.set($event)"
           name="metric"
-          class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+          class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
         >
           @for (m of metrics; track m.value) {
             <option [value]="m.value">{{ m.label }}</option>
@@ -93,7 +89,7 @@
       </div>
 
       <div>
-        <label class="block text-[11px] font-medium text-zinc-600 mb-1">
+        <label class="block text-[11px] font-medium text-muted mb-1">
           Minimum runs per variant
         </label>
         <input
@@ -103,11 +99,10 @@
           [ngModel]="minRuns()"
           (ngModelChange)="minRuns.set($event)"
           name="minRuns"
-          class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+          class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
         />
-        <p class="text-[10px] text-zinc-500 mt-1">
-          Default 50. For conversion rates under 5%, bump to 200+ so the
-          z-test has enough signal.
+        <p class="text-[10px] text-muted mt-1">
+          Default 50. For conversion rates under 5%, bump to 200+ so the z-test has enough signal.
         </p>
       </div>
 
@@ -116,11 +111,11 @@
       }
     </div>
 
-    <footer class="px-5 py-3 border-t border-zinc-200 flex items-center gap-2">
+    <footer class="px-5 py-3 border-t border-subtle flex items-center gap-2">
       <div class="flex-1"></div>
       <button
         type="button"
-        class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+        class="px-3 py-1.5 text-xs rounded border border-subtle text-default hover:bg-surface-2"
         [disabled]="busy()"
         (click)="cancel.emit()"
       >
@@ -128,7 +123,7 @@
       </button>
       <button
         type="submit"
-        class="px-3 py-1.5 text-xs rounded bg-zinc-900 text-white hover:bg-zinc-800"
+        class="px-3 py-1.5 text-xs rounded bg-accent text-white hover:bg-accent"
         [disabled]="!canSubmit()"
       >
         @if (busy()) {

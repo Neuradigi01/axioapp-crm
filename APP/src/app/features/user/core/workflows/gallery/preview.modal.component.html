@@ -1,26 +1,26 @@
 <div
-  class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-6"
+  class="fixed inset-0 z-50 bg-accent/40 backdrop-blur-sm flex items-center justify-center p-6"
   (click)="close.emit()"
 >
   <div
-    class="bg-white rounded-xl border border-zinc-200 shadow-xl flex flex-col w-full max-w-4xl h-[80vh]"
+    class="bg-surface rounded-xl border border-subtle shadow-xl flex flex-col w-full max-w-4xl h-[80vh]"
     (click)="$event.stopPropagation()"
   >
-    <header class="px-5 py-3 border-b border-zinc-200 flex items-center gap-3">
+    <header class="px-5 py-3 border-b border-subtle flex items-center gap-3">
       <div class="flex-1 min-w-0">
-        <h2 class="text-sm font-semibold text-zinc-800 truncate">
+        <h2 class="text-sm font-semibold text-default truncate">
           {{ entry().name }}
         </h2>
-        <p class="text-[11px] text-zinc-500 truncate">
+        <p class="text-[11px] text-muted truncate">
           {{ entry().description }}
         </p>
       </div>
-      <button type="button" class="text-zinc-400 hover:text-zinc-700" (click)="close.emit()">
+      <button type="button" class="text-faint hover:text-default" (click)="close.emit()">
         <lucide-icon name="X" class="w-4 h-4"></lucide-icon>
       </button>
     </header>
 
-    <div class="flex-1 min-h-0 bg-zinc-100 relative overflow-hidden">
+    <div class="flex-1 min-h-0 bg-surface-2 relative overflow-hidden">
       <svg
         class="absolute inset-0 w-full h-full"
         [attr.viewBox]="viewBox()"
@@ -64,21 +64,21 @@
       </svg>
     </div>
 
-    <footer class="px-5 py-3 border-t border-zinc-200 flex items-center gap-2">
-      <span class="text-[11px] text-zinc-500">
+    <footer class="px-5 py-3 border-t border-subtle flex items-center gap-2">
+      <span class="text-[11px] text-muted">
         Read-only preview. Cloning gives you an editable draft.
       </span>
       <div class="flex-1"></div>
       <button
         type="button"
-        class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+        class="px-3 py-1.5 text-xs rounded border border-subtle text-default hover:bg-surface-2"
         (click)="close.emit()"
       >
         Close
       </button>
       <button
         type="button"
-        class="px-3 py-1.5 text-xs rounded bg-zinc-900 text-white hover:bg-zinc-800"
+        class="px-3 py-1.5 text-xs rounded bg-accent text-white hover:bg-accent"
         (click)="use.emit()"
       >
         Use this template

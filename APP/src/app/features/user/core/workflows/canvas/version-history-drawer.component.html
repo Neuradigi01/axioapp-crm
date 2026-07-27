@@ -1,14 +1,14 @@
-<div class="flex flex-col h-full bg-white">
-  <header class="px-4 py-3 border-b border-zinc-200 flex items-center justify-between">
+<div class="flex flex-col h-full bg-surface">
+  <header class="px-4 py-3 border-b border-subtle flex items-center justify-between">
     <div>
-      <h3 class="text-sm font-semibold text-zinc-800">Version history</h3>
+      <h3 class="text-sm font-semibold text-default">Version history</h3>
       @if (total() > 0) {
-        <p class="text-[11px] text-zinc-500">{{ versions().length }} of {{ total() }} versions</p>
+        <p class="text-[11px] text-muted">{{ versions().length }} of {{ total() }} versions</p>
       }
     </div>
     <button
       type="button"
-      class="text-zinc-400 hover:text-zinc-700"
+      class="text-faint hover:text-default"
       (click)="close.emit()"
       title="Close"
     >
@@ -25,7 +25,7 @@
       </span>
       <button
         type="button"
-        class="px-2 py-0.5 rounded bg-white border border-amber-300 text-amber-900 hover:bg-amber-100"
+        class="px-2 py-0.5 rounded bg-surface border border-amber-300 text-amber-900 hover:bg-amber-100"
         (click)="backToCurrent.emit()"
       >
         Back to current
@@ -43,30 +43,30 @@
 
   <div class="flex-1 overflow-y-auto px-4 py-3">
     @if (loading()) {
-      <p class="text-xs text-zinc-500 italic">Loading versions…</p>
+      <p class="text-xs text-muted italic">Loading versions…</p>
     } @else if (versions().length === 0) {
-      <p class="text-xs text-zinc-500 italic">
+      <p class="text-xs text-muted italic">
         No saved versions yet — versions land each time you save a graph change.
       </p>
     } @else {
       <ol class="space-y-2">
         @for (entry of versions(); track entry.id) {
           <li
-            class="border border-zinc-200 rounded p-3"
+            class="border border-subtle rounded p-3"
             [class.bg-amber-50]="viewingVersion() === entry.version"
             [class.border-amber-300]="viewingVersion() === entry.version"
           >
             <div class="flex items-center gap-2">
-              <span class="text-xs font-mono font-semibold text-zinc-700">
+              <span class="text-xs font-mono font-semibold text-default">
                 v{{ entry.version }}
               </span>
-              <span class="text-[10px] text-zinc-500">
+              <span class="text-[10px] text-muted">
                 {{ entry.created_at | date: 'medium' }}
               </span>
               <div class="flex-1"></div>
               <button
                 type="button"
-                class="text-[11px] px-2 py-0.5 rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+                class="text-[11px] px-2 py-0.5 rounded border border-subtle text-default hover:bg-surface-2"
                 [disabled]="fetchingDetail() !== null || viewingVersion() === entry.version"
                 (click)="onView(entry.version)"
               >
@@ -80,18 +80,18 @@
               </button>
               <button
                 type="button"
-                class="text-[11px] px-2 py-0.5 rounded bg-zinc-900 text-white hover:bg-zinc-800"
+                class="text-[11px] px-2 py-0.5 rounded bg-accent text-white hover:bg-accent"
                 (click)="onRestore(entry.version)"
               >
                 Restore
               </button>
             </div>
             @if (entry.change_note) {
-              <p class="mt-1 text-xs text-zinc-700">
+              <p class="mt-1 text-xs text-default">
                 {{ entry.change_note }}
               </p>
             } @else {
-              <p class="mt-1 text-[11px] text-zinc-400 italic">No change note recorded.</p>
+              <p class="mt-1 text-[11px] text-faint italic">No change note recorded.</p>
             }
           </li>
         }

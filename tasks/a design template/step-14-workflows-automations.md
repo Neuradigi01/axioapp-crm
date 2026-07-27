@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the Workflows module (list + flowchart builder) and the Automations module (list + single-trigger builder).
 **Track:** Design Refresh — Track 4 (Page pass)
-**Status:** Pending
+**Status:** COMPLETED — 56 HTML files across workflows (canvas + node editors + gallery + analytics + A/B) + automations (list + editor + runs + template-picker) bulk-swapped to AIXO semantic tokens. Canvas + palette + node cards inherit surface/border-subtle via the token remap. `ng build` green.
 **Depends on:** Steps 1, 5, 6, 7
 
 ---

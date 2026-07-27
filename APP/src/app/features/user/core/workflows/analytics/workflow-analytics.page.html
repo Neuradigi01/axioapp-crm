@@ -1,15 +1,15 @@
-<div class="min-h-[calc(100vh-3.5rem)] bg-zinc-50">
-  <header class="h-14 flex items-center gap-3 px-6 bg-white border-b border-zinc-200">
+<div class="min-h-[calc(100vh-3.5rem)] bg-surface-2">
+  <header class="h-14 flex items-center gap-3 px-6 bg-surface border-b border-subtle">
     <a
       [routerLink]="['/user/workflows', workflowId()]"
-      class="p-1.5 rounded text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
+      class="p-1.5 rounded text-muted hover:text-default hover:bg-surface-2"
       title="Back to canvas"
     >
       <lucide-icon name="ArrowLeft" class="w-4 h-4"></lucide-icon>
     </a>
-    <h1 class="text-base font-semibold text-zinc-800 truncate">
+    <h1 class="text-base font-semibold text-default truncate">
       Analytics —
-      <span class="text-zinc-600">{{ workflow()?.name ?? '—' }}</span>
+      <span class="text-muted">{{ workflow()?.name ?? '—' }}</span>
     </h1>
     <div class="flex-1"></div>
     <div class="flex items-center gap-1.5">
@@ -17,12 +17,12 @@
         <button
           type="button"
           class="px-2.5 py-1 text-xs rounded-full border"
-          [class.bg-zinc-900]="rangeDays() === preset.days"
+          [class.bg-accent]="rangeDays() === preset.days"
           [class.text-white]="rangeDays() === preset.days"
-          [class.border-zinc-900]="rangeDays() === preset.days"
-          [class.bg-white]="rangeDays() !== preset.days"
-          [class.text-zinc-700]="rangeDays() !== preset.days"
-          [class.border-zinc-300]="rangeDays() !== preset.days"
+          [class.border-accent]="rangeDays() === preset.days"
+          [class.bg-surface]="rangeDays() !== preset.days"
+          [class.text-default]="rangeDays() !== preset.days"
+          [class.border-subtle]="rangeDays() !== preset.days"
           (click)="rangeDays.set(preset.days)"
         >
           {{ preset.label }}
@@ -32,7 +32,7 @@
   </header>
 
   @if (loading()) {
-    <div class="px-6 py-12 text-center text-sm text-zinc-500">Loading analytics…</div>
+    <div class="px-6 py-12 text-center text-sm text-muted">Loading analytics…</div>
   } @else if (error()) {
     <div class="px-6 py-12 text-center text-sm text-rose-700">
       {{ error() }}
@@ -40,19 +40,19 @@
   } @else if (analytics(); as a) {
     <!-- KPI cards -->
     <section class="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="bg-white rounded-lg border border-zinc-200 p-4">
-        <div class="text-[10px] uppercase tracking-wide text-zinc-500">Enrolled</div>
-        <div class="text-2xl font-semibold text-zinc-900 mt-1">
+      <div class="bg-surface rounded-lg border border-subtle p-4">
+        <div class="text-[10px] uppercase tracking-wide text-muted">Enrolled</div>
+        <div class="text-2xl font-semibold text-default mt-1">
           {{ a.totals.enrolled | number }}
         </div>
-        <div class="text-[11px] text-zinc-500 mt-1">in window</div>
+        <div class="text-[11px] text-muted mt-1">in window</div>
       </div>
-      <div class="bg-white rounded-lg border border-zinc-200 p-4">
-        <div class="text-[10px] uppercase tracking-wide text-zinc-500">Completed</div>
-        <div class="text-2xl font-semibold text-zinc-900 mt-1">
+      <div class="bg-surface rounded-lg border border-subtle p-4">
+        <div class="text-[10px] uppercase tracking-wide text-muted">Completed</div>
+        <div class="text-2xl font-semibold text-default mt-1">
           {{ a.totals.completed | number }}
         </div>
-        <div class="text-[11px] text-zinc-500 mt-1">
+        <div class="text-[11px] text-muted mt-1">
           @if (a.totals.avg_completion_seconds !== null) {
             avg {{ a.totals.avg_completion_seconds / 60 | number: '1.0-1' }} min
           } @else {
@@ -60,35 +60,35 @@
           }
         </div>
       </div>
-      <div class="bg-white rounded-lg border border-zinc-200 p-4">
-        <div class="text-[10px] uppercase tracking-wide text-zinc-500">Goal rate</div>
+      <div class="bg-surface rounded-lg border border-subtle p-4">
+        <div class="text-[10px] uppercase tracking-wide text-muted">Goal rate</div>
         <div class="text-2xl font-semibold text-emerald-700 mt-1">
           {{ a.totals.conversion_rate | percent: '1.1-2' }}
         </div>
-        <div class="text-[11px] text-zinc-500 mt-1">
+        <div class="text-[11px] text-muted mt-1">
           {{ a.totals.goal_reached | number }} goal reached
         </div>
       </div>
-      <div class="bg-white rounded-lg border border-zinc-200 p-4">
-        <div class="text-[10px] uppercase tracking-wide text-zinc-500">Est. cost</div>
-        <div class="text-2xl font-semibold text-zinc-900 mt-1">${{ costFormatted() }}</div>
-        <div class="text-[11px] text-zinc-500 mt-1">{{ a.totals.running | number }} running</div>
+      <div class="bg-surface rounded-lg border border-subtle p-4">
+        <div class="text-[10px] uppercase tracking-wide text-muted">Est. cost</div>
+        <div class="text-2xl font-semibold text-default mt-1">${{ costFormatted() }}</div>
+        <div class="text-[11px] text-muted mt-1">{{ a.totals.running | number }} running</div>
       </div>
     </section>
 
     <!-- Daily sparklines -->
     <section class="px-6 py-2">
-      <div class="bg-white rounded-lg border border-zinc-200 p-4">
-        <h3 class="text-sm font-semibold text-zinc-800 mb-3">Daily trend</h3>
+      <div class="bg-surface rounded-lg border border-subtle p-4">
+        <h3 class="text-sm font-semibold text-default mb-3">Daily trend</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <div class="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">Enrolled</div>
+            <div class="text-[10px] uppercase tracking-wide text-muted mb-1">Enrolled</div>
             <svg viewBox="0 0 240 36" class="w-full h-9" preserveAspectRatio="none">
               <path [attr.d]="dailySparkPath()" class="stroke-sky-600 fill-none" stroke-width="2" />
             </svg>
           </div>
           <div>
-            <div class="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">Completed</div>
+            <div class="text-[10px] uppercase tracking-wide text-muted mb-1">Completed</div>
             <svg viewBox="0 0 240 36" class="w-full h-9" preserveAspectRatio="none">
               <path
                 [attr.d]="dailySparkCompletedPath()"
@@ -98,7 +98,7 @@
             </svg>
           </div>
           <div>
-            <div class="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">Goal reached</div>
+            <div class="text-[10px] uppercase tracking-wide text-muted mb-1">Goal reached</div>
             <svg viewBox="0 0 240 36" class="w-full h-9" preserveAspectRatio="none">
               <path
                 [attr.d]="dailySparkGoalPath()"
@@ -113,28 +113,28 @@
 
     <!-- Funnel + drawer -->
     <section class="px-6 py-2 grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div class="lg:col-span-2 bg-white rounded-lg border border-zinc-200">
-        <header class="px-4 py-3 border-b border-zinc-200">
-          <h3 class="text-sm font-semibold text-zinc-800">Step funnel</h3>
-          <p class="text-[11px] text-zinc-500">Click a step to inspect skip-reason breakdown.</p>
+      <div class="lg:col-span-2 bg-surface rounded-lg border border-subtle">
+        <header class="px-4 py-3 border-b border-subtle">
+          <h3 class="text-sm font-semibold text-default">Step funnel</h3>
+          <p class="text-[11px] text-muted">Click a step to inspect skip-reason breakdown.</p>
         </header>
         <div class="px-4 py-3 space-y-2">
           @for (row of a.funnel; track row.node_id) {
             <button
               type="button"
-              class="w-full text-left hover:bg-zinc-50 rounded p-2 border border-transparent"
-              [class.border-zinc-300]="drawerNode()?.node_id === row.node_id"
+              class="w-full text-left hover:bg-surface-2 rounded p-2 border border-transparent"
+              [class.border-subtle]="drawerNode()?.node_id === row.node_id"
               (click)="selectFunnelNode(row)"
             >
               <div class="flex items-center gap-2 text-xs">
-                <span class="font-mono text-[10px] text-zinc-400">{{ row.node_type }}</span>
-                <span class="font-medium text-zinc-800 flex-1 truncate">{{ row.label }}</span>
-                <span class="text-zinc-700">{{ row.total | number }}</span>
+                <span class="font-mono text-[10px] text-faint">{{ row.node_type }}</span>
+                <span class="font-medium text-default flex-1 truncate">{{ row.label }}</span>
+                <span class="text-default">{{ row.total | number }}</span>
               </div>
-              <div class="mt-1 h-2 bg-zinc-100 rounded overflow-hidden">
+              <div class="mt-1 h-2 bg-surface-2 rounded overflow-hidden">
                 <div class="h-full bg-sky-500" [style.width.%]="funnelBarPct(row)"></div>
               </div>
-              <div class="mt-1 flex items-center gap-3 text-[10px] text-zinc-500">
+              <div class="mt-1 flex items-center gap-3 text-[10px] text-muted">
                 <span class="text-emerald-700">✓ {{ row.completed_count | number }}</span>
                 @if (row.skipped_count > 0) {
                   <span class="text-amber-700">⊝ {{ row.skipped_count | number }} skipped</span>
@@ -145,14 +145,14 @@
               </div>
             </button>
           } @empty {
-            <p class="text-xs text-zinc-500">No step runs yet in this window.</p>
+            <p class="text-xs text-muted">No step runs yet in this window.</p>
           }
         </div>
       </div>
 
-      <aside class="bg-white rounded-lg border border-zinc-200">
-        <header class="px-4 py-3 border-b border-zinc-200 flex items-center gap-2">
-          <h3 class="text-sm font-semibold text-zinc-800 flex-1">
+      <aside class="bg-surface rounded-lg border border-subtle">
+        <header class="px-4 py-3 border-b border-subtle flex items-center gap-2">
+          <h3 class="text-sm font-semibold text-default flex-1">
             @if (drawerNode(); as node) {
               {{ node.label }}
             } @else {
@@ -160,45 +160,45 @@
             }
           </h3>
           @if (drawerNode()) {
-            <button type="button" class="text-zinc-400 hover:text-zinc-700" (click)="closeDrawer()">
+            <button type="button" class="text-faint hover:text-default" (click)="closeDrawer()">
               <lucide-icon name="X" class="w-4 h-4"></lucide-icon>
             </button>
           }
         </header>
         <div class="px-4 py-3">
           @if (drawerNode(); as node) {
-            <p class="text-[11px] text-zinc-500 mb-2">{{ node.node_type }}</p>
+            <p class="text-[11px] text-muted mb-2">{{ node.node_type }}</p>
             <dl class="grid grid-cols-2 gap-2 text-xs mb-3">
               <div>
-                <dt class="text-zinc-500">Total</dt>
-                <dd class="text-zinc-900 font-medium">{{ node.total | number }}</dd>
+                <dt class="text-muted">Total</dt>
+                <dd class="text-default font-medium">{{ node.total | number }}</dd>
               </div>
               <div>
-                <dt class="text-zinc-500">Completed</dt>
+                <dt class="text-muted">Completed</dt>
                 <dd class="text-emerald-700 font-medium">{{ node.completed_count | number }}</dd>
               </div>
               <div>
-                <dt class="text-zinc-500">Skipped</dt>
+                <dt class="text-muted">Skipped</dt>
                 <dd class="text-amber-700 font-medium">{{ node.skipped_count | number }}</dd>
               </div>
               <div>
-                <dt class="text-zinc-500">Errored</dt>
+                <dt class="text-muted">Errored</dt>
                 <dd class="text-rose-700 font-medium">{{ node.errored_count | number }}</dd>
               </div>
             </dl>
-            <h4 class="text-[11px] font-semibold text-zinc-600 mb-1">Skip reasons</h4>
+            <h4 class="text-[11px] font-semibold text-muted mb-1">Skip reasons</h4>
             <ul class="text-xs space-y-1">
               @for (reason of skipReasonsFor(node.node_id); track reason.reason) {
                 <li class="flex items-center justify-between">
-                  <span class="text-zinc-700 font-mono">{{ reason.reason }}</span>
-                  <span class="text-zinc-500">{{ reason.count | number }}</span>
+                  <span class="text-default font-mono">{{ reason.reason }}</span>
+                  <span class="text-muted">{{ reason.count | number }}</span>
                 </li>
               } @empty {
-                <li class="text-zinc-500">No skipped runs.</li>
+                <li class="text-muted">No skipped runs.</li>
               }
             </ul>
           } @else {
-            <p class="text-xs text-zinc-500">Pick a step to drill into skip reasons.</p>
+            <p class="text-xs text-muted">Pick a step to drill into skip reasons.</p>
           }
         </div>
       </aside>
@@ -206,13 +206,13 @@
 
     <!-- Send metrics -->
     <section class="px-6 py-2 pb-6">
-      <div class="bg-white rounded-lg border border-zinc-200">
-        <header class="px-4 py-3 border-b border-zinc-200">
-          <h3 class="text-sm font-semibold text-zinc-800">Send metrics</h3>
+      <div class="bg-surface rounded-lg border border-subtle">
+        <header class="px-4 py-3 border-b border-subtle">
+          <h3 class="text-sm font-semibold text-default">Send metrics</h3>
         </header>
         <div class="overflow-x-auto">
           <table class="w-full text-xs">
-            <thead class="bg-zinc-50 text-zinc-500">
+            <thead class="bg-surface-2 text-muted">
               <tr>
                 <th class="px-4 py-2 text-left">Channel</th>
                 <th class="px-4 py-2 text-right">Total</th>
@@ -222,7 +222,7 @@
                 <th class="px-4 py-2 text-right">Delivery %</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-zinc-100">
+            <tbody class="divide-y divide-subtle">
               @for (m of a.send_metrics; track m.channel) {
                 <tr>
                   <td class="px-4 py-2 capitalize">{{ m.channel }}</td>
@@ -236,7 +236,7 @@
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="6" class="px-4 py-3 text-center text-zinc-500">
+                  <td colspan="6" class="px-4 py-3 text-center text-muted">
                     No send actions ran in this window.
                   </td>
                 </tr>
@@ -247,7 +247,7 @@
       </div>
     </section>
 
-    <p class="px-6 pb-6 text-[10px] text-zinc-400">
+    <p class="px-6 pb-6 text-[10px] text-faint">
       Window: {{ a.window.since | date: 'mediumDate' }} →
       {{ a.window.until | date: 'mediumDate' }}
     </p>

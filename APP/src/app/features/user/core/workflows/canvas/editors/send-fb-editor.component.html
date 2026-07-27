@@ -1,23 +1,23 @@
 <div class="space-y-3">
   <div>
-    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Facebook template</label>
+    <label class="block text-[11px] font-medium text-muted mb-1">Facebook template</label>
     <input
       type="text"
       [ngModel]="state().templateId"
       (ngModelChange)="onTemplateChange($event)"
       placeholder="template UUID"
-      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500 font-mono"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500 font-mono"
     />
     @if (!state().templateId) {
       <p class="text-[10px] text-rose-600 mt-1">Template is required.</p>
     }
   </div>
   <div>
-    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Recipient PSID</label>
+    <label class="block text-[11px] font-medium text-muted mb-1">Recipient PSID</label>
     <select
       [ngModel]="state().recipient"
       (ngModelChange)="onRecipientChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
     >
       <option value="">— pick —</option>
       <option value="contact.fb_psid">Contact's Messenger PSID</option>
@@ -29,16 +29,16 @@
         [ngModel]="state().customRecipient"
         (ngModelChange)="onCustomChange($event)"
         placeholder="dotted path to PSID"
-        class="mt-1 w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+        class="mt-1 w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
       />
     }
   </div>
   <div>
-    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Category</label>
+    <label class="block text-[11px] font-medium text-muted mb-1">Category</label>
     <select
       [ngModel]="state().category"
       (ngModelChange)="onCategoryChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-zinc-500"
     >
       @for (c of categoryOptions; track c.value) {
         <option [value]="c.value">{{ c.label }}</option>

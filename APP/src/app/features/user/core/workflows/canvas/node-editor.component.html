@@ -1,19 +1,19 @@
 <div class="flex flex-col h-full">
   <!-- Header -->
-  <header class="px-4 py-3 border-b border-zinc-200 space-y-2">
+  <header class="px-4 py-3 border-b border-subtle space-y-2">
     <div class="flex items-center gap-2">
       @if (nodeType()) {
-        <lucide-icon [name]="nodeType()!.icon" class="w-4 h-4 text-zinc-600 shrink-0"></lucide-icon>
+        <lucide-icon [name]="nodeType()!.icon" class="w-4 h-4 text-muted shrink-0"></lucide-icon>
       }
       <input
         type="text"
         [ngModel]="displayLabel()"
         (ngModelChange)="onLabelChange($event)"
-        class="flex-1 min-w-0 text-sm font-medium text-zinc-800 bg-transparent border-b border-transparent focus:border-zinc-400 focus:outline-none px-1"
+        class="flex-1 min-w-0 text-sm font-medium text-default bg-transparent border-b border-transparent focus:border-zinc-400 focus:outline-none px-1"
       />
       <button
         type="button"
-        class="text-zinc-400 hover:text-zinc-700"
+        class="text-faint hover:text-default"
         (click)="close.emit()"
         title="Close"
       >
@@ -21,11 +21,11 @@
       </button>
     </div>
     <div class="flex items-center gap-1 text-[10px]">
-      <span class="font-mono text-zinc-500">{{ node().type }}</span>
+      <span class="font-mono text-muted">{{ node().type }}</span>
       <div class="flex-1"></div>
       <button
         type="button"
-        class="px-2 py-0.5 rounded text-zinc-600 hover:bg-zinc-100"
+        class="px-2 py-0.5 rounded text-muted hover:bg-surface-2"
         (click)="onDuplicate()"
         title="Duplicate"
       >
@@ -33,7 +33,7 @@
       </button>
       <button
         type="button"
-        class="px-2 py-0.5 rounded text-zinc-600 hover:bg-zinc-100"
+        class="px-2 py-0.5 rounded text-muted hover:bg-surface-2"
         (click)="onDisconnect()"
         title="Disconnect all edges"
       >
@@ -235,7 +235,7 @@
         />
       }
       @default {
-        <p class="text-xs text-zinc-500 italic">
+        <p class="text-xs text-muted italic">
           No editor registered for node type
           <code>{{ node().type }}</code
           >.

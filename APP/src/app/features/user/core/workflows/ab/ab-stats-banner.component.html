@@ -12,40 +12,34 @@
     @if (winnerCalled()) {
       <lucide-icon name="Trophy" class="w-4 h-4 text-emerald-600"></lucide-icon>
       <span class="font-semibold">{{ winnerLabel() }} won.</span>
-      <span class="text-emerald-800">
-        Decided {{ s.decided_at | date: 'medium' }}.
-      </span>
+      <span class="text-emerald-800"> Decided {{ s.decided_at | date: 'medium' }}. </span>
     } @else {
       <lucide-icon name="Beaker" class="w-4 h-4 text-sky-600"></lucide-icon>
       <span class="font-semibold">A/B test running.</span>
       @if (s.holdback_until) {
-        <span>
-          Decision after {{ s.holdback_until | date: 'medium' }}.
-        </span>
+        <span> Decision after {{ s.holdback_until | date: 'medium' }}. </span>
       }
     }
 
     <span class="flex items-center gap-1.5 ml-2">
-      <span class="text-zinc-500">A:</span>
+      <span class="text-muted">A:</span>
       <strong>{{ aPercent() | percent: '1.1-1' }}</strong>
-      <span class="text-zinc-500">({{ s.a_goal_runs }} / {{ s.a_total_runs }})</span>
+      <span class="text-muted">({{ s.a_goal_runs }} / {{ s.a_total_runs }})</span>
     </span>
     <span class="flex items-center gap-1.5">
-      <span class="text-zinc-500">B:</span>
+      <span class="text-muted">B:</span>
       <strong>{{ bPercent() | percent: '1.1-1' }}</strong>
-      <span class="text-zinc-500">({{ s.b_goal_runs }} / {{ s.b_total_runs }})</span>
+      <span class="text-muted">({{ s.b_goal_runs }} / {{ s.b_total_runs }})</span>
     </span>
     @if (s.p_value !== null && s.p_value !== undefined) {
-      <span class="text-[10px] text-zinc-500">
-        p = {{ s.p_value.toFixed(3) }}
-      </span>
+      <span class="text-[10px] text-muted"> p = {{ s.p_value.toFixed(3) }} </span>
     }
 
     <div class="flex-1"></div>
 
     <a
       [routerLink]="['/user/workflows', workflowId(), 'ab-compare']"
-      class="px-2 py-0.5 rounded border border-current/30 text-[11px] hover:bg-white/50"
+      class="px-2 py-0.5 rounded border border-current/30 text-[11px] hover:bg-surface/50"
     >
       Compare
     </a>
@@ -60,7 +54,7 @@
     }
   </div>
 } @else if (loading()) {
-  <div class="px-4 py-2 border-b bg-zinc-50 border-zinc-200 text-[11px] text-zinc-500">
+  <div class="px-4 py-2 border-b bg-surface-2 border-subtle text-[11px] text-muted">
     Loading A/B stats…
   </div>
 } @else if (error()) {

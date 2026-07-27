@@ -1,11 +1,11 @@
-<aside class="flex w-48 shrink-0 flex-col border-r border-zinc-200 bg-white">
-  <header class="flex items-center justify-between border-b border-zinc-200 px-3 py-2">
-    <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Folders</h2>
+<aside class="flex w-48 shrink-0 flex-col border-r border-subtle bg-surface">
+  <header class="flex items-center justify-between border-b border-subtle px-3 py-2">
+    <h2 class="text-xs font-semibold uppercase tracking-wide text-muted">Folders</h2>
     @if (canWrite()) {
       <button
         type="button"
         (click)="onNewFolder()"
-        class="inline-flex items-center gap-1 rounded-md p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+        class="inline-flex items-center gap-1 rounded-md p-1 text-muted hover:bg-surface-2 hover:text-default"
         title="New folder"
       >
         <lucide-icon name="folder-plus" size="14" />
@@ -23,11 +23,11 @@
     <button
       type="button"
       (click)="selectAll()"
-      class="mb-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-100"
-      [class.bg-zinc-100]="selectedFolderId() === null"
+      class="mb-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface-2"
+      [class.bg-surface-2]="selectedFolderId() === null"
       [class.font-semibold]="selectedFolderId() === null"
     >
-      <lucide-icon name="list" size="14" class="text-zinc-500" />
+      <lucide-icon name="list" size="14" class="text-muted" />
       <span class="flex-1">All workflows</span>
     </button>
 
@@ -35,20 +35,20 @@
       @for (folder of topLevel(); track trackById($index, folder)) {
         <div cdkDrag>
           <div
-            class="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-zinc-100"
-            [class.bg-zinc-100]="selectedFolderId() === folder.id"
+            class="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-2"
+            [class.bg-surface-2]="selectedFolderId() === folder.id"
           >
             @if (canWrite()) {
               <button
                 type="button"
                 cdkDragHandle
-                class="cursor-grab text-zinc-300 hover:text-zinc-500"
+                class="cursor-grab text-zinc-300 hover:text-muted"
                 title="Drag to reorder"
               >
                 <lucide-icon name="grip-vertical" size="12" />
               </button>
             }
-            <lucide-icon name="folder" size="14" class="text-zinc-500" />
+            <lucide-icon name="folder" size="14" class="text-muted" />
 
             @if (editingId() === folder.id) {
               <input
@@ -58,7 +58,7 @@
                 (blur)="commitRename(folder)"
                 (keydown.enter)="commitRename(folder)"
                 (keydown.escape)="cancelRename()"
-                class="flex-1 rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-sm focus:border-zinc-500 focus:outline-none"
+                class="flex-1 rounded border border-subtle bg-surface px-1.5 py-0.5 text-sm focus:border-zinc-500 focus:outline-none"
                 autofocus
               />
             } @else {
@@ -76,7 +76,7 @@
                 <button
                   type="button"
                   (click)="onDelete(folder, $event)"
-                  class="invisible rounded p-0.5 text-zinc-400 hover:text-rose-600 group-hover:visible"
+                  class="invisible rounded p-0.5 text-faint hover:text-rose-600 group-hover:visible"
                   title="Delete folder"
                 >
                   <lucide-icon name="trash-2" size="12" />
@@ -87,10 +87,10 @@
 
           @for (child of childrenOf(folder.id); track trackById($index, child)) {
             <div
-              class="group ml-5 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-zinc-100"
-              [class.bg-zinc-100]="selectedFolderId() === child.id"
+              class="group ml-5 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-surface-2"
+              [class.bg-surface-2]="selectedFolderId() === child.id"
             >
-              <lucide-icon name="folder" size="13" class="text-zinc-400" />
+              <lucide-icon name="folder" size="13" class="text-faint" />
               <button
                 type="button"
                 (click)="select(child.id)"
@@ -105,7 +105,7 @@
                 <button
                   type="button"
                   (click)="onDelete(child, $event)"
-                  class="invisible rounded p-0.5 text-zinc-400 hover:text-rose-600 group-hover:visible"
+                  class="invisible rounded p-0.5 text-faint hover:text-rose-600 group-hover:visible"
                   title="Delete folder"
                 >
                   <lucide-icon name="trash-2" size="12" />
@@ -118,7 +118,7 @@
     </div>
 
     @if (topLevel().length === 0) {
-      <p class="px-2 py-3 text-[11px] text-zinc-500">
+      <p class="px-2 py-3 text-[11px] text-muted">
         No folders yet. Group workflows by team or channel.
       </p>
     }
