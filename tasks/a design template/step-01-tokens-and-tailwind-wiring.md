@@ -2,7 +2,7 @@
 
 **Goal:** Define AIXO's 12 CSS-variable tokens in dark + light + 4 vertical-accent variants, and expose them as semantic Tailwind colors so every existing and future page can restyle by swapping utility classes (never hex).
 **Track:** Design Refresh — Track 1 (Foundation)
-**Status:** Pending
+**Status:** COMPLETED — AIXO token layer + font families landed; legacy palette remapped to AIXO values via `tokens.scss` primitives so existing pages inherit the new look. Tailwind semantic colors exposed. `ng build` green.
 **Depends on:** none (this is the base other steps build on)
 
 ---

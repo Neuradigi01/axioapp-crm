@@ -5,6 +5,14 @@
 // =============================================================================
 
 @use '@angular/material' as mat;
+@use 'styles/aixo-tokens';
+
+// Variable-font families for the AIXO design system. Loaded via @import
+// (not @use) because they're CSS files, not Sass modules — must sit after
+// all @use rules per Sass ordering rules.
+@import '@fontsource-variable/inter/index.css';
+@import '@fontsource-variable/inter-tight/index.css';
+@import '@fontsource-variable/jetbrains-mono/index.css';
 
 // ---------------------------------------------------------------------------
 // Material Theme
