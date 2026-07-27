@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the three-pane conversations UI (channel nav + thread list + thread pane) with channel-branded bubbles inside a neutral chrome.
 **Track:** Design Refresh — Track 4 (Page pass)
-**Status:** Pending
+**Status:** COMPLETED — all 5 conversations HTML files bulk-swapped to AIXO semantic tokens: conversations.page (shell), conversation-list, chat-thread, compose-bar, interactive-builder. Chrome now surface/border-subtle/accent-soft; channel-brand bubble hex colors (WhatsApp/Messenger/Instagram/Telegram) preserved inside the message thread. `ng build` green.
 **Depends on:** Steps 1, 5, 6, 7
 
 ---

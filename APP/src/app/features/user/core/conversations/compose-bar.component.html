@@ -1,7 +1,7 @@
 <div
   [class]="
-    'border-t border-zinc-200 px-4 py-3 transition-colors ' +
-    (isNoteMode() ? 'bg-amber-50' : 'bg-white')
+    'border-t border-subtle px-4 py-3 transition-colors ' +
+    (isNoteMode() ? 'bg-amber-50' : 'bg-surface')
   "
   (dragover)="onDragOver($event)"
   (dragleave)="onDragLeave($event)"
@@ -10,14 +10,14 @@
 >
   <!-- Mode toggle (Reply / Note) — Step 13 -->
   <div
-    class="mb-2 inline-flex items-center gap-0.5 rounded-md border border-zinc-200 bg-white p-0.5 text-xs"
+    class="mb-2 inline-flex items-center gap-0.5 rounded-md border border-subtle bg-surface p-0.5 text-xs"
   >
     <button
       type="button"
       (click)="setMode('reply')"
       [class]="
         'rounded-md px-2.5 py-1 font-medium transition ' +
-        (mode() === 'reply' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100')
+        (mode() === 'reply' ? 'bg-accent text-white' : 'text-muted hover:bg-surface-2')
       "
     >
       Reply
@@ -27,7 +27,7 @@
       (click)="setMode('note')"
       [class]="
         'rounded-md px-2.5 py-1 font-medium transition ' +
-        (mode() === 'note' ? 'bg-amber-500 text-white' : 'text-zinc-600 hover:bg-zinc-100')
+        (mode() === 'note' ? 'bg-amber-500 text-white' : 'text-muted hover:bg-surface-2')
       "
     >
       <lucide-icon name="sticky-note" size="11" class="mr-1 inline" />
@@ -101,22 +101,22 @@
 
   @if (replyingTo; as r) {
     <div
-      class="mb-2 flex items-center gap-2 rounded-md border-l-2 border-zinc-400 bg-zinc-50 px-2 py-1 text-xs text-zinc-700"
+      class="mb-2 flex items-center gap-2 rounded-md border-l-2 border-zinc-400 bg-surface-2 px-2 py-1 text-xs text-default"
     >
       <lucide-icon
         name="corner-up-left"
         size="14"
-        class="shrink-0 text-zinc-500"
+        class="shrink-0 text-muted"
         aria-hidden="true"
       ></lucide-icon>
       <div class="min-w-0 flex-1">
-        <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Replying to</p>
+        <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">Replying to</p>
         <p class="truncate text-xs">{{ quotedSnippet() }}</p>
       </div>
       <button
         type="button"
         (click)="dismissReply()"
-        class="rounded p-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700"
+        class="rounded p-1 text-muted hover:bg-surface-2 hover:text-default"
         aria-label="Cancel reply"
       >
         <lucide-icon name="x" size="14" aria-hidden="true"></lucide-icon>
@@ -126,51 +126,36 @@
 
   @if (stagedFile(); as f) {
     <div
-      class="mb-2 flex items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-2"
+      class="mb-2 flex items-center gap-3 rounded-md border border-subtle bg-surface-2 p-2"
       data-testid="compose-media-preview"
     >
       @switch (stagedType()) {
         @case ('image') {
-          <lucide-icon
-            name="image"
-            size="20"
-            class="text-zinc-500"
-            aria-hidden="true"
-          ></lucide-icon>
+          <lucide-icon name="image" size="20" class="text-muted" aria-hidden="true"></lucide-icon>
         }
         @case ('video') {
-          <lucide-icon
-            name="video"
-            size="20"
-            class="text-zinc-500"
-            aria-hidden="true"
-          ></lucide-icon>
+          <lucide-icon name="video" size="20" class="text-muted" aria-hidden="true"></lucide-icon>
         }
         @case ('audio') {
-          <lucide-icon
-            name="music"
-            size="20"
-            class="text-zinc-500"
-            aria-hidden="true"
-          ></lucide-icon>
+          <lucide-icon name="music" size="20" class="text-muted" aria-hidden="true"></lucide-icon>
         }
         @default {
           <lucide-icon
             name="file-text"
             size="20"
-            class="text-zinc-500"
+            class="text-muted"
             aria-hidden="true"
           ></lucide-icon>
         }
       }
       <div class="flex-1 truncate">
-        <div class="truncate text-xs font-medium text-zinc-800">{{ f.name }}</div>
-        <div class="text-[10px] text-zinc-500">{{ stagedType() }} · {{ formatBytes(f.size) }}</div>
+        <div class="truncate text-xs font-medium text-default">{{ f.name }}</div>
+        <div class="text-[10px] text-muted">{{ stagedType() }} · {{ formatBytes(f.size) }}</div>
       </div>
       <button
         type="button"
         (click)="clearStaged()"
-        class="rounded p-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700"
+        class="rounded p-1 text-muted hover:bg-surface-2 hover:text-default"
         aria-label="Remove attachment"
       >
         <lucide-icon name="x" size="14" aria-hidden="true"></lucide-icon>
@@ -183,7 +168,7 @@
       <button
         type="button"
         (click)="openFilePicker()"
-        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50"
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface text-muted hover:bg-surface-2"
         aria-label="Attach a file"
         title="Attach a file"
         data-testid="compose-attach-button"
@@ -193,7 +178,7 @@
       <button
         type="button"
         (click)="requestInteractive()"
-        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50"
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface text-muted hover:bg-surface-2"
         aria-label="Send an interactive message"
         title="Interactive message"
         data-testid="compose-interactive-button"
@@ -205,7 +190,7 @@
         <button
           type="button"
           (click)="openLocationDialog()"
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50"
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface text-muted hover:bg-surface-2"
           aria-label="Share a location"
           title="Share a location"
           data-testid="compose-location-button"
@@ -241,28 +226,28 @@
         [attr.placeholder]="placeholder()"
         [disabled]="textareaDisabled()"
         [class]="
-          'block min-h-[2.5rem] w-full resize-none rounded-md border px-3 py-2 text-sm placeholder-zinc-400 shadow-sm focus:outline-none focus:ring-1 disabled:bg-zinc-100 disabled:text-zinc-500 ' +
+          'block min-h-[2.5rem] w-full resize-none rounded-md border px-3 py-2 text-sm placeholder-zinc-400 shadow-sm focus:outline-none focus:ring-1 disabled:bg-surface-2 disabled:text-muted ' +
           (isNoteMode()
             ? 'border-amber-300 bg-amber-50 focus:border-amber-500 focus:ring-amber-500'
-            : 'border-zinc-300 bg-white focus:border-zinc-500 focus:ring-zinc-500')
+            : 'border-subtle bg-surface focus:border-zinc-500 focus:ring-zinc-500')
         "
       ></textarea>
       @if (mentionOpen() && isNoteMode()) {
         <ul
-          class="absolute bottom-full left-0 right-0 mb-1 max-h-48 overflow-y-auto rounded-md border border-zinc-200 bg-white shadow-lg"
+          class="absolute bottom-full left-0 right-0 mb-1 max-h-48 overflow-y-auto rounded-md border border-subtle bg-surface shadow-lg"
         >
           @if (mentionCandidates().length === 0) {
-            <li class="px-3 py-2 text-xs text-zinc-500">No matches.</li>
+            <li class="px-3 py-2 text-xs text-muted">No matches.</li>
           }
           @for (s of mentionCandidates(); track s.id) {
             <li>
               <button
                 type="button"
                 (click)="pickMention(s)"
-                class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-zinc-50"
+                class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-2"
               >
                 <span
-                  class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-semibold text-zinc-600"
+                  class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-2 text-[10px] font-semibold text-muted"
                 >
                   {{ s.full_name.substring(0, 1).toUpperCase() }}
                 </span>
@@ -289,7 +274,7 @@
           'rounded-md px-3 py-1.5 text-xs font-medium transition ' +
           (aiHandling
             ? 'bg-violet-100 text-violet-700 hover:bg-violet-200'
-            : 'border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+            : 'border border-subtle bg-surface text-default hover:bg-surface-2')
         "
       >
         {{ aiHandling ? 'AI On' : 'Let AI handle' }}
@@ -298,13 +283,13 @@
         type="button"
         (click)="submit()"
         [disabled]="(!isNoteMode() && outOfSession) || (!stagedFile() && !text().trim().length)"
-        class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+        class="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
       >
         Send
       </button>
     </div>
   </div>
-  <p class="mt-2 text-[10px] text-zinc-400">
+  <p class="mt-2 text-[10px] text-faint">
     @if (canAttachMedia()) {
       Enter to send · Shift+Enter for newline · drag a file or click
       <lucide-icon
@@ -325,32 +310,32 @@
      button (browser prompts; falls back silently). -->
 @if (locationDialogOpen()) {
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40"
     (click)="closeLocationDialog()"
   >
     <div
-      class="w-full max-w-md rounded-md border border-zinc-200 bg-white p-4 shadow-lg"
+      class="w-full max-w-md rounded-md border border-subtle bg-surface p-4 shadow-lg"
       (click)="$event.stopPropagation()"
     >
-      <p class="mb-2 text-sm font-semibold text-zinc-900">Share a location</p>
+      <p class="mb-2 text-sm font-semibold text-default">Share a location</p>
       <div class="mb-2 grid grid-cols-2 gap-2 text-xs">
         <label>
-          <span class="mb-1 block font-medium text-zinc-700">Latitude</span>
+          <span class="mb-1 block font-medium text-default">Latitude</span>
           <input
             type="number"
             step="any"
-            class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+            class="w-full rounded-md border border-subtle px-2.5 py-1.5"
             placeholder="19.0760"
             [ngModel]="locationDraft().latitude"
             (ngModelChange)="patchLocation({ latitude: $event })"
           />
         </label>
         <label>
-          <span class="mb-1 block font-medium text-zinc-700">Longitude</span>
+          <span class="mb-1 block font-medium text-default">Longitude</span>
           <input
             type="number"
             step="any"
-            class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+            class="w-full rounded-md border border-subtle px-2.5 py-1.5"
             placeholder="72.8777"
             [ngModel]="locationDraft().longitude"
             (ngModelChange)="patchLocation({ longitude: $event })"
@@ -358,22 +343,22 @@
         </label>
       </div>
       <label class="mb-2 block text-xs">
-        <span class="mb-1 block font-medium text-zinc-700">Name (optional)</span>
+        <span class="mb-1 block font-medium text-default">Name (optional)</span>
         <input
           type="text"
           maxlength="200"
-          class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+          class="w-full rounded-md border border-subtle px-2.5 py-1.5"
           placeholder="Sharma Furniture — Andheri"
           [ngModel]="locationDraft().name"
           (ngModelChange)="patchLocation({ name: $event })"
         />
       </label>
       <label class="mb-3 block text-xs">
-        <span class="mb-1 block font-medium text-zinc-700">Address (optional)</span>
+        <span class="mb-1 block font-medium text-default">Address (optional)</span>
         <input
           type="text"
           maxlength="500"
-          class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+          class="w-full rounded-md border border-subtle px-2.5 py-1.5"
           placeholder="123 Andheri West, Mumbai"
           [ngModel]="locationDraft().address"
           (ngModelChange)="patchLocation({ address: $event })"
@@ -383,7 +368,7 @@
         <button
           type="button"
           (click)="useMyLocation()"
-          class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+          class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs text-default hover:bg-surface-2"
         >
           <lucide-icon name="map-pin" size="12" aria-hidden="true"></lucide-icon>
           Use my location
@@ -392,7 +377,7 @@
           <button
             type="button"
             (click)="closeLocationDialog()"
-            class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+            class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs text-default hover:bg-surface-2"
           >
             Cancel
           </button>
@@ -400,7 +385,7 @@
             type="button"
             [disabled]="!canSendLocation()"
             (click)="submitLocation()"
-            class="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+            class="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent disabled:opacity-50"
           >
             Send location
           </button>

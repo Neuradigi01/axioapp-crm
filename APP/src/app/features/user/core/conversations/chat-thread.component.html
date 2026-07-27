@@ -1,11 +1,11 @@
 <div class="flex min-h-0 flex-1 flex-col">
   <!-- Header -->
-  <div class="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
+  <div class="flex items-center justify-between border-b border-subtle bg-surface px-4 py-3">
     <div class="min-w-0">
-      <p class="truncate text-sm font-semibold text-zinc-900">
+      <p class="truncate text-sm font-semibold text-default">
         {{ conversation.external_id }}
       </p>
-      <p class="flex items-center gap-2 text-xs text-zinc-500 capitalize">
+      <p class="flex items-center gap-2 text-xs text-muted capitalize">
         <span>{{ conversation.channel }} · {{ conversation.status }}</span>
         <!-- Step 24 — attribution chip. Hidden for organic. -->
         @if (conversation.acquisition_source === 'ad') {
@@ -30,7 +30,7 @@
           [title]="'Reassign — ' + staffNameFor(conversation.assigned_to_id)"
         >
           <span
-            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/50 text-[10px] font-semibold"
+            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface/50 text-[10px] font-semibold"
           >
             {{ staffInitialsFor(conversation.assigned_to_id) }}
           </span>
@@ -49,7 +49,7 @@
           [title]="staffNameFor(conversation.assigned_to_id)"
         >
           <span
-            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/50 text-[10px] font-semibold"
+            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface/50 text-[10px] font-semibold"
           >
             {{ staffInitialsFor(conversation.assigned_to_id) }}
           </span>
@@ -61,7 +61,7 @@
         <button
           type="button"
           (click)="toggleTagManager(); $event.stopPropagation()"
-          class="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          class="inline-flex items-center gap-1 rounded-full border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
           aria-label="Tags"
         >
           <lucide-icon name="tag" class="h-3 w-3" />
@@ -101,7 +101,7 @@
   </div>
 
   @if (conversation.tags && conversation.tags.length > 0) {
-    <div class="border-b border-zinc-100 bg-white px-4 py-2">
+    <div class="border-b border-subtle bg-surface px-4 py-2">
       <div class="flex flex-wrap gap-1">
         @for (t of conversation.tags; track t.id) {
           <app-tag-chip [tag]="t" />
@@ -118,11 +118,11 @@
   />
 
   <!-- Messages -->
-  <div #scrollHost class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-zinc-50 px-4 py-4">
+  <div #scrollHost class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-surface-2 px-4 py-4">
     @if (loading) {
-      <div class="py-6 text-center text-sm text-zinc-500">Loading thread…</div>
+      <div class="py-6 text-center text-sm text-muted">Loading thread…</div>
     } @else if (!detail || detail.messages.length === 0) {
-      <div class="py-6 text-center text-sm text-zinc-500">
+      <div class="py-6 text-center text-sm text-muted">
         No messages yet — type something below to start the conversation.
       </div>
     } @else {
@@ -165,14 +165,14 @@
                visible on hover for pointer devices. -->
             <div
               [class]="
-                'pointer-events-none absolute -top-7 z-10 hidden gap-0.5 rounded-full border border-zinc-200 bg-white p-0.5 shadow-sm transition group-hover:flex group-hover:pointer-events-auto ' +
+                'pointer-events-none absolute -top-7 z-10 hidden gap-0.5 rounded-full border border-subtle bg-surface p-0.5 shadow-sm transition group-hover:flex group-hover:pointer-events-auto ' +
                 (m.direction === 'out' ? 'right-2' : 'left-2')
               "
             >
               <button
                 type="button"
                 (click)="onReplyClick(m)"
-                class="inline-flex h-6 w-6 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100"
+                class="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-surface-2"
                 aria-label="Reply"
                 title="Reply"
               >
@@ -181,7 +181,7 @@
               <button
                 type="button"
                 (click)="openPicker(m.id)"
-                class="inline-flex h-6 w-6 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100"
+                class="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-surface-2"
                 aria-label="React"
                 title="React"
               >
@@ -191,7 +191,7 @@
                 <button
                   type="button"
                   (click)="copyText(m)"
-                  class="inline-flex h-6 w-6 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100"
+                  class="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-surface-2"
                   aria-label="Copy"
                   title="Copy"
                 >
@@ -215,8 +215,8 @@
               [class]="
                 'relative max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ' +
                 (m.direction === 'out'
-                  ? 'bg-zinc-900 text-white'
-                  : 'bg-white text-zinc-900 ring-1 ring-zinc-200') +
+                  ? 'bg-accent text-white'
+                  : 'bg-surface text-default ring-1 border-subtle') +
                 (isPending(m) ? ' opacity-60' : '')
               "
             >
@@ -225,8 +225,8 @@
                   [class]="
                     'mb-1 rounded-md border-l-2 px-2 py-1 text-[11px] leading-tight ' +
                     (m.direction === 'out'
-                      ? 'border-zinc-300 bg-white/10 text-zinc-200'
-                      : 'border-zinc-400 bg-zinc-50 text-zinc-600')
+                      ? 'border-subtle bg-surface/10 text-zinc-200'
+                      : 'border-zinc-400 bg-surface-2 text-muted')
                   "
                 >
                   <p class="truncate font-medium opacity-90">
@@ -255,7 +255,7 @@
               }
               @if (replyAttribution(m); as attr) {
                 <p
-                  class="mb-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-[10px] font-medium text-zinc-600"
+                  class="mb-1 rounded-md border border-subtle bg-surface-2 px-2 py-1 text-[10px] font-medium text-muted"
                 >
                   ↳ Reply to: {{ attr.title }}
                 </p>
@@ -268,7 +268,7 @@
                   <div class="mt-2 space-y-1">
                     @for (b of interactiveButtons(m); track b.id) {
                       <div
-                        class="rounded border border-white/20 bg-white/10 px-2 py-1 text-center text-xs font-medium text-white"
+                        class="rounded border border-white/20 bg-surface/10 px-2 py-1 text-center text-xs font-medium text-white"
                       >
                         {{ b.title }}
                       </div>
@@ -288,13 +288,13 @@
                   }
                 }
                 @case ('list') {
-                  <div class="mt-2 space-y-1 rounded border border-white/20 bg-white/10 p-2">
+                  <div class="mt-2 space-y-1 rounded border border-white/20 bg-surface/10 p-2">
                     @for (s of interactiveListSections(m); track s.title) {
                       <p class="text-[10px] font-semibold uppercase tracking-wide opacity-80">
                         {{ s.title }}
                       </p>
                       @for (r of s.rows; track r.id) {
-                        <div class="rounded bg-white/10 px-2 py-1 text-xs">
+                        <div class="rounded bg-surface/10 px-2 py-1 text-xs">
                           <span class="font-medium">{{ r.title }}</span>
                           @if (r.description) {
                             <span class="ml-1 text-[10px] opacity-80"> — {{ r.description }} </span>
@@ -338,11 +338,11 @@
                   >
                     @for (r of reactions; track r.emoji) {
                       <span
-                        class="inline-flex items-center gap-0.5 rounded-full bg-white px-1.5 py-0.5 text-[11px] text-zinc-700 shadow-sm ring-1 ring-zinc-200"
+                        class="inline-flex items-center gap-0.5 rounded-full bg-surface px-1.5 py-0.5 text-[11px] text-default shadow-sm ring-1 border-subtle"
                       >
                         <span>{{ r.emoji }}</span>
                         @if (r.count > 1) {
-                          <span class="text-[10px] font-medium text-zinc-500">
+                          <span class="text-[10px] font-medium text-muted">
                             {{ r.count }}
                           </span>
                         }
@@ -354,7 +354,7 @@
               <p
                 [class]="
                   'mt-1 flex items-center justify-end gap-1 text-[10px] ' +
-                  (m.direction === 'out' ? 'text-zinc-300' : 'text-zinc-500')
+                  (m.direction === 'out' ? 'text-zinc-300' : 'text-muted')
                 "
               >
                 @if (m.direction === 'out' && m.is_ai) {
