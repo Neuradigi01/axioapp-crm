@@ -2,7 +2,7 @@
 
 **Goal:** Restyle every overlay-layer primitive: modal dialogs, dropdown menus, popovers, side sheets/drawers, toasts, and the Quick-add FAB.
 **Track:** Design Refresh — Track 3 (Shared primitives)
-**Status:** Pending
+**Status:** COMPLETED — AIXO overrides landed for `.mat-mdc-dialog-container` / `.mat-mdc-menu-panel` / `.mat-mdc-snack-bar-container`; `.cdk-overlay-dark-backdrop` darkened to 60%. Global `popIn` / `fadeIn` / `toastIn` keyframes added to `aixo-tokens.scss`. ToastHostComponent, QuickAddFabComponent, ConfirmDialogComponent restyled with semantic tokens + AIXO panel look. `ReassignModalComponent` / `BulkActionBarComponent` deferred to Step 9/10 (page-context restyle). `ng build` green.
 **Depends on:** Step 1
 
 ---

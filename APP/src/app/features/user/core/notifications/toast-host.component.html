@@ -8,24 +8,24 @@
       <button
         type="button"
         (click)="onClick(t)"
-        class="pointer-events-auto flex w-full items-start gap-3 rounded-md border px-3 py-2.5 text-left shadow-sm transition hover:shadow-md"
-        [class]="toneClass(t.tone)"
+        class="pointer-events-auto flex w-full items-start gap-3 rounded-xl border border-subtle bg-surface-2 px-3.5 py-3 text-left shadow-elevated transition hover:brightness-105"
+        style="animation: popIn 0.15s ease"
       >
-        <span
-          class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-zinc-200"
-        >
-          <lucide-icon [name]="toneIcon(t.tone)" class="h-3.5 w-3.5 text-zinc-700" />
-        </span>
+        <lucide-icon
+          [name]="toneIcon(t.tone)"
+          class="mt-0.5 h-4 w-4 shrink-0"
+          [class]="toneIconClass(t.tone)"
+        />
         <span class="min-w-0 flex-1">
-          <span class="block truncate text-sm font-medium text-zinc-900">{{ t.title }}</span>
+          <span class="block truncate text-sm font-medium text-default">{{ t.title }}</span>
           @if (t.body) {
-            <span class="mt-0.5 block text-xs text-zinc-600">{{ t.body }}</span>
+            <span class="mt-0.5 block text-xs text-muted">{{ t.body }}</span>
           }
         </span>
         <button
           type="button"
           (click)="onClose($event, t.id)"
-          class="rounded p-0.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+          class="rounded p-0.5 text-faint transition hover:bg-surface hover:text-default"
           aria-label="Dismiss"
         >
           <lucide-icon name="x" class="h-3.5 w-3.5" />

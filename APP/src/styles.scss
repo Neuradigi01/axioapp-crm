@@ -395,3 +395,86 @@ body {
     height: 100%;
   }
 }
+
+// ---------------------------------------------------------------------------
+// AIXO Modal Dialog (default look for any MatDialog)
+// ---------------------------------------------------------------------------
+.mat-mdc-dialog-container {
+  --mdc-dialog-container-color: var(--surface-2);
+  --mdc-dialog-subhead-color: var(--text);
+  --mdc-dialog-supporting-text-color: var(--text-muted);
+
+  .mdc-dialog__surface {
+    background: var(--surface-2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35) !important;
+    animation: popIn 0.12s ease;
+  }
+}
+
+.cdk-overlay-dark-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+// ---------------------------------------------------------------------------
+// AIXO Dropdown Menu (default look for any MatMenu)
+// ---------------------------------------------------------------------------
+.mat-mdc-menu-panel {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35) !important;
+  padding: 6px !important;
+  animation: popIn 0.12s ease;
+
+  .mat-mdc-menu-content {
+    padding: 0 !important;
+  }
+
+  .mat-mdc-menu-item {
+    border-radius: 8px !important;
+    min-height: auto !important;
+    padding: 9px 10px !important;
+    font-size: 13px !important;
+    color: var(--text) !important;
+    font-family: var(--font-ui);
+
+    &:hover:not([disabled]) {
+      background: var(--surface) !important;
+    }
+
+    .mat-mdc-menu-item-text {
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .mat-icon,
+    lucide-icon {
+      color: var(--text-muted);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AIXO Snackbar (MatSnackBar) — bottom-right AIXO toast look
+// ---------------------------------------------------------------------------
+.mat-mdc-snack-bar-container {
+  --mdc-snackbar-container-color: var(--surface-2);
+  --mdc-snackbar-supporting-text-color: var(--text);
+  --mat-snack-bar-button-color: var(--accent);
+
+  .mdc-snackbar__surface {
+    background: var(--surface-2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35) !important;
+    min-width: auto !important;
+  }
+
+  .mdc-snackbar__label {
+    color: var(--text) !important;
+    font-family: var(--font-ui);
+    font-size: 13px !important;
+  }
+}
