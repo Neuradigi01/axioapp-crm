@@ -1,31 +1,22 @@
 @if (vm(); as banner) {
   <div
-    [class]="
-      'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b ' +
-      toneClasses()
-    "
+    [class]="'flex items-center gap-3 border-b px-5 py-2 text-[13px] ' + toneClasses()"
     role="status"
     aria-live="polite"
   >
-    <div class="flex items-start sm:items-center gap-2">
-      @if (banner.tone !== 'info') {
-        <lucide-icon name="alert-triangle" class="w-5 h-5 mt-0.5 sm:mt-0 shrink-0"></lucide-icon>
-      }
-      <span class="text-sm font-medium leading-snug">
-        {{ banner.message }}
-      </span>
-    </div>
-
+    @if (banner.tone !== 'info') {
+      <lucide-icon name="alert-triangle" class="h-3.5 w-3.5 shrink-0"></lucide-icon>
+    } @else {
+      <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>
+    }
+    <span class="min-w-0 flex-1 truncate leading-snug">{{ banner.message }}</span>
     <button
       type="button"
       (click)="onCta()"
-      [class]="
-        'inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-semibold transition-colors shrink-0 ' +
-        ctaClasses()
-      "
+      [class]="'inline-flex items-center gap-1 text-[13px] font-semibold ' + ctaClasses()"
     >
       {{ banner.ctaLabel }}
-      <lucide-icon name="arrow-right" class="w-4 h-4"></lucide-icon>
+      <lucide-icon name="arrow-right" class="h-3.5 w-3.5"></lucide-icon>
     </button>
   </div>
 }

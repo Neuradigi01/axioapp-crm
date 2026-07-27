@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the top header to AIXO's thin variant (52px), migrate the existing trial banner to the AIXO strip look, and land the Cmd+K command palette shell (empty results OK for this step — real search wiring is a future step).
 **Track:** Design Refresh — Track 2 (App shell)
-**Status:** Pending
+**Status:** COMPLETED — 52px header with semantic tokens + centered Cmd+K search pill, restyled trial-banner strip (accent-soft for info, semantic amber/red for warning/urgent), AIXO notif popover, avatar menu now inline with `bg-accent-soft` `text-accent` initials square. Global `CommandPaletteComponent` registered in shell; Cmd+K / Ctrl+K toggles from any page, arrow keys navigate module list, Enter opens, Esc closes. `ng build` green.
 **Depends on:** Step 1, Step 2, Step 3
 
 ---

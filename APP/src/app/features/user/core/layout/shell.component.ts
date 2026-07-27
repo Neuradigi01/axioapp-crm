@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal, viewChild } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 import { ToastHostComponent } from '../notifications/toast-host.component';
 import { QuickAddFabComponent } from '../shared/quick-add-fab/quick-add-fab.component';
+import { CommandPaletteComponent } from '../shared/command-palette/command-palette.component';
 import { TrialBannerComponent } from '../billing/components/trial-banner/trial-banner.component';
 import { UpgradeModalComponent } from '../billing/components/upgrade-modal/upgrade-modal.component';
 import { SidebarComponent } from './sidebar.component';
@@ -19,6 +20,7 @@ const SIDEBAR_STORAGE_KEY = 'furniturecrm:sidebar-open';
     HeaderComponent,
     ToastHostComponent,
     QuickAddFabComponent,
+    CommandPaletteComponent,
     TrialBannerComponent,
     UpgradeModalComponent,
   ],
@@ -30,6 +32,10 @@ export class ShellComponent {
   protected readonly sidebarOpen = signal(this.loadInitialSidebarState());
   /** Mobile off-canvas drawer state (always starts closed, not persisted). */
   protected readonly mobileMenuOpen = signal(false);
+  /** Handle on the command palette so the header search-pill click can
+   *  toggle it. Cmd+K also toggles it via the component's own document
+   *  keydown listener. */
+  protected readonly palette = viewChild<CommandPaletteComponent>('palette');
 
   toggleSidebar(): void {
     const next = !this.sidebarOpen();
@@ -43,6 +49,10 @@ export class ShellComponent {
 
   closeMobileMenu(): void {
     this.mobileMenuOpen.set(false);
+  }
+
+  openPalette(): void {
+    this.palette()?.toggle();
   }
 
   private loadInitialSidebarState(): boolean {
