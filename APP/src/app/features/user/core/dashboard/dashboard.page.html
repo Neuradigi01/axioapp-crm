@@ -1,30 +1,30 @@
-<div class="px-6 py-6">
+<div class="mx-auto max-w-[1180px] px-6 py-6">
   <!-- Header — greeting + scope pill (left); date-range picker + Refresh (right) -->
   <header class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
     <div>
       @if (summary(); as s) {
-        <h1 class="text-2xl font-semibold text-zinc-900">
+        <h1 class="font-display text-[26px] font-bold leading-tight tracking-tight text-default">
           Welcome back, {{ s.greeting.first_name }}
         </h1>
-        <p class="mt-1 text-sm text-zinc-500">
+        <p class="mt-1 text-sm text-muted">
           {{ s.greeting.role_name || 'Member' }} · {{ s.greeting.org_name }}
           @if (s.scope === 'personal') {
             <span
-              class="ml-2 inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600"
+              class="ml-2 inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted"
             >
               Showing your data
             </span>
           } @else {
             <span
-              class="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+              class="ml-2 inline-flex items-center rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent"
             >
               Team view
             </span>
           }
         </p>
       } @else {
-        <div class="h-7 w-56 animate-pulse rounded bg-zinc-200"></div>
-        <div class="mt-2 h-4 w-40 animate-pulse rounded bg-zinc-100"></div>
+        <div class="h-7 w-56 animate-pulse rounded bg-surface-2"></div>
+        <div class="mt-2 h-4 w-40 animate-pulse rounded bg-surface-2"></div>
       }
     </div>
     <div class="flex items-center gap-2">
@@ -33,7 +33,7 @@
         type="button"
         (click)="refresh()"
         [disabled]="refreshing()"
-        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+        class="btn btn-secondary btn-sm"
       >
         {{ refreshing() ? 'Refreshing…' : 'Refresh' }}
       </button>
@@ -43,38 +43,29 @@
   <!-- Quick-actions row — permission-gated; collapses entirely when none visible -->
   <app-dashboard-quick-actions />
 
-  <!-- whatsapp-platform-upgrade Step 12 — WhatsApp health widget.
-       Hidden when the org has no connected WhatsApp integration. -->
+  <!-- WhatsApp health widget. Hidden when the org has no connected WhatsApp integration. -->
   <div class="mb-4">
     <app-whatsapp-health-widget />
   </div>
 
   @if (error(); as err) {
     <div
-      class="mb-4 flex items-center justify-between gap-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+      class="mb-4 flex items-center justify-between gap-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-500"
     >
       <span>{{ err }}</span>
-      <button
-        type="button"
-        (click)="refresh()"
-        class="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100"
-      >
-        Retry
-      </button>
+      <button type="button" (click)="refresh()" class="btn btn-secondary btn-sm">Retry</button>
     </div>
   }
 
-  <!-- Hero KPI strip — the 4 highest-signal metrics with delta pills.
-       When the tile is a follow-up card (no route) we wrap it in a
-       button so the click still scrolls-and-filters the widget. -->
+  <!-- Hero KPI strip -->
   @if (summary(); as s) {
-    <section class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <section class="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
       @for (card of heroCards(); track card.key) {
         @if (isFollowupCard(card)) {
           <button
             type="button"
             (click)="onCardClick(card)"
-            class="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 rounded-xl"
+            class="rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <app-dashboard-kpi-tile
               [label]="card.label"
@@ -98,9 +89,9 @@
       }
     </section>
   } @else {
-    <section class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <section class="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
       @for (i of [1, 2, 3, 4]; track i) {
-        <div class="h-28 animate-pulse rounded-xl border border-zinc-200 bg-zinc-50"></div>
+        <div class="h-28 animate-pulse rounded-xl border border-subtle bg-surface"></div>
       }
     </section>
   }
@@ -111,15 +102,12 @@
     <app-dashboard-funnel-chart />
   </section>
 
-  <!-- Secondary KPI cards grid — everything not already in the hero strip -->
+  <!-- Secondary KPI cards grid -->
   @if (summary(); as s) {
-    <section class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <section class="mt-6 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
       @for (card of secondaryCards(); track card.key) {
         @if (card.link; as link) {
-          <a
-            [routerLink]="link"
-            class="group block rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition hover:border-zinc-300 hover:shadow"
-          >
+          <a [routerLink]="link" class="card group block transition hover:border-muted">
             <ng-container
               [ngTemplateOutlet]="cardBody"
               [ngTemplateOutletContext]="{ $implicit: card }"
@@ -129,7 +117,7 @@
           <button
             type="button"
             (click)="onCardClick(card)"
-            class="group block w-full rounded-xl border border-zinc-200 bg-white p-4 text-left shadow-sm transition hover:border-zinc-300 hover:shadow"
+            class="card group block w-full text-left transition hover:border-muted"
           >
             <ng-container
               [ngTemplateOutlet]="cardBody"
@@ -137,7 +125,7 @@
             ></ng-container>
           </button>
         } @else {
-          <div class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div class="card">
             <ng-container
               [ngTemplateOutlet]="cardBody"
               [ngTemplateOutletContext]="{ $implicit: card }"
@@ -147,81 +135,61 @@
       }
     </section>
   } @else {
-    <section class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <section class="mt-6 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
       @for (i of [1, 2, 3, 4]; track i) {
-        <div class="h-24 animate-pulse rounded-xl border border-zinc-200 bg-zinc-50"></div>
+        <div class="h-24 animate-pulse rounded-xl border border-subtle bg-surface"></div>
       }
     </section>
   }
 
-  <!-- Follow-ups + Appointments pair — "what to do" (tasks/dashboard-updates
-       Step 3) side-by-side with "what to attend" (existing). The anchor
-       id lets Step 4's KPI-card click handler scroll straight to the
-       widget. -->
+  <!-- Follow-ups + Appointments pair -->
   <section
     id="todays-followups-widget"
-    class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2 scroll-mt-6"
+    class="mt-6 grid grid-cols-1 gap-4 scroll-mt-6 lg:grid-cols-2"
   >
     <app-todays-followups />
 
-    <!-- Appointments (tasks/dashboard-updates Step 5) — "Today" by
-         default, "Next 5" on demand. Server-side filter via the
-         `upcoming_scope` query param on /dashboard/summary. -->
-    <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
-      <div class="border-b border-zinc-100 px-4 py-3">
-        <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold text-zinc-900">Appointments</h2>
-          <a
-            routerLink="/user/appointments"
-            class="text-xs font-medium text-zinc-500 hover:text-zinc-900"
-            >View all →</a
+    <!-- Appointments — Today by default, Next 5 on demand -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Appointments</h3>
+        <a routerLink="/user/appointments" class="card-link">View all →</a>
+      </div>
+      <div class="mb-3 flex flex-wrap gap-2">
+        @for (chip of appointmentChips; track chip.value) {
+          <button
+            type="button"
+            (click)="setAppointmentsScope(chip.value)"
+            [class]="appointmentsScope() === chip.value ? 'chip chip-active' : 'chip'"
           >
-        </div>
-        <!-- Today / Next 5 chip toggle — matches the Follow-ups
-             widget's bucket-chip style so both widgets read
-             visually parallel. -->
-        <div class="mt-3 flex flex-wrap gap-2">
-          @for (chip of appointmentChips; track chip.value) {
-            <button
-              type="button"
-              (click)="setAppointmentsScope(chip.value)"
-              [class]="
-                appointmentsScope() === chip.value
-                  ? 'inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white'
-                  : 'inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2.5 py-1 text-[11px] font-medium text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-100'
-              "
-            >
-              {{ chip.label }}
-            </button>
-          }
-        </div>
+            {{ chip.label }}
+          </button>
+        }
       </div>
       @if (summary(); as s) {
         @if (s.upcoming_appointments.length === 0) {
-          <div class="px-4 py-10 text-center text-sm text-zinc-500">
+          <div class="py-8 text-center text-sm text-muted">
             @if (appointmentsScope() === 'today') {
               No appointments scheduled for today.
             } @else {
               No upcoming appointments.
             }
-            <a
-              routerLink="/user/appointments"
-              class="ml-1 font-medium text-zinc-700 hover:underline"
+            <a routerLink="/user/appointments" class="ml-1 font-medium text-accent hover:opacity-80"
               >Schedule one →</a
             >
           </div>
         } @else {
-          <ul class="divide-y divide-zinc-100">
+          <ul class="divide-y divide-subtle">
             @for (u of s.upcoming_appointments; track u.id) {
-              <li class="flex items-start gap-3 px-4 py-2.5">
-                <div class="w-20 shrink-0 text-xs text-zinc-500">
+              <li class="flex items-start gap-3 py-2.5">
+                <div class="w-20 shrink-0 font-mono text-xs text-faint">
                   {{ u.starts_at | date: 'EEE, MMM d' }}<br />
-                  <span class="text-zinc-700">{{ u.starts_at | date: 'h:mm a' }}</span>
+                  <span class="text-muted">{{ u.starts_at | date: 'h:mm a' }}</span>
                 </div>
                 <div class="min-w-0">
-                  <p class="truncate text-sm font-medium text-zinc-900">{{ u.title }}</p>
+                  <p class="truncate text-sm font-medium text-default">{{ u.title }}</p>
                   @if (u.with_contact_name) {
-                    <p class="truncate text-[11px] text-zinc-500">with {{ u.with_contact_name }}</p>
+                    <p class="truncate text-[11px] text-faint">with {{ u.with_contact_name }}</p>
                   }
                 </div>
               </li>
@@ -230,44 +198,44 @@
         }
       } @else {
         @for (i of [1, 2, 3]; track i) {
-          <div class="mx-4 my-2.5 h-10 animate-pulse rounded bg-zinc-50"></div>
+          <div class="my-2.5 h-10 animate-pulse rounded bg-surface-2"></div>
         }
       }
     </div>
   </section>
 
-  <!-- Recent activity — full width below the pair. -->
+  <!-- Recent activity -->
   <section class="mt-6">
-    <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
-      <div class="border-b border-zinc-100 px-4 py-3">
-        <h2 class="text-sm font-semibold text-zinc-900">Recent activity</h2>
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Recent activity</h3>
       </div>
       @if (summary(); as s) {
         @if (s.recent_activity.length === 0) {
-          <div class="px-4 py-10 text-center text-sm text-zinc-500">
+          <div class="py-8 text-center text-sm text-muted">
             No recent activity yet — start a lead or schedule an appointment to see it here.
           </div>
         } @else {
-          <ul class="divide-y divide-zinc-100">
+          <ul class="divide-y divide-subtle">
             @for (a of s.recent_activity; track $index) {
-              <li class="flex items-start justify-between gap-3 px-4 py-2.5">
+              <li class="flex items-start justify-between gap-3 py-2.5">
                 <div class="min-w-0">
-                  <p class="truncate text-sm text-zinc-800">
+                  <p class="truncate text-sm text-default">
                     <span class="font-medium">{{ a.actor_name }}</span>
                     {{ actionLabel(a.action) }}
-                    <span class="text-zinc-500">{{ a.entity_label }}</span>
+                    <span class="text-muted">{{ a.entity_label }}</span>
                   </p>
                 </div>
-                <span class="shrink-0 whitespace-nowrap text-[11px] text-zinc-400">{{
-                  relativeTime(a.at)
-                }}</span>
+                <span class="shrink-0 whitespace-nowrap font-mono text-[11px] text-faint">
+                  {{ relativeTime(a.at) }}
+                </span>
               </li>
             }
           </ul>
         }
       } @else {
         @for (i of [1, 2, 3, 4]; track i) {
-          <div class="mx-4 my-2.5 h-8 animate-pulse rounded bg-zinc-50"></div>
+          <div class="my-2.5 h-8 animate-pulse rounded bg-surface-2"></div>
         }
       }
     </div>
@@ -276,7 +244,7 @@
 
 <!-- Shared card-body template — keeps the link vs div branches above DRY. -->
 <ng-template #cardBody let-card>
-  <div class="text-2xl font-semibold text-zinc-900">
+  <div class="font-mono text-[26px] font-semibold leading-none tracking-[-.02em] text-default">
     @switch (card.format) {
       @case ('currency') {
         {{ formatCurrency(card.value) }}
@@ -289,9 +257,11 @@
       }
       @case ('leaderboard') {
         @if (asLeaderboard(card.value).length > 0) {
-          <span class="text-lg">{{ asLeaderboard(card.value)[0].name }}</span>
+          <span class="font-ui text-base font-semibold">{{
+            asLeaderboard(card.value)[0].name
+          }}</span>
         } @else {
-          <span class="text-zinc-400">—</span>
+          <span class="text-faint">—</span>
         }
       }
       @default {
@@ -299,14 +269,14 @@
       }
     }
   </div>
-  <div class="mt-1 text-xs text-zinc-500">{{ card.label }}</div>
+  <div class="mt-2 text-[12.5px] text-muted">{{ card.label }}</div>
 
   @if (card.format === 'leaderboard' && asLeaderboard(card.value).length > 1) {
-    <ul class="mt-2 space-y-0.5 text-[11px] text-zinc-500">
+    <ul class="mt-2 space-y-0.5 text-[11px] text-muted">
       @for (entry of asLeaderboard(card.value).slice(1); track entry.name) {
         <li class="flex items-center justify-between">
           <span class="truncate">{{ entry.name }}</span>
-          <span class="ml-2 shrink-0 font-mono text-zinc-400">{{ entry.count }}</span>
+          <span class="ml-2 shrink-0 font-mono text-faint">{{ entry.count }}</span>
         </li>
       }
     </ul>

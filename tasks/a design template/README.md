@@ -127,7 +127,7 @@ Grouped into 5 tracks. Each step is independently reviewable; pause/report after
 
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
-| 8 | [Dashboard (signature strip + KPIs + funnel + follow-ups)](step-08-dashboard.md) | Pending | ~1 day |
+| 8 | [Dashboard (signature strip + KPIs + funnel + follow-ups)](step-08-dashboard.md) | COMPLETED | ~1 day |
 | 9 | [Contacts (list + detail drawer + import)](step-09-contacts.md) | Pending | ~1 day |
 | 10 | [Leads (list + pipeline board)](step-10-leads.md) | Pending | ~1 day |
 | 11 | [Conversations (three-pane + channel bubbles)](step-11-conversations.md) | Pending | ~1 day |

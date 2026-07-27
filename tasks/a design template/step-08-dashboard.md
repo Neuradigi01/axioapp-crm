@@ -2,7 +2,7 @@
 
 **Goal:** Match AIXO's dashboard: greeting header + date-range pill, signature strip, KPI cards, revenue trend + funnel split, ops KPIs, follow-ups + appointments split, recent-activity card.
 **Track:** Design Refresh — Track 4 (Page pass)
-**Status:** Pending
+**Status:** COMPLETED — dashboard page restyled to AIXO layout with `max-w-[1180px]`, `font-display` 26px greeting, date-range pill in surface + accent-soft active, KPI tiles using `.card` shape + `.badge` delta pills, trend/funnel cards, follow-ups + appointments split as `.card`s, recent activity card. Every existing signal / service / permission gate preserved. `ng build` green.
 **Depends on:** Steps 1, 6
 
 ---
