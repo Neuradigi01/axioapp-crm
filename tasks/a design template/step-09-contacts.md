@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the Contacts list, detail drawer / modal, import wizard, and any contact-related overlays.
 **Track:** Design Refresh — Track 4 (Page pass)
-**Status:** Pending
+**Status:** COMPLETED — contacts list, form modal, detail page, import wizard, and bulk-action bar all restyled with semantic tokens. List page uses `PageHeader`-style header + `.btn`/`.input`/`.select` + AIXO table. Detail + import get bulk token swap (zinc → surface/text tokens). Bulk-action bar is now the floating AIXO surface-2 pill from Step 7. `ng build` green.
 **Depends on:** Steps 1, 5, 6, 7
 
 ---
