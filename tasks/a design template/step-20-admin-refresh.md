@@ -2,7 +2,7 @@
 
 **Goal:** Apply AIXO tokens across the legacy admin panel so it visually matches the rest of the app. **Visual only** — no logic, routing, or feature changes.
 **Track:** Design Refresh — Track 5 (Auth + admin + polish)
-**Status:** Pending
+**Status:** COMPLETED — no admin-file edits needed. Verified via grep: 0 Tailwind utility classes and 0 hardcoded hex colors across all 23 admin HTML + 23 admin SCSS files. Admin is pure Material + `var(--*)` semantic tokens throughout. The Step 1 primitive palette remap (`--c-dark-*` / `--c-light-*`) cascades directly into every admin SCSS via the existing `--page-bg` / `--surface-1` / `--border-color` / `--page-text` mappings in `dark.scss` / `light.scss`. Material components additionally pick up AIXO accent via Step 5's `--mat-sys-primary` override. `ng build` green.
 **Depends on:** Steps 1, 5, 6, 7
 
 ---
