@@ -1,8 +1,8 @@
 <div class="space-y-4">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
-      <h2 class="text-base font-semibold text-zinc-900">Email sequences</h2>
-      <p class="mt-0.5 text-xs text-zinc-500">
+      <h2 class="text-base font-semibold text-default">Email sequences</h2>
+      <p class="mt-0.5 text-xs text-muted">
         Multi-step drip campaigns. Enroll leads or contacts to start sending; replies auto-pause the
         enrollment.
       </p>
@@ -13,20 +13,20 @@
         <lucide-icon
           name="search"
           size="14"
-          class="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400"
+          class="absolute left-2 top-1/2 -translate-y-1/2 text-faint"
           aria-hidden="true"
         ></lucide-icon>
         <input
           type="text"
           [formControl]="searchCtrl"
           placeholder="Search by name…"
-          class="w-56 rounded-md border border-zinc-300 bg-white py-1.5 pl-7 pr-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-56 rounded-md border border-subtle bg-surface py-1.5 pl-7 pr-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </label>
       @if (canManage()) {
         <button
           type="button"
-          class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-accent"
           (click)="openCreate()"
         >
           <lucide-icon name="plus" size="14" aria-hidden="true"></lucide-icon>
@@ -50,7 +50,7 @@
     </div>
   }
 
-  <section class="rounded-xl border border-zinc-200 bg-white shadow-sm">
+  <section class="rounded-xl border border-subtle bg-surface shadow-sm">
     @if (loadError(); as err) {
       <div class="px-6 py-10 text-center">
         <div
@@ -58,11 +58,11 @@
         >
           <lucide-icon name="alert-triangle" size="18" aria-hidden="true"></lucide-icon>
         </div>
-        <p class="mt-3 text-sm font-medium text-zinc-700">Couldn't load sequences</p>
-        <p class="mt-1 text-xs text-zinc-500">{{ err }}</p>
+        <p class="mt-3 text-sm font-medium text-default">Couldn't load sequences</p>
+        <p class="mt-1 text-xs text-muted">{{ err }}</p>
         <button
           type="button"
-          class="mt-3 inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          class="mt-3 inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
           (click)="refresh()"
         >
           <lucide-icon name="refresh-cw" size="12" aria-hidden="true"></lucide-icon>
@@ -72,24 +72,24 @@
     } @else if (sequences() === null) {
       <div class="space-y-2 p-6">
         @for (i of [0, 1]; track i) {
-          <div class="h-10 animate-pulse rounded bg-zinc-100" aria-hidden="true"></div>
+          <div class="h-10 animate-pulse rounded bg-surface-2" aria-hidden="true"></div>
         }
       </div>
     } @else if (emptyState()) {
       <div class="px-6 py-12 text-center">
         <div
-          class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 ring-1 ring-zinc-200"
+          class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 text-faint ring-1 border-subtle"
         >
           <lucide-icon name="workflow" size="22" aria-hidden="true"></lucide-icon>
         </div>
-        <p class="mt-3 text-sm font-medium text-zinc-700">
+        <p class="mt-3 text-sm font-medium text-default">
           @if (searchCtrl.value) {
             No sequences match "{{ searchCtrl.value }}".
           } @else {
             No sequences yet
           }
         </p>
-        <p class="mt-1 text-xs text-zinc-500">
+        <p class="mt-1 text-xs text-muted">
           @if (!searchCtrl.value && canManage()) {
             Build a multi-step outreach sequence to drip messages at the right cadence.
           }
@@ -97,7 +97,7 @@
         @if (!searchCtrl.value && canManage()) {
           <button
             type="button"
-            class="mt-3 inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
+            class="mt-3 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-accent"
             (click)="openCreate()"
           >
             <lucide-icon name="plus" size="14" aria-hidden="true"></lucide-icon>
@@ -109,7 +109,7 @@
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead
-            class="border-b border-zinc-200 bg-zinc-50 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+            class="border-b border-subtle bg-surface-2 text-left text-xs font-medium uppercase tracking-wide text-muted"
           >
             <tr>
               <th class="px-6 py-2.5">Name</th>
@@ -119,18 +119,18 @@
               <th class="px-6 py-2.5 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-zinc-100">
+          <tbody class="divide-y divide-subtle">
             @for (s of sequences(); track s.id) {
-              <tr class="text-zinc-700 hover:bg-zinc-50">
+              <tr class="text-default hover:bg-surface-2">
                 <td class="px-6 py-3">
                   <a
                     [routerLink]="['/user/settings/email-sequences', s.id]"
-                    class="font-medium text-zinc-900 hover:underline"
+                    class="font-medium text-default hover:underline"
                   >
                     {{ s.name }}
                   </a>
                   @if (!s.is_active) {
-                    <span class="ml-2 text-xs text-zinc-400">(inactive)</span>
+                    <span class="ml-2 text-xs text-faint">(inactive)</span>
                   }
                 </td>
                 <td class="px-6 py-3 text-xs font-mono">
@@ -138,14 +138,14 @@
                 </td>
                 <td class="px-6 py-3 text-xs">
                   @if (stats()[s.id]; as st) {
-                    <span class="inline-flex items-center gap-2 text-zinc-600">
+                    <span class="inline-flex items-center gap-2 text-muted">
                       <span
                         ><span class="font-semibold text-emerald-700">{{ st.active }}</span>
                         active</span
                       >
                       <span class="text-zinc-300">·</span>
                       <span
-                        ><span class="font-semibold text-zinc-700">{{ st.completed }}</span>
+                        ><span class="font-semibold text-default">{{ st.completed }}</span>
                         done</span
                       >
                       @if (st.paused_on_reply > 0) {
@@ -159,17 +159,17 @@
                       }
                     </span>
                   } @else {
-                    <span class="text-zinc-400">…</span>
+                    <span class="text-faint">…</span>
                   }
                 </td>
-                <td class="px-6 py-3 text-xs text-zinc-600">
+                <td class="px-6 py-3 text-xs text-muted">
                   {{ s.updated_at | date: 'medium' }}
                 </td>
                 <td class="px-6 py-3 text-right">
                   <div class="inline-flex items-center gap-1">
                     <a
                       [routerLink]="['/user/settings/email-sequences', s.id]"
-                      class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                      class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
                     >
                       <lucide-icon name="eye" size="12" aria-hidden="true"></lucide-icon>
                       View
@@ -177,14 +177,14 @@
                     @if (canManage()) {
                       <a
                         [routerLink]="['/user/settings/email-sequences', s.id, 'edit']"
-                        class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                        class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
                       >
                         <lucide-icon name="pencil" size="12" aria-hidden="true"></lucide-icon>
                         Edit
                       </a>
                       <button
                         type="button"
-                        class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                        class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
                         [disabled]="deleting() === s.id"
                         (click)="openDelete(s)"
                       >
@@ -205,11 +205,11 @@
 
 @if (confirmDelete(); as target) {
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40 p-4"
     (click)="cancelDelete()"
   >
     <div
-      class="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-xl"
+      class="w-full max-w-sm rounded-xl border border-subtle bg-surface p-6 shadow-xl"
       role="dialog"
       aria-modal="true"
       (click)="$event.stopPropagation()"
@@ -221,8 +221,8 @@
           <lucide-icon name="trash-2" size="20" aria-hidden="true"></lucide-icon>
         </div>
         <div>
-          <h3 class="text-base font-semibold text-zinc-900">Delete sequence?</h3>
-          <p class="mt-1 text-sm text-zinc-600">
+          <h3 class="text-base font-semibold text-default">Delete sequence?</h3>
+          <p class="mt-1 text-sm text-muted">
             "<span class="font-medium">{{ target.name }}</span
             >" will be soft-deleted. In-flight enrollments stop sending on the next scheduler tick;
             historical enrollment rows survive.
@@ -232,7 +232,7 @@
       <div class="mt-5 flex items-center justify-end gap-2">
         <button
           type="button"
-          class="inline-flex items-center rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          class="inline-flex items-center rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
           [disabled]="deleting() === target.id"
           (click)="cancelDelete()"
         >

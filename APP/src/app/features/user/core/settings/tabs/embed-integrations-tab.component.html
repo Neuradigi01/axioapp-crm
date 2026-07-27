@@ -1,32 +1,32 @@
 <div class="space-y-6 p-6 max-w-4xl">
   <header class="space-y-1">
-    <h2 class="text-lg font-semibold text-zinc-900">Embed widget</h2>
-    <p class="text-sm text-zinc-500">
+    <h2 class="text-lg font-semibold text-default">Embed widget</h2>
+    <p class="text-sm text-muted">
       Issue keys, configure the form, and copy the snippet to paste onto your website.
     </p>
   </header>
 
   <!-- Tab strip -->
-  <div class="flex items-center gap-1 border-b border-zinc-200">
+  <div class="flex items-center gap-1 border-b border-subtle">
     <button
       type="button"
       (click)="activeTab.set('config')"
-      [class.text-zinc-900]="activeTab() === 'config'"
-      [class.border-zinc-900]="activeTab() === 'config'"
-      [class.text-zinc-500]="activeTab() !== 'config'"
+      [class.text-default]="activeTab() === 'config'"
+      [class.border-accent]="activeTab() === 'config'"
+      [class.text-muted]="activeTab() !== 'config'"
       [class.border-transparent]="activeTab() !== 'config'"
-      class="-mb-px border-b-2 px-3 py-2 text-sm font-medium hover:text-zinc-900"
+      class="-mb-px border-b-2 px-3 py-2 text-sm font-medium hover:text-default"
     >
       Keys &amp; configuration
     </button>
     <button
       type="button"
       (click)="activeTab.set('log')"
-      [class.text-zinc-900]="activeTab() === 'log'"
-      [class.border-zinc-900]="activeTab() === 'log'"
-      [class.text-zinc-500]="activeTab() !== 'log'"
+      [class.text-default]="activeTab() === 'log'"
+      [class.border-accent]="activeTab() === 'log'"
+      [class.text-muted]="activeTab() !== 'log'"
       [class.border-transparent]="activeTab() !== 'log'"
-      class="-mb-px border-b-2 px-3 py-2 text-sm font-medium hover:text-zinc-900"
+      class="-mb-px border-b-2 px-3 py-2 text-sm font-medium hover:text-default"
     >
       Submission log
     </button>
@@ -37,7 +37,7 @@
   } @else {
     <div class="space-y-8">
       @if (loading()) {
-        <p class="text-sm text-zinc-500">Loading…</p>
+        <p class="text-sm text-muted">Loading…</p>
       } @else if (loadError(); as err) {
         <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {{ err }}
@@ -46,11 +46,11 @@
         <!-- =================== Panel 1: Keys =================== -->
         <section class="space-y-3">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">Keys</h3>
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted">Keys</h3>
             <button
               type="button"
               (click)="openIssueModal()"
-              class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+              class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent"
             >
               <lucide-icon name="plus" class="h-4 w-4" />
               Issue new key
@@ -59,14 +59,14 @@
 
           @if (keys().length === 0) {
             <div
-              class="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+              class="rounded-md border border-subtle bg-surface-2 px-4 py-6 text-center text-sm text-muted"
             >
               No keys issued yet. Click <strong>Issue new key</strong> to create one.
             </div>
           } @else {
-            <div class="overflow-hidden rounded-md border border-zinc-200 bg-white">
+            <div class="overflow-hidden rounded-md border border-subtle bg-surface">
               <table class="min-w-full text-sm">
-                <thead class="bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                <thead class="bg-surface-2 text-xs font-medium uppercase tracking-wide text-muted">
                   <tr>
                     <th class="px-4 py-2 text-left">Name</th>
                     <th class="px-4 py-2 text-left">Prefix</th>
@@ -76,17 +76,17 @@
                     <th class="w-12 px-4 py-2"></th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100">
+                <tbody class="divide-y divide-subtle">
                   @for (k of keys(); track k.id) {
                     <tr>
-                      <td class="px-4 py-3 font-medium text-zinc-900">
+                      <td class="px-4 py-3 font-medium text-default">
                         {{ k.name ?? '(unnamed)' }}
                       </td>
-                      <td class="px-4 py-3 font-mono text-xs text-zinc-700">{{ k.prefix }}…</td>
-                      <td class="px-4 py-3 text-xs text-zinc-600">
+                      <td class="px-4 py-3 font-mono text-xs text-default">{{ k.prefix }}…</td>
+                      <td class="px-4 py-3 text-xs text-muted">
                         {{ relativeTime(k.created_at) }}
                       </td>
-                      <td class="px-4 py-3 text-xs text-zinc-600">
+                      <td class="px-4 py-3 text-xs text-muted">
                         {{ relativeTime(k.last_used_at) }}
                       </td>
                       <td class="px-4 py-3">
@@ -121,14 +121,14 @@
         <!-- =================== Panel 2: Form configuration =================== -->
         @if (config(); as cfg) {
           <section class="space-y-3">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted">
               Form configuration
             </h3>
 
             <!-- Fields list -->
-            <div class="overflow-hidden rounded-md border border-zinc-200 bg-white">
+            <div class="overflow-hidden rounded-md border border-subtle bg-surface">
               <table class="min-w-full text-sm">
-                <thead class="bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                <thead class="bg-surface-2 text-xs font-medium uppercase tracking-wide text-muted">
                   <tr>
                     <th class="px-3 py-2 text-left">Field</th>
                     <th class="px-3 py-2 text-left">Label</th>
@@ -138,12 +138,12 @@
                     <th class="w-12 px-3 py-2 text-center"></th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100">
+                <tbody class="divide-y divide-subtle">
                   @for (f of cfg.fields; track f.key; let i = $index) {
                     <tr>
                       <td class="px-3 py-2">
                         <div class="flex items-center gap-1.5">
-                          <code class="text-xs text-zinc-600">{{ f.key }}</code>
+                          <code class="text-xs text-muted">{{ f.key }}</code>
                           @if (f.field_source === 'custom') {
                             <span
                               class="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-medium text-indigo-700"
@@ -151,14 +151,14 @@
                             >
                           }
                         </div>
-                        <p class="text-[10px] text-zinc-400">{{ f.field_type }}</p>
+                        <p class="text-[10px] text-faint">{{ f.field_type }}</p>
                       </td>
                       <td class="px-3 py-2">
                         <input
                           type="text"
                           [value]="f.label"
                           (input)="onFieldLabelInput(i, $event)"
-                          class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm"
+                          class="block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-sm"
                         />
                       </td>
                       <td class="px-3 py-2">
@@ -166,7 +166,7 @@
                           type="text"
                           [value]="f.placeholder ?? ''"
                           (input)="onFieldPlaceholderInput(i, $event)"
-                          class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm"
+                          class="block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-sm"
                         />
                       </td>
                       <td class="px-3 py-2">
@@ -174,7 +174,7 @@
                           type="checkbox"
                           [checked]="f.required"
                           (change)="onFieldRequiredToggle(i, $event)"
-                          class="rounded border-zinc-300"
+                          class="rounded border-subtle"
                         />
                       </td>
                       <td class="px-3 py-2 text-center">
@@ -183,7 +183,7 @@
                             type="button"
                             (click)="moveField(i, -1)"
                             [disabled]="i === 0"
-                            class="rounded p-1 hover:bg-zinc-100 disabled:opacity-30"
+                            class="rounded p-1 hover:bg-surface-2 disabled:opacity-30"
                           >
                             <lucide-icon name="chevron-up" class="h-3 w-3" />
                           </button>
@@ -191,7 +191,7 @@
                             type="button"
                             (click)="moveField(i, 1)"
                             [disabled]="i === cfg.fields.length - 1"
-                            class="rounded p-1 hover:bg-zinc-100 disabled:opacity-30"
+                            class="rounded p-1 hover:bg-surface-2 disabled:opacity-30"
                           >
                             <lucide-icon name="chevron-down" class="h-3 w-3" />
                           </button>
@@ -202,7 +202,7 @@
                           type="button"
                           (click)="removeField(i)"
                           title="Remove this field from the widget"
-                          class="rounded p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600"
+                          class="rounded p-1 text-faint hover:bg-red-50 hover:text-red-600"
                         >
                           <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
                         </button>
@@ -219,28 +219,28 @@
                 <button
                   type="button"
                   (click)="openPicker()"
-                  class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                  class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
                 >
                   <lucide-icon name="plus" class="h-3.5 w-3.5" />
                   Add custom field to widget
                 </button>
               } @else {
-                <div class="space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                <div class="space-y-2 rounded-md border border-subtle bg-surface-2 p-3">
                   <div class="flex items-center justify-between">
-                    <h4 class="text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                    <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
                       Pick a contact custom field
                     </h4>
                     <button
                       type="button"
                       (click)="closePicker()"
-                      class="text-xs text-zinc-500 hover:text-zinc-700"
+                      class="text-xs text-muted hover:text-default"
                     >
                       Close
                     </button>
                   </div>
 
                   @if (pickerLoading()) {
-                    <p class="text-xs text-zinc-500">Loading…</p>
+                    <p class="text-xs text-muted">Loading…</p>
                   } @else if (pickerError(); as err) {
                     <p
                       class="rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-700"
@@ -248,26 +248,26 @@
                       {{ err }}
                     </p>
                   } @else if (pickerOptions().length === 0) {
-                    <p class="text-xs text-zinc-500">
+                    <p class="text-xs text-muted">
                       No more custom fields available. Add new ones under
                       <strong>Settings → Custom fields</strong>, then refresh this page.
                     </p>
                   } @else {
-                    <ul class="divide-y divide-zinc-200 rounded-md border border-zinc-200 bg-white">
+                    <ul class="divide-y divide-subtle rounded-md border border-subtle bg-surface">
                       @for (opt of pickerOptions(); track opt.entity + '.' + opt.field_key) {
                         <li class="flex items-center justify-between gap-2 px-3 py-2">
                           <div>
                             <div class="flex items-center gap-1.5">
-                              <span class="text-sm font-medium text-zinc-900">{{
+                              <span class="text-sm font-medium text-default">{{
                                 opt.field_label
                               }}</span>
                               <span
-                                class="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium uppercase text-zinc-600"
+                                class="rounded-full bg-surface-2 px-1.5 py-0.5 text-[9px] font-medium uppercase text-muted"
                               >
                                 {{ opt.entity }}
                               </span>
                             </div>
-                            <div class="text-[10px] text-zinc-500">
+                            <div class="text-[10px] text-muted">
                               <code>{{ opt.field_key }}</code> · {{ opt.field_type }}
                               @if (opt.is_required) {
                                 · required
@@ -281,14 +281,14 @@
                             type="button"
                             (click)="addCustomField(opt)"
                             [disabled]="!opt.widget_supported"
-                            class="rounded-md bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+                            class="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-zinc-300"
                           >
                             Add
                           </button>
                         </li>
                       }
                     </ul>
-                    <p class="text-[10px] text-zinc-400">
+                    <p class="text-[10px] text-faint">
                       Adding a field makes it appear on the widget form. Visitors can leave it blank
                       unless you mark it required.
                     </p>
@@ -300,9 +300,9 @@
             <!-- Interest options — only shown when the `interest` field is configured. -->
             @if (interestIndex() >= 0) {
               <div>
-                <label class="mb-1 block text-xs font-medium text-zinc-700">
+                <label class="mb-1 block text-xs font-medium text-default">
                   Interest options
-                  <span class="font-normal text-zinc-400"
+                  <span class="font-normal text-faint"
                     >(comma-separated; used when "interest" is a select field)</span
                   >
                 </label>
@@ -311,7 +311,7 @@
                   [value]="interestOptionsValue()"
                   (input)="onInterestOptionsInput($event)"
                   placeholder="Sofas, Beds, Dining, Wardrobes, Other"
-                  class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                  class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
                 />
               </div>
             }
@@ -319,82 +319,82 @@
             <!-- Submit button label + thank-you copy -->
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
-                <label class="mb-1 block text-xs font-medium text-zinc-700"
+                <label class="mb-1 block text-xs font-medium text-default"
                   >Submit button label</label
                 >
                 <input
                   type="text"
                   [value]="cfg.submit_button_label"
                   (input)="onSubmitLabelInput($event)"
-                  class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                  class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label class="mb-1 block text-xs font-medium text-zinc-700"
+                <label class="mb-1 block text-xs font-medium text-default"
                   >Thank-you redirect URL
-                  <span class="font-normal text-zinc-400">(optional)</span></label
+                  <span class="font-normal text-faint">(optional)</span></label
                 >
                 <input
                   type="url"
                   [value]="cfg.thank_you_url ?? ''"
                   (input)="onThankYouUrlInput($event)"
                   placeholder="https://yoursite.com/thank-you"
-                  class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                  class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label class="mb-1 block text-xs font-medium text-zinc-700">Thank-you message</label>
+              <label class="mb-1 block text-xs font-medium text-default">Thank-you message</label>
               <input
                 type="text"
                 [value]="cfg.thank_you_message"
                 (input)="onThankYouMessageInput($event)"
-                class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
               />
             </div>
 
             <!-- Branding -->
             <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div>
-                <label class="mb-1 block text-xs font-medium text-zinc-700">Accent colour</label>
+                <label class="mb-1 block text-xs font-medium text-default">Accent colour</label>
                 <input
                   type="color"
                   [value]="cfg.branding.accent_color"
                   (input)="onAccentInput($event)"
-                  class="h-10 w-full rounded-md border border-zinc-300 bg-white"
+                  class="h-10 w-full rounded-md border border-subtle bg-surface"
                 />
               </div>
               <div class="md:col-span-2">
-                <label class="mb-1 block text-xs font-medium text-zinc-700"
-                  >Logo URL <span class="font-normal text-zinc-400">(optional)</span></label
+                <label class="mb-1 block text-xs font-medium text-default"
+                  >Logo URL <span class="font-normal text-faint">(optional)</span></label
                 >
                 <input
                   type="url"
                   [value]="cfg.branding.logo_url ?? ''"
                   (input)="onLogoUrlInput($event)"
                   placeholder="https://yoursite.com/logo.png"
-                  class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                  class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
                 />
               </div>
             </div>
 
-            <label class="flex items-center gap-2 text-sm text-zinc-700">
+            <label class="flex items-center gap-2 text-sm text-default">
               <input
                 type="checkbox"
                 [checked]="cfg.branding.show_powered_by"
                 (change)="onPoweredByToggle($event)"
-                class="rounded border-zinc-300"
+                class="rounded border-subtle"
               />
               Show "Powered by CRM" link
             </label>
 
             <!-- Spam protection sub-panel -->
-            <div class="space-y-3 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+            <div class="space-y-3 rounded-md border border-subtle bg-surface-2 p-4">
               <div class="flex items-start justify-between gap-2">
                 <div>
-                  <h4 class="text-sm font-semibold text-zinc-800">Spam protection</h4>
-                  <p class="text-xs text-zinc-500">
+                  <h4 class="text-sm font-semibold text-default">Spam protection</h4>
+                  <p class="text-xs text-muted">
                     The honeypot is always on. Min-fill-time and reCAPTCHA are extra layers — none
                     of them are visible to your visitors when configured correctly.
                   </p>
@@ -402,9 +402,9 @@
               </div>
 
               <div>
-                <label class="mb-1 block text-xs font-medium text-zinc-700">
+                <label class="mb-1 block text-xs font-medium text-default">
                   Minimum fill time
-                  <span class="font-normal text-zinc-400"
+                  <span class="font-normal text-faint"
                     >(submissions arriving faster than this are silently dropped — set to 0 to
                     disable)</span
                   >
@@ -419,18 +419,18 @@
                     (input)="onMinFillTimeInput($event)"
                     class="flex-1"
                   />
-                  <span class="w-20 text-right font-mono text-xs text-zinc-700"
+                  <span class="w-20 text-right font-mono text-xs text-default"
                     >{{ cfg.spam_protection.min_fill_time_ms }}ms</span
                   >
                 </div>
               </div>
 
-              <label class="flex items-center gap-2 text-sm text-zinc-700">
+              <label class="flex items-center gap-2 text-sm text-default">
                 <input
                   type="checkbox"
                   [checked]="cfg.spam_protection.recaptcha_enabled"
                   (change)="onRecaptchaToggle($event)"
-                  class="rounded border-zinc-300"
+                  class="rounded border-subtle"
                 />
                 Enable Google reCAPTCHA v3
               </label>
@@ -438,23 +438,23 @@
               @if (cfg.spam_protection.recaptcha_enabled) {
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div>
-                    <label class="mb-1 block text-xs font-medium text-zinc-700">
+                    <label class="mb-1 block text-xs font-medium text-default">
                       reCAPTCHA site key
-                      <span class="font-normal text-zinc-400">(public — used in the widget)</span>
+                      <span class="font-normal text-faint">(public — used in the widget)</span>
                     </label>
                     <input
                       type="text"
                       [value]="cfg.spam_protection.recaptcha_site_key ?? ''"
                       (input)="onRecaptchaSiteKeyInput($event)"
                       placeholder="6Lc…"
-                      class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-mono"
+                      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-mono"
                       autocomplete="off"
                     />
                   </div>
                   <div>
-                    <label class="mb-1 block text-xs font-medium text-zinc-700">
+                    <label class="mb-1 block text-xs font-medium text-default">
                       reCAPTCHA secret key
-                      <span class="font-normal text-zinc-400"
+                      <span class="font-normal text-faint"
                         >(server-side only, never sent to visitors)</span
                       >
                     </label>
@@ -463,18 +463,18 @@
                       [value]="cfg.spam_protection.recaptcha_secret_key ?? ''"
                       (input)="onRecaptchaSecretKeyInput($event)"
                       placeholder="6Lc…"
-                      class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-mono"
+                      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-mono"
                       autocomplete="off"
                     />
                   </div>
                 </div>
-                <p class="text-[11px] text-zinc-500">
+                <p class="text-[11px] text-muted">
                   Issue keys from
                   <a
                     href="https://www.google.com/recaptcha/admin/create"
                     target="_blank"
                     rel="noopener"
-                    class="text-zinc-700 underline"
+                    class="text-default underline"
                     >Google reCAPTCHA admin</a
                   >
                   — pick <strong>reCAPTCHA v3</strong>, add the domain(s) the widget runs on.
@@ -490,7 +490,7 @@
               </div>
             }
 
-            <div class="flex items-center justify-end gap-2 border-t border-zinc-200 pt-3">
+            <div class="flex items-center justify-end gap-2 border-t border-subtle pt-3">
               @if (saveOkAt() !== null && !dirty()) {
                 <span class="text-xs text-emerald-600">Saved.</span>
               }
@@ -498,7 +498,7 @@
                 type="button"
                 [disabled]="!dirty() || saving()"
                 (click)="save()"
-                class="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {{ saving() ? 'Saving…' : 'Save configuration' }}
               </button>
@@ -508,16 +508,14 @@
 
         <!-- =================== Panel 3: Install snippet =================== -->
         <section class="space-y-3">
-          <h3 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            Install snippet
-          </h3>
+          <h3 class="text-sm font-semibold uppercase tracking-wide text-muted">Install snippet</h3>
           @if (activeKey()) {
-            <p class="text-xs text-zinc-500">
+            <p class="text-xs text-muted">
               Paste this snippet on any page of your website where you want the lead form to appear.
               <br />
               The widget JS bundle is shipped in Step 5 — for now the snippet is a preview.
             </p>
-            <div class="overflow-hidden rounded-md border border-zinc-200 bg-zinc-900 p-4">
+            <div class="overflow-hidden rounded-md border border-subtle bg-accent p-4">
               <pre class="whitespace-pre-wrap break-all text-xs text-zinc-100 font-mono">{{
                 snippet()
               }}</pre>
@@ -526,7 +524,7 @@
               <button
                 type="button"
                 (click)="copySnippet()"
-                class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
               >
                 @if (snippetCopied()) {
                   <lucide-icon name="check" class="h-4 w-4 text-emerald-600" />
@@ -537,13 +535,13 @@
                 }
               </button>
             </div>
-            <p class="text-[11px] text-zinc-400">
+            <p class="text-[11px] text-faint">
               Note: the snippet shows the key prefix only ("{{ activeKey()?.prefix }}…"). Replace
               the `…` with the rest of the secret you saved when issuing the key.
             </p>
           } @else {
             <div
-              class="rounded-md border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+              class="rounded-md border border-subtle bg-surface-2 px-4 py-6 text-center text-sm text-muted"
             >
               Issue a key first to see the install snippet.
             </div>

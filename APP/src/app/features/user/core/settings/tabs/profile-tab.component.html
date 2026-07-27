@@ -1,5 +1,5 @@
 <div>
-  <p class="mb-4 text-sm text-zinc-500">
+  <p class="mb-4 text-sm text-muted">
     Update your name, contact details, and password. Email is immutable.
   </p>
 
@@ -10,43 +10,43 @@
   }
 
   @if (loading()) {
-    <div class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
+    <div class="rounded-lg border border-subtle bg-surface p-6 text-center text-sm text-muted">
       Loading…
     </div>
   } @else if (me(); as m) {
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <!-- Profile sub-form -->
-      <section class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 class="mb-3 text-sm font-semibold text-zinc-900">Profile</h2>
+      <section class="rounded-lg border border-subtle bg-surface p-5 shadow-sm">
+        <h2 class="mb-3 text-sm font-semibold text-default">Profile</h2>
         <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="space-y-3">
           <label class="block text-sm">
-            <span class="block text-xs font-medium text-zinc-600">Full name</span>
+            <span class="block text-xs font-medium text-muted">Full name</span>
             <input
               type="text"
               formControlName="full_name"
               autocomplete="name"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
           </label>
           <label class="block text-sm">
-            <span class="block text-xs font-medium text-zinc-600">Email</span>
+            <span class="block text-xs font-medium text-muted">Email</span>
             <input
               type="email"
               [value]="m.email"
               readonly
-              class="mt-1 block w-full cursor-not-allowed rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-600 shadow-sm"
+              class="mt-1 block w-full cursor-not-allowed rounded-md border border-subtle bg-surface-2 px-3 py-1.5 text-sm text-muted shadow-sm"
             />
-            <span class="mt-1 block text-[11px] text-zinc-500">
+            <span class="mt-1 block text-[11px] text-muted">
               Email is immutable. To change it, ask an admin to invite a new account.
             </span>
           </label>
           <label class="block text-sm">
-            <span class="block text-xs font-medium text-zinc-600">Phone</span>
+            <span class="block text-xs font-medium text-muted">Phone</span>
             <input
               type="tel"
               formControlName="phone"
               autocomplete="tel"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
           </label>
 
@@ -69,7 +69,7 @@
             <button
               type="submit"
               [disabled]="profileForm.invalid || profileSaving()"
-              class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+              class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               {{ profileSaving() ? 'Saving…' : 'Save profile' }}
             </button>
@@ -78,43 +78,43 @@
       </section>
 
       <!-- Password sub-form -->
-      <section class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 class="mb-3 text-sm font-semibold text-zinc-900">Password</h2>
+      <section class="rounded-lg border border-subtle bg-surface p-5 shadow-sm">
+        <h2 class="mb-3 text-sm font-semibold text-default">Password</h2>
         <form [formGroup]="passwordForm" (ngSubmit)="changePassword()" class="space-y-3">
           <label class="block text-sm">
-            <span class="block text-xs font-medium text-zinc-600">Current password</span>
+            <span class="block text-xs font-medium text-muted">Current password</span>
             <input
               type="password"
               formControlName="current_password"
               autocomplete="current-password"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
           </label>
           <label class="block text-sm">
-            <span class="block text-xs font-medium text-zinc-600">New password</span>
+            <span class="block text-xs font-medium text-muted">New password</span>
             <input
               type="password"
               formControlName="new_password"
               autocomplete="new-password"
               minlength="8"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
-            <span class="mt-1 block text-[11px] text-zinc-500">Minimum 8 characters.</span>
+            <span class="mt-1 block text-[11px] text-muted">Minimum 8 characters.</span>
           </label>
           <label class="block text-sm">
-            <span class="block text-xs font-medium text-zinc-600">Confirm new password</span>
+            <span class="block text-xs font-medium text-muted">Confirm new password</span>
             <input
               type="password"
               formControlName="confirm_password"
               autocomplete="new-password"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             />
           </label>
-          <label class="flex items-center gap-2 pt-1 text-sm text-zinc-700">
+          <label class="flex items-center gap-2 pt-1 text-sm text-default">
             <input
               type="checkbox"
               formControlName="sign_out_others"
-              class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+              class="h-4 w-4 rounded border-subtle text-default focus:ring-zinc-500"
             />
             Sign out of all other sessions
           </label>
@@ -138,7 +138,7 @@
             <button
               type="submit"
               [disabled]="passwordSaving()"
-              class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+              class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               {{ passwordSaving() ? 'Saving…' : 'Change password' }}
             </button>

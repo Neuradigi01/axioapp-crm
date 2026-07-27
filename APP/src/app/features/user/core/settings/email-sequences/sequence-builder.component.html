@@ -4,21 +4,21 @@
     <div>
       <a
         routerLink="/user/settings/email-sequences"
-        class="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-700"
+        class="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-default"
       >
         <lucide-icon name="arrow-left" size="12" aria-hidden="true"></lucide-icon>
         Back to sequences
       </a>
-      <h1 class="mt-1 text-xl font-semibold text-zinc-900">
+      <h1 class="mt-1 text-xl font-semibold text-default">
         {{ isEdit() ? 'Edit sequence' : 'New sequence' }}
       </h1>
-      <p class="mt-0.5 text-xs text-zinc-500">
+      <p class="mt-0.5 text-xs text-muted">
         Drip-send templates on a schedule. Replies auto-pause; you can resume manually.
       </p>
     </div>
     <button
       type="button"
-      class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 disabled:opacity-50"
+      class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-accent disabled:opacity-50"
       [disabled]="!canSave() || submitting()"
       (click)="save()"
     >
@@ -53,27 +53,27 @@
   @if (loading()) {
     <div class="space-y-2">
       @for (i of [0, 1, 2]; track i) {
-        <div class="h-16 animate-pulse rounded bg-zinc-100" aria-hidden="true"></div>
+        <div class="h-16 animate-pulse rounded bg-surface-2" aria-hidden="true"></div>
       }
     </div>
   } @else {
     <!-- Top-level fields -->
-    <section class="space-y-4 rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
+    <section class="space-y-4 rounded-md border border-subtle bg-surface p-4 shadow-sm">
       <div>
-        <label class="block text-xs font-medium text-zinc-700">
+        <label class="block text-xs font-medium text-default">
           Name <span class="text-rose-600">*</span>
         </label>
         <input
           type="text"
           [formControl]="nameCtrl"
           placeholder="Designer outreach"
-          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
-        <p class="mt-1 text-xs text-zinc-500">Internal label — shown in pickers and reports.</p>
+        <p class="mt-1 text-xs text-muted">Internal label — shown in pickers and reports.</p>
       </div>
 
-      <label class="inline-flex items-center gap-2 text-sm text-zinc-700">
-        <input type="checkbox" [formControl]="activeCtrl" class="rounded border-zinc-300" />
+      <label class="inline-flex items-center gap-2 text-sm text-default">
+        <input type="checkbox" [formControl]="activeCtrl" class="rounded border-subtle" />
         Active (available for new enrollments)
       </label>
     </section>
@@ -81,8 +81,8 @@
     <!-- Step list -->
     <section class="space-y-3">
       <header class="flex items-center justify-between">
-        <h2 class="text-sm font-semibold text-zinc-900">Steps</h2>
-        <p class="text-xs text-zinc-500">
+        <h2 class="text-sm font-semibold text-default">Steps</h2>
+        <p class="text-xs text-muted">
           Drag the handle to reorder. Step 1 fires at enrollment; subsequent steps wait `delay_days`
           after the prior send.
         </p>
@@ -90,7 +90,7 @@
 
       @if (steps().length === 0) {
         <div
-          class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 p-6 text-center text-xs text-zinc-500"
+          class="rounded-md border border-dashed border-subtle bg-surface-2 p-6 text-center text-xs text-muted"
         >
           No steps yet. Add at least one to enable saving.
         </div>
@@ -99,8 +99,8 @@
       <div class="space-y-2">
         @for (row of steps(); track $index; let i = $index) {
           <div
-            class="flex items-stretch gap-2 rounded-md border bg-white p-3 shadow-sm"
-            [class.border-zinc-200]="dropTargetIndex() !== i"
+            class="flex items-stretch gap-2 rounded-md border bg-surface p-3 shadow-sm"
+            [class.border-subtle]="dropTargetIndex() !== i"
             [class.border-blue-400]="dropTargetIndex() === i"
             [class.opacity-50]="draggingIndex() === i"
             draggable="true"
@@ -112,7 +112,7 @@
           >
             <!-- Drag handle -->
             <div
-              class="flex shrink-0 cursor-grab items-center px-1 text-zinc-400 hover:text-zinc-600"
+              class="flex shrink-0 cursor-grab items-center px-1 text-faint hover:text-muted"
               title="Drag to reorder"
             >
               <lucide-icon name="grip-vertical" size="16" aria-hidden="true"></lucide-icon>
@@ -121,7 +121,7 @@
             <!-- Step number -->
             <div class="flex shrink-0 items-center">
               <span
-                class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-700"
+                class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-default"
               >
                 {{ i + 1 }}
               </span>
@@ -131,56 +131,56 @@
             <div class="relative flex-1 min-w-0">
               <button
                 type="button"
-                class="flex w-full items-center justify-between gap-2 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-left text-sm hover:bg-zinc-50"
+                class="flex w-full items-center justify-between gap-2 rounded-md border border-subtle bg-surface px-3 py-1.5 text-left text-sm hover:bg-surface-2"
                 (click)="openPicker(i)"
               >
                 @if (row.template_id !== null) {
                   <span class="min-w-0 truncate">
-                    <span class="block truncate font-medium text-zinc-900">
+                    <span class="block truncate font-medium text-default">
                       {{ row.template_name ?? 'Loading template…' }}
                     </span>
-                    <span class="block truncate font-mono text-[10px] text-zinc-500">
+                    <span class="block truncate font-mono text-[10px] text-muted">
                       {{ row.template_id }}
                     </span>
                   </span>
                 } @else {
-                  <span class="text-zinc-500">Pick a template…</span>
+                  <span class="text-muted">Pick a template…</span>
                 }
                 <lucide-icon
                   name="chevron-down"
                   size="12"
-                  class="shrink-0 text-zinc-400"
+                  class="shrink-0 text-faint"
                   aria-hidden="true"
                 ></lucide-icon>
               </button>
 
               @if (pickerOpenRow() === i) {
                 <div
-                  class="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-xl"
+                  class="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-hidden rounded-md border border-subtle bg-surface shadow-xl"
                   role="dialog"
                   aria-label="Pick a template"
                 >
-                  <div class="border-b border-zinc-200 p-2">
+                  <div class="border-b border-subtle p-2">
                     <label class="relative block">
                       <span class="sr-only">Search</span>
                       <lucide-icon
                         name="search"
                         size="12"
-                        class="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400"
+                        class="absolute left-2 top-1/2 -translate-y-1/2 text-faint"
                         aria-hidden="true"
                       ></lucide-icon>
                       <input
                         type="text"
                         [formControl]="templateSearchCtrl"
                         placeholder="Search templates…"
-                        class="block w-full rounded-md border border-zinc-300 bg-white py-1 pl-6 pr-2 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                        class="block w-full rounded-md border border-subtle bg-surface py-1 pl-6 pr-2 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                         autofocus
                       />
                     </label>
                   </div>
                   <div class="max-h-56 overflow-y-auto">
                     @if (templateSearchLoading() && templateResults().length === 0) {
-                      <p class="flex items-center gap-1 px-3 py-3 text-xs text-zinc-500">
+                      <p class="flex items-center gap-1 px-3 py-3 text-xs text-muted">
                         <lucide-icon
                           name="loader-2"
                           size="12"
@@ -190,24 +190,24 @@
                         Loading…
                       </p>
                     } @else if (templateResults().length === 0) {
-                      <p class="px-3 py-3 text-xs text-zinc-500">
+                      <p class="px-3 py-3 text-xs text-muted">
                         No templates match. Create one in
                         <span class="font-medium">Settings → Email Templates</span>.
                       </p>
                     } @else {
-                      <ul class="divide-y divide-zinc-100">
+                      <ul class="divide-y divide-subtle">
                         @for (t of templateResults(); track t.id) {
                           <li>
                             <button
                               type="button"
-                              class="flex w-full items-start justify-between gap-2 px-3 py-2 text-left hover:bg-zinc-50"
+                              class="flex w-full items-start justify-between gap-2 px-3 py-2 text-left hover:bg-surface-2"
                               (click)="selectTemplate(i, t)"
                             >
                               <div class="flex-1 min-w-0">
-                                <p class="truncate text-sm font-medium text-zinc-900">
+                                <p class="truncate text-sm font-medium text-default">
                                   {{ t.name }}
                                 </p>
-                                <p class="truncate text-xs text-zinc-500">{{ t.subject }}</p>
+                                <p class="truncate text-xs text-muted">{{ t.subject }}</p>
                               </div>
                             </button>
                           </li>
@@ -215,10 +215,10 @@
                       </ul>
                     }
                   </div>
-                  <div class="border-t border-zinc-200 px-3 py-1.5 text-right">
+                  <div class="border-t border-subtle px-3 py-1.5 text-right">
                     <button
                       type="button"
-                      class="text-xs text-zinc-500 hover:text-zinc-700"
+                      class="text-xs text-muted hover:text-default"
                       (click)="closePicker()"
                     >
                       Cancel
@@ -231,28 +231,28 @@
             <!-- Delay days -->
             <div class="flex shrink-0 items-center gap-1">
               @if (i === 0) {
-                <span class="text-xs text-zinc-500">Send</span>
-                <span class="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-zinc-700"
+                <span class="text-xs text-muted">Send</span>
+                <span class="rounded bg-surface-2 px-1.5 py-0.5 text-xs font-medium text-default"
                   >immediately</span
                 >
               } @else {
-                <span class="text-xs text-zinc-500">Wait</span>
+                <span class="text-xs text-muted">Wait</span>
                 <input
                   type="number"
                   min="0"
                   max="365"
                   [value]="row.delay_days"
                   (input)="setDelay(i, $any($event.target).valueAsNumber)"
-                  class="w-16 rounded-md border border-zinc-300 bg-white px-2 py-1 text-right text-sm font-mono shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  class="w-16 rounded-md border border-subtle bg-surface px-2 py-1 text-right text-sm font-mono shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                 />
-                <span class="text-xs text-zinc-500">days</span>
+                <span class="text-xs text-muted">days</span>
               }
             </div>
 
             <!-- Remove -->
             <button
               type="button"
-              class="shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-rose-50 hover:text-rose-600"
+              class="shrink-0 rounded-md p-1.5 text-faint hover:bg-rose-50 hover:text-rose-600"
               aria-label="Remove step"
               title="Remove step"
               (click)="removeStep(i)"
@@ -265,7 +265,7 @@
 
       <button
         type="button"
-        class="inline-flex items-center gap-1.5 rounded-md border border-dashed border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        class="inline-flex items-center gap-1.5 rounded-md border border-dashed border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
         (click)="addStep()"
       >
         <lucide-icon name="plus" size="14" aria-hidden="true"></lucide-icon>

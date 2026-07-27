@@ -136,7 +136,7 @@ Grouped into 5 tracks. Each step is independently reviewable; pause/report after
 | 14 | [Workflows + Automations](step-14-workflows-automations.md) | COMPLETED | ~1 day |
 | 15 | [Reviews + Reporting](step-15-reviews-reporting.md) | COMPLETED | ~½ day |
 | 16 | [Integrations + Billing](step-16-integrations-billing.md) | COMPLETED | ~1 day |
-| 17 | [Settings (all tabs) + Notifications + Profile](step-17-settings-notifications-profile.md) | Pending | ~1 day |
+| 17 | [Settings (all tabs) + Notifications + Profile](step-17-settings-notifications-profile.md) | COMPLETED | ~1 day |
 | 18 | [Small pages sweep (calls, catalog, activities, tasks, walk-ins, custom-fields, standard-fields, ai, staff, whatsapp, services)](step-18-small-pages-sweep.md) | Pending | ~1 day |
 
 ### Track 5 — Auth + admin + polish

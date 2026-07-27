@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the settings page (all tabs — General, Users, Roles, Permissions, Custom Fields, Standard Fields, Pipelines, Appearance, Data, Security, etc.), the notifications preferences page, and the user profile page.
 **Track:** Design Refresh — Track 4 (Page pass)
-**Status:** Pending
+**Status:** COMPLETED — 38 HTML files across settings (all tabs — profile / roles / team / two-factor / login-history / notifications / appearance / standard-fields / automation-settings / ai-settings / embed-integrations / issue-key-modal / submission-log / store-profile), notifications (popover + toast-host), profile, and settings/integrations subtree (google-calendar-card / meta-card / google-card / whatsapp-card / dlq-list) + email-sequences + general/compliance-settings. Every appearance-tab card, tab list, form field, and integration wizard inherits AIXO tokens. `ng build` green.
 **Depends on:** Steps 1, 5, 6, 7
 
 ---

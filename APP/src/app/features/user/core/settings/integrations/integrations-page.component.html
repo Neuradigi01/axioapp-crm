@@ -1,7 +1,7 @@
 <div class="flex h-[calc(100vh-4rem)] flex-col">
-  <header class="border-b border-zinc-200 bg-white px-6 py-3">
-    <h1 class="text-xl font-semibold text-zinc-900">Integrations</h1>
-    <p class="text-xs text-zinc-500">
+  <header class="border-b border-subtle bg-surface px-6 py-3">
+    <h1 class="text-xl font-semibold text-default">Integrations</h1>
+    <p class="text-xs text-muted">
       Connect ad platforms (Google Ads, Meta Ads) and messaging channels (WhatsApp) to your CRM.
       Lead form submissions land in Leads; inbound messages land in Conversations.
     </p>
@@ -57,7 +57,7 @@
     }
 
     @if (loading()) {
-      <p class="flex items-center gap-2 text-sm text-zinc-500">
+      <p class="flex items-center gap-2 text-sm text-muted">
         <lucide-icon
           name="loader-2"
           size="14"
@@ -114,18 +114,13 @@
          link to expand the inline table even when the status banner
          isn't showing. -->
       <section
-        class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm"
+        class="rounded-lg border border-subtle bg-surface p-4 shadow-sm"
         data-testid="dlq-summary"
       >
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <lucide-icon
-              name="inbox"
-              size="16"
-              class="text-zinc-500"
-              aria-hidden="true"
-            ></lucide-icon>
-            <h3 class="text-sm font-medium text-zinc-900">Dead-letter queue</h3>
+            <lucide-icon name="inbox" size="16" class="text-muted" aria-hidden="true"></lucide-icon>
+            <h3 class="text-sm font-medium text-default">Dead-letter queue</h3>
           </div>
           @if (dlqTotal() !== null) {
             @if (dlqTotal()! > 0) {
@@ -145,7 +140,7 @@
             }
           }
         </div>
-        <p class="mt-2 text-xs text-zinc-500">
+        <p class="mt-2 text-xs text-muted">
           Webhook payloads that exhausted their retry budget or failed validation land here. Click a
           row's Replay button to re-enqueue, or Discard to silence (the row stays for audit).
         </p>

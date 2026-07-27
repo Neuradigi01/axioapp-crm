@@ -1,8 +1,8 @@
 <div class="mx-auto max-w-5xl p-6 space-y-5">
   <header class="flex flex-wrap items-start justify-between gap-3">
     <div>
-      <h1 class="text-lg font-semibold text-zinc-900">Catalog categories</h1>
-      <p class="mt-0.5 text-xs text-zinc-500">
+      <h1 class="text-lg font-semibold text-default">Catalog categories</h1>
+      <p class="mt-0.5 text-xs text-muted">
         {{ totalCategories() }} categor{{ totalCategories() === 1 ? 'y' : 'ies' }} ·
         {{ activeCategories() }} active. Used to group products in filters &amp; pickers.
       </p>
@@ -10,7 +10,7 @@
     <div class="flex items-center gap-2">
       <a
         routerLink="/user/catalog"
-        class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
       >
         <lucide-icon name="arrow-left" class="h-4 w-4" />
         Back to catalog
@@ -18,7 +18,7 @@
       <button
         type="button"
         (click)="openAdd()"
-        class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent"
       >
         <lucide-icon name="plus" class="h-4 w-4" />
         Add category
@@ -31,12 +31,12 @@
     <form
       [formGroup]="form"
       (ngSubmit)="onSubmit()"
-      class="space-y-4 rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200"
+      class="space-y-4 rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle"
     >
-      <h2 class="text-sm font-semibold text-zinc-900">New category</h2>
+      <h2 class="text-sm font-semibold text-default">New category</h2>
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label for="cc_name" class="block text-xs font-medium text-zinc-700">
+          <label for="cc_name" class="block text-xs font-medium text-default">
             Name <span class="text-red-600">*</span>
           </label>
           <input
@@ -44,59 +44,59 @@
             type="text"
             formControlName="name"
             placeholder="e.g. Sofas"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           />
         </div>
         <div>
-          <label for="cc_emoji" class="block text-xs font-medium text-zinc-700">Icon emoji</label>
+          <label for="cc_emoji" class="block text-xs font-medium text-default">Icon emoji</label>
           <input
             id="cc_emoji"
             type="text"
             formControlName="icon_emoji"
             placeholder="🛋️"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           />
         </div>
         <div>
-          <label for="cc_color" class="block text-xs font-medium text-zinc-700"> Colour hex </label>
+          <label for="cc_color" class="block text-xs font-medium text-default"> Colour hex </label>
           <input
             id="cc_color"
             type="text"
             formControlName="color_hex"
             placeholder="#7c3aed"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 font-mono text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           />
           @if (form.controls.color_hex.touched && form.controls.color_hex.errors?.['pattern']) {
             <p class="mt-1 text-xs text-red-600">Use #RRGGBB (e.g. #7c3aed).</p>
           }
         </div>
         <div>
-          <label for="cc_order" class="block text-xs font-medium text-zinc-700">
+          <label for="cc_order" class="block text-xs font-medium text-default">
             Display order
           </label>
           <input
             id="cc_order"
             type="number"
             formControlName="display_order"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           />
         </div>
       </div>
       <div>
-        <label for="cc_desc" class="block text-xs font-medium text-zinc-700">Description</label>
+        <label for="cc_desc" class="block text-xs font-medium text-default">Description</label>
         <textarea
           id="cc_desc"
           rows="2"
           formControlName="description"
           placeholder="Optional description shown in tooltips"
-          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         ></textarea>
       </div>
-      <label class="flex items-center gap-2 text-sm text-zinc-700">
+      <label class="flex items-center gap-2 text-sm text-default">
         <input
           type="checkbox"
           formControlName="is_active"
-          class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+          class="h-4 w-4 rounded border-subtle text-default focus:ring-zinc-500"
         />
         Active (shown in the catalog filter dropdown)
       </label>
@@ -111,14 +111,14 @@
         <button
           type="button"
           (click)="cancelForm()"
-          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         >
           Cancel
         </button>
         <button
           type="submit"
           [disabled]="saving()"
-          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-zinc-400"
         >
           {{ editingId() ? 'Save changes' : 'Create category' }}
         </button>
@@ -131,24 +131,22 @@
     <p class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{{ err }}</p>
   } @else if (loading()) {
     <p
-      class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+      class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-6 text-center text-sm text-muted"
     >
       Loading categories…
     </p>
   } @else if (categories().length === 0) {
     <p
-      class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-500"
+      class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-10 text-center text-sm text-muted"
     >
       No categories yet.
-      <span class="block text-xs text-zinc-400"
-        >Click "Add category" to create your first one.</span
-      >
+      <span class="block text-xs text-faint">Click "Add category" to create your first one.</span>
     </p>
   } @else {
-    <div class="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-zinc-200">
+    <div class="overflow-hidden rounded-lg bg-surface shadow-sm ring-1 border-subtle">
       <table class="w-full text-sm">
         <thead
-          class="bg-zinc-50 text-left text-[11px] font-medium uppercase tracking-wide text-zinc-500"
+          class="bg-surface-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted"
         >
           <tr>
             <th class="w-12 px-4 py-2.5">Icon</th>
@@ -159,41 +157,41 @@
             <th class="w-24 px-4 py-2.5"></th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-zinc-100">
+        <tbody class="divide-y divide-subtle">
           @for (cat of categories(); track cat.id) {
             @if (editingId() === cat.id) {
-              <tr class="bg-zinc-50">
+              <tr class="bg-surface-2">
                 <td colspan="6" class="p-4">
                   <form
                     [formGroup]="form"
                     (ngSubmit)="onSubmit()"
-                    class="space-y-3 rounded-md bg-white p-4 ring-1 ring-zinc-200"
+                    class="space-y-3 rounded-md bg-surface p-4 ring-1 border-subtle"
                   >
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
-                        <label class="block text-xs font-medium text-zinc-700">
+                        <label class="block text-xs font-medium text-default">
                           Name <span class="text-red-600">*</span>
                         </label>
                         <input
                           type="text"
                           formControlName="name"
-                          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                         />
                       </div>
                       <div>
-                        <label class="block text-xs font-medium text-zinc-700">Icon emoji</label>
+                        <label class="block text-xs font-medium text-default">Icon emoji</label>
                         <input
                           type="text"
                           formControlName="icon_emoji"
-                          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                         />
                       </div>
                       <div>
-                        <label class="block text-xs font-medium text-zinc-700">Colour hex</label>
+                        <label class="block text-xs font-medium text-default">Colour hex</label>
                         <input
                           type="text"
                           formControlName="color_hex"
-                          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 font-mono text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                         />
                         @if (
                           form.controls.color_hex.touched &&
@@ -203,27 +201,27 @@
                         }
                       </div>
                       <div>
-                        <label class="block text-xs font-medium text-zinc-700">Display order</label>
+                        <label class="block text-xs font-medium text-default">Display order</label>
                         <input
                           type="number"
                           formControlName="display_order"
-                          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                         />
                       </div>
                     </div>
                     <div>
-                      <label class="block text-xs font-medium text-zinc-700">Description</label>
+                      <label class="block text-xs font-medium text-default">Description</label>
                       <textarea
                         rows="2"
                         formControlName="description"
-                        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                        class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                       ></textarea>
                     </div>
-                    <label class="flex items-center gap-2 text-sm text-zinc-700">
+                    <label class="flex items-center gap-2 text-sm text-default">
                       <input
                         type="checkbox"
                         formControlName="is_active"
-                        class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                        class="h-4 w-4 rounded border-subtle text-default focus:ring-zinc-500"
                       />
                       Active
                     </label>
@@ -238,14 +236,14 @@
                       <button
                         type="button"
                         (click)="cancelForm()"
-                        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         [disabled]="saving()"
-                        class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+                        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-zinc-400"
                       >
                         Save changes
                       </button>
@@ -263,11 +261,11 @@
                     {{ cat.icon_emoji ?? '📦' }}
                   </span>
                 </td>
-                <td class="px-4 py-2.5 font-medium text-zinc-900">{{ cat.name }}</td>
-                <td class="px-4 py-2.5 text-zinc-600">
+                <td class="px-4 py-2.5 font-medium text-default">{{ cat.name }}</td>
+                <td class="px-4 py-2.5 text-muted">
                   {{ cat.description ?? '—' }}
                 </td>
-                <td class="px-4 py-2.5 text-center font-mono text-xs text-zinc-500">
+                <td class="px-4 py-2.5 text-center font-mono text-xs text-muted">
                   {{ cat.display_order }}
                 </td>
                 <td class="px-4 py-2.5 text-center">
@@ -279,7 +277,7 @@
                     </span>
                   } @else {
                     <span
-                      class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 ring-1 ring-zinc-200"
+                      class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted ring-1 border-subtle"
                     >
                       inactive
                     </span>
@@ -290,14 +288,14 @@
                     <button
                       type="button"
                       (click)="openEdit(cat)"
-                      class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                      class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       (click)="onDelete(cat)"
-                      class="rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                      class="rounded-md border border-red-200 bg-surface px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
                     >
                       Delete
                     </button>

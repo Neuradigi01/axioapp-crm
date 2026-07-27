@@ -1,19 +1,19 @@
 <div class="p-8">
   <header class="mb-6">
-    <h1 class="text-2xl font-semibold text-zinc-900">Settings</h1>
-    <p class="mt-1 text-sm text-zinc-500">Tenant configuration for this organisation.</p>
+    <h1 class="text-2xl font-semibold text-default">Settings</h1>
+    <p class="mt-1 text-sm text-muted">Tenant configuration for this organisation.</p>
   </header>
 
-  <nav class="mb-6 flex flex-wrap gap-2 border-b border-zinc-200">
+  <nav class="mb-6 flex flex-wrap gap-2 border-b border-subtle">
     @for (tab of tabs(); track tab.id) {
       <button
         type="button"
         class="-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors"
-        [class.border-zinc-900]="active() === tab.id"
-        [class.text-zinc-900]="active() === tab.id"
+        [class.border-accent]="active() === tab.id"
+        [class.text-default]="active() === tab.id"
         [class.border-transparent]="active() !== tab.id"
-        [class.text-zinc-500]="active() !== tab.id"
-        [class.hover:text-zinc-900]="active() !== tab.id"
+        [class.text-muted]="active() !== tab.id"
+        [class.hover:text-default]="active() !== tab.id"
         (click)="active.set(tab.id)"
       >
         {{ tab.label }}
