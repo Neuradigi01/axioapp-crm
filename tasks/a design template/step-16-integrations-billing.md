@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the Integrations directory + connection wizards, and the Billing module (plan cards, invoices list, seats management, upgrade modal).
 **Track:** Design Refresh — Track 4 (Page pass)
-**Status:** Pending
+**Status:** COMPLETED — 5 billing HTML files bulk-swapped: billing.page (plans + invoices), upgrade-modal, upgrade-success, trial-banner (re-swept), locked-feature. Integrations module is currently housed under `settings/integrations/` (already covered in Step 17) — no standalone `/user/integrations/` route yet. `ng build` green.
 **Depends on:** Steps 1, 5, 6, 7
 
 ---
