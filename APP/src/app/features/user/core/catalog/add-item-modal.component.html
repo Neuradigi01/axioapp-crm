@@ -2,7 +2,7 @@
   <div
     class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-surface shadow-xl ring-1 border-subtle"
   >
-    <header class="sticky top-0 z-10 border-b border-subtle bg-surface px-6 py-4">
+    <header class="sticky top-0 z-10 border-b border-subtle bg-surface px-4 md:px-6 py-4">
       <h2 class="text-base font-semibold text-default">
         {{ isEdit() ? 'Edit product' : 'Add product' }}
       </h2>
@@ -15,7 +15,7 @@
       </p>
     </header>
 
-    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-5 px-6 py-5">
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-5 px-4 md:px-6 py-5">
       <!-- Primary cover image -->
       <div>
         <label class="block text-xs font-medium text-default">Primary cover image</label>
@@ -342,7 +342,7 @@
     </form>
 
     <footer
-      class="sticky bottom-0 flex items-center justify-end gap-2 rounded-b-lg border-t border-subtle bg-surface-2 px-6 py-3"
+      class="sticky bottom-0 flex items-center justify-end gap-2 rounded-b-lg border-t border-subtle bg-surface-2 px-4 md:px-6 py-3"
     >
       <button
         type="button"

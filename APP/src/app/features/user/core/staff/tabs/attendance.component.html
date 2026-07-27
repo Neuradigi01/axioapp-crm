@@ -50,9 +50,9 @@
           </span>
         </div>
         @if (loading()) {
-          <div class="py-6 text-center text-sm text-muted">Loading…</div>
+          <div class="py-4 md:py-6 text-center text-sm text-muted">Loading…</div>
         } @else if (attendance().length === 0) {
-          <div class="py-6 text-center text-sm text-muted">No sessions in this month.</div>
+          <div class="py-4 md:py-6 text-center text-sm text-muted">No sessions in this month.</div>
         } @else {
           <ul class="divide-y divide-subtle">
             @for (a of attendance(); track a.id) {

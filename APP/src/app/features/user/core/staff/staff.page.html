@@ -1,4 +1,4 @@
-<div class="px-6 py-6">
+<div class="px-4 py-4 md:px-6 md:py-6">
   <!-- Header -->
   <div class="mb-6 flex items-start justify-between">
     <div>
@@ -95,7 +95,9 @@
 
   <!-- Loading -->
   @if (loading()) {
-    <div class="rounded-md border border-subtle bg-surface p-6 text-center text-sm text-muted">
+    <div
+      class="rounded-md border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+    >
       Loading…
     </div>
   } @else {

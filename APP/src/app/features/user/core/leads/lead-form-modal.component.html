@@ -1,6 +1,6 @@
 <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
   <div class="w-full max-w-2xl rounded-lg bg-surface shadow-xl ring-1 border-subtle">
-    <header class="border-b border-subtle px-6 py-4">
+    <header class="border-b border-subtle px-4 md:px-6 py-4">
       <h2 class="text-base font-semibold text-default">
         {{ isEdit() ? 'Edit lead' : 'New lead' }}
       </h2>
@@ -17,7 +17,7 @@
     <form
       [formGroup]="standard"
       (ngSubmit)="onSubmit()"
-      class="max-h-[70vh] overflow-y-auto px-6 py-5"
+      class="max-h-[70vh] overflow-y-auto px-4 md:px-6 py-5"
     >
       <!-- Contact section -->
       <section>
@@ -229,7 +229,7 @@
     </form>
 
     <footer
-      class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-6 py-3 rounded-b-lg"
+      class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-4 md:px-6 py-3 rounded-b-lg"
     >
       <button
         type="button"

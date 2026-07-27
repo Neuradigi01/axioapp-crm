@@ -21,7 +21,7 @@
           <div class="h-9 w-full rounded-md bg-surface-2"></div>
         </div>
       } @else if (totalOpen() === 0) {
-        <p class="py-6 text-center text-xs text-muted">You have no open tasks.</p>
+        <p class="py-4 md:py-6 text-center text-xs text-muted">You have no open tasks.</p>
       } @else {
         <div class="space-y-3">
           @for (group of groups(); track group.id) {

@@ -1,5 +1,5 @@
 <div class="flex min-h-[calc(100vh-4rem)] flex-col bg-surface-2">
-  <header class="border-b border-subtle bg-surface px-6 py-4">
+  <header class="border-b border-subtle bg-surface px-4 md:px-6 py-4">
     <div class="flex items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <a
@@ -28,7 +28,7 @@
     }
   </header>
 
-  <section class="border-b border-subtle bg-surface px-6 py-3">
+  <section class="border-b border-subtle bg-surface px-4 md:px-6 py-3">
     <div class="flex flex-wrap items-center gap-2">
       <select
         [value]="statusFilter()"
@@ -51,15 +51,17 @@
     </div>
   </section>
 
-  <section class="flex-1 px-6 py-4">
+  <section class="flex-1 px-4 md:px-6 py-4">
     @if (loading() && items().length === 0) {
       <div
-        class="rounded-md border border-subtle bg-surface px-4 py-6 text-center text-sm text-muted"
+        class="rounded-md border border-subtle bg-surface px-4 py-4 md:py-6 text-center text-sm text-muted"
       >
         Loading runs…
       </div>
     } @else if (items().length === 0) {
-      <div class="rounded-md border border-dashed border-subtle bg-surface px-6 py-10 text-center">
+      <div
+        class="rounded-md border border-dashed border-subtle bg-surface px-4 md:px-6 py-10 text-center"
+      >
         <lucide-icon name="clock" size="28" class="mx-auto mb-2 text-faint" />
         <p class="text-sm font-medium text-default">No runs match your filters.</p>
         <p class="mt-1 text-xs text-muted">
@@ -141,7 +143,7 @@
               </tr>
               @if (expandedId() === row.id) {
                 <tr class="bg-surface-2">
-                  <td colspan="7" class="px-6 py-3">
+                  <td colspan="7" class="px-4 md:px-6 py-3">
                     <div class="text-[10px] font-semibold uppercase tracking-wide text-muted">
                       Event payload
                     </div>

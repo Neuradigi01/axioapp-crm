@@ -1,5 +1,5 @@
 <div
-  class="fixed inset-0 z-50 bg-accent/40 backdrop-blur-sm flex items-center justify-center p-6"
+  class="fixed inset-0 z-50 bg-accent/40 backdrop-blur-sm flex items-center justify-center p-4 md:p-6"
   (click)="busy() ? null : cancel.emit()"
 >
   <div
@@ -20,7 +20,7 @@
 
     <div class="px-5 py-4 space-y-3">
       <label
-        class="block px-3 py-6 text-center text-xs text-muted border-2 border-dashed border-subtle rounded cursor-pointer hover:border-muted hover:bg-surface-2"
+        class="block px-3 py-4 md:py-6 text-center text-xs text-muted border-2 border-dashed border-subtle rounded cursor-pointer hover:border-muted hover:bg-surface-2"
       >
         <lucide-icon name="upload" class="w-5 h-5 mb-1 text-muted inline"></lucide-icon>
         @if (fileName()) {

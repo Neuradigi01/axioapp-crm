@@ -1,8 +1,8 @@
 @if (variant() === 'page') {
   <!-- Full-bleed page wrapper -->
-  <div class="flex min-h-[60vh] items-center justify-center px-6 py-12">
+  <div class="flex min-h-[60vh] items-center justify-center px-4 md:px-6 py-12">
     <div
-      class="w-full max-w-lg rounded-2xl border border-subtle bg-surface p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800"
+      class="w-full max-w-lg rounded-2xl border border-subtle bg-surface p-5 md:p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800"
     >
       @if (illustrationUrl(); as url) {
         <img [src]="url" alt="" class="mx-auto mb-6 h-32 w-32" aria-hidden="true" />

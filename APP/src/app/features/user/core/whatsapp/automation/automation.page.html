@@ -1,5 +1,5 @@
 <div class="flex min-h-[calc(100vh-4rem)] flex-col bg-surface-2">
-  <header class="border-b border-subtle bg-surface px-6 py-4">
+  <header class="border-b border-subtle bg-surface px-4 md:px-6 py-4">
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-xl font-semibold text-default">WhatsApp Automation</h1>
@@ -91,7 +91,7 @@
   </header>
 
   @if (mode() !== 'list') {
-    <section class="mx-auto w-full max-w-3xl flex-1 px-6 py-6">
+    <section class="mx-auto w-full max-w-3xl flex-1 px-4 md:px-6 py-4 md:py-6">
       <div class="mb-4 flex items-center gap-2 text-xs text-muted">
         <button
           type="button"
@@ -117,10 +117,10 @@
       }
     </section>
   } @else if (activeTab() === 'assignment') {
-    <section class="flex-1 px-6 py-4">
+    <section class="flex-1 px-4 md:px-6 py-4">
       <div class="overflow-hidden rounded-lg border border-subtle bg-surface">
         @if (assignmentRules().length === 0) {
-          <div class="px-6 py-12 text-center">
+          <div class="px-4 md:px-6 py-12 text-center">
             <p class="text-sm font-medium text-default">No assignment rules yet.</p>
             @if (canManage()) {
               <button
@@ -227,11 +227,11 @@
       </div>
     </section>
   } @else if (activeTab() === 'ai') {
-    <section class="mx-auto w-full max-w-3xl flex-1 px-6 py-6">
+    <section class="mx-auto w-full max-w-3xl flex-1 px-4 md:px-6 py-4 md:py-6">
       <app-ai-settings />
     </section>
   } @else {
-    <section class="flex-1 px-6 py-4">
+    <section class="flex-1 px-4 md:px-6 py-4">
       <!-- Dry-run test panel -->
       <div class="mb-4 rounded-md border border-subtle bg-surface p-3">
         <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Test a message</p>
@@ -286,9 +286,9 @@
       <!-- Rules list -->
       <div class="overflow-hidden rounded-lg border border-subtle bg-surface">
         @if (loading()) {
-          <div class="px-6 py-8 text-center text-sm text-muted">Loading…</div>
+          <div class="px-4 md:px-6 py-5 md:py-8 text-center text-sm text-muted">Loading…</div>
         } @else if (rules().length === 0) {
-          <div class="px-6 py-12 text-center">
+          <div class="px-4 md:px-6 py-12 text-center">
             <p class="text-sm font-medium text-default">No rules yet.</p>
             @if (canManage()) {
               <button

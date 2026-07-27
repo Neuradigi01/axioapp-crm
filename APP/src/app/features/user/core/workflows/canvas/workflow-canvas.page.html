@@ -1,6 +1,8 @@
 <div class="h-[calc(100vh-3.5rem)] flex flex-col bg-surface-2">
   <!-- Header bar -->
-  <header class="h-14 flex items-center gap-3 px-4 bg-surface border-b border-subtle shrink-0">
+  <header
+    class="h-14 flex items-center gap-2 md:gap-3 px-3 md:px-4 bg-surface border-b border-subtle shrink-0"
+  >
     <a
       routerLink="/user/workflows"
       class="p-1.5 rounded text-muted hover:text-default hover:bg-surface-2"
@@ -9,13 +11,35 @@
       <lucide-icon name="arrow-left" class="w-4 h-4"></lucide-icon>
     </a>
 
+    <!-- Mobile: open node palette -->
+    <button
+      type="button"
+      (click)="toggleMobilePalette()"
+      class="p-1.5 rounded text-muted hover:text-default hover:bg-surface-2 md:hidden"
+      title="Node palette"
+      aria-label="Toggle node palette"
+    >
+      <lucide-icon name="layout-grid" class="w-4 h-4"></lucide-icon>
+    </button>
+
     <input
       type="text"
-      class="flex-1 max-w-md text-base font-medium bg-transparent text-default focus:outline-none focus:border-b focus:border-subtle px-1"
+      class="flex-1 max-w-md text-sm md:text-base font-medium bg-transparent text-default focus:outline-none focus:border-b focus:border-subtle px-1 min-w-0"
       [ngModel]="state.name()"
       (ngModelChange)="state.setName($event)"
       placeholder="Untitled workflow"
     />
+
+    <!-- Mobile: open right inspector -->
+    <button
+      type="button"
+      (click)="toggleMobileInspector()"
+      class="p-1.5 rounded text-muted hover:text-default hover:bg-surface-2 md:hidden"
+      title="Inspector"
+      aria-label="Toggle inspector"
+    >
+      <lucide-icon name="more-vertical" class="w-4 h-4"></lucide-icon>
+    </button>
 
     <app-workflow-status-badge [status]="state.status()" />
 
@@ -175,11 +199,24 @@
 
   <!-- Main 3-column layout -->
   <div class="flex-1 flex min-h-0">
-    <!-- Left palette. Hidden below md so the canvas gets full width;
-         mobile users can horizontally scroll and pan-drag nodes. -->
-    <aside class="hidden w-[300px] shrink-0 md:block">
+    <!-- Left palette. On desktop: always visible in-flow at 300px.
+         On mobile: fixed slide-over from the left, toggled by the header
+         "layout-grid" button. -->
+    <aside
+      class="fixed inset-y-0 left-0 z-40 w-[280px] max-w-[85vw] shrink-0 transform border-r border-subtle bg-surface transition-transform duration-200 ease-out md:relative md:z-auto md:w-[300px] md:translate-x-0 md:border-r-0"
+      [class.-translate-x-full]="!mobilePaletteOpen()"
+    >
       <app-node-palette />
     </aside>
+
+    <!-- Backdrop when any mobile overlay is open -->
+    @if (mobilePaletteOpen() || mobileInspectorOpen()) {
+      <div
+        class="fixed inset-0 z-30 bg-black/50 md:hidden"
+        (click)="closeMobileOverlays()"
+        aria-hidden="true"
+      ></div>
+    }
 
     <!-- Canvas -->
     <main
@@ -308,9 +345,12 @@
     </main>
 
     <!-- Right drawer — version history (Step 17) / typed node editor (Step 15) / test-fire trace.
-         On mobile becomes a bottom sheet-style full-width panel. -->
+         Hidden on mobile so the canvas gets full width; desktop shows a
+         fixed-width right column. A future step will surface a floating
+         "open inspector" toggle for mobile users. -->
     <aside
-      class="w-full shrink-0 bg-surface border-t md:border-t-0 md:border-l border-subtle flex flex-col md:w-[440px]"
+      class="fixed inset-y-0 right-0 z-40 flex w-[380px] max-w-[85vw] shrink-0 transform flex-col border-l border-subtle bg-surface transition-transform duration-200 ease-out md:relative md:z-auto md:w-[440px] md:translate-x-0"
+      [class.translate-x-full]="!mobileInspectorOpen()"
     >
       @if (showVersionDrawer() && state.workflowId(); as wfId) {
         <app-version-history-drawer

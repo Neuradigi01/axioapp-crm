@@ -8,7 +8,7 @@
       (click)="$event.stopPropagation()"
     >
       <header
-        class="sticky top-0 z-10 flex items-start justify-between border-b border-subtle bg-surface px-6 py-4"
+        class="sticky top-0 z-10 flex items-start justify-between border-b border-subtle bg-surface px-4 md:px-6 py-4"
       >
         <div>
           <p class="text-[11px] font-mono uppercase tracking-wider text-muted">{{ item.sku }}</p>
@@ -29,7 +29,7 @@
         }
       </header>
 
-      <div class="space-y-4 px-6 py-5">
+      <div class="space-y-4 px-4 md:px-6 py-5">
         <div class="flex justify-center">
           @if (imageHref(); as src) {
             <img
@@ -129,7 +129,7 @@
       </div>
 
       <footer
-        class="sticky bottom-0 flex items-center justify-end gap-2 rounded-b-lg border-t border-subtle bg-surface-2 px-6 py-3"
+        class="sticky bottom-0 flex items-center justify-end gap-2 rounded-b-lg border-t border-subtle bg-surface-2 px-4 md:px-6 py-3"
       >
         <button
           type="button"

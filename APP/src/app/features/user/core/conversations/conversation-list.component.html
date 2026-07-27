@@ -68,9 +68,9 @@
   <!-- List -->
   <div class="min-h-0 flex-1 overflow-y-auto">
     @if (loading) {
-      <div class="py-6 text-center text-sm text-muted">Loading…</div>
+      <div class="py-4 md:py-6 text-center text-sm text-muted">Loading…</div>
     } @else if (displayItems().length === 0) {
-      <div class="px-3 py-6 text-center text-sm text-muted">
+      <div class="px-3 py-4 md:py-6 text-center text-sm text-muted">
         No conversations yet. Inbound messages will land here as customers reach out.
       </div>
     } @else {

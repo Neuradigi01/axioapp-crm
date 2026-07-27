@@ -1,6 +1,6 @@
 <div class="min-h-[calc(100vh-3.5rem)] bg-surface-2">
   <!-- Header -->
-  <header class="h-14 flex items-center gap-3 px-6 bg-surface border-b border-subtle">
+  <header class="h-14 flex items-center gap-3 px-4 md:px-6 bg-surface border-b border-subtle">
     <a
       [routerLink]="['/user/workflows', workflowId()]"
       class="p-1.5 rounded text-muted hover:text-default hover:bg-surface-2"
@@ -23,14 +23,14 @@
   </header>
 
   @if (loading()) {
-    <div class="px-6 py-12 text-center text-sm text-muted">Loading comparison…</div>
+    <div class="px-4 md:px-6 py-12 text-center text-sm text-muted">Loading comparison…</div>
   } @else if (error()) {
-    <div class="px-6 py-12 text-center">
+    <div class="px-4 md:px-6 py-12 text-center">
       <p class="text-red-400 text-sm">{{ error() }}</p>
     </div>
   } @else if (stats(); as s) {
     <!-- Verdict banner -->
-    <section class="px-6 py-4 border-b border-subtle bg-surface">
+    <section class="px-4 md:px-6 py-4 border-b border-subtle bg-surface">
       <div
         class="rounded-lg px-4 py-3 flex items-center gap-3"
         [class.bg-emerald-500/10]="winnerCalled()"
@@ -72,7 +72,7 @@
     </section>
 
     <!-- Side-by-side variant cards -->
-    <section class="px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+    <section class="px-4 md:px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-4">
       <!-- Variant A -->
       <article
         class="bg-surface rounded-lg shadow-sm border p-5"
@@ -213,7 +213,7 @@
     </section>
 
     <!-- Lift + sample table -->
-    <section class="px-6 py-4">
+    <section class="px-4 md:px-6 py-4">
       <div class="bg-surface rounded-lg shadow-sm border border-subtle">
         <header class="px-4 py-3 border-b border-subtle">
           <h3 class="text-sm font-semibold text-default">Comparison</h3>

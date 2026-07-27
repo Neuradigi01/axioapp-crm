@@ -1,6 +1,6 @@
 <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
   <div class="w-full max-w-2xl rounded-lg bg-surface shadow-xl ring-1 border-subtle">
-    <header class="border-b border-subtle px-6 py-4">
+    <header class="border-b border-subtle px-4 md:px-6 py-4">
       <h2 class="text-base font-semibold text-default">Register walk-in</h2>
       <p class="mt-1 text-xs text-muted">
         Phone is the dedup key — if a customer with this phone already exists, we'll reuse their
@@ -11,7 +11,7 @@
     <form
       [formGroup]="form"
       (ngSubmit)="onSubmit()"
-      class="max-h-[70vh] overflow-y-auto px-6 py-5 space-y-5"
+      class="max-h-[70vh] overflow-y-auto px-4 md:px-6 py-5 space-y-5"
     >
       <section>
         <h3 class="text-xs font-semibold uppercase tracking-wide text-muted">Customer</h3>
@@ -277,7 +277,7 @@
     </form>
 
     <footer
-      class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-6 py-3 rounded-b-lg"
+      class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-4 md:px-6 py-3 rounded-b-lg"
     >
       <button
         type="button"

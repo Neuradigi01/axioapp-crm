@@ -1,6 +1,6 @@
 <div class="min-h-[calc(100vh-3.5rem)] bg-surface-2">
   <!-- Header bar -->
-  <header class="h-14 flex items-center gap-3 px-6 bg-surface border-b border-subtle">
+  <header class="h-14 flex items-center gap-3 px-4 md:px-6 bg-surface border-b border-subtle">
     <a
       routerLink="/user/workflows"
       class="p-1.5 rounded text-muted hover:text-default hover:bg-surface-2"
@@ -28,7 +28,7 @@
   }
 
   <!-- Category tabs -->
-  <div class="px-6 pt-4">
+  <div class="px-4 md:px-6 pt-4">
     <div class="flex flex-wrap gap-1.5">
       <button
         type="button"
@@ -62,7 +62,7 @@
   </div>
 
   <!-- Cards grid -->
-  <main class="px-6 py-6">
+  <main class="px-4 md:px-6 py-4 md:py-6">
     @if (loading()) {
       <div class="text-sm text-muted italic">Loading templates…</div>
     } @else if (filteredEntries().length === 0) {

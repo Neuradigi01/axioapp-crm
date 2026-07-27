@@ -196,11 +196,11 @@
   <!-- Body -->
   <section class="overflow-hidden rounded-lg bg-surface shadow-sm ring-1 border-subtle">
     @if (state.loadError(); as err) {
-      <div class="px-6 py-4 text-sm text-red-400">{{ err }}</div>
+      <div class="px-4 md:px-6 py-4 text-sm text-red-400">{{ err }}</div>
     } @else if (state.loading() && visible().length === 0) {
       <div class="divide-y divide-subtle">
         @for (i of [0, 1, 2, 3, 4]; track i) {
-          <div class="flex items-center gap-4 px-6 py-4">
+          <div class="flex items-center gap-4 px-4 md:px-6 py-4">
             <div class="h-9 w-9 animate-pulse rounded-full bg-surface-2"></div>
             <div class="flex-1">
               <div class="h-3 w-40 animate-pulse rounded bg-surface-2"></div>
@@ -210,7 +210,7 @@
         }
       </div>
     } @else if (visible().length === 0) {
-      <div class="px-6 py-10 text-center text-sm text-muted">
+      <div class="px-4 md:px-6 py-10 text-center text-sm text-muted">
         No walk-ins yet.
         <span class="block text-xs text-faint">Click "Register Walk-in" to start.</span>
       </div>

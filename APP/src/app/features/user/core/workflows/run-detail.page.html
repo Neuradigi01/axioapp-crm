@@ -1,5 +1,5 @@
 <div class="min-h-[calc(100vh-3.5rem)] bg-surface-2">
-  <header class="h-14 flex items-center gap-3 px-6 bg-surface border-b border-subtle">
+  <header class="h-14 flex items-center gap-3 px-4 md:px-6 bg-surface border-b border-subtle">
     @if (detail(); as d) {
       <a
         [routerLink]="['/user/workflows', d.workflow_id]"
@@ -30,12 +30,12 @@
   </header>
 
   @if (loading()) {
-    <div class="px-6 py-12 text-center text-sm text-muted">Loading run timeline…</div>
+    <div class="px-4 md:px-6 py-12 text-center text-sm text-muted">Loading run timeline…</div>
   } @else if (error()) {
-    <div class="px-6 py-12 text-center text-sm text-red-400">{{ error() }}</div>
+    <div class="px-4 md:px-6 py-12 text-center text-sm text-red-400">{{ error() }}</div>
   } @else if (detail(); as d) {
     <!-- Header card -->
-    <section class="px-6 py-4">
+    <section class="px-4 md:px-6 py-4">
       <div class="bg-surface rounded-lg border border-subtle px-4 py-3">
         <dl class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
           <div>
@@ -77,7 +77,7 @@
     </section>
 
     <!-- Step timeline -->
-    <section class="px-6 py-2 pb-6">
+    <section class="px-4 md:px-6 py-2 pb-6">
       <div class="bg-surface rounded-lg border border-subtle">
         <header class="px-4 py-3 border-b border-subtle">
           <h3 class="text-sm font-semibold text-default">Step timeline</h3>

@@ -34,7 +34,9 @@
   }
 
   @if (!loading() && rows().length === 0) {
-    <p class="py-6 text-center text-sm text-muted">No DLQ rows for this filter. All clear.</p>
+    <p class="py-4 md:py-6 text-center text-sm text-muted">
+      No DLQ rows for this filter. All clear.
+    </p>
   } @else {
     <div class="overflow-x-auto">
       <table class="min-w-full text-sm">

@@ -120,9 +120,9 @@
   <!-- Messages -->
   <div #scrollHost class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-surface-2 px-4 py-4">
     @if (loading) {
-      <div class="py-6 text-center text-sm text-muted">Loading thread…</div>
+      <div class="py-4 md:py-6 text-center text-sm text-muted">Loading thread…</div>
     } @else if (!detail || detail.messages.length === 0) {
-      <div class="py-6 text-center text-sm text-muted">
+      <div class="py-4 md:py-6 text-center text-sm text-muted">
         No messages yet — type something below to start the conversation.
       </div>
     } @else {

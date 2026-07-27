@@ -1,5 +1,5 @@
 <div class="min-h-[calc(100vh-3.5rem)] bg-surface-2">
-  <header class="h-14 flex items-center gap-3 px-6 bg-surface border-b border-subtle">
+  <header class="h-14 flex items-center gap-3 px-4 md:px-6 bg-surface border-b border-subtle">
     <a
       routerLink="/user/workflows"
       class="p-1.5 rounded text-muted hover:text-default hover:bg-surface-2"
@@ -12,7 +12,7 @@
   </header>
 
   <!-- Picker bar -->
-  <section class="px-6 py-4 bg-surface border-b border-subtle">
+  <section class="px-4 md:px-6 py-4 bg-surface border-b border-subtle">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
       <!-- Contact picker -->
       <div class="md:col-span-2 relative">
@@ -86,7 +86,7 @@
   </section>
 
   <!-- Trace results -->
-  <section class="px-6 py-4">
+  <section class="px-4 md:px-6 py-4">
     @if (trace(); as t) {
       <div class="text-xs text-muted mb-2">
         Traced

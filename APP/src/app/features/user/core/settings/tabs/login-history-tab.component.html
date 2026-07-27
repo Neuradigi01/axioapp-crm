@@ -19,12 +19,14 @@
   }
 
   @if (loading()) {
-    <div class="rounded-lg border border-subtle bg-surface p-6 text-center text-sm text-muted">
+    <div
+      class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+    >
       Loading…
     </div>
   } @else if (sessions().length === 0) {
     <div
-      class="rounded-lg border border-dashed border-subtle bg-surface p-8 text-center text-sm text-muted"
+      class="rounded-lg border border-dashed border-subtle bg-surface p-5 md:p-8 text-center text-sm text-muted"
     >
       No sessions on record.
     </div>

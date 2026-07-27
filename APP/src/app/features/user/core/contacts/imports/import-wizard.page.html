@@ -50,7 +50,7 @@
   <!-- Step 1 — Upload                                                 -->
   <!-- ============================================================== -->
   @if (step() === 1) {
-    <section class="space-y-4 rounded-lg border border-subtle bg-surface p-6">
+    <section class="space-y-4 rounded-lg border border-subtle bg-surface p-4 md:p-6">
       <div>
         <h2 class="text-sm font-semibold text-default">Choose a file</h2>
         <p class="text-xs text-muted">.xlsx or .csv · up to 5 MB · 10,000 rows max.</p>
@@ -142,7 +142,7 @@
   <!-- Step 2 — Map columns                                            -->
   <!-- ============================================================== -->
   @if (step() === 2 && importMeta(); as meta) {
-    <section class="space-y-5 rounded-lg border border-subtle bg-surface p-6">
+    <section class="space-y-5 rounded-lg border border-subtle bg-surface p-4 md:p-6">
       <div class="flex items-start justify-between gap-4">
         <div>
           <h2 class="text-sm font-semibold text-default">Map columns</h2>
@@ -301,7 +301,7 @@
   <!-- Step 3 — Preview & commit                                       -->
   <!-- ============================================================== -->
   @if (step() === 3 && dryRunResult(); as result) {
-    <section class="space-y-5 rounded-lg border border-subtle bg-surface p-6">
+    <section class="space-y-5 rounded-lg border border-subtle bg-surface p-4 md:p-6">
       <div>
         <h2 class="text-sm font-semibold text-default">Preview</h2>
         <p class="text-xs text-muted">
@@ -418,7 +418,9 @@
   <!-- Step 4 — Success                                                -->
   <!-- ============================================================== -->
   @if (step() === 4 && commitResult(); as outcome) {
-    <section class="space-y-5 rounded-lg border border-emerald-500/20 bg-surface p-8 text-center">
+    <section
+      class="space-y-5 rounded-lg border border-emerald-500/20 bg-surface p-5 md:p-8 text-center"
+    >
       <div
         class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10"
       >

@@ -1,5 +1,5 @@
 <div class="flex min-h-[calc(100vh-4rem)] flex-col bg-surface-2">
-  <header class="border-b border-subtle bg-surface px-6 py-4">
+  <header class="border-b border-subtle bg-surface px-4 md:px-6 py-4">
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-xl font-semibold text-default">WhatsApp Business profile</h1>
@@ -59,9 +59,9 @@
   </header>
 
   @if (loading()) {
-    <div class="px-6 py-12 text-center text-sm text-muted">Loading profile…</div>
+    <div class="px-4 md:px-6 py-12 text-center text-sm text-muted">Loading profile…</div>
   } @else if (profile(); as p) {
-    <section class="grid grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-3">
+    <section class="grid grid-cols-1 gap-6 px-4 md:px-6 py-4 md:py-6 lg:grid-cols-3">
       <!-- Photo + verified name (left) -->
       <div class="space-y-4">
         <div class="rounded-md border border-subtle bg-surface p-4">
@@ -375,7 +375,7 @@
     <!-- whatsapp-platform-upgrade Step 16 — auto-reply settings.
          Independent save from the profile form above; same row,
          different surface. -->
-    <section class="px-6 pb-6">
+    <section class="px-4 md:px-6 pb-6">
       <app-auto-reply-section />
     </section>
   }

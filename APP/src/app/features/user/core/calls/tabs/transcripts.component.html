@@ -10,9 +10,9 @@
       <div class="px-3 py-2 text-xs text-red-400">{{ err }}</div>
     }
     @if (callsLoading()) {
-      <div class="px-3 py-6 text-center text-sm text-muted">Loading…</div>
+      <div class="px-3 py-4 md:py-6 text-center text-sm text-muted">Loading…</div>
     } @else if (calls().length === 0) {
-      <div class="px-3 py-6 text-center text-sm text-muted">No calls logged yet.</div>
+      <div class="px-3 py-4 md:py-6 text-center text-sm text-muted">No calls logged yet.</div>
     } @else {
       <ul class="max-h-[60vh] divide-y divide-subtle overflow-y-auto">
         @for (c of calls(); track c.id) {
@@ -57,7 +57,7 @@
         </div>
 
         @if (transcriptLoading()) {
-          <div class="py-6 text-center text-sm text-muted">Loading transcript…</div>
+          <div class="py-4 md:py-6 text-center text-sm text-muted">Loading transcript…</div>
         } @else {
           @if (transcriptHas404()) {
             <p class="mb-2 text-xs text-muted italic">

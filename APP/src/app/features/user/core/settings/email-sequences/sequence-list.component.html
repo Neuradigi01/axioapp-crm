@@ -52,7 +52,7 @@
 
   <section class="rounded-xl border border-subtle bg-surface shadow-sm">
     @if (loadError(); as err) {
-      <div class="px-6 py-10 text-center">
+      <div class="px-4 md:px-6 py-10 text-center">
         <div
           class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10 text-rose-600 ring-1 border-red-500/20"
         >
@@ -70,13 +70,13 @@
         </button>
       </div>
     } @else if (sequences() === null) {
-      <div class="space-y-2 p-6">
+      <div class="space-y-2 p-4 md:p-6">
         @for (i of [0, 1]; track i) {
           <div class="h-10 animate-pulse rounded bg-surface-2" aria-hidden="true"></div>
         }
       </div>
     } @else if (emptyState()) {
-      <div class="px-6 py-12 text-center">
+      <div class="px-4 md:px-6 py-12 text-center">
         <div
           class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 text-faint ring-1 border-subtle"
         >
@@ -112,17 +112,17 @@
             class="border-b border-subtle bg-surface-2 text-left text-xs font-medium uppercase tracking-wide text-muted"
           >
             <tr>
-              <th class="px-6 py-2.5">Name</th>
-              <th class="px-6 py-2.5">Steps</th>
-              <th class="px-6 py-2.5">Enrollments</th>
-              <th class="px-6 py-2.5">Updated</th>
-              <th class="px-6 py-2.5 text-right">Actions</th>
+              <th class="px-4 md:px-6 py-2.5">Name</th>
+              <th class="px-4 md:px-6 py-2.5">Steps</th>
+              <th class="px-4 md:px-6 py-2.5">Enrollments</th>
+              <th class="px-4 md:px-6 py-2.5">Updated</th>
+              <th class="px-4 md:px-6 py-2.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-subtle">
             @for (s of sequences(); track s.id) {
               <tr class="text-default hover:bg-surface-2">
-                <td class="px-6 py-3">
+                <td class="px-4 md:px-6 py-3">
                   <a
                     [routerLink]="['/user/settings/email-sequences', s.id]"
                     class="font-medium text-default hover:underline"
@@ -133,10 +133,10 @@
                     <span class="ml-2 text-xs text-faint">(inactive)</span>
                   }
                 </td>
-                <td class="px-6 py-3 text-xs font-mono">
+                <td class="px-4 md:px-6 py-3 text-xs font-mono">
                   {{ s.steps.length }}
                 </td>
-                <td class="px-6 py-3 text-xs">
+                <td class="px-4 md:px-6 py-3 text-xs">
                   @if (stats()[s.id]; as st) {
                     <span class="inline-flex items-center gap-2 text-muted">
                       <span
@@ -162,10 +162,10 @@
                     <span class="text-faint">…</span>
                   }
                 </td>
-                <td class="px-6 py-3 text-xs text-muted">
+                <td class="px-4 md:px-6 py-3 text-xs text-muted">
                   {{ s.updated_at | date: 'medium' }}
                 </td>
-                <td class="px-6 py-3 text-right">
+                <td class="px-4 md:px-6 py-3 text-right">
                   <div class="inline-flex items-center gap-1">
                     <a
                       [routerLink]="['/user/settings/email-sequences', s.id]"

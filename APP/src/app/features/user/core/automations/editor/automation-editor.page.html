@@ -1,16 +1,16 @@
 <div class="flex min-h-[calc(100vh-4rem)] flex-col bg-surface-2">
-  <header class="border-b border-subtle bg-surface px-6 py-4">
-    <div class="flex items-center justify-between gap-4">
-      <div class="flex items-center gap-3">
+  <header class="border-b border-subtle bg-surface px-4 py-3 md:px-6 md:py-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
         <a
           routerLink="/user/automations"
-          class="inline-flex items-center gap-1 rounded text-xs text-muted hover:text-default"
+          class="inline-flex shrink-0 items-center gap-1 rounded text-xs text-muted hover:text-default"
         >
           <lucide-icon name="arrow-left" size="12" />
-          Back to automations
+          <span class="hidden sm:inline">Back to automations</span>
         </a>
-        <span class="text-faint">·</span>
-        <h1 class="text-lg font-semibold text-default">
+        <span class="hidden text-faint sm:inline">·</span>
+        <h1 class="min-w-0 truncate text-base font-semibold text-default md:text-lg">
           @if (trigger(); as t) {
             {{ t.name }}
           } @else {
@@ -19,7 +19,7 @@
         </h1>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         @if (toast(); as msg) {
           <div
             class="rounded-md border border-subtle bg-surface-2 px-3 py-1.5 text-xs text-default"
@@ -94,7 +94,7 @@
     }
   </header>
 
-  <section class="flex-1 px-6 py-6">
+  <section class="flex-1 px-4 py-4 md:px-6 md:py-6">
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
       <!-- left: the 4 cards -->
       <form [formGroup]="form" class="flex flex-col gap-4">

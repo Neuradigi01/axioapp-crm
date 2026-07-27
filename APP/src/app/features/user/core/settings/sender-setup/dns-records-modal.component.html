@@ -9,7 +9,7 @@
     aria-modal="true"
     aria-labelledby="dns-records-title"
   >
-    <header class="flex items-start gap-3 border-b border-subtle p-6">
+    <header class="flex items-start gap-3 border-b border-subtle p-4 md:p-6">
       <div
         class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-default ring-1 border-subtle"
         aria-hidden="true"
@@ -35,7 +35,7 @@
       </button>
     </header>
 
-    <div class="max-h-[60vh] space-y-4 overflow-y-auto p-6">
+    <div class="max-h-[60vh] space-y-4 overflow-y-auto p-4 md:p-6">
       @for (record of records(); track record.purpose) {
         <section class="rounded-lg border border-subtle bg-surface-2 p-4">
           <div class="flex items-center justify-between gap-2">
@@ -83,7 +83,7 @@
       }
     </div>
 
-    <footer class="flex items-center justify-end gap-2 border-t border-subtle px-6 py-4">
+    <footer class="flex items-center justify-end gap-2 border-t border-subtle px-4 md:px-6 py-4">
       <button
         type="button"
         class="inline-flex items-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-accent"

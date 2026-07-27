@@ -1,5 +1,5 @@
 <div class="flex min-h-[calc(100vh-4rem)] flex-col bg-surface-2">
-  <header class="border-b border-subtle bg-surface px-6 py-4">
+  <header class="border-b border-subtle bg-surface px-4 md:px-6 py-4">
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-xl font-semibold text-default">Templates</h1>
@@ -30,7 +30,7 @@
     }
   </header>
 
-  <section class="border-b border-subtle bg-surface px-6 py-3">
+  <section class="border-b border-subtle bg-surface px-4 md:px-6 py-3">
     <div class="flex flex-wrap items-center gap-2">
       <div class="relative">
         <lucide-icon
@@ -84,7 +84,7 @@
     </div>
   </section>
 
-  <section class="flex-1 px-6 py-6">
+  <section class="flex-1 px-4 md:px-6 py-4 md:py-6">
     @if (loading()) {
       <div class="flex items-center gap-2 text-sm text-muted">
         <lucide-icon name="loader-2" size="14" class="animate-spin" />
@@ -92,7 +92,7 @@
       </div>
     } @else if (items().length === 0) {
       <div
-        class="mx-auto mt-12 max-w-md rounded-lg border border-dashed border-subtle bg-surface p-8 text-center"
+        class="mx-auto mt-12 max-w-md rounded-lg border border-dashed border-subtle bg-surface p-5 md:p-8 text-center"
       >
         <lucide-icon name="file-text" size="32" class="mx-auto text-faint" />
         <h2 class="mt-4 text-sm font-semibold text-default">

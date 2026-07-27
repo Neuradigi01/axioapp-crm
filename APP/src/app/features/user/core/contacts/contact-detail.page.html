@@ -14,7 +14,7 @@
       {{ err }}
     </div>
   } @else if (loading() || contact() === null) {
-    <div class="mt-4 animate-pulse rounded-lg bg-surface p-6 shadow-sm ring-1 border-subtle">
+    <div class="mt-4 animate-pulse rounded-lg bg-surface p-4 md:p-6 shadow-sm ring-1 border-subtle">
       <div class="flex items-center gap-4">
         <div class="h-14 w-14 rounded-full bg-surface-2"></div>
         <div class="flex-1">
@@ -26,7 +26,7 @@
   } @else {
     @let c = contact()!;
     <!-- Header card -->
-    <section class="mt-4 rounded-lg bg-surface p-6 shadow-sm ring-1 border-subtle">
+    <section class="mt-4 rounded-lg bg-surface p-4 md:p-6 shadow-sm ring-1 border-subtle">
       <div class="flex items-start justify-between gap-4">
         <div class="flex items-start gap-4">
           <span

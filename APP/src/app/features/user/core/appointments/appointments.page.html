@@ -154,7 +154,7 @@
 
         @if (daysAppointments().length === 0) {
           <p
-            class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-6 text-center text-xs text-muted"
+            class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-4 md:py-6 text-center text-xs text-muted"
           >
             Nothing scheduled on this day.
           </p>
@@ -207,7 +207,7 @@
       @if (state.loading() && state.items().length === 0) {
         <div class="divide-y divide-subtle">
           @for (i of [0, 1, 2, 3, 4]; track i) {
-            <div class="flex items-center gap-4 px-6 py-4">
+            <div class="flex items-center gap-4 px-4 md:px-6 py-4">
               <div class="h-9 w-9 animate-pulse rounded-full bg-surface-2"></div>
               <div class="flex-1">
                 <div class="h-3 w-40 animate-pulse rounded bg-surface-2"></div>
@@ -217,7 +217,7 @@
           }
         </div>
       } @else if (state.items().length === 0) {
-        <div class="px-6 py-10 text-center text-sm text-muted">
+        <div class="px-4 md:px-6 py-10 text-center text-sm text-muted">
           No appointments match the current filters.
           <span class="block text-xs text-faint">Try "All" status + "All" scope.</span>
         </div>

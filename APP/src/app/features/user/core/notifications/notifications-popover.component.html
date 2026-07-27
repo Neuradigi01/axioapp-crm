@@ -34,7 +34,7 @@
           <div class="h-10 w-full rounded bg-subtle"></div>
         </div>
       } @else if (items().length === 0) {
-        <p class="px-3 py-6 text-center text-xs text-faint">You're all caught up.</p>
+        <p class="px-3 py-4 md:py-6 text-center text-xs text-faint">You're all caught up.</p>
       } @else {
         <ul class="divide-y divide-subtle">
           @for (n of items(); track n.id) {

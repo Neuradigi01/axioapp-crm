@@ -46,11 +46,11 @@
 
     <div class="max-h-[60vh] overflow-y-auto">
       @if (loading()) {
-        <p class="px-4 py-6 text-center text-xs text-muted">Loading templates…</p>
+        <p class="px-4 py-4 md:py-6 text-center text-xs text-muted">Loading templates…</p>
       } @else if (loadError(); as err) {
-        <p class="px-4 py-6 text-center text-xs text-rose-600">{{ err }}</p>
+        <p class="px-4 py-4 md:py-6 text-center text-xs text-rose-600">{{ err }}</p>
       } @else if (filtered().length === 0) {
-        <div class="px-4 py-6 text-center text-xs text-muted">
+        <div class="px-4 py-4 md:py-6 text-center text-xs text-muted">
           No published {{ channel() }} templates match.
           @if (channel() === 'whatsapp') {
             (WhatsApp triggers require Meta-approved templates.)

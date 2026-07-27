@@ -1,4 +1,4 @@
-<div class="flex min-h-[calc(100vh-4rem)] bg-surface-2">
+<div class="flex min-h-[calc(100vh-4rem)] flex-col bg-surface-2 md:flex-row">
   <app-workflow-folders-sidebar
     [folders]="folders()"
     [selectedFolderId]="selectedFolderId()"
@@ -10,7 +10,7 @@
 
   <div class="flex min-w-0 flex-1 flex-col">
     <header class="border-b border-subtle bg-surface px-4 py-4">
-      <div class="flex items-center justify-between gap-4">
+      <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
         <div class="min-w-0 flex-1">
           <h1 class="text-xl font-semibold text-default">Workflows</h1>
           <p class="text-xs text-muted">
@@ -18,7 +18,7 @@
             channels, and route work to the right team.
           </p>
         </div>
-        <div class="flex shrink-0 items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2 md:shrink-0">
           <a
             routerLink="/user/workflows/diagnostics"
             class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
@@ -68,7 +68,7 @@
             [value]="searchQuery()"
             (input)="onSearchInput($any($event.target).value)"
             placeholder="Search workflows…"
-            class="w-64 rounded-md border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none"
+            class="w-full min-w-[180px] rounded-md border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none sm:w-64"
           />
         </div>
 
@@ -168,7 +168,7 @@
         </div>
       } @else if (items().length === 0) {
         <div
-          class="mx-auto mt-12 max-w-md rounded-lg border border-dashed border-subtle bg-surface p-8 text-center"
+          class="mx-auto mt-12 max-w-md rounded-lg border border-dashed border-subtle bg-surface p-6 text-center md:p-8"
         >
           <lucide-icon name="workflow" size="32" class="mx-auto text-faint" />
           <h2 class="mt-4 text-sm font-semibold text-default">

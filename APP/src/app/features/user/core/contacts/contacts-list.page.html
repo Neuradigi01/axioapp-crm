@@ -89,11 +89,11 @@
   <!-- Body -->
   <div class="overflow-x-auto rounded-xl border border-subtle bg-surface">
     @if (state.loadError(); as err) {
-      <div class="px-6 py-4 text-sm text-red-500">{{ err }}</div>
+      <div class="px-4 md:px-6 py-4 text-sm text-red-500">{{ err }}</div>
     } @else if (state.loading()) {
       <div class="divide-y divide-subtle">
         @for (i of [0, 1, 2, 3, 4]; track i) {
-          <div class="flex items-center gap-4 px-6 py-4">
+          <div class="flex items-center gap-4 px-4 md:px-6 py-4">
             <div class="h-9 w-9 animate-pulse rounded-full bg-surface-2"></div>
             <div class="flex-1">
               <div class="h-3 w-40 animate-pulse rounded bg-surface-2"></div>
@@ -104,7 +104,7 @@
         }
       </div>
     } @else if (state.items().length === 0) {
-      <div class="px-6 py-12 text-center">
+      <div class="px-4 md:px-6 py-12 text-center">
         <p class="text-sm font-medium text-default">No contacts found.</p>
         <p class="mt-1 text-xs text-faint">Try a different search or clear filters.</p>
       </div>
@@ -123,7 +123,7 @@
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               <button
                 type="button"
@@ -141,37 +141,37 @@
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               Phone
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               Email
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               Source
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               Owner
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               Tags
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="px-4 md:px-6 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               <button
                 type="button"
@@ -207,7 +207,7 @@
                   [attr.aria-label]="'Select ' + item.full_name"
                 />
               </td>
-              <td class="whitespace-nowrap px-6 py-3 text-sm font-medium text-default">
+              <td class="whitespace-nowrap px-4 md:px-6 py-3 text-sm font-medium text-default">
                 <div class="flex items-center gap-3">
                   <span
                     class="flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft font-display text-xs font-semibold text-accent"
@@ -234,7 +234,7 @@
                 </div>
               </td>
               <td
-                class="whitespace-nowrap px-6 py-3 text-sm text-muted"
+                class="whitespace-nowrap px-4 md:px-6 py-3 text-sm text-muted"
                 (click)="$event.stopPropagation()"
               >
                 @if (item.phone) {
@@ -254,7 +254,7 @@
                 }
               </td>
               <td
-                class="whitespace-nowrap px-6 py-3 text-sm text-muted"
+                class="whitespace-nowrap px-4 md:px-6 py-3 text-sm text-muted"
                 (click)="$event.stopPropagation()"
               >
                 @if (item.email) {
@@ -265,10 +265,10 @@
                   <span class="text-faint">—</span>
                 }
               </td>
-              <td class="whitespace-nowrap px-6 py-3 text-sm text-muted">
+              <td class="whitespace-nowrap px-4 md:px-6 py-3 text-sm text-muted">
                 {{ item.source ?? '—' }}
               </td>
-              <td class="whitespace-nowrap px-6 py-3 text-sm text-muted">
+              <td class="whitespace-nowrap px-4 md:px-6 py-3 text-sm text-muted">
                 @if (item.assigned_to_id) {
                   <div class="flex items-center gap-2">
                     <span
@@ -282,7 +282,7 @@
                   <span class="text-faint">Unassigned</span>
                 }
               </td>
-              <td class="px-6 py-3 text-sm text-muted">
+              <td class="px-4 md:px-6 py-3 text-sm text-muted">
                 <div class="flex flex-wrap gap-1">
                   @for (tag of item.tags; track tag) {
                     <span
@@ -296,7 +296,7 @@
                 </div>
               </td>
               <td
-                class="whitespace-nowrap px-6 py-3 text-right font-mono text-sm text-muted tabular-nums"
+                class="whitespace-nowrap px-4 md:px-6 py-3 text-right font-mono text-sm text-muted tabular-nums"
               >
                 {{ item.last_activity_at | relativeTime }}
               </td>

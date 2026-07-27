@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-[1180px] px-6 py-6">
+<div class="mx-auto max-w-[1180px] px-4 py-4 md:px-6 md:py-6">
   <!-- Header — greeting + scope pill (left); date-range picker + Refresh (right) -->
   <header class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
     <div>
@@ -168,7 +168,7 @@
       </div>
       @if (summary(); as s) {
         @if (s.upcoming_appointments.length === 0) {
-          <div class="py-8 text-center text-sm text-muted">
+          <div class="py-5 md:py-8 text-center text-sm text-muted">
             @if (appointmentsScope() === 'today') {
               No appointments scheduled for today.
             } @else {
@@ -212,7 +212,7 @@
       </div>
       @if (summary(); as s) {
         @if (s.recent_activity.length === 0) {
-          <div class="py-8 text-center text-sm text-muted">
+          <div class="py-5 md:py-8 text-center text-sm text-muted">
             No recent activity yet — start a lead or schedule an appointment to see it here.
           </div>
         } @else {
