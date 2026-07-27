@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the shared card, table, chip, badge, page-header, and empty-state primitives.
 **Track:** Design Refresh — Track 3 (Shared primitives)
-**Status:** Pending
+**Status:** COMPLETED — `.card` / `.card-signature` / `.card-header` / `.card-title` / `.card-link` / `.chip` / `.chip-active` / `.badge` / `.badge-muted` / `.status-*` / `.aixo-table` classes landed in `aixo-components.scss`. Material `.mat-mdc-card` and legacy `.page-layout__table` repointed to AIXO tokens. New `EmptyStateComponent` and `PageHeaderComponent` under `core/shared/`. `ng build` green.
 **Depends on:** Step 1
 
 ---

@@ -120,7 +120,7 @@ Grouped into 5 tracks. Each step is independently reviewable; pause/report after
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
 | 5 | [Buttons + inputs + form fields](step-05-buttons-inputs-forms.md) | COMPLETED | ~1 day |
-| 6 | [Cards + tables + chips + badges + empty states](step-06-cards-tables-chips.md) | Pending | ~1 day |
+| 6 | [Cards + tables + chips + badges + empty states](step-06-cards-tables-chips.md) | COMPLETED | ~1 day |
 | 7 | [Dialogs + menus + toasts + notifications dropdown + avatar menu](step-07-dialogs-menus-toasts.md) | Pending | ~1 day |
 
 ### Track 4 — Page pass (one focus per step)
