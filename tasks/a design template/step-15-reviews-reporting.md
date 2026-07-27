@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the Reviews module and Reporting (dashboards / saved reports) module.
 **Track:** Design Refresh — Track 4 (Page pass)
-**Status:** Pending
+**Status:** COMPLETED — reviews.page + reply-modal bulk-swapped to AIXO tokens. Reporting folder not yet scaffolded in this repo — deferred until backend surfaces exist. `ng build` green.
 **Depends on:** Steps 1, 5, 6, 7
 
 ---
