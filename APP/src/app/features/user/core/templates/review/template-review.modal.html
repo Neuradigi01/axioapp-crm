@@ -1,8 +1,8 @@
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-  <div class="w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
-    <header class="border-b border-zinc-200 px-5 py-3">
-      <h2 class="text-sm font-semibold text-zinc-900">Review template</h2>
-      <p class="mt-0.5 text-xs text-zinc-500">
+  <div class="w-full max-w-md rounded-lg bg-surface shadow-xl ring-1 border-subtle">
+    <header class="border-b border-subtle px-5 py-3">
+      <h2 class="text-sm font-semibold text-default">Review template</h2>
+      <p class="mt-0.5 text-xs text-muted">
         {{ template().name }} · v{{ template().current_version }}
       </p>
     </header>
@@ -16,7 +16,7 @@
           [class]="
             action() === 'approve'
               ? 'border-emerald-300 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200'
-              : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+              : 'border-subtle bg-surface text-default hover:bg-surface-2'
           "
         >
           <lucide-icon name="check" size="14" class="mr-1 inline" />
@@ -29,7 +29,7 @@
           [class]="
             action() === 'request_changes'
               ? 'border-amber-300 bg-amber-50 text-amber-800 ring-1 ring-amber-200'
-              : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+              : 'border-subtle bg-surface text-default hover:bg-surface-2'
           "
         >
           <lucide-icon name="pencil" size="14" class="mr-1 inline" />
@@ -42,7 +42,7 @@
           [class]="
             action() === 'reject'
               ? 'border-rose-300 bg-rose-50 text-rose-800 ring-1 ring-rose-200'
-              : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+              : 'border-subtle bg-surface text-default hover:bg-surface-2'
           "
         >
           <lucide-icon name="x" size="14" class="mr-1 inline" />
@@ -51,13 +51,13 @@
       </div>
 
       <label class="block">
-        <span class="text-xs font-medium text-zinc-700">
+        <span class="text-xs font-medium text-default">
           Note
           @if (noteRequired()) {
             <span class="text-rose-600">*</span>
-            <span class="text-zinc-400">required</span>
+            <span class="text-faint">required</span>
           } @else {
-            <span class="text-zinc-400">optional</span>
+            <span class="text-faint">optional</span>
           }
         </span>
         <textarea
@@ -65,7 +65,7 @@
           [value]="note()"
           (input)="onNoteInput($any($event.target).value)"
           maxlength="2000"
-          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
           placeholder="What should the author know?"
         ></textarea>
       </label>
@@ -78,13 +78,13 @@
     </div>
 
     <footer
-      class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3"
+      class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-5 py-3"
     >
       <button
         type="button"
         (click)="close()"
         [disabled]="submitting()"
-        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default hover:bg-surface-2 disabled:opacity-50"
       >
         Cancel
       </button>
@@ -92,7 +92,7 @@
         type="button"
         (click)="submit()"
         [disabled]="!canSubmit()"
-        class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
       >
         @if (submitting()) {
           <lucide-icon name="loader-2" size="12" class="animate-spin" />

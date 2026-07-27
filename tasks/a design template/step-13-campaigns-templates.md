@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the Campaigns module (list, builder, analytics) and the central Templates library (list, editor, category filter).
 **Track:** Design Refresh — Track 4 (Page pass)
-**Status:** Pending
+**Status:** COMPLETED — 17 HTML files across campaigns (3) + templates (14) bulk-swapped to AIXO semantic tokens. Covers campaigns.page, create-campaign-modal, campaign-detail, templates.page, template-editor + per-channel forms (wa/sms/email/fb/push/html-composer), variable-picker, status-badge, channel-chip, versions-drawer, test-send + review modals. `ng build` green.
 **Depends on:** Steps 1, 5, 6, 7
 
 ---

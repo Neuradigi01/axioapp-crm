@@ -1,8 +1,8 @@
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 px-4">
-  <div class="w-full max-w-2xl rounded-lg bg-white p-5 shadow-xl max-h-[90vh] overflow-y-auto">
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/50 px-4">
+  <div class="w-full max-w-2xl rounded-lg bg-surface p-5 shadow-xl max-h-[90vh] overflow-y-auto">
     <header class="mb-4">
-      <h2 class="text-lg font-semibold text-zinc-900">New campaign</h2>
-      <p class="mt-1 text-xs text-zinc-500">
+      <h2 class="text-lg font-semibold text-default">New campaign</h2>
+      <p class="mt-1 text-xs text-muted">
         Save as draft. Click <span class="font-medium">Start</span> from the list when you're ready
         to send.
       </p>
@@ -11,18 +11,18 @@
     <form [formGroup]="form" (ngSubmit)="save()" class="space-y-3">
       <div class="grid grid-cols-2 gap-3">
         <label class="block text-sm">
-          <span class="block text-xs font-medium text-zinc-600">Name</span>
+          <span class="block text-xs font-medium text-muted">Name</span>
           <input
             type="text"
             formControlName="name"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           />
         </label>
         <label class="block text-sm">
-          <span class="block text-xs font-medium text-zinc-600">Channel</span>
+          <span class="block text-xs font-medium text-muted">Channel</span>
           <select
             formControlName="channel"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           >
             @for (c of channels; track c.value) {
               <option [value]="c.value">{{ c.label }}</option>
@@ -41,22 +41,22 @@
           [class.bg-amber-50]="capacityBand() === 'amber'"
           [class.border-rose-200]="capacityBand() === 'red'"
           [class.bg-rose-50]="capacityBand() === 'red'"
-          [class.border-zinc-200]="capacityBand() === null"
-          [class.bg-zinc-50]="capacityBand() === null"
+          [class.border-subtle]="capacityBand() === null"
+          [class.bg-surface-2]="capacityBand() === null"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="flex-1 space-y-1">
-              <div class="font-medium text-zinc-800">WhatsApp quota: {{ c.tier_label }}</div>
+              <div class="font-medium text-default">WhatsApp quota: {{ c.tier_label }}</div>
               @if (c.is_unlimited) {
-                <div class="text-zinc-600">Unlimited messages today.</div>
+                <div class="text-muted">Unlimited messages today.</div>
               } @else {
-                <div class="text-zinc-700">
+                <div class="text-default">
                   {{ c.used_today.toLocaleString() }} used ·
                   <span class="font-semibold">
                     {{ c.remaining.toLocaleString() }} remaining today
                   </span>
                 </div>
-                <div class="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200">
+                <div class="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
                   <div
                     class="h-full transition-all"
                     [class.bg-emerald-500]="capacityBand() === 'green'"
@@ -65,7 +65,7 @@
                     [style.width.%]="c.usage_percent"
                   ></div>
                 </div>
-                <div class="text-[10px] text-zinc-500">
+                <div class="text-[10px] text-muted">
                   Resets at 5:30 AM IST (00:00 UTC). {{ c.usage_percent }}% used.
                 </div>
               }
@@ -74,7 +74,7 @@
               type="button"
               (click)="refreshCapacity()"
               [disabled]="capacityLoading()"
-              class="shrink-0 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+              class="shrink-0 rounded-md border border-subtle bg-surface px-2 py-1 text-[10px] font-medium text-default hover:bg-surface-2 disabled:opacity-50"
             >
               {{ capacityLoading() ? 'Refreshing…' : 'Refresh' }}
             </button>
@@ -82,42 +82,42 @@
         </div>
       }
 
-      <fieldset class="rounded-md border border-zinc-200 p-3 space-y-3">
-        <legend class="px-1 text-xs font-medium text-zinc-600">Audience</legend>
+      <fieldset class="rounded-md border border-subtle p-3 space-y-3">
+        <legend class="px-1 text-xs font-medium text-muted">Audience</legend>
         <!-- 3-mode radio toggle (Step 3.5.9) -->
         <div class="grid grid-cols-3 gap-2 text-xs">
           <button
             type="button"
             class="rounded-md border p-2 text-left transition"
             [class.border-zinc-700]="audienceMode() === 'everyone'"
-            [class.bg-zinc-100]="audienceMode() === 'everyone'"
-            [class.border-zinc-300]="audienceMode() !== 'everyone'"
+            [class.bg-surface-2]="audienceMode() === 'everyone'"
+            [class.border-subtle]="audienceMode() !== 'everyone'"
             (click)="onAudienceModeChange('everyone')"
           >
-            <span class="font-medium text-zinc-900">Everyone</span>
-            <p class="mt-0.5 text-[10px] text-zinc-500">All contacts in the org</p>
+            <span class="font-medium text-default">Everyone</span>
+            <p class="mt-0.5 text-[10px] text-muted">All contacts in the org</p>
           </button>
           <button
             type="button"
             class="rounded-md border p-2 text-left transition"
             [class.border-zinc-700]="audienceMode() === 'group'"
-            [class.bg-zinc-100]="audienceMode() === 'group'"
-            [class.border-zinc-300]="audienceMode() !== 'group'"
+            [class.bg-surface-2]="audienceMode() === 'group'"
+            [class.border-subtle]="audienceMode() !== 'group'"
             (click)="onAudienceModeChange('group')"
           >
-            <span class="font-medium text-zinc-900">Saved group</span>
-            <p class="mt-0.5 text-[10px] text-zinc-500">Pick a contact group</p>
+            <span class="font-medium text-default">Saved group</span>
+            <p class="mt-0.5 text-[10px] text-muted">Pick a contact group</p>
           </button>
           <button
             type="button"
             class="rounded-md border p-2 text-left transition"
             [class.border-zinc-700]="audienceMode() === 'filter'"
-            [class.bg-zinc-100]="audienceMode() === 'filter'"
-            [class.border-zinc-300]="audienceMode() !== 'filter'"
+            [class.bg-surface-2]="audienceMode() === 'filter'"
+            [class.border-subtle]="audienceMode() !== 'filter'"
             (click)="onAudienceModeChange('filter')"
           >
-            <span class="font-medium text-zinc-900">Custom filter</span>
-            <p class="mt-0.5 text-[10px] text-zinc-500">q / source / tag</p>
+            <span class="font-medium text-default">Custom filter</span>
+            <p class="mt-0.5 text-[10px] text-muted">q / source / tag</p>
           </button>
         </div>
 
@@ -136,7 +136,7 @@
             <select
               [value]="selectedGroupId() ?? ''"
               (change)="onSelectedGroupChange($any($event.target).value)"
-              class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
             >
               <option value="">— Pick a saved group —</option>
               @for (g of groups(); track g.id) {
@@ -152,38 +152,38 @@
         @if (audienceMode() === 'filter') {
           <div class="grid grid-cols-3 gap-2">
             <label class="block text-sm">
-              <span class="block text-[10px] text-zinc-500">Search (q)</span>
+              <span class="block text-[10px] text-muted">Search (q)</span>
               <input
                 type="text"
                 formControlName="audience_q"
                 placeholder="name / phone / email"
-                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
             </label>
             <label class="block text-sm">
-              <span class="block text-[10px] text-zinc-500">Source</span>
+              <span class="block text-[10px] text-muted">Source</span>
               <input
                 type="text"
                 formControlName="audience_source"
                 placeholder="walk-in"
-                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
             </label>
             <label class="block text-sm">
-              <span class="block text-[10px] text-zinc-500">Tag</span>
+              <span class="block text-[10px] text-muted">Tag</span>
               <input
                 type="text"
                 formControlName="audience_tag"
                 placeholder="vip"
-                class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
             </label>
           </div>
 
           <!-- Live matching-contacts preview (Custom filter mode only) -->
-          <div class="mt-2 rounded-md border border-zinc-200 bg-white">
+          <div class="mt-2 rounded-md border border-subtle bg-surface">
             <div
-              class="flex items-center justify-between gap-2 border-b border-zinc-200 px-2 py-1 text-[10px] uppercase tracking-wide text-zinc-500"
+              class="flex items-center justify-between gap-2 border-b border-subtle px-2 py-1 text-[10px] uppercase tracking-wide text-muted"
               [class.border-b-0]="audiencePreviewCollapsed()"
             >
               <span>Matching contacts</span>
@@ -201,7 +201,7 @@
                   <button
                     type="button"
                     (click)="selectAllShown()"
-                    class="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50"
+                    class="rounded border border-subtle bg-surface px-1.5 py-0.5 text-[10px] font-medium text-default hover:bg-surface-2"
                   >
                     Select all shown
                   </button>
@@ -210,7 +210,7 @@
                   <button
                     type="button"
                     (click)="clearSelection()"
-                    class="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50"
+                    class="rounded border border-subtle bg-surface px-1.5 py-0.5 text-[10px] font-medium text-default hover:bg-surface-2"
                   >
                     Clear
                   </button>
@@ -220,7 +220,7 @@
                   (click)="toggleAudiencePreviewCollapsed()"
                   [attr.aria-expanded]="!audiencePreviewCollapsed()"
                   [attr.aria-label]="audiencePreviewCollapsed() ? 'Show matches' : 'Hide matches'"
-                  class="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50"
+                  class="rounded border border-subtle bg-surface px-1.5 py-0.5 text-[10px] font-medium text-default hover:bg-surface-2"
                 >
                   {{ audiencePreviewCollapsed() ? 'Show' : 'Hide' }}
                 </button>
@@ -229,27 +229,27 @@
             @if (audiencePreviewCollapsed()) {
               <!-- Collapsed: body hidden. Chip strip below still shows the selection. -->
             } @else if (audiencePreviewRows().length === 0 && !audiencePreviewLoading()) {
-              <p class="px-2 py-2 text-xs text-zinc-500">
+              <p class="px-2 py-2 text-xs text-muted">
                 Add a search / source / tag above to preview matching contacts.
               </p>
             } @else {
-              <ul class="max-h-48 divide-y divide-zinc-100 overflow-y-auto">
+              <ul class="max-h-48 divide-y divide-subtle overflow-y-auto">
                 @for (c of audiencePreviewRows(); track c.id) {
                   <li>
                     <label
-                      class="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs hover:bg-zinc-50"
+                      class="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs hover:bg-surface-2"
                     >
                       <input
                         type="checkbox"
                         [checked]="isContactSelected(c.id)"
                         (change)="toggleContactSelected(c)"
-                        class="h-3.5 w-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                        class="h-3.5 w-3.5 rounded border-subtle text-default focus:ring-zinc-500"
                       />
                       <span class="min-w-0 flex-1">
-                        <span class="block truncate font-medium text-zinc-900">
+                        <span class="block truncate font-medium text-default">
                           {{ c.full_name }}
                         </span>
-                        <span class="block truncate text-[10px] text-zinc-500">
+                        <span class="block truncate text-[10px] text-muted">
                           {{ c.phone ?? '—' }} · {{ c.email ?? '—' }}
                         </span>
                       </span>
@@ -263,15 +263,15 @@
 
         <!-- Selected contacts chip strip (Custom filter mode, non-empty) -->
         @if (selectedContactMap().size > 0) {
-          <div class="rounded-md border border-zinc-200 bg-white p-2">
+          <div class="rounded-md border border-subtle bg-surface p-2">
             <div
-              class="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wide text-zinc-500"
+              class="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted"
             >
               <span>Selected contacts ({{ selectedContactMap().size }})</span>
               <button
                 type="button"
                 (click)="clearSelection()"
-                class="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-zinc-700 hover:bg-zinc-50"
+                class="rounded border border-subtle bg-surface px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-default hover:bg-surface-2"
               >
                 Clear all
               </button>
@@ -279,17 +279,17 @@
             <div class="flex flex-wrap gap-1.5">
               @for (c of selectedContactList(); track c.id) {
                 <span
-                  class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] text-zinc-700"
+                  class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-default"
                 >
                   <span class="truncate max-w-[10rem]">
                     {{ c.full_name }}
-                    <span class="text-zinc-500">· {{ c.phone ?? c.email ?? '—' }}</span>
+                    <span class="text-muted">· {{ c.phone ?? c.email ?? '—' }}</span>
                   </span>
                   <button
                     type="button"
                     (click)="removeSelectedContact(c.id)"
                     aria-label="Remove"
-                    class="ml-0.5 rounded-full text-zinc-500 hover:text-zinc-800"
+                    class="ml-0.5 rounded-full text-muted hover:text-default"
                   >
                     ×
                   </button>
@@ -301,9 +301,9 @@
 
         <!-- Live count preview -->
         <div
-          class="flex items-center gap-2 rounded-md bg-zinc-50 px-2 py-1.5 text-xs text-zinc-700"
+          class="flex items-center gap-2 rounded-md bg-surface-2 px-2 py-1.5 text-xs text-default"
         >
-          <lucide-icon name="users" class="h-3 w-3 text-zinc-500" />
+          <lucide-icon name="users" class="h-3 w-3 text-muted" />
           @if (selectedContactMap().size > 0) {
             <span>
               <span class="font-medium">{{ selectedContactMap().size }}</span>
@@ -312,16 +312,16 @@
               campaign.
             </span>
           } @else if (audienceCountLoading()) {
-            <span class="text-zinc-500">Counting…</span>
+            <span class="text-muted">Counting…</span>
           } @else if (audienceCount() !== null) {
             <span>
               <span class="font-medium">{{ audienceCount() }}</span>
               {{ audienceCount() === 1 ? 'contact' : 'contacts' }} will receive this campaign.
             </span>
           } @else if (audienceMode() === 'everyone') {
-            <span class="text-zinc-500"> All contacts in the org. Counts shown after save. </span>
+            <span class="text-muted"> All contacts in the org. Counts shown after save. </span>
           } @else {
-            <span class="text-zinc-500">
+            <span class="text-muted">
               @if (audienceMode() === 'group') {
                 Pick a group to see the count.
               } @else {
@@ -377,11 +377,11 @@
           </div>
         }
 
-        <fieldset class="rounded-md border border-zinc-200 p-3 space-y-3">
-          <legend class="px-1 text-xs font-medium text-zinc-600">Email sender identity</legend>
+        <fieldset class="rounded-md border border-subtle p-3 space-y-3">
+          <legend class="px-1 text-xs font-medium text-muted">Email sender identity</legend>
 
           @if (emailAccountsLoading()) {
-            <div class="rounded-md bg-zinc-50 px-2 py-1.5 text-xs text-zinc-500">
+            <div class="rounded-md bg-surface-2 px-2 py-1.5 text-xs text-muted">
               Loading connected mailboxes…
             </div>
           } @else if (emailAccounts() !== null && emailAccounts()!.length === 0) {
@@ -397,13 +397,13 @@
           } @else {
             <div class="grid grid-cols-2 gap-3">
               <label class="block text-sm">
-                <span class="block text-xs font-medium text-zinc-600">
+                <span class="block text-xs font-medium text-muted">
                   Send from mailbox
                   <span class="ml-1 text-rose-500">*</span>
                 </span>
                 <select
                   formControlName="email_account_id"
-                  class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                 >
                   <option [ngValue]="null">— Pick a mailbox —</option>
                   @for (a of emailAccounts() ?? []; track a.id) {
@@ -414,7 +414,7 @@
                 </select>
               </label>
               <label class="block text-sm">
-                <span class="block text-xs font-medium text-zinc-600">
+                <span class="block text-xs font-medium text-muted">
                   Sender name
                   <span class="ml-1 text-rose-500">*</span>
                 </span>
@@ -423,35 +423,35 @@
                   formControlName="sender_name"
                   maxlength="120"
                   placeholder="Your Shop"
-                  class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                 />
-                <span class="mt-0.5 block text-[10px] text-zinc-500">
+                <span class="mt-0.5 block text-[10px] text-muted">
                   Shown in inbox before the address.
                 </span>
               </label>
             </div>
 
             <label class="block text-sm">
-              <span class="block text-xs font-medium text-zinc-600"> Reply-to (optional) </span>
+              <span class="block text-xs font-medium text-muted"> Reply-to (optional) </span>
               <input
                 type="email"
                 formControlName="reply_to"
                 maxlength="320"
                 placeholder="hello@yourshop.com"
-                class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
-              <span class="mt-0.5 block text-[10px] text-zinc-500">
+              <span class="mt-0.5 block text-[10px] text-muted">
                 Where replies land. Defaults to the mailbox address at send time.
               </span>
             </label>
 
             <label class="block text-sm">
               <span class="mb-1 flex items-center justify-between">
-                <span class="text-xs font-medium text-zinc-600">
+                <span class="text-xs font-medium text-muted">
                   Subject
                   <span class="ml-1 text-rose-500">*</span>
                 </span>
-                <span class="text-[10px] text-zinc-500">
+                <span class="text-[10px] text-muted">
                   {{ (form.controls.subject.value ?? '').length }} / 998
                 </span>
               </span>
@@ -460,15 +460,15 @@
                 formControlName="subject"
                 maxlength="998"
                 [placeholder]="subjectPlaceholder"
-                class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
-              <span class="mt-1 flex items-center gap-2 text-[10px] text-zinc-500">
+              <span class="mt-1 flex items-center gap-2 text-[10px] text-muted">
                 Insert variable:
                 @for (tag of subjectMergeTags; track tag.value) {
                   <button
                     type="button"
                     (click)="onInsertSubjectTag(tag.value)"
-                    class="rounded border border-zinc-300 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50"
+                    class="rounded border border-subtle px-1.5 py-0.5 text-[10px] font-medium text-default hover:bg-surface-2"
                   >
                     {{ tag.label }}
                   </button>
@@ -477,15 +477,15 @@
             </label>
 
             <label class="block text-sm">
-              <span class="block text-xs font-medium text-zinc-600"> Preheader (optional) </span>
+              <span class="block text-xs font-medium text-muted"> Preheader (optional) </span>
               <input
                 type="text"
                 formControlName="preheader"
                 maxlength="200"
                 placeholder="Five picks for you, expires Sunday"
-                class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
-              <span class="mt-0.5 block text-[10px] text-zinc-500">
+              <span class="mt-0.5 block text-[10px] text-muted">
                 Preview snippet shown next to the subject in the inbox · ~90 chars for Gmail / Apple
                 Mail.
               </span>
@@ -500,10 +500,10 @@
              stacked row list so WhatsApp templates can render approval
              status + category + language + preview inline. Non-approved
              WA rows are visibly disabled and can't be selected. -->
-        <div class="rounded-md border border-zinc-200 p-3 space-y-3">
+        <div class="rounded-md border border-subtle p-3 space-y-3">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-zinc-600"> Template </span>
-            <span class="text-[10px] text-zinc-400">
+            <span class="text-xs font-medium text-muted"> Template </span>
+            <span class="text-[10px] text-faint">
               From your template library · /user/templates
             </span>
           </div>
@@ -511,7 +511,7 @@
           <div
             role="listbox"
             aria-label="Template"
-            class="max-h-64 divide-y divide-zinc-100 overflow-y-auto rounded-md border border-zinc-200 bg-white"
+            class="max-h-64 divide-y divide-subtle overflow-y-auto rounded-md border border-subtle bg-surface"
           >
             @for (t of templates(); track t.id) {
               <button
@@ -524,13 +524,13 @@
                 [class.bg-emerald-50]="selectedTemplateId() === t.id"
                 [class.border-emerald-600]="selectedTemplateId() === t.id"
                 [class.border-transparent]="selectedTemplateId() !== t.id"
-                [class.hover:bg-zinc-50]="isRowSelectable(t) && selectedTemplateId() !== t.id"
+                [class.hover:bg-surface-2]="isRowSelectable(t) && selectedTemplateId() !== t.id"
                 [class.cursor-not-allowed]="!isRowSelectable(t)"
                 [class.opacity-60]="!isRowSelectable(t)"
               >
                 <span class="min-w-0 flex-1">
                   <span class="flex items-center gap-2">
-                    <span class="block truncate text-sm font-medium text-zinc-900">
+                    <span class="block truncate text-sm font-medium text-default">
                       {{ t.name }}
                     </span>
                     @if (selectedTemplateId() === t.id) {
@@ -541,7 +541,7 @@
                       </span>
                     }
                   </span>
-                  <span class="mt-0.5 block truncate text-[11px] text-zinc-500">
+                  <span class="mt-0.5 block truncate text-[11px] text-muted">
                     {{ rowSubtitle(t) }}
                   </span>
                 </span>
@@ -567,9 +567,9 @@
                 <span class="normal-case tracking-normal text-emerald-700">{{ t.name }}</span>
               </div>
               @if (t.subject) {
-                <div class="mb-1 text-sm font-semibold text-zinc-900">{{ t.subject }}</div>
+                <div class="mb-1 text-sm font-semibold text-default">{{ t.subject }}</div>
               }
-              <div class="whitespace-pre-wrap font-mono text-xs text-zinc-700">{{ t.body }}</div>
+              <div class="whitespace-pre-wrap font-mono text-xs text-default">{{ t.body }}</div>
             </div>
 
             <!-- Variable bindings — WA-positional only.
@@ -578,16 +578,16 @@
                  time, so there's nothing for the operator to bind. -->
             @if (templateVariableNumbers().length > 0) {
               <div class="space-y-2">
-                <span class="text-xs font-medium text-zinc-600"> Variable bindings </span>
+                <span class="text-xs font-medium text-muted"> Variable bindings </span>
                 @for (n of templateVariableNumbers(); track n) {
                   <div class="grid grid-cols-12 gap-2 items-start">
-                    <div class="col-span-2 text-xs text-zinc-700 font-mono pt-1.5">
+                    <div class="col-span-2 text-xs text-default font-mono pt-1.5">
                       {{ '{{' + n + '}}' }}
                     </div>
                     <select
                       [value]="variables()[n.toString()]?.kind ?? 'static'"
                       (change)="onVariableKindChange(n, $any($event.target).value)"
-                      class="col-span-3 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                      class="col-span-3 rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                     >
                       <option value="static">Static text</option>
                       <option value="field">Contact field</option>
@@ -596,7 +596,7 @@
                       <select
                         [value]="variables()[n.toString()]?.value ?? ''"
                         (change)="onVariableValueChange(n, $any($event.target).value)"
-                        class="col-span-7 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                        class="col-span-7 rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                       >
                         <option value="">— Select field —</option>
                         @for (f of contactFieldOptions; track f.value) {
@@ -609,14 +609,14 @@
                         [value]="variables()[n.toString()]?.value ?? ''"
                         (input)="onVariableValueChange(n, $any($event.target).value)"
                         placeholder="e.g. 30%"
-                        class="col-span-7 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                        class="col-span-7 rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                       />
                     }
                   </div>
                 }
               </div>
             } @else {
-              <p class="text-[10px] text-zinc-500">
+              <p class="text-[10px] text-muted">
                 Variables resolve from each contact's data at send time.
               </p>
             }
@@ -639,18 +639,18 @@
           }
         </div>
       } @else if (templatesLoading()) {
-        <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+        <div class="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs text-muted">
           Loading templates…
         </div>
       }
 
       <label class="block text-sm">
-        <span class="block text-xs font-medium text-zinc-600">
+        <span class="block text-xs font-medium text-muted">
           @if (selectedTemplateId()) {
             Free-text fallback body (ignored — template selected above)
           } @else {
             Message body
-            <span class="ml-1 text-[10px] text-zinc-400">
+            <span class="ml-1 text-[10px] text-faint">
               Use <code>{{ varFullName }}</code> · <code>{{ varPhone }}</code> for personalisation
             </span>
           }
@@ -660,7 +660,7 @@
           formControlName="template"
           [placeholder]="templatePlaceholder"
           [class.opacity-50]="selectedTemplateId()"
-          class="mt-1 block w-full resize-none rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 block w-full resize-none rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         ></textarea>
       </label>
 
@@ -671,8 +671,8 @@
       @if (isEmailChannel() && !selectedTemplateId()) {
         <div class="block">
           <div class="mb-1 flex items-center justify-between text-xs">
-            <span class="font-medium text-zinc-600">Or write HTML instead</span>
-            <span class="text-[10px] text-zinc-400">
+            <span class="font-medium text-muted">Or write HTML instead</span>
+            <span class="text-[10px] text-faint">
               Sanitised server-side · Angular sanitises the preview too
             </span>
           </div>
@@ -685,13 +685,13 @@
       }
 
       <label class="block text-sm">
-        <span class="block text-xs font-medium text-zinc-600">
+        <span class="block text-xs font-medium text-muted">
           Schedule (optional — leave blank to send when you click Start)
         </span>
         <input
           type="datetime-local"
           formControlName="schedule_at"
-          class="mt-1 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </label>
 
@@ -711,11 +711,11 @@
              WA-only (per project memory) — Email A/B lands in a
              follow-up. Hide the toggle entirely on non-WA channels so
              users can't enable something the backend would reject. -->
-        <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs">
+        <div class="rounded-md border border-subtle bg-surface-2 p-3 text-xs">
           <label class="flex cursor-pointer items-center gap-2">
             <input type="checkbox" formControlName="is_ab_test" />
-            <span class="font-medium text-zinc-800">Run as an A/B test</span>
-            <span class="text-zinc-500">
+            <span class="font-medium text-default">Run as an A/B test</span>
+            <span class="text-muted">
               — split the audience between two templates and let the CRM pick the winner.
             </span>
           </label>
@@ -737,7 +737,7 @@
         <button
           type="button"
           (click)="close()"
-          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         >
           Cancel
         </button>
@@ -751,7 +751,7 @@
                 ? 'Pick a mailbox, sender name, and subject to send an Email campaign.'
                 : ''
           "
-          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:opacity-50"
         >
           {{ submitting() ? 'Saving…' : 'Save draft' }}
         </button>

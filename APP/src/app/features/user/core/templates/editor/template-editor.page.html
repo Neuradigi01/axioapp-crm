@@ -1,16 +1,16 @@
-<div class="flex min-h-[calc(100vh-4rem)] flex-col bg-zinc-50">
-  <header class="border-b border-zinc-200 bg-white px-6 py-4">
+<div class="flex min-h-[calc(100vh-4rem)] flex-col bg-surface-2">
+  <header class="border-b border-subtle bg-surface px-6 py-4">
     <div class="flex items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <a
           routerLink="/user/templates"
-          class="inline-flex items-center gap-1 rounded text-xs text-zinc-500 hover:text-zinc-900"
+          class="inline-flex items-center gap-1 rounded text-xs text-muted hover:text-default"
         >
           <lucide-icon name="arrow-left" size="12" />
           Back to list
         </a>
         <span class="text-zinc-300">·</span>
-        <h1 class="text-lg font-semibold text-zinc-900">
+        <h1 class="text-lg font-semibold text-default">
           @if (template(); as t) {
             {{ t.name }}
           } @else {
@@ -26,14 +26,14 @@
       <div class="flex items-center gap-2">
         @if (toast(); as msg) {
           <div
-            class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs text-zinc-700"
+            class="rounded-md border border-subtle bg-surface-2 px-3 py-1.5 text-xs text-default"
           >
             <lucide-icon name="check" size="12" class="mr-1 inline" />
             {{ msg }}
             <button
               type="button"
               (click)="dismissToast()"
-              class="ml-2 text-zinc-500 hover:text-zinc-700"
+              class="ml-2 text-muted hover:text-default"
               aria-label="Dismiss"
             >
               <lucide-icon name="x" size="10" />
@@ -44,7 +44,7 @@
           <button
             type="button"
             (click)="openVersionsDrawer()"
-            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
           >
             <lucide-icon name="history" size="12" />
             Versions
@@ -54,7 +54,7 @@
           <button
             type="button"
             (click)="openTestSendModal()"
-            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
           >
             <lucide-icon name="send" size="12" />
             Test send
@@ -121,7 +121,7 @@
             type="button"
             (click)="refreshExternalStatus()"
             [disabled]="transitioning() !== null"
-            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
             title="Re-check Meta for the live status — same call the hourly sweep makes"
           >
             @if (transitioning() === 'sync_external') {
@@ -153,7 +153,7 @@
             type="button"
             (click)="archiveTemplate()"
             [disabled]="transitioning() !== null"
-            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
           >
             @if (transitioning() === 'archive') {
               <lucide-icon name="loader-2" size="12" class="animate-spin" />
@@ -168,7 +168,7 @@
             type="button"
             (click)="save()"
             [disabled]="saving()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
           >
             @if (saving()) {
               <lucide-icon name="loader-2" size="12" class="animate-spin" />
@@ -231,20 +231,20 @@
       <div class="flex flex-col gap-4">
         <form
           [formGroup]="headerForm"
-          class="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4"
+          class="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4"
         >
           <label class="block">
-            <span class="text-xs font-medium text-zinc-700">Template name</span>
+            <span class="text-xs font-medium text-default">Template name</span>
             <input
               type="text"
               formControlName="name"
               maxlength="120"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
               [class.border-rose-400]="waNameInvalid()"
               placeholder="e.g. welcome_lead"
             />
             @if (channel() === 'whatsapp') {
-              <p class="mt-1 text-[10px] text-zinc-500">
+              <p class="mt-1 text-[10px] text-muted">
                 Meta requires lowercase letters, digits, and underscores only — no spaces or
                 capitals.
               </p>
@@ -257,7 +257,7 @@
                 <button
                   type="button"
                   (click)="normaliseWaName()"
-                  class="rounded border border-zinc-300 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-700 hover:bg-zinc-50"
+                  class="rounded border border-subtle bg-surface px-2 py-0.5 text-[10px] font-medium text-default hover:bg-surface-2"
                 >
                   Fix to snake_case
                 </button>
@@ -266,10 +266,10 @@
           </label>
 
           <label class="block">
-            <span class="text-xs font-medium text-zinc-700">Channel</span>
+            <span class="text-xs font-medium text-default">Channel</span>
             <select
               formControlName="channel"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
             >
               <option value="">— Pick a channel —</option>
               <option value="email">Email</option>
@@ -280,7 +280,7 @@
               <option value="push">Push notification</option>
             </select>
             @if (template()) {
-              <p class="mt-1 text-[10px] text-zinc-400">
+              <p class="mt-1 text-[10px] text-faint">
                 Channel is locked after the first save — fork a new template to switch.
               </p>
             }
@@ -288,28 +288,28 @@
         </form>
 
         @if (channel() === 'whatsapp' && waForm(); as f) {
-          <div class="rounded-lg border border-zinc-200 bg-white p-4">
+          <div class="rounded-lg border border-subtle bg-surface p-4">
             <app-wa-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
           </div>
         } @else if (channel() === 'email' && emailForm(); as f) {
-          <div class="rounded-lg border border-zinc-200 bg-white p-4">
+          <div class="rounded-lg border border-subtle bg-surface p-4">
             <app-email-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
           </div>
         } @else if (channel() === 'sms' && smsForm(); as f) {
-          <div class="rounded-lg border border-zinc-200 bg-white p-4">
+          <div class="rounded-lg border border-subtle bg-surface p-4">
             <app-sms-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
           </div>
         } @else if ((channel() === 'facebook' || channel() === 'instagram') && fbForm(); as f) {
-          <div class="rounded-lg border border-zinc-200 bg-white p-4">
+          <div class="rounded-lg border border-subtle bg-surface p-4">
             <app-fb-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
           </div>
         } @else if (channel() === 'push' && pushForm(); as f) {
-          <div class="rounded-lg border border-zinc-200 bg-white p-4">
+          <div class="rounded-lg border border-subtle bg-surface p-4">
             <app-push-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
           </div>
         } @else {
           <div
-            class="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-500"
+            class="rounded-lg border border-dashed border-subtle bg-surface p-6 text-center text-sm text-muted"
           >
             Pick a channel above to start editing the template body.
           </div>
@@ -319,7 +319,7 @@
       <!-- middle: variable picker -->
       @if (channel(); as c) {
         <aside
-          class="sticky top-4 max-h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-zinc-200 bg-white"
+          class="sticky top-4 max-h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-subtle bg-surface"
         >
           <app-variable-picker [channel]="c" (insert)="onInsertVariable($event)" />
         </aside>
@@ -328,7 +328,7 @@
       <!-- right: live preview -->
       @if (channel(); as c) {
         <aside class="sticky top-4">
-          <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+          <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted">
             <app-channel-chip [channel]="c" />
           </p>
           <app-preview-pane

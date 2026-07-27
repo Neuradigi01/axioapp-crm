@@ -132,7 +132,7 @@ Grouped into 5 tracks. Each step is independently reviewable; pause/report after
 | 10 | [Leads (list + pipeline board)](step-10-leads.md) | COMPLETED | ~1 day |
 | 11 | [Conversations (three-pane + channel bubbles)](step-11-conversations.md) | COMPLETED | ~1 day |
 | 12 | [Appointments (calendar + list)](step-12-appointments.md) | COMPLETED | ~1 day |
-| 13 | [Campaigns + Templates](step-13-campaigns-templates.md) | Pending | ~1 day |
+| 13 | [Campaigns + Templates](step-13-campaigns-templates.md) | COMPLETED | ~1 day |
 | 14 | [Workflows + Automations](step-14-workflows-automations.md) | Pending | ~1 day |
 | 15 | [Reviews + Reporting](step-15-reviews-reporting.md) | Pending | ~½ day |
 | 16 | [Integrations + Billing](step-16-integrations-billing.md) | Pending | ~1 day |

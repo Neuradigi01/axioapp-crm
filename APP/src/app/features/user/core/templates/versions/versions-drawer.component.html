@@ -1,19 +1,19 @@
 <div class="fixed inset-0 z-50 flex justify-end bg-black/40">
   <div
-    class="flex h-full w-full max-w-xl flex-col bg-white shadow-xl ring-1 ring-zinc-200"
+    class="flex h-full w-full max-w-xl flex-col bg-surface shadow-xl ring-1 border-subtle"
     (click)="$event.stopPropagation()"
   >
-    <header class="flex items-center justify-between border-b border-zinc-200 px-5 py-3">
+    <header class="flex items-center justify-between border-b border-subtle px-5 py-3">
       <div>
-        <h2 class="text-sm font-semibold text-zinc-900">Version history</h2>
-        <p class="mt-0.5 text-xs text-zinc-500">
+        <h2 class="text-sm font-semibold text-default">Version history</h2>
+        <p class="mt-0.5 text-xs text-muted">
           {{ template().name }} · current v{{ template().current_version }}
         </p>
       </div>
       <button
         type="button"
         (click)="close()"
-        class="rounded p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+        class="rounded p-1 text-muted hover:bg-surface-2 hover:text-default"
         aria-label="Close"
       >
         <lucide-icon name="x" size="14" />
@@ -22,7 +22,7 @@
 
     <div class="flex-1 overflow-auto">
       @if (loading()) {
-        <div class="flex items-center gap-2 px-5 py-4 text-xs text-zinc-500">
+        <div class="flex items-center gap-2 px-5 py-4 text-xs text-muted">
           <lucide-icon name="loader-2" size="12" class="animate-spin" />
           Loading versions…
         </div>
@@ -33,14 +33,14 @@
           {{ err }}
         </div>
       } @else if (versions().length === 0) {
-        <p class="px-5 py-4 text-xs text-zinc-500">No history yet.</p>
+        <p class="px-5 py-4 text-xs text-muted">No history yet.</p>
       } @else {
-        <ul class="divide-y divide-zinc-100">
+        <ul class="divide-y divide-subtle">
           @for (v of versions(); track trackByVersion($index, v)) {
             <li class="px-5 py-3">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0 flex-1">
-                  <p class="text-sm font-medium text-zinc-900">
+                  <p class="text-sm font-medium text-default">
                     v{{ v.version }}
                     @if (v.version === template().current_version) {
                       <span
@@ -50,18 +50,18 @@
                       </span>
                     }
                   </p>
-                  <p class="mt-0.5 text-[11px] text-zinc-500">
+                  <p class="mt-0.5 text-[11px] text-muted">
                     {{ v.changed_at | date: 'medium' }}
                   </p>
                   @if (v.change_note) {
-                    <p class="mt-1 text-xs text-zinc-700">{{ v.change_note }}</p>
+                    <p class="mt-1 text-xs text-default">{{ v.change_note }}</p>
                   }
                 </div>
                 <div class="flex flex-col items-end gap-1">
                   <button
                     type="button"
                     (click)="viewVersion(v)"
-                    class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+                    class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default hover:bg-surface-2"
                   >
                     <lucide-icon name="eye" size="11" />
                     View
@@ -71,7 +71,7 @@
                       type="button"
                       (click)="restore(v)"
                       [disabled]="restoring() !== null"
-                      class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                      class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                     >
                       @if (restoring() === v.version) {
                         <lucide-icon name="loader-2" size="11" class="animate-spin" />
@@ -97,13 +97,13 @@
       }
 
       @if (viewing(); as v) {
-        <div class="border-t border-zinc-200 bg-zinc-50 px-5 py-4">
+        <div class="border-t border-subtle bg-surface-2 px-5 py-4">
           <div class="mb-2 flex items-center justify-between">
-            <p class="text-xs font-semibold text-zinc-700">v{{ v.version }} preview</p>
+            <p class="text-xs font-semibold text-default">v{{ v.version }} preview</p>
             <button
               type="button"
               (click)="closeView()"
-              class="text-xs text-zinc-500 hover:text-zinc-900"
+              class="text-xs text-muted hover:text-default"
             >
               Close preview
             </button>
