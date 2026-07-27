@@ -1,14 +1,14 @@
-<div class="w-full rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
+<div class="w-full rounded-xl border border-subtle bg-surface p-6 shadow-sm sm:p-8">
   <div class="mb-6 text-center">
-    <h1 class="text-xl font-semibold text-zinc-900">Create Account</h1>
-    <p class="mt-1 text-sm text-zinc-500">Fill in your details to register</p>
+    <h1 class="text-xl font-semibold text-default">Create Account</h1>
+    <p class="mt-1 text-sm text-muted">Fill in your details to register</p>
   </div>
 
   <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="space-y-4">
     <!-- Name Row -->
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div>
-        <label for="first_name" class="mb-1 block text-sm font-medium text-zinc-700"
+        <label for="first_name" class="mb-1 block text-sm font-medium text-default"
           >First Name</label
         >
         <input
@@ -16,7 +16,7 @@
           type="text"
           formControlName="first_name"
           autocomplete="given-name"
-          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         @if (
           registerForm.controls['first_name'].invalid &&
@@ -31,15 +31,13 @@
         }
       </div>
       <div>
-        <label for="last_name" class="mb-1 block text-sm font-medium text-zinc-700"
-          >Last Name</label
-        >
+        <label for="last_name" class="mb-1 block text-sm font-medium text-default">Last Name</label>
         <input
           id="last_name"
           type="text"
           formControlName="last_name"
           autocomplete="family-name"
-          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         @if (
           registerForm.controls['last_name'].invalid &&
@@ -57,14 +55,14 @@
 
     <!-- Email + Inline OTP -->
     <div>
-      <label for="email" class="mb-1 block text-sm font-medium text-zinc-700">Email</label>
+      <label for="email" class="mb-1 block text-sm font-medium text-default">Email</label>
       <div class="flex gap-2">
         <input
           id="email"
           type="email"
           formControlName="email"
           autocomplete="email"
-          class="w-full min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full min-w-0 flex-1 rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         @if (needsEmailOtp()) {
           <button
@@ -75,7 +73,7 @@
               isSendingEmailOtp() ||
               emailTimer.remaining() > 0
             "
-            class="shrink-0 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+            class="shrink-0 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {{ isSendingEmailOtp() ? 'Sending…' : emailOtpSent() ? 'Resend' : 'Send OTP' }}
           </button>
@@ -90,13 +88,13 @@
         </p>
       }
       @if (needsEmailOtp() && emailTimer.remaining() > 0) {
-        <p class="mt-1 text-xs text-zinc-500">Resend in {{ emailTimer.remaining() }}s</p>
+        <p class="mt-1 text-xs text-muted">Resend in {{ emailTimer.remaining() }}s</p>
       }
     </div>
 
     @if (needsEmailOtp() && emailOtpSent()) {
       <div>
-        <label for="email_otp_code" class="mb-1 block text-sm font-medium text-zinc-700"
+        <label for="email_otp_code" class="mb-1 block text-sm font-medium text-default"
           >Email OTP</label
         >
         <input
@@ -104,14 +102,14 @@
           type="text"
           formControlName="email_otp_code"
           autocomplete="one-time-code"
-          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </div>
     }
 
     <!-- Mobile + Inline OTP -->
     <div>
-      <label for="mobile_no" class="mb-1 block text-sm font-medium text-zinc-700"
+      <label for="mobile_no" class="mb-1 block text-sm font-medium text-default"
         >Mobile Number</label
       >
       <div class="flex gap-2">
@@ -120,7 +118,7 @@
           type="tel"
           formControlName="mobile_no"
           autocomplete="tel"
-          class="w-full min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full min-w-0 flex-1 rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         @if (needsSmsOtp()) {
           <button
@@ -129,20 +127,20 @@
             [disabled]="
               !registerForm.get('mobile_no')!.value || isSendingSmsOtp() || smsTimer.remaining() > 0
             "
-            class="shrink-0 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+            class="shrink-0 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {{ isSendingSmsOtp() ? 'Sending…' : smsOtpSent() ? 'Resend' : 'Send OTP' }}
           </button>
         }
       </div>
       @if (needsSmsOtp() && smsTimer.remaining() > 0) {
-        <p class="mt-1 text-xs text-zinc-500">Resend in {{ smsTimer.remaining() }}s</p>
+        <p class="mt-1 text-xs text-muted">Resend in {{ smsTimer.remaining() }}s</p>
       }
     </div>
 
     @if (needsSmsOtp() && smsOtpSent()) {
       <div>
-        <label for="mobile_otp_code" class="mb-1 block text-sm font-medium text-zinc-700"
+        <label for="mobile_otp_code" class="mb-1 block text-sm font-medium text-default"
           >Mobile OTP</label
         >
         <input
@@ -150,7 +148,7 @@
           type="text"
           formControlName="mobile_otp_code"
           autocomplete="one-time-code"
-          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </div>
     }
@@ -158,12 +156,12 @@
     <!-- Country / State Row -->
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div>
-        <label for="country_id" class="mb-1 block text-sm font-medium text-zinc-700">Country</label>
+        <label for="country_id" class="mb-1 block text-sm font-medium text-default">Country</label>
         <select
           id="country_id"
           formControlName="country_id"
           (change)="onCountryChange()"
-          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         >
           <option [ngValue]="null">-- Select --</option>
           @for (country of countries(); track country.id) {
@@ -172,11 +170,11 @@
         </select>
       </div>
       <div>
-        <label for="state_id" class="mb-1 block text-sm font-medium text-zinc-700">State</label>
+        <label for="state_id" class="mb-1 block text-sm font-medium text-default">State</label>
         <select
           id="state_id"
           formControlName="state_id"
-          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400"
+          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-faint"
         >
           <option [ngValue]="null">{{ statesLoading() ? 'Loading…' : '-- Select --' }}</option>
           @for (state of states(); track state.id) {
@@ -188,20 +186,20 @@
 
     <!-- Password -->
     <div>
-      <label for="password" class="mb-1 block text-sm font-medium text-zinc-700">Password</label>
+      <label for="password" class="mb-1 block text-sm font-medium text-default">Password</label>
       <div class="relative" appPasswordToggle #pwToggle="passwordToggle">
         <input
           id="password"
           formControlName="password"
           [type]="pwToggle.type()"
           autocomplete="new-password"
-          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 pr-10 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         <button
           type="button"
           (click)="pwToggle.toggle()"
           [attr.aria-label]="pwToggle.ariaLabel()"
-          class="absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400 transition hover:text-zinc-600"
+          class="absolute inset-y-0 right-0 flex items-center px-3 text-faint transition hover:text-muted"
         >
           <lucide-icon [name]="pwToggle.hidden() ? 'eye' : 'eye-off'" class="h-4 w-4" />
         </button>
@@ -218,7 +216,7 @@
 
     <!-- Confirm Password -->
     <div>
-      <label for="confirm_password" class="mb-1 block text-sm font-medium text-zinc-700"
+      <label for="confirm_password" class="mb-1 block text-sm font-medium text-default"
         >Confirm Password</label
       >
       <div class="relative" appPasswordToggle #cpToggle="passwordToggle">
@@ -227,13 +225,13 @@
           formControlName="confirm_password"
           [type]="cpToggle.type()"
           autocomplete="new-password"
-          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 pr-10 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
         <button
           type="button"
           (click)="cpToggle.toggle()"
           [attr.aria-label]="cpToggle.ariaLabel()"
-          class="absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400 transition hover:text-zinc-600"
+          class="absolute inset-y-0 right-0 flex items-center px-3 text-faint transition hover:text-muted"
         >
           <lucide-icon [name]="cpToggle.hidden() ? 'eye' : 'eye-off'" class="h-4 w-4" />
         </button>
@@ -254,14 +252,14 @@
 
     <!-- Referral ID -->
     <div>
-      <label for="referral_id" class="mb-1 block text-sm font-medium text-zinc-700"
+      <label for="referral_id" class="mb-1 block text-sm font-medium text-default"
         >Referral ID (optional)</label
       >
       <input
         id="referral_id"
         type="text"
         formControlName="referral_id"
-        class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       />
     </div>
 
@@ -276,14 +274,14 @@
     <button
       type="submit"
       [disabled]="isLoading()"
-      class="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+      class="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
     >
       {{ isLoading() ? 'Creating account…' : 'Create Account' }}
     </button>
   </form>
 
-  <p class="mt-6 text-center text-sm text-zinc-500">
+  <p class="mt-6 text-center text-sm text-muted">
     Already have an account?
-    <a [routerLink]="loginUrl" class="font-medium text-zinc-900 hover:underline">Login</a>
+    <a [routerLink]="loginUrl" class="font-medium text-default hover:underline">Login</a>
   </p>
 </div>

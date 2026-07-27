@@ -1,18 +1,18 @@
 <main
-  class="min-h-screen bg-zinc-50 px-4 py-16 text-zinc-900"
+  class="min-h-screen bg-surface-2 px-4 py-16 text-default"
   data-testid="data-deletion-status-page"
 >
   <div class="mx-auto max-w-xl">
     <header class="mb-8">
       <h1 class="text-2xl font-semibold tracking-tight">Data deletion status</h1>
-      <p class="mt-2 text-sm text-zinc-600">
+      <p class="mt-2 text-sm text-muted">
         We received your request to delete your data from Core CRM. This page shows the current
         status — it stays valid forever, so you can revisit it any time.
       </p>
     </header>
 
     @if (loading()) {
-      <div class="rounded-lg border border-zinc-200 bg-white p-6 text-sm text-zinc-600 shadow-sm">
+      <div class="rounded-lg border border-subtle bg-surface p-6 text-sm text-muted shadow-sm">
         Checking status…
       </div>
     } @else if (error(); as err) {
@@ -27,7 +27,7 @@
         </p>
       </div>
     } @else if (response(); as r) {
-      <section class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
+      <section class="rounded-lg border border-subtle bg-surface p-6 shadow-sm">
         <div class="flex items-start gap-3">
           @switch (displayStatus()) {
             @case ('pending') {
@@ -37,7 +37,7 @@
               ></span>
               <div>
                 <h2 class="text-base font-semibold">Pending</h2>
-                <p class="mt-1 text-sm text-zinc-600">
+                <p class="mt-1 text-sm text-muted">
                   We received your request and are about to start. This page refreshes
                   automatically.
                 </p>
@@ -50,7 +50,7 @@
               ></span>
               <div>
                 <h2 class="text-base font-semibold">In progress</h2>
-                <p class="mt-1 text-sm text-zinc-600">
+                <p class="mt-1 text-sm text-muted">
                   Your data is being removed. This usually completes within a minute.
                 </p>
               </div>
@@ -62,12 +62,12 @@
               ></span>
               <div>
                 <h2 class="text-base font-semibold">Completed</h2>
-                <p class="mt-1 text-sm text-zinc-600">
+                <p class="mt-1 text-sm text-muted">
                   Your WhatsApp data has been removed from Core CRM.
                 </p>
                 @if (r.is_demo) {
                   <p
-                    class="mt-2 inline-block rounded bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700"
+                    class="mt-2 inline-block rounded bg-surface-2 px-2 py-0.5 text-xs font-medium text-default"
                   >
                     Demo response (sample data for app reviewers)
                   </p>
@@ -81,11 +81,11 @@
               ></span>
               <div>
                 <h2 class="text-base font-semibold">Failed</h2>
-                <p class="mt-1 text-sm text-zinc-600">
+                <p class="mt-1 text-sm text-muted">
                   Something went wrong while processing your deletion. Our team has been notified —
                   you don't need to do anything.
                 </p>
-                <p class="mt-2 text-xs text-zinc-500">
+                <p class="mt-2 text-xs text-muted">
                   For urgent issues, contact
                   <a href="mailto:privacy@core-crm.com" class="underline hover:no-underline"
                     >privacy&#64;core-crm.com</a
@@ -100,37 +100,35 @@
               ></span>
               <div>
                 <h2 class="text-base font-semibold">Unknown</h2>
-                <p class="mt-1 text-sm text-zinc-600">Status unavailable.</p>
+                <p class="mt-1 text-sm text-muted">Status unavailable.</p>
               </div>
             }
           }
         </div>
 
-        <dl
-          class="mt-6 grid grid-cols-1 gap-3 border-t border-zinc-200 pt-6 text-sm sm:grid-cols-2"
-        >
+        <dl class="mt-6 grid grid-cols-1 gap-3 border-t border-subtle pt-6 text-sm sm:grid-cols-2">
           <div>
-            <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Requested</dt>
+            <dt class="text-xs font-medium uppercase tracking-wide text-muted">Requested</dt>
             <dd class="mt-0.5">
               {{ r.requested_at | date: 'medium' }}
             </dd>
           </div>
           @if (r.completed_at; as ca) {
             <div>
-              <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Completed</dt>
+              <dt class="text-xs font-medium uppercase tracking-wide text-muted">Completed</dt>
               <dd class="mt-0.5">{{ ca | date: 'medium' }}</dd>
             </div>
           }
           <div>
-            <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt class="text-xs font-medium uppercase tracking-wide text-muted">
               Confirmation code
             </dt>
-            <dd class="mt-0.5 break-all font-mono text-xs text-zinc-700">
+            <dd class="mt-0.5 break-all font-mono text-xs text-default">
               {{ r.confirmation_code }}
             </dd>
           </div>
           <div>
-            <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <dt class="text-xs font-medium uppercase tracking-wide text-muted">
               Workspaces affected
             </dt>
             <dd class="mt-0.5">{{ r.affected_org_count }}</dd>
@@ -139,7 +137,7 @@
       </section>
     }
 
-    <footer class="mt-8 text-xs text-zinc-500">
+    <footer class="mt-8 text-xs text-muted">
       <p>
         Core CRM removes all WhatsApp messages associated with the Meta account that initiated this
         deletion. Contact records sourced from other channels (email, web forms, manual entry) are

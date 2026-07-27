@@ -143,7 +143,7 @@ Grouped into 5 tracks. Each step is independently reviewable; pause/report after
 
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
-| 19 | [Accounts (login / register / 2FA / forgot / reset / onboarding) realign](step-19-accounts-realign.md) | Pending | ~1 day |
+| 19 | [Accounts (login / register / 2FA / forgot / reset / onboarding) realign](step-19-accounts-realign.md) | COMPLETED | ~1 day |
 | 20 | [Admin panel visual refresh (scope override)](step-20-admin-refresh.md) | Pending | ~1 day |
 | 21 | [Error + Access Denied + shared micro-pages](step-21-error-pages.md) | Pending | ~¼ day |
 | 22 | [Polish pass + a11y audit + reduced-motion check](step-22-polish-a11y.md) | Pending | ~½ day |

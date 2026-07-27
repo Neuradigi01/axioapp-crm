@@ -2,7 +2,7 @@
 
 **Goal:** Realign the accounts pages (login, register, forgot / reset password, 2FA, verify-email, onboarding, accounts-layout) with the new AIXO tokens. They already use Tailwind (per prior migration) — this step swaps `bg-white` / `bg-zinc-900` / `border-zinc-200` for the new semantic tokens so both dark and light work consistently.
 **Track:** Design Refresh — Track 5 (Auth + admin + polish)
-**Status:** Pending
+**Status:** COMPLETED — 11 accounts HTML files bulk-swapped: accounts-layout, login, register, forgot-password, reset-password, two-factor, verify-email, email-verification-notice, onboarding. Existing tailwind auth pages now render with AIXO semantic tokens in both dark + light. Also swept `text-gray-*` / `border-gray-*` patterns (accounts pages use gray in places instead of zinc). `ng build` green.
 **Depends on:** Steps 1, 2, 5
 
 ---
