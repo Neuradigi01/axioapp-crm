@@ -107,7 +107,7 @@ export const NODE_HEADER = 30;
           (mousedown)="$event.stopPropagation()"
           aria-label="Node actions"
         >
-          <lucide-icon name="MoreVertical" class="w-3.5 h-3.5"></lucide-icon>
+          <lucide-icon name="more-vertical" class="w-3.5 h-3.5"></lucide-icon>
         </button>
       </svg:foreignObject>
 

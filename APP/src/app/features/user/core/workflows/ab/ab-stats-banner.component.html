@@ -10,11 +10,11 @@
     [class.animate-pulse]="winnerCalled()"
   >
     @if (winnerCalled()) {
-      <lucide-icon name="Trophy" class="w-4 h-4 text-emerald-600"></lucide-icon>
+      <lucide-icon name="trophy" class="w-4 h-4 text-emerald-600"></lucide-icon>
       <span class="font-semibold">{{ winnerLabel() }} won.</span>
       <span class="text-emerald-800"> Decided {{ s.decided_at | date: 'medium' }}. </span>
     } @else {
-      <lucide-icon name="Beaker" class="w-4 h-4 text-sky-600"></lucide-icon>
+      <lucide-icon name="beaker" class="w-4 h-4 text-sky-600"></lucide-icon>
       <span class="font-semibold">A/B test running.</span>
       @if (s.holdback_until) {
         <span> Decision after {{ s.holdback_until | date: 'medium' }}. </span>

@@ -6,7 +6,7 @@
         class="p-1.5 rounded text-muted hover:text-default hover:bg-surface-2"
         title="Back to workflow"
       >
-        <lucide-icon name="ArrowLeft" class="w-4 h-4"></lucide-icon>
+        <lucide-icon name="arrow-left" class="w-4 h-4"></lucide-icon>
       </a>
       <h1 class="text-base font-semibold text-default">
         Run <span class="text-muted font-mono">{{ runId().slice(0, 8) }}…</span>
@@ -14,7 +14,7 @@
       <span class="text-xs text-muted">— {{ d.workflow_name }}</span>
     } @else {
       <a routerLink="/user/workflows" class="p-1.5 rounded text-muted hover:text-default">
-        <lucide-icon name="ArrowLeft" class="w-4 h-4"></lucide-icon>
+        <lucide-icon name="arrow-left" class="w-4 h-4"></lucide-icon>
       </a>
       <h1 class="text-base font-semibold text-default">Run detail</h1>
     }

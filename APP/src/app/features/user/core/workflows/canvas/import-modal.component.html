@@ -14,7 +14,7 @@
         [disabled]="busy()"
         (click)="cancel.emit()"
       >
-        <lucide-icon name="X" class="w-4 h-4"></lucide-icon>
+        <lucide-icon name="x" class="w-4 h-4"></lucide-icon>
       </button>
     </header>
 
@@ -22,7 +22,7 @@
       <label
         class="block px-3 py-6 text-center text-xs text-muted border-2 border-dashed border-subtle rounded cursor-pointer hover:border-muted hover:bg-surface-2"
       >
-        <lucide-icon name="Upload" class="w-5 h-5 mb-1 text-muted inline"></lucide-icon>
+        <lucide-icon name="upload" class="w-5 h-5 mb-1 text-muted inline"></lucide-icon>
         @if (fileName()) {
           <p class="text-default font-medium truncate">{{ fileName() }}</p>
           <p class="text-[10px] text-muted mt-1">Click to pick a different file.</p>
