@@ -112,7 +112,7 @@ Grouped into 5 tracks. Each step is independently reviewable; pause/report after
 
 | # | Title | Status | Effort |
 |---|-------|--------|--------|
-| 3 | [Sidebar rail + workspace switcher](step-03-sidebar-rail-and-workspace-switcher.md) | Pending | ~1 day |
+| 3 | [Sidebar rail + workspace switcher](step-03-sidebar-rail-and-workspace-switcher.md) | COMPLETED | ~1 day |
 | 4 | [Header + trial banner + command palette shell](step-04-header-banner-cmdk.md) | Pending | ~½ day |
 
 ### Track 3 — Shared primitives (`core/shared/`)

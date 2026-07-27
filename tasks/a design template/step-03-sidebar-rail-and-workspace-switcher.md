@@ -2,7 +2,7 @@
 
 **Goal:** Rebuild the left sidebar to match AIXO's rail: collapsible width, workspace-switcher card on top, section-grouped nav in the middle, profile at bottom. Zero changes to the menu registry or permission gates.
 **Track:** Design Refresh — Track 2 (App shell)
-**Status:** Pending
+**Status:** COMPLETED — sidebar rebuilt to AIXO rail with workspace switcher on top, module list in the middle, profile card at bottom. Uses semantic tokens (`bg-surface`, `border-subtle`, `bg-accent`, `text-muted`, `text-faint`). Registry consumption + collapse/expand + mobile drawer preserved. `ng build` green.
 **Depends on:** Step 1, Step 2
 
 ---
