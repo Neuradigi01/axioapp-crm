@@ -12,10 +12,10 @@
           [class]="
             'flex items-center gap-1.5 rounded-full px-2.5 py-1 ring-1 ' +
             (step() === i + 1
-              ? 'bg-zinc-900 text-white ring-zinc-900'
+              ? 'bg-accent text-white ring-zinc-900'
               : step() > i + 1
                 ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                : 'bg-white text-zinc-500 ring-zinc-200')
+                : 'bg-surface text-muted border-subtle')
           "
         >
           <span>{{ i + 1 }}</span>
@@ -24,40 +24,40 @@
       }
     </ol>
 
-    <div class="flex-1 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-4">
+    <div class="flex-1 overflow-y-auto rounded-lg border border-subtle bg-surface p-4">
       @switch (step()) {
         <!-- 1. Basics -->
         @case (1) {
-          <h3 class="text-base font-semibold text-zinc-900">Basics</h3>
-          <p class="mb-3 text-xs text-zinc-500">
+          <h3 class="text-base font-semibold text-default">Basics</h3>
+          <p class="mb-3 text-xs text-muted">
             Choose a unique name (lowercase, underscores), the language, and the category that best
             fits the template's purpose.
           </p>
 
-          <label class="mb-1 block text-xs font-medium text-zinc-700">Name</label>
+          <label class="mb-1 block text-xs font-medium text-default">Name</label>
           <input
             type="text"
             [ngModel]="name()"
             (ngModelChange)="name.set($event)"
             placeholder="diwali_sale_2026"
-            class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="w-full rounded-md border border-subtle px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           />
           @if (nameError(); as err) {
             <p class="mt-1 text-xs text-rose-600">{{ err }}</p>
           }
 
-          <label class="mb-1 mt-4 block text-xs font-medium text-zinc-700">Language</label>
+          <label class="mb-1 mt-4 block text-xs font-medium text-default">Language</label>
           <select
             [ngModel]="language()"
             (ngModelChange)="language.set($event)"
-            class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
           >
             @for (l of LANGUAGES; track l.code) {
               <option [value]="l.code">{{ l.label }} ({{ l.code }})</option>
             }
           </select>
 
-          <label class="mb-1 mt-4 block text-xs font-medium text-zinc-700">Category</label>
+          <label class="mb-1 mt-4 block text-xs font-medium text-default">Category</label>
           <div class="grid grid-cols-3 gap-2">
             @for (c of ['MARKETING', 'UTILITY', 'AUTHENTICATION']; track c) {
               <button
@@ -66,8 +66,8 @@
                 [class]="
                   'rounded-md border px-3 py-2 text-xs font-medium transition ' +
                   (category() === c
-                    ? 'border-zinc-900 bg-zinc-900 text-white'
-                    : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+                    ? 'border-accent bg-accent text-white'
+                    : 'border-subtle bg-surface text-default hover:bg-surface-2')
                 "
               >
                 {{ c }}
@@ -78,8 +78,8 @@
 
         <!-- 2. Header -->
         @case (2) {
-          <h3 class="text-base font-semibold text-zinc-900">Header</h3>
-          <p class="mb-3 text-xs text-zinc-500">
+          <h3 class="text-base font-semibold text-default">Header</h3>
+          <p class="mb-3 text-xs text-muted">
             Optional. TEXT supports a short line at the top of the bubble; media headers attach a
             sample asset at submit time.
           </p>
@@ -92,8 +92,8 @@
                 [class]="
                   'rounded-md border px-3 py-2 text-xs font-medium transition ' +
                   (headerType() === t
-                    ? 'border-zinc-900 bg-zinc-900 text-white'
-                    : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+                    ? 'border-accent bg-accent text-white'
+                    : 'border-subtle bg-surface text-default hover:bg-surface-2')
                 "
               >
                 {{ t || 'None' }}
@@ -102,7 +102,7 @@
           </div>
 
           @if (headerType() === 'TEXT') {
-            <label class="mb-1 block text-xs font-medium text-zinc-700">
+            <label class="mb-1 block text-xs font-medium text-default">
               Header text ({{ LIMITS.headerMax }} chars max)
             </label>
             <input
@@ -111,9 +111,9 @@
               (ngModelChange)="headerText.set($event)"
               [maxlength]="LIMITS.headerMax"
               placeholder="Diwali Sale"
-              class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+              class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
             />
-            <p class="mt-1 text-right text-[10px] text-zinc-400">
+            <p class="mt-1 text-right text-[10px] text-faint">
               {{ headerText().length }}/{{ LIMITS.headerMax }}
             </p>
             @if (headerError(); as err) {
@@ -130,11 +130,11 @@
 
         <!-- 3. Body -->
         @case (3) {
-          <h3 class="text-base font-semibold text-zinc-900">Body</h3>
-          <p class="mb-3 text-xs text-zinc-500">
-            Use <code class="rounded bg-zinc-100 px-1 py-0.5">{{ '{{1}}' }}</code>,
-            <code class="rounded bg-zinc-100 px-1 py-0.5">{{ '{{2}}' }}</code>… for variables. Up to
-            {{ LIMITS.bodyMax }} characters.
+          <h3 class="text-base font-semibold text-default">Body</h3>
+          <p class="mb-3 text-xs text-muted">
+            Use <code class="rounded bg-surface-2 px-1 py-0.5">{{ '{{1}}' }}</code>,
+            <code class="rounded bg-surface-2 px-1 py-0.5">{{ '{{2}}' }}</code>… for variables. Up
+            to {{ LIMITS.bodyMax }} characters.
           </p>
 
           <textarea
@@ -143,13 +143,13 @@
             rows="6"
             [maxlength]="LIMITS.bodyMax"
             placeholder="Hi {{ '{{1}}' }}, enjoy 30% off on all {{ '{{2}}' }} this Diwali!"
-            class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm font-mono"
+            class="w-full rounded-md border border-subtle px-3 py-2 text-sm font-mono"
           ></textarea>
-          <div class="mt-1 flex items-center justify-between text-[10px] text-zinc-400">
+          <div class="mt-1 flex items-center justify-between text-[10px] text-faint">
             <button
               type="button"
               (click)="insertVariable()"
-              class="rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+              class="rounded border border-subtle bg-surface px-2 py-1 text-xs text-default hover:bg-surface-2"
             >
               + Variable
             </button>
@@ -162,8 +162,8 @@
 
         <!-- 4. Footer -->
         @case (4) {
-          <h3 class="text-base font-semibold text-zinc-900">Footer</h3>
-          <p class="mb-3 text-xs text-zinc-500">
+          <h3 class="text-base font-semibold text-default">Footer</h3>
+          <p class="mb-3 text-xs text-muted">
             Optional. Up to {{ LIMITS.footerMax }} characters — typically used for fine-print or
             branding.
           </p>
@@ -173,17 +173,17 @@
             (ngModelChange)="footerText.set($event)"
             [maxlength]="LIMITS.footerMax"
             placeholder="Sharma Furniture"
-            class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
           />
-          <p class="mt-1 text-right text-[10px] text-zinc-400">
+          <p class="mt-1 text-right text-[10px] text-faint">
             {{ footerText().length }}/{{ LIMITS.footerMax }}
           </p>
         }
 
         <!-- 5. Buttons -->
         @case (5) {
-          <h3 class="text-base font-semibold text-zinc-900">Buttons</h3>
-          <p class="mb-3 text-xs text-zinc-500">
+          <h3 class="text-base font-semibold text-default">Buttons</h3>
+          <p class="mb-3 text-xs text-muted">
             Quick-reply buttons and CTAs (URL / phone) cannot be mixed in the same template — Meta's
             rule.
           </p>
@@ -203,8 +203,8 @@
                 [class]="
                   'rounded-md border px-3 py-2 text-xs font-medium transition ' +
                   (buttonGroup() === g.key
-                    ? 'border-zinc-900 bg-zinc-900 text-white'
-                    : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+                    ? 'border-accent bg-accent text-white'
+                    : 'border-subtle bg-surface text-default hover:bg-surface-2')
                 "
               >
                 {{ g.label }}
@@ -222,12 +222,12 @@
                     (ngModelChange)="updateQuickReply($index, $event)"
                     [maxlength]="LIMITS.buttonTextMax"
                     placeholder="Yes"
-                    class="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                    class="flex-1 rounded-md border border-subtle px-3 py-2 text-sm"
                   />
                   <button
                     type="button"
                     (click)="removeQuickReply($index)"
-                    class="rounded p-1.5 text-zinc-500 hover:bg-zinc-100"
+                    class="rounded p-1.5 text-muted hover:bg-surface-2"
                     aria-label="Remove"
                   >
                     <lucide-icon name="x" size="14" />
@@ -238,7 +238,7 @@
                 <button
                   type="button"
                   (click)="addQuickReply()"
-                  class="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-xs text-zinc-600 hover:bg-zinc-50"
+                  class="rounded-md border border-dashed border-subtle px-3 py-2 text-xs text-muted hover:bg-surface-2"
                 >
                   + Add quick reply
                 </button>
@@ -249,12 +249,12 @@
           @if (buttonGroup() === 'CTA') {
             <div class="space-y-3">
               @for (btn of ctaButtons(); track $index) {
-                <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                <div class="rounded-md border border-subtle bg-surface-2 p-3">
                   <div class="mb-2 flex items-center justify-between">
                     <select
                       [ngModel]="btn.type"
                       (ngModelChange)="updateCta($index, { type: $event })"
-                      class="rounded-md border border-zinc-300 px-2 py-1 text-xs"
+                      class="rounded-md border border-subtle px-2 py-1 text-xs"
                     >
                       <option value="URL">URL</option>
                       <option value="PHONE_NUMBER">Phone</option>
@@ -262,7 +262,7 @@
                     <button
                       type="button"
                       (click)="removeCta($index)"
-                      class="rounded p-1 text-zinc-500 hover:bg-zinc-100"
+                      class="rounded p-1 text-muted hover:bg-surface-2"
                       aria-label="Remove"
                     >
                       <lucide-icon name="x" size="14" />
@@ -274,7 +274,7 @@
                     (ngModelChange)="updateCta($index, { text: $event })"
                     [maxlength]="LIMITS.buttonTextMax"
                     placeholder="Label (e.g. Open catalogue)"
-                    class="mb-2 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                    class="mb-2 w-full rounded-md border border-subtle px-3 py-2 text-sm"
                   />
                   @if (btn.type === 'URL') {
                     <input
@@ -283,7 +283,7 @@
                       (ngModelChange)="updateCta($index, { url: $event })"
                       [maxlength]="LIMITS.ctaUrlMax"
                       placeholder="https://example.com/sale"
-                      class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                      class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
                     />
                   } @else {
                     <input
@@ -292,7 +292,7 @@
                       (ngModelChange)="updateCta($index, { phone_number: $event })"
                       [maxlength]="LIMITS.ctaPhoneMax"
                       placeholder="+919876543210"
-                      class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                      class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
                     />
                   }
                 </div>
@@ -301,7 +301,7 @@
                 <button
                   type="button"
                   (click)="addCta()"
-                  class="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-xs text-zinc-600 hover:bg-zinc-50"
+                  class="rounded-md border border-dashed border-subtle px-3 py-2 text-xs text-muted hover:bg-surface-2"
                 >
                   + Add CTA
                 </button>
@@ -316,31 +316,31 @@
 
         <!-- 6. Samples -->
         @case (6) {
-          <h3 class="text-base font-semibold text-zinc-900">Sample values</h3>
-          <p class="mb-3 text-xs text-zinc-500">
+          <h3 class="text-base font-semibold text-default">Sample values</h3>
+          <p class="mb-3 text-xs text-muted">
             Meta uses these to render an example when reviewing your template. The preview pane to
             the right also uses them.
           </p>
 
           @if (variableSlots().length === 0) {
-            <div class="rounded-md bg-zinc-50 px-3 py-4 text-center text-xs text-zinc-500">
-              No <code class="rounded bg-zinc-100 px-1 py-0.5">{{ '{{n}}' }}</code>
+            <div class="rounded-md bg-surface-2 px-3 py-4 text-center text-xs text-muted">
+              No <code class="rounded bg-surface-2 px-1 py-0.5">{{ '{{n}}' }}</code>
               placeholders in your body — nothing to sample.
             </div>
           } @else {
             <div class="space-y-2">
               @for (n of variableSlots(); track n) {
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-zinc-700">
+                  <label class="mb-1 block text-xs font-medium text-default">
                     Sample for
-                    <code class="rounded bg-zinc-100 px-1 py-0.5">{{ '{{' + n + '}}' }}</code>
+                    <code class="rounded bg-surface-2 px-1 py-0.5">{{ '{{' + n + '}}' }}</code>
                   </label>
                   <input
                     type="text"
                     [ngModel]="sampleValues()[n] || ''"
                     (ngModelChange)="updateSample(n, $event)"
                     placeholder="Example value"
-                    class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                    class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
                   />
                 </div>
               }
@@ -353,27 +353,27 @@
 
         <!-- 7. Review -->
         @case (7) {
-          <h3 class="text-base font-semibold text-zinc-900">Review &amp; submit</h3>
-          <p class="mb-3 text-xs text-zinc-500">
+          <h3 class="text-base font-semibold text-default">Review &amp; submit</h3>
+          <p class="mb-3 text-xs text-muted">
             Double-check the preview on the right. Once you submit, Meta will review (typically 30
             minutes to 24 hours).
           </p>
           <dl class="space-y-2 text-xs">
-            <div class="flex justify-between border-b border-zinc-100 pb-1">
-              <dt class="font-medium text-zinc-700">Name</dt>
-              <dd class="font-mono text-zinc-900">{{ name() }}</dd>
+            <div class="flex justify-between border-b border-subtle pb-1">
+              <dt class="font-medium text-default">Name</dt>
+              <dd class="font-mono text-default">{{ name() }}</dd>
             </div>
-            <div class="flex justify-between border-b border-zinc-100 pb-1">
-              <dt class="font-medium text-zinc-700">Language · Category</dt>
-              <dd class="text-zinc-900">{{ language() }} · {{ category() }}</dd>
+            <div class="flex justify-between border-b border-subtle pb-1">
+              <dt class="font-medium text-default">Language · Category</dt>
+              <dd class="text-default">{{ language() }} · {{ category() }}</dd>
             </div>
-            <div class="flex justify-between border-b border-zinc-100 pb-1">
-              <dt class="font-medium text-zinc-700">Header</dt>
-              <dd class="text-zinc-900">{{ headerType() || 'None' }}</dd>
+            <div class="flex justify-between border-b border-subtle pb-1">
+              <dt class="font-medium text-default">Header</dt>
+              <dd class="text-default">{{ headerType() || 'None' }}</dd>
             </div>
-            <div class="flex justify-between border-b border-zinc-100 pb-1">
-              <dt class="font-medium text-zinc-700">Buttons</dt>
-              <dd class="text-zinc-900">
+            <div class="flex justify-between border-b border-subtle pb-1">
+              <dt class="font-medium text-default">Buttons</dt>
+              <dd class="text-default">
                 {{ assembledButtons().length }}
                 {{ buttonGroup() === 'NONE' ? '' : '(' + buttonGroup() + ')' }}
               </dd>
@@ -395,7 +395,7 @@
       <button
         type="button"
         (click)="onCancel()"
-        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
       >
         Cancel
       </button>
@@ -404,7 +404,7 @@
           <button
             type="button"
             (click)="goPrev()"
-            class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
           >
             Back
           </button>
@@ -414,7 +414,7 @@
             type="button"
             (click)="goNext()"
             [disabled]="!canAdvance()"
-            class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+            class="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
           >
             Next
           </button>
@@ -443,7 +443,7 @@
         [buttons]="assembledButtons()"
         [sampleValues]="sampleValues()"
       />
-      <p class="mt-2 text-center text-[10px] text-zinc-500">
+      <p class="mt-2 text-center text-[10px] text-muted">
         Approximation — actual rendering varies across iOS / Android / Web.
       </p>
     </div>

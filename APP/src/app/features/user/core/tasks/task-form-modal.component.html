@@ -1,11 +1,11 @@
 <div class="fixed inset-0 z-40 bg-black/40" (click)="onCancel()" role="presentation"></div>
 <div
-  class="fixed left-1/2 top-1/2 z-50 flex max-h-[92vh] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+  class="fixed left-1/2 top-1/2 z-50 flex max-h-[92vh] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-surface shadow-2xl"
   role="dialog"
   aria-label="Task form"
 >
-  <div class="border-b border-zinc-200 px-5 py-3">
-    <h3 class="text-sm font-semibold text-zinc-900">
+  <div class="border-b border-subtle px-5 py-3">
+    <h3 class="text-sm font-semibold text-default">
       {{ isEdit() ? 'Edit task' : 'Create task' }}
     </h3>
   </div>
@@ -17,7 +17,7 @@
   >
     @if (!isHidden('title')) {
       <label class="block text-sm">
-        <span class="mb-1 block text-xs font-medium text-zinc-600">
+        <span class="mb-1 block text-xs font-medium text-muted">
           {{ stdField('title')?.label ?? 'Title' }} <span class="text-rose-600">*</span>
         </span>
         <input
@@ -26,17 +26,17 @@
           autocomplete="off"
           maxlength="255"
           [attr.placeholder]="stdField('title')?.placeholder"
-          class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
         />
         @if (stdField('title')?.help_text; as help) {
-          <span class="mt-1 block text-xs text-zinc-500">{{ help }}</span>
+          <span class="mt-1 block text-xs text-muted">{{ help }}</span>
         }
       </label>
     }
 
     @if (!isHidden('description')) {
       <label class="block text-sm">
-        <span class="mb-1 block text-xs font-medium text-zinc-600">
+        <span class="mb-1 block text-xs font-medium text-muted">
           {{ stdField('description')?.label ?? 'Description' }}
           @if (stdField('description')?.is_required) {
             <span class="text-rose-600">*</span>
@@ -46,10 +46,10 @@
           formControlName="description"
           rows="2"
           [attr.placeholder]="stdField('description')?.placeholder"
-          class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
         ></textarea>
         @if (stdField('description')?.help_text; as help) {
-          <span class="mt-1 block text-xs text-zinc-500">{{ help }}</span>
+          <span class="mt-1 block text-xs text-muted">{{ help }}</span>
         }
       </label>
     }
@@ -57,7 +57,7 @@
     <div class="grid grid-cols-2 gap-3">
       @if (!isHidden('due_at')) {
         <label class="block text-sm">
-          <span class="mb-1 block text-xs font-medium text-zinc-600">
+          <span class="mb-1 block text-xs font-medium text-muted">
             {{ stdField('due_at')?.label ?? 'Due date' }}
             @if (stdField('due_at')?.is_required) {
               <span class="text-rose-600">*</span>
@@ -66,28 +66,28 @@
           <input
             type="datetime-local"
             formControlName="due_at"
-            class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+            class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
           />
           @if (stdField('due_at')?.help_text; as help) {
-            <span class="mt-1 block text-xs text-zinc-500">{{ help }}</span>
+            <span class="mt-1 block text-xs text-muted">{{ help }}</span>
           }
         </label>
       }
       @if (!isHidden('priority')) {
         <label class="block text-sm">
-          <span class="mb-1 block text-xs font-medium text-zinc-600">
+          <span class="mb-1 block text-xs font-medium text-muted">
             {{ stdField('priority')?.label ?? 'Priority' }} <span class="text-rose-600">*</span>
           </span>
           <select
             formControlName="priority"
-            class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+            class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
           >
             <option value="low">Low</option>
             <option value="med">Medium</option>
             <option value="high">High</option>
           </select>
           @if (stdField('priority')?.help_text; as help) {
-            <span class="mt-1 block text-xs text-zinc-500">{{ help }}</span>
+            <span class="mt-1 block text-xs text-muted">{{ help }}</span>
           }
         </label>
       }
@@ -95,7 +95,7 @@
 
     @if (hasAssigneeDropdown() && !isHidden('assigned_to_id')) {
       <label class="block text-sm">
-        <span class="mb-1 block text-xs font-medium text-zinc-600">
+        <span class="mb-1 block text-xs font-medium text-muted">
           {{ stdField('assigned_to_id')?.label ?? 'Assignee' }}
           @if (stdField('assigned_to_id')?.is_required) {
             <span class="text-rose-600">*</span>
@@ -103,31 +103,31 @@
         </span>
         <select
           formControlName="assigned_to_id"
-          class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
         >
           @for (a of assignees; track a.id) {
             <option [value]="a.id">{{ a.full_name || a.email }}</option>
           }
         </select>
         @if (stdField('assigned_to_id')?.help_text; as help) {
-          <span class="mt-1 block text-xs text-zinc-500">{{ help }}</span>
+          <span class="mt-1 block text-xs text-muted">{{ help }}</span>
         }
       </label>
     } @else if (!hasAssigneeDropdown()) {
-      <p class="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+      <p class="rounded-md bg-surface-2 px-3 py-2 text-xs text-muted">
         Task will be assigned to you.
       </p>
     }
 
     <!-- T3 — Followup type. Optional; NULL = generic to-do. -->
     <label class="block text-sm">
-      <span class="mb-1 block text-xs font-medium text-zinc-600">
+      <span class="mb-1 block text-xs font-medium text-muted">
         Follow-up type
-        <span class="ml-1 text-zinc-400">(optional)</span>
+        <span class="ml-1 text-faint">(optional)</span>
       </span>
       <select
         formControlName="followup_type"
-        class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+        class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
       >
         @for (o of followupOptions; track o.value) {
           <option [value]="o.value">{{ o.label }}</option>
@@ -138,9 +138,9 @@
     <!-- T5 — Related contact picker. Optional. On save, sets
          related_entity_type='contact' + related_entity_id. -->
     <div class="text-sm">
-      <span class="mb-1 block text-xs font-medium text-zinc-600">
+      <span class="mb-1 block text-xs font-medium text-muted">
         Linked contact
-        <span class="ml-1 text-zinc-400">(optional)</span>
+        <span class="ml-1 text-faint">(optional)</span>
       </span>
       @if (selectedContact(); as c) {
         <div
@@ -158,7 +158,7 @@
           <button
             type="button"
             (click)="clearContact()"
-            class="rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-medium text-amber-900 hover:bg-amber-100"
+            class="rounded-md border border-amber-300 bg-surface px-2 py-1 text-[11px] font-medium text-amber-900 hover:bg-amber-100"
           >
             Change
           </button>
@@ -170,21 +170,21 @@
           (input)="onContactSearchInput($event)"
           placeholder="Search by name, phone, or email…"
           autocomplete="off"
-          class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
         />
         @if (contactResults().length > 0) {
           <ul
-            class="mt-2 max-h-40 divide-y divide-zinc-100 overflow-auto rounded-md border border-zinc-200"
+            class="mt-2 max-h-40 divide-y divide-subtle overflow-auto rounded-md border border-subtle"
           >
             @for (row of contactResults(); track row.id) {
               <li>
                 <button
                   type="button"
                   (click)="pickContact(row)"
-                  class="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-xs hover:bg-zinc-50"
+                  class="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-xs hover:bg-surface-2"
                 >
-                  <span class="font-medium text-zinc-900">{{ row.full_name }}</span>
-                  <span class="text-zinc-500">
+                  <span class="font-medium text-default">{{ row.full_name }}</span>
+                  <span class="text-muted">
                     {{ row.phone || '—' }}
                     @if (row.email) {
                       · {{ row.email }}
@@ -195,7 +195,7 @@
             }
           </ul>
         } @else if (contactSearch().length >= 2 && !contactSearching()) {
-          <p class="mt-1 text-xs text-zinc-500">
+          <p class="mt-1 text-xs text-muted">
             No contacts match &ldquo;{{ contactSearch() }}&rdquo;.
           </p>
         }
@@ -205,8 +205,8 @@
     <!-- T4 — Dynamic custom fields. Renders zero output when the org
          has no `entity_type='task'` definitions. -->
     @if (fields().length > 0) {
-      <div class="border-t border-zinc-200 pt-4">
-        <h4 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Custom</h4>
+      <div class="border-t border-subtle pt-4">
+        <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">Custom</h4>
         <div class="mt-2">
           <app-dynamic-form
             [fields]="fields()"
@@ -229,14 +229,14 @@
       <button
         type="button"
         (click)="onCancel()"
-        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
       >
         Cancel
       </button>
       <button
         type="submit"
         [disabled]="form.invalid || saving()"
-        class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
       >
         {{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Create task' }}
       </button>

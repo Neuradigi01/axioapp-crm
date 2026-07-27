@@ -1,10 +1,10 @@
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 px-4">
-  <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/50 px-4">
+  <div class="w-full max-w-md rounded-lg bg-surface p-5 shadow-xl">
     <header class="mb-4">
-      <h2 class="text-lg font-semibold text-zinc-900">Log a call</h2>
+      <h2 class="text-lg font-semibold text-default">Log a call</h2>
       @if (prefilledContactName) {
-        <p class="mt-1 text-xs text-zinc-500">
-          For <span class="font-medium text-zinc-700">{{ prefilledContactName }}</span>
+        <p class="mt-1 text-xs text-muted">
+          For <span class="font-medium text-default">{{ prefilledContactName }}</span>
         </p>
       }
     </header>
@@ -12,40 +12,40 @@
     <form [formGroup]="form" (ngSubmit)="save()" class="space-y-3">
       <div class="grid grid-cols-2 gap-3">
         <label class="block text-sm">
-          <span class="block text-xs font-medium text-zinc-600">Direction</span>
+          <span class="block text-xs font-medium text-muted">Direction</span>
           <select
             formControlName="direction"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           >
             <option value="out">Outgoing</option>
             <option value="in">Incoming</option>
           </select>
         </label>
         <label class="block text-sm">
-          <span class="block text-xs font-medium text-zinc-600">Started</span>
+          <span class="block text-xs font-medium text-muted">Started</span>
           <input
             type="datetime-local"
             formControlName="started_at"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           />
         </label>
       </div>
 
       <div class="grid grid-cols-2 gap-3">
         <label class="block text-sm">
-          <span class="block text-xs font-medium text-zinc-600">Duration (sec)</span>
+          <span class="block text-xs font-medium text-muted">Duration (sec)</span>
           <input
             type="number"
             min="0"
             formControlName="duration_sec"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           />
         </label>
         <label class="block text-sm">
-          <span class="block text-xs font-medium text-zinc-600">Outcome</span>
+          <span class="block text-xs font-medium text-muted">Outcome</span>
           <select
             formControlName="outcome_id"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
           >
             <option [ngValue]="null">— Not set —</option>
             @for (o of outcomes; track o.id) {
@@ -56,11 +56,11 @@
       </div>
 
       <label class="block text-sm">
-        <span class="block text-xs font-medium text-zinc-600">Notes</span>
+        <span class="block text-xs font-medium text-muted">Notes</span>
         <textarea
           rows="3"
           formControlName="notes"
-          class="mt-1 block w-full resize-none rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 block w-full resize-none rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         ></textarea>
       </label>
 
@@ -68,7 +68,7 @@
            after the Call row is created so we have a stable id to
            attach to. -->
       <div class="block text-sm">
-        <span class="block text-xs font-medium text-zinc-600">Recording (optional)</span>
+        <span class="block text-xs font-medium text-muted">Recording (optional)</span>
 
         @if (recordingFile(); as f) {
           <div
@@ -94,19 +94,17 @@
             (dragleave)="onDragLeave()"
             (drop)="onDrop($event)"
             [class.border-zinc-500]="dragActive()"
-            [class.bg-zinc-50]="dragActive()"
-            class="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-zinc-300 bg-white px-3 py-4 text-center text-xs text-zinc-500 transition hover:border-zinc-400 hover:bg-zinc-50"
+            [class.bg-surface-2]="dragActive()"
+            class="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-subtle bg-surface px-3 py-4 text-center text-xs text-muted transition hover:border-zinc-400 hover:bg-surface-2"
           >
             <lucide-icon
               name="upload-cloud"
               size="18"
-              class="mb-1 text-zinc-400"
+              class="mb-1 text-faint"
               aria-hidden="true"
             ></lucide-icon>
-            <span class="font-medium text-zinc-700">Drop audio file or click to upload</span>
-            <span class="mt-0.5 text-[11px] text-zinc-400">
-              mp3 · m4a · ogg · wav · max 30 MB
-            </span>
+            <span class="font-medium text-default">Drop audio file or click to upload</span>
+            <span class="mt-0.5 text-[11px] text-faint"> mp3 · m4a · ogg · wav · max 30 MB </span>
             <input
               type="file"
               accept=".mp3,.m4a,.ogg,.wav,audio/*"
@@ -131,14 +129,14 @@
         <button
           type="button"
           (click)="close()"
-          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         >
           Cancel
         </button>
         <button
           type="submit"
           [disabled]="submitting()"
-          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:opacity-50"
         >
           @if (uploadingRecording()) {
             Uploading recording…

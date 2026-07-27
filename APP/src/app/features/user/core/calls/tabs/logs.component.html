@@ -1,15 +1,15 @@
 <div>
   <div class="mb-3 flex items-center justify-between">
     <div>
-      <h2 class="text-base font-semibold text-zinc-900">Recent calls</h2>
-      <p class="text-xs text-zinc-500">
+      <h2 class="text-base font-semibold text-default">Recent calls</h2>
+      <p class="text-xs text-muted">
         {{ items().length }} {{ items().length === 1 ? 'call' : 'calls' }} logged
       </p>
     </div>
     <button
       type="button"
       (click)="openModal()"
-      class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+      class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent"
     >
       Log call
     </button>
@@ -22,56 +22,44 @@
   }
 
   @if (loading()) {
-    <div class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
+    <div class="rounded-lg border border-subtle bg-surface p-6 text-center text-sm text-muted">
       Loading…
     </div>
   } @else if (items().length === 0) {
     <div
-      class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
+      class="rounded-lg border border-dashed border-subtle bg-surface p-12 text-center text-sm text-muted"
     >
       No calls logged yet. Click "Log call" to record one.
     </div>
   } @else {
-    <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
-      <table class="min-w-full divide-y divide-zinc-200 text-sm">
-        <thead class="bg-zinc-50">
+    <div class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
+      <table class="min-w-full divide-y divide-subtle text-sm">
+        <thead class="bg-surface-2">
           <tr>
-            <th
-              class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
-            >
+            <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
               Started
             </th>
-            <th
-              class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
-            >
+            <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
               Direction
             </th>
-            <th
-              class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-zinc-500"
-            >
+            <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-muted">
               Duration
             </th>
-            <th
-              class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
-            >
+            <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
               Outcome
             </th>
-            <th
-              class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
-            >
+            <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
               Notes
             </th>
-            <th
-              class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
-            >
+            <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
               Recording
             </th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-zinc-100">
+        <tbody class="divide-y divide-subtle">
           @for (c of items(); track c.id) {
             <tr>
-              <td class="whitespace-nowrap px-4 py-2 text-zinc-700">
+              <td class="whitespace-nowrap px-4 py-2 text-default">
                 {{ formatTimestamp(c.started_at) }}
               </td>
               <td class="px-4 py-2">
@@ -86,7 +74,7 @@
                   {{ c.direction === 'out' ? '↗ Outgoing' : '↘ Incoming' }}
                 </span>
               </td>
-              <td class="whitespace-nowrap px-4 py-2 text-right font-medium text-zinc-900">
+              <td class="whitespace-nowrap px-4 py-2 text-right font-medium text-default">
                 {{ formatDuration(c.duration_sec) }}
               </td>
               <td class="px-4 py-2">
@@ -95,19 +83,19 @@
                   <span
                     [style.background-color]="outcome.color + '20'"
                     [style.color]="outcome.color"
-                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-zinc-200"
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 border-subtle"
                   >
                     {{ outcome.label }}
                   </span>
                 } @else {
-                  <span class="text-xs text-zinc-400">—</span>
+                  <span class="text-xs text-faint">—</span>
                 }
               </td>
-              <td class="max-w-md px-4 py-2 text-zinc-700">
+              <td class="max-w-md px-4 py-2 text-default">
                 @if (c.notes) {
                   <span class="line-clamp-2">{{ c.notes }}</span>
                 } @else {
-                  <span class="text-xs text-zinc-400">—</span>
+                  <span class="text-xs text-faint">—</span>
                 }
               </td>
               <td class="px-4 py-2">
@@ -123,7 +111,7 @@
                     External link ↗
                   </a>
                 } @else {
-                  <span class="text-xs text-zinc-400">—</span>
+                  <span class="text-xs text-faint">—</span>
                 }
               </td>
             </tr>

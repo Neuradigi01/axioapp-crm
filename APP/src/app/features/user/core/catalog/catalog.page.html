@@ -1,8 +1,8 @@
 <div class="mx-auto max-w-7xl p-6 space-y-5">
   <header class="flex flex-wrap items-start justify-between gap-3">
     <div>
-      <h1 class="text-lg font-semibold text-zinc-900">Catalog</h1>
-      <p class="mt-0.5 text-xs text-zinc-500">
+      <h1 class="text-lg font-semibold text-default">Catalog</h1>
+      <p class="mt-0.5 text-xs text-muted">
         {{ totalProducts() }} product{{ totalProducts() === 1 ? '' : 's' }} · what your contacts
         &amp; leads can show interest in.
       </p>
@@ -10,7 +10,7 @@
     <div class="flex items-center gap-2">
       <a
         routerLink="/user/catalog/import"
-        class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
         title="Bulk-import products from CSV"
       >
         <lucide-icon name="upload" class="h-4 w-4" />
@@ -18,7 +18,7 @@
       </a>
       <a
         routerLink="/user/settings/catalog-categories"
-        class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
         title="Manage categories"
       >
         <lucide-icon name="folder" class="h-4 w-4" />
@@ -27,7 +27,7 @@
       <button
         type="button"
         (click)="openCreate()"
-        class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent"
       >
         <lucide-icon name="plus" class="h-4 w-4" />
         Add Product
@@ -37,21 +37,21 @@
 
   <!-- KPI cards -->
   <section class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-    <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
-      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Total Products</p>
-      <p class="mt-2 text-2xl font-semibold text-zinc-900">{{ totalProducts() }}</p>
+    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
+      <p class="text-xs font-medium uppercase tracking-wide text-muted">Total Products</p>
+      <p class="mt-2 text-2xl font-semibold text-default">{{ totalProducts() }}</p>
     </div>
-    <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
-      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Active</p>
+    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
+      <p class="text-xs font-medium uppercase tracking-wide text-muted">Active</p>
       <p class="mt-2 text-2xl font-semibold text-emerald-600">{{ activeProducts() }}</p>
     </div>
-    <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
-      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Inactive</p>
-      <p class="mt-2 text-2xl font-semibold text-zinc-500">{{ inactiveProducts() }}</p>
+    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
+      <p class="text-xs font-medium uppercase tracking-wide text-muted">Inactive</p>
+      <p class="mt-2 text-2xl font-semibold text-muted">{{ inactiveProducts() }}</p>
     </div>
-    <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200">
-      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Categories</p>
-      <p class="mt-2 text-2xl font-semibold text-zinc-900">{{ distinctCategories() }}</p>
+    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
+      <p class="text-xs font-medium uppercase tracking-wide text-muted">Categories</p>
+      <p class="mt-2 text-2xl font-semibold text-default">{{ distinctCategories() }}</p>
     </div>
   </section>
 
@@ -62,14 +62,14 @@
       <div class="relative">
         <lucide-icon
           name="search"
-          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
         />
         <input
           id="cat_q"
           type="search"
           [formControl]="searchControl"
           placeholder="Search by name or SKU…"
-          class="block w-full rounded-md border border-zinc-300 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="block w-full rounded-md border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </div>
     </div>
@@ -82,7 +82,7 @@
       <select
         id="cat_category"
         [formControl]="categoryControl"
-        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       >
         <option value="">All categories</option>
         @for (c of categoryOptions(); track c.id) {
@@ -105,23 +105,21 @@
   } @else if (loading() && items().length === 0) {
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       @for (i of [0, 1, 2, 3, 4, 5]; track i) {
-        <div class="h-32 rounded-lg bg-zinc-100 animate-pulse"></div>
+        <div class="h-32 rounded-lg bg-surface-2 animate-pulse"></div>
       }
     </div>
   } @else if (items().length === 0) {
     <p
-      class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-500"
+      class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-10 text-center text-sm text-muted"
     >
       No products yet.
-      <span class="block text-xs text-zinc-400"
-        >Click "Add Product" to create your first item.</span
-      >
+      <span class="block text-xs text-faint">Click "Add Product" to create your first item.</span>
     </p>
   } @else {
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       @for (item of items(); track item.id) {
         <article
-          class="cursor-pointer rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200 transition hover:ring-zinc-400"
+          class="cursor-pointer rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle transition hover:ring-zinc-400"
           (click)="openView(item)"
         >
           <div class="flex items-start gap-3">
@@ -129,28 +127,28 @@
               <img
                 [src]="src"
                 [alt]="item.name"
-                class="h-12 w-12 shrink-0 rounded-md object-cover ring-1 ring-zinc-200"
+                class="h-12 w-12 shrink-0 rounded-md object-cover ring-1 border-subtle"
               />
             } @else {
               <span
-                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-2xl"
+                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-surface-2 text-2xl"
                 aria-hidden="true"
               >
                 {{ emojiFor(item.category) }}
               </span>
             }
             <div class="min-w-0 flex-1">
-              <p class="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+              <p class="text-[11px] font-mono uppercase tracking-wider text-muted">
                 {{ item.sku }}
               </p>
-              <h3 class="mt-0.5 truncate text-sm font-semibold text-zinc-900">{{ item.name }}</h3>
-              <p class="mt-0.5 text-xs text-zinc-500">
+              <h3 class="mt-0.5 truncate text-sm font-semibold text-default">{{ item.name }}</h3>
+              <p class="mt-0.5 text-xs text-muted">
                 {{ item.category ?? 'Uncategorized' }}
               </p>
             </div>
             @if (!item.is_active) {
               <span
-                class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 ring-1 ring-zinc-200"
+                class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted ring-1 border-subtle"
               >
                 inactive
               </span>
@@ -164,21 +162,21 @@
           </div>
 
           <div class="mt-3 flex items-center justify-between">
-            <p class="text-base font-semibold text-zinc-900">
+            <p class="text-base font-semibold text-default">
               {{ item.price | formatINR }}
             </p>
             <div class="flex items-center gap-1" (click)="$event.stopPropagation()">
               <button
                 type="button"
                 (click)="openEdit(item)"
-                class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
               >
                 Edit
               </button>
               <button
                 type="button"
                 (click)="onDelete(item)"
-                class="rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                class="rounded-md border border-red-200 bg-surface px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
               >
                 Delete
               </button>

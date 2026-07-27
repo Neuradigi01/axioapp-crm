@@ -5,7 +5,7 @@
       [formControl]="text"
       rows="3"
       placeholder="Add a note (visible to everyone in your org)…"
-      class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
     ></textarea>
   </label>
 
@@ -28,7 +28,7 @@
     <button
       type="submit"
       [disabled]="submitting()"
-      class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+      class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-zinc-400"
     >
       {{ submitting() ? 'Saving…' : 'Add note' }}
     </button>

@@ -1,6 +1,6 @@
-<div class="space-y-4 rounded-md border border-zinc-200 bg-white p-4">
+<div class="space-y-4 rounded-md border border-subtle bg-surface p-4">
   <div class="flex items-center justify-between">
-    <h3 class="text-base font-semibold text-zinc-900">
+    <h3 class="text-base font-semibold text-default">
       {{ editingId() ? 'Edit rule' : 'New rule' }}
     </h3>
     <label class="flex items-center gap-2 text-xs">
@@ -21,49 +21,49 @@
 
   <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
     <div>
-      <label class="mb-1 block text-xs font-medium text-zinc-700">Name</label>
+      <label class="mb-1 block text-xs font-medium text-default">Name</label>
       <input
         type="text"
         [ngModel]="name()"
         (ngModelChange)="name.set($event)"
         maxlength="128"
         placeholder="Pricing query"
-        class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+        class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
       />
     </div>
     <div>
-      <label class="mb-1 block text-xs font-medium text-zinc-700">Priority</label>
+      <label class="mb-1 block text-xs font-medium text-default">Priority</label>
       <input
         type="number"
         [ngModel]="priority()"
         (ngModelChange)="priority.set($event)"
         min="0"
         max="10000"
-        class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+        class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
       />
-      <p class="mt-1 text-[10px] text-zinc-500">
+      <p class="mt-1 text-[10px] text-muted">
         Lower = evaluated first. Use the drag-handles on the rule list to reorder visually.
       </p>
     </div>
   </div>
 
   <div>
-    <label class="mb-1 block text-xs font-medium text-zinc-700"> Keywords (comma-separated) </label>
+    <label class="mb-1 block text-xs font-medium text-default"> Keywords (comma-separated) </label>
     <input
       type="text"
       [ngModel]="keywordsInput()"
       (ngModelChange)="keywordsInput.set($event)"
       placeholder="price, rate, cost"
-      class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+      class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
     />
-    <p class="mt-1 text-[10px] text-zinc-500">
+    <p class="mt-1 text-[10px] text-muted">
       {{ keywords().length }}
       {{ keywords().length === 1 ? 'keyword' : 'keywords' }}.
     </p>
   </div>
 
   <div>
-    <label class="mb-1 block text-xs font-medium text-zinc-700">Match type</label>
+    <label class="mb-1 block text-xs font-medium text-default">Match type</label>
     <div class="grid grid-cols-3 gap-2">
       @for (m of ['contains', 'exact', 'regex']; track m) {
         <button
@@ -72,8 +72,8 @@
           [class]="
             'rounded-md border px-3 py-2 text-xs font-medium transition ' +
             (matchType() === m
-              ? 'border-zinc-900 bg-zinc-900 text-white'
-              : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+              ? 'border-accent bg-accent text-white'
+              : 'border-subtle bg-surface text-default hover:bg-surface-2')
           "
         >
           {{ m }}
@@ -85,24 +85,24 @@
   <!-- Action stack -->
   <div>
     <div class="mb-2 flex items-center justify-between">
-      <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Actions</p>
-      <p class="text-[10px] text-zinc-500">{{ actions().length }} / 10 — run in order on match.</p>
+      <p class="text-xs font-semibold uppercase tracking-wide text-muted">Actions</p>
+      <p class="text-[10px] text-muted">{{ actions().length }} / 10 — run in order on match.</p>
     </div>
 
     @if (actions().length === 0) {
-      <p class="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+      <p class="rounded-md bg-surface-2 px-3 py-2 text-xs text-muted">
         No actions yet — pick one below to add it.
       </p>
     }
 
     @for (a of actions(); track $index; let i = $index) {
-      <div class="mb-2 rounded-md border border-zinc-200 p-2">
+      <div class="mb-2 rounded-md border border-subtle p-2">
         <div class="mb-1 flex items-center justify-between">
-          <span class="text-xs font-medium text-zinc-700"> {{ i + 1 }}. {{ a.action_type }} </span>
+          <span class="text-xs font-medium text-default"> {{ i + 1 }}. {{ a.action_type }} </span>
           <button
             type="button"
             (click)="removeAction(i)"
-            class="rounded p-1 text-zinc-500 hover:bg-zinc-100"
+            class="rounded p-1 text-muted hover:bg-surface-2"
             aria-label="Remove"
           >
             <lucide-icon name="x" size="12" />
@@ -117,14 +117,14 @@
               rows="2"
               maxlength="4096"
               placeholder="Sure, our pricing starts at ₹4,999. Want a custom quote?"
-              class="w-full rounded-md border border-zinc-300 px-3 py-2 text-xs"
+              class="w-full rounded-md border border-subtle px-3 py-2 text-xs"
             ></textarea>
           }
           @case ('reply_template') {
             <select
               [ngModel]="actionConfigValue(a, 'template_id') || null"
               (ngModelChange)="updateActionConfig(i, 'template_id', $event)"
-              class="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-xs"
+              class="w-full rounded-md border border-subtle px-2 py-1.5 text-xs"
             >
               <option [ngValue]="null">— Pick a template —</option>
               @for (t of approvedTemplates(); track t.id) {
@@ -136,7 +136,7 @@
             <select
               [ngModel]="actionConfigValue(a, 'tag_id') || null"
               (ngModelChange)="updateActionConfig(i, 'tag_id', $event)"
-              class="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-xs"
+              class="w-full rounded-md border border-subtle px-2 py-1.5 text-xs"
             >
               <option [ngValue]="null">— Pick a tag —</option>
               @for (tag of tags(); track tag.id) {
@@ -148,7 +148,7 @@
             <select
               [ngModel]="actionConfigValue(a, 'user_id') || null"
               (ngModelChange)="updateActionConfig(i, 'user_id', $event)"
-              class="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-xs"
+              class="w-full rounded-md border border-subtle px-2 py-1.5 text-xs"
             >
               <option [ngValue]="null">— Pick a user —</option>
               @for (s of staff(); track s.id) {
@@ -157,7 +157,7 @@
             </select>
           }
           @case ('escalate_to_ai') {
-            <p class="text-xs text-zinc-500">
+            <p class="text-xs text-muted">
               Flips the conversation's "AI handling" toggle on. Step 19 wires the actual AI agent;
               the toggle is the hook.
             </p>
@@ -171,35 +171,35 @@
         <button
           type="button"
           (click)="addAction('reply_text')"
-          class="rounded-md border border-dashed border-zinc-300 px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50"
+          class="rounded-md border border-dashed border-subtle px-2 py-1 text-[11px] text-muted hover:bg-surface-2"
         >
           + Reply text
         </button>
         <button
           type="button"
           (click)="addAction('reply_template')"
-          class="rounded-md border border-dashed border-zinc-300 px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50"
+          class="rounded-md border border-dashed border-subtle px-2 py-1 text-[11px] text-muted hover:bg-surface-2"
         >
           + Reply template
         </button>
         <button
           type="button"
           (click)="addAction('tag_conversation')"
-          class="rounded-md border border-dashed border-zinc-300 px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50"
+          class="rounded-md border border-dashed border-subtle px-2 py-1 text-[11px] text-muted hover:bg-surface-2"
         >
           + Tag
         </button>
         <button
           type="button"
           (click)="addAction('assign_to_user')"
-          class="rounded-md border border-dashed border-zinc-300 px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50"
+          class="rounded-md border border-dashed border-subtle px-2 py-1 text-[11px] text-muted hover:bg-surface-2"
         >
           + Assign
         </button>
         <button
           type="button"
           (click)="addAction('escalate_to_ai')"
-          class="rounded-md border border-dashed border-zinc-300 px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-50"
+          class="rounded-md border border-dashed border-subtle px-2 py-1 text-[11px] text-muted hover:bg-surface-2"
         >
           + Escalate to AI
         </button>
@@ -207,11 +207,11 @@
     }
   </div>
 
-  <div class="flex items-center justify-end gap-2 border-t border-zinc-100 pt-3">
+  <div class="flex items-center justify-end gap-2 border-t border-subtle pt-3">
     <button
       type="button"
       (click)="onCancel()"
-      class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+      class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
     >
       Cancel
     </button>
@@ -219,7 +219,7 @@
       type="button"
       (click)="onSave()"
       [disabled]="saving()"
-      class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+      class="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
     >
       {{ saving() ? 'Saving…' : editingId() ? 'Save changes' : 'Create rule' }}
     </button>

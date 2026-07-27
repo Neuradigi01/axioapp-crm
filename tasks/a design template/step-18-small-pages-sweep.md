@@ -2,7 +2,7 @@
 
 **Goal:** Restyle the remaining smaller modules in one pass: calls, catalog, activities, tasks, walk-ins, custom-fields, standard-fields, pipelines (config side), AI, staff (portal side handled separately in Step 19-alt if needed), whatsapp (channel config), services.
 **Track:** Design Refresh — Track 4 (Page pass)
-**Status:** Pending
+**Status:** COMPLETED — 41 HTML files across 12 small modules bulk-swapped to AIXO semantic tokens: calls, catalog, activities, tasks, walk-ins, custom-fields, standard-fields, pipelines, AI, staff, whatsapp (business-profile + templates + template-wizard), services. `ng build` green.
 **Depends on:** Steps 1, 5, 6, 7
 
 ---

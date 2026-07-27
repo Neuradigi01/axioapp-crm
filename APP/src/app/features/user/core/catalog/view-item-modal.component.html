@@ -4,15 +4,15 @@
     (click)="close.emit()"
   >
     <div
-      class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl ring-1 ring-zinc-200"
+      class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-surface shadow-xl ring-1 border-subtle"
       (click)="$event.stopPropagation()"
     >
       <header
-        class="sticky top-0 z-10 flex items-start justify-between border-b border-zinc-200 bg-white px-6 py-4"
+        class="sticky top-0 z-10 flex items-start justify-between border-b border-subtle bg-surface px-6 py-4"
       >
         <div>
-          <p class="text-[11px] font-mono uppercase tracking-wider text-zinc-500">{{ item.sku }}</p>
-          <h2 class="mt-0.5 text-base font-semibold text-zinc-900">{{ item.name }}</h2>
+          <p class="text-[11px] font-mono uppercase tracking-wider text-muted">{{ item.sku }}</p>
+          <h2 class="mt-0.5 text-base font-semibold text-default">{{ item.name }}</h2>
         </div>
         @if (item.is_active) {
           <span
@@ -22,7 +22,7 @@
           </span>
         } @else {
           <span
-            class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 ring-1 ring-zinc-200"
+            class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted ring-1 border-subtle"
           >
             inactive
           </span>
@@ -35,11 +35,11 @@
             <img
               [src]="src"
               [alt]="item.name"
-              class="h-48 w-48 rounded-md object-cover ring-1 ring-zinc-200"
+              class="h-48 w-48 rounded-md object-cover ring-1 border-subtle"
             />
           } @else {
             <div
-              class="flex h-48 w-48 items-center justify-center rounded-md bg-zinc-100 text-xs text-zinc-400 ring-1 ring-dashed ring-zinc-300"
+              class="flex h-48 w-48 items-center justify-center rounded-md bg-surface-2 text-xs text-faint ring-1 ring-dashed border-subtle"
             >
               No image
             </div>
@@ -48,13 +48,13 @@
 
         @if (galleryHrefs().length > 0) {
           <div>
-            <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Gallery</p>
+            <p class="text-xs font-medium uppercase tracking-wide text-muted">Gallery</p>
             <div class="mt-1 flex flex-wrap gap-2">
               @for (href of galleryHrefs(); track href) {
                 <img
                   [src]="href"
                   [alt]="item.name + ' gallery image'"
-                  class="h-16 w-16 rounded-md object-cover ring-1 ring-zinc-200"
+                  class="h-16 w-16 rounded-md object-cover ring-1 border-subtle"
                 />
               }
             </div>
@@ -63,43 +63,43 @@
 
         <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <div>
-            <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Category</dt>
-            <dd class="mt-0.5 text-zinc-900">{{ item.category ?? 'Uncategorized' }}</dd>
+            <dt class="text-xs font-medium uppercase tracking-wide text-muted">Category</dt>
+            <dd class="mt-0.5 text-default">{{ item.category ?? 'Uncategorized' }}</dd>
           </div>
           <div>
-            <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Price</dt>
-            <dd class="mt-0.5 font-semibold text-zinc-900">{{ item.price | formatINR }}</dd>
+            <dt class="text-xs font-medium uppercase tracking-wide text-muted">Price</dt>
+            <dd class="mt-0.5 font-semibold text-default">{{ item.price | formatINR }}</dd>
           </div>
           @if (item.cost_price != null) {
             <div>
-              <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Cost price</dt>
-              <dd class="mt-0.5 text-zinc-900">{{ item.cost_price | formatINR }}</dd>
+              <dt class="text-xs font-medium uppercase tracking-wide text-muted">Cost price</dt>
+              <dd class="mt-0.5 text-default">{{ item.cost_price | formatINR }}</dd>
             </div>
           }
           <div>
-            <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Currency</dt>
-            <dd class="mt-0.5 text-zinc-900">{{ item.currency }}</dd>
+            <dt class="text-xs font-medium uppercase tracking-wide text-muted">Currency</dt>
+            <dd class="mt-0.5 text-default">{{ item.currency }}</dd>
           </div>
           <div>
-            <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Status</dt>
-            <dd class="mt-0.5 text-zinc-900">{{ item.is_active ? 'Active' : 'Inactive' }}</dd>
+            <dt class="text-xs font-medium uppercase tracking-wide text-muted">Status</dt>
+            <dd class="mt-0.5 text-default">{{ item.is_active ? 'Active' : 'Inactive' }}</dd>
           </div>
         </dl>
 
         @if (item.description) {
           <div>
-            <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Description</p>
-            <p class="mt-1 whitespace-pre-wrap text-sm text-zinc-800">{{ item.description }}</p>
+            <p class="text-xs font-medium uppercase tracking-wide text-muted">Description</p>
+            <p class="mt-1 whitespace-pre-wrap text-sm text-default">{{ item.description }}</p>
           </div>
         }
 
         @if (item.tags.length > 0) {
           <div>
-            <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Tags</p>
+            <p class="text-xs font-medium uppercase tracking-wide text-muted">Tags</p>
             <div class="mt-1 flex flex-wrap gap-1.5">
               @for (tag of item.tags; track tag) {
                 <span
-                  class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+                  class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 border-subtle"
                 >
                   {{ tag }}
                 </span>
@@ -110,38 +110,38 @@
 
         @if (customEntries().length > 0) {
           <div>
-            <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">Custom fields</p>
-            <dl class="mt-1 divide-y divide-zinc-100 rounded-md border border-zinc-200 text-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-muted">Custom fields</p>
+            <dl class="mt-1 divide-y divide-subtle rounded-md border border-subtle text-sm">
               @for (entry of customEntries(); track entry[0]) {
                 <div class="flex items-start justify-between gap-4 px-3 py-2">
-                  <dt class="text-zinc-500">{{ entry[0] }}</dt>
-                  <dd class="text-zinc-900">{{ entry[1] }}</dd>
+                  <dt class="text-muted">{{ entry[0] }}</dt>
+                  <dd class="text-default">{{ entry[1] }}</dd>
                 </div>
               }
             </dl>
           </div>
         }
 
-        <p class="text-[11px] text-zinc-400">
+        <p class="text-[11px] text-faint">
           Created {{ item.created_at | date: 'mediumDate' }} · Updated
           {{ item.updated_at | date: 'mediumDate' }}
         </p>
       </div>
 
       <footer
-        class="sticky bottom-0 flex items-center justify-end gap-2 rounded-b-lg border-t border-zinc-200 bg-zinc-50 px-6 py-3"
+        class="sticky bottom-0 flex items-center justify-end gap-2 rounded-b-lg border-t border-subtle bg-surface-2 px-6 py-3"
       >
         <button
           type="button"
           (click)="close.emit()"
-          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         >
           Close
         </button>
         <button
           type="button"
           (click)="onEdit()"
-          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent"
         >
           Edit
         </button>

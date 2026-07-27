@@ -1,12 +1,12 @@
 @if (open()) {
   <div
-    class="absolute right-0 top-full z-20 mt-1 w-80 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg"
+    class="absolute right-0 top-full z-20 mt-1 w-80 overflow-hidden rounded-md border border-subtle bg-surface shadow-lg"
     role="dialog"
     aria-label="My tasks"
   >
-    <header class="flex items-center justify-between border-b border-zinc-200 px-3 py-2">
-      <h3 class="text-sm font-semibold text-zinc-900">My tasks</h3>
-      <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
+    <header class="flex items-center justify-between border-b border-subtle px-3 py-2">
+      <h3 class="text-sm font-semibold text-default">My tasks</h3>
+      <span class="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-default">
         {{ totalOpen() }} open
       </span>
     </header>
@@ -16,12 +16,12 @@
         <p class="text-xs text-red-600">{{ err }}</p>
       } @else if (loading() && items().length === 0) {
         <div class="space-y-2 animate-pulse">
-          <div class="h-3 w-32 rounded bg-zinc-200"></div>
-          <div class="h-9 w-full rounded-md bg-zinc-100"></div>
-          <div class="h-9 w-full rounded-md bg-zinc-100"></div>
+          <div class="h-3 w-32 rounded bg-surface-2"></div>
+          <div class="h-9 w-full rounded-md bg-surface-2"></div>
+          <div class="h-9 w-full rounded-md bg-surface-2"></div>
         </div>
       } @else if (totalOpen() === 0) {
-        <p class="py-6 text-center text-xs text-zinc-500">You have no open tasks.</p>
+        <p class="py-6 text-center text-xs text-muted">You have no open tasks.</p>
       } @else {
         <div class="space-y-3">
           @for (group of groups(); track group.id) {
@@ -29,25 +29,25 @@
               <h4
                 class="mb-1 text-[10px] font-semibold uppercase tracking-wider"
                 [class.text-red-600]="group.id === 'overdue'"
-                [class.text-zinc-500]="group.id !== 'overdue'"
+                [class.text-muted]="group.id !== 'overdue'"
               >
                 {{ group.label }}
               </h4>
               <ul class="space-y-1">
                 @for (task of group.items; track task.id) {
-                  <li class="flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-zinc-50">
+                  <li class="flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-surface-2">
                     <input
                       type="checkbox"
                       [checked]="false"
                       (change)="markDone(task)"
                       [attr.aria-label]="'Mark ' + task.title + ' done'"
-                      class="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                      class="mt-0.5 h-4 w-4 rounded border-subtle text-default focus:ring-zinc-500"
                     />
                     <div class="min-w-0 flex-1">
-                      <p class="truncate text-xs font-medium text-zinc-900">
+                      <p class="truncate text-xs font-medium text-default">
                         {{ task.title }}
                       </p>
-                      <p class="text-[10px] text-zinc-500">
+                      <p class="text-[10px] text-muted">
                         {{ formatDue(task.due_at) }} · {{ task.priority }}
                       </p>
                     </div>
@@ -63,10 +63,10 @@
     <!-- T8 — Deep-link to the full tasks page. Always visible so the
          user can escape the summary popover into edit / filter / bulk
          actions the popover doesn't expose. -->
-    <footer class="border-t border-zinc-100 bg-zinc-50 px-3 py-2 text-right">
+    <footer class="border-t border-subtle bg-surface-2 px-3 py-2 text-right">
       <a
         routerLink="/user/tasks"
-        class="inline-flex items-center gap-1 text-xs font-medium text-zinc-700 hover:text-zinc-900 hover:underline"
+        class="inline-flex items-center gap-1 text-xs font-medium text-default hover:text-default hover:underline"
       >
         Open full tasks page
         <lucide-icon name="arrow-right" class="h-3 w-3" />

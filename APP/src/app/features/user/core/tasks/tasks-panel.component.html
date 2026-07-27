@@ -3,34 +3,34 @@
   <form
     [formGroup]="form"
     (ngSubmit)="onSubmit()"
-    class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-zinc-200"
+    class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle"
   >
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
       <div>
-        <label class="block text-xs font-medium text-zinc-700" for="tp_title">Title</label>
+        <label class="block text-xs font-medium text-default" for="tp_title">Title</label>
         <input
           id="tp_title"
           type="text"
           formControlName="title"
           placeholder="e.g. Follow up about sofa quote"
-          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </div>
       <div>
-        <label class="block text-xs font-medium text-zinc-700" for="tp_due">Due</label>
+        <label class="block text-xs font-medium text-default" for="tp_due">Due</label>
         <input
           id="tp_due"
           type="datetime-local"
           formControlName="due_at"
-          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </div>
       <div>
-        <label class="block text-xs font-medium text-zinc-700" for="tp_priority">Priority</label>
+        <label class="block text-xs font-medium text-default" for="tp_priority">Priority</label>
         <select
           id="tp_priority"
           formControlName="priority"
-          class="mt-1 block rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 block rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         >
           <option value="low">Low</option>
           <option value="med">Medium</option>
@@ -40,7 +40,7 @@
       <button
         type="submit"
         [disabled]="submitting()"
-        class="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+        class="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-zinc-400"
       >
         {{ submitting() ? 'Adding…' : 'Add task' }}
       </button>
@@ -57,8 +57,8 @@
 
   <!-- List header / summary -->
   <div class="flex items-center justify-between">
-    <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Tasks</h3>
-    <p class="text-xs text-zinc-500">{{ openCount() }} open · {{ doneCount() }} done</p>
+    <h3 class="text-xs font-semibold uppercase tracking-wide text-muted">Tasks</h3>
+    <p class="text-xs text-muted">{{ openCount() }} open · {{ doneCount() }} done</p>
   </div>
 
   <!-- Body -->
@@ -70,42 +70,42 @@
     <ul class="space-y-2">
       @for (i of skeletonRows; track i) {
         <li
-          class="flex items-start gap-3 rounded-lg bg-white p-3 shadow-sm ring-1 ring-zinc-200 animate-pulse"
+          class="flex items-start gap-3 rounded-lg bg-surface p-3 shadow-sm ring-1 border-subtle animate-pulse"
         >
-          <div class="mt-0.5 h-4 w-4 rounded-sm bg-zinc-200"></div>
+          <div class="mt-0.5 h-4 w-4 rounded-sm bg-surface-2"></div>
           <div class="flex-1">
-            <div class="h-3 w-40 rounded bg-zinc-200"></div>
-            <div class="mt-2 h-3 w-24 rounded bg-zinc-100"></div>
+            <div class="h-3 w-40 rounded bg-surface-2"></div>
+            <div class="mt-2 h-3 w-24 rounded bg-surface-2"></div>
           </div>
         </li>
       }
     </ul>
   } @else if (items().length === 0) {
     <p
-      class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+      class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-6 text-center text-sm text-muted"
     >
       No tasks yet.
-      <span class="block text-xs text-zinc-400">Add one above to get started.</span>
+      <span class="block text-xs text-faint">Add one above to get started.</span>
     </p>
   } @else {
     <ul class="space-y-2">
       @for (task of items(); track task.id) {
         <li
-          class="group flex items-start gap-3 rounded-lg bg-white p-3 shadow-sm ring-1 ring-zinc-200"
+          class="group flex items-start gap-3 rounded-lg bg-surface p-3 shadow-sm ring-1 border-subtle"
         >
           <input
             type="checkbox"
             [checked]="task.status === 'done'"
             (change)="toggleDone(task)"
             [attr.aria-label]="task.status === 'done' ? 'Mark as open' : 'Mark as done'"
-            class="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+            class="mt-0.5 h-4 w-4 rounded border-subtle text-default focus:ring-zinc-500"
           />
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span
                 class="text-sm font-medium"
-                [class.text-zinc-900]="task.status !== 'done'"
-                [class.text-zinc-400]="task.status === 'done'"
+                [class.text-default]="task.status !== 'done'"
+                [class.text-faint]="task.status === 'done'"
                 [class.line-through]="task.status === 'done'"
               >
                 {{ task.title }}
@@ -124,14 +124,14 @@
                 </span>
               }
             </div>
-            <p class="mt-1 text-xs text-zinc-500">{{ formatDue(task.due_at) }}</p>
+            <p class="mt-1 text-xs text-muted">{{ formatDue(task.due_at) }}</p>
           </div>
           <!-- T6 — Edit + delete row actions on the panel. -->
           <div class="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
             <button
               type="button"
               (click)="openEdit(task)"
-              class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+              class="rounded-md p-1 text-faint hover:bg-surface-2 hover:text-default"
               title="Edit task"
               aria-label="Edit task"
             >
@@ -140,7 +140,7 @@
             <button
               type="button"
               (click)="onDelete(task)"
-              class="rounded-md p-1 text-zinc-400 hover:bg-red-50 hover:text-red-700"
+              class="rounded-md p-1 text-faint hover:bg-red-50 hover:text-red-700"
               title="Delete task"
               aria-label="Delete task"
             >

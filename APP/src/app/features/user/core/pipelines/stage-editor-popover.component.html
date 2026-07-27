@@ -1,21 +1,21 @@
 <div
-  class="w-72 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg"
+  class="w-72 overflow-hidden rounded-md border border-subtle bg-surface shadow-lg"
   role="dialog"
   aria-label="Edit stage"
 >
-  <header class="border-b border-zinc-200 px-3 py-2">
-    <h3 class="text-sm font-semibold text-zinc-900">Edit stage</h3>
+  <header class="border-b border-subtle px-3 py-2">
+    <h3 class="text-sm font-semibold text-default">Edit stage</h3>
   </header>
 
   <div class="space-y-3 px-3 py-3">
     <label class="block">
-      <span class="text-xs font-medium text-zinc-700">Name</span>
+      <span class="text-xs font-medium text-default">Name</span>
       <input
         type="text"
         [value]="nameValue()"
         (input)="onNameInput($any($event.target).value)"
         maxlength="128"
-        class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none"
+        class="mt-1 w-full rounded border border-subtle px-2 py-1.5 text-sm text-default focus:border-zinc-500 focus:outline-none"
       />
       @if (!nameValid()) {
         <p class="mt-1 text-[11px] text-red-600">Name is required (1–128 chars).</p>
@@ -23,7 +23,7 @@
     </label>
 
     <div>
-      <span class="text-xs font-medium text-zinc-700">Colour</span>
+      <span class="text-xs font-medium text-default">Colour</span>
       <div class="mt-1 flex items-center gap-2">
         <div class="flex items-center gap-1.5">
           @for (preset of presetColors; track preset) {
@@ -32,7 +32,7 @@
               (click)="onSelectPreset(preset)"
               [attr.aria-label]="'Use colour ' + preset"
               [attr.aria-pressed]="colorValue() === preset"
-              class="h-5 w-5 rounded-full ring-2 ring-transparent transition hover:ring-zinc-300"
+              class="h-5 w-5 rounded-full ring-2 ring-transparent transition hover:border-subtle"
               [class.ring-zinc-900]="colorValue() === preset"
               [style.background-color]="preset"
             ></button>
@@ -44,7 +44,7 @@
           (input)="onColorInput($any($event.target).value)"
           placeholder="#a855f7"
           maxlength="9"
-          class="w-24 rounded border border-zinc-300 px-2 py-1 text-xs font-mono text-zinc-900 focus:border-zinc-500 focus:outline-none"
+          class="w-24 rounded border border-subtle px-2 py-1 text-xs font-mono text-default focus:border-zinc-500 focus:outline-none"
         />
       </div>
       @if (!colorValid()) {
@@ -53,19 +53,19 @@
     </div>
 
     @if (isTerminal()) {
-      <p class="rounded bg-zinc-50 px-2 py-1.5 text-[11px] text-zinc-600">
+      <p class="rounded bg-surface-2 px-2 py-1.5 text-[11px] text-muted">
         ⓘ This stage marks leads as won/lost — name and colour only.
       </p>
     } @else {
       <div>
-        <span class="text-xs font-medium text-zinc-700">Position</span>
+        <span class="text-xs font-medium text-default">Position</span>
         <div class="mt-1 flex items-center gap-2">
           <button
             type="button"
             (click)="onMoveLeft()"
             [disabled]="!canMoveLeft()"
             aria-label="Move stage left"
-            class="rounded border border-zinc-300 px-2 py-1 text-sm text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded border border-subtle px-2 py-1 text-sm text-default transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
           >
             ←
           </button>
@@ -74,15 +74,15 @@
             (click)="onMoveRight()"
             [disabled]="!canMoveRight()"
             aria-label="Move stage right"
-            class="rounded border border-zinc-300 px-2 py-1 text-sm text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded border border-subtle px-2 py-1 text-sm text-default transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
           >
             →
           </button>
-          <span class="text-[11px] text-zinc-500">slot {{ displayOrderValue() + 1 }}</span>
+          <span class="text-[11px] text-muted">slot {{ displayOrderValue() + 1 }}</span>
         </div>
       </div>
 
-      <div class="border-t border-zinc-200 pt-2">
+      <div class="border-t border-subtle pt-2">
         <button
           type="button"
           (click)="onDelete()"
@@ -98,14 +98,14 @@
     }
   </div>
 
-  <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-3 py-2">
+  <footer class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-3 py-2">
     @if (saveError(); as err) {
       <p class="mr-auto text-[11px] text-red-600">{{ err }}</p>
     }
     <button
       type="button"
       (click)="onCancel()"
-      class="rounded border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50"
+      class="rounded border border-subtle bg-surface px-3 py-1 text-xs font-medium text-default transition hover:bg-surface-2"
     >
       Cancel
     </button>
@@ -113,7 +113,7 @@
       type="button"
       (click)="onSave()"
       [disabled]="!canSave()"
-      class="rounded bg-zinc-900 px-3 py-1 text-xs font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+      class="rounded bg-accent px-3 py-1 text-xs font-medium text-white transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
     >
       Save
     </button>

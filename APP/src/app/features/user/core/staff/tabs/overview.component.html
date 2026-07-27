@@ -1,13 +1,13 @@
 @if (sortedRows().length === 0) {
   <div
-    class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
+    class="rounded-lg border border-dashed border-subtle bg-surface p-12 text-center text-sm text-muted"
   >
     No staff members yet.
   </div>
 } @else {
   <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
     @for (row of sortedRows(); track row.staff.id) {
-      <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+      <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
         <div class="flex items-start justify-between">
           <div class="flex items-center gap-3">
             <div
@@ -19,10 +19,10 @@
               {{ initials(row.staff.full_name) }}
             </div>
             <div class="min-w-0">
-              <p class="truncate text-sm font-semibold text-zinc-900">
+              <p class="truncate text-sm font-semibold text-default">
                 {{ row.staff.full_name }}
               </p>
-              <p class="truncate text-xs text-zinc-500">
+              <p class="truncate text-xs text-muted">
                 {{ row.staff.email }}
               </p>
             </div>
@@ -40,49 +40,49 @@
 
         <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
           <div>
-            <dt class="text-xs text-zinc-500">Leads converted</dt>
-            <dd class="font-medium text-zinc-900">
+            <dt class="text-xs text-muted">Leads converted</dt>
+            <dd class="font-medium text-default">
               {{ row.performance.leads_converted }} /
               {{ row.performance.leads_converted + row.performance.leads_active }}
             </dd>
           </div>
           <div>
-            <dt class="text-xs text-zinc-500">Active leads</dt>
-            <dd class="font-medium text-zinc-900">{{ row.performance.leads_active }}</dd>
+            <dt class="text-xs text-muted">Active leads</dt>
+            <dd class="font-medium text-default">{{ row.performance.leads_active }}</dd>
           </div>
           <div>
-            <dt class="text-xs text-zinc-500">Monthly target</dt>
-            <dd class="font-medium text-zinc-900">
+            <dt class="text-xs text-muted">Monthly target</dt>
+            <dd class="font-medium text-default">
               {{ row.performance.monthly_target | formatINR: true }}
             </dd>
           </div>
           <div>
-            <dt class="text-xs text-zinc-500">Sales (MTD)</dt>
-            <dd class="font-medium text-zinc-900">
+            <dt class="text-xs text-muted">Sales (MTD)</dt>
+            <dd class="font-medium text-default">
               {{ row.performance.sales | formatINR: true }}
             </dd>
           </div>
           <div>
-            <dt class="text-xs text-zinc-500">Rating</dt>
-            <dd class="font-medium text-zinc-900">
+            <dt class="text-xs text-muted">Rating</dt>
+            <dd class="font-medium text-default">
               {{ row.performance.rating }}
               <span class="ml-1 text-amber-500">★</span>
             </dd>
           </div>
           <div>
-            <dt class="text-xs text-zinc-500">Commission</dt>
-            <dd class="font-medium text-zinc-900">{{ row.performance.commission_rate }}%</dd>
+            <dt class="text-xs text-muted">Commission</dt>
+            <dd class="font-medium text-default">{{ row.performance.commission_rate }}%</dd>
           </div>
         </dl>
 
         <div class="mt-4">
-          <div class="mb-1 flex justify-between text-xs text-zinc-500">
+          <div class="mb-1 flex justify-between text-xs text-muted">
             <span>Target progress</span>
-            <span class="font-medium text-zinc-700">
+            <span class="font-medium text-default">
               {{ row.performance.target_progress_pct ?? 0 }}%
             </span>
           </div>
-          <div class="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+          <div class="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
             <div
               class="h-full bg-emerald-500"
               [style.width.%]="

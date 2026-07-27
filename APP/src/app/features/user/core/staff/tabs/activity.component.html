@@ -1,16 +1,16 @@
 @if (rows().length === 0) {
   <div
-    class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
+    class="rounded-lg border border-dashed border-subtle bg-surface p-12 text-center text-sm text-muted"
   >
     No staff to inspect yet.
   </div>
 } @else {
   <div class="space-y-4">
     <div class="flex items-center gap-3">
-      <label class="text-sm font-medium text-zinc-700">Staff member</label>
+      <label class="text-sm font-medium text-default">Staff member</label>
       <select
         (change)="pickStaff($event)"
-        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       >
         @for (row of rows(); track row.staff.id) {
           <option [value]="row.staff.id" [selected]="row.staff.id === selectedUserId()">
@@ -26,18 +26,18 @@
       </div>
     }
 
-    <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+    <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
       @if (loading()) {
-        <div class="py-6 text-center text-sm text-zinc-500">Loading…</div>
+        <div class="py-6 text-center text-sm text-muted">Loading…</div>
       } @else if (activities().length === 0) {
-        <div class="py-6 text-center text-sm text-zinc-500">
+        <div class="py-6 text-center text-sm text-muted">
           No activity recorded for this staff member yet.
         </div>
       } @else {
         <ul class="space-y-6">
           @for (group of groups(); track group.dayKey) {
             <li>
-              <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 {{ group.dayLabel }}
               </div>
               <ul class="space-y-3">
@@ -53,8 +53,8 @@
                       <lucide-icon [name]="meta.icon" class="h-4 w-4"></lucide-icon>
                     </div>
                     <div class="min-w-0 flex-1">
-                      <p class="text-sm text-zinc-900">{{ snippet(a) }}</p>
-                      <p class="mt-0.5 text-xs text-zinc-500">
+                      <p class="text-sm text-default">{{ snippet(a) }}</p>
+                      <p class="mt-0.5 text-xs text-muted">
                         {{ meta.label }} · {{ entityLabel(a) }} ·
                         {{ a.created_at | relativeTime }}
                       </p>
