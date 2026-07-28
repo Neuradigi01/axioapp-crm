@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -184,12 +184,12 @@ export class CustomOrdersPageComponent {
 
   protected fmtInr(value: number): string {
     if (value >= 100000) {
-      return `â‚¹${(value / 100000).toFixed(1)}L`;
+      return `₹${(value / 100000).toFixed(1)}L`;
     }
     if (value >= 1000) {
-      return `â‚¹${(value / 1000).toFixed(1)}K`;
+      return `₹${(value / 1000).toFixed(1)}K`;
     }
-    return `â‚¹${Math.round(value)}`;
+    return `₹${Math.round(value)}`;
   }
 
   private fetchContacts(ids: string[]): void {

@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -20,7 +20,7 @@ import { StaffApiService, StaffWithPerformance } from '../staff-api.service';
  * Targets & Commission tab — table of staff with an inline editor.
  *
  * Click "Edit" on a row → that row expands with three numeric inputs
- * (commission %, monthly target â‚¹, rating). Hitting Save fires PUT
+ * (commission %, monthly target ₹, rating). Hitting Save fires PUT
  * /staff/{user_id} and emits `saved` so the parent reloads the joined
  * list.
  *

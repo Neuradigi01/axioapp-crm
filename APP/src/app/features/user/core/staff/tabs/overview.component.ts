@@ -1,4 +1,4 @@
-﻿import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { InrPipe } from '../../shared/pipes/inr.pipe';

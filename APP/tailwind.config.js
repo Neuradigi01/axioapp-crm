@@ -42,6 +42,8 @@ module.exports = {
         subtle: 'var(--border)',
       },
       fontFamily: {
+        // Emoji fonts are appended to every family so inline emojis
+        // (🛋 🎉 🔒 etc.) render on OS emoji fallbacks instead of tofu.
         ui: [
           'Inter Variable',
           'Inter',
@@ -49,6 +51,10 @@ module.exports = {
           '-apple-system',
           'BlinkMacSystemFont',
           'sans-serif',
+          'Apple Color Emoji',
+          'Segoe UI Emoji',
+          'Segoe UI Symbol',
+          'Noto Color Emoji',
         ],
         display: [
           'Inter Tight Variable',
@@ -57,6 +63,10 @@ module.exports = {
           'Inter',
           'system-ui',
           'sans-serif',
+          'Apple Color Emoji',
+          'Segoe UI Emoji',
+          'Segoe UI Symbol',
+          'Noto Color Emoji',
         ],
         mono: [
           'JetBrains Mono Variable',
@@ -65,6 +75,10 @@ module.exports = {
           'SF Mono',
           'Consolas',
           'monospace',
+          'Apple Color Emoji',
+          'Segoe UI Emoji',
+          'Segoe UI Symbol',
+          'Noto Color Emoji',
         ],
       },
       boxShadow: {

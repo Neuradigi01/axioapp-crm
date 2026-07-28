@@ -23,12 +23,19 @@
   --accent: #0d9488; // Core CRM default (teal); per-vertical override via [data-accent]
   --accent-soft: #0d94881a;
 
-  // Typography — variable-font families
-  --font-ui: 'Inter Variable', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  // Typography — variable-font families.
+  // Emoji fallbacks appended so glyphs like 🛋 🎉 🔒 that pages sprinkle
+  // in text render via the OS emoji font instead of showing as tofu
+  // (Inter has no emoji coverage).
+  --font-ui:
+    'Inter Variable', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --font-display:
-    'Inter Tight Variable', 'Inter Tight', 'Inter Variable', 'Inter', system-ui, sans-serif;
+    'Inter Tight Variable', 'Inter Tight', 'Inter Variable', 'Inter', system-ui, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --font-mono:
-    'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+    'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 }
 
 // Light theme — attribute on <html> flips these values
