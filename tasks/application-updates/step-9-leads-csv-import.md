@@ -2,7 +2,7 @@
 
 **Goal:** Layer the shared name / email / phone validators into the existing async leads-import Celery task so its already-shipped `errors.csv` / `skipped.csv` / `warnings.csv` outputs carry format-level failures alongside the existing "missing full_name" / "duplicate contact" / "unmatched pipeline stage" cases.
 **Track:** Application Updates — Form & CSV-Import Validation
-**Status:** Pending
+**Status:** COMPLETED — shared name/email/phone validators wired into `_commit_rows` row loop via new `_validate_row_shape` helper; failed rows land in `errors.csv` with `__row_number` + `__column` + `__value` + `__error` columns; `error_reasons` bucket auto-picks up the new reason strings. **No frontend edits** — the result page renders `error_reasons` keys directly as labels, so the new reason strings ("invalid email format", "phone must be 8–15 digits …", "name contains disallowed characters") auto-appear. **No schema changes.** Backend parse-check clean. Shared-writer swap deferred to avoid renaming the pre-existing `__error` column (would break any downstream tool parsing the CSV) — inline writer just gained the two new columns instead.
 **Depends on:** Step 1 (`validators.py` + `import_errors.py`).
 
 ---

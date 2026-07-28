@@ -82,6 +82,7 @@ from src.app.core.leads.ingest import ingest as ingest_lead
 from src.app.core.leads.models import LeadSource
 from src.app.core.leads.schemas import LeadCreate
 from src.app.core.pipelines.service import get_pipeline_by_key
+from src.app.shared import validators as shared_validators
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
 from src.app.shared.storage import get_storage
@@ -384,8 +385,22 @@ async def _commit_rows(
         if not full_name:
             errors += 1
             reason = "missing required field 'contact.full_name'"
-            error_rows.append(_make_error_row(parsed, reason))
+            error_rows.append(
+                _make_error_row(parsed, reason, column="contact.full_name", value=None)
+            )
             _bump(error_reasons, _bucket_error(reason))
+            continue
+
+        # Shared per-field shape validators. Failures don't write a
+        # contact/lead — they land in errors.csv with the offending
+        # column + value + reason so the operator can fix the source
+        # spreadsheet in place. Same reason strings the contacts and
+        # catalog imports use.
+        shape_error = _validate_row_shape(parsed, full_name, email, phone)
+        if shape_error is not None:
+            errors += 1
+            error_rows.append(shape_error)
+            _bump(error_reasons, _bucket_error(shape_error["error"]))
             continue
 
         contact_custom, lead_custom = _split_custom_data(mapped, contact_cf_keys, lead_cf_keys)
@@ -698,13 +713,70 @@ def _format_exc(exc: Exception) -> str:
     return text[:500]
 
 
-def _make_error_row(parsed: ParsedRow, message: str) -> dict[str, Any]:
-    """Build the dict the error CSV writer will dump as one CSV row."""
+def _make_error_row(
+    parsed: ParsedRow,
+    message: str,
+    *,
+    column: str | None = None,
+    value: str | None = None,
+) -> dict[str, Any]:
+    """Build the dict the error CSV writer will dump as one CSV row.
+
+    `column` + `value` are optional metadata added when the shared
+    per-field validators landed in the row loop — they identify *which*
+    column tripped and echo back the offending value so the operator
+    can fix the source spreadsheet without cross-referencing.
+    """
     return {
         "row_number": parsed.row_number,
         "raw": parsed.raw,
+        "column": column,
+        "value": value,
         "error": message,
     }
+
+
+def _validate_row_shape(
+    parsed: ParsedRow,
+    full_name: str,
+    email: str | None,
+    phone: str | None,
+) -> dict[str, Any] | None:
+    """Run shared name/email/phone validators against a mapped row.
+
+    Returns the first failure as an error-row dict (ready to append to
+    ``error_rows``), or ``None`` if the row passes every shape check.
+    Only fields that are present get validated — optional email/phone
+    that are blank sail through.
+    """
+    try:
+        shared_validators.validate_name(full_name)
+    except shared_validators.ValidationError as exc:
+        return _make_error_row(
+            parsed, exc.reason, column="contact.full_name", value=full_name
+        )
+
+    if email:
+        stripped_email = str(email).strip()
+        if stripped_email:
+            try:
+                shared_validators.validate_email(stripped_email)
+            except shared_validators.ValidationError as exc:
+                return _make_error_row(
+                    parsed, exc.reason, column="contact.email", value=stripped_email
+                )
+
+    if phone:
+        stripped_phone = str(phone).strip()
+        if stripped_phone:
+            try:
+                shared_validators.validate_phone(stripped_phone)
+            except shared_validators.ValidationError as exc:
+                return _make_error_row(
+                    parsed, exc.reason, column="contact.phone", value=stripped_phone
+                )
+
+    return None
 
 
 async def _write_error_csv(
@@ -716,17 +788,25 @@ async def _write_error_csv(
 ) -> str:
     """Write the per-import errors CSV via the storage backend.
 
-    Column order matches the source CSV exactly, then appends
-    `__row_number` + `__error` so a rep can fix the file in place and
-    re-upload without column re-shuffling.
+    Column order matches the source CSV exactly, then appends the four
+    inspection columns operators use to fix the file in place:
+    ``__row_number``, ``__column``, ``__value``, ``__error``. The
+    ``__column`` + ``__value`` pair was added when the shared per-field
+    validators landed in the row loop — they identify which column
+    tripped and echo the offending value back. Consumers that parse
+    the CSV by header (all internal callers) tolerate the new columns;
+    positional parsers would break, but there are no known external
+    consumers.
     """
     buf = io.StringIO()
-    columns = header.columns + ["__row_number", "__error"]
+    columns = header.columns + ["__row_number", "__column", "__value", "__error"]
     writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
     writer.writeheader()
     for row in error_rows:
         out = dict(row["raw"])
         out["__row_number"] = row["row_number"]
+        out["__column"] = row.get("column") or ""
+        out["__value"] = "" if row.get("value") is None else row["value"]
         out["__error"] = row["error"]
         writer.writerow(out)
     blob = buf.getvalue().encode("utf-8")
