@@ -161,9 +161,9 @@ export class LeadDetailPageComponent implements OnInit {
     const stage = (this.lead()?.pipeline_stage ?? '').toLowerCase();
     return (
       STAGE_TONES[stage] ?? {
-        bg: 'bg-zinc-100',
-        text: 'text-zinc-700',
-        ring: 'ring-zinc-200',
+        bg: 'bg-surface-2',
+        text: 'text-default',
+        ring: 'border-subtle',
       }
     );
   });

@@ -24,12 +24,12 @@ import { BillingCycle, Plan } from './pricing.types';
   imports: [LucideAngularModule, RouterLink],
   template: `
     <article
-      class="relative flex flex-col rounded-2xl border bg-white dark:bg-slate-800 p-6 shadow-sm transition-all"
+      class="relative flex flex-col rounded-2xl border bg-surface dark:bg-surface-2 p-6 shadow-sm transition-all"
       [class.border-blue-600]="popular()"
       [class.border-2]="popular()"
       [class.shadow-md]="popular()"
-      [class.border-gray-200]="!popular()"
-      [class.dark:border-slate-700]="!popular()"
+      [class.border-subtle]="!popular()"
+      [class.dark:border-subtle]="!popular()"
     >
       @if (popular()) {
         <span
@@ -40,28 +40,28 @@ import { BillingCycle, Plan } from './pricing.types';
       }
 
       <header class="mb-4">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">
+        <h3 class="text-lg font-semibold text-default dark:text-default">
           {{ plan().name }}
         </h3>
       </header>
 
       <div class="mb-6">
         <div class="flex items-baseline gap-1">
-          <span class="text-4xl font-bold text-gray-900 dark:text-slate-100">
+          <span class="text-4xl font-bold text-default dark:text-default">
             \${{ displayPrice() }}
           </span>
-          <span class="text-sm text-gray-500 dark:text-slate-400">/mo</span>
+          <span class="text-sm text-muted dark:text-faint">/mo</span>
         </div>
         @if (cycle() === 'annual') {
-          <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">
+          <p class="mt-1 text-xs text-muted dark:text-faint">
             \${{ plan().pricing.annual_bundle_usd }} billed annually
             <span class="text-emerald-600 dark:text-emerald-400 font-medium"> · save 20% </span>
           </p>
         }
-        <p class="mt-3 text-sm text-gray-600 dark:text-slate-300">
+        <p class="mt-3 text-sm text-muted dark:text-muted">
           {{ plan().pricing.included_seats }} seats included
         </p>
-        <p class="text-sm text-gray-500 dark:text-slate-400">
+        <p class="text-sm text-muted dark:text-faint">
           +\${{ extraSeatPrice() }} per extra seat /
           {{ cycle() === 'annual' ? 'yr' : 'mo' }}
         </p>
@@ -69,7 +69,7 @@ import { BillingCycle, Plan } from './pricing.types';
 
       <ul class="flex-1 space-y-2.5 mb-6">
         @for (feature of cardFeatures(); track feature) {
-          <li class="flex items-start gap-2 text-sm text-gray-700 dark:text-slate-300">
+          <li class="flex items-start gap-2 text-sm text-default dark:text-muted">
             <lucide-icon
               name="check"
               class="w-4 h-4 mt-0.5 text-emerald-500 shrink-0"
@@ -86,12 +86,12 @@ import { BillingCycle, Plan } from './pricing.types';
         [class.bg-blue-600]="popular()"
         [class.text-white]="popular()"
         [class.hover:bg-blue-700]="popular()"
-        [class.bg-gray-100]="!popular()"
-        [class.dark:bg-slate-700]="!popular()"
-        [class.text-gray-900]="!popular()"
-        [class.dark:text-slate-100]="!popular()"
-        [class.hover:bg-gray-200]="!popular()"
-        [class.dark:hover:bg-slate-600]="!popular()"
+        [class.bg-surface-2]="!popular()"
+        [class.dark:bg-surface]="!popular()"
+        [class.text-default]="!popular()"
+        [class.dark:text-default]="!popular()"
+        [class.hover:bg-surface-2]="!popular()"
+        [class.dark:hover:bg-surface]="!popular()"
       >
         Start free trial
       </a>

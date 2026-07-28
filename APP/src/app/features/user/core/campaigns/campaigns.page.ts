@@ -41,10 +41,10 @@ const CHANNEL_STYLES: Record<string, ChannelStyle> = {
   },
   email: {
     label: 'Email',
-    cls: 'bg-zinc-100 text-zinc-600',
+    cls: 'bg-surface-2 text-muted',
     icon: '✉',
   },
-  sms: { label: 'SMS', cls: 'bg-zinc-100 text-zinc-700', icon: '📱' },
+  sms: { label: 'SMS', cls: 'bg-surface-2 text-default', icon: '📱' },
   facebook: { label: 'Facebook', cls: 'bg-blue-100 text-blue-700', icon: 'f' },
   instagram: {
     label: 'Instagram',
@@ -58,8 +58,8 @@ const CHANNEL_STYLES: Record<string, ChannelStyle> = {
 const STATUS_STYLES: Record<CampaignStatus, { label: string; cls: string; dot: string }> = {
   draft: {
     label: 'Draft',
-    cls: 'bg-zinc-100 text-zinc-600 border-zinc-200',
-    dot: 'text-zinc-400',
+    cls: 'bg-surface-2 text-muted border-subtle',
+    dot: 'text-faint',
   },
   scheduled: {
     label: 'Scheduled',
@@ -486,7 +486,7 @@ export class CampaignsPageComponent {
   }
 
   protected createdByBg(c: Campaign): string {
-    if (!c.created_by_id) return 'bg-zinc-200 text-zinc-600';
+    if (!c.created_by_id) return 'bg-surface-2 text-muted';
     const idx = c.created_by_id.charCodeAt(0) % 9;
     const palette = [
       'bg-emerald-100 text-emerald-700',

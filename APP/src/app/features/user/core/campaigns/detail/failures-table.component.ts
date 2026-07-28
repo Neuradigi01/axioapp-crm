@@ -27,8 +27,8 @@ import { CampaignFailuresReport } from '../../reporting/whatsapp/whatsapp-report
         </p>
       } @else {
         <table class="w-full text-xs">
-          <thead class="text-zinc-500">
-            <tr class="border-b border-zinc-200">
+          <thead class="text-muted">
+            <tr class="border-b border-subtle">
               <th class="py-1 text-left font-medium">Reason</th>
               <th class="py-1 text-right font-medium">Count</th>
               <th class="py-1 text-right font-medium">% of failed</th>
@@ -36,10 +36,10 @@ import { CampaignFailuresReport } from '../../reporting/whatsapp/whatsapp-report
           </thead>
           <tbody>
             @for (b of sortedBuckets(); track b.reason) {
-              <tr class="border-b border-zinc-100 last:border-0">
-                <td class="py-1 text-zinc-800">{{ b.label }}</td>
-                <td class="py-1 text-right text-zinc-700">{{ b.count }}</td>
-                <td class="py-1 text-right text-zinc-500">
+              <tr class="border-b border-subtle last:border-0">
+                <td class="py-1 text-default">{{ b.label }}</td>
+                <td class="py-1 text-right text-default">{{ b.count }}</td>
+                <td class="py-1 text-right text-muted">
                   {{ percent(b.count, r.total_failed) }}%
                 </td>
               </tr>
@@ -48,13 +48,13 @@ import { CampaignFailuresReport } from '../../reporting/whatsapp/whatsapp-report
         </table>
 
         @if (r.sample_errors.length > 0) {
-          <details class="mt-2 text-xs text-zinc-600">
-            <summary class="cursor-pointer text-zinc-500 hover:text-zinc-700">
+          <details class="mt-2 text-xs text-muted">
+            <summary class="cursor-pointer text-muted hover:text-default">
               Sample errors ({{ r.sample_errors.length }})
             </summary>
             <ul class="mt-1 space-y-0.5 pl-4 text-[11px]">
               @for (e of r.sample_errors; track e) {
-                <li class="text-zinc-600">{{ e }}</li>
+                <li class="text-muted">{{ e }}</li>
               }
             </ul>
           </details>

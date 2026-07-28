@@ -18,7 +18,7 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
   imports: [LucideAngularModule],
   template: `
     <section
-      class="flex h-full flex-col rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+      class="flex h-full flex-col rounded-xl border border-subtle bg-surface p-6 shadow-sm dark:border-subtle dark:bg-accent"
     >
       <div class="flex items-start justify-between gap-3">
         <div class="flex items-center gap-3">
@@ -29,11 +29,11 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
           </div>
           <div>
             <p
-              class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+              class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint"
             >
               Seats
             </p>
-            <h2 class="text-base font-semibold text-zinc-900 dark:text-slate-100">Team seats</h2>
+            <h2 class="text-base font-semibold text-default dark:text-default">Team seats</h2>
           </div>
         </div>
 
@@ -42,18 +42,18 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
           (click)="onManage()"
           class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
           [class.cursor-not-allowed]="manageDisabled()"
-          [class.border-zinc-200]="manageDisabled()"
-          [class.text-zinc-400]="manageDisabled()"
-          [class.dark:border-slate-700]="manageDisabled()"
-          [class.dark:text-slate-500]="manageDisabled()"
-          [class.border-zinc-300]="!manageDisabled()"
-          [class.bg-white]="!manageDisabled()"
-          [class.text-zinc-700]="!manageDisabled()"
-          [class.hover:bg-zinc-50]="!manageDisabled()"
-          [class.dark:border-slate-600]="!manageDisabled()"
-          [class.dark:bg-slate-700]="!manageDisabled()"
-          [class.dark:text-slate-200]="!manageDisabled()"
-          [class.dark:hover:bg-slate-600]="!manageDisabled()"
+          [class.border-subtle]="manageDisabled()"
+          [class.text-faint]="manageDisabled()"
+          [class.dark:border-subtle]="manageDisabled()"
+          [class.dark:text-muted]="manageDisabled()"
+          [class.border-subtle]="!manageDisabled()"
+          [class.bg-surface]="!manageDisabled()"
+          [class.text-default]="!manageDisabled()"
+          [class.hover:bg-surface-2]="!manageDisabled()"
+          [class.dark:border-subtle]="!manageDisabled()"
+          [class.dark:bg-surface]="!manageDisabled()"
+          [class.dark:text-default]="!manageDisabled()"
+          [class.dark:hover:bg-surface]="!manageDisabled()"
           [disabled]="manageDisabled()"
           [title]="manageTooltip()"
         >
@@ -63,12 +63,12 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
 
       <div class="mt-5">
         <div class="flex items-baseline justify-between">
-          <p class="text-sm text-zinc-600 dark:text-slate-400">In use</p>
-          <p class="text-sm font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
+          <p class="text-sm text-muted dark:text-faint">In use</p>
+          <p class="text-sm font-semibold tabular-nums text-default dark:text-default">
             {{ subscription().seats.in_use }} / {{ subscription().seats.purchased }}
           </p>
         </div>
-        <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-slate-700">
+        <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-2 dark:bg-surface">
           <div
             class="h-full rounded-full transition-all"
             [class.bg-emerald-500]="seatTone() === 'green'"
@@ -77,7 +77,7 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
             [style.width.%]="seatPercent()"
           ></div>
         </div>
-        <p class="mt-2 text-xs text-zinc-500 dark:text-slate-400">
+        <p class="mt-2 text-xs text-muted dark:text-faint">
           {{ helperLine() }}
         </p>
       </div>
@@ -85,33 +85,33 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
       <dl class="mt-6 grid flex-1 gap-4 sm:grid-cols-3">
         <div>
           <dt
-            class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+            class="text-[11px] font-medium uppercase tracking-wide text-muted dark:text-faint"
           >
             Included
           </dt>
-          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
+          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default dark:text-default">
             {{ subscription().seats.included }}
           </dd>
         </div>
         <div>
           <dt
-            class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+            class="text-[11px] font-medium uppercase tracking-wide text-muted dark:text-faint"
           >
             Active
           </dt>
-          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
+          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default dark:text-default">
             {{ subscription().seats.in_use }}
           </dd>
         </div>
         <div>
           <dt
-            class="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+            class="text-[11px] font-medium uppercase tracking-wide text-muted dark:text-faint"
           >
             Extra seat
           </dt>
-          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
+          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default dark:text-default">
             {{ '$' + subscription().seats.extra_seat_cost_per_period_usd }}
-            <span class="text-xs font-normal text-zinc-500 dark:text-slate-400">
+            <span class="text-xs font-normal text-muted dark:text-faint">
               /{{ subscription().billing_cycle === 'annual' ? 'yr' : 'mo' }}
             </span>
           </dd>

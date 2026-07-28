@@ -33,7 +33,7 @@ type ExportFormat = 'csv' | 'pdf';
     <div class="relative inline-block">
       <button
         type="button"
-        class="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+        class="inline-flex items-center gap-1 rounded-full border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
         (click)="toggle(); $event.stopPropagation()"
         [disabled]="busy()"
         aria-label="Export conversation"
@@ -43,19 +43,19 @@ type ExportFormat = 'csv' | 'pdf';
       </button>
       @if (open()) {
         <div
-          class="absolute right-0 z-50 mt-1 w-32 rounded-md border border-zinc-200 bg-white py-1 text-xs shadow-lg"
+          class="absolute right-0 z-50 mt-1 w-32 rounded-md border border-subtle bg-surface py-1 text-xs shadow-lg"
           (click)="$event.stopPropagation()"
         >
           <button
             type="button"
-            class="block w-full px-3 py-1.5 text-left text-zinc-700 hover:bg-zinc-50"
+            class="block w-full px-3 py-1.5 text-left text-default hover:bg-surface-2"
             (click)="download('csv')"
           >
             CSV
           </button>
           <button
             type="button"
-            class="block w-full px-3 py-1.5 text-left text-zinc-700 hover:bg-zinc-50"
+            class="block w-full px-3 py-1.5 text-left text-default hover:bg-surface-2"
             (click)="download('pdf')"
           >
             PDF

@@ -42,13 +42,13 @@ interface FlowField {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule],
   template: `
-    <div class="rounded-md border border-zinc-200 bg-white p-3">
-      <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+    <div class="rounded-md border border-subtle bg-surface p-3">
+      <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
         Preview ({{ screens().length }} screen{{ screens().length === 1 ? '' : 's' }})
       </p>
       @for (screen of screens(); track screen.id; let i = $index) {
-        <div class="mb-3 rounded border border-zinc-200 bg-zinc-50 p-3">
-          <p class="mb-2 text-xs font-semibold text-zinc-800">{{ i + 1 }}. {{ screen.title }}</p>
+        <div class="mb-3 rounded border border-subtle bg-surface-2 p-3">
+          <p class="mb-2 text-xs font-semibold text-default">{{ i + 1 }}. {{ screen.title }}</p>
           <ul class="space-y-1.5 text-xs">
             @for (field of screenFields(screen); track field.name || field.type) {
               <li class="flex items-start gap-2">
@@ -58,31 +58,31 @@ interface FlowField {
                   {{ humanType(field.type) }}
                 </span>
                 <span class="flex flex-col">
-                  <span class="font-medium text-zinc-800">
+                  <span class="font-medium text-default">
                     {{ field.label || field.name || '(no label)' }}
                     @if (field.required) {
                       <span class="text-rose-600">*</span>
                     }
                   </span>
                   @if (field.helperText) {
-                    <span class="text-[11px] text-zinc-500">
+                    <span class="text-[11px] text-muted">
                       {{ field.helperText }}
                     </span>
                   }
                   @if (field.options && field.options.length > 0) {
-                    <span class="text-[11px] text-zinc-500">
+                    <span class="text-[11px] text-muted">
                       Options: {{ field.options.join(', ') }}
                     </span>
                   }
                 </span>
               </li>
             } @empty {
-              <li class="text-[11px] text-zinc-500">(no input fields on this screen)</li>
+              <li class="text-[11px] text-muted">(no input fields on this screen)</li>
             }
           </ul>
         </div>
       } @empty {
-        <p class="text-[11px] text-zinc-500">Empty flow — add a screen to get started.</p>
+        <p class="text-[11px] text-muted">Empty flow — add a screen to get started.</p>
       }
     </div>
   `,

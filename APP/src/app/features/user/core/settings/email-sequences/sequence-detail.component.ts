@@ -105,7 +105,7 @@ export class SequenceDetailComponent implements OnInit {
 
   protected readonly statePillClasses: Record<EnrollmentState, string> = {
     active: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-    completed: 'bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200',
+    completed: 'bg-surface-2 text-default ring-1 border-subtle',
     paused_on_reply: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
     paused_manual: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
     cancelled: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',

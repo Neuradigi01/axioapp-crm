@@ -59,7 +59,7 @@ export class OptInChipComponent {
       case 'implicit':
         return 'bg-amber-50 text-amber-700 ring-amber-200';
       default:
-        return 'bg-zinc-100 text-zinc-600 ring-zinc-200';
+        return 'bg-surface-2 text-muted border-subtle';
     }
   });
 

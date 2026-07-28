@@ -27,11 +27,11 @@ import { FlowCategory, FlowTemplate, FlowsService } from './flows.service';
   imports: [CommonModule],
   template: `
     <div class="space-y-3">
-      <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <p class="text-xs font-semibold uppercase tracking-wide text-muted">
         Pick a template to start from
       </p>
       @if (loading()) {
-        <p class="text-[11px] text-zinc-500">Loading templates…</p>
+        <p class="text-[11px] text-muted">Loading templates…</p>
       }
       @if (error(); as err) {
         <p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
@@ -43,12 +43,12 @@ import { FlowCategory, FlowTemplate, FlowsService } from './flows.service';
           <button
             type="button"
             (click)="onPick(t.key)"
-            class="flex flex-col items-start gap-1 rounded-md border border-zinc-200 bg-white px-3 py-3 text-left transition hover:border-zinc-400 hover:bg-zinc-50"
+            class="flex flex-col items-start gap-1 rounded-md border border-subtle bg-surface px-3 py-3 text-left transition hover:border-muted hover:bg-surface-2"
           >
-            <span class="text-sm font-semibold text-zinc-900">
+            <span class="text-sm font-semibold text-default">
               {{ t.label }}
             </span>
-            <span class="text-[11px] text-zinc-500">
+            <span class="text-[11px] text-muted">
               {{ t.description }}
             </span>
           </button>

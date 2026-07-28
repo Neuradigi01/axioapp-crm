@@ -83,7 +83,7 @@ export class CampaignDetailPageComponent {
     const c = this.campaign();
     if (!c) return null;
     const map: Record<string, { label: string; cls: string }> = {
-      draft: { label: 'Draft', cls: 'bg-zinc-100 text-zinc-700 ring-zinc-200' },
+      draft: { label: 'Draft', cls: 'bg-surface-2 text-default border-subtle' },
       scheduled: { label: 'Scheduled', cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
       running: { label: 'Running', cls: 'bg-sky-50 text-sky-700 ring-sky-200' },
       done: { label: 'Done', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },

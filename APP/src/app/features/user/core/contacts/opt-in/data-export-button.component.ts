@@ -32,7 +32,7 @@ import { extractApiError } from '@core/services/api-error.util';
   template: `
     <button
       type="button"
-      class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+      class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
       [disabled]="busy()"
       (click)="download()"
       title="DPDP right-to-access: download all data we hold about this contact."

@@ -61,7 +61,7 @@ const TYPE_META: Record<ActivityType, TypeMeta> = {
   task: {
     icon: 'check',
     label: 'Task',
-    ringClass: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+    ringClass: 'bg-surface-2 text-default border-subtle',
   },
 };
 

@@ -168,7 +168,7 @@ export class LeadCardComponent {
       case 'lost':
         return 'bg-red-100 text-red-700 ring-red-200';
       default:
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   }
 
@@ -187,7 +187,7 @@ export class LeadCardComponent {
       case 'walk_in':
         return 'bg-teal-100 text-teal-700 ring-teal-200';
       default:
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   }
 

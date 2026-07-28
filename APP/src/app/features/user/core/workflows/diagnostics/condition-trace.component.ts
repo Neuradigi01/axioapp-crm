@@ -19,7 +19,7 @@ import { DiagnosticsConditionTrace } from '../workflows-api.service';
     @let n = node();
     @switch (n.kind) {
       @case ('empty') {
-        <div class="text-[10px] text-zinc-500 italic">empty condition (always matches)</div>
+        <div class="text-[10px] text-muted italic">empty condition (always matches)</div>
       }
       @case ('invalid') {
         <div class="text-[10px] text-rose-700">invalid: {{ n.error }}</div>
@@ -32,12 +32,12 @@ import { DiagnosticsConditionTrace } from '../workflows-api.service';
           [class.bg-rose-50]="!n.result"
           [class.text-rose-900]="!n.result"
         >
-          <span class="font-mono text-zinc-600">{{ n.path }}</span>
-          <span class="font-mono text-zinc-500">{{ n.op }}</span>
+          <span class="font-mono text-muted">{{ n.path }}</span>
+          <span class="font-mono text-muted">{{ n.op }}</span>
           <span class="font-mono">{{ formatValue(n.value) }}</span>
           <span class="flex-1"></span>
-          <span class="text-[10px] text-zinc-500">resolved:</span>
-          <span class="font-mono text-zinc-700">
+          <span class="text-[10px] text-muted">resolved:</span>
+          <span class="font-mono text-default">
             @if (n.missing) {
               <em>(missing)</em>
             } @else {
@@ -48,8 +48,8 @@ import { DiagnosticsConditionTrace } from '../workflows-api.service';
         </div>
       }
       @case ('all') {
-        <div class="border-l-2 border-zinc-300 pl-3 my-1">
-          <div class="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">
+        <div class="border-l-2 border-subtle pl-3 my-1">
+          <div class="text-[10px] uppercase tracking-wide text-muted mb-1">
             ALL of (AND) — {{ n.result ? 'pass' : 'fail' }}
           </div>
           @for (child of n.children ?? []; track $index) {
@@ -58,8 +58,8 @@ import { DiagnosticsConditionTrace } from '../workflows-api.service';
         </div>
       }
       @case ('any') {
-        <div class="border-l-2 border-zinc-300 pl-3 my-1">
-          <div class="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">
+        <div class="border-l-2 border-subtle pl-3 my-1">
+          <div class="text-[10px] uppercase tracking-wide text-muted mb-1">
             ANY of (OR) — {{ n.result ? 'pass' : 'fail' }}
           </div>
           @for (child of n.children ?? []; track $index) {
@@ -68,8 +68,8 @@ import { DiagnosticsConditionTrace } from '../workflows-api.service';
         </div>
       }
       @case ('not') {
-        <div class="border-l-2 border-zinc-300 pl-3 my-1">
-          <div class="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">
+        <div class="border-l-2 border-subtle pl-3 my-1">
+          <div class="text-[10px] uppercase tracking-wide text-muted mb-1">
             NOT — {{ n.result ? 'pass' : 'fail' }}
           </div>
           @for (child of n.children ?? []; track $index) {

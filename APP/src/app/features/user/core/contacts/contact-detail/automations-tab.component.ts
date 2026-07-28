@@ -35,7 +35,7 @@ import {
  */
 
 const STATUS_PALETTE: Record<AutomationRunStatus, string> = {
-  queued: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+  queued: 'bg-surface-2 text-default border-subtle',
   dispatched: 'bg-blue-50 text-blue-700 ring-blue-200',
   sent: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   failed: 'bg-rose-50 text-rose-700 ring-rose-200',

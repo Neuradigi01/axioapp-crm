@@ -24,7 +24,7 @@ const QUALITY_DOT: Record<WhatsAppQualityRating, string> = {
   GREEN: 'bg-emerald-500',
   YELLOW: 'bg-amber-500',
   RED: 'bg-rose-500',
-  UNKNOWN: 'bg-zinc-300',
+  UNKNOWN: 'bg-surface-2',
 };
 
 const QUALITY_LABEL: Record<WhatsAppQualityRating, string> = {
@@ -43,26 +43,26 @@ const QUALITY_LABEL: Record<WhatsAppQualityRating, string> = {
     @if (data(); as h) {
       <a
         routerLink="/user/integrations"
-        class="block rounded-md border border-zinc-200 bg-white p-3 transition hover:border-zinc-300 hover:shadow-sm"
+        class="block rounded-md border border-subtle bg-surface p-3 transition hover:border-subtle hover:shadow-sm"
       >
         <div class="flex items-center justify-between">
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">WhatsApp health</p>
-          <lucide-icon name="arrow-right" class="h-3 w-3 text-zinc-400" />
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">WhatsApp health</p>
+          <lucide-icon name="arrow-right" class="h-3 w-3 text-faint" />
         </div>
         <div class="mt-2 flex items-center gap-2">
           <span
             [class]="'inline-block h-2.5 w-2.5 rounded-full ' + QUALITY_DOT[h.quality_rating]"
           ></span>
-          <span class="text-sm font-medium text-zinc-900">
+          <span class="text-sm font-medium text-default">
             {{ QUALITY_LABEL[h.quality_rating] }}
           </span>
           @if (h.tier_label) {
-            <span class="text-xs text-zinc-500">·</span>
-            <span class="text-xs text-zinc-600">{{ h.tier_label }}</span>
+            <span class="text-xs text-muted">·</span>
+            <span class="text-xs text-muted">{{ h.tier_label }}</span>
           }
         </div>
         @if (!h.is_unlimited && h.daily_limit > 0) {
-          <p class="mt-1 text-[11px] text-zinc-500">
+          <p class="mt-1 text-[11px] text-muted">
             {{ h.used_today | number }} / {{ h.daily_limit | number }} today
           </p>
         }

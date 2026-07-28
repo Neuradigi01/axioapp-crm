@@ -106,9 +106,9 @@ export class WorkflowRunDetailPageComponent {
       case 'paused':
         return 'bg-amber-100 text-amber-800';
       case 'canceled':
-        return 'bg-zinc-200 text-zinc-700';
+        return 'bg-surface-2 text-default';
       default:
-        return 'bg-zinc-100 text-zinc-700';
+        return 'bg-surface-2 text-default';
     }
   }
 }

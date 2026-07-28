@@ -98,7 +98,7 @@ export class IntegrationStatusComponent {
       case 'error':
         return 'bg-rose-500';
       default:
-        return 'bg-zinc-400';
+        return 'bg-surface-2';
     }
   }
 

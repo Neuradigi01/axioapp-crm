@@ -24,10 +24,10 @@ import {
       <div class="space-y-1.5">
         @for (stage of r.stages; track stage.key; let i = $index) {
           <div class="grid grid-cols-12 items-center gap-2 text-xs">
-            <span class="col-span-3 truncate font-medium text-zinc-700">
+            <span class="col-span-3 truncate font-medium text-default">
               {{ stage.label }}
             </span>
-            <div class="col-span-7 h-5 overflow-hidden rounded bg-zinc-100">
+            <div class="col-span-7 h-5 overflow-hidden rounded bg-surface-2">
               <div
                 class="flex h-full items-center px-2 text-[10px] font-semibold text-white"
                 [class]="barColor(stage.key)"
@@ -38,11 +38,11 @@ import {
                 }
               </div>
             </div>
-            <span class="col-span-2 text-right text-zinc-600">
+            <span class="col-span-2 text-right text-muted">
               @if (percentOfMax(stage.count) <= 12) {
-                <span class="mr-1 text-zinc-700">{{ stage.count }}</span>
+                <span class="mr-1 text-default">{{ stage.count }}</span>
               }
-              <span class="text-[10px] text-zinc-500">
+              <span class="text-[10px] text-muted">
                 @if (i > 0 && r.stages[0].count > 0) {
                   ({{ percent(stage.count, r.stages[0].count) }}%)
                 }
@@ -53,15 +53,15 @@ import {
       </div>
 
       <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
-        <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-          <p class="text-[10px] uppercase text-zinc-500">Median time to delivery</p>
-          <p class="text-sm font-semibold text-zinc-900">
+        <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
+          <p class="text-[10px] uppercase text-muted">Median time to delivery</p>
+          <p class="text-sm font-semibold text-default">
             {{ formatDuration(r.delivery_median_seconds) }}
           </p>
         </div>
-        <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-          <p class="text-[10px] uppercase text-zinc-500">p95</p>
-          <p class="text-sm font-semibold text-zinc-900">
+        <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
+          <p class="text-[10px] uppercase text-muted">p95</p>
+          <p class="text-sm font-semibold text-default">
             {{ formatDuration(r.delivery_p95_seconds) }}
           </p>
         </div>
@@ -94,7 +94,7 @@ export class FunnelChartComponent {
   protected barColor(key: string): string {
     switch (key) {
       case 'targeted':
-        return 'bg-zinc-500';
+        return 'bg-muted';
       case 'sent':
         return 'bg-sky-500';
       case 'delivered':
@@ -108,7 +108,7 @@ export class FunnelChartComponent {
       case 'failed':
         return 'bg-rose-500';
       default:
-        return 'bg-zinc-400';
+        return 'bg-surface-2';
     }
   }
 }

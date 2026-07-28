@@ -270,7 +270,7 @@ export class HistoryPageComponent {
       case 'processing':
         return 'bg-blue-100 text-blue-700 ring-blue-200';
       default:
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   }
 

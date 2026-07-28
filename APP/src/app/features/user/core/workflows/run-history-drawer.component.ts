@@ -99,10 +99,10 @@ export class RunHistoryDrawerComponent {
       case 'errored':
         return 'bg-rose-50 text-rose-700 ring-rose-200';
       case 'canceled':
-        return 'bg-zinc-100 text-zinc-500 ring-zinc-300';
+        return 'bg-surface-2 text-muted border-subtle';
       case 'pending':
       default:
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   }
 
@@ -113,12 +113,12 @@ export class RunHistoryDrawerComponent {
       case 'running':
         return 'bg-blue-50 text-blue-700 ring-blue-200';
       case 'skipped':
-        return 'bg-zinc-100 text-zinc-500 ring-zinc-300';
+        return 'bg-surface-2 text-muted border-subtle';
       case 'errored':
         return 'bg-rose-50 text-rose-700 ring-rose-200';
       case 'pending':
       default:
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   }
 

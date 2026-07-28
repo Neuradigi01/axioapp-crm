@@ -47,7 +47,7 @@ interface UsageRowVM {
   imports: [LucideAngularModule],
   template: `
     <section
-      class="flex h-full flex-col rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+      class="flex h-full flex-col rounded-xl border border-subtle bg-surface p-6 shadow-sm dark:border-subtle dark:bg-accent"
     >
       <div class="flex items-center gap-3">
         <div
@@ -57,16 +57,16 @@ interface UsageRowVM {
         </div>
         <div>
           <p
-            class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+            class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint"
           >
             Usage
           </p>
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-slate-100">Current period</h2>
+          <h2 class="text-base font-semibold text-default dark:text-default">Current period</h2>
         </div>
       </div>
 
       @if (viewRows().length === 0) {
-        <p class="mt-6 text-sm text-zinc-500 dark:text-slate-400">
+        <p class="mt-6 text-sm text-muted dark:text-faint">
           No metered resources on your plan.
         </p>
       } @else {
@@ -74,13 +74,13 @@ interface UsageRowVM {
           @for (row of viewRows(); track row.label) {
             <div>
               <div class="flex items-center justify-between text-sm">
-                <span class="font-medium text-zinc-700 dark:text-slate-200">
+                <span class="font-medium text-default dark:text-default">
                   {{ row.label }}
                 </span>
-                <span class="tabular-nums text-zinc-600 dark:text-slate-300">
+                <span class="tabular-nums text-muted dark:text-muted">
                   {{ row.countDisplay }}
                   @if (row.showBar) {
-                    <span class="ml-1 text-xs text-zinc-400 dark:text-slate-500">
+                    <span class="ml-1 text-xs text-faint dark:text-muted">
                       ({{ row.percent }}%)
                     </span>
                   }
@@ -89,7 +89,7 @@ interface UsageRowVM {
 
               @if (row.showBar) {
                 <div
-                  class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-slate-700"
+                  class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-2 dark:bg-surface"
                 >
                   <div
                     class="h-full rounded-full transition-all"
@@ -104,7 +104,7 @@ interface UsageRowVM {
                   Unlimited
                 </p>
               } @else {
-                <p class="mt-1 text-xs text-zinc-500 dark:text-slate-400">
+                <p class="mt-1 text-xs text-muted dark:text-faint">
                   Not included on your plan
                 </p>
               }

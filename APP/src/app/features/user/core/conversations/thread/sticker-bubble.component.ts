@@ -32,12 +32,12 @@ export interface StickerAttachment {
   template: `
     <div class="flex flex-col items-start gap-1">
       <div
-        class="flex h-24 w-24 items-center justify-center rounded-md bg-zinc-50 text-3xl ring-1 ring-zinc-200"
+        class="flex h-24 w-24 items-center justify-center rounded-md bg-surface-2 text-3xl ring-1 border-subtle"
       >
         🟦
       </div>
       <span
-        class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 ring-1 ring-zinc-200"
+        class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-muted ring-1 border-subtle"
       >
         Sticker
         @if (sticker().animated) {

@@ -30,7 +30,7 @@ import { CallsApiService } from './calls-api.service';
   imports: [CommonModule, LucideAngularModule],
   template: `
     @if (loading()) {
-      <div class="inline-flex items-center gap-1 text-[11px] text-zinc-500">
+      <div class="inline-flex items-center gap-1 text-[11px] text-muted">
         <lucide-icon
           name="loader-2"
           size="12"

@@ -38,8 +38,8 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
     <div class="space-y-4 p-4">
       <header class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 class="text-xl font-semibold text-zinc-900">Block list</h1>
-          <p class="text-xs text-zinc-500">
+          <h1 class="text-xl font-semibold text-default">Block list</h1>
+          <p class="text-xs text-muted">
             Numbers we won't send to or accept from. Inbound is silently dropped; outbound is
             refused by the campaign send guard.
           </p>
@@ -47,7 +47,7 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
         <button
           type="button"
           (click)="openAdd()"
-          class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent"
         >
           <lucide-icon name="plus" class="h-3.5 w-3.5" />
           Block a number
@@ -58,12 +58,12 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
         <input
           type="search"
           placeholder="Filter by digits…"
-          class="w-64 rounded-md border border-zinc-300 px-2.5 py-1.5 text-xs"
+          class="w-64 rounded-md border border-subtle px-2.5 py-1.5 text-xs"
           [ngModel]="search()"
           (ngModelChange)="onSearch($event)"
         />
         @if (loading()) {
-          <span class="text-[11px] text-zinc-500">Loading…</span>
+          <span class="text-[11px] text-muted">Loading…</span>
         }
       </div>
 
@@ -73,14 +73,14 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
         </p>
       }
       @if (toast(); as msg) {
-        <p class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+        <p class="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs text-default">
           {{ msg }}
         </p>
       }
 
-      <div class="overflow-hidden rounded-md border border-zinc-200 bg-white">
+      <div class="overflow-hidden rounded-md border border-subtle bg-surface">
         <table class="w-full text-xs">
-          <thead class="bg-zinc-50 text-zinc-500">
+          <thead class="bg-surface-2 text-muted">
             <tr>
               <th class="px-3 py-2 text-left font-medium">Phone</th>
               <th class="px-3 py-2 text-left font-medium">Reason</th>
@@ -89,22 +89,22 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
               <th class="px-3 py-2 text-right font-medium">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-zinc-100">
+          <tbody class="divide-y divide-subtle">
             @for (row of page().items; track row.id) {
               <tr>
-                <td class="px-3 py-2 font-mono text-zinc-800">
+                <td class="px-3 py-2 font-mono text-default">
                   {{ row.phone_number }}
                 </td>
-                <td class="px-3 py-2 capitalize text-zinc-700">{{ row.reason }}</td>
-                <td class="px-3 py-2 text-zinc-500">
+                <td class="px-3 py-2 capitalize text-default">{{ row.reason }}</td>
+                <td class="px-3 py-2 text-muted">
                   {{ formatDate(row.created_at) }}
                 </td>
-                <td class="px-3 py-2 text-zinc-600">{{ row.notes || '—' }}</td>
+                <td class="px-3 py-2 text-muted">{{ row.notes || '—' }}</td>
                 <td class="px-3 py-2 text-right">
                   <button
                     type="button"
                     (click)="onUnblock(row)"
-                    class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50"
+                    class="rounded-md border border-subtle bg-surface px-2 py-1 text-[11px] font-medium text-default hover:bg-surface-2"
                   >
                     Unblock
                   </button>
@@ -112,7 +112,7 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
               </tr>
             } @empty {
               <tr>
-                <td colspan="5" class="px-3 py-6 text-center text-zinc-500">
+                <td colspan="5" class="px-3 py-6 text-center text-muted">
                   No blocked numbers. Inbound + outbound flow without restriction.
                 </td>
               </tr>
@@ -122,14 +122,14 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
       </div>
 
       @if (page().total > page().size) {
-        <div class="flex items-center justify-between text-xs text-zinc-500">
+        <div class="flex items-center justify-between text-xs text-muted">
           <span>{{ page().total }} blocked total</span>
           <div class="flex gap-1">
             <button
               type="button"
               [disabled]="page().page === 1"
               (click)="setPage(page().page - 1)"
-              class="rounded border border-zinc-300 bg-white px-2 py-1 disabled:opacity-40"
+              class="rounded border border-subtle bg-surface px-2 py-1 disabled:opacity-40"
             >
               Prev
             </button>
@@ -137,7 +137,7 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
               type="button"
               [disabled]="page().page * page().size >= page().total"
               (click)="setPage(page().page + 1)"
-              class="rounded border border-zinc-300 bg-white px-2 py-1 disabled:opacity-40"
+              class="rounded border border-subtle bg-surface px-2 py-1 disabled:opacity-40"
             >
               Next
             </button>
@@ -148,28 +148,28 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
 
     @if (addOpen()) {
       <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40"
         (click)="closeAdd()"
       >
         <div
-          class="w-full max-w-md rounded-md border border-zinc-200 bg-white p-4 shadow-lg"
+          class="w-full max-w-md rounded-md border border-subtle bg-surface p-4 shadow-lg"
           (click)="$event.stopPropagation()"
         >
-          <p class="mb-2 text-sm font-semibold text-zinc-900">Block a number</p>
+          <p class="mb-2 text-sm font-semibold text-default">Block a number</p>
           <label class="mb-2 block text-xs">
-            <span class="mb-1 block font-medium text-zinc-700">Phone</span>
+            <span class="mb-1 block font-medium text-default">Phone</span>
             <input
               type="text"
-              class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+              class="w-full rounded-md border border-subtle px-2.5 py-1.5"
               placeholder="+91 9XXXXXXXXX"
               [ngModel]="form().phone_number"
               (ngModelChange)="patchForm({ phone_number: $event })"
             />
           </label>
           <label class="mb-2 block text-xs">
-            <span class="mb-1 block font-medium text-zinc-700">Reason</span>
+            <span class="mb-1 block font-medium text-default">Reason</span>
             <select
-              class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+              class="w-full rounded-md border border-subtle px-2.5 py-1.5"
               [ngModel]="form().reason"
               (ngModelChange)="patchForm({ reason: $event })"
             >
@@ -179,10 +179,10 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
             </select>
           </label>
           <label class="mb-3 block text-xs">
-            <span class="mb-1 block font-medium text-zinc-700">Notes</span>
+            <span class="mb-1 block font-medium text-default">Notes</span>
             <textarea
               rows="2"
-              class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+              class="w-full rounded-md border border-subtle px-2.5 py-1.5"
               [ngModel]="form().notes"
               (ngModelChange)="patchForm({ notes: $event })"
             ></textarea>
@@ -191,7 +191,7 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
             <button
               type="button"
               (click)="closeAdd()"
-              class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+              class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
             >
               Cancel
             </button>
@@ -199,7 +199,7 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
               type="button"
               [disabled]="busy() || !form().phone_number"
               (click)="submitAdd()"
-              class="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+              class="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent disabled:opacity-50"
             >
               {{ busy() ? 'Adding…' : 'Block number' }}
             </button>

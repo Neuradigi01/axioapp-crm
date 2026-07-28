@@ -50,16 +50,16 @@ import { FunnelChartComponent } from './funnel-chart.component';
     </div>
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <div class="rounded-md border border-zinc-200 bg-white p-4">
+      <div class="rounded-md border border-subtle bg-surface p-4">
         <div class="mb-3 flex items-center justify-between">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Funnel</p>
-            <p class="text-[11px] text-zinc-500">
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted">Funnel</p>
+            <p class="text-[11px] text-muted">
               Conversion attribution uses a 7-day window from message receipt.
             </p>
           </div>
           @if (funnelLoading()) {
-            <span class="text-[11px] text-zinc-500">Loading…</span>
+            <span class="text-[11px] text-muted">Loading…</span>
           }
         </div>
         @if (funnelError(); as err) {
@@ -71,16 +71,16 @@ import { FunnelChartComponent } from './funnel-chart.component';
         }
       </div>
 
-      <div class="rounded-md border border-zinc-200 bg-white p-4">
+      <div class="rounded-md border border-subtle bg-surface p-4">
         <div class="mb-3 flex items-center justify-between">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted">
               Failure breakdown
             </p>
-            <p class="text-[11px] text-zinc-500">Classified from Meta's error titles.</p>
+            <p class="text-[11px] text-muted">Classified from Meta's error titles.</p>
           </div>
           @if (failuresLoading()) {
-            <span class="text-[11px] text-zinc-500">Loading…</span>
+            <span class="text-[11px] text-muted">Loading…</span>
           }
         </div>
         @if (failuresError(); as err) {

@@ -174,7 +174,7 @@ export class TodaysFollowupsComponent {
     if (row.status === 'cancelled') {
       return {
         label: 'Cancelled',
-        classes: 'bg-zinc-100 text-zinc-600 ring-zinc-200',
+        classes: 'bg-surface-2 text-muted border-subtle',
       };
     }
     // open — decide Overdue vs Pending from the due_at.

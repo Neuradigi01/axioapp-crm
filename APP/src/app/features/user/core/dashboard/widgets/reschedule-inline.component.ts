@@ -28,19 +28,19 @@ import { LucideAngularModule } from 'lucide-angular';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, LucideAngularModule],
   template: `
-    <div class="flex flex-wrap items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 p-2">
+    <div class="flex flex-wrap items-center gap-2 rounded-md border border-subtle bg-surface-2 p-2">
       <input
         type="datetime-local"
         [ngModel]="localValue()"
         (ngModelChange)="localValue.set($event)"
-        class="flex-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        class="flex-1 rounded-md border border-subtle bg-surface px-2 py-1 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         [attr.aria-label]="'New due date and time'"
       />
       <button
         type="button"
         (click)="onSave()"
         [disabled]="!localValue()"
-        class="inline-flex items-center gap-1 rounded-md bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+        class="inline-flex items-center gap-1 rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-surface-2"
       >
         <lucide-icon name="check" size="14" aria-hidden="true"></lucide-icon>
         Save
@@ -48,7 +48,7 @@ import { LucideAngularModule } from 'lucide-angular';
       <button
         type="button"
         (click)="cancel.emit()"
-        class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+        class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
       >
         <lucide-icon name="x" size="14" aria-hidden="true"></lucide-icon>
         Cancel

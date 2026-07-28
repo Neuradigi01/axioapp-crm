@@ -35,7 +35,7 @@ import { ColumnDef, ColumnPrefsService } from '../shared/column-prefs.service';
         [attr.aria-expanded]="open()"
         aria-haspopup="true"
         title="Customize columns"
-        class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2.5 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-2 text-sm font-medium text-default hover:bg-surface-2"
       >
         <lucide-icon name="columns-3" class="h-4 w-4" />
         <span class="sr-only">Customize columns</span>
@@ -44,10 +44,10 @@ import { ColumnDef, ColumnPrefsService } from '../shared/column-prefs.service';
       @if (open()) {
         <div
           role="menu"
-          class="absolute right-0 z-40 mt-1 w-64 origin-top-right rounded-md border border-zinc-200 bg-white shadow-lg ring-1 ring-black/5"
+          class="absolute right-0 z-40 mt-1 w-64 origin-top-right rounded-md border border-subtle bg-surface shadow-lg ring-1 ring-black/5"
         >
           <div
-            class="border-b border-zinc-100 px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-500"
+            class="border-b border-subtle px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted"
           >
             Columns
           </div>
@@ -59,17 +59,17 @@ import { ColumnDef, ColumnPrefsService } from '../shared/column-prefs.service';
             @for (col of columns(); track col.key) {
               <li
                 cdkDrag
-                class="flex cursor-grab items-center gap-2 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 active:cursor-grabbing"
+                class="flex cursor-grab items-center gap-2 px-3 py-1.5 text-sm text-default hover:bg-surface-2 active:cursor-grabbing"
               >
                 <lucide-icon
                   name="grip-vertical"
-                  class="h-4 w-4 flex-shrink-0 text-zinc-400"
+                  class="h-4 w-4 flex-shrink-0 text-faint"
                   cdkDragHandle
                 />
                 <label class="flex flex-1 cursor-pointer items-center gap-2">
                   <input
                     type="checkbox"
-                    class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                    class="h-4 w-4 rounded border-subtle text-default focus:ring-accent"
                     [checked]="col.visible"
                     (change)="onToggle(col.key, $any($event.target).checked)"
                   />
@@ -78,18 +78,18 @@ import { ColumnDef, ColumnPrefsService } from '../shared/column-prefs.service';
               </li>
             }
           </ul>
-          <div class="flex items-center justify-between border-t border-zinc-100 px-3 py-2">
+          <div class="flex items-center justify-between border-t border-subtle px-3 py-2">
             <button
               type="button"
               (click)="onReset()"
-              class="text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:underline"
+              class="text-xs font-medium text-muted hover:text-default hover:underline"
             >
               Reset to default
             </button>
             <button
               type="button"
               (click)="close()"
-              class="text-xs font-medium text-zinc-500 hover:text-zinc-700"
+              class="text-xs font-medium text-muted hover:text-default"
             >
               Done
             </button>

@@ -51,22 +51,22 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
       <!-- Header -->
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="text-base font-semibold text-zinc-900">
+          <h2 class="text-base font-semibold text-default">
             {{ template.name }}
           </h2>
-          <p class="text-xs text-zinc-500">
+          <p class="text-xs text-muted">
             {{ template.category }} · {{ template.language }} ·
             {{ template.submission_status }}
           </p>
         </div>
-        <div class="flex items-center gap-1 rounded-md border border-zinc-200 bg-white p-0.5">
+        <div class="flex items-center gap-1 rounded-md border border-subtle bg-surface p-0.5">
           @for (r of RANGES; track r.key) {
             <button
               type="button"
               (click)="setRange(r.key)"
               [class]="
                 'rounded-md px-2.5 py-1 text-xs font-medium transition ' +
-                (range() === r.key ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100')
+                (range() === r.key ? 'bg-accent text-white' : 'text-muted hover:bg-surface-2')
               "
             >
               {{ r.label }}
@@ -83,61 +83,61 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
 
       @if (loading()) {
         <div
-          class="rounded-md border border-zinc-200 bg-white px-6 py-12 text-center text-sm text-zinc-500"
+          class="rounded-md border border-subtle bg-surface px-6 py-12 text-center text-sm text-muted"
         >
           Loading metrics…
         </div>
       } @else if (data(); as d) {
         @if (d.sent === 0 && d.failed === 0) {
-          <div class="rounded-md border border-zinc-200 bg-white px-6 py-12 text-center">
-            <lucide-icon name="trending-up" class="mx-auto mb-2 h-8 w-8 text-zinc-300" />
-            <p class="text-sm font-medium text-zinc-700">No data yet.</p>
-            <p class="mt-1 text-xs text-zinc-500">
+          <div class="rounded-md border border-subtle bg-surface px-6 py-12 text-center">
+            <lucide-icon name="trending-up" class="mx-auto mb-2 h-8 w-8 text-faint" />
+            <p class="text-sm font-medium text-default">No data yet.</p>
+            <p class="mt-1 text-xs text-muted">
               Send this template in a campaign to see metrics here.
             </p>
           </div>
         } @else {
           <!-- Stat-card grid -->
           <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-            <div class="rounded-md border border-zinc-200 bg-white p-3">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Sent</p>
-              <p class="mt-1 text-2xl font-semibold text-zinc-900">
+            <div class="rounded-md border border-subtle bg-surface p-3">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">Sent</p>
+              <p class="mt-1 text-2xl font-semibold text-default">
                 {{ d.sent }}
               </p>
             </div>
-            <div class="rounded-md border border-zinc-200 bg-white p-3">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+            <div class="rounded-md border border-subtle bg-surface p-3">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">
                 Delivered
               </p>
-              <p class="mt-1 text-2xl font-semibold text-zinc-900">
+              <p class="mt-1 text-2xl font-semibold text-default">
                 {{ d.delivered }}
               </p>
-              <p class="text-[10px] text-zinc-500">{{ d.delivery_rate }}%</p>
+              <p class="text-[10px] text-muted">{{ d.delivery_rate }}%</p>
             </div>
-            <div class="rounded-md border border-zinc-200 bg-white p-3">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Read</p>
-              <p class="mt-1 text-2xl font-semibold text-zinc-900">
+            <div class="rounded-md border border-subtle bg-surface p-3">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">Read</p>
+              <p class="mt-1 text-2xl font-semibold text-default">
                 {{ d.read }}
               </p>
-              <p class="text-[10px] text-zinc-500">{{ d.read_rate }}%</p>
+              <p class="text-[10px] text-muted">{{ d.read_rate }}%</p>
             </div>
-            <div class="rounded-md border border-zinc-200 bg-white p-3">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Replied</p>
-              <p class="mt-1 text-2xl font-semibold text-zinc-900">
+            <div class="rounded-md border border-subtle bg-surface p-3">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">Replied</p>
+              <p class="mt-1 text-2xl font-semibold text-default">
                 {{ d.replied }}
               </p>
-              <p class="text-[10px] text-zinc-500">{{ d.reply_rate }}%</p>
+              <p class="text-[10px] text-muted">{{ d.reply_rate }}%</p>
             </div>
-            <div class="rounded-md border border-zinc-200 bg-white p-3">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+            <div class="rounded-md border border-subtle bg-surface p-3">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">
                 Click-through
               </p>
-              <p class="mt-1 text-2xl font-semibold text-zinc-900">
+              <p class="mt-1 text-2xl font-semibold text-default">
                 {{ d.click_through }}
               </p>
             </div>
-            <div class="rounded-md border border-zinc-200 bg-white p-3">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Failed</p>
+            <div class="rounded-md border border-subtle bg-surface p-3">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">Failed</p>
               <p class="mt-1 text-2xl font-semibold text-rose-700">
                 {{ d.failed }}
               </p>
@@ -146,12 +146,12 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
 
           <!-- Chart + failure table -->
           <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div class="rounded-md border border-zinc-200 bg-white p-4 lg:col-span-2">
-              <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <div class="rounded-md border border-subtle bg-surface p-4 lg:col-span-2">
+              <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 Daily trend
               </p>
               @if (d.daily.length === 0) {
-                <p class="py-4 text-center text-xs text-zinc-500">
+                <p class="py-4 text-center text-xs text-muted">
                   Not enough data for a trend chart yet.
                 </p>
               } @else {
@@ -187,9 +187,9 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
                     stroke-width="2"
                   />
                 </svg>
-                <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-zinc-600">
+                <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted">
                   <span class="inline-flex items-center gap-1">
-                    <span class="inline-block h-2 w-2 rounded-full bg-zinc-900"></span>
+                    <span class="inline-block h-2 w-2 rounded-full bg-accent"></span>
                     Sent
                   </span>
                   <span class="inline-flex items-center gap-1">
@@ -208,18 +208,18 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
               }
             </div>
 
-            <div class="rounded-md border border-zinc-200 bg-white p-4">
-              <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <div class="rounded-md border border-subtle bg-surface p-4">
+              <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
                 Failure breakdown
               </p>
               @if (d.failures.length === 0) {
-                <p class="py-4 text-center text-xs text-zinc-500">No failures in this range. 🎉</p>
+                <p class="py-4 text-center text-xs text-muted">No failures in this range. 🎉</p>
               } @else {
-                <ul class="divide-y divide-zinc-100">
+                <ul class="divide-y divide-subtle">
                   @for (f of d.failures; track f.bucket) {
                     <li class="flex items-center justify-between py-1.5 text-xs">
-                      <span class="text-zinc-700">{{ f.label }}</span>
-                      <span class="font-semibold text-zinc-900">
+                      <span class="text-default">{{ f.label }}</span>
+                      <span class="font-semibold text-default">
                         {{ f.count }}
                       </span>
                     </li>
@@ -230,9 +230,9 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
           </div>
 
           @if (d.used_in_campaigns > 0) {
-            <p class="text-xs text-zinc-500">
+            <p class="text-xs text-muted">
               Used in
-              <a routerLink="/user/campaigns" class="font-semibold text-zinc-900 underline"
+              <a routerLink="/user/campaigns" class="font-semibold text-default underline"
                 >{{ d.used_in_campaigns }}
                 {{ d.used_in_campaigns === 1 ? 'campaign' : 'campaigns' }}</a
               >.

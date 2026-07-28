@@ -1023,7 +1023,7 @@ export class LeadsPageComponent {
     if (score >= 90) return 'bg-red-100 text-red-800 ring-red-200';
     if (score >= 60) return 'bg-orange-100 text-orange-800 ring-orange-200';
     if (score >= 30) return 'bg-amber-100 text-amber-800 ring-amber-200';
-    return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+    return 'bg-surface-2 text-default border-subtle';
   }
 
   protected ownerLabel(assignedTo: string | null): string {

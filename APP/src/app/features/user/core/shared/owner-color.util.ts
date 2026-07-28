@@ -29,9 +29,9 @@ const PALETTE: ReadonlyArray<OwnerColor> = [
 ];
 
 const UNASSIGNED: OwnerColor = {
-  bg: 'bg-zinc-100',
-  text: 'text-zinc-600',
-  ring: 'ring-zinc-200',
+  bg: 'bg-surface-2',
+  text: 'text-muted',
+  ring: 'border-subtle',
 };
 
 export function ownerColor(userId: string | null | undefined): OwnerColor {

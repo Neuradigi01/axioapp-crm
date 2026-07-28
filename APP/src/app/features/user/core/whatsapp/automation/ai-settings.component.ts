@@ -30,19 +30,19 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, LucideAngularModule],
   template: `
-    <div class="space-y-4 rounded-md border border-zinc-200 bg-white p-4">
+    <div class="space-y-4 rounded-md border border-subtle bg-surface p-4">
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">
             AI agent settings
           </p>
-          <p class="text-[11px] text-zinc-500">
+          <p class="text-[11px] text-muted">
             Wires the per-conversation "AI Handled" toggle. Replies below the confidence threshold
             escalate to a human.
           </p>
         </div>
         @if (loading()) {
-          <span class="text-[11px] text-zinc-500">Loading…</span>
+          <span class="text-[11px] text-muted">Loading…</span>
         }
       </div>
 
@@ -52,7 +52,7 @@ import {
         </div>
       }
       @if (toast(); as msg) {
-        <div class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+        <div class="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs text-default">
           {{ msg }}
         </div>
       }
@@ -67,7 +67,7 @@ import {
       </label>
 
       <div>
-        <label class="mb-1 block text-xs font-medium text-zinc-700">
+        <label class="mb-1 block text-xs font-medium text-default">
           Confidence threshold ({{ threshold().toFixed(2) }})
         </label>
         <input
@@ -79,17 +79,17 @@ import {
           (ngModelChange)="threshold.set(Number($event))"
           class="w-full"
         />
-        <p class="mt-1 text-[10px] text-zinc-500">
+        <p class="mt-1 text-[10px] text-muted">
           Below this confidence, the AI escalates to a human. 0.6 is a conservative default; raise
           to 0.8 for very high-stakes businesses, lower to 0.4 if you trust the LLM more.
         </p>
       </div>
 
       <div>
-        <label class="mb-1 block text-xs font-medium text-zinc-700">
+        <label class="mb-1 block text-xs font-medium text-default">
           Handover keywords (one per line)
         </label>
-        <p class="mb-2 text-[10px] text-zinc-500">
+        <p class="mb-2 text-[10px] text-muted">
           When the customer's message contains any of these phrases, the AI hands off to a human
           immediately — no LLM call.
         </p>
@@ -98,15 +98,15 @@ import {
           (ngModelChange)="handoverKeywordsText.set($event)"
           rows="4"
           placeholder="talk to person&#10;agent please&#10;इंसान से बात"
-          class="w-full rounded-md border border-zinc-300 px-3 py-2 text-xs font-mono"
+          class="w-full rounded-md border border-subtle px-3 py-2 text-xs font-mono"
         ></textarea>
       </div>
 
       <div>
-        <label class="mb-1 block text-xs font-medium text-zinc-700">
+        <label class="mb-1 block text-xs font-medium text-default">
           System prompt (optional)
         </label>
-        <p class="mb-2 text-[10px] text-zinc-500">
+        <p class="mb-2 text-[10px] text-muted">
           Persona / business context prepended to every AI call. Leave blank for the built-in
           baseline (polite, concise, defers to humans on prices).
         </p>
@@ -116,9 +116,9 @@ import {
           rows="5"
           maxlength="4096"
           placeholder="You are the customer-service assistant for Sharma Furniture, a family-run furniture store in Mumbai since 1992…"
-          class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+          class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
         ></textarea>
-        <p class="mt-1 text-right text-[10px] text-zinc-400">{{ systemPrompt().length }}/4096</p>
+        <p class="mt-1 text-right text-[10px] text-faint">{{ systemPrompt().length }}/4096</p>
       </div>
 
       <div class="flex justify-end">
@@ -126,7 +126,7 @@ import {
           type="button"
           (click)="save()"
           [disabled]="saving() || loading()"
-          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
         >
           {{ saving() ? 'Saving…' : 'Save AI settings' }}
         </button>

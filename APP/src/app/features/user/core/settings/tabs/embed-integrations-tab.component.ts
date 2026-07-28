@@ -200,7 +200,7 @@ export class EmbedIntegrationsTabComponent {
     if (key.revoked_at) {
       return {
         label: 'Revoked',
-        cls: 'bg-zinc-100 text-zinc-600 ring-zinc-200',
+        cls: 'bg-surface-2 text-muted border-subtle',
       };
     }
     return {

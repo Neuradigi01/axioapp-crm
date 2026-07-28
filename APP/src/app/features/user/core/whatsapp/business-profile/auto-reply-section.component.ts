@@ -43,16 +43,16 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, LucideAngularModule],
   template: `
-    <div class="rounded-md border border-zinc-200 bg-white p-4">
+    <div class="rounded-md border border-subtle bg-surface p-4">
       <div class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Auto-replies</p>
-          <p class="text-[11px] text-zinc-500">
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">Auto-replies</p>
+          <p class="text-[11px] text-muted">
             Fired on inbound messages. Cooldown: one per contact per type per 24 hours.
           </p>
         </div>
         @if (loading()) {
-          <span class="text-[11px] text-zinc-500">Loading…</span>
+          <span class="text-[11px] text-muted">Loading…</span>
         }
       </div>
 
@@ -66,16 +66,16 @@ import {
 
       @if (toast(); as msg) {
         <div
-          class="mb-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700"
+          class="mb-3 rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs text-default"
         >
           {{ msg }}
         </div>
       }
 
       <!-- Greeting card -->
-      <div class="mb-4 rounded-md border border-zinc-200 p-3">
+      <div class="mb-4 rounded-md border border-subtle p-3">
         <div class="mb-2 flex items-center justify-between">
-          <label class="flex items-center gap-2 text-sm font-medium text-zinc-800">
+          <label class="flex items-center gap-2 text-sm font-medium text-default">
             <input
               type="checkbox"
               [checked]="greetingEnabled()"
@@ -83,7 +83,7 @@ import {
             />
             Greeting (first-time contact)
           </label>
-          <p class="text-[10px] text-zinc-500">Sent once per contact per 24 hr.</p>
+          <p class="text-[10px] text-muted">Sent once per contact per 24 hr.</p>
         </div>
         <textarea
           [ngModel]="greetingMessage()"
@@ -91,54 +91,54 @@ import {
           rows="2"
           maxlength="4096"
           placeholder="Hello {{ '{{contact.first_name}}' }}, welcome to {{ '{{org.name}}' }}!"
-          class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+          class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
         ></textarea>
         <div class="mt-1 flex flex-wrap gap-1">
           <button
             type="button"
             (click)="insertGreetingVar('contact.first_name')"
-            class="rounded bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-700 hover:bg-zinc-200"
+            class="rounded bg-surface-2 px-2 py-0.5 text-[10px] text-default hover:bg-surface-2"
           >
             + contact.first_name
           </button>
           <button
             type="button"
             (click)="insertGreetingVar('contact.full_name')"
-            class="rounded bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-700 hover:bg-zinc-200"
+            class="rounded bg-surface-2 px-2 py-0.5 text-[10px] text-default hover:bg-surface-2"
           >
             + contact.full_name
           </button>
           <button
             type="button"
             (click)="insertGreetingVar('org.name')"
-            class="rounded bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-700 hover:bg-zinc-200"
+            class="rounded bg-surface-2 px-2 py-0.5 text-[10px] text-default hover:bg-surface-2"
           >
             + org.name
           </button>
         </div>
-        <label class="mb-1 mt-3 block text-[11px] font-medium text-zinc-600">
+        <label class="mb-1 mt-3 block text-[11px] font-medium text-muted">
           Fallback template (out-of-session)
         </label>
         <select
           [ngModel]="greetingTemplateId()"
           (ngModelChange)="greetingTemplateId.set($event || null)"
-          class="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-xs"
+          class="w-full rounded-md border border-subtle px-2 py-1.5 text-xs"
         >
           <option [ngValue]="null">— None —</option>
           @for (t of approvedTemplates(); track t.id) {
             <option [ngValue]="t.id">{{ t.name }} ({{ t.language }})</option>
           }
         </select>
-        <p class="mt-1 text-[10px] text-zinc-500">
+        <p class="mt-1 text-[10px] text-muted">
           Used when the contact is outside their 24-hour session window. Only approved templates
           appear.
         </p>
       </div>
 
       <!-- Away card -->
-      <div class="mb-4 rounded-md border border-zinc-200 p-3">
+      <div class="mb-4 rounded-md border border-subtle p-3">
         <div class="mb-2 flex items-center justify-between">
-          <label class="flex items-center gap-2 text-sm font-medium text-zinc-800">
+          <label class="flex items-center gap-2 text-sm font-medium text-default">
             <input
               type="checkbox"
               [checked]="awayEnabled()"
@@ -146,7 +146,7 @@ import {
             />
             Out-of-hours auto-reply
           </label>
-          <p class="text-[10px] text-zinc-500">Fires outside business hours (set above).</p>
+          <p class="text-[10px] text-muted">Fires outside business hours (set above).</p>
         </div>
         <textarea
           [ngModel]="awayMessage()"
@@ -154,31 +154,31 @@ import {
           rows="2"
           maxlength="4096"
           placeholder="Thanks {{ '{{contact.first_name}}' }} — we're closed right now and will reply during business hours."
-          class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+          class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
         ></textarea>
         <div class="mt-1 flex flex-wrap gap-1">
           <button
             type="button"
             (click)="insertAwayVar('contact.first_name')"
-            class="rounded bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-700 hover:bg-zinc-200"
+            class="rounded bg-surface-2 px-2 py-0.5 text-[10px] text-default hover:bg-surface-2"
           >
             + contact.first_name
           </button>
           <button
             type="button"
             (click)="insertAwayVar('org.name')"
-            class="rounded bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-700 hover:bg-zinc-200"
+            class="rounded bg-surface-2 px-2 py-0.5 text-[10px] text-default hover:bg-surface-2"
           >
             + org.name
           </button>
         </div>
-        <label class="mb-1 mt-3 block text-[11px] font-medium text-zinc-600">
+        <label class="mb-1 mt-3 block text-[11px] font-medium text-muted">
           Fallback template (out-of-session)
         </label>
         <select
           [ngModel]="awayTemplateId()"
           (ngModelChange)="awayTemplateId.set($event || null)"
-          class="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-xs"
+          class="w-full rounded-md border border-subtle px-2 py-1.5 text-xs"
         >
           <option [ngValue]="null">— None —</option>
           @for (t of approvedTemplates(); track t.id) {
@@ -192,7 +192,7 @@ import {
           type="button"
           (click)="save()"
           [disabled]="saving() || loading()"
-          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
         >
           {{ saving() ? 'Saving…' : 'Save auto-replies' }}
         </button>

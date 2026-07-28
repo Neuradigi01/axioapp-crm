@@ -36,15 +36,15 @@ type EditingState = LeadScoringRule | undefined | null;
     <div class="mx-auto max-w-5xl p-6 space-y-5">
       <header class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 class="text-lg font-semibold text-zinc-900">Lead scoring rules</h1>
-          <p class="mt-0.5 text-xs text-zinc-500">
+          <h1 class="text-lg font-semibold text-default">Lead scoring rules</h1>
+          <p class="mt-0.5 text-xs text-muted">
             Points add up across active rules; the final score is capped at 100 per lead.
           </p>
-          <p class="mt-1 text-xs text-zinc-500">
+          <p class="mt-1 text-xs text-muted">
             Also see:
             <a
               routerLink="/user/settings/lead-routing"
-              class="text-zinc-900 underline hover:text-zinc-700"
+              class="text-default underline hover:text-default"
               >Lead routing</a
             >
             &mdash; how new leads are assigned to reps.
@@ -55,7 +55,7 @@ type EditingState = LeadScoringRule | undefined | null;
             type="button"
             (click)="onRecompute()"
             [disabled]="recomputing()"
-            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             @if (recomputing()) {
               <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
@@ -68,7 +68,7 @@ type EditingState = LeadScoringRule | undefined | null;
           <button
             type="button"
             (click)="openCreate()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent"
           >
             <lucide-icon name="plus" class="h-4 w-4" />
             Add rule
@@ -89,9 +89,9 @@ type EditingState = LeadScoringRule | undefined | null;
         </p>
       }
 
-      <div class="overflow-hidden rounded-lg ring-1 ring-zinc-200 bg-white">
-        <table class="min-w-full divide-y divide-zinc-200">
-          <thead class="bg-zinc-50 text-xs uppercase tracking-wider text-zinc-500">
+      <div class="overflow-hidden rounded-lg ring-1 border-subtle bg-surface">
+        <table class="min-w-full divide-y divide-subtle">
+          <thead class="bg-surface-2 text-xs uppercase tracking-wider text-muted">
             <tr>
               <th class="px-4 py-2.5 text-left font-medium">Name</th>
               <th class="px-4 py-2.5 text-left font-medium">Condition</th>
@@ -102,21 +102,21 @@ type EditingState = LeadScoringRule | undefined | null;
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-zinc-100 text-sm">
+          <tbody class="divide-y divide-subtle text-sm">
             @if (loading()) {
               <tr>
-                <td colspan="5" class="px-4 py-6 text-center text-xs text-zinc-500">Loading…</td>
+                <td colspan="5" class="px-4 py-6 text-center text-xs text-muted">Loading…</td>
               </tr>
             } @else {
               @for (rule of rules(); track rule.id) {
                 <tr>
-                  <td class="px-4 py-2.5 align-top font-medium text-zinc-900">
+                  <td class="px-4 py-2.5 align-top font-medium text-default">
                     {{ rule.name }}
                   </td>
-                  <td class="px-4 py-2.5 align-top text-xs text-zinc-600">
+                  <td class="px-4 py-2.5 align-top text-xs text-muted">
                     {{ humanizeCondition(rule.condition) }}
                   </td>
-                  <td class="px-4 py-2.5 align-top text-right tabular-nums text-zinc-900">
+                  <td class="px-4 py-2.5 align-top text-right tabular-nums text-default">
                     {{ rule.points > 0 ? '+' + rule.points : rule.points }}
                   </td>
                   <td class="px-4 py-2.5 align-top text-center">
@@ -128,7 +128,7 @@ type EditingState = LeadScoringRule | undefined | null;
                       </span>
                     } @else {
                       <span
-                        class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200"
+                        class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-default ring-1 border-subtle"
                       >
                         Inactive
                       </span>
@@ -139,7 +139,7 @@ type EditingState = LeadScoringRule | undefined | null;
                       <button
                         type="button"
                         (click)="openEdit(rule)"
-                        class="inline-flex items-center rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+                        class="inline-flex items-center rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-default"
                         aria-label="Edit rule"
                       >
                         <lucide-icon name="pencil" class="h-4 w-4" />
@@ -157,7 +157,7 @@ type EditingState = LeadScoringRule | undefined | null;
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="5" class="px-4 py-10 text-center text-xs text-zinc-500">
+                  <td colspan="5" class="px-4 py-10 text-center text-xs text-muted">
                     No scoring rules yet. Add one to start scoring leads automatically.
                   </td>
                 </tr>
@@ -171,59 +171,59 @@ type EditingState = LeadScoringRule | undefined | null;
     <!-- Edit / create rule modal. -->
     @if (editing() !== null) {
       <div
-        class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/40 px-4"
+        class="fixed inset-0 z-40 flex items-center justify-center bg-accent/40 px-4"
         role="dialog"
         aria-modal="true"
       >
-        <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl ring-1 ring-zinc-200">
-          <h2 class="text-base font-semibold text-zinc-900">
+        <div class="w-full max-w-md rounded-lg bg-surface p-5 shadow-xl ring-1 border-subtle">
+          <h2 class="text-base font-semibold text-default">
             {{ editing() ? 'Edit rule' : 'New rule' }}
           </h2>
           <div class="mt-4 space-y-3">
             <label class="block">
-              <span class="text-xs font-medium text-zinc-700">Name</span>
+              <span class="text-xs font-medium text-default">Name</span>
               <input
                 type="text"
                 maxlength="120"
                 [(ngModel)]="formName"
                 placeholder="e.g. Qualified + Mumbai"
-                class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-faint shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </label>
             <label class="block">
-              <span class="text-xs font-medium text-zinc-700">Points</span>
+              <span class="text-xs font-medium text-default">Points</span>
               <input
                 type="number"
                 min="-100"
                 max="100"
                 step="1"
                 [(ngModel)]="formPoints"
-                class="mt-1 block w-32 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 tabular-nums shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                class="mt-1 block w-32 rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default tabular-nums shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
-              <span class="ml-2 text-xs text-zinc-500">Range: -100 to 100</span>
+              <span class="ml-2 text-xs text-muted">Range: -100 to 100</span>
             </label>
             <div>
-              <span class="text-xs font-medium text-zinc-700">Condition</span>
+              <span class="text-xs font-medium text-default">Condition</span>
               <div class="mt-1 flex items-center gap-2">
                 <span
-                  class="flex-1 truncate rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700"
+                  class="flex-1 truncate rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs text-default"
                 >
                   {{ humanizeCondition(formCondition()) }}
                 </span>
                 <button
                   type="button"
                   (click)="openConditionPicker()"
-                  class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                  class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
                 >
                   <lucide-icon name="sliders-horizontal" class="h-3.5 w-3.5" />
                   Edit
                 </button>
               </div>
             </div>
-            <label class="flex items-center gap-2 text-xs text-zinc-700">
+            <label class="flex items-center gap-2 text-xs text-default">
               <input
                 type="checkbox"
-                class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                class="h-4 w-4 rounded border-subtle text-default focus:ring-accent"
                 [(ngModel)]="formActive"
               />
               Active
@@ -239,7 +239,7 @@ type EditingState = LeadScoringRule | undefined | null;
               type="button"
               (click)="closeEditor()"
               [disabled]="submitting()"
-              class="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+              class="rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancel
             </button>
@@ -247,7 +247,7 @@ type EditingState = LeadScoringRule | undefined | null;
               type="button"
               (click)="submitEditor()"
               [disabled]="submitting()"
-              class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+              class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
               @if (submitting()) {
                 <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />

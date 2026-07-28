@@ -15,7 +15,7 @@ interface BadgeDescriptor {
 const STATUS_BADGES: Record<WorkflowStatus, BadgeDescriptor> = {
   draft: {
     label: 'Draft',
-    classes: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+    classes: 'bg-surface-2 text-default border-subtle',
   },
   active: {
     label: 'Active',
@@ -27,7 +27,7 @@ const STATUS_BADGES: Record<WorkflowStatus, BadgeDescriptor> = {
   },
   archived: {
     label: 'Archived',
-    classes: 'bg-zinc-100 text-zinc-500 ring-zinc-300',
+    classes: 'bg-surface-2 text-muted border-subtle',
   },
 };
 

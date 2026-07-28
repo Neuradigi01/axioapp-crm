@@ -1,16 +1,16 @@
 <div class="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 md:p-6">
   <div
-    class="w-full max-w-md rounded-2xl border border-subtle bg-surface p-5 md:p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800"
+    class="w-full max-w-md rounded-2xl border border-subtle bg-surface p-5 md:p-8 text-center shadow-sm dark:border-subtle dark:bg-surface-2"
   >
     @switch (status()) {
       @case ('polling') {
         <div
           class="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-500/20 border-t-blue-600"
         ></div>
-        <h1 class="mt-4 text-lg font-semibold text-default dark:text-slate-100">
+        <h1 class="mt-4 text-lg font-semibold text-default dark:text-default">
           Confirming your payment…
         </h1>
-        <p class="mt-2 text-sm text-muted dark:text-slate-400">
+        <p class="mt-2 text-sm text-muted dark:text-faint">
           Hang tight — this usually takes a few seconds.
         </p>
       }
@@ -21,10 +21,10 @@
         >
           ✓
         </div>
-        <h1 class="mt-4 text-lg font-semibold text-default dark:text-slate-100">
+        <h1 class="mt-4 text-lg font-semibold text-default dark:text-default">
           Upgrade complete
         </h1>
-        <p class="mt-2 text-sm text-muted dark:text-slate-400">
+        <p class="mt-2 text-sm text-muted dark:text-faint">
           Taking you to your billing settings…
         </p>
       }
@@ -35,10 +35,10 @@
         >
           ⏱
         </div>
-        <h1 class="mt-4 text-lg font-semibold text-default dark:text-slate-100">
+        <h1 class="mt-4 text-lg font-semibold text-default dark:text-default">
           Payment received — confirmation is taking longer than expected
         </h1>
-        <p class="mt-2 text-sm text-muted dark:text-slate-400">
+        <p class="mt-2 text-sm text-muted dark:text-faint">
           Your payment was accepted by Stripe but our records haven't caught up yet. Refresh this
           page in a minute, or open Billing to check the current status.
         </p>

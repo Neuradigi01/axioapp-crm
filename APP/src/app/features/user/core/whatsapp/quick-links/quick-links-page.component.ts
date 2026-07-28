@@ -29,8 +29,8 @@ type Mode = 'list' | 'edit';
     <div class="space-y-4 p-4">
       <header class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 class="text-xl font-semibold text-zinc-900">Quick contact links</h1>
-          <p class="text-xs text-zinc-500">
+          <h1 class="text-xl font-semibold text-default">Quick contact links</h1>
+          <p class="text-xs text-muted">
             Print on billboards, receipts, packaging. Each scan attributes the resulting
             conversation to the link.
           </p>
@@ -39,7 +39,7 @@ type Mode = 'list' | 'edit';
           <button
             type="button"
             (click)="openCreate()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent"
           >
             <lucide-icon name="plus" class="h-3.5 w-3.5" />
             New link
@@ -48,7 +48,7 @@ type Mode = 'list' | 'edit';
           <button
             type="button"
             (click)="backToList()"
-            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs text-default hover:bg-surface-2"
           >
             <lucide-icon name="arrow-left" class="h-3.5 w-3.5" />
             Back
@@ -62,16 +62,16 @@ type Mode = 'list' | 'edit';
         </p>
       }
       @if (toast(); as msg) {
-        <p class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+        <p class="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs text-default">
           {{ msg }}
         </p>
       }
 
       @switch (mode()) {
         @case ('list') {
-          <div class="overflow-hidden rounded-md border border-zinc-200 bg-white">
+          <div class="overflow-hidden rounded-md border border-subtle bg-surface">
             <table class="w-full text-xs">
-              <thead class="bg-zinc-50 text-zinc-500">
+              <thead class="bg-surface-2 text-muted">
                 <tr>
                   <th class="px-3 py-2 text-left font-medium">Label</th>
                   <th class="px-3 py-2 text-left font-medium">Slug</th>
@@ -82,18 +82,18 @@ type Mode = 'list' | 'edit';
                   <th class="px-3 py-2 text-right font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-zinc-100">
+              <tbody class="divide-y divide-subtle">
                 @for (row of page().items; track row.id) {
                   <tr>
-                    <td class="px-3 py-2 font-medium text-zinc-900">
+                    <td class="px-3 py-2 font-medium text-default">
                       {{ row.label }}
                     </td>
-                    <td class="px-3 py-2 font-mono text-[11px] text-zinc-600">
+                    <td class="px-3 py-2 font-mono text-[11px] text-muted">
                       {{ row.code }}
                     </td>
-                    <td class="px-3 py-2 text-zinc-700">+{{ row.phone_number }}</td>
-                    <td class="px-3 py-2 text-right text-zinc-700">{{ row.click_count }}</td>
-                    <td class="px-3 py-2 text-right text-zinc-700">{{ row.scan_count }}</td>
+                    <td class="px-3 py-2 text-default">+{{ row.phone_number }}</td>
+                    <td class="px-3 py-2 text-right text-default">{{ row.click_count }}</td>
+                    <td class="px-3 py-2 text-right text-default">{{ row.scan_count }}</td>
                     <td class="px-3 py-2 text-right text-emerald-700">
                       {{ row.attributed_conversation_count }}
                     </td>
@@ -102,14 +102,14 @@ type Mode = 'list' | 'edit';
                         <button
                           type="button"
                           (click)="onEdit(row)"
-                          class="rounded border border-zinc-300 bg-white px-2 py-1 text-[11px] text-zinc-700 hover:bg-zinc-50"
+                          class="rounded border border-subtle bg-surface px-2 py-1 text-[11px] text-default hover:bg-surface-2"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           (click)="onDelete(row)"
-                          class="rounded border border-rose-300 bg-white px-2 py-1 text-[11px] text-rose-700 hover:bg-rose-50"
+                          class="rounded border border-rose-300 bg-surface px-2 py-1 text-[11px] text-rose-700 hover:bg-rose-50"
                         >
                           Delete
                         </button>
@@ -118,7 +118,7 @@ type Mode = 'list' | 'edit';
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="7" class="px-3 py-6 text-center text-zinc-500">
+                    <td colspan="7" class="px-3 py-6 text-center text-muted">
                       No links yet. Click <em>New link</em> to create the first one.
                     </td>
                   </tr>

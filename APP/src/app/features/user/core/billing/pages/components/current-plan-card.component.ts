@@ -38,7 +38,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
   archived: {
     label: 'Archived',
     pillClasses:
-      'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600',
+      'bg-surface-2 text-default border-subtle dark:bg-surface dark:text-muted dark:ring-slate-600',
   },
 };
 
@@ -55,13 +55,13 @@ const STATUS_TONES: Record<string, StatusTone> = {
   imports: [LucideAngularModule],
   template: `
     <section
-      class="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
+      class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm dark:border-subtle dark:bg-accent"
     >
       <div class="flex flex-wrap items-start justify-between gap-4 p-6">
         <div class="min-w-0">
           <div class="flex items-center gap-2">
             <p
-              class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+              class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint"
             >
               Current plan
             </p>
@@ -72,20 +72,20 @@ const STATUS_TONES: Record<string, StatusTone> = {
               {{ statusTone().label }}
             </span>
           </div>
-          <h2 class="mt-2 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-slate-100">
+          <h2 class="mt-2 text-2xl font-semibold tracking-tight text-default dark:text-default">
             {{ subscription().plan.name }}
           </h2>
           @if (priceHeadline(); as price) {
             <div class="mt-2 flex items-baseline gap-1.5">
-              <span class="text-3xl font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
+              <span class="text-3xl font-semibold tabular-nums text-default dark:text-default">
                 ₹{{ formatINR(price.amount) }}
               </span>
-              <span class="text-sm text-zinc-500 dark:text-slate-400">
+              <span class="text-sm text-muted dark:text-faint">
                 {{ '/' + price.cycleLabel }}
               </span>
             </div>
           }
-          <p class="mt-2 text-sm text-zinc-600 dark:text-slate-400">
+          <p class="mt-2 text-sm text-muted dark:text-faint">
             {{ contextLine() }}
           </p>
         </div>
@@ -93,7 +93,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
         <button
           type="button"
           (click)="onUpgrade()"
-          class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+          class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent dark:bg-surface dark:text-default dark:hover:bg-surface-2"
         >
           Upgrade plan
           <lucide-icon name="arrow-right" size="14" aria-hidden="true"></lucide-icon>
@@ -101,16 +101,16 @@ const STATUS_TONES: Record<string, StatusTone> = {
       </div>
 
       <dl
-        class="grid gap-px border-t border-zinc-200 bg-zinc-200 sm:grid-cols-2 dark:border-slate-700 dark:bg-slate-700"
+        class="grid gap-px border-t border-subtle bg-surface-2 sm:grid-cols-2 dark:border-subtle dark:bg-surface"
       >
         @for (row of detailRows(); track row.label) {
-          <div class="bg-zinc-50 px-6 py-4 dark:bg-slate-800/60">
+          <div class="bg-surface-2 px-6 py-4 dark:bg-accent/60">
             <dt
-              class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400"
+              class="text-xs font-medium uppercase tracking-wide text-muted dark:text-faint"
             >
               {{ row.label }}
             </dt>
-            <dd class="mt-1 text-sm font-medium tabular-nums text-zinc-900 dark:text-slate-100">
+            <dd class="mt-1 text-sm font-medium tabular-nums text-default dark:text-default">
               {{ row.value }}
             </dd>
           </div>

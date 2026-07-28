@@ -175,7 +175,7 @@ export class PipelineBoardComponent {
   protected stagePillClass(stage: PipelineStage): string {
     if (stage.is_won) return 'bg-emerald-100 text-emerald-700 ring-emerald-200';
     if (stage.is_lost) return 'bg-red-100 text-red-700 ring-red-200';
-    return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+    return 'bg-surface-2 text-default border-subtle';
   }
 
   private stageKeyFromDropListId(id: string): string {

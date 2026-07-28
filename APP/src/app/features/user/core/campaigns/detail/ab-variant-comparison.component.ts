@@ -54,7 +54,7 @@ interface AbComparisonReport {
   imports: [CommonModule, LucideAngularModule],
   template: `
     @if (loading()) {
-      <p class="text-[11px] text-zinc-500">Loading A/B comparison…</p>
+      <p class="text-[11px] text-muted">Loading A/B comparison…</p>
     }
     @if (error(); as err) {
       <p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
@@ -63,13 +63,13 @@ interface AbComparisonReport {
     }
     @if (report(); as r) {
       @if (r.is_ab_test && r.a && r.b) {
-        <div class="rounded-md border border-zinc-200 bg-white p-4">
+        <div class="rounded-md border border-subtle bg-surface p-4">
           <div class="mb-3 flex items-center justify-between">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              <p class="text-xs font-semibold uppercase tracking-wide text-muted">
                 A/B comparison
               </p>
-              <p class="text-[11px] text-zinc-500">
+              <p class="text-[11px] text-muted">
                 Winner metric: {{ humanMetric(r.winner_metric) }}
               </p>
             </div>
@@ -91,73 +91,73 @@ interface AbComparisonReport {
           </div>
 
           <table class="w-full text-xs">
-            <thead class="text-zinc-500">
-              <tr class="border-b border-zinc-200">
+            <thead class="text-muted">
+              <tr class="border-b border-subtle">
                 <th class="py-1 text-left font-medium">Metric</th>
                 <th class="py-1 text-right font-medium">Variant A</th>
                 <th class="py-1 text-right font-medium">Variant B</th>
               </tr>
             </thead>
             <tbody>
-              <tr class="border-b border-zinc-100">
-                <td class="py-1.5 text-zinc-700">Template</td>
-                <td class="py-1.5 text-right text-zinc-700">
+              <tr class="border-b border-subtle">
+                <td class="py-1.5 text-default">Template</td>
+                <td class="py-1.5 text-right text-default">
                   {{ r.a.template_name || '—' }}
                 </td>
-                <td class="py-1.5 text-right text-zinc-700">
+                <td class="py-1.5 text-right text-default">
                   {{ r.b.template_name || '—' }}
                 </td>
               </tr>
-              <tr class="border-b border-zinc-100">
-                <td class="py-1.5 text-zinc-700">Sent</td>
-                <td class="py-1.5 text-right text-zinc-700">{{ r.a.sent }}</td>
-                <td class="py-1.5 text-right text-zinc-700">{{ r.b.sent }}</td>
+              <tr class="border-b border-subtle">
+                <td class="py-1.5 text-default">Sent</td>
+                <td class="py-1.5 text-right text-default">{{ r.a.sent }}</td>
+                <td class="py-1.5 text-right text-default">{{ r.b.sent }}</td>
               </tr>
-              <tr class="border-b border-zinc-100">
-                <td class="py-1.5 text-zinc-700">Delivered</td>
-                <td class="py-1.5 text-right text-zinc-700">{{ r.a.delivered }}</td>
-                <td class="py-1.5 text-right text-zinc-700">{{ r.b.delivered }}</td>
+              <tr class="border-b border-subtle">
+                <td class="py-1.5 text-default">Delivered</td>
+                <td class="py-1.5 text-right text-default">{{ r.a.delivered }}</td>
+                <td class="py-1.5 text-right text-default">{{ r.b.delivered }}</td>
               </tr>
-              <tr class="border-b border-zinc-100">
-                <td class="py-1.5 text-zinc-700">Read</td>
+              <tr class="border-b border-subtle">
+                <td class="py-1.5 text-default">Read</td>
                 <td
-                  class="py-1.5 text-right text-zinc-700"
+                  class="py-1.5 text-right text-default"
                   [class.font-semibold]="r.winner_metric === 'read_rate'"
                 >
                   {{ r.a.read }} ({{ percent(r.a.read_rate) }}%)
                 </td>
                 <td
-                  class="py-1.5 text-right text-zinc-700"
+                  class="py-1.5 text-right text-default"
                   [class.font-semibold]="r.winner_metric === 'read_rate'"
                 >
                   {{ r.b.read }} ({{ percent(r.b.read_rate) }}%)
                 </td>
               </tr>
-              <tr class="border-b border-zinc-100">
-                <td class="py-1.5 text-zinc-700">Replied</td>
+              <tr class="border-b border-subtle">
+                <td class="py-1.5 text-default">Replied</td>
                 <td
-                  class="py-1.5 text-right text-zinc-700"
+                  class="py-1.5 text-right text-default"
                   [class.font-semibold]="r.winner_metric === 'reply_rate'"
                 >
                   {{ r.a.replied }} ({{ percent(r.a.reply_rate) }}%)
                 </td>
                 <td
-                  class="py-1.5 text-right text-zinc-700"
+                  class="py-1.5 text-right text-default"
                   [class.font-semibold]="r.winner_metric === 'reply_rate'"
                 >
                   {{ r.b.replied }} ({{ percent(r.b.reply_rate) }}%)
                 </td>
               </tr>
               <tr>
-                <td class="py-1.5 text-zinc-700">Failed</td>
-                <td class="py-1.5 text-right text-zinc-700">{{ r.a.failed }}</td>
-                <td class="py-1.5 text-right text-zinc-700">{{ r.b.failed }}</td>
+                <td class="py-1.5 text-default">Failed</td>
+                <td class="py-1.5 text-right text-default">{{ r.a.failed }}</td>
+                <td class="py-1.5 text-right text-default">{{ r.b.failed }}</td>
               </tr>
             </tbody>
           </table>
 
           @if (r.winning_variant && r.winner_decided_at) {
-            <p class="mt-3 text-[11px] text-zinc-500">
+            <p class="mt-3 text-[11px] text-muted">
               Winner decided at {{ formatDate(r.winner_decided_at) }}. Remaining unsent recipients
               (if any) receive the winning template automatically.
             </p>

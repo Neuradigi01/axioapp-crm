@@ -32,8 +32,8 @@ import { LeadRoutingStrategy, LeadsApiService } from '../leads/leads-api.service
   template: `
     <div class="mx-auto max-w-3xl space-y-5 p-6">
       <header>
-        <h1 class="text-lg font-semibold text-zinc-900">Lead routing</h1>
-        <p class="mt-0.5 text-xs text-zinc-500">
+        <h1 class="text-lg font-semibold text-default">Lead routing</h1>
+        <p class="mt-0.5 text-xs text-muted">
           How new leads are assigned to reps when they land — from manual entry, the embed widget,
           ad integrations, or bulk imports.
         </p>
@@ -53,33 +53,33 @@ import { LeadRoutingStrategy, LeadsApiService } from '../leads/leads-api.service
         </p>
       }
 
-      <section class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-        <h2 class="text-sm font-semibold text-zinc-900">Assignment strategy</h2>
-        <p class="mt-1 text-xs text-zinc-500">
+      <section class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
+        <h2 class="text-sm font-semibold text-default">Assignment strategy</h2>
+        <p class="mt-1 text-xs text-muted">
           Picks the rep for each freshly-ingested lead. Applies to every ingest path (manual,
           widget, Google Ads, Meta Ads, bulk import).
         </p>
 
         <label class="mt-3 block">
-          <span class="text-xs font-medium text-zinc-700">Strategy</span>
+          <span class="text-xs font-medium text-default">Strategy</span>
           <select
             [ngModel]="strategy()"
             (ngModelChange)="strategy.set($event)"
             [disabled]="loading() || submitting()"
-            class="mt-1 block w-full max-w-xs rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full max-w-xs rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           >
             <option value="round_robin">Round-robin (rotate through eligible reps)</option>
           </select>
         </label>
 
-        <p class="mt-3 text-xs text-zinc-500">
-          <strong class="text-zinc-700">Eligible reps</strong> are users whose role holds the
-          <code class="rounded bg-zinc-100 px-1 py-0.5 font-mono">leads.own</code> permission. Grant
+        <p class="mt-3 text-xs text-muted">
+          <strong class="text-default">Eligible reps</strong> are users whose role holds the
+          <code class="rounded bg-surface-2 px-1 py-0.5 font-mono">leads.own</code> permission. Grant
           or revoke that permission on the
           <a
             routerLink="/user/settings"
             [queryParams]="{ tab: 'roles' }"
-            class="text-zinc-900 underline hover:text-zinc-700"
+            class="text-default underline hover:text-default"
             >Roles page</a
           >. If no user in your org holds it, new leads land unassigned and show under the
           "Unassigned" filter on the kanban.
@@ -90,7 +90,7 @@ import { LeadRoutingStrategy, LeadsApiService } from '../leads/leads-api.service
             type="button"
             (click)="onSave()"
             [disabled]="loading() || submitting()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
           >
             @if (submitting()) {
               <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />
@@ -102,13 +102,13 @@ import { LeadRoutingStrategy, LeadsApiService } from '../leads/leads-api.service
         </div>
       </section>
 
-      <section class="rounded-lg bg-white p-5 shadow-sm ring-1 ring-zinc-200">
-        <h2 class="text-sm font-semibold text-zinc-900">Related settings</h2>
-        <ul class="mt-2 space-y-1 text-xs text-zinc-600">
+      <section class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
+        <h2 class="text-sm font-semibold text-default">Related settings</h2>
+        <ul class="mt-2 space-y-1 text-xs text-muted">
           <li>
             <a
               routerLink="/user/settings/lead-scoring"
-              class="inline-flex items-center gap-1 text-zinc-900 underline hover:text-zinc-700"
+              class="inline-flex items-center gap-1 text-default underline hover:text-default"
             >
               <lucide-icon name="target" class="h-3.5 w-3.5" />
               Lead scoring rules
@@ -119,12 +119,12 @@ import { LeadRoutingStrategy, LeadsApiService } from '../leads/leads-api.service
             <a
               routerLink="/user/settings"
               [queryParams]="{ tab: 'roles' }"
-              class="inline-flex items-center gap-1 text-zinc-900 underline hover:text-zinc-700"
+              class="inline-flex items-center gap-1 text-default underline hover:text-default"
             >
               <lucide-icon name="users" class="h-3.5 w-3.5" />
               Roles &amp; permissions
             </a>
-            &mdash; grant <code class="rounded bg-zinc-100 px-1 py-0.5 font-mono">leads.own</code>
+            &mdash; grant <code class="rounded bg-surface-2 px-1 py-0.5 font-mono">leads.own</code>
             to reps who should receive assignments.
           </li>
         </ul>

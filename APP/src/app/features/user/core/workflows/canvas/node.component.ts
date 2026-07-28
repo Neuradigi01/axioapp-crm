@@ -76,8 +76,8 @@ export const NODE_HEADER = 30;
       <svg:rect [attr.width]="WIDTH" height="1" [attr.y]="HEADER" class="fill-zinc-200" />
 
       <svg:foreignObject [attr.width]="WIDTH" [attr.height]="HEADER" x="0" y="0">
-        <div class="flex items-center gap-2 px-3 h-full text-xs font-semibold text-zinc-700">
-          <lucide-icon [name]="icon()" class="w-3.5 h-3.5 text-zinc-600"></lucide-icon>
+        <div class="flex items-center gap-2 px-3 h-full text-xs font-semibold text-default">
+          <lucide-icon [name]="icon()" class="w-3.5 h-3.5 text-muted"></lucide-icon>
           <span class="truncate flex-1">{{ displayName() }}</span>
           @if (validationFailed()) {
             <span
@@ -94,7 +94,7 @@ export const NODE_HEADER = 30;
         x="0"
         [attr.y]="HEADER + 4"
       >
-        <div class="px-3 text-[11px] leading-snug text-zinc-500">
+        <div class="px-3 text-[11px] leading-snug text-muted">
           {{ description() }}
         </div>
       </svg:foreignObject>
@@ -102,7 +102,7 @@ export const NODE_HEADER = 30;
       <svg:foreignObject [attr.x]="WIDTH - 26" y="6" width="20" height="20">
         <button
           type="button"
-          class="w-5 h-5 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
+          class="w-5 h-5 flex items-center justify-center rounded text-faint hover:text-default hover:bg-surface-2"
           (click)="onMenuClick($event)"
           (mousedown)="$event.stopPropagation()"
           aria-label="Node actions"
@@ -210,7 +210,7 @@ export class WorkflowNodeComponent {
 
     return type.description;
   });
-  readonly bodyClass = computed(() => this.nodeType()?.colorClass ?? 'bg-zinc-50 border-zinc-300');
+  readonly bodyClass = computed(() => this.nodeType()?.colorClass ?? 'bg-surface-2 border-subtle');
   readonly transform = computed(() => {
     const pos = this.node().position ?? { x: 0, y: 0 };
     return `translate(${pos.x}, ${pos.y})`;

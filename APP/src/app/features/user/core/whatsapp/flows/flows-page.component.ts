@@ -36,8 +36,8 @@ type Mode = 'list' | 'pick' | 'build';
     <div class="space-y-4 p-4">
       <header class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 class="text-xl font-semibold text-zinc-900">WhatsApp Flows</h1>
-          <p class="text-xs text-zinc-500">
+          <h1 class="text-xl font-semibold text-default">WhatsApp Flows</h1>
+          <p class="text-xs text-muted">
             In-chat forms (booking, lead capture, feedback) customers fill inside WhatsApp.
           </p>
         </div>
@@ -45,7 +45,7 @@ type Mode = 'list' | 'pick' | 'build';
           <button
             type="button"
             (click)="openPicker()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent"
           >
             <lucide-icon name="plus" class="h-3.5 w-3.5" />
             New flow
@@ -54,7 +54,7 @@ type Mode = 'list' | 'pick' | 'build';
           <button
             type="button"
             (click)="backToList()"
-            class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs text-default hover:bg-surface-2"
           >
             <lucide-icon name="arrow-left" class="h-3.5 w-3.5" />
             Back
@@ -68,7 +68,7 @@ type Mode = 'list' | 'pick' | 'build';
         </p>
       }
       @if (toast(); as msg) {
-        <p class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+        <p class="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs text-default">
           {{ msg }}
         </p>
       }
@@ -76,11 +76,11 @@ type Mode = 'list' | 'pick' | 'build';
       @switch (mode()) {
         @case ('list') {
           @if (loading()) {
-            <p class="text-[11px] text-zinc-500">Loading…</p>
+            <p class="text-[11px] text-muted">Loading…</p>
           }
-          <div class="overflow-hidden rounded-md border border-zinc-200 bg-white">
+          <div class="overflow-hidden rounded-md border border-subtle bg-surface">
             <table class="w-full text-xs">
-              <thead class="bg-zinc-50 text-zinc-500">
+              <thead class="bg-surface-2 text-muted">
                 <tr>
                   <th class="px-3 py-2 text-left font-medium">Name</th>
                   <th class="px-3 py-2 text-left font-medium">Category</th>
@@ -89,10 +89,10 @@ type Mode = 'list' | 'pick' | 'build';
                   <th class="px-3 py-2 text-right font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-zinc-100">
+              <tbody class="divide-y divide-subtle">
                 @for (row of flows(); track row.id) {
                   <tr>
-                    <td class="px-3 py-2 font-medium text-zinc-900">
+                    <td class="px-3 py-2 font-medium text-default">
                       {{ row.name }}
                     </td>
                     <td class="px-3 py-2">
@@ -115,7 +115,7 @@ type Mode = 'list' | 'pick' | 'build';
                         {{ row.status }}
                       </span>
                     </td>
-                    <td class="px-3 py-2 text-zinc-500">
+                    <td class="px-3 py-2 text-muted">
                       {{ formatDate(row.updated_at) }}
                     </td>
                     <td class="px-3 py-2 text-right">
@@ -123,7 +123,7 @@ type Mode = 'list' | 'pick' | 'build';
                         <button
                           type="button"
                           (click)="onEdit(row)"
-                          class="rounded border border-zinc-300 bg-white px-2 py-1 text-[11px] text-zinc-700 hover:bg-zinc-50"
+                          class="rounded border border-subtle bg-surface px-2 py-1 text-[11px] text-default hover:bg-surface-2"
                         >
                           Edit
                         </button>
@@ -139,7 +139,7 @@ type Mode = 'list' | 'pick' | 'build';
                           <button
                             type="button"
                             (click)="onTestSend(row)"
-                            class="rounded border border-zinc-300 bg-white px-2 py-1 text-[11px] text-zinc-700 hover:bg-zinc-50"
+                            class="rounded border border-subtle bg-surface px-2 py-1 text-[11px] text-default hover:bg-surface-2"
                           >
                             Test send
                           </button>
@@ -147,7 +147,7 @@ type Mode = 'list' | 'pick' | 'build';
                         <button
                           type="button"
                           (click)="onArchive(row)"
-                          class="rounded border border-rose-300 bg-white px-2 py-1 text-[11px] text-rose-700 hover:bg-rose-50"
+                          class="rounded border border-rose-300 bg-surface px-2 py-1 text-[11px] text-rose-700 hover:bg-rose-50"
                         >
                           Archive
                         </button>
@@ -156,7 +156,7 @@ type Mode = 'list' | 'pick' | 'build';
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="5" class="px-3 py-6 text-center text-zinc-500">
+                    <td colspan="5" class="px-3 py-6 text-center text-muted">
                       No flows yet. Click <em>New flow</em> to start from a template.
                     </td>
                   </tr>
@@ -341,7 +341,7 @@ export class WhatsAppFlowsPageComponent {
       case 'signup':
         return 'bg-violet-50 text-violet-700 ring-violet-200';
       default:
-        return 'bg-zinc-100 text-zinc-600 ring-zinc-200';
+        return 'bg-surface-2 text-muted border-subtle';
     }
   }
 
@@ -350,7 +350,7 @@ export class WhatsAppFlowsPageComponent {
       case 'published':
         return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
       case 'archived':
-        return 'bg-zinc-100 text-zinc-500 ring-zinc-200';
+        return 'bg-surface-2 text-muted border-subtle';
       default:
         return 'bg-amber-50 text-amber-700 ring-amber-200';
     }

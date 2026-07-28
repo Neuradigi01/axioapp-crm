@@ -47,7 +47,7 @@ const QUALITY_BADGE: Record<
   UNKNOWN: {
     emoji: '❔',
     label: 'Unknown',
-    classes: 'bg-zinc-100 text-zinc-600 ring-zinc-200',
+    classes: 'bg-surface-2 text-muted border-subtle',
   },
 };
 
@@ -93,14 +93,14 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
 
       @if (loading() && !data()) {
         <div
-          class="rounded-md border border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500"
+          class="rounded-md border border-subtle bg-surface px-4 py-6 text-center text-sm text-muted"
         >
           Loading health…
         </div>
       } @else if (data(); as h) {
         <!-- Top row: badges + refresh -->
         <div
-          class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-zinc-200 bg-white p-3"
+          class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-subtle bg-surface p-3"
         >
           <div class="flex flex-wrap items-center gap-2">
             <span
@@ -115,7 +115,7 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
             </span>
             @if (h.tier_label) {
               <span
-                class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+                class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-default ring-1 border-subtle"
               >
                 Tier · {{ h.tier_label }}
               </span>
@@ -130,7 +130,7 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
             }
             @if (h.throughput) {
               <span
-                class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-medium text-zinc-700 ring-1 ring-zinc-200"
+                class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-0.5 text-[11px] font-medium text-default ring-1 border-subtle"
               >
                 <lucide-icon name="zap" size="10" />
                 {{ h.throughput }} msg/s
@@ -141,7 +141,7 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
             type="button"
             (click)="refresh()"
             [disabled]="refreshing()"
-            class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+            class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
           >
             <lucide-icon name="refresh-cw" size="12" />
             {{ refreshing() ? 'Refreshing…' : 'Refresh' }}
@@ -150,14 +150,14 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
 
         <!-- 24-hr usage bar (unless unlimited tier) -->
         @if (!h.is_unlimited && h.daily_limit > 0) {
-          <div class="rounded-md border border-zinc-200 bg-white p-3">
+          <div class="rounded-md border border-subtle bg-surface p-3">
             <div class="mb-1 flex items-center justify-between text-xs">
-              <span class="font-medium text-zinc-700">24-hour usage</span>
-              <span class="text-zinc-600">
+              <span class="font-medium text-default">24-hour usage</span>
+              <span class="text-muted">
                 {{ h.used_today | number }} / {{ h.daily_limit | number }} ({{ h.usage_percent }}%)
               </span>
             </div>
-            <div class="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+            <div class="h-2 w-full overflow-hidden rounded-full bg-surface-2">
               <div
                 [class]="
                   'h-full rounded-full transition-all ' +
@@ -214,8 +214,8 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
 
         <!-- Timeline chart (last 30 days) -->
         @if (h.events.length > 0) {
-          <div class="rounded-md border border-zinc-200 bg-white p-3">
-            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <div class="rounded-md border border-subtle bg-surface p-3">
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
               Last 30 days
             </p>
             <ul class="space-y-1.5">
@@ -226,10 +226,10 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
                       'inline-flex h-2 w-2 shrink-0 rounded-full ' + eventDotClass(e.event_type)
                     "
                   ></span>
-                  <span class="font-medium text-zinc-700">
+                  <span class="font-medium text-default">
                     {{ eventLabel(e.event_type) }}
                   </span>
-                  <span class="text-zinc-500">
+                  <span class="text-muted">
                     @if (e.old_value && e.new_value) {
                       {{ formatValue(e.old_value) }} →
                       {{ formatValue(e.new_value) }}
@@ -237,7 +237,7 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
                       {{ formatValue(e.new_value) }}
                     }
                   </span>
-                  <span class="ml-auto text-[10px] text-zinc-400">
+                  <span class="ml-auto text-[10px] text-faint">
                     {{ e.occurred_at | date: 'short' }}
                   </span>
                 </li>
@@ -247,7 +247,7 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
         }
 
         @if (h.health_synced_at) {
-          <p class="text-[10px] text-zinc-500">
+          <p class="text-[10px] text-muted">
             Synced from Meta: {{ h.health_synced_at | date: 'short' }}
           </p>
         }
@@ -318,7 +318,7 @@ export class PhoneHealthCardComponent {
       case 'restriction_lifted':
         return 'bg-sky-500';
       default:
-        return 'bg-zinc-400';
+        return 'bg-surface-2';
     }
   }
 

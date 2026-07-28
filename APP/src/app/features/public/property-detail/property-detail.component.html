@@ -1,13 +1,13 @@
 <section>
   @if (loading()) {
-    <div class="rounded-xl border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
+    <div class="rounded-xl border border-subtle bg-surface p-6 text-center text-sm text-muted">
       Loading property…
     </div>
   } @else if (notFound()) {
-    <div class="rounded-xl border border-zinc-200 bg-white px-6 py-14 text-center shadow-sm">
-      <lucide-icon name="alert-triangle" class="mx-auto mb-2 h-8 w-8 text-zinc-400"></lucide-icon>
-      <h1 class="text-lg font-semibold text-zinc-900">Property not available</h1>
-      <p class="mt-1 text-sm text-zinc-500">
+    <div class="rounded-xl border border-subtle bg-surface px-6 py-14 text-center shadow-sm">
+      <lucide-icon name="alert-triangle" class="mx-auto mb-2 h-8 w-8 text-faint"></lucide-icon>
+      <h1 class="text-lg font-semibold text-default">Property not available</h1>
+      <p class="mt-1 text-sm text-muted">
         The link may have expired or the listing is no longer active.
       </p>
     </div>
@@ -16,11 +16,11 @@
          Industry standard for real-estate listings (Zillow/Redfin/
          MagicBricks/99acres). Consistent frame across every listing,
          cinematic look. Slight center crop is expected. -->
-    <div class="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-zinc-100 shadow-sm">
+    <div class="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-surface-2 shadow-sm">
       @if (currentImage(); as img) {
         <img [src]="imgSrc(img.image_url)" [alt]="d.title" class="h-full w-full object-cover" />
       } @else {
-        <div class="flex h-full w-full items-center justify-center text-zinc-400">
+        <div class="flex h-full w-full items-center justify-center text-faint">
           <lucide-icon name="image-off" class="h-10 w-10"></lucide-icon>
         </div>
       }
@@ -29,7 +29,7 @@
         <button
           type="button"
           (click)="prevImage()"
-          class="absolute left-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-800 shadow-sm hover:bg-white"
+          class="absolute left-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-surface/90 text-default shadow-sm hover:bg-surface"
           aria-label="Previous image"
         >
           <lucide-icon name="chevron-left" class="h-5 w-5"></lucide-icon>
@@ -37,7 +37,7 @@
         <button
           type="button"
           (click)="nextImage()"
-          class="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-800 shadow-sm hover:bg-white"
+          class="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-surface/90 text-default shadow-sm hover:bg-surface"
           aria-label="Next image"
         >
           <lucide-icon name="chevron-right" class="h-5 w-5"></lucide-icon>
@@ -87,18 +87,18 @@
       <div>
         <div class="flex flex-wrap items-center gap-2">
           <span
-            class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+            class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 ring-zinc-200"
           >
             {{ labelForType(d.property_type) }}
           </span>
           <span
-            class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+            class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 ring-zinc-200"
           >
             {{ labelForType(d.category) }}
           </span>
         </div>
-        <h1 class="mt-2 text-2xl font-semibold text-zinc-900">{{ d.title }}</h1>
-        <div class="mt-1 text-sm text-zinc-500">
+        <h1 class="mt-2 text-2xl font-semibold text-default">{{ d.title }}</h1>
+        <div class="mt-1 text-sm text-muted">
           {{ d.city || '—' }}
           @if (d.state) {
             <span>, {{ d.state }}</span>
@@ -108,7 +108,7 @@
           }
         </div>
       </div>
-      <div class="text-2xl font-semibold text-zinc-900">
+      <div class="text-2xl font-semibold text-default">
         {{ formatPrice(d.price, d.currency) }}
       </div>
     </div>
@@ -117,20 +117,20 @@
       <!-- Left column: description + details + amenities -->
       <div class="space-y-6 lg:col-span-2">
         <!-- Highlights -->
-        <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 class="text-sm font-semibold text-zinc-900">Highlights</h2>
+        <div class="rounded-xl border border-subtle bg-surface p-5 shadow-sm">
+          <h2 class="text-sm font-semibold text-default">Highlights</h2>
           <dl class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div>
-              <dt class="text-xs text-zinc-500">Bedrooms</dt>
-              <dd class="mt-0.5 text-sm font-medium text-zinc-900">{{ d.bedrooms ?? '—' }}</dd>
+              <dt class="text-xs text-muted">Bedrooms</dt>
+              <dd class="mt-0.5 text-sm font-medium text-default">{{ d.bedrooms ?? '—' }}</dd>
             </div>
             <div>
-              <dt class="text-xs text-zinc-500">Bathrooms</dt>
-              <dd class="mt-0.5 text-sm font-medium text-zinc-900">{{ d.bathrooms ?? '—' }}</dd>
+              <dt class="text-xs text-muted">Bathrooms</dt>
+              <dd class="mt-0.5 text-sm font-medium text-default">{{ d.bathrooms ?? '—' }}</dd>
             </div>
             <div>
-              <dt class="text-xs text-zinc-500">Area</dt>
-              <dd class="mt-0.5 text-sm font-medium text-zinc-900">
+              <dt class="text-xs text-muted">Area</dt>
+              <dd class="mt-0.5 text-sm font-medium text-default">
                 @if (d.area_value !== null) {
                   {{ d.area_value }} {{ d.area_unit }}
                 } @else {
@@ -139,33 +139,33 @@
               </dd>
             </div>
             <div>
-              <dt class="text-xs text-zinc-500">Pincode</dt>
-              <dd class="mt-0.5 text-sm font-medium text-zinc-900">{{ d.pincode || '—' }}</dd>
+              <dt class="text-xs text-muted">Pincode</dt>
+              <dd class="mt-0.5 text-sm font-medium text-default">{{ d.pincode || '—' }}</dd>
             </div>
           </dl>
         </div>
 
         @if (d.address_line) {
-          <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-            <h2 class="text-sm font-semibold text-zinc-900">Address</h2>
-            <p class="mt-2 whitespace-pre-line text-sm text-zinc-700">{{ d.address_line }}</p>
+          <div class="rounded-xl border border-subtle bg-surface p-5 shadow-sm">
+            <h2 class="text-sm font-semibold text-default">Address</h2>
+            <p class="mt-2 whitespace-pre-line text-sm text-default">{{ d.address_line }}</p>
           </div>
         }
 
         @if (d.description) {
-          <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-            <h2 class="text-sm font-semibold text-zinc-900">About this property</h2>
-            <p class="mt-2 whitespace-pre-line text-sm text-zinc-700">{{ d.description }}</p>
+          <div class="rounded-xl border border-subtle bg-surface p-5 shadow-sm">
+            <h2 class="text-sm font-semibold text-default">About this property</h2>
+            <p class="mt-2 whitespace-pre-line text-sm text-default">{{ d.description }}</p>
           </div>
         }
 
         @if (d.amenities.length > 0) {
-          <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-            <h2 class="text-sm font-semibold text-zinc-900">Amenities</h2>
+          <div class="rounded-xl border border-subtle bg-surface p-5 shadow-sm">
+            <h2 class="text-sm font-semibold text-default">Amenities</h2>
             <div class="mt-3 flex flex-wrap gap-2">
               @for (a of d.amenities; track a) {
                 <span
-                  class="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-700 ring-1 ring-zinc-200"
+                  class="inline-flex items-center rounded-full bg-surface-2 px-3 py-1 text-xs text-default ring-1 ring-zinc-200"
                 >
                   {{ a }}
                 </span>
@@ -178,19 +178,19 @@
       <!-- Right column: contact card -->
       <aside class="lg:col-span-1">
         <div
-          class="sticky top-6 space-y-3 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm"
+          class="sticky top-6 space-y-3 rounded-xl border border-subtle bg-surface p-5 shadow-sm"
         >
-          <h2 class="text-sm font-semibold text-zinc-900">Contact</h2>
+          <h2 class="text-sm font-semibold text-default">Contact</h2>
           @if (d.contact_person) {
             <div>
-              <div class="text-xs text-zinc-500">Contact person</div>
-              <div class="text-sm font-medium text-zinc-900">{{ d.contact_person }}</div>
+              <div class="text-xs text-muted">Contact person</div>
+              <div class="text-sm font-medium text-default">{{ d.contact_person }}</div>
             </div>
           }
           @if (telLink(); as tel) {
             <a
               [href]="tel"
-              class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+              class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
             >
               <lucide-icon name="phone" class="h-4 w-4"></lucide-icon>
               {{ d.contact_phone }}
@@ -199,14 +199,14 @@
           @if (mailtoLink(); as mailto) {
             <a
               [href]="mailto"
-              class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+              class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent hover:brightness-95"
             >
               <lucide-icon name="mail" class="h-4 w-4"></lucide-icon>
               Send enquiry
             </a>
           }
           @if (!telLink() && !mailtoLink()) {
-            <p class="text-xs text-zinc-500">
+            <p class="text-xs text-muted">
               Contact details will appear here once the owner adds them.
             </p>
           }

@@ -19,7 +19,7 @@ interface BadgeDescriptor {
 }
 
 const INTERNAL: Record<TemplateInternalStatus, BadgeDescriptor> = {
-  draft: { label: 'Draft', classes: 'bg-zinc-100 text-zinc-700 ring-zinc-200' },
+  draft: { label: 'Draft', classes: 'bg-surface-2 text-default border-subtle' },
   in_review: {
     label: 'In review',
     classes: 'bg-amber-50 text-amber-700 ring-amber-200',
@@ -34,7 +34,7 @@ const INTERNAL: Record<TemplateInternalStatus, BadgeDescriptor> = {
   },
   archived: {
     label: 'Archived',
-    classes: 'bg-zinc-100 text-zinc-500 ring-zinc-300',
+    classes: 'bg-surface-2 text-muted border-subtle',
   },
 };
 

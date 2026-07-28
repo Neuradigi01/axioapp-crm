@@ -13,8 +13,8 @@ import { RouterOutlet } from '@angular/router';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterOutlet],
   template: `
-    <div class="min-h-screen bg-zinc-50 text-zinc-900">
-      <header class="border-b border-zinc-200 bg-white">
+    <div class="min-h-screen bg-surface-2 text-default">
+      <header class="border-b border-subtle bg-surface">
         <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <span class="text-lg font-semibold tracking-tight">Properties</span>
         </div>
@@ -22,9 +22,7 @@ import { RouterOutlet } from '@angular/router';
       <main class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <router-outlet />
       </main>
-      <footer
-        class="mt-16 border-t border-zinc-200 bg-white py-6 text-center text-xs text-zinc-500"
-      >
+      <footer class="mt-16 border-t border-subtle bg-surface py-6 text-center text-xs text-muted">
         Powered by CRM
       </footer>
     </div>

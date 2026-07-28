@@ -198,7 +198,7 @@ export class TasksPanelComponent {
       case 'med':
         return 'bg-amber-100 text-amber-700 ring-amber-200';
       case 'low':
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   }
 

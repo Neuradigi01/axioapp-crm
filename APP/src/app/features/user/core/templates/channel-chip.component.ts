@@ -65,7 +65,7 @@ export class ChannelChipComponent {
       DESCRIPTORS[this.channel()] ?? {
         label: this.channel(),
         icon: 'tag',
-        classes: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+        classes: 'bg-surface-2 text-default border-subtle',
       }
     );
   });

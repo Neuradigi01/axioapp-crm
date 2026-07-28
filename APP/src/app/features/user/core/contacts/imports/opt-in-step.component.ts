@@ -51,20 +51,20 @@ const SOURCES: SourceOption[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule],
   template: `
-    <fieldset class="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-      <legend class="px-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+    <fieldset class="rounded-md border border-subtle bg-surface-2 p-3">
+      <legend class="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
         WhatsApp opt-in source
         <span class="ml-1 text-rose-600">*</span>
       </legend>
-      <p class="mb-2 text-[11px] text-zinc-500">
+      <p class="mb-2 text-[11px] text-muted">
         How was consent captured for these contacts? DPDP requires a recorded provenance for every
         imported row.
       </p>
       <div class="space-y-1.5">
         @for (s of SOURCES; track s.value) {
           <label
-            class="flex cursor-pointer items-start gap-2 rounded border border-zinc-200 bg-white px-2.5 py-2 text-xs transition hover:border-zinc-300"
-            [class.border-zinc-900]="selected() === s.value"
+            class="flex cursor-pointer items-start gap-2 rounded border border-subtle bg-surface px-2.5 py-2 text-xs transition hover:border-subtle"
+            [class.border-accent]="selected() === s.value"
           >
             <input
               type="radio"
@@ -74,8 +74,8 @@ const SOURCES: SourceOption[] = [
               (change)="onPick(s.value)"
             />
             <span class="flex flex-col">
-              <span class="font-medium text-zinc-800">{{ s.label }}</span>
-              <span class="text-[11px] text-zinc-500">{{ s.hint }}</span>
+              <span class="font-medium text-default">{{ s.label }}</span>
+              <span class="text-[11px] text-muted">{{ s.hint }}</span>
             </span>
           </label>
         }
