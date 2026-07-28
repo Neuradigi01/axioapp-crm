@@ -2,7 +2,7 @@
 
 **Goal:** Bring the catalog bulk-import surface up to the same level as leads / contacts — wire shared validators into per-row processing, and add a downloadable `errors.csv` endpoint so operators can see exactly which SKUs were rejected and why.
 **Track:** Application Updates — Form & CSV-Import Validation
-**Status:** Pending
+**Status:** COMPLETED — service-side validators (SKU pattern, name shape via `validate_name`, ISO 4217 currency, price upper bound) wired into `bulk_import_items` row loop via new `_validate_bulk_import_row` helper; failures land in the response `errors[]` with `{row_index, sku, column, value, reason}`. Frontend gained a "Download errors CSV" button that composes the CSV client-side (catalog import is synchronous, so the browser still holds the parsed rows). Error table now shows Column + Value columns. **Went with Option B (no persistence table)** — see Notes. No migration. Backend parse-check clean; frontend tsc + eslint + prettier all clean.
 **Depends on:** Step 1 (`validators.py` + `import_errors.py`), Step 8 (contacts pattern is the template).
 
 ---

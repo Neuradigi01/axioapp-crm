@@ -197,9 +197,20 @@ class CatalogItemBulkImportRequest(BaseModel):
 
 
 class CatalogItemBulkImportRowError(BaseModel):
+    """One rejected import row's forensic record.
+
+    Existing consumers read `row_index` + `sku` + `reason` only;
+    `column` + `value` were added when the shared per-field validators
+    landed in the row loop, so operators can see *which* column tripped
+    and *what* the offending value was without downloading the CSV.
+    Both remain optional to keep the payload additive for older UI builds.
+    """
+
     row_index: int
     sku: str
     reason: str
+    column: str | None = None
+    value: str | None = None
 
 
 class CatalogItemBulkImportResult(BaseModel):

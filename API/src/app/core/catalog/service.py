@@ -44,6 +44,7 @@ from src.app.core.catalog.schemas import (
     CatalogItemCreate,
     CatalogItemUpdate,
 )
+from src.app.shared import validators as shared_validators
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.queries import ensure_found
@@ -542,6 +543,61 @@ async def remove_gallery_image(
 
 # --- Bulk import (C8) -----------------------------------------------------
 
+# Shape constraints applied per-row in `bulk_import_items` on top of the
+# Pydantic min/max_length checks. Failures land in the response's `errors`
+# list instead of 422-ing the whole batch — same UX as contacts / leads.
+_SKU_RE = re.compile(r"^[A-Z0-9][A-Z0-9_\-]{1,63}$")
+_CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
+_PRICE_MAX = 1_000_000_000  # 1B cap — covers real furniture pricing with headroom
+
+
+def _validate_bulk_import_row(
+    idx: int, row: Any
+) -> CatalogItemBulkImportRowError | None:
+    """Server-side per-row validators for the bulk-import wizard.
+
+    Returns the first shape failure as a `CatalogItemBulkImportRowError`,
+    or `None` if the row passes every check. Applied on top of the
+    Pydantic schema — Pydantic already guards min/max_length + price>=0;
+    this catches SKU character class, name content, currency casing,
+    and price upper bound.
+    """
+    if not _SKU_RE.match(row.sku):
+        return CatalogItemBulkImportRowError(
+            row_index=idx,
+            sku=row.sku,
+            column="sku",
+            value=row.sku,
+            reason="SKU must be 2–64 chars, uppercase alphanumeric + '-' or '_'",
+        )
+    try:
+        shared_validators.validate_name(row.name)
+    except shared_validators.ValidationError as exc:
+        return CatalogItemBulkImportRowError(
+            row_index=idx,
+            sku=row.sku,
+            column="name",
+            value=row.name,
+            reason=exc.reason,
+        )
+    if row.currency and not _CURRENCY_RE.match(row.currency):
+        return CatalogItemBulkImportRowError(
+            row_index=idx,
+            sku=row.sku,
+            column="currency",
+            value=row.currency,
+            reason="currency must be a 3-letter ISO 4217 code (e.g. INR, USD)",
+        )
+    if row.price is not None and row.price > _PRICE_MAX:
+        return CatalogItemBulkImportRowError(
+            row_index=idx,
+            sku=row.sku,
+            column="price",
+            value=str(row.price),
+            reason=f"price out of range 0–{_PRICE_MAX:,}",
+        )
+    return None
+
 
 async def bulk_import_items(
     session: AsyncSession,
@@ -569,6 +625,10 @@ async def bulk_import_items(
     errors: list[CatalogItemBulkImportRowError] = []
 
     for i, row in enumerate(payload.rows):
+        shape_error = _validate_bulk_import_row(i, row)
+        if shape_error is not None:
+            errors.append(shape_error)
+            continue
         try:
             if row.sku in existing_skus or row.sku in seen_in_batch:
                 skipped += 1

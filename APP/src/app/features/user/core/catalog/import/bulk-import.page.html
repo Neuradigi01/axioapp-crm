@@ -213,7 +213,17 @@
 
         @if (res.errors.length > 0) {
           <div>
-            <p class="text-xs font-medium uppercase tracking-wide text-muted">Error rows</p>
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-medium uppercase tracking-wide text-muted">Error rows</p>
+              <button
+                type="button"
+                (click)="downloadErrorsCsv()"
+                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
+              >
+                <lucide-icon name="download" class="h-3.5 w-3.5" />
+                Download errors CSV
+              </button>
+            </div>
             <div class="mt-1 overflow-hidden rounded-md border border-subtle text-xs">
               <table class="w-full">
                 <thead
@@ -222,6 +232,8 @@
                   <tr>
                     <th class="px-3 py-2">Row</th>
                     <th class="px-3 py-2">SKU</th>
+                    <th class="px-3 py-2">Column</th>
+                    <th class="px-3 py-2">Value</th>
                     <th class="px-3 py-2">Reason</th>
                   </tr>
                 </thead>
@@ -233,6 +245,8 @@
                     <tr>
                       <td class="px-3 py-1.5 font-mono text-muted">{{ err.row_index + 1 }}</td>
                       <td class="px-3 py-1.5 font-mono text-default">{{ err.sku }}</td>
+                      <td class="px-3 py-1.5 text-muted">{{ err.column ?? '—' }}</td>
+                      <td class="px-3 py-1.5 text-muted">{{ err.value ?? '—' }}</td>
                       <td class="px-3 py-1.5 text-default">{{ err.reason }}</td>
                     </tr>
                   }

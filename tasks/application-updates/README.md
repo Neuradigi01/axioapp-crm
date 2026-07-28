@@ -75,7 +75,7 @@ Track is done when:
 | 7 | [Settings forms](step-7-settings-forms.md) | COMPLETED | ~½ day |
 | 8 | [Contacts CSV import — validation + errors.csv](step-8-contacts-csv-import.md) | COMPLETED | ~½ day |
 | 9 | [Leads CSV import — new validation rules](step-9-leads-csv-import.md) | COMPLETED | ~½ day |
-| 10 | [Catalog CSV import — validation + errors.csv](step-10-catalog-csv-import.md) | Pending | ~½ day |
+| 10 | [Catalog CSV import — validation + errors.csv](step-10-catalog-csv-import.md) | COMPLETED | ~½ day |
 
 **Total: ~5 working days.** Each step is independently verifiable; pause and report after each per rule 9.
 
