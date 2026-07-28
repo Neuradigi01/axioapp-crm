@@ -1,6 +1,8 @@
 import { Component, input } from '@angular/core';
 import { AbstractControl } from '@angular/forms';
 
+import { REASON } from '@shared/validators/custom-validators';
+
 interface ValidatorErrorDetail {
   requiredLength?: number;
   min?: number;
@@ -16,6 +18,14 @@ const DEFAULT_MESSAGES: Record<string, string | ((err: ValidatorErrorDetail) => 
   max: (err) => `Maximum value is ${err.max}`,
   pattern: 'Invalid format',
   passwordMismatch: 'Passwords do not match',
+  // Keys emitted by the shared validators in `@shared/validators/custom-validators`.
+  // Reason strings come from `REASON` so form errors and CSV `errors.csv` rows
+  // read identically.
+  nameInvalid: REASON.invalidName,
+  emailInvalid: REASON.invalidEmail,
+  phoneInvalid: REASON.invalidPhone,
+  passwordWeak: REASON.weakPassword,
+  urlInvalid: REASON.invalidUrl,
 };
 
 @Component({

@@ -2,7 +2,7 @@
 
 **Goal:** Apply the shared validators from Step 1 to all five accounts pages so login, registration, forgot-password, reset-password, and accept-invite enforce industry-standard name / email / phone / password rules with clear inline errors.
 **Track:** Application Updates — Form & CSV-Import Validation
-**Status:** Pending
+**Status:** COMPLETED — all 5 accounts forms wired to shared validators; central `DEFAULT_MESSAGES` in `validation-message.component.ts` picks up the new keys so no per-template error strings needed on login/register/forgot/reset; accept-invite gained per-field `<app-validation-message>` blocks (was form-level only); manual `password !== confirm_password` check removed. tsc + eslint + prettier all clean.
 **Depends on:** Step 1 (shared validators).
 
 ---

@@ -44,6 +44,9 @@
               autocomplete="given-name"
               class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            <p class="mt-1 text-xs text-rose-600">
+              <app-validation-message [control]="form.controls.first_name" label="First name" />
+            </p>
           </label>
           <label class="block text-sm">
             <span class="mb-1 block text-xs font-medium text-muted">Last name</span>
@@ -53,6 +56,9 @@
               autocomplete="family-name"
               class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            <p class="mt-1 text-xs text-rose-600">
+              <app-validation-message [control]="form.controls.last_name" label="Last name" />
+            </p>
           </label>
         </div>
         <label class="block text-sm">
@@ -63,6 +69,9 @@
             autocomplete="tel"
             class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
+          <p class="mt-1 text-xs text-rose-600">
+            <app-validation-message [control]="form.controls.phone" label="Phone" />
+          </p>
         </label>
         <label class="block text-sm">
           <span class="mb-1 block text-xs font-medium text-muted">Password</span>
@@ -70,10 +79,14 @@
             type="password"
             formControlName="password"
             autocomplete="new-password"
-            minlength="8"
             class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <span class="mt-1 block text-[11px] text-muted">Minimum 8 characters.</span>
+          <span class="mt-1 block text-[11px] text-muted">
+            8–128 chars with upper, lower, digit, and special.
+          </span>
+          <p class="mt-1 text-xs text-rose-600">
+            <app-validation-message [control]="form.controls.password" label="Password" />
+          </p>
         </label>
         <label class="block text-sm">
           <span class="mb-1 block text-xs font-medium text-muted">Confirm password</span>
@@ -83,6 +96,12 @@
             autocomplete="new-password"
             class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
+          <p class="mt-1 text-xs text-rose-600">
+            <app-validation-message
+              [control]="form.controls.confirm_password"
+              label="Confirm password"
+            />
+          </p>
         </label>
 
         @if (submitError(); as err) {

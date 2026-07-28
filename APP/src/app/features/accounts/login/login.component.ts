@@ -57,8 +57,10 @@ export class LoginComponent {
   readonly userType: UserType = (this.route.snapshot.data['userType'] as UserType) ?? 'User';
 
   readonly loginForm: FormGroup = this.fb.group({
-    identifier: ['', Validators.required],
-    password: ['', Validators.required],
+    identifier: ['', [Validators.required, Validators.maxLength(254)]],
+    // No strength check on login — existing accounts may pre-date the
+    // password rules. Presence + a sane max only.
+    password: ['', [Validators.required, Validators.maxLength(128)]],
     rememberMe: [false],
   });
 
