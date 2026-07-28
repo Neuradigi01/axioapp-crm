@@ -36,7 +36,7 @@ import { BlockListService, BlockReason } from '../../whatsapp/block-list/block-l
       <div class="relative inline-block">
         <button
           type="button"
-          class="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-surface px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
+          class="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-surface px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10"
           (click)="toggle(); $event.stopPropagation()"
           aria-label="Block this number"
         >
@@ -73,7 +73,7 @@ import { BlockListService, BlockReason } from '../../whatsapp/block-list/block-l
               ></textarea>
             </label>
             @if (error(); as err) {
-              <p class="mb-1 text-[11px] text-rose-700">{{ err }}</p>
+              <p class="mb-1 text-[11px] text-red-400">{{ err }}</p>
             }
             <div class="flex justify-end gap-1">
               <button
@@ -87,7 +87,7 @@ import { BlockListService, BlockReason } from '../../whatsapp/block-list/block-l
                 type="button"
                 [disabled]="busy()"
                 (click)="submit()"
-                class="rounded bg-rose-600 px-2 py-1 font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+                class="rounded bg-red-500 px-2 py-1 font-semibold text-white hover:bg-red-400 disabled:opacity-50"
               >
                 {{ busy() ? 'Blocking…' : 'Block' }}
               </button>

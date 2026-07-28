@@ -50,7 +50,7 @@
             <button
               type="button"
               (click)="openIssueModal()"
-              class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent"
+              class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
             >
               <lucide-icon name="plus" class="h-4 w-4" />
               Issue new key
@@ -281,7 +281,7 @@
                             type="button"
                             (click)="addCustomField(opt)"
                             [disabled]="!opt.widget_supported"
-                            class="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-surface-2"
+                            class="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:bg-surface-2"
                           >
                             Add
                           </button>
@@ -498,7 +498,7 @@
                 type="button"
                 [disabled]="!dirty() || saving()"
                 (click)="save()"
-                class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {{ saving() ? 'Saving…' : 'Save configuration' }}
               </button>

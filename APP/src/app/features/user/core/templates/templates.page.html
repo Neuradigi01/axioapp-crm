@@ -12,7 +12,7 @@
         @if (canWrite()) {
           <a
             routerLink="/user/templates/new"
-            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95"
           >
             <lucide-icon name="plus" size="14" />
             New template
@@ -113,7 +113,7 @@
         @if (canWrite() && !channelFilter() && !statusFilter() && !debouncedSearch()) {
           <a
             routerLink="/user/templates/new"
-            class="mt-4 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent"
+            class="mt-4 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95"
           >
             <lucide-icon name="plus" size="14" />
             Create your first template

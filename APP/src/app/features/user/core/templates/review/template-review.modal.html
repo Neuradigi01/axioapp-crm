@@ -41,7 +41,7 @@
           class="rounded-md border px-2 py-2 font-medium"
           [class]="
             action() === 'reject'
-              ? 'border-rose-300 bg-red-500/10 text-red-400 ring-1 border-red-500/20'
+              ? 'border-red-500/30 bg-red-500/10 text-red-400 ring-1 border-red-500/20'
               : 'border-subtle bg-surface text-default hover:bg-surface-2'
           "
         >
@@ -54,7 +54,7 @@
         <span class="text-xs font-medium text-default">
           Note
           @if (noteRequired()) {
-            <span class="text-rose-600">*</span>
+            <span class="text-red-500">*</span>
             <span class="text-faint">required</span>
           } @else {
             <span class="text-faint">optional</span>
@@ -94,7 +94,7 @@
         type="button"
         (click)="submit()"
         [disabled]="!canSubmit()"
-        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
       >
         @if (submitting()) {
           <lucide-icon name="loader-2" size="12" class="animate-spin" />

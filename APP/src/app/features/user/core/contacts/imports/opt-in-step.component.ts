@@ -54,7 +54,7 @@ const SOURCES: SourceOption[] = [
     <fieldset class="rounded-md border border-subtle bg-surface-2 p-3">
       <legend class="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
         WhatsApp opt-in source
-        <span class="ml-1 text-rose-600">*</span>
+        <span class="ml-1 text-red-500">*</span>
       </legend>
       <p class="mb-2 text-[11px] text-muted">
         How was consent captured for these contacts? DPDP requires a recorded provenance for every

@@ -1,5 +1,5 @@
 <div
-  class="fixed inset-0 z-40 flex items-start justify-center bg-accent/40 px-4 py-12"
+  class="fixed inset-0 z-40 flex items-start justify-center bg-black/60 px-4 py-12"
   (click)="onClose()"
 >
   <div
@@ -48,7 +48,7 @@
       @if (loading()) {
         <p class="px-4 py-4 md:py-6 text-center text-xs text-muted">Loading templates…</p>
       } @else if (loadError(); as err) {
-        <p class="px-4 py-4 md:py-6 text-center text-xs text-rose-600">{{ err }}</p>
+        <p class="px-4 py-4 md:py-6 text-center text-xs text-red-500">{{ err }}</p>
       } @else if (filtered().length === 0) {
         <div class="px-4 py-4 md:py-6 text-center text-xs text-muted">
           No published {{ channel() }} templates match.
@@ -92,7 +92,7 @@
                 <button
                   type="button"
                   (click)="onPick(t)"
-                  class="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[11px] font-semibold text-white hover:bg-accent"
+                  class="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[11px] font-semibold text-white hover:brightness-95"
                 >
                   Use
                 </button>

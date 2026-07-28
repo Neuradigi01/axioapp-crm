@@ -40,7 +40,7 @@ import { CallsApiService } from './calls-api.service';
         Loading…
       </div>
     } @else if (error()) {
-      <span class="text-[11px] text-rose-600">{{ error() }}</span>
+      <span class="text-[11px] text-red-500">{{ error() }}</span>
     } @else if (blobUrl(); as src) {
       <audio controls preload="metadata" [src]="src" class="h-8 max-w-xs">
         Your browser doesn't support inline audio playback.

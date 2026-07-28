@@ -79,7 +79,7 @@ import { TagChipComponent } from './tag-chip.component';
         </div>
 
         @if (loadError(); as err) {
-          <p class="mb-1 text-[10px] text-rose-600">{{ err }}</p>
+          <p class="mb-1 text-[10px] text-red-500">{{ err }}</p>
         }
 
         <ul class="max-h-48 space-y-0.5 overflow-y-auto">
@@ -106,7 +106,7 @@ import { TagChipComponent } from './tag-chip.component';
                   type="button"
                   (click)="onDelete(t)"
                   [disabled]="busyTagId() === t.id"
-                  class="rounded p-0.5 text-faint hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
+                  class="rounded p-0.5 text-faint hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
                   title="Delete tag"
                   aria-label="Delete tag"
                 >
@@ -140,7 +140,7 @@ import { TagChipComponent } from './tag-chip.component';
               type="button"
               (click)="onCreate()"
               [disabled]="creating()"
-              class="w-full rounded-md bg-accent px-2 py-1 text-xs font-semibold text-white hover:bg-accent disabled:opacity-50"
+              class="w-full rounded-md bg-accent px-2 py-1 text-xs font-semibold text-white hover:brightness-95 disabled:opacity-50"
             >
               {{ creating() ? 'Creating…' : 'Create + apply' }}
             </button>

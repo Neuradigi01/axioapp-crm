@@ -1,5 +1,5 @@
 <div
-  class="fixed inset-0 z-40 flex items-start justify-center bg-accent/40 px-4 py-12"
+  class="fixed inset-0 z-40 flex items-start justify-center bg-black/60 px-4 py-12"
   (click)="onClose()"
 >
   <div
@@ -53,7 +53,7 @@
         type="button"
         (click)="onConfirm()"
         [disabled]="submitting()"
-        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
       >
         @if (submitting()) {
           <lucide-icon name="loader-2" size="12" class="animate-spin" />

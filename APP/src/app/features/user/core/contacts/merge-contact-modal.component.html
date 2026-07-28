@@ -112,8 +112,8 @@
       <button
         type="button"
         (click)="onConfirm()"
-        [class.bg-rose-600]="confirmPending()"
-        [class.hover:bg-rose-700]="confirmPending()"
+        [class.bg-red-500]="confirmPending()"
+        [class.hover:bg-red-400]="confirmPending()"
         [class.bg-accent]="!confirmPending()"
         [class.hover:bg-accent]="!confirmPending()"
         class="rounded-md px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-surface-2"

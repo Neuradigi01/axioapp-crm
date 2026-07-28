@@ -82,7 +82,7 @@ export const NODE_HEADER = 30;
           @if (validationFailed()) {
             <span
               title="Configuration incomplete"
-              class="inline-block w-2 h-2 rounded-full bg-rose-500 shrink-0"
+              class="inline-block w-2 h-2 rounded-full bg-red-500 shrink-0"
             ></span>
           }
         </div>

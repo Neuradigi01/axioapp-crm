@@ -26,10 +26,10 @@
       </select>
     }
     @if (!state().templateId) {
-      <p class="text-[10px] text-rose-600 mt-1">Template is required.</p>
+      <p class="text-[10px] text-red-500 mt-1">Template is required.</p>
     }
     @if (loadError(); as err) {
-      <p class="text-[10px] text-rose-600 mt-1">{{ err }}</p>
+      <p class="text-[10px] text-red-500 mt-1">{{ err }}</p>
     }
   </div>
 
@@ -57,7 +57,7 @@
     @if (
       !state().recipient || (state().recipient === 'custom' && !state().customRecipient.trim())
     ) {
-      <p class="text-[10px] text-rose-600 mt-1">Recipient is required.</p>
+      <p class="text-[10px] text-red-500 mt-1">Recipient is required.</p>
     }
   </div>
 

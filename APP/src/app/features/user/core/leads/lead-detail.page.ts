@@ -55,7 +55,7 @@ const STAGE_TONES: Record<string, { bg: string; text: string; ring: string }> = 
   proposal: { bg: 'bg-amber-50', text: 'text-amber-700', ring: 'ring-amber-200' },
   negotiation: { bg: 'bg-orange-50', text: 'text-orange-700', ring: 'ring-orange-200' },
   won: { bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200' },
-  lost: { bg: 'bg-rose-50', text: 'text-rose-700', ring: 'ring-rose-200' },
+  lost: { bg: 'bg-red-500/10', text: 'text-red-400', ring: 'ring-red-500/20' },
 };
 
 @Component({

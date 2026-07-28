@@ -22,15 +22,15 @@ import { DiagnosticsConditionTrace } from '../workflows-api.service';
         <div class="text-[10px] text-muted italic">empty condition (always matches)</div>
       }
       @case ('invalid') {
-        <div class="text-[10px] text-rose-700">invalid: {{ n.error }}</div>
+        <div class="text-[10px] text-red-400">invalid: {{ n.error }}</div>
       }
       @case ('leaf') {
         <div
           class="flex items-center gap-2 text-[11px] py-1 px-2 rounded"
           [class.bg-emerald-50]="n.result"
           [class.text-emerald-900]="n.result"
-          [class.bg-rose-50]="!n.result"
-          [class.text-rose-900]="!n.result"
+          [class.bg-red-500/10]="!n.result"
+          [class.text-red-300]="!n.result"
         >
           <span class="font-mono text-muted">{{ n.path }}</span>
           <span class="font-mono text-muted">{{ n.op }}</span>

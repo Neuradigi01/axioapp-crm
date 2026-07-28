@@ -68,7 +68,7 @@ export class CallPhoneBookTabComponent {
 
   protected avatarBg(id: string): string {
     const palette = [
-      'bg-rose-100 text-rose-700',
+      'bg-red-500/10 text-red-400',
       'bg-amber-100 text-amber-700',
       'bg-emerald-100 text-emerald-700',
       'bg-sky-100 text-sky-700',

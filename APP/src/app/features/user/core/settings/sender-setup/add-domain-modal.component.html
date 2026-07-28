@@ -1,5 +1,5 @@
 <div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40 p-4"
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
   (click)="onBackdropClick($event)"
   data-testid="add-domain-modal-backdrop"
 >
@@ -38,11 +38,11 @@
           [formControl]="form.domain"
           placeholder="yourshop.com"
           class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          [class.border-rose-300]="form.domain.touched && form.domain.invalid"
+          [class.border-red-500/30]="form.domain.touched && form.domain.invalid"
         />
       </label>
       @if (form.domain.touched && form.domain.invalid) {
-        <p class="text-xs text-rose-600">
+        <p class="text-xs text-red-500">
           Enter a valid domain — letters, digits, hyphens, and a TLD (e.g.
           <span class="font-mono">yourshop.com</span>).
         </p>
@@ -59,7 +59,7 @@
         </button>
         <button
           type="submit"
-          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-accent disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95 disabled:opacity-50"
           [disabled]="creating() || form.domain.invalid"
         >
           @if (creating()) {

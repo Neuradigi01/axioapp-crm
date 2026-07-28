@@ -65,8 +65,8 @@ export interface ContextMenuItem {
           <button
             type="button"
             class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            [class.text-rose-600]="item.danger && !item.disabled"
-            [class.hover:bg-rose-50]="item.danger && !item.disabled"
+            [class.text-red-500]="item.danger && !item.disabled"
+            [class.hover:bg-red-500/10]="item.danger && !item.disabled"
             [class.hover:bg-surface-2]="!item.danger && !item.disabled"
             [disabled]="item.disabled"
             (click)="onSelect(item)"

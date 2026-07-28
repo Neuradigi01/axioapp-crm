@@ -69,7 +69,7 @@
     <div class="mt-3 flex items-center gap-2">
       <button
         type="button"
-        class="px-3 py-1.5 text-xs rounded bg-accent text-white hover:bg-accent disabled:opacity-50"
+        class="px-3 py-1.5 text-xs rounded bg-accent text-white hover:brightness-95 disabled:opacity-50"
         [disabled]="!canRun()"
         (click)="runTrace()"
       >
@@ -111,7 +111,7 @@
                 class="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-semibold"
                 [class.bg-emerald-200]="entry.eligible"
                 [class.text-emerald-300]="entry.eligible"
-                [class.bg-rose-200]="!entry.eligible"
+                [class.bg-red-500/20]="!entry.eligible"
                 [class.text-red-300]="!entry.eligible"
               >
                 {{ entry.eligible ? '✓' : '✗' }}

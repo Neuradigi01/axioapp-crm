@@ -1,5 +1,5 @@
 <div
-  class="fixed inset-0 z-40 flex items-center justify-center bg-accent/40 p-4"
+  class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
   (click)="onBackdropClick($event)"
 >
   <div
@@ -89,7 +89,7 @@
             </p>
             <button
               type="button"
-              class="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-accent disabled:opacity-60"
+              class="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:brightness-95 disabled:opacity-60"
               [disabled]="redirecting() !== null"
               (click)="connectGmail()"
             >
@@ -116,7 +116,7 @@
             </p>
             <button
               type="button"
-              class="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-accent disabled:opacity-60"
+              class="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:brightness-95 disabled:opacity-60"
               [disabled]="redirecting() !== null"
               (click)="connectMicrosoft()"
             >
@@ -140,7 +140,7 @@
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label class="block sm:col-span-2">
                 <span class="text-xs font-medium text-default"
-                  >From address <span class="text-rose-600">*</span></span
+                  >From address <span class="text-red-500">*</span></span
                 >
                 <input
                   type="email"
@@ -171,7 +171,7 @@
 
               <label class="block">
                 <span class="text-xs font-medium text-default"
-                  >SMTP host <span class="text-rose-600">*</span></span
+                  >SMTP host <span class="text-red-500">*</span></span
                 >
                 <input
                   type="text"
@@ -184,7 +184,7 @@
 
               <label class="block">
                 <span class="text-xs font-medium text-default"
-                  >SMTP port <span class="text-rose-600">*</span></span
+                  >SMTP port <span class="text-red-500">*</span></span
                 >
                 <input
                   type="number"
@@ -198,7 +198,7 @@
 
               <label class="block sm:col-span-2">
                 <span class="text-xs font-medium text-default"
-                  >SMTP username <span class="text-rose-600">*</span></span
+                  >SMTP username <span class="text-red-500">*</span></span
                 >
                 <input
                   type="text"
@@ -211,7 +211,7 @@
 
               <label class="block sm:col-span-2">
                 <span class="text-xs font-medium text-default"
-                  >SMTP password <span class="text-rose-600">*</span></span
+                  >SMTP password <span class="text-red-500">*</span></span
                 >
                 <div class="relative mt-1">
                   <input
@@ -263,7 +263,7 @@
               </button>
               <button
                 type="submit"
-                class="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-accent disabled:opacity-50"
+                class="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white shadow-sm hover:brightness-95 disabled:opacity-50"
                 [disabled]="submitting() || !isSmtpValid()"
               >
                 @if (submitting()) {

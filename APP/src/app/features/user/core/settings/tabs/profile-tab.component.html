@@ -73,7 +73,7 @@
             <button
               type="submit"
               [disabled]="profileForm.invalid || profileSaving()"
-              class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+              class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {{ profileSaving() ? 'Saving…' : 'Save profile' }}
             </button>
@@ -142,7 +142,7 @@
             <button
               type="submit"
               [disabled]="passwordSaving()"
-              class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+              class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {{ passwordSaving() ? 'Saving…' : 'Change password' }}
             </button>

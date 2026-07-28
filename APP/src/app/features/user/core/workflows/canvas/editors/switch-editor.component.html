@@ -9,7 +9,7 @@
       class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     />
     @if (!path().trim()) {
-      <p class="text-[10px] text-rose-600 mt-1">Path is required.</p>
+      <p class="text-[10px] text-red-500 mt-1">Path is required.</p>
     }
   </div>
 
@@ -25,7 +25,7 @@
             placeholder="value to match"
             class="flex-1 text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
           />
-          <button type="button" class="text-faint hover:text-rose-600" (click)="removeCase($index)">
+          <button type="button" class="text-faint hover:text-red-500" (click)="removeCase($index)">
             <lucide-icon name="x" class="w-3.5 h-3.5"></lucide-icon>
           </button>
         </div>
@@ -40,7 +40,7 @@
       Add case
     </button>
     @if (cases().length === 0) {
-      <p class="text-[10px] text-rose-600 mt-1">At least one case is required.</p>
+      <p class="text-[10px] text-red-500 mt-1">At least one case is required.</p>
     }
     <p class="text-[10px] text-muted mt-1">
       The <code>default</code> edge fires when no case matches.

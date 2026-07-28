@@ -87,7 +87,7 @@ export class CampaignDetailPageComponent {
       scheduled: { label: 'Scheduled', cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
       running: { label: 'Running', cls: 'bg-sky-50 text-sky-700 ring-sky-200' },
       done: { label: 'Done', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-      failed: { label: 'Failed', cls: 'bg-rose-50 text-rose-700 ring-rose-200' },
+      failed: { label: 'Failed', cls: 'bg-red-500/10 text-red-400 ring-red-500/20' },
     };
     return map[c.status];
   });
@@ -278,7 +278,7 @@ export class CampaignDetailPageComponent {
       case 'queued':
         return 'bg-amber-50 text-amber-700 ring-amber-200';
       case 'failed':
-        return 'bg-rose-50 text-rose-700 ring-rose-200';
+        return 'bg-red-500/10 text-red-400 ring-red-500/20';
     }
   }
 

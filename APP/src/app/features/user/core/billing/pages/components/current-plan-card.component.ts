@@ -33,7 +33,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
   cancelled: {
     label: 'Cancelled',
     pillClasses:
-      'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:ring-rose-900',
+      'bg-red-500/10 text-red-400 ring-red-500/20 dark:bg-red-300 dark:text-red-500/30 dark:ring-red-300',
   },
   archived: {
     label: 'Archived',
@@ -91,7 +91,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
         <button
           type="button"
           (click)="onUpgrade()"
-          class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent dark:bg-surface dark:text-default dark:hover:bg-surface-2"
+          class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 dark:bg-surface dark:text-default dark:hover:bg-surface-2"
         >
           Upgrade plan
           <lucide-icon name="arrow-right" size="14" aria-hidden="true"></lucide-icon>
@@ -102,7 +102,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
         class="grid gap-px border-t border-subtle bg-surface-2 sm:grid-cols-2 dark:border-subtle dark:bg-surface"
       >
         @for (row of detailRows(); track row.label) {
-          <div class="bg-surface-2 px-6 py-4 dark:bg-accent/60">
+          <div class="bg-surface-2 px-6 py-4 dark:bg-black/60">
             <dt class="text-xs font-medium uppercase tracking-wide text-muted dark:text-faint">
               {{ row.label }}
             </dt>

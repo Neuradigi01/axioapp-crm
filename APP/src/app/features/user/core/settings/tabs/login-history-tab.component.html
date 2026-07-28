@@ -81,7 +81,7 @@
                     type="button"
                     (click)="revoke(s)"
                     [disabled]="revokingId() === s.id"
-                    class="text-xs text-rose-600 hover:text-red-400 disabled:opacity-50"
+                    class="text-xs text-red-500 hover:text-red-400 disabled:opacity-50"
                   >
                     {{ revokingId() === s.id ? 'Signing out…' : 'Sign out' }}
                   </button>

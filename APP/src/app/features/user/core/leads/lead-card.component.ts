@@ -32,7 +32,7 @@ const AVATAR_PALETTE: ReadonlyArray<string> = [
   'bg-emerald-200 text-emerald-800',
   'bg-sky-200 text-sky-800',
   'bg-amber-200 text-amber-800',
-  'bg-rose-200 text-rose-800',
+  'bg-red-500/20 text-red-400',
   'bg-violet-200 text-violet-800',
   'bg-cyan-200 text-cyan-800',
   'bg-orange-200 text-orange-800',
@@ -136,7 +136,7 @@ export class LeadCardComponent {
   readonly stalenessDotClass = computed(() => {
     switch (this.stalenessLevel()) {
       case 'rotten':
-        return 'bg-rose-500';
+        return 'bg-red-500';
       case 'stale':
         return 'bg-amber-500';
       default:

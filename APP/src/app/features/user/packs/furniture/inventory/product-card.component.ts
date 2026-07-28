@@ -30,7 +30,7 @@ export class ProductCardComponent {
     if (i.qty_on_hand <= 0) {
       return {
         label: 'Out of Stock',
-        cls: 'bg-rose-50 text-rose-700 ring-rose-200',
+        cls: 'bg-red-500/10 text-red-400 ring-red-500/20',
       };
     }
     if (i.reorder_level > 0 && i.qty_on_hand <= i.reorder_level) {
@@ -51,7 +51,7 @@ export class ProductCardComponent {
     // Deterministic colour per item id so the same SKU always gets
     // the same pastel background until real photos land.
     const palette = [
-      'bg-rose-100',
+      'bg-red-500/10',
       'bg-amber-100',
       'bg-emerald-100',
       'bg-sky-100',

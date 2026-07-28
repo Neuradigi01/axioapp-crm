@@ -55,7 +55,7 @@ const STATUS_BADGE: Record<WhatsAppTemplateSubmissionStatus, { label: string; cl
   },
   rejected: {
     label: 'Rejected',
-    classes: 'bg-rose-50 text-rose-700 ring-rose-200',
+    classes: 'bg-red-500/10 text-red-400 ring-red-500/20',
   },
   paused: {
     label: 'Paused',

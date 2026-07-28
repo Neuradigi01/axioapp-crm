@@ -35,7 +35,7 @@
           <button
             type="button"
             (click)="startCreate()"
-            class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent"
+            class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
           >
             Create role
           </button>
@@ -140,7 +140,7 @@
                         ' member(s) still use this role. Reassign them first.'
                       : 'Delete role'
                   "
-                  class="rounded-md border border-rose-300 bg-surface px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="rounded-md border border-red-500/30 bg-surface px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Delete
                 </button>
@@ -248,7 +248,7 @@
           <button
             type="submit"
             [disabled]="nameForm.invalid || saving()"
-            class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+            class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {{ saving() ? 'Saving…' : editingRole() ? 'Save changes' : 'Create role' }}
           </button>

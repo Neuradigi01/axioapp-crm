@@ -90,7 +90,7 @@ import { LeadRoutingStrategy, LeadsApiService } from '../leads/leads-api.service
             type="button"
             (click)="onSave()"
             [disabled]="loading() || submitting()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             @if (submitting()) {
               <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />

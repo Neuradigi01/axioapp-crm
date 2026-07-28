@@ -40,7 +40,7 @@ import { LucideAngularModule } from 'lucide-angular';
         type="button"
         (click)="onSave()"
         [disabled]="!localValue()"
-        class="inline-flex items-center gap-1 rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-surface-2"
+        class="inline-flex items-center gap-1 rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:bg-surface-2"
       >
         <lucide-icon name="check" size="14" aria-hidden="true"></lucide-icon>
         Save

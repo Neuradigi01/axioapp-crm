@@ -90,7 +90,7 @@ export class StockAlertsTabComponent {
     return s === 'out'
       ? {
           label: 'Out of Stock',
-          cls: 'bg-rose-50 text-rose-700 ring-rose-200',
+          cls: 'bg-red-500/10 text-red-400 ring-red-500/20',
         }
       : {
           label: 'Low Stock',
@@ -106,7 +106,7 @@ export class StockAlertsTabComponent {
       case 'high':
         return {
           label: 'High',
-          cls: 'bg-rose-100 text-rose-800 ring-rose-300',
+          cls: 'bg-red-500/10 text-red-400 ring-red-500/30',
         };
       case 'med':
         return {

@@ -25,7 +25,7 @@
       Loading property…
     </div>
   } @else if (loadError()) {
-    <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
       {{ loadError() }}
     </div>
   } @else {
@@ -40,7 +40,7 @@
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label class="col-span-full block">
             <span class="mb-1 block text-xs font-medium text-muted">
-              Title <span class="text-rose-600">*</span>
+              Title <span class="text-red-500">*</span>
             </span>
             <input
               type="text"
@@ -49,13 +49,13 @@
               class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm placeholder:text-faint focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
             @if (fieldError('title'); as msg) {
-              <span class="mt-1 block text-xs text-rose-600">{{ msg }}</span>
+              <span class="mt-1 block text-xs text-red-500">{{ msg }}</span>
             }
           </label>
 
           <label class="block">
             <span class="mb-1 block text-xs font-medium text-muted">
-              Type <span class="text-rose-600">*</span>
+              Type <span class="text-red-500">*</span>
             </span>
             <select
               formControlName="property_type"
@@ -67,13 +67,13 @@
               }
             </select>
             @if (fieldError('property_type'); as msg) {
-              <span class="mt-1 block text-xs text-rose-600">{{ msg }}</span>
+              <span class="mt-1 block text-xs text-red-500">{{ msg }}</span>
             }
           </label>
 
           <label class="block">
             <span class="mb-1 block text-xs font-medium text-muted">
-              Category <span class="text-rose-600">*</span>
+              Category <span class="text-red-500">*</span>
             </span>
             <select
               formControlName="category"
@@ -85,7 +85,7 @@
               }
             </select>
             @if (fieldError('category'); as msg) {
-              <span class="mt-1 block text-xs text-rose-600">{{ msg }}</span>
+              <span class="mt-1 block text-xs text-red-500">{{ msg }}</span>
             }
           </label>
 
@@ -268,7 +268,7 @@
               class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
             @if (fieldError('contact_email'); as msg) {
-              <span class="mt-1 block text-xs text-rose-600">{{ msg }}</span>
+              <span class="mt-1 block text-xs text-red-500">{{ msg }}</span>
             }
           </label>
         </div>
@@ -296,7 +296,7 @@
 
       <!-- Error banner -->
       @if (submitError()) {
-        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        <div class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
           {{ submitError() }}
         </div>
       }
@@ -331,7 +331,7 @@
           <button
             type="submit"
             [disabled]="saving()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-2 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             @if (saving()) {
               <lucide-icon name="loader-2" class="h-4 w-4 animate-spin"></lucide-icon>

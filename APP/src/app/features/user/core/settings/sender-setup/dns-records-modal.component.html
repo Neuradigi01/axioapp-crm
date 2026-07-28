@@ -1,5 +1,5 @@
 <div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40 p-4"
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
   (click)="onBackdropClick($event)"
   data-testid="dns-records-modal-backdrop"
 >
@@ -86,7 +86,7 @@
     <footer class="flex items-center justify-end gap-2 border-t border-subtle px-4 md:px-6 py-4">
       <button
         type="button"
-        class="inline-flex items-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-accent"
+        class="inline-flex items-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
         (click)="closed.emit()"
       >
         Done

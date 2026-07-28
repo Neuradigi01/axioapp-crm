@@ -91,7 +91,7 @@ interface UsageRowVM {
                     class="h-full rounded-full transition-all"
                     [class.bg-emerald-500]="row.tone === 'green'"
                     [class.bg-amber-500]="row.tone === 'yellow'"
-                    [class.bg-rose-500]="row.tone === 'red'"
+                    [class.bg-red-500]="row.tone === 'red'"
                     [style.width.%]="row.percent"
                   ></div>
                 </div>

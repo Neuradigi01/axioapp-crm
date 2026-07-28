@@ -17,7 +17,7 @@
       </a>
       <a
         routerLink="/user/contacts/groups/new"
-        class="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent"
+        class="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
       >
         <lucide-icon name="plus" class="h-4 w-4" />
         New group
@@ -48,7 +48,7 @@
       </p>
       <a
         routerLink="/user/contacts/groups/new"
-        class="mt-4 inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent"
+        class="mt-4 inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
       >
         <lucide-icon name="plus" class="h-4 w-4" />
         Create your first group
@@ -134,7 +134,7 @@
                 </button>
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-surface px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10"
+                  class="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-surface px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10"
                   (click)="onDeleteClick(g)"
                 >
                   <lucide-icon name="trash-2" class="h-3 w-3" />
@@ -194,10 +194,10 @@
 </div>
 
 @if (pendingDelete(); as target) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/50 px-4">
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
     <div class="w-full max-w-md rounded-lg bg-surface p-5 shadow-xl">
       <header class="mb-3 flex items-start gap-3">
-        <span class="rounded-full bg-red-500/10 p-2 text-rose-600">
+        <span class="rounded-full bg-red-500/10 p-2 text-red-500">
           <lucide-icon name="alert-triangle" class="h-5 w-5" />
         </span>
         <div>
@@ -219,7 +219,7 @@
         </button>
         <button
           type="button"
-          class="inline-flex items-center gap-1 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+          class="inline-flex items-center gap-1 rounded-md bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-400 disabled:opacity-50"
           [disabled]="deleting()"
           (click)="onConfirmDelete()"
         >

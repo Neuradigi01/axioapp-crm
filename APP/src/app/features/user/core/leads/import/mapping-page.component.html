@@ -208,7 +208,7 @@
           type="button"
           [disabled]="!canCommit()"
           (click)="commit()"
-          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           @if (committing()) {
             <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
@@ -224,7 +224,7 @@
 
   <!-- Save-preset modal -->
   @if (savePresetOpen()) {
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40 p-4">
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div class="w-full max-w-md rounded-md bg-surface p-5 shadow-xl">
         <h2 class="text-base font-semibold text-default">Save mapping as preset</h2>
         <p class="mt-1 text-xs text-muted">
@@ -256,7 +256,7 @@
             type="button"
             [disabled]="saving()"
             (click)="saveAsPreset()"
-            class="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent disabled:opacity-50"
+            class="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
           >
             {{ saving() ? 'Saving…' : 'Save preset' }}
           </button>

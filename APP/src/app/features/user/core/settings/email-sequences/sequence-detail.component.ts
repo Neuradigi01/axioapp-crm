@@ -108,7 +108,7 @@ export class SequenceDetailComponent implements OnInit {
     completed: 'bg-surface-2 text-default ring-1 border-subtle',
     paused_on_reply: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
     paused_manual: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
-    cancelled: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+    cancelled: 'bg-red-500/10 text-red-400 ring-1 ring-red-500/20',
   };
 
   ngOnInit(): void {

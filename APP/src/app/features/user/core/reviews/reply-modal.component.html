@@ -1,4 +1,4 @@
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/50 px-4">
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
   <div class="w-full max-w-lg rounded-lg bg-surface p-5 shadow-xl">
     <header class="mb-3">
       <h2 class="text-lg font-semibold text-default">Reply to review</h2>
@@ -48,7 +48,7 @@
         <button
           type="submit"
           [disabled]="submitting() || !textControl.value.trim()"
-          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:opacity-50"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
         >
           {{ submitting() ? 'Sending…' : 'Send reply' }}
         </button>

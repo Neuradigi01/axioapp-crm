@@ -9,7 +9,7 @@
     </div>
     <a
       [routerLink]="['/user/properties/new']"
-      class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-accent"
+      class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:brightness-95"
     >
       <lucide-icon name="plus" class="h-4 w-4"></lucide-icon>
       New Property
@@ -59,7 +59,7 @@
 
   <!-- Error banner -->
   @if (loadError()) {
-    <div class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div class="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
       {{ loadError() }}
     </div>
   }
@@ -75,7 +75,7 @@
         </div>
         <a
           [routerLink]="['/user/properties/new']"
-          class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-accent"
+          class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:brightness-95"
         >
           <lucide-icon name="plus" class="h-4 w-4"></lucide-icon>
           New Property

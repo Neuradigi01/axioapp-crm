@@ -47,7 +47,7 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
         <button
           type="button"
           (click)="openAdd()"
-          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95"
         >
           <lucide-icon name="plus" class="h-3.5 w-3.5" />
           Block a number
@@ -68,7 +68,7 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
       </div>
 
       @if (error(); as err) {
-        <p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
           {{ err }}
         </p>
       }
@@ -148,7 +148,7 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
 
     @if (addOpen()) {
       <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
         (click)="closeAdd()"
       >
         <div
@@ -199,7 +199,7 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
               type="button"
               [disabled]="busy() || !form().phone_number"
               (click)="submitAdd()"
-              class="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent disabled:opacity-50"
+              class="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95 disabled:opacity-50"
             >
               {{ busy() ? 'Adding…' : 'Block number' }}
             </button>

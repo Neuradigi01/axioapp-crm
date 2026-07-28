@@ -50,7 +50,7 @@ import { OptInChipComponent } from './opt-in-chip.component';
         <p class="text-[11px] text-muted">Loading…</p>
       }
       @if (error(); as err) {
-        <p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
           {{ err }}
         </p>
       }
@@ -66,9 +66,9 @@ import { OptInChipComponent } from './opt-in-chip.component';
           </div>
           @if (h.opt_out_recorded_at) {
             <div
-              class="col-span-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-rose-700"
+              class="col-span-2 rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1 text-red-400"
             >
-              <dt class="text-[10px] uppercase text-rose-700">Opted out</dt>
+              <dt class="text-[10px] uppercase text-red-400">Opted out</dt>
               <dd>
                 {{ formatDate(h.opt_out_recorded_at) }}
                 @if (h.opt_out_reason) {
@@ -91,7 +91,7 @@ import { OptInChipComponent } from './opt-in-chip.component';
             </button>
             <button
               type="button"
-              class="rounded-md border border-rose-300 bg-surface px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+              class="rounded-md border border-red-500/30 bg-surface px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
               [disabled]="busy() || h.status === 'opted_out'"
               (click)="manualOptOut()"
             >

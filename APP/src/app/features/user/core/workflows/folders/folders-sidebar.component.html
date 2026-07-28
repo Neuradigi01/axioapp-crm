@@ -16,7 +16,7 @@
   </header>
 
   @if (mutationError(); as err) {
-    <div class="border-b border-rose-100 bg-red-500/10 px-3 py-1.5 text-[11px] text-red-400">
+    <div class="border-b border-red-500/10 bg-red-500/10 px-3 py-1.5 text-[11px] text-red-400">
       {{ err }}
     </div>
   }
@@ -78,7 +78,7 @@
                 <button
                   type="button"
                   (click)="onDelete(folder, $event)"
-                  class="invisible rounded p-0.5 text-faint hover:text-rose-600 group-hover:visible"
+                  class="invisible rounded p-0.5 text-faint hover:text-red-500 group-hover:visible"
                   title="Delete folder"
                 >
                   <lucide-icon name="trash-2" size="12" />
@@ -107,7 +107,7 @@
                 <button
                   type="button"
                   (click)="onDelete(child, $event)"
-                  class="invisible rounded p-0.5 text-faint hover:text-rose-600 group-hover:visible"
+                  class="invisible rounded p-0.5 text-faint hover:text-red-500 group-hover:visible"
                   title="Delete folder"
                 >
                   <lucide-icon name="trash-2" size="12" />

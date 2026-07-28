@@ -22,7 +22,7 @@
           registerForm.controls['first_name'].invalid &&
           (registerForm.controls['first_name'].touched || registerForm.controls['first_name'].dirty)
         ) {
-          <p class="mt-1 text-xs text-rose-600">
+          <p class="mt-1 text-xs text-red-500">
             <app-validation-message
               [control]="registerForm.controls['first_name']"
               label="First name"
@@ -43,7 +43,7 @@
           registerForm.controls['last_name'].invalid &&
           (registerForm.controls['last_name'].touched || registerForm.controls['last_name'].dirty)
         ) {
-          <p class="mt-1 text-xs text-rose-600">
+          <p class="mt-1 text-xs text-red-500">
             <app-validation-message
               [control]="registerForm.controls['last_name']"
               label="Last name"
@@ -83,7 +83,7 @@
         registerForm.controls['email'].invalid &&
         (registerForm.controls['email'].touched || registerForm.controls['email'].dirty)
       ) {
-        <p class="mt-1 text-xs text-rose-600">
+        <p class="mt-1 text-xs text-red-500">
           <app-validation-message [control]="registerForm.controls['email']" label="Email" />
         </p>
       }
@@ -208,7 +208,7 @@
         registerForm.controls['password'].invalid &&
         (registerForm.controls['password'].touched || registerForm.controls['password'].dirty)
       ) {
-        <p class="mt-1 text-xs text-rose-600">
+        <p class="mt-1 text-xs text-red-500">
           <app-validation-message [control]="registerForm.controls['password']" label="Password" />
         </p>
       }
@@ -241,7 +241,7 @@
         (registerForm.controls['confirm_password'].touched ||
           registerForm.controls['confirm_password'].dirty)
       ) {
-        <p class="mt-1 text-xs text-rose-600">
+        <p class="mt-1 text-xs text-red-500">
           <app-validation-message
             [control]="registerForm.controls['confirm_password']"
             label="Confirm password"
@@ -274,7 +274,7 @@
     <button
       type="submit"
       [disabled]="isLoading()"
-      class="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+      class="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {{ isLoading() ? 'Creating account…' : 'Create Account' }}
     </button>

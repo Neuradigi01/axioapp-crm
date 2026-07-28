@@ -18,7 +18,7 @@
     @if (!isHidden('title')) {
       <label class="block text-sm">
         <span class="mb-1 block text-xs font-medium text-muted">
-          {{ stdField('title')?.label ?? 'Title' }} <span class="text-rose-600">*</span>
+          {{ stdField('title')?.label ?? 'Title' }} <span class="text-red-500">*</span>
         </span>
         <input
           type="text"
@@ -39,7 +39,7 @@
         <span class="mb-1 block text-xs font-medium text-muted">
           {{ stdField('description')?.label ?? 'Description' }}
           @if (stdField('description')?.is_required) {
-            <span class="text-rose-600">*</span>
+            <span class="text-red-500">*</span>
           }
         </span>
         <textarea
@@ -60,7 +60,7 @@
           <span class="mb-1 block text-xs font-medium text-muted">
             {{ stdField('due_at')?.label ?? 'Due date' }}
             @if (stdField('due_at')?.is_required) {
-              <span class="text-rose-600">*</span>
+              <span class="text-red-500">*</span>
             }
           </span>
           <input
@@ -78,7 +78,7 @@
       @if (!isHidden('priority')) {
         <label class="block text-sm">
           <span class="mb-1 block text-xs font-medium text-muted">
-            {{ stdField('priority')?.label ?? 'Priority' }} <span class="text-rose-600">*</span>
+            {{ stdField('priority')?.label ?? 'Priority' }} <span class="text-red-500">*</span>
           </span>
           <select
             formControlName="priority"
@@ -100,7 +100,7 @@
         <span class="mb-1 block text-xs font-medium text-muted">
           {{ stdField('assigned_to_id')?.label ?? 'Assignee' }}
           @if (stdField('assigned_to_id')?.is_required) {
-            <span class="text-rose-600">*</span>
+            <span class="text-red-500">*</span>
           }
         </span>
         <select
@@ -238,7 +238,7 @@
       <button
         type="submit"
         [disabled]="form.invalid || saving()"
-        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Create task' }}
       </button>

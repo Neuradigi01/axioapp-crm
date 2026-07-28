@@ -28,8 +28,8 @@
                   ? 'Add at least one image to publish.'
                   : action.label
               "
-              [class.text-rose-700]="action.destructive"
-              [class.hover:bg-rose-50]="action.destructive"
+              [class.text-red-400]="action.destructive"
+              [class.hover:bg-red-500/10]="action.destructive"
               class="flex w-full items-center gap-2 px-3 py-2 text-left text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <lucide-icon [name]="action.icon" class="h-4 w-4"></lucide-icon>
@@ -45,7 +45,7 @@
 <!-- Delete / Archive confirmation modal -->
 @if (pendingMessage(); as msg) {
   <div
-    class="fixed inset-0 z-40 flex items-center justify-center bg-accent/40 p-4"
+    class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
     role="dialog"
     aria-modal="true"
   >
@@ -63,7 +63,7 @@
         <button
           type="button"
           (click)="confirmPending()"
-          class="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-700"
+          class="rounded-md bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-400"
         >
           {{ msg.confirm }}
         </button>
@@ -75,7 +75,7 @@
 <!-- Clipboard fallback modal (older browsers) -->
 @if (clipboardFallbackUrl(); as url) {
   <div
-    class="fixed inset-0 z-40 flex items-center justify-center bg-accent/40 p-4"
+    class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
     role="dialog"
     aria-modal="true"
   >
@@ -95,7 +95,7 @@
         <button
           type="button"
           (click)="dismissClipboardFallback()"
-          class="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent"
+          class="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-95"
         >
           Done
         </button>

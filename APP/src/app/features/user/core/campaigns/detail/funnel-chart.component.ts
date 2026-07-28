@@ -106,7 +106,7 @@ export class FunnelChartComponent {
       case 'converted':
         return 'bg-violet-500';
       case 'failed':
-        return 'bg-rose-500';
+        return 'bg-red-500';
       default:
         return 'bg-surface-2';
     }

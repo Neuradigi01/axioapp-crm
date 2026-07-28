@@ -45,7 +45,7 @@ type Mode = 'list' | 'pick' | 'build';
           <button
             type="button"
             (click)="openPicker()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95"
           >
             <lucide-icon name="plus" class="h-3.5 w-3.5" />
             New flow
@@ -63,7 +63,7 @@ type Mode = 'list' | 'pick' | 'build';
       </header>
 
       @if (error(); as err) {
-        <p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
           {{ err }}
         </p>
       }
@@ -147,7 +147,7 @@ type Mode = 'list' | 'pick' | 'build';
                         <button
                           type="button"
                           (click)="onArchive(row)"
-                          class="rounded border border-rose-300 bg-surface px-2 py-1 text-[11px] text-rose-700 hover:bg-rose-50"
+                          class="rounded border border-red-500/30 bg-surface px-2 py-1 text-[11px] text-red-400 hover:bg-red-500/10"
                         >
                           Archive
                         </button>

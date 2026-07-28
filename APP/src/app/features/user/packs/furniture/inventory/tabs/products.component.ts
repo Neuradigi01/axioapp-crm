@@ -113,7 +113,7 @@ export class ProductsTabComponent {
     if (item.qty_on_hand <= 0) {
       return {
         label: 'Out of Stock',
-        cls: 'bg-rose-50 text-rose-700 ring-rose-200',
+        cls: 'bg-red-500/10 text-red-400 ring-red-500/20',
       };
     }
     if (item.reorder_level > 0 && item.qty_on_hand <= item.reorder_level) {

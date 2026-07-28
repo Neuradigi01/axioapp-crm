@@ -14,7 +14,7 @@
   </div>
 
   @if (loadError(); as err) {
-    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
       {{ err }}
     </div>
   }
@@ -113,7 +113,7 @@
 
   <!-- Reorder modal -->
   @if (modalTarget(); as row) {
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/50 px-4">
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
       <div class="w-full max-w-md rounded-lg bg-surface p-5 shadow-xl">
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-default">Plan a reorder</h2>
@@ -169,7 +169,7 @@
             <button
               type="submit"
               [disabled]="busyAlertId() === row.alert.id"
-              class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:opacity-50"
+              class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
             >
               {{ busyAlertId() === row.alert.id ? 'Saving…' : 'Confirm reorder' }}
             </button>

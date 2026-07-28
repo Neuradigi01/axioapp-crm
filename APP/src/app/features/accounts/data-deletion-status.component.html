@@ -16,10 +16,10 @@
         Checking status…
       </div>
     } @else if (error(); as err) {
-      <div class="rounded-lg border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800 shadow-sm">
+      <div class="rounded-lg border border-red-500/20 bg-red-500/10 p-6 text-sm text-red-400 shadow-sm">
         <p class="font-medium">We couldn't load this page.</p>
         <p class="mt-2">{{ err }}</p>
-        <p class="mt-4 text-xs text-rose-700">
+        <p class="mt-4 text-xs text-red-400">
           If the problem keeps happening, contact us at
           <a href="mailto:privacy@core-crm.com" class="underline hover:no-underline"
             >privacy&#64;core-crm.com</a
@@ -76,7 +76,7 @@
             }
             @case ('failed') {
               <span
-                class="mt-1 h-3 w-3 shrink-0 rounded-full bg-rose-500"
+                class="mt-1 h-3 w-3 shrink-0 rounded-full bg-red-500"
                 aria-hidden="true"
               ></span>
               <div>

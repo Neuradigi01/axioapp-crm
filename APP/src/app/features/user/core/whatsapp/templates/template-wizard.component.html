@@ -43,7 +43,7 @@
             class="w-full rounded-md border border-subtle px-3 py-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
           @if (nameError(); as err) {
-            <p class="mt-1 text-xs text-rose-600">{{ err }}</p>
+            <p class="mt-1 text-xs text-red-500">{{ err }}</p>
           }
 
           <label class="mb-1 mt-4 block text-xs font-medium text-default">Language</label>
@@ -117,7 +117,7 @@
               {{ headerText().length }}/{{ LIMITS.headerMax }}
             </p>
             @if (headerError(); as err) {
-              <p class="mt-1 text-xs text-rose-600">{{ err }}</p>
+              <p class="mt-1 text-xs text-red-500">{{ err }}</p>
             }
           } @else if (headerType() && headerType() !== 'TEXT') {
             <div class="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
@@ -156,7 +156,7 @@
             <span>{{ bodyChars() }}/{{ LIMITS.bodyMax }}</span>
           </div>
           @if (bodyError(); as err) {
-            <p class="mt-1 text-xs text-rose-600">{{ err }}</p>
+            <p class="mt-1 text-xs text-red-500">{{ err }}</p>
           }
         }
 
@@ -310,7 +310,7 @@
           }
 
           @if (buttonsError(); as err) {
-            <p class="mt-2 text-xs text-rose-600">{{ err }}</p>
+            <p class="mt-2 text-xs text-red-500">{{ err }}</p>
           }
         }
 
@@ -347,7 +347,7 @@
             </div>
           }
           @if (samplesError(); as err) {
-            <p class="mt-2 text-xs text-rose-600">{{ err }}</p>
+            <p class="mt-2 text-xs text-red-500">{{ err }}</p>
           }
         }
 
@@ -414,7 +414,7 @@
             type="button"
             (click)="goNext()"
             [disabled]="!canAdvance()"
-            class="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
+            class="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
           >
             Next
           </button>

@@ -23,7 +23,7 @@ import {
 const QUALITY_DOT: Record<WhatsAppQualityRating, string> = {
   GREEN: 'bg-emerald-500',
   YELLOW: 'bg-amber-500',
-  RED: 'bg-rose-500',
+  RED: 'bg-red-500',
   UNKNOWN: 'bg-surface-2',
 };
 
@@ -68,7 +68,7 @@ const QUALITY_LABEL: Record<WhatsAppQualityRating, string> = {
         }
         @if (h.restrictions.length > 0) {
           <p
-            class="mt-1 inline-flex items-center gap-1 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700"
+            class="mt-1 inline-flex items-center gap-1 rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-400"
           >
             <lucide-icon name="alert-triangle" size="10" />
             Restricted

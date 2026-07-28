@@ -17,7 +17,7 @@
           class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none disabled:bg-surface-2"
         />
         @if (recipient() && !recipientValid()) {
-          <p class="mt-1 text-[10px] text-rose-600">
+          <p class="mt-1 text-[10px] text-red-500">
             Doesn't look like a valid {{ template().channel }} recipient.
           </p>
         }
@@ -95,7 +95,7 @@
           type="button"
           (click)="submit()"
           [disabled]="!canSubmit()"
-          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
         >
           @if (submitting()) {
             <lucide-icon name="loader-2" size="12" class="animate-spin" />

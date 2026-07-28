@@ -1,5 +1,5 @@
 @if (open()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40 p-4">
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
     <div class="w-full max-w-lg rounded-md bg-surface p-5 shadow-xl">
       @if (issuedKey(); as key) {
         <!-- Reveal phase ----------------------------------------- -->
@@ -62,7 +62,7 @@
             type="button"
             [disabled]="!canClose()"
             (click)="close()"
-            class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+            class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Done
           </button>
@@ -107,7 +107,7 @@
             type="button"
             [disabled]="submitting()"
             (click)="submit()"
-            class="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent disabled:opacity-50"
+            class="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
           >
             @if (submitting()) {
               <lucide-icon name="loader-2" class="mr-1 inline h-4 w-4 animate-spin" />

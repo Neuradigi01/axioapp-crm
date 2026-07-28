@@ -1006,7 +1006,7 @@ export class LeadsPageComponent {
       case 'won':
         return 'bg-emerald-100 text-emerald-800 ring-emerald-200';
       case 'lost':
-        return 'bg-rose-100 text-rose-800 ring-rose-200';
+        return 'bg-red-500/10 text-red-400 ring-red-500/20';
       default:
         return 'bg-blue-100 text-blue-800 ring-blue-200';
     }

@@ -6,12 +6,12 @@
       Validating invitation…
     </div>
   } @else if (state() === 'invalid') {
-    <div class="rounded-lg border border-rose-200 bg-rose-50 p-6 text-center shadow-sm">
-      <h1 class="text-base font-semibold text-rose-800">Invitation unavailable</h1>
-      <p class="mt-2 text-sm text-rose-700">{{ invalidReason() }}</p>
+    <div class="rounded-lg border border-red-500/20 bg-red-500/10 p-6 text-center shadow-sm">
+      <h1 class="text-base font-semibold text-red-400">Invitation unavailable</h1>
+      <p class="mt-2 text-sm text-red-400">{{ invalidReason() }}</p>
       <a
         href="/accounts/login"
-        class="mt-4 inline-block rounded-md bg-rose-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-800"
+        class="mt-4 inline-block rounded-md bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
       >
         Go to login
       </a>
@@ -44,9 +44,11 @@
               autocomplete="given-name"
               class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
-            <p class="mt-1 text-xs text-rose-600">
-              <app-validation-message [control]="form.controls.first_name" label="First name" />
-            </p>
+            @if (form.controls.first_name.touched && form.controls.first_name.invalid) {
+              <p class="mt-1 text-xs text-red-500">
+                <app-validation-message [control]="form.controls.first_name" label="First name" />
+              </p>
+            }
           </label>
           <label class="block text-sm">
             <span class="mb-1 block text-xs font-medium text-muted">Last name</span>
@@ -56,9 +58,11 @@
               autocomplete="family-name"
               class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
-            <p class="mt-1 text-xs text-rose-600">
-              <app-validation-message [control]="form.controls.last_name" label="Last name" />
-            </p>
+            @if (form.controls.last_name.touched && form.controls.last_name.invalid) {
+              <p class="mt-1 text-xs text-red-500">
+                <app-validation-message [control]="form.controls.last_name" label="Last name" />
+              </p>
+            }
           </label>
         </div>
         <label class="block text-sm">
@@ -69,9 +73,11 @@
             autocomplete="tel"
             class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <p class="mt-1 text-xs text-rose-600">
-            <app-validation-message [control]="form.controls.phone" label="Phone" />
-          </p>
+          @if (form.controls.phone.touched && form.controls.phone.invalid) {
+            <p class="mt-1 text-xs text-red-500">
+              <app-validation-message [control]="form.controls.phone" label="Phone" />
+            </p>
+          }
         </label>
         <label class="block text-sm">
           <span class="mb-1 block text-xs font-medium text-muted">Password</span>
@@ -84,9 +90,11 @@
           <span class="mt-1 block text-[11px] text-muted">
             8–128 chars with upper, lower, digit, and special.
           </span>
-          <p class="mt-1 text-xs text-rose-600">
-            <app-validation-message [control]="form.controls.password" label="Password" />
-          </p>
+          @if (form.controls.password.touched && form.controls.password.invalid) {
+            <p class="mt-1 text-xs text-red-500">
+              <app-validation-message [control]="form.controls.password" label="Password" />
+            </p>
+          }
         </label>
         <label class="block text-sm">
           <span class="mb-1 block text-xs font-medium text-muted">Confirm password</span>
@@ -96,16 +104,20 @@
             autocomplete="new-password"
             class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <p class="mt-1 text-xs text-rose-600">
-            <app-validation-message
-              [control]="form.controls.confirm_password"
-              label="Confirm password"
-            />
-          </p>
+          @if (form.controls.confirm_password.touched && form.controls.confirm_password.invalid) {
+            <p class="mt-1 text-xs text-red-500">
+              <app-validation-message
+                [control]="form.controls.confirm_password"
+                label="Confirm password"
+              />
+            </p>
+          }
         </label>
 
         @if (submitError(); as err) {
-          <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          <div
+            class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+          >
             {{ err }}
           </div>
         }
@@ -113,7 +125,7 @@
         <button
           type="submit"
           [disabled]="submitting()"
-          class="mt-2 w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+          class="mt-2 w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {{ submitting() ? 'Creating account…' : 'Accept invitation' }}
         </button>

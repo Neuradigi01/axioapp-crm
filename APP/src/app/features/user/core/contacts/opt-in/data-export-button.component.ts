@@ -41,7 +41,7 @@ import { extractApiError } from '@core/services/api-error.util';
       {{ busy() ? 'Preparing…' : 'Export contact data' }}
     </button>
     @if (error(); as err) {
-      <p class="mt-1 text-[11px] text-rose-700">{{ err }}</p>
+      <p class="mt-1 text-[11px] text-red-400">{{ err }}</p>
     }
   `,
 })

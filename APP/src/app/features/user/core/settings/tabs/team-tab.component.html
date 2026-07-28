@@ -54,7 +54,7 @@
           <button
             type="button"
             (click)="openInviteModal()"
-            class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent"
+            class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
           >
             Invite member
           </button>
@@ -155,7 +155,7 @@
                   <button
                     type="submit"
                     [disabled]="editForm.invalid || savingId() === u.id"
-                    class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+                    class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {{ savingId() === u.id ? 'Saving…' : 'Save' }}
                   </button>
@@ -201,7 +201,7 @@
                       (click)="toggleStatus(u)"
                       [disabled]="savingId() === u.id"
                       class="rounded-md border px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
-                      [class.border-rose-300]="u.is_active"
+                      [class.border-red-500/30]="u.is_active"
                       [class.bg-surface]="u.is_active"
                       [class.text-red-400]="u.is_active"
                       [class.hover:bg-red-500/10]="u.is_active"
@@ -261,7 +261,7 @@
                   type="button"
                   (click)="revokeInvite(inv)"
                   [disabled]="revokingInviteId() === inv.id"
-                  class="rounded-md border border-rose-300 bg-surface px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="rounded-md border border-red-500/30 bg-surface px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {{ revokingInviteId() === inv.id ? 'Revoking…' : 'Revoke' }}
                 </button>
@@ -274,9 +274,15 @@
 
     <!-- Invite modal -------------------------------------------------------- -->
     @if (inviteModalOpen()) {
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40 p-4">
-        <div class="w-full max-w-md rounded-lg bg-surface p-5 shadow-xl">
-          <h3 class="mb-3 text-base font-semibold text-default">Invite a member</h3>
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        style="animation: fadeIn 0.12s ease"
+      >
+        <div
+          class="w-full max-w-md rounded-2xl border border-subtle bg-surface-2 p-5 shadow-elevated"
+          style="animation: popIn 0.12s ease"
+        >
+          <h3 class="mb-3 font-display text-base font-semibold text-default">Invite a member</h3>
           @if (lastInviteLink()) {
             <div class="space-y-3">
               <div
@@ -303,7 +309,7 @@
                 <button
                   type="button"
                   (click)="closeInviteModal()"
-                  class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent"
+                  class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
                 >
                   Done
                 </button>
@@ -317,20 +323,33 @@
                   type="email"
                   formControlName="email"
                   autocomplete="email"
-                  class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
+                  placeholder="colleague@company.com"
+                  class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default placeholder:text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 />
+                @if (inviteForm.controls.email.touched && inviteForm.controls.email.invalid) {
+                  <p class="mt-1 text-xs text-red-500">
+                    @if (inviteForm.controls.email.errors?.['required']) {
+                      Email is required.
+                    } @else {
+                      Enter a valid email.
+                    }
+                  </p>
+                }
               </label>
               <label class="block text-sm">
                 <span class="mb-1 block text-xs font-medium text-muted">Role</span>
                 <select
                   formControlName="role_id"
-                  class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
+                  class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 >
                   <option value="" disabled>Choose a role…</option>
                   @for (r of roles(); track r.id) {
                     <option [value]="r.id">{{ r.name }}</option>
                   }
                 </select>
+                @if (inviteForm.controls.role_id.touched && inviteForm.controls.role_id.invalid) {
+                  <p class="mt-1 text-xs text-red-500">Pick a role for this member.</p>
+                }
               </label>
 
               @if (inviteError(); as e) {
@@ -352,7 +371,7 @@
                 <button
                   type="submit"
                   [disabled]="inviteForm.invalid || inviteSending()"
-                  class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+                  class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {{ inviteSending() ? 'Sending…' : 'Send invitation' }}
                 </button>
@@ -455,7 +474,7 @@
             <button
               type="submit"
               [disabled]="!canSubmitTransfer()"
-              class="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-md bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {{ transferSubmitting() ? 'Transferring…' : 'Transfer ownership' }}
             </button>

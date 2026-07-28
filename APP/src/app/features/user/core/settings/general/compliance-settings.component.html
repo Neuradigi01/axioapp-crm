@@ -114,14 +114,14 @@
       <!-- Save -->
       <div class="flex items-center justify-end gap-2">
         @if (error(); as err) {
-          <span class="text-xs text-rose-600">{{ err }}</span>
+          <span class="text-xs text-red-500">{{ err }}</span>
         } @else if (saved()) {
           <span class="text-xs text-emerald-400">Saved.</span>
         }
         <button
           type="submit"
           [disabled]="saving() || form.invalid"
-          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:opacity-50"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
         >
           {{ saving() ? 'Saving…' : 'Save' }}
         </button>

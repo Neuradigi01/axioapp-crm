@@ -26,7 +26,7 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
   open: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-900',
   void: 'bg-surface-2 text-muted ring-1 border-subtle dark:bg-surface dark:text-muted dark:ring-slate-600',
   uncollectible:
-    'bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:ring-rose-900',
+    'bg-red-500/10 text-red-400 ring-1 ring-red-500/20 dark:bg-red-300 dark:text-red-500/30 dark:ring-red-300',
   draft:
     'bg-surface-2 text-muted ring-1 border-subtle dark:bg-surface dark:text-muted dark:ring-slate-600',
 };
@@ -87,7 +87,7 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead
-              class="border-b border-subtle bg-surface-2 text-left text-xs uppercase tracking-wide text-muted dark:border-subtle dark:bg-accent/60 dark:text-faint"
+              class="border-b border-subtle bg-surface-2 text-left text-xs uppercase tracking-wide text-muted dark:border-subtle dark:bg-black/60 dark:text-faint"
             >
               <tr>
                 <th class="px-6 py-2.5 font-medium">Date</th>

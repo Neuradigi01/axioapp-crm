@@ -68,7 +68,7 @@ type EditingState = LeadScoringRule | undefined | null;
           <button
             type="button"
             (click)="openCreate()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
           >
             <lucide-icon name="plus" class="h-4 w-4" />
             Add rule
@@ -171,7 +171,7 @@ type EditingState = LeadScoringRule | undefined | null;
     <!-- Edit / create rule modal. -->
     @if (editing() !== null) {
       <div
-        class="fixed inset-0 z-40 flex items-center justify-center bg-accent/40 px-4"
+        class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4"
         role="dialog"
         aria-modal="true"
       >
@@ -247,7 +247,7 @@ type EditingState = LeadScoringRule | undefined | null;
               type="button"
               (click)="submitEditor()"
               [disabled]="submitting()"
-              class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+              class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               @if (submitting()) {
                 <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />

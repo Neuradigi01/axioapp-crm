@@ -1,4 +1,4 @@
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/50 px-4">
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
   <div class="w-full max-w-2xl rounded-lg bg-surface p-5 shadow-xl max-h-[90vh] overflow-y-auto">
     <header class="mb-4">
       <h2 class="text-lg font-semibold text-default">New campaign</h2>
@@ -61,7 +61,7 @@
                     class="h-full transition-all"
                     [class.bg-emerald-500]="capacityBand() === 'green'"
                     [class.bg-amber-500]="capacityBand() === 'amber'"
-                    [class.bg-rose-500]="capacityBand() === 'red'"
+                    [class.bg-red-500]="capacityBand() === 'red'"
                     [style.width.%]="c.usage_percent"
                   ></div>
                 </div>
@@ -399,7 +399,7 @@
               <label class="block text-sm">
                 <span class="block text-xs font-medium text-muted">
                   Send from mailbox
-                  <span class="ml-1 text-rose-500">*</span>
+                  <span class="ml-1 text-red-500">*</span>
                 </span>
                 <select
                   formControlName="email_account_id"
@@ -416,7 +416,7 @@
               <label class="block text-sm">
                 <span class="block text-xs font-medium text-muted">
                   Sender name
-                  <span class="ml-1 text-rose-500">*</span>
+                  <span class="ml-1 text-red-500">*</span>
                 </span>
                 <input
                   type="text"
@@ -449,7 +449,7 @@
               <span class="mb-1 flex items-center justify-between">
                 <span class="text-xs font-medium text-muted">
                   Subject
-                  <span class="ml-1 text-rose-500">*</span>
+                  <span class="ml-1 text-red-500">*</span>
                 </span>
                 <span class="text-[10px] text-muted">
                   {{ (form.controls.subject.value ?? '').length }} / 998
@@ -753,7 +753,7 @@
                 ? 'Pick a mailbox, sender name, and subject to send an Email campaign.'
                 : ''
           "
-          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:opacity-50"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
         >
           {{ submitting() ? 'Saving…' : 'Save draft' }}
         </button>

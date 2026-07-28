@@ -10,7 +10,7 @@
   <!-- Expiry Timer -->
   <div
     class="mb-4 flex items-center justify-center gap-1.5 text-xs"
-    [class.text-rose-600]="isExpired"
+    [class.text-red-500]="isExpired"
     [class.text-muted]="!isExpired"
   >
     <lucide-icon name="clock" class="h-4 w-4" />
@@ -41,7 +41,7 @@
 
   <!-- Error Message -->
   @if (errorMessage()) {
-    <p class="mt-3 text-center text-sm text-rose-600">{{ errorMessage() }}</p>
+    <p class="mt-3 text-center text-sm text-red-500">{{ errorMessage() }}</p>
   }
 
   <!-- Loading Indicator -->

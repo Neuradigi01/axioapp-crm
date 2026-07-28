@@ -100,7 +100,7 @@
               <button
                 type="button"
                 (click)="requestDelete(img)"
-                class="pointer-events-auto inline-flex items-center gap-1 rounded-md bg-surface/95 px-2 py-1 text-xs font-medium text-rose-700 shadow-sm hover:bg-surface"
+                class="pointer-events-auto inline-flex items-center gap-1 rounded-md bg-surface/95 px-2 py-1 text-xs font-medium text-red-400 shadow-sm hover:bg-surface"
               >
                 <lucide-icon name="trash-2" class="h-3 w-3"></lucide-icon>
                 Delete
@@ -115,7 +115,7 @@
   <!-- Delete confirmation modal -->
   @if (imageForConfirm() !== null) {
     <div
-      class="fixed inset-0 z-40 flex items-center justify-center bg-accent/40 p-4"
+      class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
       role="dialog"
       aria-modal="true"
     >
@@ -133,7 +133,7 @@
           <button
             type="button"
             (click)="confirmDelete()"
-            class="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-700"
+            class="rounded-md bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-400"
           >
             Delete
           </button>

@@ -1,5 +1,5 @@
 <div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40 p-4"
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
   (click)="onBackdropClick($event)"
 >
   <div class="w-full max-w-md rounded-xl border border-subtle bg-surface p-4 md:p-6 shadow-lg">
@@ -65,7 +65,7 @@
           [formControl]="code"
         />
         @if (code.touched && code.invalid) {
-          <p class="mt-1 text-xs text-rose-600">Enter the 6-digit numeric code.</p>
+          <p class="mt-1 text-xs text-red-500">Enter the 6-digit numeric code.</p>
         }
       </label>
 
@@ -100,7 +100,7 @@
           </button>
           <button
             type="submit"
-            class="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-accent disabled:opacity-50"
+            class="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white shadow-sm hover:brightness-95 disabled:opacity-50"
             [disabled]="submitting() || code.invalid"
           >
             @if (submitting()) {

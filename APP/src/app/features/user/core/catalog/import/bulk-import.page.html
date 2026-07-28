@@ -169,7 +169,7 @@
           type="button"
           [disabled]="!canGoToPreview()"
           (click)="goToPreview()"
-          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-surface-2"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:bg-surface-2"
         >
           Continue to preview
         </button>
@@ -285,7 +285,7 @@
             type="button"
             [disabled]="commitLoading() || res.inserted === 0"
             (click)="commitImport()"
-            class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-surface-2"
+            class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:bg-surface-2"
           >
             {{
               commitLoading()
@@ -314,7 +314,7 @@
       <div class="flex flex-wrap gap-2">
         <a
           routerLink="/user/catalog"
-          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
         >
           View catalog
         </a>

@@ -61,7 +61,7 @@ interface FlowField {
                   <span class="font-medium text-default">
                     {{ field.label || field.name || '(no label)' }}
                     @if (field.required) {
-                      <span class="text-rose-600">*</span>
+                      <span class="text-red-500">*</span>
                     }
                   </span>
                   @if (field.helperText) {

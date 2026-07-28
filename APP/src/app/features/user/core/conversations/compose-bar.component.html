@@ -283,7 +283,7 @@
         type="button"
         (click)="submit()"
         [disabled]="(!isNoteMode() && outOfSession) || (!stagedFile() && !text().trim().length)"
-        class="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
+        class="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
       >
         Send
       </button>
@@ -310,7 +310,7 @@
      button (browser prompts; falls back silently). -->
 @if (locationDialogOpen()) {
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
     (click)="closeLocationDialog()"
   >
     <div
@@ -385,7 +385,7 @@
             type="button"
             [disabled]="!canSendLocation()"
             (click)="submitLocation()"
-            class="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent disabled:opacity-50"
+            class="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95 disabled:opacity-50"
           >
             Send location
           </button>

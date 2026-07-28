@@ -137,7 +137,7 @@
             <button
               type="button"
               (click)="onRemoveRow(row.id)"
-              class="self-center rounded-md p-1.5 text-faint hover:bg-red-500/10 hover:text-rose-600"
+              class="self-center rounded-md p-1.5 text-faint hover:bg-red-500/10 hover:text-red-500"
               [attr.aria-label]="'Remove clause ' + row.id"
             >
               <lucide-icon name="trash-2" class="h-4 w-4" />
@@ -178,7 +178,7 @@
         <button
           type="button"
           (click)="onApply()"
-          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
         >
           Apply
         </button>

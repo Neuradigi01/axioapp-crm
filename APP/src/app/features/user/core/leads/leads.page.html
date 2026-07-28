@@ -27,7 +27,7 @@
           </span>
           @if (r.lost_count_this_month > 0) {
             <span class="inline-flex items-center gap-1 text-red-400">
-              <span class="font-medium text-rose-600">Lost this month:</span>
+              <span class="font-medium text-red-500">Lost this month:</span>
               <span class="font-semibold">{{ r.lost_count_this_month }}</span>
             </span>
           }
@@ -71,7 +71,7 @@
       <button
         type="button"
         (click)="openCreate()"
-        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
       >
         <lucide-icon name="plus" class="h-4 w-4" />
         Add Lead
@@ -785,7 +785,7 @@
      toggle, then POSTs `buildCurrentConfig()` as a new saved view. -->
 @if (saveViewModalOpen()) {
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40 px-4"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
     role="dialog"
     aria-modal="true"
     aria-labelledby="save-view-title"
@@ -837,7 +837,7 @@
           type="button"
           (click)="submitSaveView()"
           [disabled]="saveViewSubmitting()"
-          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
         >
           @if (saveViewSubmitting()) {
             <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />

@@ -41,7 +41,7 @@
         class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       />
       @if (!poolValue().trim()) {
-        <p class="text-[10px] text-rose-600 mt-1">Pool value is required.</p>
+        <p class="text-[10px] text-red-500 mt-1">Pool value is required.</p>
       }
     </div>
   } @else {
@@ -55,7 +55,7 @@
         class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted font-mono"
       />
       @if (!specificUserId().trim()) {
-        <p class="text-[10px] text-rose-600 mt-1">User UUID is required.</p>
+        <p class="text-[10px] text-red-500 mt-1">User UUID is required.</p>
       }
     </div>
   }

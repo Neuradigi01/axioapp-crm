@@ -48,7 +48,7 @@ import { QuickLink, QuickLinkUpsert, QuickLinksService } from './quick-links.ser
             type="button"
             [disabled]="busy() || !canSave()"
             (click)="save()"
-            class="rounded bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent disabled:opacity-50"
+            class="rounded bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95 disabled:opacity-50"
           >
             {{ busy() ? 'Saving…' : editing() ? 'Save changes' : 'Create link' }}
           </button>
@@ -56,7 +56,7 @@ import { QuickLink, QuickLinkUpsert, QuickLinksService } from './quick-links.ser
       </header>
 
       @if (error(); as err) {
-        <p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
           {{ err }}
         </p>
       }

@@ -42,7 +42,7 @@ const QUALITY_BADGE: Record<
   RED: {
     emoji: '🔴',
     label: 'Red',
-    classes: 'bg-rose-50 text-rose-700 ring-rose-200',
+    classes: 'bg-red-500/10 text-red-400 ring-red-500/20',
   },
   UNKNOWN: {
     emoji: '❔',
@@ -86,7 +86,7 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
   template: `
     <div class="space-y-3">
       @if (loadError(); as err) {
-        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        <div class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
           {{ err }}
         </div>
       }
@@ -165,7 +165,7 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
                     ? 'bg-emerald-500'
                     : h.usage_percent < 90
                       ? 'bg-amber-500'
-                      : 'bg-rose-500')
+                      : 'bg-red-500')
                 "
                 [style.width.%]="h.usage_percent"
               ></div>
@@ -175,12 +175,12 @@ const RECOVERY_COPY: Record<string, { title: string; body: string }> = {
 
         <!-- Restrictions banner -->
         @if (h.restrictions.length > 0) {
-          <div class="rounded-md border border-rose-200 bg-rose-50 p-3">
-            <p class="flex items-center gap-1 text-sm font-semibold text-rose-800">
+          <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3">
+            <p class="flex items-center gap-1 text-sm font-semibold text-red-400">
               <lucide-icon name="alert-triangle" size="14" />
               Meta has restricted this number
             </p>
-            <ul class="mt-1 space-y-0.5 text-xs text-rose-700">
+            <ul class="mt-1 space-y-0.5 text-xs text-red-400">
               @for (r of h.restrictions; track $index) {
                 <li>
                   • {{ asString(r['restriction_type']) || 'Restriction' }}
@@ -314,7 +314,7 @@ export class PhoneHealthCardComponent {
       case 'quality_change':
         return 'bg-amber-500';
       case 'restriction_added':
-        return 'bg-rose-500';
+        return 'bg-red-500';
       case 'restriction_lifted':
         return 'bg-sky-500';
       default:

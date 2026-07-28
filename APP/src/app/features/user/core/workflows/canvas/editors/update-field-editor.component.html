@@ -19,7 +19,7 @@
       class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     />
     @if (!fieldKey().trim()) {
-      <p class="text-[10px] text-rose-600 mt-1">Field key is required.</p>
+      <p class="text-[10px] text-red-500 mt-1">Field key is required.</p>
     } @else {
       <p class="text-[10px] text-muted mt-1">
         System fields and `custom_data.&lt;key&gt;` paths both accepted.
@@ -50,7 +50,7 @@
       class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     />
     @if (!value()) {
-      <p class="text-[10px] text-rose-600 mt-1">Value is required.</p>
+      <p class="text-[10px] text-red-500 mt-1">Value is required.</p>
     }
   </div>
 </div>

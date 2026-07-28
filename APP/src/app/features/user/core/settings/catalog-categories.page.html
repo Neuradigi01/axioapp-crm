@@ -18,7 +18,7 @@
       <button
         type="button"
         (click)="openAdd()"
-        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
       >
         <lucide-icon name="plus" class="h-4 w-4" />
         Add category
@@ -120,7 +120,7 @@
         <button
           type="submit"
           [disabled]="saving()"
-          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-surface-2"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:bg-surface-2"
         >
           {{ editingId() ? 'Save changes' : 'Create category' }}
         </button>
@@ -247,7 +247,7 @@
                       <button
                         type="submit"
                         [disabled]="saving()"
-                        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:cursor-not-allowed disabled:bg-surface-2"
+                        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:bg-surface-2"
                       >
                         Save changes
                       </button>

@@ -71,7 +71,7 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
             class="h-full rounded-full transition-all"
             [class.bg-emerald-500]="seatTone() === 'green'"
             [class.bg-amber-500]="seatTone() === 'yellow'"
-            [class.bg-rose-500]="seatTone() === 'red'"
+            [class.bg-red-500]="seatTone() === 'red'"
             [style.width.%]="seatPercent()"
           ></div>
         </div>

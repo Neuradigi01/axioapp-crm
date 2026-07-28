@@ -1,4 +1,4 @@
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/50 px-4">
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
   <div class="w-full max-w-md rounded-lg bg-surface p-5 shadow-xl">
     <header class="mb-4">
       <h2 class="text-lg font-semibold text-default">Log a call</h2>
@@ -117,7 +117,7 @@
         }
 
         @if (recordingError(); as err) {
-          <p class="mt-1 text-[11px] text-rose-600">{{ err }}</p>
+          <p class="mt-1 text-[11px] text-red-500">{{ err }}</p>
         }
       </div>
 
@@ -140,7 +140,7 @@
         <button
           type="submit"
           [disabled]="submitting()"
-          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:opacity-50"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
         >
           @if (uploadingRecording()) {
             Uploading recording…

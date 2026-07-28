@@ -124,7 +124,7 @@
           type="button"
           [disabled]="!selectedFile() || uploading()"
           (click)="submitUpload()"
-          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           @if (uploading()) {
             <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
@@ -283,7 +283,7 @@
           type="button"
           [disabled]="!canRunDryRun()"
           (click)="runDryRun()"
-          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           @if (dryRunRunning()) {
             <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
@@ -483,7 +483,7 @@
           <button
             type="button"
             (click)="goToGroup()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent hover:brightness-95"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-95"
           >
             Open group
             <lucide-icon name="arrow-right" class="h-4 w-4" />

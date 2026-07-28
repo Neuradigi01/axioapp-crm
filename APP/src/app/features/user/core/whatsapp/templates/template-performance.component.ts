@@ -76,7 +76,7 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
       </div>
 
       @if (loadError(); as err) {
-        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        <div class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
           {{ err }}
         </div>
       }
@@ -136,7 +136,7 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
             </div>
             <div class="rounded-md border border-subtle bg-surface p-3">
               <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">Failed</p>
-              <p class="mt-1 text-2xl font-semibold text-rose-700">
+              <p class="mt-1 text-2xl font-semibold text-red-400">
                 {{ d.failed }}
               </p>
             </div>
@@ -177,7 +177,7 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
                     stroke="#0ea5e9"
                     stroke-width="2"
                   />
-                  <!-- Failed (rose-500) -->
+                  <!-- Failed (red-500) -->
                   <polyline
                     [attr.points]="chartLine('failed')"
                     fill="none"
@@ -199,7 +199,7 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
                     Read
                   </span>
                   <span class="inline-flex items-center gap-1">
-                    <span class="inline-block h-2 w-2 rounded-full bg-rose-500"></span>
+                    <span class="inline-block h-2 w-2 rounded-full bg-red-500"></span>
                     Failed
                   </span>
                 </div>

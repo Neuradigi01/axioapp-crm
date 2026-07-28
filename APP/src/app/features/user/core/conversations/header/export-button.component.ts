@@ -64,7 +64,7 @@ type ExportFormat = 'csv' | 'pdf';
       }
       @if (error(); as err) {
         <p
-          class="absolute right-0 z-50 mt-1 w-64 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] text-rose-700"
+          class="absolute right-0 z-50 mt-1 w-64 rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1 text-[11px] text-red-400"
         >
           {{ err }}
         </p>
