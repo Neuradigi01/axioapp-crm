@@ -220,6 +220,11 @@
                   ) {
                     {{ msg }}
                   } @else if (
+                    standard.controls.expected_close_date.errors?.['dateMustBeFuture'];
+                    as msg
+                  ) {
+                    {{ msg }}
+                  } @else if (
                     standard.controls.expected_close_date.errors?.['dateInPast'];
                     as msg
                   ) {

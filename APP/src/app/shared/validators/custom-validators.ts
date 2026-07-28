@@ -19,6 +19,7 @@ export const REASON = {
   invalidDate: 'date must be in YYYY-MM-DD format',
   invalidDateTime: 'date-time must be in ISO 8601 format',
   dateInPast: 'date cannot be in the past',
+  dateMustBeFuture: 'date must be after today',
   dateTooOld: 'date is older than allowed',
   fileTooLarge: 'file exceeds the maximum size',
   unsupportedFileType: 'file type is not allowed',
@@ -212,6 +213,36 @@ export function dateNotPastValidator(control: AbstractControl): ValidationErrors
     return { dateInPast: REASON.dateInPast };
   }
   return null;
+}
+
+/**
+ * Rejects ISO date / date-time values that are not strictly after today.
+ * Use for "expected" fields (lead close date, walk-in return date) where
+ * today doesn't make sense — if the target is today you'd just do it now
+ * rather than set an expectation. For fields where today IS a valid pick
+ * (task due, appointment slot), use `dateNotPastValidator` instead.
+ *
+ * Date-only strings (`YYYY-MM-DD`) compare against today's local date
+ * string to avoid timezone drift. Datetime strings compare against the
+ * start of tomorrow in local time.
+ */
+export function dateFutureValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  const value = String(raw).trim();
+  if (ISO_DATE_RE.test(value)) {
+    const now = new Date();
+    const todayStr =
+      `${now.getFullYear()}-` +
+      `${String(now.getMonth() + 1).padStart(2, '0')}-` +
+      `${String(now.getDate()).padStart(2, '0')}`;
+    return value > todayStr ? null : { dateMustBeFuture: REASON.dateMustBeFuture };
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null; // shape check belongs elsewhere
+  const now = new Date();
+  const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+  return parsed.getTime() >= startOfTomorrow ? null : { dateMustBeFuture: REASON.dateMustBeFuture };
 }
 
 /**

@@ -122,8 +122,11 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
     this.standard.controls.budget.setValidators(budgetValidators);
     this.standard.controls.budget.updateValueAndValidity({ emitEvent: false });
 
-    // Date shape + not-past always apply; required layered on top per override.
-    const closeValidators: ValidatorFn[] = [commonValidators.isoDate, commonValidators.dateNotPast];
+    // Expected close date is a forward-looking projection — if the lead
+    // is actually closing today the rep clicks Won, they don't set an
+    // expectation. Enforce "tomorrow onward" via `dateFuture` (stricter
+    // than `dateNotPast` which allows today).
+    const closeValidators: ValidatorFn[] = [commonValidators.isoDate, commonValidators.dateFuture];
     if (closeRow?.is_required) closeValidators.push(commonValidators.required);
     this.standard.controls.expected_close_date.setValidators(closeValidators);
     this.standard.controls.expected_close_date.updateValueAndValidity({

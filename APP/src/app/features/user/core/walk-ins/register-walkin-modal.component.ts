@@ -87,9 +87,11 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
       validators: [commonValidators.isoDateTime],
     }),
     // W11 — "customer will return by" YYYY-MM-DD. Retention analytics.
+    // "Will return" is forward-looking — today doesn't make sense for
+    // an expected-return promise, so `dateFuture` (tomorrow onward).
     expected_return_date: this.fb.control('', {
       nonNullable: true,
-      validators: [commonValidators.isoDate],
+      validators: [commonValidators.isoDate, commonValidators.dateFuture],
     }),
   });
 

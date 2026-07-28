@@ -276,6 +276,11 @@
               <p class="mt-1 text-xs text-red-600">
                 @if (form.controls.expected_return_date.errors?.['invalidDate']; as msg) {
                   {{ msg }}
+                } @else if (
+                  form.controls.expected_return_date.errors?.['dateMustBeFuture'];
+                  as msg
+                ) {
+                  {{ msg }}
                 } @else {
                   Enter a valid date.
                 }
