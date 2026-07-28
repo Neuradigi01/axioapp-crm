@@ -23,7 +23,7 @@
         type="button"
         (click)="selectTab(tab.key)"
         [class.text-default]="activeTab() === tab.key"
-        [class.border-zinc-900]="activeTab() === tab.key"
+        [class.border-accent]="activeTab() === tab.key"
         [class.text-muted]="activeTab() !== tab.key"
         [class.border-transparent]="activeTab() !== tab.key"
         class="-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition hover:text-default"
@@ -49,7 +49,7 @@
         type="search"
         [formControl]="searchControl"
         placeholder="Search title or city…"
-        class="w-full rounded-md border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-default shadow-sm placeholder:text-faint focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+        class="w-full rounded-md border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-default shadow-sm placeholder:text-faint focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
       />
     </div>
     @if (loading()) {
@@ -159,7 +159,7 @@
         <select
           [value]="pageSize()"
           (change)="onPageSizeChange($event)"
-          class="rounded-md border border-subtle bg-surface px-2 py-1 text-sm text-default focus:border-zinc-400 focus:outline-none"
+          class="rounded-md border border-subtle bg-surface px-2 py-1 text-sm text-default focus:border-muted focus:outline-none"
         >
           <option [value]="10">10</option>
           <option [value]="20">20</option>

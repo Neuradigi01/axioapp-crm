@@ -6,9 +6,9 @@
       (dragover)="onDragOver($event)"
       (dragleave)="onDragLeave($event)"
       (drop)="onFileDrop($event)"
-      [class.border-zinc-900]="dragOver()"
+      [class.border-accent]="dragOver()"
       [class.bg-surface-2]="dragOver()"
-      class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-subtle bg-surface px-6 py-8 text-center transition hover:border-zinc-400"
+      class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-subtle bg-surface px-6 py-8 text-center transition hover:border-muted"
     >
       @if (uploading()) {
         <lucide-icon name="loader-2" class="h-8 w-8 animate-spin text-muted"></lucide-icon>

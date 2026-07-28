@@ -46,7 +46,7 @@
               type="text"
               formControlName="title"
               placeholder="e.g. Sea-facing 3 BHK, Bandra West"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm placeholder:text-faint focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm placeholder:text-faint focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
             @if (fieldError('title'); as msg) {
               <span class="mt-1 block text-xs text-rose-600">{{ msg }}</span>
@@ -59,7 +59,7 @@
             </span>
             <select
               formControlName="property_type"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             >
               <option value="" disabled>Select a type…</option>
               @for (opt of TYPE_OPTIONS; track opt.key) {
@@ -77,7 +77,7 @@
             </span>
             <select
               formControlName="category"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             >
               <option value="" disabled>Select a category…</option>
               @for (opt of CATEGORY_OPTIONS; track opt.key) {
@@ -97,7 +97,7 @@
               step="1"
               formControlName="price"
               placeholder="e.g. 25000000"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm placeholder:text-faint focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm placeholder:text-faint focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
 
@@ -107,7 +107,7 @@
               type="text"
               maxlength="3"
               formControlName="currency"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm uppercase text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm uppercase text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
 
@@ -117,7 +117,7 @@
               rows="4"
               formControlName="description"
               placeholder="Highlight what makes this listing stand out…"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm placeholder:text-faint focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm placeholder:text-faint focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             ></textarea>
           </label>
         </div>
@@ -135,7 +135,7 @@
           <textarea
             rows="2"
             formControlName="address_line"
-            class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+            class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
           ></textarea>
         </label>
 
@@ -145,7 +145,7 @@
             <input
               type="text"
               formControlName="city"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
@@ -153,7 +153,7 @@
             <input
               type="text"
               formControlName="state"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
@@ -161,7 +161,7 @@
             <input
               type="text"
               formControlName="country"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
@@ -169,7 +169,7 @@
             <input
               type="text"
               formControlName="pincode"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
         </div>
@@ -189,7 +189,7 @@
               type="number"
               min="0"
               formControlName="bedrooms"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
@@ -198,7 +198,7 @@
               type="number"
               min="0"
               formControlName="bathrooms"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
@@ -208,14 +208,14 @@
               min="0"
               step="0.01"
               formControlName="area_value"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
             <span class="mb-1 block text-xs font-medium text-muted">Area unit</span>
             <select
               formControlName="area_unit"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             >
               <option value="">—</option>
               @for (opt of UNIT_OPTIONS; track opt.key) {
@@ -249,7 +249,7 @@
             <input
               type="text"
               formControlName="contact_person"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
@@ -257,7 +257,7 @@
             <input
               type="tel"
               formControlName="contact_phone"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
@@ -265,7 +265,7 @@
             <input
               type="email"
               formControlName="contact_email"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:border-subtle"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
             @if (fieldError('contact_email'); as msg) {
               <span class="mt-1 block text-xs text-rose-600">{{ msg }}</span>

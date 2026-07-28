@@ -1,5 +1,5 @@
 <div
-  class="flex h-full flex-col rounded-lg border border-zinc-200 bg-white shadow-sm overflow-hidden"
+  class="flex h-full flex-col rounded-lg border border-subtle bg-surface shadow-sm overflow-hidden"
 >
   <!-- Thumbnail: uploaded cover if present, else material-derived glyph -->
   @if (item().cover_url; as url) {
@@ -13,9 +13,9 @@
   <div class="flex flex-1 flex-col p-3">
     <div class="mb-2 flex items-start justify-between gap-2">
       <div class="min-w-0 flex-1">
-        <p class="truncate text-sm font-semibold text-zinc-900">{{ item().sku }}</p>
+        <p class="truncate text-sm font-semibold text-default">{{ item().sku }}</p>
         @if (item().material || item().color) {
-          <p class="truncate text-xs text-zinc-500">
+          <p class="truncate text-xs text-muted">
             {{ item().material }}
             @if (item().material && item().color) {
               ·
@@ -36,20 +36,20 @@
     </div>
 
     <dl class="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-      <dt class="text-zinc-500">On hand</dt>
-      <dd class="text-right font-medium text-zinc-900">{{ item().qty_on_hand }}</dd>
-      <dt class="text-zinc-500">Reserved</dt>
-      <dd class="text-right text-zinc-700">{{ item().qty_reserved }}</dd>
-      <dt class="text-zinc-500">Reorder at</dt>
-      <dd class="text-right text-zinc-700">{{ item().reorder_level }}</dd>
+      <dt class="text-muted">On hand</dt>
+      <dd class="text-right font-medium text-default">{{ item().qty_on_hand }}</dd>
+      <dt class="text-muted">Reserved</dt>
+      <dd class="text-right text-default">{{ item().qty_reserved }}</dd>
+      <dt class="text-muted">Reorder at</dt>
+      <dd class="text-right text-default">{{ item().reorder_level }}</dd>
       @if (dimensionsLabel()) {
-        <dt class="text-zinc-500">Dimensions</dt>
-        <dd class="text-right font-mono text-zinc-700">{{ dimensionsLabel() }}</dd>
+        <dt class="text-muted">Dimensions</dt>
+        <dd class="text-right font-mono text-default">{{ dimensionsLabel() }}</dd>
       }
     </dl>
 
     <div class="mt-auto flex items-center justify-between pt-3">
-      <span class="truncate text-[10px] text-zinc-500">{{ warehouseLabel() ?? '' }}</span>
+      <span class="truncate text-[10px] text-muted">{{ warehouseLabel() ?? '' }}</span>
       @if (showBestSeller()) {
         <span
           class="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700 ring-1 ring-violet-200"

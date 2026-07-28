@@ -82,7 +82,7 @@ export class CustomOrderCardComponent {
       case 'cancelled':
         return 'bg-red-100 text-red-700 ring-red-200';
       default:
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   });
 

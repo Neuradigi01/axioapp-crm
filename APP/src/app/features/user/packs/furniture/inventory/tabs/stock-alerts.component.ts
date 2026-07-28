@@ -116,7 +116,7 @@ export class StockAlertsTabComponent {
       case 'low':
         return {
           label: 'Low',
-          cls: 'bg-zinc-100 text-zinc-700 ring-zinc-300',
+          cls: 'bg-surface-2 text-default border-subtle',
         };
     }
   }

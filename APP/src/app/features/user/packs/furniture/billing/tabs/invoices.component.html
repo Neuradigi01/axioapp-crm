@@ -1,24 +1,24 @@
 <div class="space-y-4">
   <!-- Summary tiles -->
   <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-    <div class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
-      <p class="text-[11px] uppercase tracking-wide text-zinc-500">Total Invoices</p>
-      <p class="mt-1 text-xl font-semibold text-zinc-900">{{ tiles().total }}</p>
+    <div class="rounded-lg border border-subtle bg-surface p-3 shadow-sm">
+      <p class="text-[11px] uppercase tracking-wide text-muted">Total Invoices</p>
+      <p class="mt-1 text-xl font-semibold text-default">{{ tiles().total }}</p>
     </div>
-    <div class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
-      <p class="text-[11px] uppercase tracking-wide text-zinc-500">Total Billed</p>
-      <p class="mt-1 text-xl font-semibold text-zinc-900">
+    <div class="rounded-lg border border-subtle bg-surface p-3 shadow-sm">
+      <p class="text-[11px] uppercase tracking-wide text-muted">Total Billed</p>
+      <p class="mt-1 text-xl font-semibold text-default">
         {{ tiles().billed | formatINR: true }}
       </p>
     </div>
-    <div class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
-      <p class="text-[11px] uppercase tracking-wide text-zinc-500">Collected</p>
+    <div class="rounded-lg border border-subtle bg-surface p-3 shadow-sm">
+      <p class="text-[11px] uppercase tracking-wide text-muted">Collected</p>
       <p class="mt-1 text-xl font-semibold text-emerald-700">
         {{ tiles().collected | formatINR: true }}
       </p>
     </div>
-    <div class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
-      <p class="text-[11px] uppercase tracking-wide text-zinc-500">Pending</p>
+    <div class="rounded-lg border border-subtle bg-surface p-3 shadow-sm">
+      <p class="text-[11px] uppercase tracking-wide text-muted">Pending</p>
       <p class="mt-1 text-xl font-semibold text-amber-700">
         {{ tiles().pending | formatINR: true }}
       </p>
@@ -26,7 +26,7 @@
   </div>
 
   <!-- Status filter pills -->
-  <div class="flex items-center gap-1 border-b border-zinc-200">
+  <div class="flex items-center gap-1 border-b border-subtle">
     @for (f of filters; track f.id) {
       <button
         type="button"
@@ -34,8 +34,8 @@
         [class]="
           'inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ' +
           (statusFilter() === f.id
-            ? 'border-zinc-900 text-zinc-900'
-            : 'border-transparent text-zinc-500 hover:text-zinc-700')
+            ? 'border-accent text-default'
+            : 'border-transparent text-muted hover:text-default')
         "
       >
         {{ f.label }}
@@ -50,19 +50,19 @@
   } @else if (loading() && invoices().length === 0) {
     <div class="space-y-2 animate-pulse">
       @for (i of [0, 1, 2, 3]; track i) {
-        <div class="h-12 rounded bg-zinc-100"></div>
+        <div class="h-12 rounded bg-surface-2"></div>
       }
     </div>
   } @else if (view().length === 0) {
     <div
-      class="rounded-lg border border-dashed border-zinc-300 bg-white py-12 text-center text-sm text-zinc-500"
+      class="rounded-lg border border-dashed border-subtle bg-surface py-12 text-center text-sm text-muted"
     >
       No invoices match this filter. Create one from the POS tab.
     </div>
   } @else {
-    <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
-      <table class="min-w-full divide-y divide-zinc-200 text-sm">
-        <thead class="bg-zinc-50 text-[11px] uppercase tracking-wide text-zinc-500">
+    <div class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
+      <table class="min-w-full divide-y divide-subtle text-sm">
+        <thead class="bg-surface-2 text-[11px] uppercase tracking-wide text-muted">
           <tr>
             <th class="px-3 py-2 text-left font-medium">Invoice</th>
             <th class="px-3 py-2 text-left font-medium">Customer</th>
@@ -75,24 +75,24 @@
             <th class="px-3 py-2 text-right font-medium">Issued</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-zinc-100">
+        <tbody class="divide-y divide-subtle">
           @for (inv of view(); track inv.id) {
-            <tr class="hover:bg-zinc-50/50">
-              <td class="px-3 py-2 font-medium text-zinc-900">
+            <tr class="hover:bg-surface-2/50">
+              <td class="px-3 py-2 font-medium text-default">
                 <a [routerLink]="['/user/billing/invoices', inv.id]" class="hover:underline">
                   {{ invoiceNumber(inv) }}
                 </a>
               </td>
               <td class="px-3 py-2">
-                <div class="text-zinc-900">{{ contactName(inv.contact_id) }}</div>
+                <div class="text-default">{{ contactName(inv.contact_id) }}</div>
                 @if (contactPhone(inv.contact_id); as ph) {
-                  <div class="text-[11px] text-zinc-500">{{ ph }}</div>
+                  <div class="text-[11px] text-muted">{{ ph }}</div>
                 }
               </td>
-              <td class="px-3 py-2 text-right text-zinc-800">
+              <td class="px-3 py-2 text-right text-default">
                 {{ inv.subtotal | formatINR }}
               </td>
-              <td class="px-3 py-2 text-right text-zinc-800">
+              <td class="px-3 py-2 text-right text-default">
                 {{ inv.tax_amount | formatINR }}
               </td>
               <td class="px-3 py-2 text-right text-amber-700">
@@ -102,10 +102,10 @@
                   —
                 }
               </td>
-              <td class="px-3 py-2 text-right font-semibold text-zinc-900">
+              <td class="px-3 py-2 text-right font-semibold text-default">
                 {{ inv.total | formatINR }}
               </td>
-              <td class="px-3 py-2 text-xs uppercase text-zinc-700">
+              <td class="px-3 py-2 text-xs uppercase text-default">
                 {{ paymentLabel(inv.payment_method) }}
               </td>
               <td class="px-3 py-2">
@@ -118,7 +118,7 @@
                   {{ inv.status }}
                 </span>
               </td>
-              <td class="px-3 py-2 text-right text-xs text-zinc-500">
+              <td class="px-3 py-2 text-right text-xs text-muted">
                 {{ formatDate(inv.issued_at ?? inv.created_at) }}
               </td>
             </tr>

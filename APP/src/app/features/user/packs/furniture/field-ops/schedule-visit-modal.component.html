@@ -1,13 +1,13 @@
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-accent/40 p-4">
   <div
-    class="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+    class="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-xl bg-surface shadow-xl"
   >
-    <div class="flex items-center justify-between border-b border-zinc-200 px-5 py-3">
-      <h2 class="text-base font-semibold text-zinc-900">Schedule a site visit</h2>
+    <div class="flex items-center justify-between border-b border-subtle px-5 py-3">
+      <h2 class="text-base font-semibold text-default">Schedule a site visit</h2>
       <button
         type="button"
         (click)="cancel.emit()"
-        class="rounded p-1 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
+        class="rounded p-1 text-muted transition hover:bg-surface-2 hover:text-default"
         aria-label="Close"
       >
         <lucide-icon name="x" class="h-4 w-4" />
@@ -17,21 +17,21 @@
     <form [formGroup]="form" class="flex-1 space-y-3 overflow-y-auto px-5 py-4">
       <!-- Contact -->
       <div>
-        <label class="block text-xs font-medium text-zinc-700">
+        <label class="block text-xs font-medium text-default">
           Contact <span class="text-red-500">*</span>
         </label>
         @if (selectedContact(); as c) {
           <div
-            class="mt-1 flex items-center justify-between rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm"
+            class="mt-1 flex items-center justify-between rounded-md border border-subtle bg-surface-2 px-3 py-2 text-sm"
           >
             <div>
-              <p class="font-medium text-zinc-900">{{ c.full_name }}</p>
-              <p class="text-xs text-zinc-500">{{ c.phone || '—' }}</p>
+              <p class="font-medium text-default">{{ c.full_name }}</p>
+              <p class="text-xs text-muted">{{ c.phone || '—' }}</p>
             </div>
             <button
               type="button"
               (click)="clearContact()"
-              class="text-xs text-zinc-500 hover:text-zinc-900"
+              class="text-xs text-muted hover:text-default"
             >
               Change
             </button>
@@ -45,21 +45,21 @@
               (focus)="onContactFocus()"
               (blur)="onContactBlur()"
               placeholder="Search by name, phone, or email…"
-              class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
             @if (contactSearchOpen() && contactResults().length > 0) {
               <ul
-                class="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border border-zinc-200 bg-white shadow-lg"
+                class="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border border-subtle bg-surface shadow-lg"
               >
                 @for (r of contactResults(); track r.id) {
                   <li>
                     <button
                       type="button"
                       (click)="selectContact(r)"
-                      class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50"
+                      class="block w-full px-3 py-2 text-left text-sm hover:bg-surface-2"
                     >
-                      <span class="font-medium text-zinc-900">{{ r.full_name }}</span>
-                      <span class="ml-2 text-xs text-zinc-500">{{
+                      <span class="font-medium text-default">{{ r.full_name }}</span>
+                      <span class="ml-2 text-xs text-muted">{{
                         r.phone || r.email || '—'
                       }}</span>
                     </button>
@@ -73,7 +73,7 @@
 
       @if (!isHidden('title')) {
         <div>
-          <label for="fv_title" class="block text-xs font-medium text-zinc-700">
+          <label for="fv_title" class="block text-xs font-medium text-default">
             {{ stdField('title')?.label ?? 'Title' }} <span class="text-red-500">*</span>
           </label>
           <input
@@ -83,39 +83,39 @@
             [attr.placeholder]="
               stdField('title')?.placeholder ?? 'e.g. Measurement at customer site'
             "
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
           @if (stdField('title')?.help_text; as help) {
-            <p class="mt-1 text-xs text-zinc-500">{{ help }}</p>
+            <p class="mt-1 text-xs text-muted">{{ help }}</p>
           }
         </div>
       }
 
       @if (!isHidden('purpose')) {
         <div>
-          <label class="block text-xs font-medium text-zinc-700">
+          <label class="block text-xs font-medium text-default">
             {{ stdField('purpose')?.label ?? 'Purpose' }}
             @if (stdField('purpose')?.is_required) {
               <span class="text-red-500">*</span>
             }
           </label>
-          <div class="mt-1 inline-flex overflow-hidden rounded-md ring-1 ring-zinc-300">
+          <div class="mt-1 inline-flex overflow-hidden rounded-md ring-1 border-subtle">
             @for (p of ['measurement', 'installation', 'inspection']; track p) {
               <button
                 type="button"
                 (click)="form.controls.purpose.setValue($any(p))"
                 class="px-3 py-1.5 text-xs font-medium capitalize transition"
-                [class.bg-zinc-900]="form.controls.purpose.value === p"
+                [class.bg-accent]="form.controls.purpose.value === p"
                 [class.text-white]="form.controls.purpose.value === p"
-                [class.text-zinc-700]="form.controls.purpose.value !== p"
-                [class.bg-white]="form.controls.purpose.value !== p"
+                [class.text-default]="form.controls.purpose.value !== p"
+                [class.bg-surface]="form.controls.purpose.value !== p"
               >
                 {{ p }}
               </button>
             }
           </div>
           @if (stdField('purpose')?.help_text; as help) {
-            <p class="mt-1 text-xs text-zinc-500">{{ help }}</p>
+            <p class="mt-1 text-xs text-muted">{{ help }}</p>
           }
         </div>
       }
@@ -123,31 +123,31 @@
       <div class="grid grid-cols-3 gap-3">
         @if (!isHidden('scheduled_date')) {
           <div>
-            <label class="block text-xs font-medium text-zinc-700">
+            <label class="block text-xs font-medium text-default">
               {{ stdField('scheduled_date')?.label ?? 'Date' }} <span class="text-red-500">*</span>
             </label>
             <input
               type="date"
               formControlName="scheduled_date"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
         }
         @if (!isHidden('scheduled_time')) {
           <div>
-            <label class="block text-xs font-medium text-zinc-700">
+            <label class="block text-xs font-medium text-default">
               {{ stdField('scheduled_time')?.label ?? 'Time' }} <span class="text-red-500">*</span>
             </label>
             <input
               type="time"
               formControlName="scheduled_time"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
         }
         @if (!isHidden('duration_min')) {
           <div>
-            <label class="block text-xs font-medium text-zinc-700">
+            <label class="block text-xs font-medium text-default">
               {{ stdField('duration_min')?.label ?? 'Duration (min)' }}
               <span class="text-red-500">*</span>
             </label>
@@ -157,7 +157,7 @@
               [attr.max]="stdField('duration_min')?.max_value ?? 1440"
               [attr.step]="stdField('duration_min')?.step_value ?? 15"
               formControlName="duration_min"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
         }
@@ -165,13 +165,13 @@
 
       @if (!isHidden('assigned_to_id')) {
         <div>
-          <label class="block text-xs font-medium text-zinc-700">
+          <label class="block text-xs font-medium text-default">
             {{ stdField('assigned_to_id')?.label ?? 'Assigned to' }}
             <span class="text-red-500">*</span>
           </label>
           <select
             formControlName="assigned_to_id"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           >
             <option value="" disabled>Select a staff member</option>
             @for (s of staff(); track s.id) {
@@ -183,7 +183,7 @@
 
       @if (!isHidden('location')) {
         <div>
-          <label class="block text-xs font-medium text-zinc-700">
+          <label class="block text-xs font-medium text-default">
             {{ stdField('location')?.label ?? 'Location' }}
             @if (stdField('location')?.is_required) {
               <span class="text-red-500">*</span>
@@ -193,33 +193,33 @@
             type="text"
             formControlName="location"
             [attr.placeholder]="stdField('location')?.placeholder ?? 'Customer home / site address'"
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
       }
 
       <!-- Link to custom order -->
       <div>
-        <label class="block text-xs font-medium text-zinc-700">
+        <label class="block text-xs font-medium text-default">
           Linked custom order (optional)
         </label>
         <select
           formControlName="custom_order_id"
-          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         >
           <option value="">— none —</option>
           @for (o of recentOrders(); track o.id) {
             <option [value]="o.id">{{ o.title }}</option>
           }
         </select>
-        <p class="mt-1 text-[11px] text-zinc-500">
+        <p class="mt-1 text-[11px] text-muted">
           When set, completing the visit can copy measurements back to this order.
         </p>
       </div>
 
       @if (!isHidden('notes')) {
         <div>
-          <label class="block text-xs font-medium text-zinc-700">
+          <label class="block text-xs font-medium text-default">
             {{ stdField('notes')?.label ?? 'Notes' }}
             @if (stdField('notes')?.is_required) {
               <span class="text-red-500">*</span>
@@ -232,7 +232,7 @@
               stdField('notes')?.placeholder ??
               'bring laser measure, special access instructions, …'
             "
-            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           ></textarea>
         </div>
       }
@@ -244,11 +244,11 @@
       }
     </form>
 
-    <div class="flex items-center justify-between gap-3 border-t border-zinc-200 px-5 py-3">
+    <div class="flex items-center justify-between gap-3 border-t border-subtle px-5 py-3">
       <button
         type="button"
         (click)="cancel.emit()"
-        class="rounded-md px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100"
+        class="rounded-md px-3 py-2 text-sm text-default hover:bg-surface-2"
       >
         Cancel
       </button>
@@ -256,7 +256,7 @@
         type="button"
         (click)="submit()"
         [disabled]="!canSubmit() || _submitting()"
-        class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent disabled:opacity-50"
       >
         @if (_submitting()) {
           <span
