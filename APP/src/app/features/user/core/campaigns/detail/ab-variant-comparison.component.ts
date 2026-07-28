@@ -66,9 +66,7 @@ interface AbComparisonReport {
         <div class="rounded-md border border-subtle bg-surface p-4">
           <div class="mb-3 flex items-center justify-between">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-muted">
-                A/B comparison
-              </p>
+              <p class="text-xs font-semibold uppercase tracking-wide text-muted">A/B comparison</p>
               <p class="text-[11px] text-muted">
                 Winner metric: {{ humanMetric(r.winner_metric) }}
               </p>

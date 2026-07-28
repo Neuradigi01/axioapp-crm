@@ -106,9 +106,7 @@ const RANGES: Array<{ key: TemplatePerformanceRange; label: string }> = [
               </p>
             </div>
             <div class="rounded-md border border-subtle bg-surface p-3">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                Delivered
-              </p>
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">Delivered</p>
               <p class="mt-1 text-2xl font-semibold text-default">
                 {{ d.delivered }}
               </p>

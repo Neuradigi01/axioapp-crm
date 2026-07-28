@@ -33,9 +33,7 @@ import {
     <div class="space-y-4 rounded-md border border-subtle bg-surface p-4">
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-muted">
-            AI agent settings
-          </p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">AI agent settings</p>
           <p class="text-[11px] text-muted">
             Wires the per-conversation "AI Handled" toggle. Replies below the confidence threshold
             escalate to a human.

@@ -39,9 +39,7 @@ import { CampaignFailuresReport } from '../../reporting/whatsapp/whatsapp-report
               <tr class="border-b border-subtle last:border-0">
                 <td class="py-1 text-default">{{ b.label }}</td>
                 <td class="py-1 text-right text-default">{{ b.count }}</td>
-                <td class="py-1 text-right text-muted">
-                  {{ percent(b.count, r.total_failed) }}%
-                </td>
+                <td class="py-1 text-right text-muted">{{ percent(b.count, r.total_failed) }}%</td>
               </tr>
             }
           </tbody>

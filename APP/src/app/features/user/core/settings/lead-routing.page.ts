@@ -74,8 +74,8 @@ import { LeadRoutingStrategy, LeadsApiService } from '../leads/leads-api.service
 
         <p class="mt-3 text-xs text-muted">
           <strong class="text-default">Eligible reps</strong> are users whose role holds the
-          <code class="rounded bg-surface-2 px-1 py-0.5 font-mono">leads.own</code> permission. Grant
-          or revoke that permission on the
+          <code class="rounded bg-surface-2 px-1 py-0.5 font-mono">leads.own</code> permission.
+          Grant or revoke that permission on the
           <a
             routerLink="/user/settings"
             [queryParams]="{ tab: 'roles' }"

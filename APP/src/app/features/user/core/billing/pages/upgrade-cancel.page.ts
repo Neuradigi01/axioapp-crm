@@ -29,9 +29,7 @@ import { UpgradeModalService } from '../services/upgrade-modal.service';
         >
           ↺
         </div>
-        <h1 class="mt-4 text-lg font-semibold text-default dark:text-default">
-          Upgrade cancelled
-        </h1>
+        <h1 class="mt-4 text-lg font-semibold text-default dark:text-default">Upgrade cancelled</h1>
         <p class="mt-2 text-sm text-muted dark:text-faint">
           You weren't charged. Pick up where you left off or head back to Billing.
         </p>

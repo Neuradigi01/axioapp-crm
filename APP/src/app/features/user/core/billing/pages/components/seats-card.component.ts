@@ -28,9 +28,7 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
             <lucide-icon name="users" size="18" aria-hidden="true"></lucide-icon>
           </div>
           <div>
-            <p
-              class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint"
-            >
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint">
               Seats
             </p>
             <h2 class="text-base font-semibold text-default dark:text-default">Team seats</h2>
@@ -84,9 +82,7 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
 
       <dl class="mt-6 grid flex-1 gap-4 sm:grid-cols-3">
         <div>
-          <dt
-            class="text-[11px] font-medium uppercase tracking-wide text-muted dark:text-faint"
-          >
+          <dt class="text-[11px] font-medium uppercase tracking-wide text-muted dark:text-faint">
             Included
           </dt>
           <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default dark:text-default">
@@ -94,9 +90,7 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
           </dd>
         </div>
         <div>
-          <dt
-            class="text-[11px] font-medium uppercase tracking-wide text-muted dark:text-faint"
-          >
+          <dt class="text-[11px] font-medium uppercase tracking-wide text-muted dark:text-faint">
             Active
           </dt>
           <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default dark:text-default">
@@ -104,9 +98,7 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
           </dd>
         </div>
         <div>
-          <dt
-            class="text-[11px] font-medium uppercase tracking-wide text-muted dark:text-faint"
-          >
+          <dt class="text-[11px] font-medium uppercase tracking-wide text-muted dark:text-faint">
             Extra seat
           </dt>
           <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default dark:text-default">

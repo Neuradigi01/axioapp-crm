@@ -56,9 +56,7 @@ interface UsageRowVM {
           <lucide-icon name="trending-up" size="18" aria-hidden="true"></lucide-icon>
         </div>
         <div>
-          <p
-            class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint"
-          >
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint">
             Usage
           </p>
           <h2 class="text-base font-semibold text-default dark:text-default">Current period</h2>
@@ -66,9 +64,7 @@ interface UsageRowVM {
       </div>
 
       @if (viewRows().length === 0) {
-        <p class="mt-6 text-sm text-muted dark:text-faint">
-          No metered resources on your plan.
-        </p>
+        <p class="mt-6 text-sm text-muted dark:text-faint">No metered resources on your plan.</p>
       } @else {
         <div class="mt-5 space-y-4">
           @for (row of viewRows(); track row.label) {
@@ -104,9 +100,7 @@ interface UsageRowVM {
                   Unlimited
                 </p>
               } @else {
-                <p class="mt-1 text-xs text-muted dark:text-faint">
-                  Not included on your plan
-                </p>
+                <p class="mt-1 text-xs text-muted dark:text-faint">Not included on your plan</p>
               }
             </div>
           }

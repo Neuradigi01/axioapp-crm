@@ -58,9 +58,7 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
           <lucide-icon name="receipt" size="18" aria-hidden="true"></lucide-icon>
         </div>
         <div>
-          <p
-            class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint"
-          >
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint">
             Invoices
           </p>
           <h2 class="text-base font-semibold text-default dark:text-default">Billing history</h2>

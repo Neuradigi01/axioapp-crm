@@ -60,9 +60,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
       <div class="flex flex-wrap items-start justify-between gap-4 p-6">
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <p
-              class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint"
-            >
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint">
               Current plan
             </p>
             <span
@@ -105,9 +103,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
       >
         @for (row of detailRows(); track row.label) {
           <div class="bg-surface-2 px-6 py-4 dark:bg-accent/60">
-            <dt
-              class="text-xs font-medium uppercase tracking-wide text-muted dark:text-faint"
-            >
+            <dt class="text-xs font-medium uppercase tracking-wide text-muted dark:text-faint">
               {{ row.label }}
             </dt>
             <dd class="mt-1 text-sm font-medium tabular-nums text-default dark:text-default">

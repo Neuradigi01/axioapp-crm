@@ -55,10 +55,7 @@ import { SeatPreview } from '../../types/subscription.types';
           <header
             class="flex items-start justify-between gap-4 border-b border-subtle px-6 py-4 dark:border-subtle"
           >
-            <h2
-              id="seat-modal-title"
-              class="text-lg font-semibold text-default dark:text-default"
-            >
+            <h2 id="seat-modal-title" class="text-lg font-semibold text-default dark:text-default">
               Manage seats
             </h2>
             <button
