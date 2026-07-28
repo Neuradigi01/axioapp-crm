@@ -1,14 +1,7 @@
 import { ValidatorFn, Validators } from '@angular/forms';
 
+import { emailValidator, phoneValidator } from '../../../../../shared/validators/custom-validators';
 import { FieldDef, FieldValue, ValidationRules } from './types';
-
-/**
- * Loosely-permissive phone pattern: optional leading `+`, then 7–20
- * characters of digits, spaces, dashes, or parentheses. Tight enough to
- * reject "abc" yet liberal enough not to fight Indian / international
- * dialing variants. Stricter checks belong in a backend formatter.
- */
-const PHONE_RE = /^\+?[0-9\s()-]{7,20}$/;
 
 /**
  * Translates a `FieldDef` into the Angular validator chain.
@@ -17,9 +10,11 @@ const PHONE_RE = /^\+?[0-9\s()-]{7,20}$/;
  *   1. `is_required` flag on the definition → `Validators.required`.
  *   2. The free-form `validation` JSON blob → individual `Validators.*`.
  *
- * Plus per-type defaults: `email` gets `Validators.email`, `phone` gets a
- * permissive regex. Custom `pattern` from `validation` is additive — both
- * apply when both are set.
+ * Plus per-type defaults: `email` gets the shared `emailValidator`,
+ * `phone` gets the shared `phoneValidator`. Both live in
+ * `app/src/app/shared/validators/custom-validators.ts` so a custom
+ * email / phone field validates identically to a standard one. Custom
+ * `pattern` from `validation` is additive — both apply when both are set.
  */
 export function validatorsForField(def: FieldDef): ValidatorFn[] {
   const validators: ValidatorFn[] = [];
@@ -51,10 +46,10 @@ export function validatorsForField(def: FieldDef): ValidatorFn[] {
   }
 
   if (def.field_type === 'email') {
-    validators.push(Validators.email);
+    validators.push(emailValidator);
   }
   if (def.field_type === 'phone') {
-    validators.push(Validators.pattern(PHONE_RE));
+    validators.push(phoneValidator);
   }
 
   return validators;

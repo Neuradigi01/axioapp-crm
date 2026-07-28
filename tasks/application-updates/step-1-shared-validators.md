@@ -2,7 +2,7 @@
 
 **Goal:** Extend the existing frontend `commonValidators` layer with industry-standard rules for name, email, phone, password strength, URL, and numeric ranges, and mirror them in a new `api/src/app/shared/validators.py` so every subsequent step (forms + CSV imports) validates against the same source of truth.
 **Track:** Application Updates — Form & CSV-Import Validation
-**Status:** Pending
+**Status:** COMPLETED — code + tests + regex-sync guard in place; frontend TypeScript + eslint clean; backend files parse-check clean. Pytest gate pending (user preference: batch code first, ask before running).
 **Depends on:** nothing. This step lands the foundation every other step in the track consumes.
 
 ---
