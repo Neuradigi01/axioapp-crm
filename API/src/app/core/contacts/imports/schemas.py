@@ -65,8 +65,20 @@ class ImportDryRunIn(BaseModel):
 
 
 class RowError(BaseModel):
+    """One rejected import row's forensic record.
+
+    Existing consumers read `row` + `reason` only; `column` + `value`
+    were added when the shared per-field validators (Step 1 of the
+    application-updates track) were wired into the import loop, so
+    operators can see *which* column tripped and *what* the offending
+    value was without downloading `errors.csv`. Both remain optional
+    to keep the payload additive for older UI builds.
+    """
+
     row: int
     reason: str
+    column: str | None = None
+    value: str | None = None
 
 
 class ImportDryRunOut(BaseModel):

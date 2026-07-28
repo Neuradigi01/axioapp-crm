@@ -3,6 +3,7 @@
   POST /api/v1/contacts/imports/upload         → multipart, returns import_id + mapping suggestion
   POST /api/v1/contacts/imports/{id}/dry-run   → count without writing
   POST /api/v1/contacts/imports/{id}/commit    → insert + optional group creation
+  GET  /api/v1/contacts/imports/{id}/errors.csv → downloadable per-row error report
 
 All endpoints gate on `contacts.write` — same key used by the
 contacts create/edit endpoints. No new permission key.
@@ -20,6 +21,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
@@ -32,6 +34,7 @@ from src.app.core.contacts.imports.schemas import (
 )
 from src.app.core.contacts.imports.service import (
     MAX_FILE_SIZE_BYTES,
+    build_errors_csv_response,
     commit_import,
     dry_run_import,
     upload_file,
@@ -123,4 +126,23 @@ async def commit_endpoint(
         success_count=row.success_count,
         error_count=row.error_count,
         created_group_id=row.created_group_id,
+    )
+
+
+@router.get("/{import_id}/errors.csv")
+async def download_errors_csv_endpoint(
+    import_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.write")),
+) -> StreamingResponse:
+    """Stream a CSV of every failed row from a completed import.
+
+    Columns are the original file columns + `__row_number`, `__column`,
+    `__value`, `__error_reason`. Available after dry-run or commit;
+    contents match the operator's persisted `error_log` snapshot.
+    """
+    return await build_errors_csv_response(
+        db,
+        org_id=user.org_id,
+        import_id=import_id,
     )

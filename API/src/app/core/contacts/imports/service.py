@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
@@ -27,6 +28,7 @@ from src.app.core.contacts.imports.schemas import (
     RowError,
 )
 from src.app.core.contacts.models import Contact
+from src.app.shared import import_errors, validators
 from src.app.shared.storage import get_storage
 
 # Hard caps — `(a) 5 MB / 10K rows` per Step 3.5.10's recommendation.
@@ -34,6 +36,12 @@ from src.app.shared.storage import get_storage
 # pathway lifts these.
 MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
 MAX_ROW_COUNT = 10_000
+
+# Cap persisted error records so an import with 10K rows that all fail
+# does not bloat the `error_log` JSONB into a multi-MB blob. The CSV
+# response still streams the full pass; only the DB-stored snapshot
+# is truncated.
+MAX_STORED_ERRORS = 5_000
 
 
 # --- helpers --------------------------------------------------------------
@@ -200,7 +208,22 @@ async def dry_run_import(
         mapped = _apply_mapping(raw, mapping)
 
         if not mapped.get("full_name"):
-            errors.append(RowError(row=row_no, reason="missing required field 'full_name'"))
+            errors.append(
+                RowError(
+                    row=row_no,
+                    column="full_name",
+                    value=None,
+                    reason=validators.REASON_REQUIRED_MISSING,
+                )
+            )
+            will_skip += 1
+            continue
+
+        # Field-shape validators (name / email / phone). Failures don't
+        # write and don't count as inserts.
+        shape_error = _check_row_shape(row_no, mapped)
+        if shape_error is not None:
+            errors.append(shape_error)
             will_skip += 1
             continue
 
@@ -222,7 +245,7 @@ async def dry_run_import(
     row.applied_mapping = dict(mapping)
     row.status = ContactImportStatus.dry_run
     row.error_count = len(errors)
-    row.error_log = [e.model_dump() for e in errors]
+    row.error_log = [e.model_dump() for e in errors[:MAX_STORED_ERRORS]]
     if opt_in_source is not None:
         row.opt_in_source = opt_in_source
     await session.commit()
@@ -295,12 +318,31 @@ async def commit_import(
         mapped = _apply_mapping(raw, mapping)
         full_name = mapped.get("full_name")
         if not full_name:
-            errors.append({"row": row_no, "reason": "missing required field 'full_name'"})
+            errors.append(
+                {
+                    "row": row_no,
+                    "column": "full_name",
+                    "value": None,
+                    "reason": validators.REASON_REQUIRED_MISSING,
+                }
+            )
+            continue
+
+        shape_error = _check_row_shape(row_no, mapped)
+        if shape_error is not None:
+            errors.append(shape_error.model_dump())
             continue
 
         phone_norm = _normalise_phone(mapped.get("phone") or "")
         if phone_norm and (phone_norm in existing_phones or phone_norm in seen_phones_in_file):
-            errors.append({"row": row_no, "reason": f"duplicate phone {phone_norm}"})
+            errors.append(
+                {
+                    "row": row_no,
+                    "column": "phone",
+                    "value": mapped.get("phone"),
+                    "reason": f"duplicate phone {phone_norm}",
+                }
+            )
             continue
 
         contact_id = uuid.uuid4()
@@ -376,7 +418,7 @@ async def commit_import(
     row.applied_mapping = dict(mapping)
     row.success_count = len(inserted_ids)
     row.error_count = len(errors)
-    row.error_log = errors
+    row.error_log = errors[:MAX_STORED_ERRORS]
     row.created_group_id = created_group_id
     if effective_opt_in_source:
         row.opt_in_source = effective_opt_in_source
@@ -407,6 +449,52 @@ def _read_file_bytes(storage, storage_path: str) -> bytes:
 
     full = Path("./storage").resolve() / storage_path.lstrip("/")
     return full.read_bytes()
+
+
+def _check_row_shape(row_no: int, mapped: dict[str, Any]) -> RowError | None:
+    """Run the shared per-field validators against a mapped row.
+
+    Returns the first failure as a `RowError`, or `None` if the row
+    passes every shape check. Only fields that are *present* get
+    validated (the required-field check runs separately upstream); an
+    absent optional email or phone is allowed through.
+    """
+    full_name = mapped.get("full_name") or ""
+    try:
+        validators.validate_name(full_name)
+    except validators.ValidationError as exc:
+        return RowError(
+            row=row_no,
+            column="full_name",
+            value=full_name,
+            reason=exc.reason,
+        )
+
+    email_raw = (mapped.get("email") or "").strip()
+    if email_raw:
+        try:
+            validators.validate_email(email_raw)
+        except validators.ValidationError as exc:
+            return RowError(
+                row=row_no,
+                column="email",
+                value=email_raw,
+                reason=exc.reason,
+            )
+
+    phone_raw = (mapped.get("phone") or "").strip()
+    if phone_raw:
+        try:
+            validators.validate_phone(phone_raw)
+        except validators.ValidationError as exc:
+            return RowError(
+                row=row_no,
+                column="phone",
+                value=phone_raw,
+                reason=exc.reason,
+            )
+
+    return None
 
 
 def _validate_mapping(mapping: dict[str, str]) -> None:
@@ -502,9 +590,81 @@ async def _dedupe_key_hits(
     return hits
 
 
+# --- errors.csv download --------------------------------------------------
+
+
+async def build_errors_csv_response(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    import_id: uuid.UUID,
+) -> StreamingResponse:
+    """Stream a CSV of every failed row for a completed import.
+
+    Columns are the original file columns + `__row_number`, `__column`,
+    `__value`, `__error_reason` — same shape the shared
+    `shared.import_errors.write_errors_csv` helper produces for the
+    other two import surfaces. Content is derived from the persisted
+    `error_log` (dry-run or commit) so the operator gets exactly what
+    they were shown in the wizard preview.
+    """
+    row = await _get_import(session, import_id)
+    if row.org_id != org_id:
+        # RLS already gates the query, but the explicit guard makes the
+        # 404 shape identical whether the row is missing or belongs to
+        # another tenant.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="contact import not found",
+        )
+
+    # Load the original file so the CSV echoes back the offending row
+    # data verbatim — operators fix the source spreadsheet against the
+    # column they see in the download.
+    storage = get_storage()
+    file_bytes = _read_file_bytes(storage, row.storage_path)
+    parsed_rows = list(parse_all_rows(file_bytes, row.filename))
+    headers: list[str] = list(row.headers or [])
+    if not headers and parsed_rows:
+        headers = list(parsed_rows[0][1].keys())
+
+    original_rows: list[dict[str, Any]] = [raw for _row_no, raw in parsed_rows]
+
+    persisted = row.error_log or []
+    errors_out: list[import_errors.ImportRowError] = []
+    for record in persisted:
+        errors_out.append(
+            import_errors.ImportRowError(
+                row_number=int(record.get("row", 0)),
+                column=record.get("column"),
+                value=(
+                    None
+                    if record.get("value") is None
+                    else str(record.get("value"))
+                ),
+                reason=str(record.get("reason", "")),
+            )
+        )
+
+    body = import_errors.write_errors_csv(
+        original_headers=headers,
+        original_rows=original_rows,
+        errors=errors_out,
+    )
+
+    filename = f"contact-import-{import_id}-errors.csv"
+    return StreamingResponse(
+        iter([body]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 __all__ = [
     "MAX_FILE_SIZE_BYTES",
     "MAX_ROW_COUNT",
+    "MAX_STORED_ERRORS",
+    "build_errors_csv_response",
     "commit_import",
     "dry_run_import",
     "upload_file",

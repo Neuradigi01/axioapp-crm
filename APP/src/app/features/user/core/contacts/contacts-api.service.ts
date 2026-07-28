@@ -185,6 +185,14 @@ export interface ContactImportRunIn {
 export interface ContactImportRowError {
   row: number;
   reason: string;
+  /** Column on the source CSV whose value tripped the validator (or `null`
+   *  when the failure is row-scoped, e.g. missing required field). Added
+   *  when the shared per-field validators landed in the import loop. */
+  column?: string | null;
+  /** The offending value, echoed back so the operator can locate it in
+   *  the source file without downloading `errors.csv`. `null` when no
+   *  value applies (required-missing case). */
+  value?: string | null;
 }
 
 /** Response from `POST /contacts/imports/{id}/dry-run`. */
@@ -398,5 +406,16 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
    * on `importId` so re-clicks don't double-insert. */
   commitImport(importId: string, body: ContactImportRunIn): Observable<ContactImportCommitOut> {
     return this.http.post<ContactImportCommitOut>(`${this.base}/imports/${importId}/commit`, body);
+  }
+
+  /** Download the per-row error CSV for a completed import. The blob
+   *  streams the same shape used by the leads / catalog import surfaces:
+   *  original columns + `__row_number`, `__column`, `__value`,
+   *  `__error_reason`. Available after dry-run or commit; empty if
+   *  the import had no errors. */
+  downloadImportErrors(importId: string): Observable<Blob> {
+    return this.http.get(`${this.base}/imports/${importId}/errors.csv`, {
+      responseType: 'blob',
+    });
   }
 }

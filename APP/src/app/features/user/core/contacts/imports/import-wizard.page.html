@@ -347,6 +347,8 @@
               <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
                 <tr>
                   <th class="px-3 py-2 text-left font-medium">Row</th>
+                  <th class="px-3 py-2 text-left font-medium">Column</th>
+                  <th class="px-3 py-2 text-left font-medium">Value</th>
                   <th class="px-3 py-2 text-left font-medium">Reason</th>
                 </tr>
               </thead>
@@ -354,6 +356,8 @@
                 @for (e of visibleErrors(); track e.row) {
                   <tr>
                     <td class="px-3 py-2 text-default">{{ e.row }}</td>
+                    <td class="px-3 py-2 text-muted">{{ e.column ?? '—' }}</td>
+                    <td class="px-3 py-2 text-muted">{{ e.value ?? '—' }}</td>
                     <td class="px-3 py-2 text-default">{{ e.reason }}</td>
                   </tr>
                 }
@@ -374,6 +378,22 @@
                 </button>
               </div>
             }
+            <div
+              class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-4 py-2 text-xs"
+            >
+              @if (downloadErrorsMsg(); as msg) {
+                <span class="text-red-500">{{ msg }}</span>
+              }
+              <button
+                type="button"
+                (click)="downloadErrors()"
+                [disabled]="downloadingErrors()"
+                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <lucide-icon name="download" class="h-3.5 w-3.5" />
+                {{ downloadingErrors() ? 'Preparing…' : 'Download errors CSV' }}
+              </button>
+            </div>
           </div>
         </details>
       }
@@ -448,6 +468,17 @@
           <lucide-icon name="users" class="h-4 w-4" />
           Back to contacts
         </button>
+        @if (outcome.error_count > 0) {
+          <button
+            type="button"
+            (click)="downloadErrors()"
+            [disabled]="downloadingErrors()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <lucide-icon name="download" class="h-4 w-4" />
+            {{ downloadingErrors() ? 'Preparing…' : 'Download errors CSV' }}
+          </button>
+        }
         @if (outcome.created_group_id) {
           <button
             type="button"
@@ -459,6 +490,9 @@
           </button>
         }
       </div>
+      @if (downloadErrorsMsg(); as msg) {
+        <p class="text-center text-xs text-red-500">{{ msg }}</p>
+      }
     </section>
   }
 </div>

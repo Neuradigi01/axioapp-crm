@@ -2,7 +2,7 @@
 
 **Goal:** Wire the shared backend validators (Step 1) into the contacts-import service so every row is checked for email / phone / name shape before write, and add a downloadable `errors.csv` endpoint that matches the leads-import schema — row-numbered, column-tagged, human-readable reasons.
 **Track:** Application Updates — Form & CSV-Import Validation
-**Status:** Pending
+**Status:** COMPLETED — dry-run + commit row loops both run the shared name/email/phone validators; failed rows land in `error_log` with `{row, column, value, reason}`. New endpoint `GET /api/v1/contacts/imports/{id}/errors.csv` streams the same shape the leads/catalog imports produce, via `shared.import_errors.write_errors_csv`. Persisted errors capped at 5000. Frontend wizard: error preview table gained Column/Value columns; step-3 preview and step-4 success both expose a "Download errors CSV" button. **No migration needed** — `tbl_contact_imports.error_log` JSONB column pre-existed. Backend parse-check clean; frontend tsc + eslint + prettier all clean.
 **Depends on:** Step 1 (`validators.py` + `import_errors.py`).
 
 ---
