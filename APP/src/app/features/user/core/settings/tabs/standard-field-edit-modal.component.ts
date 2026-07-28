@@ -83,9 +83,9 @@ export class StandardFieldEditModalComponent {
   protected readonly submitError = signal<string | null>(null);
 
   readonly form = new FormGroup<FormShape>({
-    label: new FormControl<string | null>(null),
-    placeholder: new FormControl<string | null>(null),
-    help_text: new FormControl<string | null>(null),
+    label: new FormControl<string | null>(null, [Validators.maxLength(128)]),
+    placeholder: new FormControl<string | null>(null, [Validators.maxLength(255)]),
+    help_text: new FormControl<string | null>(null, [Validators.maxLength(500)]),
     is_required: new FormControl<boolean | null>(null),
     is_hidden: new FormControl<boolean | null>(null),
     min_value: new FormControl<number | null>(null),

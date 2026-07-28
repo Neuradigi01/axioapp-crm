@@ -2,7 +2,7 @@
 
 **Goal:** Apply shared validators to the settings-page forms — user profile, team-tab inline edits, SMTP sender identity, sender-code verify, add-domain, compliance settings, standard-field-edit modal — so every admin configuration surface enforces the same input rules as the rest of the CRM.
 **Track:** Application Updates — Form & CSV-Import Validation
-**Status:** Pending
+**Status:** COMPLETED — profile, team, standard-field-edit, SMTP sender, and add-domain forms wired to shared validators. Two new hostname helpers added (`hostnameValidator` for RFC-1123 and `hostnameApexValidator` for apex-only DKIM domains). Profile drops manual password-match check for `matchFieldValidator`. Team-tab layers a picklist validator on role_id once roles load (dynamic). Add-domain modal swaps its local regex for `hostnameApexValidator`. SMTP password max kept at 4096 (existing) — see Notes. tsc + eslint + prettier all clean. Step 6 (campaigns wizard + workflow editors) skipped by user; standard-field modal's `default_value` typedValueValidator deferred with it.
 **Depends on:** Step 1 (shared validators).
 
 ---

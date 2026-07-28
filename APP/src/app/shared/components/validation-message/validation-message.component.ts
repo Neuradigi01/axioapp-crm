@@ -42,6 +42,8 @@ const DEFAULT_MESSAGES: Record<string, string | ((err: ValidatorErrorDetail) => 
   invalidChoice: REASON.invalidChoice,
   invalidChoicesCsv: REASON.invalidChoicesCsv,
   invalidWaVariables: REASON.invalidWaVariables,
+  invalidHostname: REASON.invalidHostname,
+  hostnameNotApex: REASON.hostnameNotApex,
 };
 
 @Component({

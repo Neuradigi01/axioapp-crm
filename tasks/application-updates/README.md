@@ -72,7 +72,7 @@ Track is done when:
 | 4 | [Activity & action forms (tasks, appointments, calls, reviews, notes)](step-4-activity-forms.md) | COMPLETED | ~½ day |
 | 5 | [Config forms A — custom fields + templates](step-5-config-forms-a.md) | COMPLETED | ~½ day |
 | 6 | [Config forms B — campaigns + workflow editors](step-6-config-forms-b.md) | Pending | ~1 day |
-| 7 | [Settings forms](step-7-settings-forms.md) | Pending | ~½ day |
+| 7 | [Settings forms](step-7-settings-forms.md) | COMPLETED | ~½ day |
 | 8 | [Contacts CSV import — validation + errors.csv](step-8-contacts-csv-import.md) | Pending | ~½ day |
 | 9 | [Leads CSV import — new validation rules](step-9-leads-csv-import.md) | Pending | ~½ day |
 | 10 | [Catalog CSV import — validation + errors.csv](step-10-catalog-csv-import.md) | Pending | ~½ day |

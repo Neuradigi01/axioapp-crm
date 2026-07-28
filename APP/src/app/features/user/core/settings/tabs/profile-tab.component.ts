@@ -5,6 +5,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import { FurnitureAuthService, MeResponse } from '../../auth/auth.service';
 import { ProfileApiService } from '../../profile/profile.service';
+import { commonValidators } from '../../shared/validators';
+import { matchFieldValidator } from '@shared/validators/custom-validators';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
@@ -37,17 +39,20 @@ export class ProfileTabComponent {
   protected readonly loadError = signal<string | null>(null);
 
   protected readonly profileForm = this.fb.nonNullable.group({
-    full_name: ['', [Validators.required, Validators.maxLength(255)]],
-    phone: [''],
+    full_name: ['', [Validators.required, commonValidators.name, Validators.maxLength(255)]],
+    phone: ['', [commonValidators.phone()]],
   });
   protected readonly profileSaving = signal(false);
   protected readonly profileOk = signal(false);
   protected readonly profileError = signal<string | null>(null);
 
   protected readonly passwordForm = this.fb.nonNullable.group({
-    current_password: ['', [Validators.required]],
-    new_password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(255)]],
-    confirm_password: ['', [Validators.required]],
+    current_password: ['', [Validators.required, Validators.maxLength(128)]],
+    new_password: ['', [Validators.required, commonValidators.password]],
+    confirm_password: [
+      '',
+      [Validators.required, Validators.maxLength(128), matchFieldValidator('new_password')],
+    ],
     sign_out_others: [false],
   });
   protected readonly passwordSaving = signal(false);
@@ -109,15 +114,12 @@ export class ProfileTabComponent {
 
   protected changePassword(): void {
     if (this.passwordSaving()) return;
-    const raw = this.passwordForm.getRawValue();
     if (this.passwordForm.invalid) {
-      this.passwordError.set('All fields are required, min 8 chars.');
+      this.passwordForm.markAllAsTouched();
+      this.passwordError.set('Please fix the highlighted fields.');
       return;
     }
-    if (raw.new_password !== raw.confirm_password) {
-      this.passwordError.set('New password and confirmation do not match.');
-      return;
-    }
+    const raw = this.passwordForm.getRawValue();
 
     this.passwordSaving.set(true);
     this.passwordError.set(null);

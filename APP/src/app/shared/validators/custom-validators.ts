@@ -26,6 +26,8 @@ export const REASON = {
   invalidChoicesCsv: 'choices must be unique, ≤ 64 chars each, and no more than 100 total',
   invalidWaVariables:
     'variables must be numbered {{1}}, {{2}}, … sequentially without gaps (max 10)',
+  invalidHostname: 'must be a valid hostname (e.g. example.com)',
+  hostnameNotApex: 'enter the apex domain only (e.g. example.com, not mail.example.com)',
 } as const;
 
 /**
@@ -328,6 +330,54 @@ export function waVariablesValidator(control: AbstractControl): ValidationErrors
     if (distinct[i] !== i + 1) {
       return { invalidWaVariables: REASON.invalidWaVariables };
     }
+  }
+  return null;
+}
+
+/** RFC-1123 hostname: 1–253 chars total; labels 1–63 alnum with internal hyphens; ≥ 2 labels. */
+const HOSTNAME_RE =
+  /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
+
+/**
+ * Any RFC-1123 hostname (subdomains allowed). Empty short-circuits to `null`.
+ * Case-insensitive on input; normalize case-side before persisting if you care.
+ */
+export function hostnameValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  const value = String(raw).trim();
+  return HOSTNAME_RE.test(value) ? null : { invalidHostname: REASON.invalidHostname };
+}
+
+/**
+ * Apex-only hostname. Rejects anything with more than the effective TLD + 1
+ * label (i.e. `example.com` OK, `mail.example.com` NOT OK, `example.co.uk`
+ * OK — since `.co.uk` is a 2-part effective TLD). Uses a small hard-coded
+ * multi-part-TLD list; extend as new cases surface.
+ */
+const MULTI_PART_TLDS = new Set<string>([
+  'co.uk',
+  'co.in',
+  'com.au',
+  'com.br',
+  'co.jp',
+  'co.kr',
+  'co.nz',
+  'com.mx',
+  'com.sg',
+]);
+
+export function hostnameApexValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  const value = String(raw).trim().toLowerCase();
+  if (!HOSTNAME_RE.test(value)) return { invalidHostname: REASON.invalidHostname };
+  const parts = value.split('.');
+  const tail2 = parts.slice(-2).join('.');
+  const effectiveTldParts = MULTI_PART_TLDS.has(tail2) ? 2 : 1;
+  // Apex = <one label>.<effective TLD>.
+  if (parts.length !== effectiveTldParts + 1) {
+    return { hostnameNotApex: REASON.hostnameNotApex };
   }
   return null;
 }

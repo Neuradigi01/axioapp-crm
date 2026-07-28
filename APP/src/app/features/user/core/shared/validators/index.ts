@@ -6,6 +6,8 @@ import {
   dateWithinPastDays,
   emailValidator,
   fileUploadValidator,
+  hostnameApexValidator,
+  hostnameValidator,
   isoDateTimeValidator,
   isoDateValidator,
   nameValidator,
@@ -66,6 +68,8 @@ export const commonValidators = {
   picklist: (allowed: readonly (string | number)[]): ValidatorFn => picklistValidator(allowed),
   choicesCsv: choicesCsvValidator as ValidatorFn,
   waVariables: waVariablesValidator as ValidatorFn,
+  hostname: hostnameValidator as ValidatorFn,
+  hostnameApex: hostnameApexValidator as ValidatorFn,
 } as const;
 
 /**
