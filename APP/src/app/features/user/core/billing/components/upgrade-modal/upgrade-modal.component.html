@@ -15,17 +15,17 @@
 
     <!-- Panel -->
     <div
-      class="relative w-full max-w-2xl rounded-2xl bg-surface shadow-xl dark:bg-surface-2 max-h-[90vh] flex flex-col"
+      class="relative w-full max-w-2xl rounded-2xl bg-surface shadow-xl max-h-[90vh] flex flex-col"
     >
       <header
-        class="flex items-start justify-between gap-4 border-b border-subtle px-4 md:px-6 py-4 dark:border-subtle"
+        class="flex items-start justify-between gap-4 border-b border-subtle px-4 md:px-6 py-4"
       >
-        <h2 id="upgrade-modal-title" class="text-lg font-semibold text-default dark:text-default">
+        <h2 id="upgrade-modal-title" class="text-lg font-semibold text-default">
           Upgrade your plan
         </h2>
         <button
           type="button"
-          class="rounded-md p-1 text-muted hover:bg-surface-2 hover:text-default dark:hover:bg-surface dark:hover:text-default"
+          class="rounded-md p-1 text-muted hover:bg-surface-2 hover:text-default dark:hover:text-default"
           (click)="close()"
           aria-label="Close"
         >
@@ -38,7 +38,7 @@
         @if (plansLoading()) {
           <div class="space-y-3">
             @for (i of [0, 1, 2]; track i) {
-              <div class="h-20 rounded-lg bg-surface-2 dark:bg-surface animate-pulse"></div>
+              <div class="h-20 rounded-lg bg-surface-2 animate-pulse"></div>
             }
           </div>
         } @else if (plansError()) {
@@ -49,9 +49,7 @@
           </p>
         } @else {
           <fieldset>
-            <legend class="text-sm font-medium text-default dark:text-default mb-3">
-              Choose your plan
-            </legend>
+            <legend class="text-sm font-medium text-default mb-3">Choose your plan</legend>
             <div class="space-y-2">
               @for (plan of visiblePlans(); track plan.code) {
                 <label
@@ -74,7 +72,7 @@
                   />
                   <div class="flex-1">
                     <div class="flex items-center justify-between gap-2">
-                      <span class="font-medium text-default dark:text-default">
+                      <span class="font-medium text-default">
                         {{ plan.name }}
                       </span>
                       @if (isPopular(plan.code)) {
@@ -85,7 +83,7 @@
                         </span>
                       }
                     </div>
-                    <div class="mt-0.5 text-sm text-muted dark:text-muted">
+                    <div class="mt-0.5 text-sm text-muted">
                       ₹{{ formatINR(planPriceFor(plan)) }}/mo
                       <span class="text-faint">·</span>
                       Up to {{ plan.pricing.included_seats }} seats included
@@ -97,10 +95,8 @@
           </fieldset>
 
           <fieldset class="mt-5">
-            <legend class="text-sm font-medium text-default dark:text-default mb-2">
-              Billing cycle
-            </legend>
-            <div class="inline-flex rounded-full border border-subtle p-1 dark:border-subtle">
+            <legend class="text-sm font-medium text-default mb-2">Billing cycle</legend>
+            <div class="inline-flex rounded-full border border-subtle p-1">
               <button
                 type="button"
                 (click)="setCycle('monthly')"
@@ -127,50 +123,46 @@
           </fieldset>
 
           <fieldset class="mt-5">
-            <legend class="text-sm font-medium text-default dark:text-default mb-2">Seats</legend>
-            <div
-              class="inline-flex items-center gap-2 rounded-lg border border-subtle p-1 dark:border-subtle"
-            >
+            <legend class="text-sm font-medium text-default mb-2">Seats</legend>
+            <div class="inline-flex items-center gap-2 rounded-lg border border-subtle p-1">
               <button
                 type="button"
                 (click)="decrementSeats()"
                 [disabled]="selectedSeats() <= minSeats()"
-                class="rounded-md px-3 py-1 text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40 dark:text-muted dark:hover:bg-surface"
+                class="rounded-md px-3 py-1 text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Decrease seats"
               >
                 −
               </button>
-              <span class="min-w-[2ch] text-center font-medium text-default dark:text-default">
+              <span class="min-w-[2ch] text-center font-medium text-default">
                 {{ selectedSeats() }}
               </span>
               <button
                 type="button"
                 (click)="incrementSeats()"
-                class="rounded-md px-3 py-1 text-default hover:bg-surface-2 dark:text-muted dark:hover:bg-surface"
+                class="rounded-md px-3 py-1 text-default hover:bg-surface-2"
                 aria-label="Increase seats"
               >
                 +
               </button>
             </div>
-            <p class="mt-1.5 text-xs text-muted dark:text-faint">
+            <p class="mt-1.5 text-xs text-muted">
               Minimum {{ minSeats() }} seat{{ minSeats() === 1 ? '' : 's' }}.
             </p>
           </fieldset>
 
           <div
-            class="mt-6 rounded-lg border border-subtle bg-surface-2 px-4 py-3 text-sm dark:border-subtle dark:bg-app"
+            class="mt-6 rounded-lg border border-subtle bg-surface-2 px-4 py-3 text-sm"
           >
             <div class="flex items-center justify-between">
-              <span class="text-muted dark:text-muted">Estimated today</span>
-              <span class="font-semibold text-default dark:text-default">
-                ₹{{ formatINR(estimateToday()) }}
-              </span>
+              <span class="text-muted">Estimated today</span>
+              <span class="font-semibold text-default"> ₹{{ formatINR(estimateToday()) }} </span>
             </div>
             <div class="mt-1 flex items-center justify-between">
-              <span class="text-muted dark:text-faint"> Renews every {{ cycleLabel() }} </span>
-              <span class="text-muted dark:text-muted"> ₹{{ formatINR(renewalAmount()) }} </span>
+              <span class="text-muted"> Renews every {{ cycleLabel() }} </span>
+              <span class="text-muted"> ₹{{ formatINR(renewalAmount()) }} </span>
             </div>
-            <p class="mt-2 text-[11px] text-muted dark:text-faint">
+            <p class="mt-2 text-[11px] text-muted">
               Final amount confirmed at checkout. Stripe may adjust by a few paise.
             </p>
           </div>
@@ -186,14 +178,12 @@
         }
       </div>
 
-      <footer
-        class="flex items-center justify-end gap-2 border-t border-subtle px-4 md:px-6 py-3 dark:border-subtle"
-      >
+      <footer class="flex items-center justify-end gap-2 border-t border-subtle px-4 md:px-6 py-3">
         <button
           type="button"
           (click)="close()"
           [disabled]="isSubmitting()"
-          class="rounded-lg px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-40 dark:text-muted dark:hover:bg-surface"
+          class="rounded-lg px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-40"
         >
           Cancel
         </button>

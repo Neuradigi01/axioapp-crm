@@ -24,7 +24,7 @@ import { CatalogTile } from './onboarding.types';
     >
       @if (tile().status === 'coming_soon') {
         <span
-          class="absolute top-2 right-2 text-[10px] font-medium uppercase tracking-wide bg-surface-2 dark:bg-surface text-default dark:text-muted px-2 py-0.5 rounded-full"
+          class="absolute top-2 right-2 text-[10px] font-medium uppercase tracking-wide bg-surface-2 text-default px-2 py-0.5 rounded-full"
         >
           Coming soon
         </span>
@@ -43,10 +43,10 @@ import { CatalogTile } from './onboarding.types';
         <lucide-icon [name]="tile().icon" class="w-6 h-6"></lucide-icon>
       </div>
 
-      <div class="text-base font-semibold text-default dark:text-default mb-1">
+      <div class="text-base font-semibold text-default mb-1">
         {{ tile().name }}
       </div>
-      <div class="text-sm text-muted dark:text-faint leading-snug line-clamp-2">
+      <div class="text-sm text-muted leading-snug line-clamp-2">
         {{ tile().description }}
       </div>
     </button>
@@ -59,15 +59,15 @@ export class PackTileComponent {
 
   protected readonly rootClasses = computed(() => {
     const base =
-      'relative flex flex-col items-start text-left rounded-xl border bg-surface dark:bg-surface-2 p-5 transition w-full h-full';
+      'relative flex flex-col items-start text-left rounded-xl border bg-surface p-5 transition w-full h-full';
     const t = this.tile();
     if (t.status !== 'available') {
-      return `${base} border-subtle dark:border-subtle opacity-60 cursor-not-allowed`;
+      return `${base} border-subtle opacity-60 cursor-not-allowed`;
     }
     if (this.selected()) {
       return `${base} border-blue-600 ring-2 ring-blue-500 shadow-md`;
     }
-    return `${base} border-subtle dark:border-subtle cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md`;
+    return `${base} border-subtle cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md`;
   });
 
   protected onClick(): void {

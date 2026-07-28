@@ -24,11 +24,10 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
 const STATUS_TONE: Record<InvoiceStatus, string> = {
   paid: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:ring-emerald-900',
   open: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-900',
-  void: 'bg-surface-2 text-muted ring-1 border-subtle dark:bg-surface dark:text-muted dark:ring-slate-600',
+  void: 'bg-surface-2 text-muted ring-1 border-subtle dark:ring-slate-600',
   uncollectible:
     'bg-red-500/10 text-red-400 ring-1 ring-red-500/20 dark:bg-red-300 dark:text-red-500/30 dark:ring-red-300',
-  draft:
-    'bg-surface-2 text-muted ring-1 border-subtle dark:bg-surface dark:text-muted dark:ring-slate-600',
+  draft: 'bg-surface-2 text-muted ring-1 border-subtle dark:ring-slate-600',
 };
 
 /**
@@ -48,38 +47,34 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
-    <section
-      class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm dark:border-subtle dark:bg-accent"
-    >
-      <div class="flex items-center gap-3 border-b border-subtle px-6 py-4 dark:border-subtle">
+    <section class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm">
+      <div class="flex items-center gap-3 border-b border-subtle px-6 py-4">
         <div
-          class="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-2 text-default ring-1 border-subtle dark:bg-surface dark:text-muted dark:ring-slate-600"
+          class="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-2 text-default ring-1 border-subtle dark:ring-slate-600"
         >
           <lucide-icon name="receipt" size="18" aria-hidden="true"></lucide-icon>
         </div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint">
-            Invoices
-          </p>
-          <h2 class="text-base font-semibold text-default dark:text-default">Billing history</h2>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">Invoices</p>
+          <h2 class="text-base font-semibold text-default">Billing history</h2>
         </div>
       </div>
 
       @if (isLoading()) {
         <div class="space-y-2 p-6">
           @for (i of [0, 1, 2]; track i) {
-            <div class="h-10 rounded bg-surface-2 animate-pulse dark:bg-surface"></div>
+            <div class="h-10 rounded bg-surface-2 animate-pulse"></div>
           }
         </div>
       } @else if (viewRows().length === 0) {
         <div class="px-6 py-12 text-center">
           <div
-            class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-faint dark:bg-surface dark:text-muted"
+            class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-faint"
           >
             <lucide-icon name="receipt" size="18" aria-hidden="true"></lucide-icon>
           </div>
-          <p class="mt-3 text-sm font-medium text-default dark:text-default">No invoices yet</p>
-          <p class="mt-1 text-xs text-muted dark:text-faint">
+          <p class="mt-3 text-sm font-medium text-default">No invoices yet</p>
+          <p class="mt-1 text-xs text-muted">
             Once you upgrade and Stripe issues the first invoice, it'll appear here.
           </p>
         </div>
@@ -87,7 +82,7 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead
-              class="border-b border-subtle bg-surface-2 text-left text-xs uppercase tracking-wide text-muted dark:border-subtle dark:bg-black/60 dark:text-faint"
+              class="border-b border-subtle bg-surface-2 text-left text-xs uppercase tracking-wide text-muted/60"
             >
               <tr>
                 <th class="px-6 py-2.5 font-medium">Date</th>
@@ -99,9 +94,7 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
             </thead>
             <tbody class="divide-y divide-subtle dark:divide-subtle">
               @for (row of viewRows(); track row.id) {
-                <tr
-                  class="text-default transition-colors hover:bg-surface-2 dark:text-default dark:hover:bg-surface/50"
-                >
+                <tr class="text-default transition-colors hover:bg-surface-2/50">
                   <td class="px-6 py-3 tabular-nums">{{ row.date }}</td>
                   <td class="px-6 py-3 font-mono text-xs">{{ row.number }}</td>
                   <td class="px-6 py-3 font-medium tabular-nums">

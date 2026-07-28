@@ -17,9 +17,7 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
-    <section
-      class="flex h-full flex-col rounded-xl border border-subtle bg-surface p-6 shadow-sm dark:border-subtle dark:bg-accent"
-    >
+    <section class="flex h-full flex-col rounded-xl border border-subtle bg-surface p-6 shadow-sm">
       <div class="flex items-start justify-between gap-3">
         <div class="flex items-center gap-3">
           <div
@@ -28,10 +26,8 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
             <lucide-icon name="users" size="18" aria-hidden="true"></lucide-icon>
           </div>
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-muted dark:text-faint">
-              Seats
-            </p>
-            <h2 class="text-base font-semibold text-default dark:text-default">Team seats</h2>
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted">Seats</p>
+            <h2 class="text-base font-semibold text-default">Team seats</h2>
           </div>
         </div>
 
@@ -49,7 +45,6 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
           [class.text-default]="!manageDisabled()"
           [class.hover:bg-surface-2]="!manageDisabled()"
           [class.dark:border-subtle]="!manageDisabled()"
-          [class.dark:bg-surface]="!manageDisabled()"
           [class.dark:text-default]="!manageDisabled()"
           [class.dark:hover:bg-surface]="!manageDisabled()"
           [disabled]="manageDisabled()"
@@ -61,12 +56,12 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
 
       <div class="mt-5">
         <div class="flex items-baseline justify-between">
-          <p class="text-sm text-muted dark:text-faint">In use</p>
-          <p class="text-sm font-semibold tabular-nums text-default dark:text-default">
+          <p class="text-sm text-muted">In use</p>
+          <p class="text-sm font-semibold tabular-nums text-default">
             {{ subscription().seats.in_use }} / {{ subscription().seats.purchased }}
           </p>
         </div>
-        <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-2 dark:bg-surface">
+        <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-2">
           <div
             class="h-full rounded-full transition-all"
             [class.bg-emerald-500]="seatTone() === 'green'"
@@ -75,35 +70,29 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
             [style.width.%]="seatPercent()"
           ></div>
         </div>
-        <p class="mt-2 text-xs text-muted dark:text-faint">
+        <p class="mt-2 text-xs text-muted">
           {{ helperLine() }}
         </p>
       </div>
 
       <dl class="mt-6 grid flex-1 gap-4 sm:grid-cols-3">
         <div>
-          <dt class="text-[11px] font-medium uppercase tracking-wide text-muted dark:text-faint">
-            Included
-          </dt>
-          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default dark:text-default">
+          <dt class="text-[11px] font-medium uppercase tracking-wide text-muted">Included</dt>
+          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default">
             {{ subscription().seats.included }}
           </dd>
         </div>
         <div>
-          <dt class="text-[11px] font-medium uppercase tracking-wide text-muted dark:text-faint">
-            Active
-          </dt>
-          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default dark:text-default">
+          <dt class="text-[11px] font-medium uppercase tracking-wide text-muted">Active</dt>
+          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default">
             {{ subscription().seats.in_use }}
           </dd>
         </div>
         <div>
-          <dt class="text-[11px] font-medium uppercase tracking-wide text-muted dark:text-faint">
-            Extra seat
-          </dt>
-          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default dark:text-default">
+          <dt class="text-[11px] font-medium uppercase tracking-wide text-muted">Extra seat</dt>
+          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default">
             {{ '$' + subscription().seats.extra_seat_cost_per_period_usd }}
-            <span class="text-xs font-normal text-muted dark:text-faint">
+            <span class="text-xs font-normal text-muted">
               /{{ subscription().billing_cycle === 'annual' ? 'yr' : 'mo' }}
             </span>
           </dd>

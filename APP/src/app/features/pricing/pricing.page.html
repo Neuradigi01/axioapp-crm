@@ -1,11 +1,11 @@
-<div class="min-h-screen bg-app dark:bg-app">
+<div class="min-h-screen bg-app">
   <!-- Top bar -->
-  <header class="bg-surface dark:bg-surface-2 border-b border-subtle dark:border-subtle">
+  <header class="bg-surface border-b border-subtle">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <a routerLink="/" class="text-lg font-semibold text-default dark:text-default"> CRM </a>
+      <a routerLink="/" class="text-lg font-semibold text-default"> CRM </a>
       <a
         routerLink="/accounts/login"
-        class="text-sm font-medium text-default dark:text-muted hover:text-default dark:hover:text-default"
+        class="text-sm font-medium text-default hover:text-default dark:hover:text-default"
       >
         Sign in
       </a>
@@ -15,16 +15,16 @@
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
     <!-- Hero -->
     <section class="text-center max-w-2xl mx-auto mb-10">
-      <h1 class="text-3xl sm:text-4xl font-semibold text-default dark:text-default">
+      <h1 class="text-3xl sm:text-4xl font-semibold text-default">
         Simple, transparent pricing
       </h1>
-      <p class="mt-3 text-muted dark:text-faint">One CRM. Three tiers. Cancel anytime.</p>
+      <p class="mt-3 text-muted">One CRM. Three tiers. Cancel anytime.</p>
     </section>
 
     <!-- Monthly / Annual toggle -->
     <div class="flex justify-center mb-10">
       <div
-        class="inline-flex rounded-full bg-surface dark:bg-surface-2 border border-subtle dark:border-subtle p-1 shadow-sm"
+        class="inline-flex rounded-full bg-surface border border-subtle p-1 shadow-sm"
         role="tablist"
         aria-label="Billing cycle"
       >
@@ -62,14 +62,14 @@
       <div class="grid gap-6 md:grid-cols-3 max-w-5xl mx-auto">
         @for (i of [0, 1, 2]; track i) {
           <div
-            class="h-96 rounded-2xl bg-surface dark:bg-surface-2 border border-subtle dark:border-subtle p-6 animate-pulse"
+            class="h-96 rounded-2xl bg-surface border border-subtle p-6 animate-pulse"
           >
-            <div class="h-5 w-24 bg-surface-2 dark:bg-surface rounded mb-4"></div>
-            <div class="h-10 w-32 bg-surface-2 dark:bg-surface rounded mb-6"></div>
+            <div class="h-5 w-24 bg-surface-2 rounded mb-4"></div>
+            <div class="h-10 w-32 bg-surface-2 rounded mb-6"></div>
             <div class="space-y-2.5">
-              <div class="h-3 w-full bg-surface-2 dark:bg-surface rounded"></div>
-              <div class="h-3 w-3/4 bg-surface-2 dark:bg-surface rounded"></div>
-              <div class="h-3 w-2/3 bg-surface-2 dark:bg-surface rounded"></div>
+              <div class="h-3 w-full bg-surface-2 rounded"></div>
+              <div class="h-3 w-3/4 bg-surface-2 rounded"></div>
+              <div class="h-3 w-2/3 bg-surface-2 rounded"></div>
             </div>
           </div>
         }
@@ -79,9 +79,9 @@
     <!-- Error state -->
     @if (loadError()) {
       <div
-        class="max-w-md mx-auto text-center rounded-2xl bg-surface dark:bg-surface-2 border border-subtle dark:border-subtle p-8"
+        class="max-w-md mx-auto text-center rounded-2xl bg-surface border border-subtle p-8"
       >
-        <p class="text-default dark:text-muted mb-4">Pricing unavailable — please try again.</p>
+        <p class="text-default mb-4">Pricing unavailable — please try again.</p>
         <button
           type="button"
           (click)="loadPlans()"
@@ -105,7 +105,7 @@
         }
       </div>
 
-      <p class="mt-8 text-center text-sm text-muted dark:text-faint">
+      <p class="mt-8 text-center text-sm text-muted">
         All plans start with a free 14-day trial. No credit card required.
       </p>
     }

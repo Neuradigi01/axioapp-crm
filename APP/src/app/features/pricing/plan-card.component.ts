@@ -24,7 +24,7 @@ import { BillingCycle, Plan } from './pricing.types';
   imports: [LucideAngularModule, RouterLink],
   template: `
     <article
-      class="relative flex flex-col rounded-2xl border bg-surface dark:bg-surface-2 p-6 shadow-sm transition-all"
+      class="relative flex flex-col rounded-2xl border bg-surface p-6 shadow-sm transition-all"
       [class.border-blue-600]="popular()"
       [class.border-2]="popular()"
       [class.shadow-md]="popular()"
@@ -40,28 +40,24 @@ import { BillingCycle, Plan } from './pricing.types';
       }
 
       <header class="mb-4">
-        <h3 class="text-lg font-semibold text-default dark:text-default">
+        <h3 class="text-lg font-semibold text-default">
           {{ plan().name }}
         </h3>
       </header>
 
       <div class="mb-6">
         <div class="flex items-baseline gap-1">
-          <span class="text-4xl font-bold text-default dark:text-default">
-            \${{ displayPrice() }}
-          </span>
-          <span class="text-sm text-muted dark:text-faint">/mo</span>
+          <span class="text-4xl font-bold text-default"> \${{ displayPrice() }} </span>
+          <span class="text-sm text-muted">/mo</span>
         </div>
         @if (cycle() === 'annual') {
-          <p class="mt-1 text-xs text-muted dark:text-faint">
+          <p class="mt-1 text-xs text-muted">
             \${{ plan().pricing.annual_bundle_usd }} billed annually
             <span class="text-emerald-600 dark:text-emerald-400 font-medium"> · save 20% </span>
           </p>
         }
-        <p class="mt-3 text-sm text-muted dark:text-muted">
-          {{ plan().pricing.included_seats }} seats included
-        </p>
-        <p class="text-sm text-muted dark:text-faint">
+        <p class="mt-3 text-sm text-muted">{{ plan().pricing.included_seats }} seats included</p>
+        <p class="text-sm text-muted">
           +\${{ extraSeatPrice() }} per extra seat /
           {{ cycle() === 'annual' ? 'yr' : 'mo' }}
         </p>
@@ -69,7 +65,7 @@ import { BillingCycle, Plan } from './pricing.types';
 
       <ul class="flex-1 space-y-2.5 mb-6">
         @for (feature of cardFeatures(); track feature) {
-          <li class="flex items-start gap-2 text-sm text-default dark:text-muted">
+          <li class="flex items-start gap-2 text-sm text-default">
             <lucide-icon
               name="check"
               class="w-4 h-4 mt-0.5 text-emerald-500 shrink-0"
@@ -87,7 +83,6 @@ import { BillingCycle, Plan } from './pricing.types';
         [class.text-white]="popular()"
         [class.hover:bg-blue-700]="popular()"
         [class.bg-surface-2]="!popular()"
-        [class.dark:bg-surface]="!popular()"
         [class.text-default]="!popular()"
         [class.dark:text-default]="!popular()"
         [class.hover:bg-surface-2]="!popular()"

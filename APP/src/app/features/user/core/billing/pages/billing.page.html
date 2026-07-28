@@ -1,15 +1,13 @@
 <div class="mx-auto max-w-5xl space-y-6 px-4 py-4 md:py-6 sm:px-6 lg:px-8">
   <!-- Page header — anchors the surface and gives the page a title
        in place of the bare card stack it had before. -->
-  <header class="border-b border-subtle pb-5 dark:border-subtle">
+  <header class="border-b border-subtle pb-5">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-default dark:text-default">
+        <h1 class="text-2xl font-semibold tracking-tight text-default">
           Billing &amp; subscription
         </h1>
-        <p class="mt-1 text-sm text-muted dark:text-faint">
-          Manage your plan, seats, usage, and invoices.
-        </p>
+        <p class="mt-1 text-sm text-muted">Manage your plan, seats, usage, and invoices.</p>
       </div>
     </div>
   </header>
@@ -19,28 +17,22 @@
          does not jump when data resolves. -->
     @for (i of [0, 1, 2]; track i) {
       <div
-        class="h-44 rounded-xl border border-subtle bg-surface p-4 md:p-6 shadow-sm animate-pulse dark:border-subtle dark:bg-surface-2"
+        class="h-44 rounded-xl border border-subtle bg-surface p-4 md:p-6 shadow-sm animate-pulse"
       >
-        <div class="h-4 w-32 bg-surface-2 rounded mb-4 dark:bg-surface"></div>
-        <div class="h-6 w-48 bg-surface-2 rounded mb-3 dark:bg-surface"></div>
-        <div class="h-3 w-64 bg-surface-2 rounded dark:bg-surface"></div>
+        <div class="h-4 w-32 bg-surface-2 rounded mb-4"></div>
+        <div class="h-6 w-48 bg-surface-2 rounded mb-3"></div>
+        <div class="h-3 w-64 bg-surface-2 rounded"></div>
       </div>
     }
   } @else if (loadError()) {
-    <div
-      class="rounded-xl border border-subtle bg-surface p-10 text-center shadow-sm dark:border-subtle dark:bg-surface-2"
-    >
+    <div class="rounded-xl border border-subtle bg-surface p-10 text-center shadow-sm">
       <div
         class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-500 ring-1 border-red-500/20 dark:bg-red-300 dark:ring-red-300"
       >
         <lucide-icon name="alert-triangle" size="22" aria-hidden="true"></lucide-icon>
       </div>
-      <h3 class="mt-4 text-base font-semibold text-default dark:text-default">
-        Couldn't load billing details
-      </h3>
-      <p class="mt-1 text-sm text-muted dark:text-faint">
-        Check your connection or try again in a moment.
-      </p>
+      <h3 class="mt-4 text-base font-semibold text-default">Couldn't load billing details</h3>
+      <p class="mt-1 text-sm text-muted">Check your connection or try again in a moment.</p>
       <button
         type="button"
         (click)="retry()"
