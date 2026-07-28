@@ -29,7 +29,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 /**
- * My Activity Log â€” the same stream the admin sees on the staff-tab
+ * My Activity Log — the same stream the admin sees on the staff-tab
  * activity view, but scoped to "me" via `GET /staff-portal/me/activity`.
  */
 @Component({

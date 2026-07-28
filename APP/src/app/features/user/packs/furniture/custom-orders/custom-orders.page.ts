@@ -23,7 +23,7 @@ import { CustomOrderFormModalComponent } from './custom-order-form-modal.compone
 import { extractApiError } from '@core/services/api-error.util';
 import { CustomOrder, CustomOrdersApiService } from './custom-orders-api.service';
 
-/** Stage keys in display order â€” used for the % progress hint on cards. */
+/** Stage keys in display order — used for the % progress hint on cards. */
 const STAGE_ORDER = [
   'measurement_scheduled',
   'design_phase',

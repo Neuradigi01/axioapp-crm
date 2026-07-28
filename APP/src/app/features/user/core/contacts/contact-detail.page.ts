@@ -353,8 +353,8 @@ export class ContactDetailPageComponent implements OnInit {
   }
 
   private formatValue(def: FieldDef, value: unknown): string {
-    if (value === null || value === undefined || value === '') return 'â€”';
-    if (Array.isArray(value)) return value.length === 0 ? 'â€”' : value.join(', ');
+    if (value === null || value === undefined || value === '') return '—';
+    if (Array.isArray(value)) return value.length === 0 ? '—' : value.join(', ');
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (def.field_type === 'currency' && typeof value === 'number') {
       return new Intl.NumberFormat('en-IN', {

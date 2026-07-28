@@ -24,7 +24,7 @@ import { extractApiError } from '@core/services/api-error.util';
  * on success.
  *
  * Reusable: same component will back the note composer for Leads and
- * Walk-ins later â€” no entity-type knowledge lives here.
+ * Walk-ins later — no entity-type knowledge lives here.
  */
 @Component({
   selector: 'app-add-note',

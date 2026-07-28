@@ -13,7 +13,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { StaffAttendance, StaffPortalApiService } from '../staff-portal-api.service';
 
 /**
- * My Attendance â€” month list of the signed-in staff's own clock-in/out
+ * My Attendance — month list of the signed-in staff's own clock-in/out
  * rows. The shell handles the actual clock-in/out button; here we just
  * read the history. Total hours shown at top so the user can see their
  * MTD time at a glance.

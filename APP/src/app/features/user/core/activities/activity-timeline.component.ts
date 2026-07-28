@@ -20,7 +20,7 @@ import { extractApiError } from '@core/services/api-error.util';
 /**
  * Reusable vertical timeline of activities for any tenant-scoped entity.
  *
- * Inputs are intentionally minimal â€” `(entityType, entityId)` only â€”
+ * Inputs are intentionally minimal — `(entityType, entityId)` only —
  * so this same component will back the Activities tab for Leads
  * (Step 2.12), Walk-ins, and any future entity. No knowledge of
  * "contact" lives here.
@@ -153,7 +153,7 @@ export class ActivityTimelineComponent {
       const from = (payload as { from?: unknown }).from;
       const to = (payload as { to?: unknown }).to;
       if (typeof from === 'string' && typeof to === 'string') {
-        return `${from} â†’ ${to}`;
+        return `${from} → ${to}`;
       }
     }
     // Fallback: stringify so unknown future shapes are still legible.

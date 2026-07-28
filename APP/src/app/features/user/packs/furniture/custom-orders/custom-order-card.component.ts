@@ -5,7 +5,7 @@ import { CustomOrder } from './custom-orders-api.service';
 import { fmtInr } from '@core/services/currency.util';
 
 /**
- * Single kanban card for a Custom Order. Dumb component â€” gets the
+ * Single kanban card for a Custom Order. Dumb component — gets the
  * row + an optional resolved contact-name pre-loaded by the parent.
  *
  * Layout matches the Vercel reference: title + status badge on top,
@@ -43,7 +43,7 @@ export class CustomOrderCardComponent {
       if (v === null || v === undefined || v === '') continue;
       parts.push(`${k}: ${String(v)}`);
     }
-    return parts.join(' Â· ');
+    return parts.join(' · ');
   });
 
   protected readonly deliveryLabel = computed(() => {

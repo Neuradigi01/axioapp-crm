@@ -21,13 +21,13 @@ import { extractApiError } from '@core/services/api-error.util';
 
 /**
  * Tasks panel rendered inside any entity detail page. Inputs are
- * `(entityType, entityId)` only â€” no contact-specific code lives here,
+ * `(entityType, entityId)` only — no contact-specific code lives here,
  * so the same component plugs into Leads (2.12) and Walk-ins later.
  *
  * Behaviour:
  *   - Lists tasks for the given entity, earliest-due first.
  *   - Inline "Add task" form (title, due, priority).
- *   - Click the checkbox to flip status open â†” done. Strikethrough on done.
+ *   - Click the checkbox to flip status open ↔ done. Strikethrough on done.
  *   - Optimistic UI: server-confirmed updates replace the in-memory row.
  */
 @Component({
@@ -172,7 +172,7 @@ export class TasksPanelComponent {
 
   protected toggleDone(task: Task): void {
     const nextStatus = task.status === 'done' ? 'open' : 'done';
-    // Optimistic local flip â€” reverts on error.
+    // Optimistic local flip — reverts on error.
     const before = this.items();
     this.items.update((rows) =>
       rows.map((r) => (r.id === task.id ? { ...r, status: nextStatus } : r)),
@@ -221,7 +221,7 @@ export class TasksPanelComponent {
 
   private normalizeDue(value: string | null | undefined): string | null {
     if (!value) return null;
-    // <input type="datetime-local"> emits "YYYY-MM-DDTHH:mm" â€” convert to ISO.
+    // <input type="datetime-local"> emits "YYYY-MM-DDTHH:mm" — convert to ISO.
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return null;
     return d.toISOString();

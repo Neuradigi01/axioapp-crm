@@ -142,7 +142,7 @@ export class ScheduleVisitModalComponent implements OnInit {
   protected readonly staff = signal<StaffListItem[]>([]);
   protected readonly recentOrders = signal<CustomOrder[]>([]);
 
-  // Contact picker state â€” same pattern as the custom-order modal.
+  // Contact picker state — same pattern as the custom-order modal.
   protected readonly selectedContact = signal<ContactListItem | null>(null);
   protected readonly contactQuery = signal('');
   protected readonly contactResults = signal<ContactListItem[]>([]);

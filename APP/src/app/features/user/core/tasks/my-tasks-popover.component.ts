@@ -18,7 +18,7 @@ import { extractApiError } from '@core/services/api-error.util';
 
 /**
  * Header popover that lists the caller's open tasks, grouped by due
- * window: Overdue â†’ Today â†’ Later â†’ No due date. Opens only when the
+ * window: Overdue → Today → Later → No due date. Opens only when the
  * `open` signal-input is true; the parent (header) owns the toggle.
  *
  * Marking a task done removes it from the list (we're filtering by
@@ -124,9 +124,9 @@ export class MyTasksPopoverComponent {
   }
 
   protected formatDue(iso: string | null): string {
-    if (iso === null) return 'â€”';
+    if (iso === null) return '—';
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return 'â€”';
+    if (Number.isNaN(d.getTime())) return '—';
     return d.toLocaleString(undefined, {
       day: 'numeric',
       month: 'short',

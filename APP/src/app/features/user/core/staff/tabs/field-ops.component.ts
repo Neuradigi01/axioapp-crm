@@ -19,7 +19,7 @@ import {
 } from '../../../packs/furniture/field-ops/field-ops-api.service';
 
 /**
- * Staff Dashboard â†’ Field Operations tab. Replaces the Step-3.5
+ * Staff Dashboard → Field Operations tab. Replaces the Step-3.5
  * placeholder with a compact org-wide visit roll-up.
  */
 @Component({
@@ -68,7 +68,7 @@ export class StaffFieldOpsTabComponent {
   }
 
   protected formatRelative(iso: string | null): string {
-    if (!iso) return 'â€”';
+    if (!iso) return '—';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleDateString('en-IN', {

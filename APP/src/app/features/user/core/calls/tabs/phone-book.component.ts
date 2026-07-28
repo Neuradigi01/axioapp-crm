@@ -116,7 +116,7 @@ export class CallPhoneBookTabComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
-          // Only show contacts that actually have a phone â€” clicking
+          // Only show contacts that actually have a phone — clicking
           // "Call" on a row without one is a footgun.
           this.items.set(resp.items.filter((c) => !!c.phone));
           this.loading.set(false);

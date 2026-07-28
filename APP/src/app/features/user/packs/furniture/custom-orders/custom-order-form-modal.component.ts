@@ -38,11 +38,11 @@ import { CustomOrderCreate, CustomOrdersApiService } from './custom-orders-api.s
 /**
  * Multi-step "New Custom Order" wizard.
  *
- *   1. Basics       â€” contact picker + title + materials/color/finish +
+ *   1. Basics       — contact picker + title + materials/color/finish +
  *                     total / advance / expected delivery date.
- *   2. Measurements â€” repeatable rows (label + L/W/H + notes).
- *   3. Photos       â€” multi-file picker with thumbnail previews.
- *   4. Review       â€” summary + Submit.
+ *   2. Measurements — repeatable rows (label + L/W/H + notes).
+ *   3. Photos       — multi-file picker with thumbnail previews.
+ *   4. Review       — summary + Submit.
  *
  * Submission order: create the order first; then in parallel POST each
  * measurement and upload each photo. We capture per-row errors and
@@ -160,7 +160,7 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
   protected readonly _submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
 
-  // Step 1 â€” basics
+  // Step 1 — basics
   readonly basics = this.fb.group({
     title: this.fb.control<string>('', {
       nonNullable: true,
@@ -176,12 +176,12 @@ export class CustomOrderFormModalComponent implements OnInit, OnDestroy {
     expected_delivery_date: this.fb.control<string>('', { nonNullable: true }),
   });
 
-  // Step 2 â€” measurements (FormArray of FormGroups)
+  // Step 2 — measurements (FormArray of FormGroups)
   readonly measurements: FormArray<FormGroup<MeasurementRowGroup>> = this.fb.array<
     FormGroup<MeasurementRowGroup>
   >([]);
 
-  // Step 3 â€” photos (signal, not a form control â€” File objects are out-of-band)
+  // Step 3 — photos (signal, not a form control — File objects are out-of-band)
   protected readonly photos = signal<PhotoStaged[]>([]);
 
   // Contact picker state

@@ -38,7 +38,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * Conversations page â€” split inbox layout. Owns:
+ * Conversations page — split inbox layout. Owns:
  *
  *   - the list of conversations + the filter signals
  *   - the currently-selected conversation id + its loaded detail
@@ -130,7 +130,7 @@ export class ConversationsPageComponent {
     return this.items().find((c) => c.id === id) ?? null;
   });
 
-  /** Last notification fingerprint we've already reacted to â€” guards
+  /** Last notification fingerprint we've already reacted to — guards
    * against re-running the refresh loop when the signal re-emits with
    * the same head element. */
   private lastSeenNotificationId: string | null = null;

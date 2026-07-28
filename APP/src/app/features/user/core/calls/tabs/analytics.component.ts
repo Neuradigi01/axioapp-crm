@@ -39,7 +39,7 @@ Chart.register(
 );
 
 /**
- * Analytics tab â€” three chart-ready arrays from `GET /calls/analytics`:
+ * Analytics tab — three chart-ready arrays from `GET /calls/analytics`:
  *   - donut: outcomes distribution (colour = outcome's stored colour)
  *   - bar:   daily volume over the window
  *   - donut: direction split (incoming vs outgoing)

@@ -40,7 +40,7 @@ const TYPE_LABELS: Readonly<Record<string, string>> = {
 };
 
 /**
- * Notifications tab â€” per-type toggles for in-app / email / push.
+ * Notifications tab — per-type toggles for in-app / email / push.
  * Reads + writes the existing `/api/v1/notification-preferences`
  * endpoints from Step 2.15. Types are free-form; the table grows as
  * other modules emit new notification types.

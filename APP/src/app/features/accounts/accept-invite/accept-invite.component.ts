@@ -29,14 +29,14 @@ interface LoginResponse {
 }
 
 /**
- * `/accounts/accept-invite?token=â€¦` â€” recipient-side flow.
+ * `/accounts/accept-invite?token=…` — recipient-side flow.
  *
  * Three states inside one component:
- *   `loading`  â€” looking up the token via GET /api/v1/invitations/lookup
- *   `invalid`  â€” token missing / expired / already-accepted
- *   `ready`    â€” preview rendered + form open
+ *   `loading`  — looking up the token via GET /api/v1/invitations/lookup
+ *   `invalid`  — token missing / expired / already-accepted
+ *   `ready`    — preview rendered + form open
  *
- * On valid submit the API returns a JWT â€” we persist it via
+ * On valid submit the API returns a JWT — we persist it via
  * `TokenStorageService` (same path the login flow uses) and redirect
  * to `/user/dashboard`. The recipient never has to log in manually.
  */

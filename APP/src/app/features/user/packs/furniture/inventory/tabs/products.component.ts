@@ -20,7 +20,7 @@ import { extractApiError } from '@core/services/api-error.util';
 type ViewMode = 'grid' | 'list';
 
 /**
- * Products tab â€” main inventory grid.
+ * Products tab — main inventory grid.
  *
  *   - Filters: warehouse (dropdown), search (debounced), active-only
  *     toggle, view-mode grid/list.
@@ -31,7 +31,7 @@ type ViewMode = 'grid' | 'list';
  *     page/size today, so we mirror that here.
  *
  * Category filter is wired but inert until catalog items have
- * categories populated â€” the dropdown stays empty by default and the
+ * categories populated — the dropdown stays empty by default and the
  * field just passes through to `category=` query.
  */
 @Component({

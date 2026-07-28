@@ -20,7 +20,7 @@ import { InventoryApiService, InventoryItem, Warehouse } from './inventory-api.s
  *
  * Form maps 1-to-1 onto `POST /inventory/items/full` (atomic catalog
  * + inventory). The optional cover image is uploaded via a second
- * `POST .../{id}/cover` call only after the create succeeds â€” if the
+ * `POST .../{id}/cover` call only after the create succeeds — if the
  * image upload fails, the product still exists with no cover.
  *
  * `warehouses` is passed in by the parent (already loaded once for the
@@ -150,7 +150,7 @@ export class AddProductModalComponent {
             this.created.emit(item);
             return;
           }
-          // Best-effort cover upload â€” if it fails, the product
+          // Best-effort cover upload — if it fails, the product
           // still exists; surface the error inline so the user can
           // retry from the items list.
           this.api

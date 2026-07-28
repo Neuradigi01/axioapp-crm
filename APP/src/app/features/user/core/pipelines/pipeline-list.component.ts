@@ -26,7 +26,7 @@ import {
 
 /**
  * Table counterpart to `PipelineBoardComponent`. Same inputs and same
- * `itemMoved` output â€” the only difference is the visual: rows in a
+ * `itemMoved` output — the only difference is the visual: rows in a
  * table, with a per-row dropdown that changes the stage.
  *
  * Reusable: takes `pipelineKey` + caller-owned `items` + an optional

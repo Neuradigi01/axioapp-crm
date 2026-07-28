@@ -6,7 +6,7 @@ import { StaffWithPerformance } from '../staff-api.service';
 import { initials } from '@core/services/text.util';
 
 /**
- * Overview tab â€” grid of staff "summary cards". One card per user
+ * Overview tab — grid of staff "summary cards". One card per user
  * showing the joined profile + performance numbers we have today.
  * Avatar background is a deterministic hash on user.id so the same
  * person keeps the same colour across reloads.

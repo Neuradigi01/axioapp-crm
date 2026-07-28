@@ -8,7 +8,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { OrgSettings, SettingsApiService } from '../settings-api.service';
 
 /**
- * Store Profile tab â€” the meat of OrgSettings. Logo, store name,
+ * Store Profile tab — the meat of OrgSettings. Logo, store name,
  * GST, full address, phone, email, currency, tax_rate, timezone,
  * locale. Submits only the dirty keys via PATCH (strict-key on the
  * backend side too).
@@ -36,7 +36,7 @@ export class StoreProfileTabComponent {
   /** Read-only org identity surfaced above the editable form (DR.5 + 2.5.4). */
   protected readonly org = signal<OrgSummary | null>(null);
   /** Gate the Save button on `settings.write`. Read access alone keeps the
-   * form viewable but unsubmittable â€” same UX shape as the Roles tab. */
+   * form viewable but unsubmittable — same UX shape as the Roles tab. */
   protected readonly canWrite = signal(false);
 
   protected readonly form = this.fb.group({

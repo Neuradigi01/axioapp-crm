@@ -20,14 +20,14 @@ import { InventoryApiService, InventoryItem, StockAlert } from '../inventory-api
  * Lists open alerts (high priority + most depleted first), shows the
  * matching item context, and exposes two actions per row:
  *
- *   - "Reorder"    â†’ opens a modal to confirm qty + supplier.
+ *   - "Reorder"    → opens a modal to confirm qty + supplier.
  *                    On confirm: PATCH alert.status='ordered'.
  *                    Supplier/qty entered in the modal are UX-only
- *                    inputs today (no `receipt_planned` ledger row â€”
+ *                    inputs today (no `receipt_planned` ledger row —
  *                    the alert status alone communicates "order in
  *                    flight"). When the real receipt is recorded, the
  *                    standard movement path auto-closes the alert.
- *   - "Mark Closed" â†’ PATCH alert.status='closed' for the operator
+ *   - "Mark Closed" → PATCH alert.status='closed' for the operator
  *                     who already restocked outside the system.
  */
 interface AlertRow {
@@ -51,7 +51,7 @@ export class StockAlertsTabComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
 
-  /** null = closed Â· AlertRow = reorder modal target. */
+  /** null = closed · AlertRow = reorder modal target. */
   protected readonly modalTarget = signal<AlertRow | null>(null);
   protected readonly busyAlertId = signal<string | null>(null);
 

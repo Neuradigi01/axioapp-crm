@@ -28,11 +28,11 @@ import { QuickRegisterResponse, WalkInsApiService } from './walk-ins-api.service
  * a phone number, we debounce + lookup an existing contact; if one
  * exists with that exact phone we show a banner ("Existing customer:
  * Asha Reddy"). The backend dedups regardless, so this is a UX hint
- * only â€” the operator can still type any name and submit.
+ * only — the operator can still type any name and submit.
  *
  * The Custom section renders `<app-dynamic-form>` against
  * `entity_type='walk_in'`. Contact custom fields are NOT enforced at
- * this surface â€” the backend's `quick-register` bypasses them on
+ * this surface — the backend's `quick-register` bypasses them on
  * contact creation (operator fills the rest later via Contacts page).
  */
 @Component({

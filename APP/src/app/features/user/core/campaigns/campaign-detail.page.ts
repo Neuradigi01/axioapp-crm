@@ -31,7 +31,7 @@ const POLL_INTERVAL_MS = 5_000;
 export type CampaignDetailTab = 'overview' | 'analytics';
 
 /**
- * Campaign detail â€” stats KPIs + per-message table with retry.
+ * Campaign detail — stats KPIs + per-message table with retry.
  *
  * Polls stats + messages every 5s while the campaign is `scheduled`
  * or `running` so the operator sees the dispatch progress without
@@ -100,7 +100,7 @@ export class CampaignDetailPageComponent {
       return;
     }
     this.loadAll();
-    // Tear the poll down on destroy â€” DestroyRef â†’ cleanup callback.
+    // Tear the poll down on destroy — DestroyRef → cleanup callback.
     this.destroyRef.onDestroy(() => this.stopPolling());
   }
 
@@ -283,7 +283,7 @@ export class CampaignDetailPageComponent {
   }
 
   protected formatDate(iso: string | null): string {
-    if (!iso) return 'â€”';
+    if (!iso) return '—';
     return new Date(iso).toLocaleString();
   }
 

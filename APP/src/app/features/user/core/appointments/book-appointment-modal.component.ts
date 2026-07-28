@@ -124,7 +124,7 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
     }
   }
 
-  /** Map a conflicting appointment id â†’ human-readable label (set by parent). */
+  /** Map a conflicting appointment id → human-readable label (set by parent). */
   @Input() conflictTitleFor: (id: string) => string | null = () => null;
 
   @Output() readonly created = new EventEmitter<Appointment>();
@@ -322,16 +322,16 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
   }
 
   protected conflictLabel(id: string): string {
-    return this.conflictTitleFor(id) ?? id.slice(0, 8) + 'â€¦';
+    return this.conflictTitleFor(id) ?? id.slice(0, 8) + '…';
   }
 
-  /** Convert `<input type="datetime-local">` value â†’ backend ISO. */
+  /** Convert `<input type="datetime-local">` value → backend ISO. */
   private toIsoFromLocal(value: string): string {
     const d = new Date(value);
     return d.toISOString();
   }
 
-  /** Convert a Date â†’ "YYYY-MM-DDTHH:mm" for <input type="datetime-local">. */
+  /** Convert a Date → "YYYY-MM-DDTHH:mm" for <input type="datetime-local">. */
   private toDatetimeLocalString(d: Date, hour: number): string {
     const local = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hour, 0, 0, 0);
     const pad = (n: number) => String(n).padStart(2, '0');

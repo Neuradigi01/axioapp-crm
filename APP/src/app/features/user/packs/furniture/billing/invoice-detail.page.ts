@@ -19,7 +19,7 @@ import { deriveApiOrigin } from '@core/services/url.util';
 import { BillingApiService, InvoiceStatus, InvoiceWithLines, Payment } from './billing-api.service';
 
 /**
- * `/billing/invoices/:id` â€” full invoice view with line items, payment
+ * `/billing/invoices/:id` — full invoice view with line items, payment
  * history, and a Print/PDF button. The PDF link is the absolute API URL
  * so `window.open` hits the API origin directly (no Angular proxy).
  */
@@ -52,7 +52,7 @@ export class InvoiceDetailPageComponent {
 
   protected readonly invoiceNumber = computed(() => {
     const inv = this.invoice();
-    if (!inv || inv.number === null) return 'â€” draft â€”';
+    if (!inv || inv.number === null) return '— draft —';
     return `INV-${String(inv.number).padStart(4, '0')}`;
   });
 
@@ -99,7 +99,7 @@ export class InvoiceDetailPageComponent {
   }
 
   protected formatDateTime(iso: string | null | undefined): string {
-    if (!iso) return 'â€”';
+    if (!iso) return '—';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleString('en-IN', {
@@ -112,7 +112,7 @@ export class InvoiceDetailPageComponent {
   }
 
   protected paymentLabel(method: string | null): string {
-    if (!method) return 'â€”';
+    if (!method) return '—';
     return method.toUpperCase();
   }
 

@@ -21,17 +21,17 @@ const AUTO_REQUEST_KEY = 'reviews_auto_request';
  * Reviews & Reputation page.
  *
  * Layout (top to bottom):
- *   - 4 KPI cards: avg rating Â· total Â· response rate Â· alerts (â‰¤3â˜…/7d)
- *   - Rating distribution bars (1â€“5)
- *   - Alerts panel (recent â‰¤3â˜… rows the operator should triage)
- *   - Filter strip: All Â· 1â˜… Â· 2â˜… Â· 3â˜… Â· 4â˜… Â· 5â˜… + auto-request toggle
- *   - Reviews list (cards). Each row: stars Â· source pill Â· text Â·
+ *   - 4 KPI cards: avg rating · total · response rate · alerts (≤3★/7d)
+ *   - Rating distribution bars (1–5)
+ *   - Alerts panel (recent ≤3★ rows the operator should triage)
+ *   - Filter strip: All · 1★ · 2★ · 3★ · 4★ · 5★ + auto-request toggle
+ *   - Reviews list (cards). Each row: stars · source pill · text ·
  *     reply/escalate buttons (when pending).
  *
  * "Auto-request" toggle persists in localStorage until Step 3.17 ships
  * the Settings backend that will own this preference server-side.
  *
- * The page reads `source` as a free-form string â€” there is no
+ * The page reads `source` as a free-form string — there is no
  * per-source branch anywhere; new sources land as a styled pill
  * automatically.
  */
@@ -51,13 +51,13 @@ export class ReviewsPageComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
 
-  /** null = All Â· 1..5 = star filter */
+  /** null = All · 1..5 = star filter */
   protected readonly ratingFilter = signal<number | null>(null);
   protected readonly replyTarget = signal<Review | null>(null);
 
   protected readonly autoRequest = signal<boolean>(this._readAutoRequest());
 
-  /** Recent â‰¤3â˜… rows for the alerts panel â€” derived from `items`. */
+  /** Recent ≤3★ rows for the alerts panel — derived from `items`. */
   protected readonly alertRows = computed(() =>
     this.items()
       .filter((r) => r.rating <= 3)
@@ -69,7 +69,7 @@ export class ReviewsPageComponent {
     return this.stats()?.distribution.find((d) => d.rating === rating)?.count ?? 0;
   }
 
-  /** Bar width % for the distribution bars â€” relative to the rating with most counts. */
+  /** Bar width % for the distribution bars — relative to the rating with most counts. */
   protected barWidthPct(rating: number): number {
     const dist = this.stats()?.distribution ?? [];
     const max = dist.reduce((m, d) => Math.max(m, d.count), 0);
@@ -78,7 +78,7 @@ export class ReviewsPageComponent {
   }
 
   protected stars(n: number): string {
-    return 'â˜…â˜…â˜…â˜…â˜…'.slice(0, n) + 'â˜†â˜†â˜†â˜†â˜†'.slice(0, 5 - n);
+    return '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
   }
 
   protected roundedAvg(avg: number): number {
@@ -109,7 +109,7 @@ export class ReviewsPageComponent {
   }
 
   /**
-   * Source pill colour â€” derived from a deterministic hash of the
+   * Source pill colour — derived from a deterministic hash of the
    * source string so unknown sources still get a stable colour. No
    * hardcoded source-specific UI per the self-check.
    */
@@ -143,7 +143,7 @@ export class ReviewsPageComponent {
       try {
         localStorage.setItem(AUTO_REQUEST_KEY, this.autoRequest() ? '1' : '0');
       } catch {
-        /* localStorage might be unavailable â€” silently ignore */
+        /* localStorage might be unavailable — silently ignore */
       }
     });
   }
@@ -173,7 +173,7 @@ export class ReviewsPageComponent {
   }
 
   protected escalate(review: Review): void {
-    const ok = window.confirm(`Escalate this ${review.rating}â˜… review for owner attention?`);
+    const ok = window.confirm(`Escalate this ${review.rating}★ review for owner attention?`);
     if (!ok) return;
     this.api
       .escalate(review.id)
