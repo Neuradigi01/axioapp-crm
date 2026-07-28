@@ -2,7 +2,7 @@
 
 **Goal:** Apply shared validators to the custom-field definition form and to all five template editors (email, SMS, WhatsApp, push, Facebook/Instagram) so template + custom-field configuration is bounded and format-checked before it hits the API.
 **Track:** Application Updates — Form & CSV-Import Validation
-**Status:** Pending
+**Status:** COMPLETED — custom-field form + 5 template editors (email, SMS, WhatsApp, push, FB) all wired to shared validators. Two new shared helpers added (`choicesCsvValidator`, `waVariablesValidator`); `commonValidators`, `REASON`, and `DEFAULT_MESSAGES` all extended. Email form gains a group-level "at least one body" validator. SMS form widens DLT header to TRAI's actual 2–11 range; adds patterns for entity/template IDs and content-category picklist. WhatsApp adds sequential-variable check on body + header. Push tightens title to iOS 65-char limit and URL-validates the action_url. FB widens body to Messenger's actual 2000. tsc + eslint + prettier all clean.
 **Depends on:** Step 1 (shared validators).
 
 ---

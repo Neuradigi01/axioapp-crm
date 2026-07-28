@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
+import { commonValidators } from '../../shared/validators';
+
 /**
  * WhatsApp sub-form — full Meta-template shape.
  *
@@ -170,7 +172,11 @@ export class WaFormComponent {
     return new FormGroup({
       body_text: new FormControl<string>('', {
         nonNullable: true,
-        validators: [Validators.required, Validators.maxLength(1024)],
+        validators: [
+          commonValidators.trimmedRequired,
+          Validators.maxLength(1024),
+          commonValidators.waVariables,
+        ],
       }),
       language: new FormControl<string>('en', {
         nonNullable: true,
@@ -178,12 +184,18 @@ export class WaFormComponent {
       }),
       category: new FormControl<WaCategory>('marketing', {
         nonNullable: true,
-        validators: [Validators.required],
+        validators: [
+          Validators.required,
+          commonValidators.picklist(['marketing', 'utility', 'authentication']),
+        ],
       }),
-      header_type: new FormControl<WaHeaderType>('', { nonNullable: true }),
+      header_type: new FormControl<WaHeaderType>('', {
+        nonNullable: true,
+        validators: [commonValidators.picklist(['', 'text', 'image', 'video', 'document'])],
+      }),
       header_text: new FormControl<string>('', {
         nonNullable: true,
-        validators: [Validators.maxLength(60)],
+        validators: [Validators.maxLength(60), commonValidators.waVariables],
       }),
       footer_text: new FormControl<string>('', {
         nonNullable: true,

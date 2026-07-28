@@ -70,7 +70,7 @@ Track is done when:
 | 2 | [Auth pages (accounts/)](step-2-auth-pages.md) | COMPLETED | ~½ day |
 | 3 | [Core entity forms (contacts, leads, walk-ins)](step-3-core-entity-forms.md) | COMPLETED | ~½ day |
 | 4 | [Activity & action forms (tasks, appointments, calls, reviews, notes)](step-4-activity-forms.md) | COMPLETED | ~½ day |
-| 5 | [Config forms A — custom fields + templates](step-5-config-forms-a.md) | Pending | ~½ day |
+| 5 | [Config forms A — custom fields + templates](step-5-config-forms-a.md) | COMPLETED | ~½ day |
 | 6 | [Config forms B — campaigns + workflow editors](step-6-config-forms-b.md) | Pending | ~1 day |
 | 7 | [Settings forms](step-7-settings-forms.md) | Pending | ~½ day |
 | 8 | [Contacts CSV import — validation + errors.csv](step-8-contacts-csv-import.md) | Pending | ~½ day |

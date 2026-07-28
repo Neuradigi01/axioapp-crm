@@ -11,13 +11,14 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
+import { commonValidators } from '../../shared/validators';
+
 /**
  * Push notification sub-form for the central template editor (Step 13).
  *
  * Captures:
- *   - title (50-char limit — the upper bound iOS/Android still render
- *     without truncation on a typical lock screen)
- *   - body (240-char limit — same constraint)
+ *   - title (65-char iOS notification limit)
+ *   - body (240-char iOS + Android common ceiling)
  *   - action URL / deeplink (optional; tapping the notification opens
  *     this in the operator's web app or routes to the deeplinked
  *     screen in a future native app)
@@ -31,7 +32,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
  * There is no external approval workflow for push templates —
  * `external_status` stays `n_a` always.
  */
-const TITLE_MAX = 50;
+const TITLE_MAX = 65;
 const BODY_MAX = 240;
 const URL_MAX = 2048;
 
@@ -94,15 +95,15 @@ export class PushFormComponent {
     return new FormGroup({
       title: new FormControl<string>('', {
         nonNullable: true,
-        validators: [Validators.required, Validators.maxLength(TITLE_MAX)],
+        validators: [commonValidators.trimmedRequired, Validators.maxLength(TITLE_MAX)],
       }),
       body_text: new FormControl<string>('', {
         nonNullable: true,
-        validators: [Validators.required, Validators.maxLength(BODY_MAX)],
+        validators: [commonValidators.trimmedRequired, Validators.maxLength(BODY_MAX)],
       }),
       action_url: new FormControl<string>('', {
         nonNullable: true,
-        validators: [Validators.maxLength(URL_MAX)],
+        validators: [commonValidators.url, Validators.maxLength(URL_MAX)],
       }),
     });
   }

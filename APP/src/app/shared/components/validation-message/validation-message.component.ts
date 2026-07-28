@@ -40,6 +40,8 @@ const DEFAULT_MESSAGES: Record<string, string | ((err: ValidatorErrorDetail) => 
   fileTooLarge: REASON.fileTooLarge,
   unsupportedFileType: REASON.unsupportedFileType,
   invalidChoice: REASON.invalidChoice,
+  invalidChoicesCsv: REASON.invalidChoicesCsv,
+  invalidWaVariables: REASON.invalidWaVariables,
 };
 
 @Component({

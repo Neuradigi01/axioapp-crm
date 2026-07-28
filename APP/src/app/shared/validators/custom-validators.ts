@@ -23,6 +23,9 @@ export const REASON = {
   fileTooLarge: 'file exceeds the maximum size',
   unsupportedFileType: 'file type is not allowed',
   invalidChoice: 'value is not an allowed option',
+  invalidChoicesCsv: 'choices must be unique, ≤ 64 chars each, and no more than 100 total',
+  invalidWaVariables:
+    'variables must be numbered {{1}}, {{2}}, … sequentially without gaps (max 10)',
 } as const;
 
 /**
@@ -275,6 +278,58 @@ export function picklistValidator(allowed: readonly (string | number)[]): Valida
     if (isEmpty(raw)) return null;
     return set.has(raw) ? null : { invalidChoice: REASON.invalidChoice, allowed };
   };
+}
+
+/**
+ * CSV of custom-field choices. Rejects duplicates (case-insensitive after
+ * trim), entries longer than 64 chars, and more than 100 entries. Empty
+ * short-circuits to `null` — required-ness belongs to `Validators.required`.
+ */
+export function choicesCsvValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  const parts = String(raw)
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (parts.length > 100) {
+    return { invalidChoicesCsv: REASON.invalidChoicesCsv };
+  }
+  const seen = new Set<string>();
+  for (const p of parts) {
+    if (p.length > 64) return { invalidChoicesCsv: REASON.invalidChoicesCsv };
+    const key = p.toLowerCase();
+    if (seen.has(key)) return { invalidChoicesCsv: REASON.invalidChoicesCsv };
+    seen.add(key);
+  }
+  return null;
+}
+
+/**
+ * WhatsApp template body / header variable syntax: `{{n}}` placeholders
+ * must start at 1, be sequential without gaps, and number no more than 10.
+ * Text without any placeholder passes. Empty short-circuits to `null`.
+ */
+export function waVariablesValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  const nums: number[] = [];
+  const re = /\{\{\s*(\d+)\s*\}\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(String(raw))) !== null) {
+    nums.push(Number(match[1]));
+  }
+  if (nums.length === 0) return null;
+  const distinct = Array.from(new Set(nums)).sort((a, b) => a - b);
+  if (distinct.length > 10) {
+    return { invalidWaVariables: REASON.invalidWaVariables };
+  }
+  for (let i = 0; i < distinct.length; i++) {
+    if (distinct[i] !== i + 1) {
+      return { invalidWaVariables: REASON.invalidWaVariables };
+    }
+  }
+  return null;
 }
 
 /**

@@ -73,6 +73,15 @@
             class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             placeholder="Teak, Oak, Mahogany"
           ></textarea>
+          @if (form.controls.choices_csv.touched && form.controls.choices_csv.invalid) {
+            <p class="mt-1 text-xs text-red-600">
+              @if (form.controls.choices_csv.errors?.['invalidChoicesCsv']; as msg) {
+                {{ msg }}
+              } @else {
+                Choices are invalid.
+              }
+            </p>
+          }
           <p class="mt-1 text-xs text-muted">
             Persisted as <code class="font-mono">options.choices</code>.
           </p>

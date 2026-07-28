@@ -1,6 +1,7 @@
 import { ValidatorFn, Validators } from '@angular/forms';
 
 import {
+  choicesCsvValidator,
   dateNotPastValidator,
   dateWithinPastDays,
   emailValidator,
@@ -14,6 +15,7 @@ import {
   picklistValidator,
   trimmedRequired,
   urlValidator,
+  waVariablesValidator,
 } from '../../../../../shared/validators/custom-validators';
 import type { StandardFieldRendered } from '../../standard-fields/types';
 
@@ -62,6 +64,8 @@ export const commonValidators = {
   fileUpload: (opts: { maxMb: number; exts: readonly string[] }): ValidatorFn =>
     fileUploadValidator(opts),
   picklist: (allowed: readonly (string | number)[]): ValidatorFn => picklistValidator(allowed),
+  choicesCsv: choicesCsvValidator as ValidatorFn,
+  waVariables: waVariablesValidator as ValidatorFn,
 } as const;
 
 /**

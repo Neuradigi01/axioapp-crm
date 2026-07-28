@@ -17,6 +17,7 @@ import {
   Validators,
 } from '@angular/forms';
 
+import { commonValidators } from '../shared/validators';
 import {
   CustomField,
   CustomFieldCreate,
@@ -90,14 +91,14 @@ export class FieldFormComponent {
 
   readonly form = this.fb.group({
     field_key: ['', [Validators.required, fieldKeyValidator]],
-    field_label: ['', [Validators.required, Validators.maxLength(128)]],
+    field_label: ['', [commonValidators.trimmedRequired, Validators.maxLength(128)]],
     field_type: this.fb.control<FieldType>('text', {
       nonNullable: true,
-      validators: [Validators.required],
+      validators: [Validators.required, commonValidators.picklist(FIELD_TYPES.map((t) => t.value))],
     }),
     is_required: [false],
     is_hidden: [false],
-    choices_csv: [''],
+    choices_csv: ['', [commonValidators.choicesCsv]],
   });
 
   // toSignal() converts the form-control's valueChanges Observable into a

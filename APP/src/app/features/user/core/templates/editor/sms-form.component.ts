@@ -11,6 +11,17 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
+import { commonValidators } from '../../shared/validators';
+
+const DLT_ID_RE = /^[0-9]{15,25}$/;
+const DLT_HEADER_RE = /^[A-Z0-9]{2,11}$/;
+const DLT_CONTENT_CATEGORIES = [
+  'transactional',
+  'promotional',
+  'service_explicit',
+  'service_implicit',
+] as const;
+
 /**
  * SMS sub-form for the central template editor (Step 12).
  *
@@ -150,11 +161,11 @@ export class SmsFormComponent {
   }
 
   protected onHeaderInput(value: string): void {
-    // Header is 6-char uppercase alphanumeric per TRAI spec.
+    // TRAI sender-ID: 2–11 chars, uppercase alphanumeric.
     const normalised = value
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, '')
-      .slice(0, 6);
+      .slice(0, 11);
     if (this.form().controls.dlt_header.value !== normalised) {
       this.form().controls.dlt_header.setValue(normalised);
     }
@@ -164,26 +175,29 @@ export class SmsFormComponent {
     return new FormGroup({
       body_text: new FormControl<string>('', {
         nonNullable: true,
-        validators: [Validators.required, Validators.maxLength(1530)],
+        validators: [commonValidators.trimmedRequired, Validators.maxLength(1600)],
       }),
       dlt_entity_id: new FormControl<string>('', {
         nonNullable: true,
-        validators: [Validators.maxLength(128)],
+        validators: [Validators.pattern(DLT_ID_RE), Validators.maxLength(128)],
       }),
       dlt_template_id: new FormControl<string>('', {
         nonNullable: true,
-        validators: [Validators.maxLength(128)],
+        validators: [Validators.pattern(DLT_ID_RE), Validators.maxLength(128)],
       }),
       dlt_content_category: new FormControl<
         SmsFormGroup['controls']['dlt_content_category']['value']
-      >('transactional', { nonNullable: true }),
+      >('transactional', {
+        nonNullable: true,
+        validators: [commonValidators.picklist(DLT_CONTENT_CATEGORIES)],
+      }),
       dlt_header: new FormControl<string>('', {
         nonNullable: true,
-        validators: [Validators.maxLength(6)],
+        validators: [Validators.pattern(DLT_HEADER_RE), Validators.maxLength(11)],
       }),
       dlt_principal_entity_id: new FormControl<string>('', {
         nonNullable: true,
-        validators: [Validators.maxLength(128)],
+        validators: [Validators.maxLength(64)],
       }),
       dlt_template_status: new FormControl<
         SmsFormGroup['controls']['dlt_template_status']['value']
