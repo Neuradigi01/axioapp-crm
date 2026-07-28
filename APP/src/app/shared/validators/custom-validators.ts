@@ -19,6 +19,10 @@ export const REASON = {
   invalidDate: 'date must be in YYYY-MM-DD format',
   invalidDateTime: 'date-time must be in ISO 8601 format',
   dateInPast: 'date cannot be in the past',
+  dateTooOld: 'date is older than allowed',
+  fileTooLarge: 'file exceeds the maximum size',
+  unsupportedFileType: 'file type is not allowed',
+  invalidChoice: 'value is not an allowed option',
 } as const;
 
 /**
@@ -203,6 +207,74 @@ export function dateNotPastValidator(control: AbstractControl): ValidationErrors
     return { dateInPast: REASON.dateInPast };
   }
   return null;
+}
+
+/**
+ * Rejects ISO date / date-time values earlier than `n` days ago. Used for
+ * "log-after-the-fact" surfaces (call logs, historical activities) where
+ * arbitrary-past is *bad* but a bounded past window is legitimate. Future
+ * values pass — separate check with `dateNotPastValidator` if the field
+ * must be forward-only.
+ */
+export function dateWithinPastDays(n: number): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const raw = control.value;
+    if (isEmpty(raw)) return null;
+    const parsed = new Date(String(raw).trim());
+    if (Number.isNaN(parsed.getTime())) return null;
+    const earliest = Date.now() - n * 24 * 60 * 60 * 1000;
+    if (parsed.getTime() < earliest) {
+      return { dateTooOld: REASON.dateTooOld, days: n };
+    }
+    return null;
+  };
+}
+
+/**
+ * `<input type="file">` control validator. Checks File.size and extension.
+ * Empty short-circuits to `null`.
+ */
+export function fileUploadValidator(opts: { maxMb: number; exts: readonly string[] }): ValidatorFn {
+  const allowedLower = opts.exts.map((e) => e.toLowerCase());
+  const maxBytes = opts.maxMb * 1024 * 1024;
+  return (control: AbstractControl): ValidationErrors | null => {
+    const file = control.value as File | null | undefined;
+    if (!file) return null;
+    const dotName = file.name || '';
+    const ext = ('.' + (dotName.split('.').pop() ?? '')).toLowerCase();
+    if (!allowedLower.includes(ext)) {
+      return { unsupportedFileType: REASON.unsupportedFileType, allowed: opts.exts };
+    }
+    if (file.size > maxBytes) {
+      return { fileTooLarge: REASON.fileTooLarge, maxMb: opts.maxMb };
+    }
+    return null;
+  };
+}
+
+/**
+ * Required + rejects whitespace-only strings. Emits the same `required`
+ * error key so existing template branches for `required` cover it — the
+ * validator's only job is to make "   " fail the same way as "".
+ */
+export function trimmedRequired(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (raw === null || raw === undefined) return { required: true };
+  if (typeof raw !== 'string') return null;
+  return raw.trim().length === 0 ? { required: true } : null;
+}
+
+/**
+ * Value must be one of the allowed options. Empty short-circuits to `null`
+ * (compose with `Validators.required` when a choice is mandatory).
+ */
+export function picklistValidator(allowed: readonly (string | number)[]): ValidatorFn {
+  const set = new Set<string | number>(allowed);
+  return (control: AbstractControl): ValidationErrors | null => {
+    const raw = control.value;
+    if (isEmpty(raw)) return null;
+    return set.has(raw) ? null : { invalidChoice: REASON.invalidChoice, allowed };
+  };
 }
 
 /**

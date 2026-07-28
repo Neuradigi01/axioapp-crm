@@ -10,11 +10,12 @@
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 
+import { commonValidators } from '../shared/validators';
 import { Call, CallOutcome, CallsApiService } from './calls-api.service';
 
 /**
@@ -26,8 +27,17 @@ import { Call, CallOutcome, CallsApiService } from './calls-api.service';
  * don't refetch on every modal open.
  */
 /** Per-file limit (matches backend `_MAX_RECORDING_BYTES`). */
-const MAX_RECORDING_BYTES = 30 * 1024 * 1024;
+const MAX_RECORDING_MB = 30;
 const ALLOWED_RECORDING_EXTS = ['.mp3', '.m4a', '.ogg', '.wav'] as const;
+/** Calls are always logged after the fact — accept up to 30 days back. */
+const CALL_BACKFILL_DAYS = 30;
+/** 24 hours max (matches DB CHECK constraint on duration_sec). */
+const MAX_CALL_DURATION_SEC = 24 * 60 * 60;
+
+const recordingUploadValidator = commonValidators.fileUpload({
+  maxMb: MAX_RECORDING_MB,
+  exts: ALLOWED_RECORDING_EXTS,
+});
 
 @Component({
   selector: 'app-log-call-modal',
@@ -41,7 +51,15 @@ export class LogCallModalComponent {
   private readonly api = inject(CallsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
-  @Input() outcomes: CallOutcome[] = [];
+  @Input() set outcomes(list: CallOutcome[]) {
+    this._outcomes = list;
+    this.form.controls.outcome_id.setValidators([commonValidators.picklist(list.map((o) => o.id))]);
+    this.form.controls.outcome_id.updateValueAndValidity({ emitEvent: false });
+  }
+  get outcomes(): CallOutcome[] {
+    return this._outcomes;
+  }
+  private _outcomes: CallOutcome[] = [];
   /** Pre-fill the contact id (used by Phone Book's click-to-call). */
   @Input() set prefilledContactId(value: string | null) {
     if (value) {
@@ -79,14 +97,14 @@ export class LogCallModalComponent {
     }),
     started_at: this.fb.control(this._nowIso(), {
       nonNullable: true,
-      validators: [Validators.required],
+      validators: [Validators.required, commonValidators.dateWithinPastDays(CALL_BACKFILL_DAYS)],
     }),
     duration_sec: this.fb.control(60, {
       nonNullable: true,
-      validators: [Validators.required, Validators.min(0)],
+      validators: [Validators.required, Validators.min(0), Validators.max(MAX_CALL_DURATION_SEC)],
     }),
     outcome_id: this.fb.control<string | null>(null),
-    notes: this.fb.control<string | null>(null),
+    notes: this.fb.control<string | null>(null, [commonValidators.maxLength(4000)]),
   });
 
   protected save(): void {
@@ -188,16 +206,18 @@ export class LogCallModalComponent {
 
   private acceptRecording(file: File): void {
     this.recordingError.set(null);
-    const ext = '.' + (file.name.split('.').pop() ?? '').toLowerCase();
-    if (!ALLOWED_RECORDING_EXTS.includes(ext as (typeof ALLOWED_RECORDING_EXTS)[number])) {
+    const errors = recordingUploadValidator(new FormControl(file));
+    if (errors?.['unsupportedFileType']) {
       this.recordingError.set(
         `Unsupported format. Allowed: ${ALLOWED_RECORDING_EXTS.join(', ')} (mp4/video is not accepted).`,
       );
       return;
     }
-    if (file.size > MAX_RECORDING_BYTES) {
+    if (errors?.['fileTooLarge']) {
       const mb = Math.round(file.size / (1024 * 1024));
-      this.recordingError.set(`File is ${mb} MB — maximum is 30 MB. Try M4A instead of WAV.`);
+      this.recordingError.set(
+        `File is ${mb} MB — maximum is ${MAX_RECORDING_MB} MB. Try M4A instead of WAV.`,
+      );
       return;
     }
     this.recordingFile.set(file);

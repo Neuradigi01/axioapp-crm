@@ -13,6 +13,8 @@
     <p class="text-xs text-red-600">
       @if (text.errors?.['required']) {
         Please enter some text.
+      } @else if (text.errors?.['minlength']) {
+        Note is too short (at least 2 characters).
       } @else if (text.errors?.['maxlength']) {
         Notes are limited to 4,000 characters.
       }

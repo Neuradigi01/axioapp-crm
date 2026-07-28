@@ -36,6 +36,10 @@ const DEFAULT_MESSAGES: Record<string, string | ((err: ValidatorErrorDetail) => 
   invalidDate: REASON.invalidDate,
   invalidDateTime: REASON.invalidDateTime,
   dateInPast: REASON.dateInPast,
+  dateTooOld: REASON.dateTooOld,
+  fileTooLarge: REASON.fileTooLarge,
+  unsupportedFileType: REASON.unsupportedFileType,
+  invalidChoice: REASON.invalidChoice,
 };
 
 @Component({

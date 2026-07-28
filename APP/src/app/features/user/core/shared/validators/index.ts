@@ -2,13 +2,17 @@ import { ValidatorFn, Validators } from '@angular/forms';
 
 import {
   dateNotPastValidator,
+  dateWithinPastDays,
   emailValidator,
+  fileUploadValidator,
   isoDateTimeValidator,
   isoDateValidator,
   nameValidator,
   numericInRange,
   passwordStrengthValidator,
   phoneValidator,
+  picklistValidator,
+  trimmedRequired,
   urlValidator,
 } from '../../../../../shared/validators/custom-validators';
 import type { StandardFieldRendered } from '../../standard-fields/types';
@@ -42,6 +46,7 @@ export const PHONE_RE = /^\+?[0-9\s()-]{8,20}$/;
  */
 export const commonValidators = {
   required: Validators.required as ValidatorFn,
+  trimmedRequired: trimmedRequired as ValidatorFn,
   email: emailValidator as ValidatorFn,
   phone: (): ValidatorFn => phoneValidator,
   name: nameValidator as ValidatorFn,
@@ -53,6 +58,10 @@ export const commonValidators = {
   isoDate: isoDateValidator as ValidatorFn,
   isoDateTime: isoDateTimeValidator as ValidatorFn,
   dateNotPast: dateNotPastValidator as ValidatorFn,
+  dateWithinPastDays: (n: number): ValidatorFn => dateWithinPastDays(n),
+  fileUpload: (opts: { maxMb: number; exts: readonly string[] }): ValidatorFn =>
+    fileUploadValidator(opts),
+  picklist: (allowed: readonly (string | number)[]): ValidatorFn => picklistValidator(allowed),
 } as const;
 
 /**

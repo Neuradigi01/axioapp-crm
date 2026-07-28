@@ -2,7 +2,7 @@
 
 **Goal:** Apply shared validators to the six modals that create activities against existing records — tasks, book/reschedule appointments, log call, reply to review, add note — so every activity carries clean, bounded data.
 **Track:** Application Updates — Form & CSV-Import Validation
-**Status:** Pending
+**Status:** COMPLETED — 6 activity/action modals wired to shared validators. Step 1's shared-validator file extended with 4 more helpers (`dateWithinPastDays`, `fileUploadValidator`, `trimmedRequired`, `picklistValidator`); `commonValidators` and `DEFAULT_MESSAGES` extended. Log-call refactored to use the shared file-upload validator (drops the local extension/size checks). Reschedule modal gained a cross-field check that rejects "new time same as original" and past times. Reply-modal and add-note now reject whitespace-only text and enforce min 2 chars. tsc + eslint + prettier all clean; 4 pre-existing eslint warnings unrelated to this step.
 **Depends on:** Step 1 (shared validators).
 
 ---

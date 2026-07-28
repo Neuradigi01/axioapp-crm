@@ -44,6 +44,9 @@
         <p class="mt-1 text-xs text-muted">Saved on the timeline entry.</p>
       </div>
 
+      @if (crossFieldError(); as msg) {
+        <p class="text-xs text-red-600">{{ msg }}</p>
+      }
       @if (_error(); as err) {
         <div
           class="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"

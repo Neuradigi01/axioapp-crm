@@ -81,19 +81,26 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
       commonValidators.maxLength(255),
     ]);
     this.form.controls.title.updateValueAndValidity({ emitEvent: false });
-    this.form.controls.scheduled_at.setValidators([commonValidators.required]);
+    // scheduled_at must be forward-looking (bookings can't land in the past).
+    this.form.controls.scheduled_at.setValidators([
+      commonValidators.required,
+      commonValidators.dateNotPast,
+    ]);
     this.form.controls.scheduled_at.updateValueAndValidity({ emitEvent: false });
 
     const durRow = map['duration_min'];
+    // Floor/ceiling always apply (1 min – 24 hr); override tightens further.
     this.form.controls.duration_min.setValidators([
       commonValidators.required,
-      Validators.min(durRow?.min_value ?? 1),
-      Validators.max(durRow?.max_value ?? 1440),
+      Validators.min(Math.max(1, durRow?.min_value ?? 1)),
+      Validators.max(Math.min(1440, durRow?.max_value ?? 1440)),
     ]);
     this.form.controls.duration_min.updateValueAndValidity({ emitEvent: false });
 
     const setReq = (ctrl: 'purpose' | 'location', row: StandardFieldRendered | undefined): void => {
-      this.form.controls[ctrl].setValidators(withRequiredIf([], row));
+      this.form.controls[ctrl].setValidators(
+        withRequiredIf([commonValidators.maxLength(1000)], row),
+      );
       this.form.controls[ctrl].updateValueAndValidity({ emitEvent: false });
     };
     setReq('purpose', map['purpose']);
@@ -139,7 +146,7 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
 
   protected readonly scheduledAtControl = this.fb.control('', {
     nonNullable: true,
-    validators: [commonValidators.required],
+    validators: [commonValidators.required, commonValidators.dateNotPast],
   });
 
   /** Assigned user id. Initialised to the current user's id once
@@ -155,13 +162,19 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
       nonNullable: true,
       validators: [commonValidators.required, commonValidators.maxLength(255)],
     }),
-    purpose: this.fb.control('', { nonNullable: true }),
+    purpose: this.fb.control('', {
+      nonNullable: true,
+      validators: [commonValidators.maxLength(1000)],
+    }),
     scheduled_at: this.scheduledAtControl,
     duration_min: this.fb.control<number>(60, {
       nonNullable: true,
       validators: [commonValidators.required, Validators.min(1), Validators.max(24 * 60)],
     }),
-    location: this.fb.control('', { nonNullable: true }),
+    location: this.fb.control('', {
+      nonNullable: true,
+      validators: [commonValidators.maxLength(1000)],
+    }),
     assigned_to_id: this.assigneeControl,
   });
 

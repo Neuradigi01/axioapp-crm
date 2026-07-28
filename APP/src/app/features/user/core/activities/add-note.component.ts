@@ -11,6 +11,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
+import { commonValidators } from '../shared/validators';
 import { Activity, ActivitiesApiService } from './activities-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -43,7 +44,11 @@ export class AddNoteComponent {
 
   readonly text = new FormControl('', {
     nonNullable: true,
-    validators: [Validators.required, Validators.maxLength(4000)],
+    validators: [
+      commonValidators.trimmedRequired,
+      Validators.minLength(2),
+      Validators.maxLength(4000),
+    ],
   });
 
   protected readonly submitting = signal(false);
