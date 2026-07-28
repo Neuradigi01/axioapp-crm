@@ -58,7 +58,9 @@ import {
       </div>
 
       @if (error(); as msg) {
-        <div class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+        >
           {{ msg }}
         </div>
       }
