@@ -32,7 +32,17 @@
                 class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               @if (form.controls.phone.touched && form.controls.phone.invalid) {
-                <p class="mt-1 text-xs text-red-600">Phone is required.</p>
+                <p class="mt-1 text-xs text-red-600">
+                  @if (form.controls.phone.errors?.['required']) {
+                    Phone is required.
+                  } @else if (form.controls.phone.errors?.['phoneInvalid']; as msg) {
+                    {{ msg }}
+                  } @else if (form.controls.phone.errors?.['maxlength']) {
+                    Phone is too long.
+                  } @else {
+                    Enter a valid phone.
+                  }
+                </p>
               }
               @if (stdField('phone')?.help_text; as help) {
                 <p class="mt-1 text-xs text-muted">{{ help }}</p>
@@ -53,6 +63,19 @@
                 [attr.placeholder]="stdField('full_name')?.placeholder ?? 'e.g. Asha Reddy'"
                 class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
+              @if (form.controls.full_name.touched && form.controls.full_name.invalid) {
+                <p class="mt-1 text-xs text-red-600">
+                  @if (form.controls.full_name.errors?.['required']) {
+                    Full name is required.
+                  } @else if (form.controls.full_name.errors?.['nameInvalid']; as msg) {
+                    {{ msg }}
+                  } @else if (form.controls.full_name.errors?.['maxlength']) {
+                    Name is too long.
+                  } @else {
+                    Enter a valid name.
+                  }
+                </p>
+              }
               @if (stdField('full_name')?.help_text; as help) {
                 <p class="mt-1 text-xs text-muted">{{ help }}</p>
               }
@@ -74,6 +97,19 @@
                 [attr.placeholder]="stdField('email')?.placeholder"
                 class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
+              @if (form.controls.email.touched && form.controls.email.invalid) {
+                <p class="mt-1 text-xs text-red-600">
+                  @if (form.controls.email.errors?.['required']) {
+                    An email is required.
+                  } @else if (form.controls.email.errors?.['emailInvalid']; as msg) {
+                    {{ msg }}
+                  } @else if (form.controls.email.errors?.['maxlength']) {
+                    Email is too long.
+                  } @else {
+                    Enter a valid email.
+                  }
+                </p>
+              }
               @if (stdField('email')?.help_text; as help) {
                 <p class="mt-1 text-xs text-muted">{{ help }}</p>
               }
@@ -171,6 +207,10 @@
                 <p class="mt-1 text-xs text-red-600">
                   @if (form.controls.budget.errors?.['required']) {
                     A value is required.
+                  } @else if (form.controls.budget.errors?.['invalidNumber']) {
+                    Enter a numeric value.
+                  } @else if (form.controls.budget.errors?.['outOfRange']; as e) {
+                    Value must be between {{ e['min'] }} and {{ e['max'] }}.
                   } @else if (form.controls.budget.errors?.['min']; as e) {
                     Must be at least {{ e['min'] }}.
                   } @else if (form.controls.budget.errors?.['max']; as e) {
@@ -203,6 +243,17 @@
               placeholder="e.g. 4 for a family"
               class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            @if (form.controls.party_size.touched && form.controls.party_size.invalid) {
+              <p class="mt-1 text-xs text-red-600">
+                @if (form.controls.party_size.errors?.['invalidNumber']) {
+                  Enter a number.
+                } @else if (form.controls.party_size.errors?.['outOfRange']; as e) {
+                  Party size must be between {{ e['min'] }} and {{ e['max'] }}.
+                } @else {
+                  Invalid party size.
+                }
+              </p>
+            }
           </div>
 
           <!-- W11 — customer said they'd return by X. Feeds retention
@@ -218,6 +269,18 @@
               formControlName="expected_return_date"
               class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            @if (
+              form.controls.expected_return_date.touched &&
+              form.controls.expected_return_date.invalid
+            ) {
+              <p class="mt-1 text-xs text-red-600">
+                @if (form.controls.expected_return_date.errors?.['invalidDate']; as msg) {
+                  {{ msg }}
+                } @else {
+                  Enter a valid date.
+                }
+              </p>
+            }
           </div>
 
           <!-- W9 — queue arrival time. Reception can stamp this when a
@@ -233,6 +296,15 @@
               formControlName="wait_started_at"
               class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            @if (form.controls.wait_started_at.touched && form.controls.wait_started_at.invalid) {
+              <p class="mt-1 text-xs text-red-600">
+                @if (form.controls.wait_started_at.errors?.['invalidDateTime']; as msg) {
+                  {{ msg }}
+                } @else {
+                  Enter a valid date-time.
+                }
+              </p>
+            }
             <p class="mt-1 text-xs text-muted">
               If left blank, wait time isn't calculated for this visit.
             </p>

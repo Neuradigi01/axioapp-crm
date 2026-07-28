@@ -1,8 +1,12 @@
 import { ValidatorFn, Validators } from '@angular/forms';
 
 import {
+  dateNotPastValidator,
   emailValidator,
+  isoDateTimeValidator,
+  isoDateValidator,
   nameValidator,
+  numericInRange,
   passwordStrengthValidator,
   phoneValidator,
   urlValidator,
@@ -45,6 +49,10 @@ export const commonValidators = {
   url: urlValidator as ValidatorFn,
   maxLength: (n: number): ValidatorFn => Validators.maxLength(n),
   minLength: (n: number): ValidatorFn => Validators.minLength(n),
+  numericInRange: (min: number, max: number): ValidatorFn => numericInRange(min, max),
+  isoDate: isoDateValidator as ValidatorFn,
+  isoDateTime: isoDateTimeValidator as ValidatorFn,
+  dateNotPast: dateNotPastValidator as ValidatorFn,
 } as const;
 
 /**

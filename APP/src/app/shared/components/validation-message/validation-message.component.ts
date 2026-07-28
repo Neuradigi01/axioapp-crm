@@ -26,6 +26,16 @@ const DEFAULT_MESSAGES: Record<string, string | ((err: ValidatorErrorDetail) => 
   phoneInvalid: REASON.invalidPhone,
   passwordWeak: REASON.weakPassword,
   urlInvalid: REASON.invalidUrl,
+  invalidNumber: REASON.invalidNumber,
+  outOfRange: (err) => {
+    if (typeof err.min === 'number' && typeof err.max === 'number') {
+      return `Value must be between ${err.min} and ${err.max}.`;
+    }
+    return REASON.outOfRange;
+  },
+  invalidDate: REASON.invalidDate,
+  invalidDateTime: REASON.invalidDateTime,
+  dateInPast: REASON.dateInPast,
 };
 
 @Component({

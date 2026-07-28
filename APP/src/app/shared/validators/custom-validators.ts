@@ -14,6 +14,11 @@ export const REASON = {
   invalidName: 'name contains disallowed characters',
   weakPassword: 'password must be 8–128 chars with upper, lower, digit, and special',
   invalidUrl: 'invalid URL',
+  invalidNumber: 'value must be a number',
+  outOfRange: 'value is outside the allowed range',
+  invalidDate: 'date must be in YYYY-MM-DD format',
+  invalidDateTime: 'date-time must be in ISO 8601 format',
+  dateInPast: 'date cannot be in the past',
 } as const;
 
 /**
@@ -122,6 +127,80 @@ export function passwordStrengthValidator(control: AbstractControl): ValidationE
     !/[^A-Za-z0-9]/.test(value)
   ) {
     return { passwordWeak: REASON.weakPassword };
+  }
+  return null;
+}
+
+/**
+ * Numeric-range validator for string-typed controls (HTML5 `<input type="number">`
+ * feeds back a string). Empty short-circuits to `null` per the other
+ * validators — combine with `Validators.required` when non-empty is
+ * required. Emits `outOfRange` with the reason string, plus `min`/`max`
+ * numeric fields for templates that want to show the bounds.
+ */
+export function numericInRange(min: number, max: number): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const raw = control.value;
+    if (isEmpty(raw)) return null;
+    const value = typeof raw === 'number' ? raw : Number(String(raw).trim());
+    if (!Number.isFinite(value)) {
+      return { invalidNumber: REASON.invalidNumber };
+    }
+    if (value < min || value > max) {
+      return { outOfRange: REASON.outOfRange, min, max };
+    }
+    return null;
+  };
+}
+
+/** YYYY-MM-DD. */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Accepts YYYY-MM-DDTHH:mm(:ss)?(Z or ±HH:mm)? — HTML5 `datetime-local` and full ISO 8601. */
+const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/;
+
+/**
+ * `<input type="date">` value shape check. Empty → null.
+ */
+export function isoDateValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  const value = String(raw).trim();
+  if (!ISO_DATE_RE.test(value) || Number.isNaN(new Date(value).getTime())) {
+    return { invalidDate: REASON.invalidDate };
+  }
+  return null;
+}
+
+/**
+ * `<input type="datetime-local">` and ISO 8601. Empty → null.
+ */
+export function isoDateTimeValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  const value = String(raw).trim();
+  if (!ISO_DATETIME_RE.test(value) || Number.isNaN(new Date(value).getTime())) {
+    return { invalidDateTime: REASON.invalidDateTime };
+  }
+  return null;
+}
+
+/**
+ * Rejects ISO date / date-time values in the past. 5-minute grace covers
+ * clock skew; date-only values are treated as "end of that day local"
+ * so selecting today is always valid until midnight.
+ */
+export function dateNotPastValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  const value = String(raw).trim();
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null; // shape check belongs elsewhere
+  const isDateOnly = value.length <= 10 && ISO_DATE_RE.test(value);
+  const target = isDateOnly ? parsed.getTime() + 24 * 60 * 60 * 1000 : parsed.getTime();
+  const graceMs = 5 * 60 * 1000;
+  if (target + graceMs < Date.now()) {
+    return { dateInPast: REASON.dateInPast };
   }
   return null;
 }

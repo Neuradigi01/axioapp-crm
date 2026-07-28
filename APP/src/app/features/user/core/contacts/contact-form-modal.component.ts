@@ -84,11 +84,14 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
   readonly isEdit = computed(() => this._contact() !== null);
 
   readonly standard = this.fb.group({
-    full_name: ['', [commonValidators.required, commonValidators.maxLength(255)]],
-    phone: ['', [commonValidators.maxLength(32)]],
-    email: ['', [commonValidators.email, commonValidators.maxLength(255)]],
+    full_name: [
+      '',
+      [commonValidators.required, commonValidators.name, commonValidators.maxLength(255)],
+    ],
+    phone: ['', [commonValidators.phone(), commonValidators.maxLength(32)]],
+    email: ['', [commonValidators.email, commonValidators.maxLength(254)]],
     source: ['', [commonValidators.maxLength(64)]],
-    tags_csv: [''],
+    tags_csv: ['', [commonValidators.maxLength(1000)]],
     assigned_to_id: [''],
   });
 
@@ -100,9 +103,10 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
    * stays required always (registry locks it).
    */
   protected applyStandardValidators(map: Record<string, StandardFieldRendered>): void {
-    // full_name — always required + max 255 (backend enforces NOT NULL).
+    // full_name — always required + name shape + max 255 (backend NOT NULL, backend max 255).
     this.standard.controls.full_name.setValidators([
       commonValidators.required,
+      commonValidators.name,
       commonValidators.maxLength(255),
     ]);
     this.standard.controls.full_name.updateValueAndValidity({
@@ -110,12 +114,12 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
     });
 
     this.standard.controls.phone.setValidators(
-      withRequiredIf([commonValidators.maxLength(32)], map['phone']),
+      withRequiredIf([commonValidators.phone(), commonValidators.maxLength(32)], map['phone']),
     );
     this.standard.controls.phone.updateValueAndValidity({ emitEvent: false });
 
     this.standard.controls.email.setValidators(
-      withRequiredIf([commonValidators.email, commonValidators.maxLength(255)], map['email']),
+      withRequiredIf([commonValidators.email, commonValidators.maxLength(254)], map['email']),
     );
     this.standard.controls.email.updateValueAndValidity({ emitEvent: false });
 
@@ -124,8 +128,9 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
     );
     this.standard.controls.source.updateValueAndValidity({ emitEvent: false });
 
-    // tags has no static validators; only required if the override sets it.
-    this.standard.controls.tags_csv.setValidators(withRequiredIf([], map['tags']));
+    this.standard.controls.tags_csv.setValidators(
+      withRequiredIf([commonValidators.maxLength(1000)], map['tags']),
+    );
     this.standard.controls.tags_csv.updateValueAndValidity({
       emitEvent: false,
     });

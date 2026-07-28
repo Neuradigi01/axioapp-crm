@@ -2,7 +2,7 @@
 
 **Goal:** Apply the shared name / email / phone validators to the four modals that create or edit the CRM's primary records — contacts, leads, walk-ins — so invalid values are blocked at the input step before any API call.
 **Track:** Application Updates — Form & CSV-Import Validation
-**Status:** Pending
+**Status:** COMPLETED — contact / lead / lost-reason / walk-in modals all wired to shared validators. Step 1's shared-validator file extended with 4 additional helpers (`numericInRange`, `isoDateValidator`, `isoDateTimeValidator`, `dateNotPastValidator`) since Step 3 was the first consumer; `commonValidators` and the `DEFAULT_MESSAGES` map updated to expose them. Templates gained inline error branches for the new validator keys. Lost-reason modal moved from manual `computed` gating to real `Validators.required` + `withRequiredIf` pattern. tsc + eslint + prettier all clean.
 **Depends on:** Step 1 (shared validators).
 
 ---

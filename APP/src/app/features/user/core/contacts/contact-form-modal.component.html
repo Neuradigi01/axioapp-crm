@@ -77,7 +77,17 @@
                 [attr.placeholder]="stdField('full_name')?.placeholder ?? 'e.g. Asha Reddy'"
               />
               @if (standard.controls.full_name.touched && standard.controls.full_name.invalid) {
-                <p class="field-error">A name is required.</p>
+                <p class="field-error">
+                  @if (standard.controls.full_name.errors?.['required']) {
+                    A name is required.
+                  } @else if (standard.controls.full_name.errors?.['nameInvalid']; as msg) {
+                    {{ msg }}
+                  } @else if (standard.controls.full_name.errors?.['maxlength']) {
+                    Name is too long.
+                  } @else {
+                    Enter a valid name.
+                  }
+                </p>
               }
               @if (stdField('full_name')?.help_text; as help) {
                 <p class="field-hint">{{ help }}</p>
@@ -103,7 +113,17 @@
                 [attr.placeholder]="stdField('phone')?.placeholder ?? '+91 9000000001'"
               />
               @if (standard.controls.phone.touched && standard.controls.phone.invalid) {
-                <p class="field-error">A phone number is required.</p>
+                <p class="field-error">
+                  @if (standard.controls.phone.errors?.['required']) {
+                    A phone number is required.
+                  } @else if (standard.controls.phone.errors?.['phoneInvalid']; as msg) {
+                    {{ msg }}
+                  } @else if (standard.controls.phone.errors?.['maxlength']) {
+                    Phone is too long.
+                  } @else {
+                    Enter a valid phone.
+                  }
+                </p>
               }
               @if (stdField('phone')?.help_text; as help) {
                 <p class="field-hint">{{ help }}</p>
@@ -131,6 +151,10 @@
                 <p class="field-error">
                   @if (standard.controls.email.errors?.['required']) {
                     An email is required.
+                  } @else if (standard.controls.email.errors?.['emailInvalid']; as msg) {
+                    {{ msg }}
+                  } @else if (standard.controls.email.errors?.['maxlength']) {
+                    Email is too long.
                   } @else {
                     Enter a valid email.
                   }

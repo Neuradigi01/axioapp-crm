@@ -110,7 +110,8 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
       emitEvent: false,
     });
 
-    const budgetValidators: ValidatorFn[] = [];
+    // Floor + ceiling always apply; override min/max tighten further if set.
+    const budgetValidators: ValidatorFn[] = [commonValidators.numericInRange(0, 1_000_000_000)];
     if (budgetRow?.is_required) budgetValidators.push(commonValidators.required);
     if (budgetRow?.min_value !== null && budgetRow?.min_value !== undefined) {
       budgetValidators.push(Validators.min(budgetRow.min_value));
@@ -121,7 +122,8 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
     this.standard.controls.budget.setValidators(budgetValidators);
     this.standard.controls.budget.updateValueAndValidity({ emitEvent: false });
 
-    const closeValidators: ValidatorFn[] = [];
+    // Date shape + not-past always apply; required layered on top per override.
+    const closeValidators: ValidatorFn[] = [commonValidators.isoDate, commonValidators.dateNotPast];
     if (closeRow?.is_required) closeValidators.push(commonValidators.required);
     this.standard.controls.expected_close_date.setValidators(closeValidators);
     this.standard.controls.expected_close_date.updateValueAndValidity({
@@ -135,12 +137,16 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
     if (!this.isEdit()) {
       this.contactBasics.controls.full_name.setValidators([
         commonValidators.required,
+        commonValidators.name,
         commonValidators.maxLength(255),
       ]);
-      this.contactBasics.controls.phone.setValidators([commonValidators.maxLength(32)]);
+      this.contactBasics.controls.phone.setValidators([
+        commonValidators.phone(),
+        commonValidators.maxLength(32),
+      ]);
       this.contactBasics.controls.email.setValidators([
         commonValidators.email,
-        commonValidators.maxLength(255),
+        commonValidators.maxLength(254),
       ]);
       this.contactBasics.controls.full_name.updateValueAndValidity({ emitEvent: false });
       this.contactBasics.controls.phone.updateValueAndValidity({ emitEvent: false });

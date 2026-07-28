@@ -68,7 +68,7 @@ Track is done when:
 |---|-------|--------|--------|
 | 1 | [Shared validators (FE + BE foundation)](step-1-shared-validators.md) | COMPLETED | ~½ day |
 | 2 | [Auth pages (accounts/)](step-2-auth-pages.md) | COMPLETED | ~½ day |
-| 3 | [Core entity forms (contacts, leads, walk-ins)](step-3-core-entity-forms.md) | Pending | ~½ day |
+| 3 | [Core entity forms (contacts, leads, walk-ins)](step-3-core-entity-forms.md) | COMPLETED | ~½ day |
 | 4 | [Activity & action forms (tasks, appointments, calls, reviews, notes)](step-4-activity-forms.md) | Pending | ~½ day |
 | 5 | [Config forms A — custom fields + templates](step-5-config-forms-a.md) | Pending | ~½ day |
 | 6 | [Config forms B — campaigns + workflow editors](step-6-config-forms-b.md) | Pending | ~1 day |
