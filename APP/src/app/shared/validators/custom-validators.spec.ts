@@ -83,21 +83,38 @@ describe('shared validators', () => {
     });
   });
 
-  describe('phoneValidator', () => {
+  describe('phoneValidator (10-digit Indian mobile)', () => {
     it('returns null for empty values', () => {
       expect(phoneValidator(ctl(''))).toBeNull();
     });
 
-    it('accepts numbers with separators', () => {
-      for (const v of ['9876543210', '+91 98765 43210', '+1 (415) 555-0132', '020-79460958']) {
+    it('accepts Indian mobile numbers with or without +91', () => {
+      for (const v of [
+        '9876543210',
+        '+91 98765 43210',
+        '91-9876543210',
+        '+919876543210',
+        '(987) 654-3210',
+        '6234567890',
+        '7234567890',
+        '8234567890',
+      ]) {
         expect(phoneValidator(ctl(v)))
           .withContext(v)
           .toBeNull();
       }
     });
 
-    it('rejects letters, too short, too long', () => {
-      for (const v of ['abc', '1234567', '1234567890123456']) {
+    it('rejects non-Indian, landline, or malformed numbers', () => {
+      for (const v of [
+        'abc',
+        '1234567',
+        '5234567890', // starts with 5
+        '0987654321', // leading zero
+        '12345678901', // 11 digits
+        '+1 415 555 0132', // US
+        '020-79460958', // Delhi landline
+      ]) {
         expect(phoneValidator(ctl(v)))
           .withContext(v)
           .toEqual({ phoneInvalid: REASON.invalidPhone });

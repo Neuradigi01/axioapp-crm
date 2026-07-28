@@ -14,6 +14,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService } from '../auth/auth.service';
+import { commonValidators } from '../shared/validators';
 import { TaskAssignee, TaskFormModalComponent } from './task-form-modal.component';
 import { Task, TaskPriority, TasksApiService } from './tasks-api.service';
 import { extractApiError } from '@core/services/api-error.util';
@@ -60,7 +61,9 @@ export class TasksPanelComponent {
 
   protected readonly form = this.fb.group({
     title: ['', [Validators.required, Validators.maxLength(255)]],
-    due_at: [''],
+    // Quick-add task: due date is optional but if set must not be in
+    // the past. Today is a legitimate pick ("do this today").
+    due_at: ['', [commonValidators.dateNotPast]],
     priority: this.fb.control<TaskPriority>('med', { nonNullable: true }),
   });
 

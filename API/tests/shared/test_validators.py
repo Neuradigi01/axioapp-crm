@@ -106,10 +106,14 @@ def test_validate_email_rejects_too_long() -> None:
 @pytest.mark.parametrize(
     "value,expected",
     [
-        ("9876543210", "9876543210"),
-        ("+91 98765 43210", "+919876543210"),
-        ("+1 (415) 555-0132", "+14155550132"),
-        ("020-79460958", "02079460958"),
+        ("9876543210", "9876543210"),          # bare 10-digit mobile
+        ("+91 98765 43210", "9876543210"),     # +91 prefix, spaces
+        ("91-9876543210", "9876543210"),       # 91 prefix, dash
+        ("+919876543210", "9876543210"),       # +91 no separators
+        ("(987) 654-3210", "9876543210"),      # US-style separators, still Indian
+        ("6234567890", "6234567890"),          # mobile starting with 6
+        ("7234567890", "7234567890"),          # 7
+        ("8234567890", "8234567890"),          # 8
     ],
 )
 def test_validate_phone_accepts_and_strips(value: str, expected: str) -> None:
@@ -118,7 +122,16 @@ def test_validate_phone_accepts_and_strips(value: str, expected: str) -> None:
 
 @pytest.mark.parametrize(
     "value",
-    ["abc", "1234567", "1234567890123456", ""],
+    [
+        "abc",                    # non-digits
+        "1234567",                # too short
+        "5234567890",             # starts with 5 — not an Indian mobile prefix
+        "0987654321",             # leading zero
+        "12345678901",            # 11 digits, no valid prefix
+        "+1 415 555 0132",        # US number
+        "020-79460958",           # Delhi landline (0 prefix, 11 digits total)
+        "",                       # empty
+    ],
 )
 def test_validate_phone_rejects_bad(value: str) -> None:
     with pytest.raises(ValidationError) as exc:
@@ -279,11 +292,15 @@ def _extract_frontend_source(name: str) -> str:
             [
                 # Phone samples are POST-strip — the strip step is the same on
                 # both sides, so testing the compiled regex is enough.
-                ("9876543210", True),
-                ("+919876543210", True),
+                ("9876543210", True),          # bare 10-digit mobile
+                ("+919876543210", True),       # +91 prefix
+                ("919876543210", True),        # 91 prefix
+                ("6234567890", True),          # first digit 6
                 ("abc", False),
-                ("1234567", False),
-                ("1234567890123456", False),
+                ("5234567890", False),         # starts with 5 — not an Indian mobile
+                ("+14155550132", False),       # US number
+                ("1234567", False),            # too short
+                ("12345678901", False),        # 11 digits
             ],
         ),
         (

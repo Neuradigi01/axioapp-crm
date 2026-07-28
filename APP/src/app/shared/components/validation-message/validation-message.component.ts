@@ -37,6 +37,7 @@ const DEFAULT_MESSAGES: Record<string, string | ((err: ValidatorErrorDetail) => 
   invalidDateTime: REASON.invalidDateTime,
   dateInPast: REASON.dateInPast,
   dateMustBeFuture: REASON.dateMustBeFuture,
+  dateInFuture: REASON.dateInFuture,
   dateTooOld: REASON.dateTooOld,
   fileTooLarge: REASON.fileTooLarge,
   unsupportedFileType: REASON.unsupportedFileType,

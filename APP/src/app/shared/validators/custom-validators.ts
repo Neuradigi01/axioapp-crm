@@ -10,7 +10,7 @@ import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 export const REASON = {
   requiredMissing: 'required field missing',
   invalidEmail: 'invalid email format',
-  invalidPhone: 'phone must be 8–15 digits (with optional country code)',
+  invalidPhone: 'phone must be a 10-digit Indian mobile number (with optional +91)',
   invalidName: 'name contains disallowed characters',
   weakPassword: 'password must be 8–128 chars with upper, lower, digit, and special',
   invalidUrl: 'invalid URL',
@@ -20,6 +20,7 @@ export const REASON = {
   invalidDateTime: 'date-time must be in ISO 8601 format',
   dateInPast: 'date cannot be in the past',
   dateMustBeFuture: 'date must be after today',
+  dateInFuture: 'date cannot be in the future',
   dateTooOld: 'date is older than allowed',
   fileTooLarge: 'file exceeds the maximum size',
   unsupportedFileType: 'file type is not allowed',
@@ -39,7 +40,7 @@ export const REASON = {
  */
 export const NAME_RE_SRC = "^[A-Za-zÀ-ÿ' .\\-]{2,100}$";
 export const EMAIL_RE_SRC = '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$';
-export const PHONE_RE_SRC = '^\\+?[0-9]{8,15}$';
+export const PHONE_RE_SRC = '^(?:\\+?91)?([6-9][0-9]{9})$';
 export const URL_RE_SRC = '^https?://[^\\s]+$';
 
 const NAME_RE = new RegExp(NAME_RE_SRC);
@@ -107,9 +108,13 @@ export function emailValidator(control: AbstractControl): ValidationErrors | nul
 }
 
 /**
- * E.164-compatible phone check. Strips spaces, `()`, and `-` first so
- * `+91 98765 43210` and `(415) 555-0132` both pass. Result must be an
- * optional `+` followed by 8–15 digits.
+ * Indian mobile phone check. Strips spaces, `()`, and `-` first so
+ * `+91 98765 43210` and `98765 43210` both pass. After stripping an
+ * optional `+91` or `91` prefix, the result must be exactly 10 digits
+ * starting with 6, 7, 8, or 9 (all Indian mobile-number prefixes).
+ * Landlines and non-Indian numbers are rejected — the CRM's target
+ * market is India and every downstream channel (SMS DLT, WhatsApp
+ * Cloud API) expects a 10-digit MSISDN.
  */
 export function phoneValidator(control: AbstractControl): ValidationErrors | null {
   const raw = control.value;
@@ -213,6 +218,30 @@ export function dateNotPastValidator(control: AbstractControl): ValidationErrors
     return { dateInPast: REASON.dateInPast };
   }
   return null;
+}
+
+/**
+ * Rejects ISO date / date-time values in the future. Use for "actual"
+ * events that have already happened (e.g. won-deal close date, purchase
+ * date) — today counts as valid; tomorrow and later do not. Mirror of
+ * `dateNotPastValidator`.
+ */
+export function dateNotFutureValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  const value = String(raw).trim();
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const isDateOnly = value.length <= 10 && ISO_DATE_RE.test(value);
+  // For date-only, "target" is start of that day. For datetime, exact instant.
+  const target = parsed.getTime();
+  const graceMs = 5 * 60 * 1000;
+  // A date-only value for today parses to 00:00 UTC — treat as valid until
+  // end-of-tomorrow in local time (so "today" always passes).
+  const now = Date.now();
+  const endOfTodayLocal = new Date(new Date().setHours(23, 59, 59, 999)).getTime();
+  const ceiling = isDateOnly ? endOfTodayLocal : now + graceMs;
+  return target <= ceiling ? null : { dateInFuture: REASON.dateInFuture };
 }
 
 /**

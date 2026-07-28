@@ -3,6 +3,7 @@ import { ValidatorFn, Validators } from '@angular/forms';
 import {
   choicesCsvValidator,
   dateFutureValidator,
+  dateNotFutureValidator,
   dateNotPastValidator,
   dateWithinPastDays,
   emailValidator,
@@ -63,6 +64,7 @@ export const commonValidators = {
   isoDate: isoDateValidator as ValidatorFn,
   isoDateTime: isoDateTimeValidator as ValidatorFn,
   dateNotPast: dateNotPastValidator as ValidatorFn,
+  dateNotFuture: dateNotFutureValidator as ValidatorFn,
   dateFuture: dateFutureValidator as ValidatorFn,
   dateWithinPastDays: (n: number): ValidatorFn => dateWithinPastDays(n),
   fileUpload: (opts: { maxMb: number; exts: readonly string[] }): ValidatorFn =>

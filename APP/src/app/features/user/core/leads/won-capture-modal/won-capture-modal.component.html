@@ -38,8 +38,21 @@
         <input
           type="date"
           [formControl]="closeDateControl"
+          min="1900-01-01"
+          max="9999-12-31"
           class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
+        @if (closeDateControl.touched && closeDateControl.invalid) {
+          <span class="mt-1 block text-xs text-red-600">
+            @if (closeDateControl.errors?.['invalidDate']; as msg) {
+              {{ msg }}
+            } @else if (closeDateControl.errors?.['dateInFuture']; as msg) {
+              {{ msg }}
+            } @else {
+              Enter a valid date.
+            }
+          </span>
+        }
       </label>
 
       <label class="block">

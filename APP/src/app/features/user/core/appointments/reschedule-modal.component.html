@@ -16,6 +16,8 @@
             id="reschedule_date"
             type="date"
             [formControl]="dateControl"
+            min="1900-01-01"
+            max="9999-12-31"
             class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
