@@ -25,17 +25,17 @@ import { LucideAngularModule } from 'lucide-angular';
   imports: [CommonModule, FormsModule, LucideAngularModule],
   template: `
     <div
-      class="flex flex-wrap items-center gap-1.5 rounded-md border border-zinc-200 bg-white p-2 focus-within:border-zinc-400 focus-within:ring-2 focus-within:ring-zinc-200"
+      class="flex flex-wrap items-center gap-1.5 rounded-md border border-subtle bg-surface p-2 focus-within:border-muted focus-within:ring-2 focus-within:ring-accent/30"
     >
       @for (chip of chips(); let idx = $index; track chip + idx) {
         <span
-          class="inline-flex items-center gap-1 rounded-full bg-zinc-100 py-0.5 pl-2.5 pr-1 text-xs text-zinc-700 ring-1 ring-zinc-200"
+          class="inline-flex items-center gap-1 rounded-full bg-surface-2 py-0.5 pl-2.5 pr-1 text-xs text-default ring-1 border-subtle"
         >
           {{ chip }}
           <button
             type="button"
             (click)="remove(idx)"
-            class="ml-0.5 rounded-full p-0.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700"
+            class="ml-0.5 rounded-full p-0.5 text-faint hover:bg-surface-2 hover:text-default"
             aria-label="Remove tag"
           >
             <lucide-icon name="x" class="h-3 w-3"></lucide-icon>
@@ -51,7 +51,7 @@ import { LucideAngularModule } from 'lucide-angular';
         (keydown)="onKey($event)"
         (blur)="commitFromBuffer()"
         [disabled]="disabled()"
-        class="min-w-32 flex-1 border-0 bg-transparent p-1 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
+        class="min-w-32 flex-1 border-0 bg-transparent p-1 text-sm text-default placeholder:text-faint focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
       />
     </div>
   `,

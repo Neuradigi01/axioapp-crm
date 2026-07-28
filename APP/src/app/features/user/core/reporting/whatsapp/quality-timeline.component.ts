@@ -45,18 +45,16 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, NgApexchartsModule],
   template: `
-    <div class="rounded-md border border-zinc-200 bg-white p-4">
+    <div class="rounded-md border border-subtle bg-surface p-4">
       <div class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Quality timeline
-          </p>
-          <p class="text-[11px] text-zinc-500">
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">Quality timeline</p>
+          <p class="text-[11px] text-muted">
             Daily send volume with phone-quality / tier changes annotated.
           </p>
         </div>
         @if (loading()) {
-          <span class="text-[11px] text-zinc-500">Loading…</span>
+          <span class="text-[11px] text-muted">Loading…</span>
         }
       </div>
 
@@ -66,7 +64,7 @@ import {
         </p>
       } @else if (report(); as r) {
         @if (r.volume.length === 0) {
-          <p class="py-8 text-center text-xs text-zinc-500">No outbound traffic in this window.</p>
+          <p class="py-8 text-center text-xs text-muted">No outbound traffic in this window.</p>
         } @else {
           <apx-chart
             [series]="series()"
@@ -82,19 +80,19 @@ import {
           />
 
           @if (r.events.length > 0) {
-            <ul class="mt-3 space-y-1 text-[11px] text-zinc-600">
+            <ul class="mt-3 space-y-1 text-[11px] text-muted">
               @for (e of r.events; track e.occurred_at) {
                 <li class="flex items-center gap-2">
                   <span
                     class="inline-flex h-2 w-2 rounded-full"
                     [class]="eventDot(e.event_type)"
                   ></span>
-                  <span class="text-zinc-500">{{ formatDate(e.occurred_at) }}</span>
-                  <span class="font-medium text-zinc-800">
+                  <span class="text-muted">{{ formatDate(e.occurred_at) }}</span>
+                  <span class="font-medium text-default">
                     {{ humanEvent(e.event_type) }}
                   </span>
                   @if (e.new_value) {
-                    <span class="text-zinc-600">→ {{ e.new_value }}</span>
+                    <span class="text-muted">→ {{ e.new_value }}</span>
                   }
                 </li>
               }
@@ -204,7 +202,7 @@ export class QualityTimelineComponent {
       case 'tier_change':
         return 'bg-blue-500';
       default:
-        return 'bg-zinc-500';
+        return 'bg-muted';
     }
   }
 

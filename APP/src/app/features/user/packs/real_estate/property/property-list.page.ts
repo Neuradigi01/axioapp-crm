@@ -188,12 +188,12 @@ export class PropertyListPageComponent {
       case 'unpublished':
         return 'bg-amber-100 text-amber-700 ring-amber-200';
       case 'archived':
-        return 'bg-zinc-200 text-zinc-700 ring-zinc-300';
+        return 'bg-surface-2 text-default border-subtle';
       case 'sold':
         return 'bg-blue-100 text-blue-700 ring-blue-200';
       case 'draft':
       default:
-        return 'bg-zinc-100 text-zinc-600 ring-zinc-200';
+        return 'bg-surface-2 text-muted border-subtle';
     }
   }
 

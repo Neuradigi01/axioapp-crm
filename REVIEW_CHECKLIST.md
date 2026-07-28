@@ -4,7 +4,9 @@
 
 This file is the master list of **every user-facing functionality in Core CRM**, grouped into modules and ordered so a reviewer can walk the whole product front-to-back. Each functionality gets reviewed **once**, end-to-end, through the full layer chain:
 
-> **UI page component → Angular service → HTTP interceptor + route guards → `/api/v1` FastAPI router → service → data-access (DAL) → SQLAlchemy async session → PostgreSQL (with Row-Level Security)** — plus whatever else the flow touches: Celery/Redis jobs, WebSockets, local file storage, Stripe, WhatsApp (Cloud API / Baileys sidecar), Google & Meta OAuth and webhooks, Gmail/Microsoft OAuth, Firebase, and the AI provider.
+> **UI page component → Angular service → HTTP interceptor + route guards → `/api/v1` FastAPI router → service → data-access (DAL) → SQLAlchemy async session → PostgreSQL (with Row-Level Se
+
+curity)** — plus whatever else the flow touches: Celery/Redis jobs, WebSockets, local file storage, Stripe, WhatsApp (Cloud API / Baileys sidecar), Google & Meta OAuth and webhooks, Gmail/Microsoft OAuth, Firebase, and the AI provider.
 
 A review is not just "does it work". Each item is judged on **correctness, security, performance, code organization, and design fit** — the last one asking whether the feature is even the *right shape* compared to how mature CRMs solve the same problem. When an item is done, its status flips and it is never re-reviewed unless the code changes.
 

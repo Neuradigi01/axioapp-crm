@@ -7,18 +7,18 @@
       (dragleave)="onDragLeave($event)"
       (drop)="onFileDrop($event)"
       [class.border-zinc-900]="dragOver()"
-      [class.bg-zinc-50]="dragOver()"
-      class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 bg-white px-6 py-8 text-center transition hover:border-zinc-400"
+      [class.bg-surface-2]="dragOver()"
+      class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-subtle bg-surface px-6 py-8 text-center transition hover:border-zinc-400"
     >
       @if (uploading()) {
-        <lucide-icon name="loader-2" class="h-8 w-8 animate-spin text-zinc-500"></lucide-icon>
-        <div class="text-sm font-medium text-zinc-700">Uploading…</div>
+        <lucide-icon name="loader-2" class="h-8 w-8 animate-spin text-muted"></lucide-icon>
+        <div class="text-sm font-medium text-default">Uploading…</div>
       } @else {
-        <lucide-icon name="upload-cloud" class="h-8 w-8 text-zinc-400"></lucide-icon>
-        <div class="text-sm font-medium text-zinc-700">
+        <lucide-icon name="upload-cloud" class="h-8 w-8 text-faint"></lucide-icon>
+        <div class="text-sm font-medium text-default">
           Drag &amp; drop images here, or click to browse
         </div>
-        <div class="text-xs text-zinc-500">JPEG, PNG, WebP — up to 5 MB each</div>
+        <div class="text-xs text-muted">JPEG, PNG, WebP — up to 5 MB each</div>
       }
       <input
         type="file"
@@ -33,11 +33,11 @@
 
   <!-- Gallery grid -->
   @if (images().length === 0) {
-    <div class="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-6 py-10 text-center">
-      <lucide-icon name="image" class="mx-auto mb-2 h-6 w-6 text-zinc-300"></lucide-icon>
-      <div class="text-sm text-zinc-600">No images uploaded yet.</div>
+    <div class="rounded-xl border border-dashed border-subtle bg-surface-2 px-6 py-10 text-center">
+      <lucide-icon name="image" class="mx-auto mb-2 h-6 w-6 text-faint"></lucide-icon>
+      <div class="text-sm text-muted">No images uploaded yet.</div>
       @if (!readonly()) {
-        <div class="mt-1 text-xs text-zinc-400">
+        <div class="mt-1 text-xs text-faint">
           Drag files onto the panel above, or click it to browse.
         </div>
       }
@@ -53,7 +53,7 @@
         <div
           cdkDrag
           [cdkDragDisabled]="readonly()"
-          class="group relative aspect-square overflow-hidden rounded-lg bg-zinc-100 ring-1 ring-zinc-200"
+          class="group relative aspect-square overflow-hidden rounded-lg bg-surface-2 ring-1 border-subtle"
         >
           <img
             [src]="imgSrc(img)"
@@ -75,7 +75,7 @@
           @if (!readonly() && images().length > 1) {
             <span
               cdkDragHandle
-              class="absolute right-2 top-2 inline-flex h-7 w-7 cursor-grab items-center justify-center rounded-full bg-white/90 text-zinc-600 opacity-0 shadow-sm ring-1 ring-zinc-200 transition group-hover:opacity-100 active:cursor-grabbing"
+              class="absolute right-2 top-2 inline-flex h-7 w-7 cursor-grab items-center justify-center rounded-full bg-surface/90 text-muted opacity-0 shadow-sm ring-1 border-subtle transition group-hover:opacity-100 active:cursor-grabbing"
               aria-label="Reorder handle"
             >
               <lucide-icon name="grip-vertical" class="h-4 w-4"></lucide-icon>
@@ -91,7 +91,7 @@
                 <button
                   type="button"
                   (click)="setFeatured(img)"
-                  class="pointer-events-auto inline-flex items-center gap-1 rounded-md bg-white/95 px-2 py-1 text-xs font-medium text-zinc-800 shadow-sm hover:bg-white"
+                  class="pointer-events-auto inline-flex items-center gap-1 rounded-md bg-surface/95 px-2 py-1 text-xs font-medium text-default shadow-sm hover:bg-surface"
                 >
                   <lucide-icon name="star" class="h-3 w-3"></lucide-icon>
                   Feature
@@ -100,7 +100,7 @@
               <button
                 type="button"
                 (click)="requestDelete(img)"
-                class="pointer-events-auto inline-flex items-center gap-1 rounded-md bg-white/95 px-2 py-1 text-xs font-medium text-rose-700 shadow-sm hover:bg-white"
+                class="pointer-events-auto inline-flex items-center gap-1 rounded-md bg-surface/95 px-2 py-1 text-xs font-medium text-rose-700 shadow-sm hover:bg-surface"
               >
                 <lucide-icon name="trash-2" class="h-3 w-3"></lucide-icon>
                 Delete
@@ -115,18 +115,18 @@
   <!-- Delete confirmation modal -->
   @if (imageForConfirm() !== null) {
     <div
-      class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/40 p-4"
+      class="fixed inset-0 z-40 flex items-center justify-center bg-accent/40 p-4"
       role="dialog"
       aria-modal="true"
     >
-      <div class="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
-        <h3 class="text-sm font-semibold text-zinc-900">Delete this image?</h3>
-        <p class="mt-1 text-xs text-zinc-500">This cannot be undone.</p>
+      <div class="w-full max-w-sm rounded-xl bg-surface p-5 shadow-xl">
+        <h3 class="text-sm font-semibold text-default">Delete this image?</h3>
+        <p class="mt-1 text-xs text-muted">This cannot be undone.</p>
         <div class="mt-4 flex items-center justify-end gap-2">
           <button
             type="button"
             (click)="cancelDelete()"
-            class="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+            class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
           >
             Cancel
           </button>

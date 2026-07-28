@@ -49,13 +49,13 @@ import { ReportGranularity, ReportRange } from './whatsapp-reports.service';
     <div class="space-y-4 p-4">
       <header class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 class="text-xl font-semibold text-zinc-900">WhatsApp reports</h1>
-          <p class="text-xs text-zinc-500">Is WhatsApp working? Who's responding fastest?</p>
+          <h1 class="text-xl font-semibold text-default">WhatsApp reports</h1>
+          <p class="text-xs text-muted">Is WhatsApp working? Who's responding fastest?</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
           <div
-            class="inline-flex items-center rounded-md border border-zinc-300 bg-white p-0.5 text-xs"
+            class="inline-flex items-center rounded-md border border-subtle bg-surface p-0.5 text-xs"
             role="tablist"
             aria-label="Date range"
           >
@@ -65,7 +65,7 @@ import { ReportGranularity, ReportRange } from './whatsapp-reports.service';
                 role="tab"
                 [class]="
                   'rounded px-2.5 py-1 ' +
-                  (range() === r.key ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100')
+                  (range() === r.key ? 'bg-accent text-white' : 'text-default hover:bg-surface-2')
                 "
                 (click)="setRange(r.key)"
               >
@@ -75,7 +75,7 @@ import { ReportGranularity, ReportRange } from './whatsapp-reports.service';
           </div>
 
           <div
-            class="inline-flex items-center rounded-md border border-zinc-300 bg-white p-0.5 text-xs"
+            class="inline-flex items-center rounded-md border border-subtle bg-surface p-0.5 text-xs"
             role="tablist"
             aria-label="Granularity"
           >
@@ -87,8 +87,8 @@ import { ReportGranularity, ReportRange } from './whatsapp-reports.service';
                 [class]="
                   'rounded px-2.5 py-1 ' +
                   (granularity() === g.key
-                    ? 'bg-zinc-900 text-white'
-                    : 'text-zinc-700 hover:bg-zinc-100') +
+                    ? 'bg-accent text-white'
+                    : 'text-default hover:bg-surface-2') +
                   (granularityDisabled(g.key) ? ' cursor-not-allowed opacity-40' : '')
                 "
                 (click)="setGranularity(g.key)"

@@ -46,18 +46,18 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, NgApexchartsModule],
   template: `
-    <div class="rounded-md border border-zinc-200 bg-white p-4">
+    <div class="rounded-md border border-subtle bg-surface p-4">
       <div class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">
             First staff response time
           </p>
-          <p class="text-[11px] text-zinc-500">
+          <p class="text-[11px] text-muted">
             Time from a customer's first inbound to a human agent's first reply.
           </p>
         </div>
         @if (loading()) {
-          <span class="text-[11px] text-zinc-500">Loading…</span>
+          <span class="text-[11px] text-muted">Loading…</span>
         }
       </div>
 
@@ -67,28 +67,28 @@ import {
         </p>
       } @else if (report(); as r) {
         <div class="mb-4 grid grid-cols-3 gap-2">
-          <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p class="text-[10px] uppercase text-zinc-500">Median</p>
-            <p class="text-lg font-semibold text-zinc-900">
+          <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
+            <p class="text-[10px] uppercase text-muted">Median</p>
+            <p class="text-lg font-semibold text-default">
               {{ formatDuration(r.overall_median_seconds) }}
             </p>
           </div>
-          <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p class="text-[10px] uppercase text-zinc-500">p95</p>
-            <p class="text-lg font-semibold text-zinc-900">
+          <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
+            <p class="text-[10px] uppercase text-muted">p95</p>
+            <p class="text-lg font-semibold text-default">
               {{ formatDuration(r.overall_p95_seconds) }}
             </p>
           </div>
-          <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p class="text-[10px] uppercase text-zinc-500">Samples</p>
-            <p class="text-lg font-semibold text-zinc-900">
+          <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
+            <p class="text-[10px] uppercase text-muted">Samples</p>
+            <p class="text-lg font-semibold text-default">
               {{ r.sample_size }}
             </p>
           </div>
         </div>
 
         @if (r.sample_size === 0) {
-          <p class="py-6 text-center text-xs text-zinc-500">
+          <p class="py-6 text-center text-xs text-muted">
             No customer-to-agent replies in this window.
           </p>
         } @else {
@@ -106,12 +106,12 @@ import {
 
           @if (r.groups.length > 0) {
             <div class="mt-4">
-              <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
                 Per-agent
               </p>
               <table class="w-full text-xs">
-                <thead class="text-zinc-500">
-                  <tr class="border-b border-zinc-200">
+                <thead class="text-muted">
+                  <tr class="border-b border-subtle">
                     <th class="py-1 text-left font-medium">Agent</th>
                     <th class="py-1 text-right font-medium">Median</th>
                     <th class="py-1 text-right font-medium">p95</th>
@@ -120,15 +120,15 @@ import {
                 </thead>
                 <tbody>
                   @for (g of r.groups; track g.key) {
-                    <tr class="border-b border-zinc-100 last:border-0">
-                      <td class="py-1 text-zinc-800">{{ g.label }}</td>
-                      <td class="py-1 text-right text-zinc-700">
+                    <tr class="border-b border-subtle last:border-0">
+                      <td class="py-1 text-default">{{ g.label }}</td>
+                      <td class="py-1 text-right text-default">
                         {{ formatDuration(g.median_seconds) }}
                       </td>
-                      <td class="py-1 text-right text-zinc-700">
+                      <td class="py-1 text-right text-default">
                         {{ formatDuration(g.p95_seconds) }}
                       </td>
-                      <td class="py-1 text-right text-zinc-700">
+                      <td class="py-1 text-right text-default">
                         {{ g.sample_size }}
                       </td>
                     </tr>
