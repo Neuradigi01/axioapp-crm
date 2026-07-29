@@ -46,9 +46,7 @@ interface UsageRowVM {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
-    <section
-      class="flex h-full flex-col rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
-    >
+    <section class="flex h-full flex-col rounded-xl border border-subtle bg-surface p-6 shadow-sm">
       <div class="flex items-center gap-3">
         <div
           class="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-50 text-violet-600 ring-1 ring-violet-100 dark:bg-violet-950 dark:text-violet-300 dark:ring-violet-900"
@@ -56,46 +54,36 @@ interface UsageRowVM {
           <lucide-icon name="trending-up" size="18" aria-hidden="true"></lucide-icon>
         </div>
         <div>
-          <p
-            class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400"
-          >
-            Usage
-          </p>
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-slate-100">Current period</h2>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">Usage</p>
+          <h2 class="text-base font-semibold text-default">Current period</h2>
         </div>
       </div>
 
       @if (viewRows().length === 0) {
-        <p class="mt-6 text-sm text-zinc-500 dark:text-slate-400">
-          No metered resources on your plan.
-        </p>
+        <p class="mt-6 text-sm text-muted">No metered resources on your plan.</p>
       } @else {
         <div class="mt-5 space-y-4">
           @for (row of viewRows(); track row.label) {
             <div>
               <div class="flex items-center justify-between text-sm">
-                <span class="font-medium text-zinc-700 dark:text-slate-200">
+                <span class="font-medium text-default">
                   {{ row.label }}
                 </span>
-                <span class="tabular-nums text-zinc-600 dark:text-slate-300">
+                <span class="tabular-nums text-muted">
                   {{ row.countDisplay }}
                   @if (row.showBar) {
-                    <span class="ml-1 text-xs text-zinc-400 dark:text-slate-500">
-                      ({{ row.percent }}%)
-                    </span>
+                    <span class="ml-1 text-xs text-faint"> ({{ row.percent }}%) </span>
                   }
                 </span>
               </div>
 
               @if (row.showBar) {
-                <div
-                  class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-slate-700"
-                >
+                <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
                   <div
                     class="h-full rounded-full transition-all"
                     [class.bg-emerald-500]="row.tone === 'green'"
                     [class.bg-amber-500]="row.tone === 'yellow'"
-                    [class.bg-rose-500]="row.tone === 'red'"
+                    [class.bg-red-500]="row.tone === 'red'"
                     [style.width.%]="row.percent"
                   ></div>
                 </div>
@@ -104,9 +92,7 @@ interface UsageRowVM {
                   Unlimited
                 </p>
               } @else {
-                <p class="mt-1 text-xs text-zinc-500 dark:text-slate-400">
-                  Not included on your plan
-                </p>
+                <p class="mt-1 text-xs text-muted">Not included on your plan</p>
               }
             </div>
           }

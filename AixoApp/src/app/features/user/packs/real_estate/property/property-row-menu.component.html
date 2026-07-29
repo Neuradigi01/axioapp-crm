@@ -5,7 +5,7 @@
     [attr.aria-expanded]="open()"
     aria-haspopup="menu"
     aria-label="Actions"
-    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-default focus:outline-none focus:ring-2 focus:border-subtle"
   >
     <lucide-icon name="more-vertical" class="h-4 w-4"></lucide-icon>
   </button>
@@ -14,7 +14,7 @@
     <div
       role="menu"
       (click)="$event.stopPropagation()"
-      class="absolute right-0 z-30 mt-1 w-56 origin-top-right rounded-md border border-zinc-200 bg-white shadow-lg ring-1 ring-black/5"
+      class="absolute right-0 z-30 mt-1 w-56 origin-top-right rounded-md border border-subtle bg-surface shadow-lg ring-1 ring-black/5"
     >
       <ul class="py-1 text-sm">
         @for (action of actions(); track action.key) {
@@ -28,9 +28,9 @@
                   ? 'Add at least one image to publish.'
                   : action.label
               "
-              [class.text-rose-700]="action.destructive"
-              [class.hover:bg-rose-50]="action.destructive"
-              class="flex w-full items-center gap-2 px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              [class.text-red-400]="action.destructive"
+              [class.hover:bg-red-500/10]="action.destructive"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <lucide-icon [name]="action.icon" class="h-4 w-4"></lucide-icon>
               {{ action.label }}
@@ -45,25 +45,25 @@
 <!-- Delete / Archive confirmation modal -->
 @if (pendingMessage(); as msg) {
   <div
-    class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/40 p-4"
+    class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
     role="dialog"
     aria-modal="true"
   >
-    <div class="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
-      <h3 class="text-sm font-semibold text-zinc-900">{{ msg.title }}</h3>
-      <p class="mt-1 text-xs text-zinc-500">{{ msg.body }}</p>
+    <div class="w-full max-w-sm rounded-xl bg-surface p-5 shadow-xl">
+      <h3 class="text-sm font-semibold text-default">{{ msg.title }}</h3>
+      <p class="mt-1 text-xs text-muted">{{ msg.body }}</p>
       <div class="mt-4 flex items-center justify-end gap-2">
         <button
           type="button"
           (click)="cancelPending()"
-          class="rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
         >
           Cancel
         </button>
         <button
           type="button"
           (click)="confirmPending()"
-          class="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-700"
+          class="rounded-md bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-400"
         >
           {{ msg.confirm }}
         </button>
@@ -75,13 +75,13 @@
 <!-- Clipboard fallback modal (older browsers) -->
 @if (clipboardFallbackUrl(); as url) {
   <div
-    class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/40 p-4"
+    class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
     role="dialog"
     aria-modal="true"
   >
-    <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-      <h3 class="text-sm font-semibold text-zinc-900">Public URL</h3>
-      <p class="mt-1 text-xs text-zinc-500">
+    <div class="w-full max-w-md rounded-xl bg-surface p-5 shadow-xl">
+      <h3 class="text-sm font-semibold text-default">Public URL</h3>
+      <p class="mt-1 text-xs text-muted">
         Your browser blocked clipboard access. Copy the URL manually below.
       </p>
       <input
@@ -89,13 +89,13 @@
         [value]="url"
         readonly
         (focus)="$event.target && $any($event.target).select()"
-        class="mt-3 w-full rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-900"
+        class="mt-3 w-full rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs text-default"
       />
       <div class="mt-4 flex items-center justify-end">
         <button
           type="button"
           (click)="dismissClipboardFallback()"
-          class="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
+          class="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-95"
         >
           Done
         </button>

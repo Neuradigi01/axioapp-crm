@@ -48,7 +48,7 @@ function buildPath(sx: number, sy: number, tx: number, ty: number): string {
         <svg:foreignObject [attr.x]="midX() - 40" [attr.y]="midY() - 12" width="80" height="24">
           <div class="flex justify-center">
             <span
-              class="px-2 py-0.5 rounded-full bg-white border border-zinc-300 text-[10px] text-zinc-700 shadow-sm"
+              class="px-2 py-0.5 rounded-full bg-surface border border-subtle text-[10px] text-default shadow-sm"
             >
               {{ edge().label }}
             </span>

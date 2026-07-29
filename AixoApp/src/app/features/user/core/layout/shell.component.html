@@ -1,4 +1,4 @@
-<div class="flex min-h-screen bg-zinc-50">
+<div class="flex min-h-screen bg-app text-default">
   @if (mobileMenuOpen()) {
     <div
       class="fixed inset-0 z-40 bg-black/50 md:hidden"
@@ -16,7 +16,7 @@
   />
 
   <div class="flex min-w-0 flex-1 flex-col">
-    <app-header (toggleSidebar)="toggleMobileMenu()" />
+    <app-header (toggleSidebar)="toggleMobileMenu()" (openPalette)="openPalette()" />
     <crm-trial-banner />
     <main class="flex-1 overflow-x-hidden">
       <router-outlet />
@@ -26,4 +26,5 @@
 
 <app-quick-add-fab />
 <app-toast-host />
+<app-command-palette #palette />
 <crm-upgrade-modal />

@@ -2,7 +2,7 @@
   <div>
     <a
       routerLink="/user/billing"
-      class="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-900"
+      class="inline-flex items-center gap-1 text-xs text-muted hover:text-default"
     >
       <lucide-icon name="chevron-left" class="h-3.5 w-3.5" />
       Back to invoices
@@ -12,22 +12,22 @@
   @if (loadError(); as err) {
     <p class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{{ err }}</p>
   } @else if (loading() && !invoice()) {
-    <div class="h-40 animate-pulse rounded-lg bg-zinc-100"></div>
+    <div class="h-40 animate-pulse rounded-lg bg-surface-2"></div>
   } @else if (invoice(); as inv) {
     <!-- Header -->
-    <header class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+    <header class="rounded-lg border border-subtle bg-surface p-5 shadow-sm">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 class="text-lg font-semibold text-zinc-900">{{ invoiceNumber() }}</h1>
-          <p class="mt-1 text-xs text-zinc-500">
+          <h1 class="text-lg font-semibold text-default">{{ invoiceNumber() }}</h1>
+          <p class="mt-1 text-xs text-muted">
             {{ contactName() ?? 'Walk-in customer' }}
             @if (contactPhone(); as ph) {
-              <span class="ml-1 text-zinc-400">·</span>
+              <span class="ml-1 text-faint">·</span>
               <span class="ml-1">{{ ph }}</span>
             }
           </p>
           @if (inv.gst_number) {
-            <p class="mt-1 text-[11px] text-zinc-500">GSTIN: {{ inv.gst_number }}</p>
+            <p class="mt-1 text-[11px] text-muted">GSTIN: {{ inv.gst_number }}</p>
           }
         </div>
         <div class="flex items-center gap-2">
@@ -43,7 +43,7 @@
             [href]="pdfHref()"
             target="_blank"
             rel="noopener"
-            class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
           >
             <lucide-icon name="printer" class="h-4 w-4" />
             Print / PDF
@@ -53,30 +53,30 @@
 
       <dl class="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
         <div>
-          <dt class="text-[11px] uppercase tracking-wide text-zinc-500">Issued</dt>
-          <dd class="mt-0.5 text-zinc-900">{{ formatDateTime(inv.issued_at) }}</dd>
+          <dt class="text-[11px] uppercase tracking-wide text-muted">Issued</dt>
+          <dd class="mt-0.5 text-default">{{ formatDateTime(inv.issued_at) }}</dd>
         </div>
         <div>
-          <dt class="text-[11px] uppercase tracking-wide text-zinc-500">Paid</dt>
-          <dd class="mt-0.5 text-zinc-900">{{ formatDateTime(inv.paid_at) }}</dd>
+          <dt class="text-[11px] uppercase tracking-wide text-muted">Paid</dt>
+          <dd class="mt-0.5 text-default">{{ formatDateTime(inv.paid_at) }}</dd>
         </div>
         <div>
-          <dt class="text-[11px] uppercase tracking-wide text-zinc-500">Method</dt>
-          <dd class="mt-0.5 text-zinc-900">{{ paymentLabel(inv.payment_method) }}</dd>
+          <dt class="text-[11px] uppercase tracking-wide text-muted">Method</dt>
+          <dd class="mt-0.5 text-default">{{ paymentLabel(inv.payment_method) }}</dd>
         </div>
         <div>
-          <dt class="text-[11px] uppercase tracking-wide text-zinc-500">Tax @</dt>
-          <dd class="mt-0.5 text-zinc-900">{{ inv.tax_rate_snapshot ?? '—' }}%</dd>
+          <dt class="text-[11px] uppercase tracking-wide text-muted">Tax @</dt>
+          <dd class="mt-0.5 text-default">{{ inv.tax_rate_snapshot ?? '—' }}%</dd>
         </div>
       </dl>
     </header>
 
     <!-- Line items -->
-    <section class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-      <h2 class="text-sm font-semibold text-zinc-900">Line items</h2>
-      <div class="mt-3 overflow-hidden rounded-md ring-1 ring-zinc-200">
-        <table class="min-w-full divide-y divide-zinc-200 text-sm">
-          <thead class="bg-zinc-50 text-[11px] uppercase tracking-wide text-zinc-500">
+    <section class="rounded-lg border border-subtle bg-surface p-5 shadow-sm">
+      <h2 class="text-sm font-semibold text-default">Line items</h2>
+      <div class="mt-3 overflow-hidden rounded-md ring-1 border-subtle">
+        <table class="min-w-full divide-y divide-subtle text-sm">
+          <thead class="bg-surface-2 text-[11px] uppercase tracking-wide text-muted">
             <tr>
               <th class="px-3 py-2 text-left font-medium">Description</th>
               <th class="px-3 py-2 text-right font-medium">Qty</th>
@@ -86,17 +86,17 @@
               <th class="px-3 py-2 text-right font-medium">Total</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-zinc-100">
+          <tbody class="divide-y divide-subtle">
             @for (l of inv.lines; track l.id) {
               <tr>
-                <td class="px-3 py-2 text-zinc-900">{{ l.description }}</td>
-                <td class="px-3 py-2 text-right text-zinc-800">{{ l.qty }}</td>
-                <td class="px-3 py-2 text-right text-zinc-800">{{ l.unit_price | formatINR }}</td>
-                <td class="px-3 py-2 text-right text-zinc-800">
+                <td class="px-3 py-2 text-default">{{ l.description }}</td>
+                <td class="px-3 py-2 text-right text-default">{{ l.qty }}</td>
+                <td class="px-3 py-2 text-right text-default">{{ l.unit_price | formatINR }}</td>
+                <td class="px-3 py-2 text-right text-default">
                   {{ l.line_subtotal | formatINR }}
                 </td>
-                <td class="px-3 py-2 text-right text-zinc-600">{{ l.tax_pct }}%</td>
-                <td class="px-3 py-2 text-right font-medium text-zinc-900">
+                <td class="px-3 py-2 text-right text-muted">{{ l.tax_pct }}%</td>
+                <td class="px-3 py-2 text-right font-medium text-default">
                   {{ l.line_total | formatINR }}
                 </td>
               </tr>
@@ -108,43 +108,43 @@
       <!-- Totals -->
       <div class="mt-4 ml-auto w-full max-w-xs space-y-1 text-sm">
         <div class="flex justify-between">
-          <span class="text-zinc-500">Subtotal</span>
-          <span class="text-zinc-900">{{ inv.subtotal | formatINR }}</span>
+          <span class="text-muted">Subtotal</span>
+          <span class="text-default">{{ inv.subtotal | formatINR }}</span>
         </div>
         <div class="flex justify-between">
-          <span class="text-zinc-500">Tax ({{ inv.tax_rate_snapshot ?? 0 }}%)</span>
-          <span class="text-zinc-900">{{ inv.tax_amount | formatINR }}</span>
+          <span class="text-muted">Tax ({{ inv.tax_rate_snapshot ?? 0 }}%)</span>
+          <span class="text-default">{{ inv.tax_amount | formatINR }}</span>
         </div>
         <div class="flex justify-between">
-          <span class="text-zinc-500">Discount</span>
+          <span class="text-muted">Discount</span>
           <span class="text-amber-700">- {{ inv.discount_amount | formatINR }}</span>
         </div>
-        <div class="mt-1 flex justify-between border-t border-zinc-200 pt-1">
-          <span class="font-semibold text-zinc-900">Total</span>
-          <span class="text-lg font-semibold text-zinc-900">{{ inv.total | formatINR }}</span>
+        <div class="mt-1 flex justify-between border-t border-subtle pt-1">
+          <span class="font-semibold text-default">Total</span>
+          <span class="text-lg font-semibold text-default">{{ inv.total | formatINR }}</span>
         </div>
       </div>
     </section>
 
     <!-- Payments -->
-    <section class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-      <h2 class="text-sm font-semibold text-zinc-900">Payments</h2>
+    <section class="rounded-lg border border-subtle bg-surface p-5 shadow-sm">
+      <h2 class="text-sm font-semibold text-default">Payments</h2>
       @if (payments().length === 0) {
-        <p class="mt-3 text-xs text-zinc-500">No payments recorded.</p>
+        <p class="mt-3 text-xs text-muted">No payments recorded.</p>
       } @else {
-        <ul class="mt-3 divide-y divide-zinc-100 text-sm">
+        <ul class="mt-3 divide-y divide-subtle text-sm">
           @for (p of payments(); track p.id) {
             <li class="flex items-center justify-between py-2">
               <div>
-                <p class="text-zinc-900">
+                <p class="text-default">
                   <span class="font-medium">{{ p.amount | formatINR }}</span>
                   <span
-                    class="ml-2 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-zinc-700"
+                    class="ml-2 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium uppercase text-default"
                   >
                     {{ p.method }}
                   </span>
                 </p>
-                <p class="text-[11px] text-zinc-500">
+                <p class="text-[11px] text-muted">
                   {{ formatDateTime(p.received_at) }}
                   @if (p.reference) {
                     · ref {{ p.reference }}
@@ -158,9 +158,9 @@
     </section>
 
     @if (inv.notes) {
-      <section class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 class="text-sm font-semibold text-zinc-900">Notes</h2>
-        <p class="mt-2 whitespace-pre-line text-sm text-zinc-700">{{ inv.notes }}</p>
+      <section class="rounded-lg border border-subtle bg-surface p-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-default">Notes</h2>
+        <p class="mt-2 whitespace-pre-line text-sm text-default">{{ inv.notes }}</p>
       </section>
     }
   }

@@ -1,17 +1,26 @@
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-  <div class="w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
-    <header class="border-b border-zinc-200 px-5 py-3">
-      <h2 class="text-sm font-semibold text-zinc-900">{{ title }}</h2>
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+  style="animation: fadeIn 0.12s ease"
+>
+  <div
+    class="w-full max-w-md overflow-hidden rounded-2xl border border-subtle bg-surface-2 shadow-elevated"
+    style="animation: popIn 0.12s ease"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-labelledby]="'confirm-title'"
+  >
+    <header class="border-b border-subtle px-5 py-4">
+      <h2 id="confirm-title" class="font-display text-base font-semibold text-default">
+        {{ title }}
+      </h2>
     </header>
     @if (body) {
-      <div class="px-5 py-4 text-sm text-zinc-700">{{ body }}</div>
+      <div class="px-5 py-4 text-[13.5px] text-muted">{{ body }}</div>
     }
-    <footer
-      class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3 rounded-b-lg"
-    >
+    <footer class="flex items-center justify-end gap-2 border-t border-subtle px-5 py-4">
       <button
         type="button"
-        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        class="btn btn-secondary"
         [disabled]="submitting"
         (click)="cancel.emit()"
       >
@@ -21,11 +30,7 @@
         type="button"
         [disabled]="submitting"
         (click)="confirm.emit()"
-        [class]="
-          danger
-            ? 'rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-400'
-            : 'rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400'
-        "
+        [class]="danger ? 'btn btn-primary bg-red-500 border-red-500' : 'btn btn-primary'"
       >
         {{ confirmLabel }}
       </button>

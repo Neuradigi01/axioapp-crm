@@ -1,44 +1,44 @@
 <form [formGroup]="form()" class="flex flex-col gap-3">
   <label class="block">
-    <span class="text-xs font-medium text-zinc-700">Subject</span>
+    <span class="text-xs font-medium text-default">Subject</span>
     <input
       type="text"
       formControlName="subject"
       maxlength="998"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
       placeholder="e.g. Welcome to {{ '{' + '{' + 'org.name' + '}' + '}' }}"
     />
   </label>
 
   <label class="block">
-    <span class="text-xs font-medium text-zinc-700">
+    <span class="text-xs font-medium text-default">
       Preview text
-      <span class="text-zinc-400">(the line Gmail / Outlook shows after the subject)</span>
+      <span class="text-faint">(the line Gmail / Outlook shows after the subject)</span>
     </span>
     <input
       type="text"
       formControlName="preview_text"
       maxlength="190"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
     />
   </label>
 
   <label class="block">
-    <span class="text-xs font-medium text-zinc-700">Plain-text body</span>
+    <span class="text-xs font-medium text-default">Plain-text body</span>
     <textarea
       formControlName="body_text"
       maxlength="65535"
       rows="8"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-mono focus:border-zinc-500 focus:outline-none"
+      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-mono focus:border-muted focus:outline-none"
       placeholder="Hi {{ '{' + '{' + 'contact.first_name' + '}' + '}' }}, …"
     ></textarea>
-    <p class="mt-1 text-[10px] text-zinc-400">
+    <p class="mt-1 text-[10px] text-faint">
       Optional when an HTML body is provided — the backend derives the plain-text fallback
       automatically. Variables like
-      <code class="rounded bg-zinc-100 px-1 py-0.5 font-mono">{{
+      <code class="rounded bg-surface-2 px-1 py-0.5 font-mono">{{
         '{' + '{' + 'contact.first_name' + '}' + '}'
       }}</code>
       resolve at send time.
@@ -50,12 +50,12 @@
        Angular's built-in sanitiser. Merge-tag inserter in the toolbar. -->
   <div class="block">
     <div class="mb-1 flex items-center justify-between text-xs">
-      <span class="font-medium text-zinc-700">HTML body</span>
-      <label class="flex items-center gap-1 text-[10px] text-zinc-500">
+      <span class="font-medium text-default">HTML body</span>
+      <label class="flex items-center gap-1 text-[10px] text-muted">
         <input
           type="checkbox"
           formControlName="body_text_fallback_auto"
-          class="rounded border-zinc-300"
+          class="rounded border-subtle"
         />
         Auto-derive plain-text fallback from this HTML
       </label>

@@ -10,8 +10,7 @@ import { ChangeDetectionStrategy, Component, inject, input, output } from '@angu
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
-// Same shape the backend enforces in `email_sender_setup/schemas.py`.
-const DOMAIN_PATTERN = /^(?=.{1,253}$)(?:(?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+(?:[A-Za-z]{2,63})$/;
+import { commonValidators } from '../../shared/validators';
 
 @Component({
   selector: 'app-sender-add-domain-modal',
@@ -32,11 +31,14 @@ export class AddDomainModalComponent {
   } = {
     domain: this.fb.control<string>('', {
       nonNullable: true,
+      // Apex-only: `example.com` OK, `mail.example.com` rejected. DKIM
+      // subdomains are handled server-side; this modal only takes the
+      // top-level org domain.
       validators: [
         Validators.required,
         Validators.minLength(3),
         Validators.maxLength(253),
-        Validators.pattern(DOMAIN_PATTERN),
+        commonValidators.hostnameApex,
       ],
     }),
   };

@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -17,14 +17,14 @@ import { extractApiError } from '@core/services/api-error.util';
 import { StaffApiService, StaffWithPerformance } from '../staff-api.service';
 
 /**
- * Targets & Commission tab â€” table of staff with an inline editor.
+ * Targets & Commission tab — table of staff with an inline editor.
  *
- * Click "Edit" on a row â†’ that row expands with three numeric inputs
- * (commission %, monthly target â‚¹, rating). Hitting Save fires PUT
+ * Click "Edit" on a row → that row expands with three numeric inputs
+ * (commission %, monthly target ₹, rating). Hitting Save fires PUT
  * /staff/{user_id} and emits `saved` so the parent reloads the joined
  * list.
  *
- * Only one row is editable at a time â€” picking another row collapses
+ * Only one row is editable at a time — picking another row collapses
  * the previous one.
  */
 @Component({

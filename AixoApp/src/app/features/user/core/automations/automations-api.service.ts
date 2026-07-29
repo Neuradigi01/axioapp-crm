@@ -116,11 +116,61 @@ export interface RunListQuery {
   offset?: number;
 }
 
+/**
+ * Filter-field metadata surfaced by the backend for the customer-
+ * friendly condition builder (tasks/automation-conditions/ Step 1).
+ * `enum_resolver` names a resolver key from step-2's registry —
+ * `null` on non-enum types.
+ */
+export type FieldSpecType =
+  | 'text'
+  | 'number'
+  | 'currency'
+  | 'date'
+  | 'datetime'
+  | 'boolean'
+  | 'enum';
+
+export interface FieldSpec {
+  path: string;
+  label: string;
+  type: FieldSpecType;
+  group: string;
+  enum_resolver: string | null;
+  help_text: string | null;
+}
+
 export interface EventCatalogEntry {
   event_type: string;
   label: string;
   description: string;
   sample_payload: Record<string, unknown>;
+  condition_fields: FieldSpec[];
+}
+
+/** One row in the value dropdown returned by step-2's live enum
+ *  resolver endpoint. Matches `core.automation.enum_resolvers.EnumOption`. */
+export interface EnumOption {
+  value: string;
+  label: string;
+}
+
+/** Response shape for step-5's matched-events preview
+ *  (`POST /event-types/{event}/preview-matches`).
+ *
+ *  - `source: 'runs'` — scanned `tbl_automation_runs`; `matched` is
+ *    exact unless `truncated`.
+ *  - `source: 'none'` — no historical rows in the window; frontend
+ *    renders the "no historical events available" hint instead of
+ *    a misleading zero-count.
+ *  - `truncated: true` — hit the 500-row cap; render "at least N".
+ */
+export interface PreviewMatchesResult {
+  matched: number;
+  scanned: number;
+  window_days: number;
+  source: 'runs' | 'none';
+  truncated: boolean;
 }
 
 export interface DryRunResult {
@@ -186,6 +236,37 @@ export class AutomationsApiService {
 
   listEventTypes(): Observable<EventCatalogEntry[]> {
     return this.http.get<EventCatalogEntry[]>(`${this.base}/event-types`);
+  }
+
+  /** tasks/automation-conditions/ Step 2 — fetch the caller org's
+   *  live options for one enum-typed field on one event. Powers the
+   *  condition-builder's Value dropdown for pipeline stages / lead
+   *  sources / users / etc. Errors:
+   *    - 404 `automation.event_not_found` — event isn't in the catalog.
+   *    - 404 `automation.field_not_found` — field isn't in the event's `condition_fields`.
+   *    - 422 `automation.field_not_enum`  — field's type isn't `enum`.
+   *  Zero-rows is NOT an error — the frontend renders a "no options" hint. */
+  listFieldValues(eventType: string, field: string): Observable<EnumOption[]> {
+    return this.http.post<EnumOption[]>(
+      `${this.base}/event-types/${encodeURIComponent(eventType)}/field-values`,
+      { field },
+    );
+  }
+
+  /** tasks/automation-conditions/ Step 5 — count how many
+   *  historical events in the last `windowDays` would match the
+   *  customer's draft condition. Informational only; no dispatch,
+   *  no side effects. Fires from the condition builder on a
+   *  debounced AST change. */
+  previewMatches(
+    eventType: string,
+    conditions: Record<string, unknown>,
+    windowDays: number = 7,
+  ): Observable<PreviewMatchesResult> {
+    return this.http.post<PreviewMatchesResult>(
+      `${this.base}/event-types/${encodeURIComponent(eventType)}/preview-matches`,
+      { conditions, window_days: windowDays },
+    );
   }
 
   /** Step 8 — run the dispatcher path against a paste-in payload

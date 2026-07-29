@@ -53,21 +53,21 @@ export interface ContextMenuItem {
     >
       <div
         #menu
-        class="absolute min-w-[168px] py-1 bg-white border border-zinc-200 rounded-lg shadow-lg text-sm text-zinc-700 select-none"
+        class="absolute min-w-[168px] py-1 bg-surface border border-subtle rounded-lg shadow-lg text-sm text-default select-none"
         [style.left.px]="pos().left"
         [style.top.px]="pos().top"
         (contextmenu)="$event.preventDefault()"
       >
         @for (item of items(); track item.id) {
           @if (item.separatorBefore) {
-            <div class="my-1 h-px bg-zinc-100"></div>
+            <div class="my-1 h-px bg-surface-2"></div>
           }
           <button
             type="button"
             class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            [class.text-rose-600]="item.danger && !item.disabled"
-            [class.hover:bg-rose-50]="item.danger && !item.disabled"
-            [class.hover:bg-zinc-100]="!item.danger && !item.disabled"
+            [class.text-red-500]="item.danger && !item.disabled"
+            [class.hover:bg-red-500/10]="item.danger && !item.disabled"
+            [class.hover:bg-surface-2]="!item.danger && !item.disabled"
             [disabled]="item.disabled"
             (click)="onSelect(item)"
           >

@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -178,7 +178,7 @@ export class FieldVisitDetailPageComponent {
           this.completing.set(false);
           this.visit.set(updated);
           this.completeOpen.set(false);
-          // Appointment status flipped server-side â€” re-fetch to reflect.
+          // Appointment status flipped server-side — re-fetch to reflect.
           this.loadAppointment(updated.appointment_id);
         },
         error: (err: HttpErrorResponse) => {
@@ -218,7 +218,7 @@ export class FieldVisitDetailPageComponent {
   }
 
   protected formatDateTime(iso: string | null | undefined): string {
-    if (!iso) return 'â€”';
+    if (!iso) return '—';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleString('en-IN', {

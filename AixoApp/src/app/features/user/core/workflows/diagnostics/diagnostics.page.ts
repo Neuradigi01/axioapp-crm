@@ -144,6 +144,6 @@ export class WorkflowDiagnosticsPageComponent {
     if (entry.eligible) {
       return 'border-emerald-200 bg-emerald-50/40';
     }
-    return 'border-zinc-200 bg-white';
+    return 'border-subtle bg-surface';
   }
 }

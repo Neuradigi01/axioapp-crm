@@ -100,15 +100,15 @@ export class WorkflowRunDetailPageComponent {
       case 'skipped':
         return 'bg-amber-100 text-amber-800';
       case 'errored':
-        return 'bg-rose-100 text-rose-800';
+        return 'bg-red-500/10 text-red-400';
       case 'running':
         return 'bg-sky-100 text-sky-800';
       case 'paused':
         return 'bg-amber-100 text-amber-800';
       case 'canceled':
-        return 'bg-zinc-200 text-zinc-700';
+        return 'bg-surface-2 text-default';
       default:
-        return 'bg-zinc-100 text-zinc-700';
+        return 'bg-surface-2 text-default';
     }
   }
 }

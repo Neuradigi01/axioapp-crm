@@ -30,24 +30,24 @@ export interface VCardAttachment {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, LucideAngularModule],
   template: `
-    <div class="rounded-md border border-zinc-200 bg-white p-2">
+    <div class="rounded-md border border-subtle bg-surface p-2">
       <div class="flex items-start gap-2">
         <div
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600"
+          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted"
         >
           <lucide-icon name="user" class="h-4 w-4" />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-medium text-zinc-900">
+          <p class="truncate text-sm font-medium text-default">
             {{ vcard().formatted_name || vcard().primary_phone || 'Contact' }}
           </p>
           @if (vcard().primary_phone) {
-            <p class="truncate text-xs text-zinc-600">
+            <p class="truncate text-xs text-muted">
               {{ vcard().primary_phone }}
             </p>
           }
           @if (vcard().primary_email) {
-            <p class="truncate text-xs text-zinc-600">
+            <p class="truncate text-xs text-muted">
               {{ vcard().primary_email }}
             </p>
           }
@@ -56,7 +56,7 @@ export interface VCardAttachment {
       <button
         type="button"
         (click)="onAddToContacts()"
-        class="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-md border border-zinc-300 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+        class="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-md border border-subtle bg-surface-2 px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
       >
         <lucide-icon name="user-plus" class="h-3 w-3" />
         Add to contacts

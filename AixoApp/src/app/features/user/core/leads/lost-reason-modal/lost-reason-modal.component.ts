@@ -5,9 +5,13 @@ import {
   Input,
   Output,
   computed,
+  effect,
   signal,
 } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+
+import { commonValidators } from '../../shared/validators';
 
 /**
  * Payload emitted on confirm. Mirrors the backend's `MoveStageRequest`
@@ -63,9 +67,22 @@ export class LostReasonModalComponent {
 
   protected readonly reasonControl = new FormControl<string>('', {
     nonNullable: true,
+    validators: [Validators.required],
   });
   protected readonly otherControl = new FormControl<string>('', {
     nonNullable: true,
+    validators: [commonValidators.maxLength(500)],
+  });
+
+  /** Tracks the reason value so `otherRequired` + `canConfirm` react to
+   * radio changes (a plain `FormControl.value` read inside a `computed`
+   * does not fire — signals need a source that emits on change).
+   */
+  private readonly reasonValue = toSignal(this.reasonControl.valueChanges, {
+    initialValue: this.reasonControl.value,
+  });
+  private readonly otherValue = toSignal(this.otherControl.valueChanges, {
+    initialValue: this.otherControl.value,
   });
 
   protected readonly reasons = [
@@ -76,16 +93,26 @@ export class LostReasonModalComponent {
     { v: 'other', label: 'Other' },
   ] as const;
 
+  /** Pre-emptive guard for the "Other → must type" UX. */
+  protected readonly otherRequired = computed(() => this.reasonValue() === 'other');
+
   protected readonly canConfirm = computed(() => {
     if (this._submitting()) return false;
-    const reason = this.reasonControl.value;
-    if (!reason) return false;
-    if (reason === 'other' && !this.otherControl.value.trim()) return false;
+    if (this.reasonControl.invalid) return false;
+    if (this.otherRequired() && !(this.otherValue() ?? '').trim()) return false;
+    if (this.otherControl.invalid) return false;
     return true;
   });
 
-  /** Pre-emptive guard for the "Other → must type" UX. */
-  protected readonly otherRequired = computed(() => this.reasonControl.value === 'other');
+  constructor() {
+    // Layer `required` on the free-text control only when reason === 'other'.
+    effect(() => {
+      const isOther = this.otherRequired();
+      const base = [commonValidators.maxLength(500)];
+      this.otherControl.setValidators(isOther ? [Validators.required, ...base] : base);
+      this.otherControl.updateValueAndValidity({ emitEvent: false });
+    });
+  }
 
   protected onConfirm(): void {
     if (!this.canConfirm()) return;

@@ -37,6 +37,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { commonValidators } from '../../shared/validators';
 import { EmailAccountsApiService } from '../../services/email-accounts-api.service';
 import {
   CreateSmtpSenderPayload,
@@ -82,15 +83,16 @@ export class AddSenderIdentityModalComponent {
   protected readonly form: FormGroup<SmtpFormShape> = this.fb.group<SmtpFormShape>({
     from_address: this.fb.control<string>('', {
       nonNullable: true,
-      validators: [Validators.required, Validators.email, Validators.maxLength(255)],
+      validators: [Validators.required, commonValidators.email, Validators.maxLength(254)],
     }),
     display_name: this.fb.control<string>('', {
       nonNullable: true,
-      validators: [Validators.maxLength(128)],
+      // Optional. If provided, must match the name shape (blocks digits, emoji, etc.).
+      validators: [commonValidators.name, Validators.maxLength(128)],
     }),
     smtp_host: this.fb.control<string>('', {
       nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(253)],
+      validators: [Validators.required, commonValidators.hostname, Validators.maxLength(253)],
     }),
     smtp_port: this.fb.control<number>(587, {
       nonNullable: true,
@@ -98,13 +100,19 @@ export class AddSenderIdentityModalComponent {
     }),
     smtp_username: this.fb.control<string>('', {
       nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(255)],
+      validators: [Validators.required, Validators.maxLength(254)],
     }),
     smtp_password: this.fb.control<string>('', {
       nonNullable: true,
+      // Kept generous (4096) — enterprise SMTP secrets can exceed the
+      // 256 the spec suggests as a "safe starting point"; matches
+      // pre-existing behaviour to avoid regressing real installs.
       validators: [Validators.required, Validators.maxLength(4096)],
     }),
-    tls_mode: this.fb.control<SmtpTlsMode>('starttls', { nonNullable: true }),
+    tls_mode: this.fb.control<SmtpTlsMode>('starttls', {
+      nonNullable: true,
+      validators: [commonValidators.picklist(['starttls', 'tls', 'none'])],
+    }),
   });
 
   protected readonly isSmtpValid = computed(() => this.form.valid);

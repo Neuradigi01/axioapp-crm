@@ -8,7 +8,7 @@ import { StaffSessionService } from '../staff-session.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * My Dashboard â€” landing tab after PIN login. Six KPI cards from
+ * My Dashboard — landing tab after PIN login. Six KPI cards from
  * `GET /staff-portal/me/performance` (leads converted, leads active,
  * sales-MTD, monthly target, target progress, rating, commission).
  */

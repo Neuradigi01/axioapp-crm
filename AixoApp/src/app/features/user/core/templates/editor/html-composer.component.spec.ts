@@ -46,7 +46,7 @@ describe('HtmlComposerComponent', () => {
     ref.setInput('value', '<p>Preview me</p>');
     fixture.detectChanges();
     const preview = fixture.nativeElement.querySelector(
-      '[class*="border-zinc-200"][class*="bg-white"][class*="p-3"][class*="text-sm"]',
+      '[class*="border-subtle"][class*="bg-surface"][class*="p-3"][class*="text-sm"]',
     ) as HTMLElement | null;
     // Fall back to a broader lookup if the class targeting drifts.
     const previewText = (preview ?? fixture.nativeElement).textContent ?? '';

@@ -30,7 +30,7 @@ import { CallsApiService } from './calls-api.service';
   imports: [CommonModule, LucideAngularModule],
   template: `
     @if (loading()) {
-      <div class="inline-flex items-center gap-1 text-[11px] text-zinc-500">
+      <div class="inline-flex items-center gap-1 text-[11px] text-muted">
         <lucide-icon
           name="loader-2"
           size="12"
@@ -40,7 +40,7 @@ import { CallsApiService } from './calls-api.service';
         Loading…
       </div>
     } @else if (error()) {
-      <span class="text-[11px] text-rose-600">{{ error() }}</span>
+      <span class="text-[11px] text-red-500">{{ error() }}</span>
     } @else if (blobUrl(); as src) {
       <audio controls preload="metadata" [src]="src" class="h-8 max-w-xs">
         Your browser doesn't support inline audio playback.

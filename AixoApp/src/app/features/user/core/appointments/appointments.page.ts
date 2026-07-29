@@ -672,7 +672,7 @@ export class AppointmentsPageComponent {
       case 'completed':
         return 'bg-emerald-100 text-emerald-700 ring-emerald-200';
       case 'cancelled':
-        return 'bg-zinc-100 text-zinc-600 ring-zinc-200';
+        return 'bg-surface-2 text-muted border-subtle';
       case 'no_show':
         return 'bg-amber-100 text-amber-700 ring-amber-200';
       default:

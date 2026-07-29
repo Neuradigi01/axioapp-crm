@@ -1,0 +1,104 @@
+@if (open()) {
+  <div
+    class="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 px-4 pt-[20vh]"
+    (click)="onOverlayClick($event)"
+    role="dialog"
+    aria-label="Command palette"
+  >
+    <div
+      class="w-full max-w-[640px] overflow-hidden rounded-2xl border border-subtle bg-surface-2 shadow-elevated"
+    >
+      <!-- Search input -->
+      <div class="flex items-center gap-3 border-b border-subtle px-4">
+        <lucide-icon name="search" class="h-4 w-4 shrink-0 text-faint" />
+        <input
+          #searchInput
+          type="text"
+          placeholder="Search or jump to…"
+          class="h-11 flex-1 bg-transparent text-sm text-default placeholder:text-faint focus:outline-none"
+          [value]="query()"
+          (input)="onQueryInput($any($event.target).value)"
+        />
+        <button
+          type="button"
+          class="rounded-md p-1 text-faint transition hover:bg-surface hover:text-default"
+          (click)="close()"
+          aria-label="Close"
+        >
+          <lucide-icon name="x" class="h-4 w-4" />
+        </button>
+      </div>
+
+      <!-- Results -->
+      <div class="max-h-[50vh] overflow-y-auto py-1">
+        @if (filtered().length === 0) {
+          <div class="px-4 py-5 md:py-8 text-center text-sm text-faint">
+            No matches for
+            <span class="font-mono text-default">"{{ query() }}"</span>
+          </div>
+        } @else {
+          <ul class="flex flex-col">
+            @for (m of filtered(); track m.id; let i = $index) {
+              <li>
+                <button
+                  type="button"
+                  class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition"
+                  [class.bg-surface]="highlight() === i"
+                  [class.text-default]="highlight() === i"
+                  [class.text-muted]="highlight() !== i"
+                  (mouseenter)="highlight.set(i)"
+                  (click)="navigate(m)"
+                >
+                  <lucide-icon
+                    [name]="m.icon"
+                    class="h-4 w-4 shrink-0"
+                    [class.text-accent]="highlight() === i"
+                    [class.text-faint]="highlight() !== i"
+                  />
+                  <span class="flex-1 truncate">{{ m.name }}</span>
+                  <span class="font-mono text-[10.5px] uppercase tracking-wider text-faint">
+                    {{ m.layer }}
+                  </span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      <!-- Footer kbd hints -->
+      <div
+        class="flex items-center justify-between border-t border-subtle bg-surface-2 px-4 py-2 text-[11px] text-faint"
+      >
+        <div class="flex items-center gap-3">
+          <span class="flex items-center gap-1.5">
+            <kbd
+              class="inline-flex h-5 min-w-[20px] items-center justify-center rounded border border-subtle bg-surface px-1 font-mono text-[10px] text-muted"
+              >↑</kbd
+            >
+            <kbd
+              class="inline-flex h-5 min-w-[20px] items-center justify-center rounded border border-subtle bg-surface px-1 font-mono text-[10px] text-muted"
+              >↓</kbd
+            >
+            navigate
+          </span>
+          <span class="flex items-center gap-1.5">
+            <kbd
+              class="inline-flex h-5 min-w-[20px] items-center justify-center rounded border border-subtle bg-surface px-1 font-mono text-[10px] text-muted"
+              >↵</kbd
+            >
+            open
+          </span>
+          <span class="flex items-center gap-1.5">
+            <kbd
+              class="inline-flex h-5 items-center justify-center rounded border border-subtle bg-surface px-1.5 font-mono text-[10px] text-muted"
+              >esc</kbd
+            >
+            close
+          </span>
+        </div>
+        <span class="hidden font-mono sm:inline">{{ filtered().length }} results</span>
+      </div>
+    </div>
+  </div>
+}

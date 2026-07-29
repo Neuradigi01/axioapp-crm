@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -16,7 +16,7 @@ import { LogCallModalComponent } from '../log-call-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * Call Logs tab â€” table of every call (newest first) + "Log call" button
+ * Call Logs tab — table of every call (newest first) + "Log call" button
  * that opens the shared `LogCallModalComponent`. Outcomes are loaded
  * once and shared with the modal as an input.
  */
@@ -53,7 +53,7 @@ export class CallLogsTabComponent {
       .subscribe({
         next: (rows) => this.outcomes.set(rows),
         error: () => {
-          /* outcomes aren't fatal â€” leave list empty */
+          /* outcomes aren't fatal — leave list empty */
         },
       });
 

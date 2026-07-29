@@ -31,7 +31,7 @@ export interface LocationAttachment {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, LucideAngularModule],
   template: `
-    <div class="overflow-hidden rounded-md border border-zinc-200 bg-zinc-50">
+    <div class="overflow-hidden rounded-md border border-subtle bg-surface-2">
       <div class="relative">
         <img
           [src]="staticMapUrl()"
@@ -42,7 +42,7 @@ export interface LocationAttachment {
         />
         @if (tileFailed()) {
           <div
-            class="absolute inset-0 flex items-center justify-center bg-zinc-100 text-xs text-zinc-500"
+            class="absolute inset-0 flex items-center justify-center bg-surface-2 text-xs text-muted"
           >
             <lucide-icon name="map-pin" class="mr-1 h-3 w-3" />
             {{ lat().toFixed(4) }}, {{ lng().toFixed(4) }}
@@ -51,10 +51,10 @@ export interface LocationAttachment {
       </div>
       <div class="px-2 py-1.5 text-xs">
         @if (location().name) {
-          <p class="font-semibold text-zinc-800">{{ location().name }}</p>
+          <p class="font-semibold text-default">{{ location().name }}</p>
         }
         @if (location().address) {
-          <p class="text-zinc-600">{{ location().address }}</p>
+          <p class="text-muted">{{ location().address }}</p>
         }
         <a
           [href]="geoUrl()"

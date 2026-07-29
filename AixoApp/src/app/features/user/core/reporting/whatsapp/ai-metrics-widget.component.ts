@@ -33,64 +33,64 @@ import { AIMetricsReport, ReportRange, WhatsAppReportsService } from './whatsapp
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule],
   template: `
-    <div class="rounded-md border border-zinc-200 bg-white p-4">
+    <div class="rounded-md border border-subtle bg-surface p-4">
       <div class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">AI metrics</p>
-          <p class="text-[11px] text-zinc-500">
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">AI metrics</p>
+          <p class="text-[11px] text-muted">
             Bot adoption, hand-off rate, and unattended completions.
           </p>
         </div>
         @if (loading()) {
-          <span class="text-[11px] text-zinc-500">Loading…</span>
+          <span class="text-[11px] text-muted">Loading…</span>
         }
       </div>
 
       @if (error(); as err) {
-        <p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
           {{ err }}
         </p>
       } @else if (report(); as r) {
         <div class="mb-4 grid grid-cols-3 gap-2">
-          <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p class="text-[10px] uppercase text-zinc-500">AI response rate</p>
+          <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
+            <p class="text-[10px] uppercase text-muted">AI response rate</p>
             <p class="text-lg font-semibold text-violet-700">{{ percent(r.ai_response_rate) }}%</p>
-            <p class="text-[10px] text-zinc-500">
+            <p class="text-[10px] text-muted">
               {{ r.ai_replies }} AI / {{ r.human_replies }} human
             </p>
           </div>
-          <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p class="text-[10px] uppercase text-zinc-500">Escalation rate</p>
+          <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
+            <p class="text-[10px] uppercase text-muted">Escalation rate</p>
             <p class="text-lg font-semibold text-amber-700">{{ percent(r.escalation_rate) }}%</p>
-            <p class="text-[10px] text-zinc-500">
+            <p class="text-[10px] text-muted">
               {{ r.escalated_conversations }} of {{ r.ai_handled_conversations }} convs
             </p>
           </div>
-          <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p class="text-[10px] uppercase text-zinc-500">AI-only completed</p>
+          <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
+            <p class="text-[10px] uppercase text-muted">AI-only completed</p>
             <p class="text-lg font-semibold text-emerald-700">
               {{ r.ai_only_completed }}
             </p>
-            <p class="text-[10px] text-zinc-500">No human reply needed</p>
+            <p class="text-[10px] text-muted">No human reply needed</p>
           </div>
         </div>
 
         @if (escalationReasonRows(r).length > 0) {
           <div>
-            <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+            <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
               Escalation reasons
             </p>
             <ul class="space-y-0.5 text-xs">
               @for (row of escalationReasonRows(r); track row.reason) {
                 <li class="flex items-center justify-between">
-                  <span class="text-zinc-700">{{ humanReason(row.reason) }}</span>
-                  <span class="font-medium text-zinc-900">{{ row.count }}</span>
+                  <span class="text-default">{{ humanReason(row.reason) }}</span>
+                  <span class="font-medium text-default">{{ row.count }}</span>
                 </li>
               }
             </ul>
           </div>
         } @else if (r.escalated_conversations === 0) {
-          <p class="text-xs text-zinc-500">
+          <p class="text-xs text-muted">
             No escalations in this window — the bot handled every flagged conversation.
           </p>
         }

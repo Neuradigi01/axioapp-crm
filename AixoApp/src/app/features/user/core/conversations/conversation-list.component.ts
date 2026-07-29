@@ -49,8 +49,8 @@ const CHANNEL_STYLES: Record<ConversationChannel, ChannelBadgeStyle> = {
   },
   sms: {
     label: 'SMS',
-    bg: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
-    dot: 'bg-zinc-500',
+    bg: 'bg-surface-2 text-default border-subtle',
+    dot: 'bg-muted',
   },
   email: {
     label: 'Email',

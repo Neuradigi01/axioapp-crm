@@ -31,7 +31,7 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
         [class]="
           'rounded-md border px-3 py-2 text-xs ' +
           (severity() === 'block'
-            ? 'border-rose-200 bg-rose-50 text-rose-700'
+            ? 'border-red-500/20 bg-red-500/10 text-red-400'
             : 'border-amber-200 bg-amber-50 text-amber-800')
         "
       >

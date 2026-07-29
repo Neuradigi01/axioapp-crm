@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -14,19 +14,20 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService } from '../auth/auth.service';
+import { commonValidators } from '../shared/validators';
 import { TaskAssignee, TaskFormModalComponent } from './task-form-modal.component';
 import { Task, TaskPriority, TasksApiService } from './tasks-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
  * Tasks panel rendered inside any entity detail page. Inputs are
- * `(entityType, entityId)` only â€” no contact-specific code lives here,
+ * `(entityType, entityId)` only — no contact-specific code lives here,
  * so the same component plugs into Leads (2.12) and Walk-ins later.
  *
  * Behaviour:
  *   - Lists tasks for the given entity, earliest-due first.
  *   - Inline "Add task" form (title, due, priority).
- *   - Click the checkbox to flip status open â†” done. Strikethrough on done.
+ *   - Click the checkbox to flip status open ↔ done. Strikethrough on done.
  *   - Optimistic UI: server-confirmed updates replace the in-memory row.
  */
 @Component({
@@ -60,7 +61,9 @@ export class TasksPanelComponent {
 
   protected readonly form = this.fb.group({
     title: ['', [Validators.required, Validators.maxLength(255)]],
-    due_at: [''],
+    // Quick-add task: due date is optional but if set must not be in
+    // the past. Today is a legitimate pick ("do this today").
+    due_at: ['', [commonValidators.dateNotPast]],
     priority: this.fb.control<TaskPriority>('med', { nonNullable: true }),
   });
 
@@ -169,7 +172,7 @@ export class TasksPanelComponent {
 
   protected toggleDone(task: Task): void {
     const nextStatus = task.status === 'done' ? 'open' : 'done';
-    // Optimistic local flip â€” reverts on error.
+    // Optimistic local flip — reverts on error.
     const before = this.items();
     this.items.update((rows) =>
       rows.map((r) => (r.id === task.id ? { ...r, status: nextStatus } : r)),
@@ -195,7 +198,7 @@ export class TasksPanelComponent {
       case 'med':
         return 'bg-amber-100 text-amber-700 ring-amber-200';
       case 'low':
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   }
 
@@ -218,7 +221,7 @@ export class TasksPanelComponent {
 
   private normalizeDue(value: string | null | undefined): string | null {
     if (!value) return null;
-    // <input type="datetime-local"> emits "YYYY-MM-DDTHH:mm" â€” convert to ISO.
+    // <input type="datetime-local"> emits "YYYY-MM-DDTHH:mm" — convert to ISO.
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return null;
     return d.toISOString();

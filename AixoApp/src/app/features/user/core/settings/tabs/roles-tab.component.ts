@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -47,18 +47,18 @@ interface RoleTemplate {
 type Mode = 'list' | 'editor';
 
 /**
- * Roles tab â€” list, create, edit, and delete roles in the active org.
+ * Roles tab — list, create, edit, and delete roles in the active org.
  *
  * Two visual states inside the tab:
- *   - `list`   â€” table of roles (name, members, permission count, actions)
- *   - `editor` â€” role name input + permission-grants matrix grouped by module
+ *   - `list`   — table of roles (name, members, permission count, actions)
+ *   - `editor` — role name input + permission-grants matrix grouped by module
  *
  * System roles (`is_system=true`) get a "View" button instead of "Edit";
  * the editor renders the matrix read-only for them. CLAUDE.md rule: core
  * + pack-installed roles stay stable; admins create custom roles instead.
  *
  * The grants matrix is rendered from `GET /permissions` (the global
- * registry â€” ~55 keys today, ~80 with the furniture pack) grouped by the
+ * registry — ~55 keys today, ~80 with the furniture pack) grouped by the
  * `module` column. Adding a new module just makes its keys show up in
  * the matrix; no UI change required.
  */

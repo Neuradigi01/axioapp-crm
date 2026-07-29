@@ -44,26 +44,19 @@ import { SeatPreview } from '../../types/subscription.types';
       >
         <button
           type="button"
-          class="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm"
+          class="absolute inset-0 bg-black/60 backdrop-blur-sm"
           (click)="close()"
           aria-label="Close seat management"
         ></button>
 
         <div
-          class="relative w-full max-w-md rounded-2xl bg-white shadow-xl dark:bg-slate-800 max-h-[90vh] flex flex-col"
+          class="relative w-full max-w-md rounded-2xl bg-surface shadow-xl max-h-[90vh] flex flex-col"
         >
-          <header
-            class="flex items-start justify-between gap-4 border-b border-zinc-200 px-6 py-4 dark:border-slate-700"
-          >
-            <h2
-              id="seat-modal-title"
-              class="text-lg font-semibold text-zinc-900 dark:text-slate-100"
-            >
-              Manage seats
-            </h2>
+          <header class="flex items-start justify-between gap-4 border-b border-subtle px-6 py-4">
+            <h2 id="seat-modal-title" class="text-lg font-semibold text-default">Manage seats</h2>
             <button
               type="button"
-              class="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-slate-700 dark:hover:text-slate-100"
+              class="rounded-md p-1 text-muted hover:bg-surface-2 hover:text-default dark:hover:text-default"
               (click)="close()"
               aria-label="Close"
             >
@@ -72,36 +65,34 @@ import { SeatPreview } from '../../types/subscription.types';
           </header>
 
           <div class="flex-1 overflow-y-auto px-6 py-5">
-            <p class="text-sm text-zinc-600 dark:text-slate-300">
+            <p class="text-sm text-muted">
               {{ planSummary() }}
             </p>
 
-            <div
-              class="mt-4 inline-flex items-center gap-2 rounded-lg border border-zinc-200 p-1 dark:border-slate-700"
-            >
+            <div class="mt-4 inline-flex items-center gap-2 rounded-lg border border-subtle p-1">
               <button
                 type="button"
                 (click)="decrement()"
                 [disabled]="seats() <= minSeats() || isSubmitting()"
-                class="rounded-md px-3 py-1 text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-700"
+                class="rounded-md px-3 py-1 text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Decrease seats"
               >
                 −
               </button>
-              <span class="min-w-[2ch] text-center font-medium text-zinc-900 dark:text-slate-100">
+              <span class="min-w-[2ch] text-center font-medium text-default">
                 {{ seats() }}
               </span>
               <button
                 type="button"
                 (click)="increment()"
                 [disabled]="isSubmitting() || isTrial()"
-                class="rounded-md px-3 py-1 text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-700"
+                class="rounded-md px-3 py-1 text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Increase seats"
               >
                 +
               </button>
             </div>
-            <p class="mt-1.5 text-xs text-zinc-500 dark:text-slate-400">
+            <p class="mt-1.5 text-xs text-muted">
               Minimum {{ minSeats() }} ·
               {{ inUseHint() }}
             </p>
@@ -115,33 +106,27 @@ import { SeatPreview } from '../../types/subscription.types';
             }
 
             <!-- Preview box -->
-            <div
-              class="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-            >
+            <div class="mt-5 rounded-lg border border-subtle bg-surface-2 px-4 py-3 text-sm">
               @if (previewLoading()) {
-                <div class="h-12 animate-pulse rounded bg-zinc-200 dark:bg-slate-700"></div>
+                <div class="h-12 animate-pulse rounded bg-surface-2"></div>
               } @else if (preview(); as p) {
                 <div class="flex items-center justify-between">
-                  <span class="text-zinc-600 dark:text-slate-300">
+                  <span class="text-muted">
                     {{ outcomeLine(p) }}
                   </span>
-                  <span class="font-semibold text-zinc-900 dark:text-slate-100">
-                    \${{ p.amount_due_usd }}
-                  </span>
+                  <span class="font-semibold text-default"> \${{ p.amount_due_usd }} </span>
                 </div>
                 @if (p.monthly_cost_after_change_usd !== null) {
-                  <div class="mt-1 text-xs text-zinc-500 dark:text-slate-400">
+                  <div class="mt-1 text-xs text-muted">
                     \${{ p.monthly_cost_after_change_usd }} per month going forward
                   </div>
                 } @else if (p.annual_cost_after_change_usd !== null) {
-                  <div class="mt-1 text-xs text-zinc-500 dark:text-slate-400">
+                  <div class="mt-1 text-xs text-muted">
                     \${{ p.annual_cost_after_change_usd }} per year going forward
                   </div>
                 }
               } @else {
-                <p class="text-xs text-zinc-500 dark:text-slate-400">
-                  Adjust seat count to see the estimate.
-                </p>
+                <p class="text-xs text-muted">Adjust seat count to see the estimate.</p>
               }
             </div>
 
@@ -163,14 +148,12 @@ import { SeatPreview } from '../../types/subscription.types';
             }
           </div>
 
-          <footer
-            class="flex items-center justify-end gap-2 border-t border-zinc-200 px-6 py-3 dark:border-slate-700"
-          >
+          <footer class="flex items-center justify-end gap-2 border-t border-subtle px-6 py-3">
             <button
               type="button"
               (click)="close()"
               [disabled]="isSubmitting()"
-              class="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-700"
+              class="rounded-lg px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-40"
             >
               Cancel
             </button>

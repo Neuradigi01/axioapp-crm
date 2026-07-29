@@ -1,17 +1,17 @@
 <section class="space-y-4">
   <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
     <div>
-      <h2 class="text-base font-semibold text-zinc-900">Custom fields</h2>
-      <p class="mt-1 text-xs text-zinc-500">
+      <h2 class="text-base font-semibold text-default">Custom fields</h2>
+      <p class="mt-1 text-xs text-muted">
         Add fields to an entity, rename labels, mark required, hide, or reorder by dragging. System
         and Pack fields can be relabelled / hidden / reordered but not deleted.
       </p>
     </div>
     <div class="flex items-center gap-2">
-      <label for="entity-type" class="text-xs text-zinc-700">Entity</label>
+      <label for="entity-type" class="text-xs text-default">Entity</label>
       <select
         id="entity-type"
-        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         [value]="entityType()"
         (change)="onEntityChange($any($event.target).value)"
       >
@@ -21,7 +21,7 @@
       </select>
       <button
         type="button"
-        class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
         (click)="openCreate()"
       >
         Add field
@@ -30,27 +30,27 @@
   </header>
 
   @if (loadError()) {
-    <div class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+    <div class="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400 ring-1 border-red-500/20">
       {{ loadError() }}
     </div>
   }
 
   @if (loading()) {
     <div
-      class="rounded-md border border-dashed border-zinc-300 px-3 py-12 text-center text-sm text-zinc-500"
+      class="rounded-md border border-dashed border-subtle px-3 py-12 text-center text-sm text-muted"
     >
       Loading fields…
     </div>
   } @else if (fields().length === 0) {
     <div
-      class="rounded-md border border-dashed border-zinc-300 px-3 py-12 text-center text-sm text-zinc-500"
+      class="rounded-md border border-dashed border-subtle px-3 py-12 text-center text-sm text-muted"
     >
       No fields defined for this entity yet.
     </div>
   } @else {
-    <div class="overflow-hidden rounded-md ring-1 ring-zinc-200">
+    <div class="overflow-hidden rounded-md ring-1 border-subtle">
       <div
-        class="grid grid-cols-12 gap-2 border-b border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-500"
+        class="grid grid-cols-12 gap-2 border-b border-subtle bg-surface-2 px-3 py-2 text-xs font-medium text-muted"
       >
         <div class="col-span-1"></div>
         <div class="col-span-3">Key</div>
@@ -60,30 +60,30 @@
         <div class="col-span-1 text-right">Required</div>
         <div class="col-span-1 text-right">Actions</div>
       </div>
-      <ul cdkDropList class="divide-y divide-zinc-100" (cdkDropListDropped)="onDrop($event)">
+      <ul cdkDropList class="divide-y divide-subtle" (cdkDropListDropped)="onDrop($event)">
         @for (field of fields(); track field.id) {
           <li
             cdkDrag
-            class="grid grid-cols-12 items-center gap-2 bg-white px-3 py-2 text-sm text-zinc-900"
+            class="grid grid-cols-12 items-center gap-2 bg-surface px-3 py-2 text-sm text-default"
           >
             <span
               cdkDragHandle
-              class="col-span-1 cursor-grab text-zinc-400 hover:text-zinc-700"
+              class="col-span-1 cursor-grab text-faint hover:text-default"
               aria-label="Drag to reorder"
               title="Drag to reorder"
             >
               ☰
             </span>
-            <span class="col-span-3 truncate font-mono text-xs text-zinc-600">{{
+            <span class="col-span-3 truncate font-mono text-xs text-muted">{{
               field.field_key
             }}</span>
-            <span class="col-span-4 truncate" [class.text-zinc-400]="field.is_hidden">
+            <span class="col-span-4 truncate" [class.text-faint]="field.is_hidden">
               {{ field.field_label }}
               @if (field.is_hidden) {
-                <span class="ml-2 text-xs text-zinc-400">(hidden)</span>
+                <span class="ml-2 text-xs text-faint">(hidden)</span>
               }
             </span>
-            <span class="col-span-1 text-xs text-zinc-600">{{ field.field_type }}</span>
+            <span class="col-span-1 text-xs text-muted">{{ field.field_type }}</span>
             <span class="col-span-1">
               <span
                 class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1"
@@ -92,13 +92,13 @@
                 {{ badgeLabel(field.source) }}
               </span>
             </span>
-            <span class="col-span-1 text-right text-xs text-zinc-600">
+            <span class="col-span-1 text-right text-xs text-muted">
               {{ field.is_required ? 'Yes' : '—' }}
             </span>
             <span class="col-span-1 flex justify-end gap-2">
               <button
                 type="button"
-                class="text-xs font-medium text-zinc-700 hover:text-zinc-900"
+                class="text-xs font-medium text-default hover:text-default"
                 (click)="openEdit(field)"
               >
                 Edit
@@ -106,7 +106,7 @@
               @if (field.source === 'user') {
                 <button
                   type="button"
-                  class="text-xs font-medium text-red-600 hover:text-red-800"
+                  class="text-xs font-medium text-red-600 hover:text-red-400"
                   (click)="onDelete(field)"
                 >
                   Delete

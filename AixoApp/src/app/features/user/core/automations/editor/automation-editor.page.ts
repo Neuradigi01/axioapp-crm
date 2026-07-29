@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
@@ -22,6 +22,7 @@ import {
   AutomationsApiService,
   DryRunResult,
   EventCatalogEntry,
+  FieldSpec,
   TriggerChannel,
   TriggerRead,
 } from '../automations-api.service';
@@ -143,14 +144,62 @@ export class AutomationEditorPageComponent {
 
   protected readonly canWrite = computed(() => this.auth.hasPermission('automations.write'));
 
+  // FormControl.value is NOT a signal — reading it inside a
+  // `computed(...)` won't re-fire on change, which used to leave
+  // `selectedEntry` (and every downstream signal) stuck at the
+  // initial value. Route the control's `valueChanges` stream through
+  // `toSignal` so every event-type switch propagates cleanly.
+  private readonly eventTypeSignal = toSignal(this.form.controls.event_type.valueChanges, {
+    initialValue: this.form.controls.event_type.value,
+  });
+
   protected readonly selectedEntry = computed<EventCatalogEntry | null>(() => {
-    const et = this.form.controls.event_type.value;
+    const et = this.eventTypeSignal();
     return this.catalog().find((e) => e.event_type === et) ?? null;
   });
 
   protected readonly samplePayload = computed<Record<string, unknown>>(
     () => this.selectedEntry()?.sample_payload ?? {},
   );
+
+  /** Step-1's `condition_fields` for the currently selected event —
+   *  drives the condition-builder's grouped field dropdown. Empty
+   *  tuple when no event picked yet, or when the event's catalog
+   *  entry doesn't carry any specs (Advanced mode falls back to the
+   *  free-text builder). */
+  protected readonly conditionFields = computed<FieldSpec[]>(
+    () => this.selectedEntry()?.condition_fields ?? [],
+  );
+
+  /** Paths in the loaded trigger's conditions that AREN'T declared
+   *  by the current event's `condition_fields` (tasks/automation-
+   *  conditions/ Step 4). Drives the top-of-page deprecation
+   *  banner + informs the operator that the trigger still fires but
+   *  is filtering on a retired field name. Walks the AST including
+   *  nested `all` / `any` branches. */
+  protected readonly legacyRulePaths = computed<string[]>(() => {
+    const knownPaths = new Set(this.conditionFields().map((f) => f.path));
+    if (knownPaths.size === 0) return [];
+    const found: string[] = [];
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return;
+      const n = node as Record<string, unknown>;
+      if ('all' in n && Array.isArray(n['all'])) {
+        for (const child of n['all'] as unknown[]) walk(child);
+        return;
+      }
+      if ('any' in n && Array.isArray(n['any'])) {
+        for (const child of n['any'] as unknown[]) walk(child);
+        return;
+      }
+      if ('field' in n && 'op' in n) {
+        const field = String(n['field'] ?? '');
+        if (field && !knownPaths.has(field)) found.push(field);
+      }
+    };
+    walk(this.conditions());
+    return found;
+  });
 
   protected readonly channelLocked = computed<boolean>(() => this.trigger() !== null);
 

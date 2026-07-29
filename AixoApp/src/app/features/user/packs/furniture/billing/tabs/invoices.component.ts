@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -54,7 +54,7 @@ export class InvoicesTabComponent {
     { id: 'void', label: 'Void' },
   ];
 
-  /** Summary tiles â€” match the Vercel reference: Total / Billed / Collected / Pending. */
+  /** Summary tiles — match the Vercel reference: Total / Billed / Collected / Pending. */
   protected readonly tiles = computed(() => {
     const rows = this.invoices();
     let billed = 0;
@@ -126,21 +126,21 @@ export class InvoicesTabComponent {
       case 'issued':
         return 'bg-amber-100 text-amber-700 ring-amber-200';
       case 'draft':
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
       case 'void':
         return 'bg-red-100 text-red-700 ring-red-200';
       default:
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   }
 
   protected paymentLabel(method: string | null): string {
-    if (!method) return 'â€”';
+    if (!method) return '—';
     return method.toUpperCase();
   }
 
   protected formatDate(iso: string | null | undefined): string {
-    if (!iso) return 'â€”';
+    if (!iso) return '—';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleDateString('en-IN', {
@@ -151,13 +151,13 @@ export class InvoicesTabComponent {
   }
 
   protected invoiceNumber(inv: Invoice): string {
-    if (inv.number === null) return 'â€” draft â€”';
+    if (inv.number === null) return '— draft —';
     return `INV-${String(inv.number).padStart(4, '0')}`;
   }
 
   protected contactName(id: string | null): string {
     if (!id) return 'Walk-in';
-    return this.contactsById()[id]?.full_name ?? 'â€¦';
+    return this.contactsById()[id]?.full_name ?? '…';
   }
 
   protected contactPhone(id: string | null): string | null {

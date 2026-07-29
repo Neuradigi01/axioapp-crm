@@ -619,11 +619,11 @@ export class TasksPageComponent {
   protected priorityClass(p: TaskPriority): string {
     switch (p) {
       case 'high':
-        return 'bg-rose-50 text-rose-700 ring-rose-200';
+        return 'bg-red-500/10 text-red-400 ring-red-500/20';
       case 'med':
         return 'bg-amber-50 text-amber-700 ring-amber-200';
       default:
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   }
 

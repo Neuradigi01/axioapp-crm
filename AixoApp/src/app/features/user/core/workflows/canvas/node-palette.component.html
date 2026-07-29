@@ -1,18 +1,18 @@
-<div class="h-full flex flex-col border-r border-zinc-200 bg-white">
-  <div class="px-4 pt-4 pb-3 border-b border-zinc-200">
-    <h2 class="text-sm font-semibold text-zinc-700">Node palette</h2>
-    <p class="text-[11px] text-zinc-500 mt-0.5">Drag a node onto the canvas to add it.</p>
+<div class="h-full flex flex-col border-r border-subtle bg-surface">
+  <div class="px-4 pt-4 pb-3 border-b border-subtle">
+    <h2 class="text-sm font-semibold text-default">Node palette</h2>
+    <p class="text-[11px] text-muted mt-0.5">Drag a node onto the canvas to add it.</p>
     <div class="relative mt-3">
       <lucide-icon
         name="Search"
-        class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400"
+        class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-faint"
       ></lucide-icon>
       <input
         type="search"
         [ngModel]="query()"
         (ngModelChange)="query.set($event)"
         placeholder="Search nodes…"
-        class="w-full pl-8 pr-3 py-1.5 text-xs rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+        class="w-full pl-8 pr-3 py-1.5 text-xs rounded border border-subtle focus:outline-none focus:border-muted"
       />
     </div>
   </div>
@@ -21,7 +21,7 @@
     @for (section of sections; track section.key) {
       @if (itemsByCategory()[section.key].length > 0) {
         <section>
-          <h3 class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+          <h3 class="text-[10px] font-semibold uppercase tracking-wider text-muted mb-2">
             {{ section.label }}
           </h3>
           <div class="space-y-1.5">
@@ -30,17 +30,17 @@
                 draggable="true"
                 (dragstart)="onDragStart($event, item)"
                 [title]="item.description"
-                class="group flex items-start gap-2 px-2.5 py-2 rounded border border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50 cursor-grab active:cursor-grabbing"
+                class="group flex items-start gap-2 px-2.5 py-2 rounded border border-subtle hover:border-subtle hover:bg-surface-2 cursor-grab active:cursor-grabbing"
               >
                 <lucide-icon
                   [name]="item.icon"
-                  class="w-3.5 h-3.5 text-zinc-600 mt-0.5 shrink-0"
+                  class="w-3.5 h-3.5 text-muted mt-0.5 shrink-0"
                 ></lucide-icon>
                 <div class="flex-1 min-w-0">
-                  <div class="text-xs font-medium text-zinc-800 truncate">
+                  <div class="text-xs font-medium text-default truncate">
                     {{ item.label }}
                   </div>
-                  <div class="text-[10px] text-zinc-500 truncate">
+                  <div class="text-[10px] text-muted truncate">
                     {{ item.type }}
                   </div>
                 </div>
@@ -58,7 +58,7 @@
       itemsByCategory()['tag_lifecycle'].length === 0 &&
       itemsByCategory()['flow_control'].length === 0
     ) {
-      <p class="text-xs text-zinc-500 italic">No nodes match the search.</p>
+      <p class="text-xs text-muted italic">No nodes match the search.</p>
     }
   </div>
 </div>

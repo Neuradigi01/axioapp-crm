@@ -9,6 +9,8 @@ import {
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 
+import { commonValidators } from '../../shared/validators';
+
 /**
  * Payload emitted on confirm. Mirrors the backend's `MoveStageRequest`
  * won-capture fields so the parent can pass it straight through to
@@ -78,18 +80,30 @@ export class WonCaptureModalComponent {
     validators: [Validators.pattern(/^\d+(\.\d{1,2})?$/)],
   });
   // Default close_date to today so the rep only edits if the close
-  // was earlier / later than "now".
+  // was earlier / later than "now". Actual-close is a past-or-today
+  // event — future closes don't make sense (that's `expected_close_date`
+  // on the lead form). `dateNotFuture` allows today + past.
   protected readonly closeDateControl = new FormControl<string>(
     new Date().toISOString().slice(0, 10),
-    { nonNullable: true },
+    {
+      nonNullable: true,
+      validators: [commonValidators.isoDate, commonValidators.dateNotFuture],
+    },
   );
-  protected readonly reasonControl = new FormControl<string>('', { nonNullable: true });
+  protected readonly reasonControl = new FormControl<string>('', {
+    nonNullable: true,
+    validators: [commonValidators.maxLength(64)],
+  });
 
   protected readonly canConfirm = computed(() => {
     if (this._submitting()) return false;
     // Value is optional at the API layer, but if the rep started
     // typing it, must parse as a valid decimal.
-    return this.valueControl.valid;
+    if (this.valueControl.invalid) return false;
+    // Close-date defaults to today; if the rep edits it, it must be a
+    // valid past-or-today ISO date.
+    if (this.closeDateControl.invalid) return false;
+    return true;
   });
 
   protected onConfirm(): void {

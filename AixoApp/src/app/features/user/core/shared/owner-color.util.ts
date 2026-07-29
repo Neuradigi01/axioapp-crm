@@ -21,7 +21,7 @@ const PALETTE: ReadonlyArray<OwnerColor> = [
   { bg: 'bg-blue-100', text: 'text-blue-800', ring: 'ring-blue-200' },
   { bg: 'bg-emerald-100', text: 'text-emerald-800', ring: 'ring-emerald-200' },
   { bg: 'bg-amber-100', text: 'text-amber-800', ring: 'ring-amber-200' },
-  { bg: 'bg-rose-100', text: 'text-rose-800', ring: 'ring-rose-200' },
+  { bg: 'bg-red-500/10', text: 'text-red-400', ring: 'ring-red-500/20' },
   { bg: 'bg-violet-100', text: 'text-violet-800', ring: 'ring-violet-200' },
   { bg: 'bg-cyan-100', text: 'text-cyan-800', ring: 'ring-cyan-200' },
   { bg: 'bg-orange-100', text: 'text-orange-800', ring: 'ring-orange-200' },
@@ -29,9 +29,9 @@ const PALETTE: ReadonlyArray<OwnerColor> = [
 ];
 
 const UNASSIGNED: OwnerColor = {
-  bg: 'bg-zinc-100',
-  text: 'text-zinc-600',
-  ring: 'ring-zinc-200',
+  bg: 'bg-surface-2',
+  text: 'text-muted',
+  ring: 'border-subtle',
 };
 
 export function ownerColor(userId: string | null | undefined): OwnerColor {

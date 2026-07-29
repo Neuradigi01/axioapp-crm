@@ -24,33 +24,33 @@ import {
   imports: [LucideAngularModule],
   template: `
     <div
-      class="flex flex-col rounded-2xl border border-zinc-200 bg-[#e5ddd5] p-4 shadow-inner"
+      class="flex flex-col rounded-2xl border border-subtle bg-[#e5ddd5] p-4 shadow-inner"
       style="min-height: 320px; background-image: radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px); background-size: 12px 12px;"
     >
-      <p class="mb-2 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-600">
+      <p class="mb-2 text-center text-[10px] font-medium uppercase tracking-wide text-muted">
         Preview
       </p>
 
       <div class="flex justify-start">
         <div
-          class="max-w-[85%] rounded-2xl rounded-tl-sm bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm"
+          class="max-w-[85%] rounded-2xl rounded-tl-sm bg-surface px-3 py-2 text-sm text-default shadow-sm"
         >
           @if (headerType === 'TEXT' && headerText) {
-            <p class="mb-1 text-sm font-bold text-zinc-900">
+            <p class="mb-1 text-sm font-bold text-default">
               {{ resolved(headerText) }}
             </p>
           } @else if (headerType === 'IMAGE') {
-            <div class="mb-2 flex h-32 items-center justify-center rounded-lg bg-zinc-100">
-              <lucide-icon name="image" class="h-8 w-8 text-zinc-400" />
+            <div class="mb-2 flex h-32 items-center justify-center rounded-lg bg-surface-2">
+              <lucide-icon name="image" class="h-8 w-8 text-faint" />
             </div>
           } @else if (headerType === 'VIDEO') {
-            <div class="mb-2 flex h-32 items-center justify-center rounded-lg bg-zinc-100">
-              <lucide-icon name="video" class="h-8 w-8 text-zinc-400" />
+            <div class="mb-2 flex h-32 items-center justify-center rounded-lg bg-surface-2">
+              <lucide-icon name="video" class="h-8 w-8 text-faint" />
             </div>
           } @else if (headerType === 'DOCUMENT') {
-            <div class="mb-2 flex h-16 items-center gap-2 rounded-lg bg-zinc-100 px-3">
-              <lucide-icon name="file-text" class="h-6 w-6 text-zinc-500" />
-              <span class="text-xs text-zinc-600">document.pdf</span>
+            <div class="mb-2 flex h-16 items-center gap-2 rounded-lg bg-surface-2 px-3">
+              <lucide-icon name="file-text" class="h-6 w-6 text-muted" />
+              <span class="text-xs text-muted">document.pdf</span>
             </div>
           }
 
@@ -59,16 +59,16 @@ import {
               {{ resolved(body) }}
             </p>
           } @else {
-            <p class="text-xs italic text-zinc-400">Body text will appear here…</p>
+            <p class="text-xs italic text-faint">Body text will appear here…</p>
           }
 
           @if (footerText) {
-            <p class="mt-1 text-xs text-zinc-500">
+            <p class="mt-1 text-xs text-muted">
               {{ footerText }}
             </p>
           }
 
-          <p class="mt-1 flex items-center justify-end gap-1 text-[10px] text-zinc-400">
+          <p class="mt-1 flex items-center justify-end gap-1 text-[10px] text-faint">
             <span>{{ currentTime() }}</span>
             <lucide-icon name="check-check" class="h-3 w-3 text-sky-500" />
           </p>
@@ -80,7 +80,7 @@ import {
           @for (b of buttons; track b.text) {
             <button
               type="button"
-              class="rounded-2xl rounded-tl-sm bg-white px-3 py-2 text-center text-sm font-medium text-[#00a884] shadow-sm"
+              class="rounded-2xl rounded-tl-sm bg-surface px-3 py-2 text-center text-sm font-medium text-[#00a884] shadow-sm"
               disabled
             >
               @if (b.type === 'URL') {

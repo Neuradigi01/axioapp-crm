@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -67,7 +67,7 @@ export class CustomOrderDetailPageComponent {
   protected readonly advanceInr = computed(() => fmtInr(this.order()?.advance_paid));
   protected readonly dueInr = computed(() => {
     const o = this.order();
-    if (!o) return 'â€”';
+    if (!o) return '—';
     const due = Math.max(Number(o.total_amount ?? 0) - Number(o.advance_paid ?? 0), 0);
     return fmtInr(String(due));
   });
@@ -94,7 +94,7 @@ export class CustomOrderDetailPageComponent {
       case 'cancelled':
         return 'bg-red-100 text-red-700 ring-red-200';
       default:
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   });
 
@@ -130,7 +130,7 @@ export class CustomOrderDetailPageComponent {
   }
 
   protected formatDate(iso: string | null | undefined): string {
-    if (!iso) return 'â€”';
+    if (!iso) return '—';
     const dt = new Date(iso);
     if (Number.isNaN(dt.getTime())) return iso;
     return dt.toLocaleDateString('en-IN', {
@@ -153,7 +153,7 @@ export class CustomOrderDetailPageComponent {
   }
 
   protected stageLabelFor(key: string | null): string {
-    if (!key) return 'â€”';
+    if (!key) return '—';
     return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   }
 

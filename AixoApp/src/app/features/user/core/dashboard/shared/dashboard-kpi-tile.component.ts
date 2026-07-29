@@ -106,9 +106,9 @@ export class DashboardKpiTileComponent {
 
   protected readonly deltaPillClass = computed(() => {
     const dir = this._deltaDirection();
-    if (dir === 'up') return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
-    if (dir === 'down') return 'bg-rose-50 text-rose-700 ring-rose-200';
-    return 'bg-zinc-100 text-zinc-600 ring-zinc-200';
+    if (dir === 'up') return 'bg-emerald-500/10 text-emerald-400';
+    if (dir === 'down') return 'bg-red-500/10 text-red-400';
+    return 'bg-surface-2 text-muted';
   });
 
   private formatCurrency(value: number | string): string {

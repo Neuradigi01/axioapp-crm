@@ -81,19 +81,26 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
       commonValidators.maxLength(255),
     ]);
     this.form.controls.title.updateValueAndValidity({ emitEvent: false });
-    this.form.controls.scheduled_at.setValidators([commonValidators.required]);
+    // scheduled_at must be forward-looking (bookings can't land in the past).
+    this.form.controls.scheduled_at.setValidators([
+      commonValidators.required,
+      commonValidators.dateNotPast,
+    ]);
     this.form.controls.scheduled_at.updateValueAndValidity({ emitEvent: false });
 
     const durRow = map['duration_min'];
+    // Floor/ceiling always apply (1 min – 24 hr); override tightens further.
     this.form.controls.duration_min.setValidators([
       commonValidators.required,
-      Validators.min(durRow?.min_value ?? 1),
-      Validators.max(durRow?.max_value ?? 1440),
+      Validators.min(Math.max(1, durRow?.min_value ?? 1)),
+      Validators.max(Math.min(1440, durRow?.max_value ?? 1440)),
     ]);
     this.form.controls.duration_min.updateValueAndValidity({ emitEvent: false });
 
     const setReq = (ctrl: 'purpose' | 'location', row: StandardFieldRendered | undefined): void => {
-      this.form.controls[ctrl].setValidators(withRequiredIf([], row));
+      this.form.controls[ctrl].setValidators(
+        withRequiredIf([commonValidators.maxLength(1000)], row),
+      );
       this.form.controls[ctrl].updateValueAndValidity({ emitEvent: false });
     };
     setReq('purpose', map['purpose']);
@@ -117,7 +124,7 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
     }
   }
 
-  /** Map a conflicting appointment id â†’ human-readable label (set by parent). */
+  /** Map a conflicting appointment id → human-readable label (set by parent). */
   @Input() conflictTitleFor: (id: string) => string | null = () => null;
 
   @Output() readonly created = new EventEmitter<Appointment>();
@@ -139,7 +146,7 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
 
   protected readonly scheduledAtControl = this.fb.control('', {
     nonNullable: true,
-    validators: [commonValidators.required],
+    validators: [commonValidators.required, commonValidators.dateNotPast],
   });
 
   /** Assigned user id. Initialised to the current user's id once
@@ -155,13 +162,19 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
       nonNullable: true,
       validators: [commonValidators.required, commonValidators.maxLength(255)],
     }),
-    purpose: this.fb.control('', { nonNullable: true }),
+    purpose: this.fb.control('', {
+      nonNullable: true,
+      validators: [commonValidators.maxLength(1000)],
+    }),
     scheduled_at: this.scheduledAtControl,
     duration_min: this.fb.control<number>(60, {
       nonNullable: true,
       validators: [commonValidators.required, Validators.min(1), Validators.max(24 * 60)],
     }),
-    location: this.fb.control('', { nonNullable: true }),
+    location: this.fb.control('', {
+      nonNullable: true,
+      validators: [commonValidators.maxLength(1000)],
+    }),
     assigned_to_id: this.assigneeControl,
   });
 
@@ -309,16 +322,16 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
   }
 
   protected conflictLabel(id: string): string {
-    return this.conflictTitleFor(id) ?? id.slice(0, 8) + 'â€¦';
+    return this.conflictTitleFor(id) ?? id.slice(0, 8) + '…';
   }
 
-  /** Convert `<input type="datetime-local">` value â†’ backend ISO. */
+  /** Convert `<input type="datetime-local">` value → backend ISO. */
   private toIsoFromLocal(value: string): string {
     const d = new Date(value);
     return d.toISOString();
   }
 
-  /** Convert a Date â†’ "YYYY-MM-DDTHH:mm" for <input type="datetime-local">. */
+  /** Convert a Date → "YYYY-MM-DDTHH:mm" for <input type="datetime-local">. */
   private toDatetimeLocalString(d: Date, hour: number): string {
     const local = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hour, 0, 0, 0);
     const pad = (n: number) => String(n).padStart(2, '0');

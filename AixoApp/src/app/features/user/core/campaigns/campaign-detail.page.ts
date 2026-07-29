@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -31,7 +31,7 @@ const POLL_INTERVAL_MS = 5_000;
 export type CampaignDetailTab = 'overview' | 'analytics';
 
 /**
- * Campaign detail â€” stats KPIs + per-message table with retry.
+ * Campaign detail — stats KPIs + per-message table with retry.
  *
  * Polls stats + messages every 5s while the campaign is `scheduled`
  * or `running` so the operator sees the dispatch progress without
@@ -83,11 +83,11 @@ export class CampaignDetailPageComponent {
     const c = this.campaign();
     if (!c) return null;
     const map: Record<string, { label: string; cls: string }> = {
-      draft: { label: 'Draft', cls: 'bg-zinc-100 text-zinc-700 ring-zinc-200' },
+      draft: { label: 'Draft', cls: 'bg-surface-2 text-default border-subtle' },
       scheduled: { label: 'Scheduled', cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
       running: { label: 'Running', cls: 'bg-sky-50 text-sky-700 ring-sky-200' },
       done: { label: 'Done', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-      failed: { label: 'Failed', cls: 'bg-rose-50 text-rose-700 ring-rose-200' },
+      failed: { label: 'Failed', cls: 'bg-red-500/10 text-red-400 ring-red-500/20' },
     };
     return map[c.status];
   });
@@ -100,7 +100,7 @@ export class CampaignDetailPageComponent {
       return;
     }
     this.loadAll();
-    // Tear the poll down on destroy â€” DestroyRef â†’ cleanup callback.
+    // Tear the poll down on destroy — DestroyRef → cleanup callback.
     this.destroyRef.onDestroy(() => this.stopPolling());
   }
 
@@ -278,12 +278,12 @@ export class CampaignDetailPageComponent {
       case 'queued':
         return 'bg-amber-50 text-amber-700 ring-amber-200';
       case 'failed':
-        return 'bg-rose-50 text-rose-700 ring-rose-200';
+        return 'bg-red-500/10 text-red-400 ring-red-500/20';
     }
   }
 
   protected formatDate(iso: string | null): string {
-    if (!iso) return 'â€”';
+    if (!iso) return '—';
     return new Date(iso).toLocaleString();
   }
 

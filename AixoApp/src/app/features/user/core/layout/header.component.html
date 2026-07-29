@@ -1,50 +1,114 @@
 <header
-  class="sticky top-0 z-10 flex h-14 items-center gap-4 border-b border-zinc-200 bg-white px-4 shadow-sm"
+  class="sticky top-0 z-10 flex h-[52px] items-center gap-3 border-b border-subtle bg-surface px-4"
 >
+  <!-- Mobile: open sidebar drawer -->
   <button
     type="button"
-    class="rounded p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 md:hidden"
+    class="rounded-lg p-1.5 text-muted transition hover:bg-surface-2 hover:text-default md:hidden"
     (click)="toggleSidebar.emit()"
-    aria-label="Toggle sidebar"
+    aria-label="Open menu"
   >
-    <lucide-icon name="menu" class="h-5 w-5" />
+    <lucide-icon name="menu" class="h-4 w-4" />
   </button>
 
-  <div class="relative flex max-w-md flex-1 items-center">
-    <lucide-icon name="search" class="pointer-events-none absolute left-3 h-4 w-4 text-zinc-400" />
-    <input
-      type="search"
-      placeholder="Search…"
-      class="h-9 w-full rounded-md border border-zinc-200 bg-zinc-50 pl-9 pr-3 text-sm placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white focus:outline-none"
-    />
-  </div>
+  <!-- Center: Cmd+K search trigger pill (desktop) -->
+  <button
+    type="button"
+    class="hidden h-8 max-w-[480px] flex-1 items-center gap-2 rounded-lg border border-subtle bg-app px-3 text-left text-sm text-faint transition hover:border-muted hover:text-muted md:mx-auto md:flex"
+    (click)="openPalette.emit()"
+    aria-label="Open command palette"
+  >
+    <lucide-icon name="search" class="h-3.5 w-3.5 shrink-0" />
+    <span class="flex-1 truncate">Search or jump to…</span>
+    <kbd
+      class="ml-auto hidden font-mono text-[10.5px] uppercase tracking-wider text-faint md:inline"
+    >
+      ⌘K
+    </kbd>
+  </button>
 
+  <!-- Right cluster -->
   <div class="ml-auto flex items-center gap-2">
+    <!-- Theme toggle (Step 2) -->
+    <div
+      class="inline-flex items-center rounded-lg border border-subtle bg-app p-0.5"
+      role="radiogroup"
+      aria-label="Theme"
+    >
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="themeChoice() === 'light'"
+        class="inline-flex h-6 w-6 items-center justify-center rounded transition"
+        [class.bg-surface]="themeChoice() === 'light'"
+        [class.text-default]="themeChoice() === 'light'"
+        [class.shadow-sm]="themeChoice() === 'light'"
+        [class.text-muted]="themeChoice() !== 'light'"
+        [class.hover:text-default]="themeChoice() !== 'light'"
+        (click)="pickTheme('light')"
+        aria-label="Light theme"
+      >
+        <lucide-icon name="sun" class="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="themeChoice() === 'dark'"
+        class="inline-flex h-6 w-6 items-center justify-center rounded transition"
+        [class.bg-surface]="themeChoice() === 'dark'"
+        [class.text-default]="themeChoice() === 'dark'"
+        [class.shadow-sm]="themeChoice() === 'dark'"
+        [class.text-muted]="themeChoice() !== 'dark'"
+        [class.hover:text-default]="themeChoice() !== 'dark'"
+        (click)="pickTheme('dark')"
+        aria-label="Dark theme"
+      >
+        <lucide-icon name="moon" class="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="themeChoice() === 'system'"
+        class="inline-flex h-6 w-6 items-center justify-center rounded transition"
+        [class.bg-surface]="themeChoice() === 'system'"
+        [class.text-default]="themeChoice() === 'system'"
+        [class.shadow-sm]="themeChoice() === 'system'"
+        [class.text-muted]="themeChoice() !== 'system'"
+        [class.hover:text-default]="themeChoice() !== 'system'"
+        (click)="pickTheme('system')"
+        aria-label="Match system theme"
+      >
+        <lucide-icon name="monitor" class="h-3.5 w-3.5" />
+      </button>
+    </div>
+
+    <!-- My tasks -->
     <div class="relative">
       <button
         type="button"
-        class="relative rounded p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"
+        class="relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-default"
         aria-label="My tasks"
         [attr.aria-expanded]="tasksOpen()"
         (click)="toggleTasks()"
       >
-        <lucide-icon name="check-square" class="h-5 w-5" />
+        <lucide-icon name="check-square" class="h-4 w-4" />
       </button>
       <app-my-tasks-popover [open]="tasksOpen()" />
     </div>
 
+    <!-- Notifications -->
     <div class="relative">
       <button
         type="button"
-        class="relative rounded p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"
+        class="relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-default"
         aria-label="Notifications"
         [attr.aria-expanded]="notificationsOpen()"
         (click)="toggleNotifications()"
       >
-        <lucide-icon name="bell" class="h-5 w-5" />
+        <lucide-icon name="bell" class="h-4 w-4" />
         @if (unreadCount() > 0) {
           <span
-            class="absolute right-0.5 top-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white"
+            class="absolute right-0 top-0 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 font-mono text-[10px] font-medium text-white"
           >
             {{ unreadCount() > 99 ? '99+' : unreadCount() }}
           </span>
@@ -56,42 +120,45 @@
       />
     </div>
 
+    <!-- Avatar / user menu -->
     <div class="relative">
       <button
         type="button"
-        class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-100"
+        class="inline-flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-subtle bg-accent-soft font-display text-sm font-semibold text-accent transition hover:brightness-105"
         (click)="toggleUserMenu()"
+        [attr.aria-expanded]="userMenuOpen()"
+        aria-label="Account"
       >
-        <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-zinc-200">
-          <lucide-icon name="user" class="h-4 w-4 text-zinc-600" />
-        </span>
         @if (user(); as u) {
-          <span class="hidden sm:inline">{{ u.full_name }}</span>
+          {{ u.full_name.charAt(0).toUpperCase() }}
+        } @else {
+          <lucide-icon name="user" class="h-4 w-4" />
         }
       </button>
 
       @if (userMenuOpen()) {
         <div
-          class="absolute right-0 top-full mt-1 w-44 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg"
+          class="absolute right-0 top-[42px] z-40 w-[224px] overflow-hidden rounded-xl border border-subtle bg-surface-2 p-1.5 shadow-elevated"
         >
           @if (user(); as u) {
-            <div class="border-b border-zinc-100 px-3 py-2 text-xs text-zinc-500">
-              <p class="truncate font-medium text-zinc-700">{{ u.full_name }}</p>
-              <p class="truncate">{{ u.email }}</p>
+            <div class="px-2.5 pb-2.5 pt-2">
+              <p class="truncate text-sm font-semibold text-default">{{ u.full_name }}</p>
+              <p class="truncate text-xs text-faint">{{ u.email }}</p>
             </div>
+            <div class="my-1 h-px bg-subtle"></div>
           }
           <a
             routerLink="/user/settings"
             [queryParams]="{ tab: 'profile' }"
-            class="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-50"
+            class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-default transition hover:bg-surface"
             (click)="toggleUserMenu()"
           >
-            <lucide-icon name="user" class="h-4 w-4" />
+            <lucide-icon name="user" class="h-4 w-4 text-muted" />
             Profile
           </a>
           <button
             type="button"
-            class="flex w-full items-center gap-2 border-t border-zinc-100 px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-50"
+            class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-red-500 transition hover:bg-surface"
             (click)="logout()"
           >
             <lucide-icon name="log-out" class="h-4 w-4" />

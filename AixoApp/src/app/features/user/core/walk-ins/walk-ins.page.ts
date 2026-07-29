@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -163,6 +163,15 @@ export class WalkInsPageComponent {
     for (const u of this.users()) map.set(u.id, u.full_name);
     return map;
   });
+
+  /** Gates the "Owner" filter dropdown. Only users with ``users.read``
+   * see org-wide walk-ins (backend list endpoint clamps everyone else
+   * to their own rows — see ``api/src/app/core/walk_ins/router.py``).
+   * Showing the dropdown to scoped roles is misleading because picking
+   * another owner would return an empty list. */
+  protected readonly canFilterByOwner = computed(() =>
+    this.auth.currentPermissions().includes('users.read'),
+  );
 
   /** Whether the scope toggle should be visible. Junior staff get the
    * implicit "mine" default with no toggle. */
@@ -720,7 +729,7 @@ export class WalkInsPageComponent {
   protected statusClass(status: WalkInStatus): string {
     switch (status) {
       case 'browsing':
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
       case 'interested':
         return 'bg-amber-100 text-amber-700 ring-amber-200';
       case 'follow_up':

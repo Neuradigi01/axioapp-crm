@@ -5,6 +5,20 @@
 // =============================================================================
 
 @use '@angular/material' as mat;
+@use 'styles/aixo-tokens';
+@use 'styles/aixo-components';
+// Legacy semantic-token mappings (--page-bg, --surface-1, --border-color etc.)
+// scoped by [data-theme] on <html> so they swap alongside AIXO tokens.
+// Both files are always loaded — the selector picks the active palette.
+@use 'styles/dark';
+@use 'styles/light';
+
+// Variable-font families for the AIXO design system. Loaded via @import
+// (not @use) because they're CSS files, not Sass modules — must sit after
+// all @use rules per Sass ordering rules.
+@import '@fontsource-variable/inter/index.css';
+@import '@fontsource-variable/inter-tight/index.css';
+@import '@fontsource-variable/jetbrains-mono/index.css';
 
 // ---------------------------------------------------------------------------
 // Material Theme
@@ -33,12 +47,13 @@ html {
 }
 
 body {
-  background-color: var(--page-bg);
-  color: var(--page-text);
-  font-family: var(--font-family-primary);
-  font: var(--mat-sys-body-medium);
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
   margin: 0;
   height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transition:
     background-color var(--transition-normal),
     color var(--transition-normal);
@@ -68,10 +83,67 @@ body {
 // ---------------------------------------------------------------------------
 // Material Component Overrides
 // ---------------------------------------------------------------------------
+// Point Material's system tokens at the AIXO palette so `mat-*` components
+// (form-field, slide-toggle, checkbox, radio, ripple) pick up the AIXO
+// accent instead of the built-in Azure blue.
+:root {
+  --mat-sys-primary: var(--accent);
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: var(--accent-soft);
+  --mat-sys-on-primary-container: var(--accent);
+}
+
 .mat-mdc-card {
-  background-color: var(--mat-card-background-color) !important;
-  border: var(--mat-card-border) !important;
-  box-shadow: var(--mat-card-box-shadow) !important;
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  color: var(--text);
+}
+
+// mat-form-field container background + text tokens repointed at AIXO
+// tokens so filled/outlined fields look like the AIXO `.input` primitive.
+.mat-mdc-form-field {
+  --mdc-filled-text-field-container-color: var(--bg);
+  --mdc-outlined-text-field-outline-color: var(--border);
+  --mdc-outlined-text-field-hover-outline-color: var(--text-faint);
+  --mdc-outlined-text-field-focus-outline-color: var(--accent);
+  --mdc-filled-text-field-label-text-color: var(--text-muted);
+  --mdc-outlined-text-field-label-text-color: var(--text-muted);
+  --mdc-filled-text-field-input-text-color: var(--text);
+  --mdc-outlined-text-field-input-text-color: var(--text);
+  --mdc-filled-text-field-caret-color: var(--accent);
+  --mdc-outlined-text-field-caret-color: var(--accent);
+}
+
+// Slide-toggle / checkbox / radio — track + fill point at accent.
+.mat-mdc-slide-toggle {
+  --mdc-switch-selected-track-color: var(--accent);
+  --mdc-switch-selected-hover-track-color: var(--accent);
+  --mdc-switch-selected-focus-track-color: var(--accent);
+  --mdc-switch-selected-pressed-track-color: var(--accent);
+  --mdc-switch-unselected-track-color: var(--bg);
+  --mdc-switch-unselected-hover-track-color: var(--bg);
+  --mdc-switch-selected-handle-color: #ffffff;
+  --mdc-switch-selected-hover-handle-color: #ffffff;
+}
+
+.mat-mdc-checkbox {
+  --mdc-checkbox-selected-icon-color: var(--accent);
+  --mdc-checkbox-selected-hover-icon-color: var(--accent);
+  --mdc-checkbox-selected-focus-icon-color: var(--accent);
+  --mdc-checkbox-selected-pressed-icon-color: var(--accent);
+  --mdc-checkbox-unselected-icon-color: var(--border);
+  --mdc-checkbox-unselected-hover-icon-color: var(--text-faint);
+}
+
+.mat-mdc-radio-button {
+  --mdc-radio-selected-icon-color: var(--accent);
+  --mdc-radio-selected-hover-icon-color: var(--accent);
+  --mdc-radio-selected-focus-icon-color: var(--accent);
+  --mdc-radio-selected-pressed-icon-color: var(--accent);
+  --mdc-radio-unselected-icon-color: var(--border);
+  --mdc-radio-unselected-hover-icon-color: var(--text-faint);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,36 +250,34 @@ body {
   }
 }
 
+// AIXO table look — no zebra stripes, uppercase micro-labels in the head,
+// 1px per-row separator, hover surface-2. Applies to any legacy list page
+// using `.page-layout__table`; new pages should use `.aixo-table` directly.
 .page-layout__table {
   th {
-    padding: var(--spacing-md) var(--spacing-lg);
+    padding: 10px 16px;
     text-align: left;
-    font-size: var(--font-size-sm);
+    font-size: 11px;
     font-weight: 600;
-    color: var(--page-text-secondary);
-    background-color: var(--table-header-bg);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background-color: var(--surface-2);
     white-space: nowrap;
-    border-bottom: 1px solid var(--divider-color);
+    border-bottom: 1px solid var(--border);
   }
 
   td {
-    padding: var(--spacing-md) var(--spacing-lg);
-    font-size: var(--font-size-sm);
-    color: var(--page-text);
-    border-bottom: 1px solid var(--divider-color);
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
     vertical-align: middle;
+    background-color: transparent;
   }
 
   tr:hover td {
-    background-color: var(--table-row-hover);
-  }
-
-  tr:nth-child(even) td {
-    background-color: var(--table-row-alt);
-  }
-
-  tr:nth-child(even):hover td {
-    background-color: var(--table-row-hover);
+    background-color: var(--surface-2);
   }
 }
 
@@ -224,7 +294,7 @@ body {
   .page-layout__table {
     th,
     td {
-      padding: var(--spacing-sm) var(--spacing-md);
+      padding: 8px 12px;
     }
   }
 }
@@ -328,5 +398,88 @@ body {
     padding: 0 !important;
     max-height: none !important;
     height: 100%;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AIXO Modal Dialog (default look for any MatDialog)
+// ---------------------------------------------------------------------------
+.mat-mdc-dialog-container {
+  --mdc-dialog-container-color: var(--surface-2);
+  --mdc-dialog-subhead-color: var(--text);
+  --mdc-dialog-supporting-text-color: var(--text-muted);
+
+  .mdc-dialog__surface {
+    background: var(--surface-2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35) !important;
+    animation: popIn 0.12s ease;
+  }
+}
+
+.cdk-overlay-dark-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+// ---------------------------------------------------------------------------
+// AIXO Dropdown Menu (default look for any MatMenu)
+// ---------------------------------------------------------------------------
+.mat-mdc-menu-panel {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35) !important;
+  padding: 6px !important;
+  animation: popIn 0.12s ease;
+
+  .mat-mdc-menu-content {
+    padding: 0 !important;
+  }
+
+  .mat-mdc-menu-item {
+    border-radius: 8px !important;
+    min-height: auto !important;
+    padding: 9px 10px !important;
+    font-size: 13px !important;
+    color: var(--text) !important;
+    font-family: var(--font-ui);
+
+    &:hover:not([disabled]) {
+      background: var(--surface) !important;
+    }
+
+    .mat-mdc-menu-item-text {
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .mat-icon,
+    lucide-icon {
+      color: var(--text-muted);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AIXO Snackbar (MatSnackBar) — bottom-right AIXO toast look
+// ---------------------------------------------------------------------------
+.mat-mdc-snack-bar-container {
+  --mdc-snackbar-container-color: var(--surface-2);
+  --mdc-snackbar-supporting-text-color: var(--text);
+  --mat-snack-bar-button-color: var(--accent);
+
+  .mdc-snackbar__surface {
+    background: var(--surface-2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35) !important;
+    min-width: auto !important;
+  }
+
+  .mdc-snackbar__label {
+    color: var(--text) !important;
+    font-family: var(--font-ui);
+    font-size: 13px !important;
   }
 }

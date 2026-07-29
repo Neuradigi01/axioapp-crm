@@ -1,9 +1,9 @@
-<div class="w-full rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
+<div class="w-full rounded-xl border border-subtle bg-surface p-6 shadow-sm sm:p-8">
   <div class="mb-6 text-center">
-    <h1 class="text-xl font-semibold text-zinc-900">
+    <h1 class="text-xl font-semibold text-default">
       {{ isAdmin ? 'Admin Sign In' : 'Sign In' }}
     </h1>
-    <p class="mt-1 text-sm text-zinc-500">
+    <p class="mt-1 text-sm text-muted">
       {{ isAdmin ? 'Admin Portal' : 'Welcome back' }}
     </p>
   </div>
@@ -11,7 +11,7 @@
   <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="space-y-4">
     <!-- Identifier -->
     <div>
-      <label for="identifier" class="mb-1 block text-sm font-medium text-zinc-700">
+      <label for="identifier" class="mb-1 block text-sm font-medium text-default">
         {{ isAdmin ? 'Admin ID or Email' : 'User ID or Email' }}
       </label>
       <input
@@ -19,13 +19,13 @@
         type="text"
         formControlName="identifier"
         autocomplete="username"
-        class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       />
       @if (
         loginForm.controls['identifier'].invalid &&
         (loginForm.controls['identifier'].touched || loginForm.controls['identifier'].dirty)
       ) {
-        <p class="mt-1 text-xs text-rose-600">
+        <p class="mt-1 text-xs text-red-500">
           <app-validation-message
             [control]="loginForm.controls['identifier']"
             [label]="isAdmin ? 'Admin ID or Email' : 'User ID or Email'"
@@ -36,20 +36,20 @@
 
     <!-- Password -->
     <div>
-      <label for="password" class="mb-1 block text-sm font-medium text-zinc-700">Password</label>
+      <label for="password" class="mb-1 block text-sm font-medium text-default">Password</label>
       <div class="relative" appPasswordToggle #pwToggle="passwordToggle">
         <input
           id="password"
           formControlName="password"
           [type]="pwToggle.type()"
           autocomplete="current-password"
-          class="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 pr-10 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 pr-10 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
         <button
           type="button"
           (click)="pwToggle.toggle()"
           [attr.aria-label]="pwToggle.ariaLabel()"
-          class="absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400 transition hover:text-zinc-600"
+          class="absolute inset-y-0 right-0 flex items-center px-3 text-faint transition hover:text-muted"
         >
           <lucide-icon [name]="pwToggle.hidden() ? 'eye' : 'eye-off'" class="h-4 w-4" />
         </button>
@@ -58,18 +58,18 @@
         loginForm.controls['password'].invalid &&
         (loginForm.controls['password'].touched || loginForm.controls['password'].dirty)
       ) {
-        <p class="mt-1 text-xs text-rose-600">
+        <p class="mt-1 text-xs text-red-500">
           <app-validation-message [control]="loginForm.controls['password']" label="Password" />
         </p>
       }
     </div>
 
     <!-- Remember Me -->
-    <label class="flex items-center gap-2 text-sm text-zinc-600">
+    <label class="flex items-center gap-2 text-sm text-muted">
       <input
         type="checkbox"
         formControlName="rememberMe"
-        class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+        class="h-4 w-4 rounded border-subtle text-default focus:ring-accent"
       />
       Remember me
     </label>
@@ -85,7 +85,7 @@
     <button
       type="submit"
       [disabled]="isLoading() || loginForm.invalid"
-      class="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+      class="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {{ isLoading() ? 'Signing in…' : 'Sign In' }}
     </button>
@@ -94,14 +94,14 @@
   <div class="mt-6 flex flex-col items-center gap-2 text-center">
     <a
       [routerLink]="forgotPasswordUrl"
-      class="text-sm font-medium text-zinc-600 transition hover:text-zinc-900"
+      class="text-sm font-medium text-muted transition hover:text-default"
     >
       Forgot password?
     </a>
     @if (!isAdmin) {
-      <p class="text-sm text-zinc-500">
+      <p class="text-sm text-muted">
         Don't have an account?
-        <a [routerLink]="registerUrl" class="font-medium text-zinc-900 hover:underline">Register</a>
+        <a [routerLink]="registerUrl" class="font-medium text-default hover:underline">Register</a>
       </p>
     }
   </div>

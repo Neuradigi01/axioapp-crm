@@ -26,7 +26,7 @@ const MORE_EMOJIS = ['🔥', '🎉', '👏', '✅', '❌', '💯', '🤔', '😎
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
-      class="inline-flex flex-col gap-1 rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-md"
+      class="inline-flex flex-col gap-1 rounded-2xl border border-subtle bg-surface p-1.5 shadow-md"
       (click)="$event.stopPropagation()"
     >
       <div class="flex items-center gap-0.5">
@@ -35,8 +35,8 @@ const MORE_EMOJIS = ['🔥', '🎉', '👏', '✅', '❌', '💯', '🤔', '😎
             type="button"
             (click)="pickEmoji(emoji)"
             [class]="
-              'inline-flex h-8 w-8 items-center justify-center rounded-full text-lg transition hover:bg-zinc-100 ' +
-              (existing === emoji ? 'bg-zinc-100 ring-1 ring-zinc-300' : '')
+              'inline-flex h-8 w-8 items-center justify-center rounded-full text-lg transition hover:bg-surface-2 ' +
+              (existing === emoji ? 'bg-surface-2 ring-1 border-subtle' : '')
             "
             [attr.aria-label]="'React with ' + emoji"
           >
@@ -46,7 +46,7 @@ const MORE_EMOJIS = ['🔥', '🎉', '👏', '✅', '❌', '💯', '🤔', '😎
         <button
           type="button"
           (click)="toggleMore()"
-          class="inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium text-zinc-500 transition hover:bg-zinc-100"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium text-muted transition hover:bg-surface-2"
           aria-label="More reactions"
         >
           {{ moreOpen() ? '−' : '+' }}
@@ -59,8 +59,8 @@ const MORE_EMOJIS = ['🔥', '🎉', '👏', '✅', '❌', '💯', '🤔', '😎
               type="button"
               (click)="pickEmoji(emoji)"
               [class]="
-                'inline-flex h-8 w-8 items-center justify-center rounded-full text-lg transition hover:bg-zinc-100 ' +
-                (existing === emoji ? 'bg-zinc-100 ring-1 ring-zinc-300' : '')
+                'inline-flex h-8 w-8 items-center justify-center rounded-full text-lg transition hover:bg-surface-2 ' +
+                (existing === emoji ? 'bg-surface-2 ring-1 border-subtle' : '')
               "
               [attr.aria-label]="'React with ' + emoji"
             >

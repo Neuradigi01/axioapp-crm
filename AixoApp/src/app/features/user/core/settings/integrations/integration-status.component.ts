@@ -96,9 +96,9 @@ export class IntegrationStatusComponent {
       case 'expired':
         return 'bg-amber-500';
       case 'error':
-        return 'bg-rose-500';
+        return 'bg-red-500';
       default:
-        return 'bg-zinc-400';
+        return 'bg-surface-2';
     }
   }
 

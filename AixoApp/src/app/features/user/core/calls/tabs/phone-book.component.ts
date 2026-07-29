@@ -1,4 +1,4 @@
-﻿import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -68,7 +68,7 @@ export class CallPhoneBookTabComponent {
 
   protected avatarBg(id: string): string {
     const palette = [
-      'bg-rose-100 text-rose-700',
+      'bg-red-500/10 text-red-400',
       'bg-amber-100 text-amber-700',
       'bg-emerald-100 text-emerald-700',
       'bg-sky-100 text-sky-700',
@@ -116,7 +116,7 @@ export class CallPhoneBookTabComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
-          // Only show contacts that actually have a phone â€” clicking
+          // Only show contacts that actually have a phone — clicking
           // "Call" on a row without one is a footgun.
           this.items.set(resp.items.filter((c) => !!c.phone));
           this.loading.set(false);

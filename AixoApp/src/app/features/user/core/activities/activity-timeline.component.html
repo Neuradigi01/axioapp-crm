@@ -1,34 +1,34 @@
 @if (loadError(); as err) {
-  <div class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+  <div class="rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 border-red-500/20">
     {{ err }}
   </div>
 } @else if (loading() && items().length === 0) {
   <ul class="space-y-4" aria-busy="true">
     @for (i of skeletonRows; track i) {
       <li class="flex items-start gap-3 animate-pulse">
-        <div class="h-8 w-8 shrink-0 rounded-full bg-zinc-200"></div>
+        <div class="h-8 w-8 shrink-0 rounded-full bg-surface-2"></div>
         <div class="flex-1">
-          <div class="h-3 w-32 rounded bg-zinc-200"></div>
-          <div class="mt-2 h-3 w-full rounded bg-zinc-100"></div>
+          <div class="h-3 w-32 rounded bg-surface-2"></div>
+          <div class="mt-2 h-3 w-full rounded bg-surface-2"></div>
         </div>
       </li>
     }
   </ul>
 } @else if (items().length === 0) {
   <p
-    class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+    class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-4 md:py-6 text-center text-sm text-muted"
   >
     No activity yet.
-    <span class="block text-xs text-zinc-400">Add a note below to start the timeline.</span>
+    <span class="block text-xs text-faint">Add a note below to start the timeline.</span>
   </p>
 } @else {
   <div class="space-y-6">
     @for (group of groups(); track group.day) {
       <section>
-        <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+        <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
           {{ group.label }}
         </h3>
-        <ol class="relative ml-3 border-l border-zinc-200">
+        <ol class="relative ml-3 border-l border-subtle">
           @for (a of group.items; track a.id) {
             @let m = meta(a.type);
             <li class="relative mb-5 pl-6 last:mb-0">
@@ -39,10 +39,10 @@
                 <lucide-icon [name]="m.icon" class="h-3.5 w-3.5" />
               </span>
               <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span class="text-sm font-medium text-zinc-900">{{ m.label }}</span>
-                <span class="text-xs text-zinc-500">{{ a.created_at | relativeTime }}</span>
+                <span class="text-sm font-medium text-default">{{ m.label }}</span>
+                <span class="text-xs text-muted">{{ a.created_at | relativeTime }}</span>
               </div>
-              <p class="mt-1 whitespace-pre-wrap text-sm text-zinc-700">
+              <p class="mt-1 whitespace-pre-wrap text-sm text-default">
                 {{ payloadPreview(a) }}
               </p>
             </li>

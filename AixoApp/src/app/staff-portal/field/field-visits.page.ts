@@ -22,11 +22,11 @@ import {
 } from '../../features/user/packs/furniture/field-ops/field-ops-api.service';
 
 /**
- * Staff Portal â†’ Field Visits tab.
+ * Staff Portal → Field Visits tab.
  *
  * Lists visits assigned to the logged-in staff user (via the
  * `/staff-portal/me/field-visits` family, which gates on the staff
- * bearer token). Tap a visit to complete it on the spot â€” the
+ * bearer token). Tap a visit to complete it on the spot — the
  * complete handler shares the same backend service as the admin
  * surface, including measurement copyback to any linked custom order.
  */
@@ -96,7 +96,7 @@ export class FieldVisitsPageComponent {
   }
 
   protected formatDateTime(iso: string | null): string {
-    if (!iso) return 'â€”';
+    if (!iso) return '—';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleString('en-IN', {

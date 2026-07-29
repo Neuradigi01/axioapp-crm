@@ -8,27 +8,24 @@
     <!-- Backdrop -->
     <button
       type="button"
-      class="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm"
+      class="absolute inset-0 bg-black/60 backdrop-blur-sm"
       (click)="close()"
       aria-label="Close upgrade modal"
     ></button>
 
     <!-- Panel -->
     <div
-      class="relative w-full max-w-2xl rounded-2xl bg-white shadow-xl dark:bg-slate-800 max-h-[90vh] flex flex-col"
+      class="relative w-full max-w-2xl rounded-2xl bg-surface shadow-xl max-h-[90vh] flex flex-col"
     >
       <header
-        class="flex items-start justify-between gap-4 border-b border-zinc-200 px-6 py-4 dark:border-slate-700"
+        class="flex items-start justify-between gap-4 border-b border-subtle px-4 md:px-6 py-4"
       >
-        <h2
-          id="upgrade-modal-title"
-          class="text-lg font-semibold text-zinc-900 dark:text-slate-100"
-        >
+        <h2 id="upgrade-modal-title" class="text-lg font-semibold text-default">
           Upgrade your plan
         </h2>
         <button
           type="button"
-          class="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-slate-700 dark:hover:text-slate-100"
+          class="rounded-md p-1 text-muted hover:bg-surface-2 hover:text-default dark:hover:text-default"
           (click)="close()"
           aria-label="Close"
         >
@@ -36,36 +33,34 @@
         </button>
       </header>
 
-      <div class="flex-1 overflow-y-auto px-6 py-5">
+      <div class="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         <!-- Plan loading / error -->
         @if (plansLoading()) {
           <div class="space-y-3">
             @for (i of [0, 1, 2]; track i) {
-              <div class="h-20 rounded-lg bg-zinc-100 dark:bg-slate-700 animate-pulse"></div>
+              <div class="h-20 rounded-lg bg-surface-2 animate-pulse"></div>
             }
           </div>
         } @else if (plansError()) {
           <p
-            class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+            class="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
           >
             Couldn't load the plan list. Please close this dialog and try again.
           </p>
         } @else {
           <fieldset>
-            <legend class="text-sm font-medium text-zinc-700 dark:text-slate-200 mb-3">
-              Choose your plan
-            </legend>
+            <legend class="text-sm font-medium text-default mb-3">Choose your plan</legend>
             <div class="space-y-2">
               @for (plan of visiblePlans(); track plan.code) {
                 <label
                   class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
                   [class.border-blue-600]="selectedPlan() === plan.code"
-                  [class.bg-blue-50]="selectedPlan() === plan.code"
+                  [class.bg-blue-500/10]="selectedPlan() === plan.code"
                   [class.dark:bg-blue-950]="selectedPlan() === plan.code"
-                  [class.border-zinc-200]="selectedPlan() !== plan.code"
-                  [class.dark:border-slate-700]="selectedPlan() !== plan.code"
-                  [class.hover:border-zinc-300]="selectedPlan() !== plan.code"
-                  [class.dark:hover:border-slate-600]="selectedPlan() !== plan.code"
+                  [class.border-subtle]="selectedPlan() !== plan.code"
+                  [class.dark:border-subtle]="selectedPlan() !== plan.code"
+                  [class.hover:border-subtle]="selectedPlan() !== plan.code"
+                  [class.dark:hover:border-subtle]="selectedPlan() !== plan.code"
                 >
                   <input
                     type="radio"
@@ -77,7 +72,7 @@
                   />
                   <div class="flex-1">
                     <div class="flex items-center justify-between gap-2">
-                      <span class="font-medium text-zinc-900 dark:text-slate-100">
+                      <span class="font-medium text-default">
                         {{ plan.name }}
                       </span>
                       @if (isPopular(plan.code)) {
@@ -88,9 +83,9 @@
                         </span>
                       }
                     </div>
-                    <div class="mt-0.5 text-sm text-zinc-600 dark:text-slate-300">
+                    <div class="mt-0.5 text-sm text-muted">
                       ₹{{ formatINR(planPriceFor(plan)) }}/mo
-                      <span class="text-zinc-400">·</span>
+                      <span class="text-faint">·</span>
                       Up to {{ plan.pricing.included_seats }} seats included
                     </div>
                   </div>
@@ -100,18 +95,16 @@
           </fieldset>
 
           <fieldset class="mt-5">
-            <legend class="text-sm font-medium text-zinc-700 dark:text-slate-200 mb-2">
-              Billing cycle
-            </legend>
-            <div class="inline-flex rounded-full border border-zinc-200 p-1 dark:border-slate-700">
+            <legend class="text-sm font-medium text-default mb-2">Billing cycle</legend>
+            <div class="inline-flex rounded-full border border-subtle p-1">
               <button
                 type="button"
                 (click)="setCycle('monthly')"
                 class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
                 [class.bg-blue-600]="selectedCycle() === 'monthly'"
                 [class.text-white]="selectedCycle() === 'monthly'"
-                [class.text-zinc-700]="selectedCycle() !== 'monthly'"
-                [class.dark:text-slate-300]="selectedCycle() !== 'monthly'"
+                [class.text-default]="selectedCycle() !== 'monthly'"
+                [class.dark:text-muted]="selectedCycle() !== 'monthly'"
               >
                 Monthly
               </button>
@@ -121,8 +114,8 @@
                 class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
                 [class.bg-blue-600]="selectedCycle() === 'annual'"
                 [class.text-white]="selectedCycle() === 'annual'"
-                [class.text-zinc-700]="selectedCycle() !== 'annual'"
-                [class.dark:text-slate-300]="selectedCycle() !== 'annual'"
+                [class.text-default]="selectedCycle() !== 'annual'"
+                [class.dark:text-muted]="selectedCycle() !== 'annual'"
               >
                 Annual <span class="ml-1 text-xs opacity-80">save 20%</span>
               </button>
@@ -130,63 +123,51 @@
           </fieldset>
 
           <fieldset class="mt-5">
-            <legend class="text-sm font-medium text-zinc-700 dark:text-slate-200 mb-2">
-              Seats
-            </legend>
-            <div
-              class="inline-flex items-center gap-2 rounded-lg border border-zinc-200 p-1 dark:border-slate-700"
-            >
+            <legend class="text-sm font-medium text-default mb-2">Seats</legend>
+            <div class="inline-flex items-center gap-2 rounded-lg border border-subtle p-1">
               <button
                 type="button"
                 (click)="decrementSeats()"
                 [disabled]="selectedSeats() <= minSeats()"
-                class="rounded-md px-3 py-1 text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-700"
+                class="rounded-md px-3 py-1 text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Decrease seats"
               >
                 −
               </button>
-              <span class="min-w-[2ch] text-center font-medium text-zinc-900 dark:text-slate-100">
+              <span class="min-w-[2ch] text-center font-medium text-default">
                 {{ selectedSeats() }}
               </span>
               <button
                 type="button"
                 (click)="incrementSeats()"
-                class="rounded-md px-3 py-1 text-zinc-700 hover:bg-zinc-100 dark:text-slate-300 dark:hover:bg-slate-700"
+                class="rounded-md px-3 py-1 text-default hover:bg-surface-2"
                 aria-label="Increase seats"
               >
                 +
               </button>
             </div>
-            <p class="mt-1.5 text-xs text-zinc-500 dark:text-slate-400">
+            <p class="mt-1.5 text-xs text-muted">
               Minimum {{ minSeats() }} seat{{ minSeats() === 1 ? '' : 's' }}.
             </p>
           </fieldset>
 
-          <div
-            class="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-          >
+          <div class="mt-6 rounded-lg border border-subtle bg-surface-2 px-4 py-3 text-sm">
             <div class="flex items-center justify-between">
-              <span class="text-zinc-600 dark:text-slate-300">Estimated today</span>
-              <span class="font-semibold text-zinc-900 dark:text-slate-100">
-                ₹{{ formatINR(estimateToday()) }}
-              </span>
+              <span class="text-muted">Estimated today</span>
+              <span class="font-semibold text-default"> ₹{{ formatINR(estimateToday()) }} </span>
             </div>
             <div class="mt-1 flex items-center justify-between">
-              <span class="text-zinc-500 dark:text-slate-400">
-                Renews every {{ cycleLabel() }}
-              </span>
-              <span class="text-zinc-600 dark:text-slate-300">
-                ₹{{ formatINR(renewalAmount()) }}
-              </span>
+              <span class="text-muted"> Renews every {{ cycleLabel() }} </span>
+              <span class="text-muted"> ₹{{ formatINR(renewalAmount()) }} </span>
             </div>
-            <p class="mt-2 text-[11px] text-zinc-500 dark:text-slate-400">
+            <p class="mt-2 text-[11px] text-muted">
               Final amount confirmed at checkout. Stripe may adjust by a few paise.
             </p>
           </div>
 
           @if (submitError(); as msg) {
             <p
-              class="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+              class="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
               role="alert"
             >
               {{ msg }}
@@ -195,14 +176,12 @@
         }
       </div>
 
-      <footer
-        class="flex items-center justify-end gap-2 border-t border-zinc-200 px-6 py-3 dark:border-slate-700"
-      >
+      <footer class="flex items-center justify-end gap-2 border-t border-subtle px-4 md:px-6 py-3">
         <button
           type="button"
           (click)="close()"
           [disabled]="isSubmitting()"
-          class="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-700"
+          class="rounded-lg px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-40"
         >
           Cancel
         </button>

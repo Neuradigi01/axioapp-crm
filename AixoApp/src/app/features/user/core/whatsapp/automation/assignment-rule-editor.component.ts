@@ -42,9 +42,9 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, LucideAngularModule],
   template: `
-    <div class="space-y-4 rounded-md border border-zinc-200 bg-white p-4">
+    <div class="space-y-4 rounded-md border border-subtle bg-surface p-4">
       <div class="flex items-center justify-between">
-        <h3 class="text-base font-semibold text-zinc-900">
+        <h3 class="text-base font-semibold text-default">
           {{ editingId() ? 'Edit assignment rule' : 'New assignment rule' }}
         </h3>
         <label class="flex items-center gap-2 text-xs">
@@ -58,38 +58,40 @@ import {
       </div>
 
       @if (error(); as msg) {
-        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+        >
           {{ msg }}
         </div>
       }
 
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
-          <label class="mb-1 block text-xs font-medium text-zinc-700">Name</label>
+          <label class="mb-1 block text-xs font-medium text-default">Name</label>
           <input
             type="text"
             [ngModel]="name()"
             (ngModelChange)="name.set($event)"
             maxlength="128"
             placeholder="Round-robin sales team"
-            class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
           />
         </div>
         <div>
-          <label class="mb-1 block text-xs font-medium text-zinc-700">Priority</label>
+          <label class="mb-1 block text-xs font-medium text-default">Priority</label>
           <input
             type="number"
             [ngModel]="priority()"
             (ngModelChange)="priority.set($event)"
             min="0"
             max="10000"
-            class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
           />
         </div>
       </div>
 
       <div>
-        <label class="mb-1 block text-xs font-medium text-zinc-700">Strategy</label>
+        <label class="mb-1 block text-xs font-medium text-default">Strategy</label>
         <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
           @for (
             s of [
@@ -106,8 +108,8 @@ import {
               [class]="
                 'rounded-md border px-3 py-2 text-xs font-medium transition ' +
                 (strategy() === s.key
-                  ? 'border-zinc-900 bg-zinc-900 text-white'
-                  : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+                  ? 'border-accent bg-accent text-white'
+                  : 'border-subtle bg-surface text-default hover:bg-surface-2')
               "
             >
               {{ s.label }}
@@ -124,7 +126,7 @@ import {
         @case ('load_balanced') {
           <ng-container *ngTemplateOutlet="usersPicker" />
           <div>
-            <label class="mb-1 block text-xs font-medium text-zinc-700">
+            <label class="mb-1 block text-xs font-medium text-default">
               Cap per user (optional)
             </label>
             <input
@@ -133,17 +135,17 @@ import {
               (ngModelChange)="capPerUser.set($event ? Number($event) : null)"
               min="1"
               placeholder="No cap"
-              class="w-40 rounded-md border border-zinc-300 px-3 py-2 text-sm"
+              class="w-40 rounded-md border border-subtle px-3 py-2 text-sm"
             />
-            <p class="mt-1 text-[10px] text-zinc-500">
+            <p class="mt-1 text-[10px] text-muted">
               Skip users with this many open conversations or more.
             </p>
           </div>
         }
         @case ('tag_based') {
           <div>
-            <p class="mb-1 text-xs font-medium text-zinc-700">Tag → user mapping</p>
-            <p class="mb-2 text-[10px] text-zinc-500">
+            <p class="mb-1 text-xs font-medium text-default">Tag → user mapping</p>
+            <p class="mb-2 text-[10px] text-muted">
               When a new conversation has the tag, route it to the matching user.
             </p>
             <div class="space-y-2">
@@ -152,18 +154,18 @@ import {
                   <select
                     [ngModel]="row.tagId || null"
                     (ngModelChange)="updateTagMappingRow(i, 'tagId', $event)"
-                    class="flex-1 rounded-md border border-zinc-300 px-2 py-1.5 text-xs"
+                    class="flex-1 rounded-md border border-subtle px-2 py-1.5 text-xs"
                   >
                     <option [ngValue]="null">— Pick a tag —</option>
                     @for (t of tags(); track t.id) {
                       <option [ngValue]="t.id">{{ t.name }}</option>
                     }
                   </select>
-                  <span class="text-xs text-zinc-500">→</span>
+                  <span class="text-xs text-muted">→</span>
                   <select
                     [ngModel]="row.userId || null"
                     (ngModelChange)="updateTagMappingRow(i, 'userId', $event)"
-                    class="flex-1 rounded-md border border-zinc-300 px-2 py-1.5 text-xs"
+                    class="flex-1 rounded-md border border-subtle px-2 py-1.5 text-xs"
                   >
                     <option [ngValue]="null">— Pick a user —</option>
                     @for (u of staff(); track u.id) {
@@ -173,7 +175,7 @@ import {
                   <button
                     type="button"
                     (click)="removeTagMappingRow(i)"
-                    class="rounded p-1 text-zinc-500 hover:bg-zinc-100"
+                    class="rounded p-1 text-muted hover:bg-surface-2"
                     aria-label="Remove row"
                   >
                     <lucide-icon name="x" size="12" />
@@ -183,7 +185,7 @@ import {
               <button
                 type="button"
                 (click)="addTagMappingRow()"
-                class="rounded-md border border-dashed border-zinc-300 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50"
+                class="rounded-md border border-dashed border-subtle px-3 py-1.5 text-xs text-muted hover:bg-surface-2"
               >
                 + Add mapping
               </button>
@@ -192,8 +194,8 @@ import {
         }
         @case ('team_based') {
           <div>
-            <p class="mb-1 text-xs font-medium text-zinc-700">Team</p>
-            <p class="mb-2 text-[10px] text-zinc-500">
+            <p class="mb-1 text-xs font-medium text-default">Team</p>
+            <p class="mb-2 text-[10px] text-muted">
               Teams are a placeholder — this strategy picks a random active org member until the
               teams concept lands. Enter any UUID for now (or use a different strategy).
             </p>
@@ -202,13 +204,13 @@ import {
               [ngModel]="teamId()"
               (ngModelChange)="teamId.set($event)"
               placeholder="team UUID"
-              class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+              class="w-full rounded-md border border-subtle px-3 py-2 text-sm"
             />
           </div>
         }
       }
 
-      <label class="flex items-center gap-2 text-xs text-zinc-700">
+      <label class="flex items-center gap-2 text-xs text-default">
         <input
           type="checkbox"
           [checked]="skipOutsideHours()"
@@ -217,11 +219,11 @@ import {
         Skip outside business hours (uses the schedule on the Business Profile page)
       </label>
 
-      <div class="flex items-center justify-end gap-2 border-t border-zinc-100 pt-3">
+      <div class="flex items-center justify-end gap-2 border-t border-subtle pt-3">
         <button
           type="button"
           (click)="onCancel()"
-          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         >
           Cancel
         </button>
@@ -229,7 +231,7 @@ import {
           type="button"
           (click)="onSave()"
           [disabled]="saving()"
-          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
         >
           {{ saving() ? 'Saving…' : editingId() ? 'Save changes' : 'Create rule' }}
         </button>
@@ -239,8 +241,8 @@ import {
     <!-- Shared users picker used by round_robin + load_balanced -->
     <ng-template #usersPicker>
       <div>
-        <p class="mb-1 text-xs font-medium text-zinc-700">Eligible users</p>
-        <p class="mb-2 text-[10px] text-zinc-500">
+        <p class="mb-1 text-xs font-medium text-default">Eligible users</p>
+        <p class="mb-2 text-[10px] text-muted">
           Pick the staff who should receive new conversations.
         </p>
         <div class="space-y-1">

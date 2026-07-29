@@ -14,11 +14,11 @@ import { LucideAngularModule } from 'lucide-angular';
   imports: [LucideAngularModule],
   template: `
     <div
-      class="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-zinc-300 bg-white px-6 py-12 text-center"
+      class="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-subtle bg-surface px-6 py-12 text-center"
     >
-      <lucide-icon name="package" class="h-8 w-8 text-zinc-400"></lucide-icon>
-      <h3 class="text-lg font-semibold text-zinc-900">{{ title() }}</h3>
-      <p class="max-w-md text-sm text-zinc-500">{{ message() }}</p>
+      <lucide-icon name="package" class="h-8 w-8 text-faint"></lucide-icon>
+      <h3 class="text-lg font-semibold text-default">{{ title() }}</h3>
+      <p class="max-w-md text-sm text-muted">{{ message() }}</p>
     </div>
   `,
 })

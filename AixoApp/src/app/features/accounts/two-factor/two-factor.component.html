@@ -1,17 +1,17 @@
-<div class="w-full rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
+<div class="w-full rounded-xl border border-subtle bg-surface p-6 shadow-sm sm:p-8">
   <div class="mb-6 text-center">
-    <h1 class="text-xl font-semibold text-zinc-900">Two-Factor Verification</h1>
-    <p class="mt-1 text-sm text-zinc-500">
+    <h1 class="text-xl font-semibold text-default">Two-Factor Verification</h1>
+    <p class="mt-1 text-sm text-muted">
       Enter the verification code from your
-      <span class="font-medium text-zinc-700">{{ methodLabel }}</span>
+      <span class="font-medium text-default">{{ methodLabel }}</span>
     </p>
   </div>
 
   <!-- Expiry Timer -->
   <div
     class="mb-4 flex items-center justify-center gap-1.5 text-xs"
-    [class.text-rose-600]="isExpired"
-    [class.text-zinc-500]="!isExpired"
+    [class.text-red-500]="isExpired"
+    [class.text-muted]="!isExpired"
   >
     <lucide-icon name="clock" class="h-4 w-4" />
     @if (isExpired) {
@@ -29,7 +29,7 @@
         type="text"
         inputmode="numeric"
         maxlength="1"
-        class="h-12 w-10 rounded-md border border-zinc-300 bg-white text-center text-lg font-semibold text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:bg-zinc-100"
+        class="h-12 w-10 rounded-md border border-subtle bg-surface text-center text-lg font-semibold text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:cursor-not-allowed disabled:bg-surface-2"
         [value]="digit"
         [disabled]="isLoading() || isExpired"
         (input)="onDigitInput($index, $event)"
@@ -41,12 +41,12 @@
 
   <!-- Error Message -->
   @if (errorMessage()) {
-    <p class="mt-3 text-center text-sm text-rose-600">{{ errorMessage() }}</p>
+    <p class="mt-3 text-center text-sm text-red-500">{{ errorMessage() }}</p>
   }
 
   <!-- Loading Indicator -->
   @if (isLoading()) {
-    <p class="mt-3 text-center text-sm text-zinc-500">Verifying…</p>
+    <p class="mt-3 text-center text-sm text-muted">Verifying…</p>
   }
 
   <!-- Resend Button (email/sms only) -->
@@ -56,7 +56,7 @@
         type="button"
         [disabled]="resendCooldown() > 0 || isLoading()"
         (click)="resendCode()"
-        class="text-sm font-medium text-zinc-600 transition hover:text-zinc-900 disabled:cursor-not-allowed disabled:text-zinc-400"
+        class="text-sm font-medium text-muted transition hover:text-default disabled:cursor-not-allowed disabled:text-faint"
       >
         @if (resendCooldown() > 0) {
           Resend code in {{ resendCooldown() }}s
@@ -69,12 +69,12 @@
 
   <!-- Try Another Way -->
   @if (alternativeMethods.length > 0) {
-    <div class="mt-4 border-t border-zinc-100 pt-4 text-center">
+    <div class="mt-4 border-t border-subtle pt-4 text-center">
       <button
         type="button"
         (click)="toggleMethodOptions()"
         [disabled]="isLoading()"
-        class="text-sm font-medium text-zinc-600 transition hover:text-zinc-900 disabled:cursor-not-allowed disabled:text-zinc-400"
+        class="text-sm font-medium text-muted transition hover:text-default disabled:cursor-not-allowed disabled:text-faint"
       >
         Try another way
       </button>
@@ -86,7 +86,7 @@
               type="button"
               [disabled]="isLoading()"
               (click)="selectMethod(m)"
-              class="flex w-full items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              class="flex w-full items-center justify-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <lucide-icon
                 [name]="
@@ -111,7 +111,7 @@
   <div class="mt-6 text-center">
     <a
       [routerLink]="loginUrl()"
-      class="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-600 transition hover:text-zinc-900"
+      class="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-default"
     >
       <lucide-icon name="arrow-left" class="h-4 w-4" />
       Back to login

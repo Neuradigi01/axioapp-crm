@@ -1,86 +1,78 @@
 <div>
   <div class="mb-3 flex items-center justify-between gap-3">
-    <p class="text-sm text-zinc-500">
+    <p class="text-sm text-muted">
       Recent sign-ins to your account. The session you're using is marked
-      <span class="font-medium text-emerald-700">"This session"</span>. Sign out of any others if
+      <span class="font-medium text-emerald-400">"This session"</span>. Sign out of any others if
       they look unfamiliar.
     </p>
-    <button
-      type="button"
-      class="shrink-0 text-xs text-zinc-600 hover:text-zinc-900"
-      (click)="reload()"
-    >
+    <button type="button" class="shrink-0 text-xs text-muted hover:text-default" (click)="reload()">
       Refresh
     </button>
   </div>
 
   @if (error(); as err) {
-    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div
+      class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+    >
       {{ err }}
     </div>
   }
 
   @if (loading()) {
-    <div class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
+    <div
+      class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+    >
       Loading…
     </div>
   } @else if (sessions().length === 0) {
     <div
-      class="rounded-lg border border-dashed border-zinc-300 bg-white p-8 text-center text-sm text-zinc-500"
+      class="rounded-lg border border-dashed border-subtle bg-surface p-5 md:p-8 text-center text-sm text-muted"
     >
       No sessions on record.
     </div>
   } @else {
-    <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
-      <table class="min-w-full divide-y divide-zinc-200 text-sm">
-        <thead class="bg-zinc-50">
+    <div class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
+      <table class="min-w-full divide-y divide-subtle text-sm">
+        <thead class="bg-surface-2">
           <tr>
-            <th
-              class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
-            >
+            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
               Signed in
             </th>
-            <th
-              class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
-            >
+            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
               Device / browser
             </th>
-            <th
-              class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
-            >
+            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
               IP
             </th>
-            <th
-              class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
-            >
+            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
               Status
             </th>
             <th class="px-3 py-2"></th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-zinc-100">
+        <tbody class="divide-y divide-subtle">
           @for (s of sessions(); track s.id) {
-            <tr [class.bg-emerald-50]="s.is_current">
-              <td class="px-3 py-2 text-zinc-800">
+            <tr [class.bg-emerald-500/10]="s.is_current">
+              <td class="px-3 py-2 text-default">
                 {{ s.created_at | date: 'medium' }}
               </td>
-              <td class="px-3 py-2 text-zinc-700">
+              <td class="px-3 py-2 text-default">
                 {{ s.ua || '—' }}
               </td>
-              <td class="px-3 py-2 font-mono text-xs text-zinc-600">
+              <td class="px-3 py-2 font-mono text-xs text-muted">
                 {{ s.ip || '—' }}
               </td>
               <td class="px-3 py-2 text-xs">
                 @if (s.is_current) {
-                  <span class="rounded bg-emerald-100 px-2 py-0.5 text-emerald-800"
+                  <span class="rounded bg-emerald-500/10 px-2 py-0.5 text-emerald-400"
                     >This session</span
                   >
                 } @else if (s.revoked_at) {
-                  <span class="rounded bg-zinc-100 px-2 py-0.5 text-zinc-600">Signed out</span>
+                  <span class="rounded bg-surface-2 px-2 py-0.5 text-muted">Signed out</span>
                 } @else if (isActive(s)) {
-                  <span class="rounded bg-blue-100 px-2 py-0.5 text-blue-800">Active</span>
+                  <span class="rounded bg-blue-500/10 px-2 py-0.5 text-blue-400">Active</span>
                 } @else {
-                  <span class="rounded bg-amber-100 px-2 py-0.5 text-amber-800">Expired</span>
+                  <span class="rounded bg-amber-500/10 px-2 py-0.5 text-amber-400">Expired</span>
                 }
               </td>
               <td class="px-3 py-2 text-right">
@@ -89,7 +81,7 @@
                     type="button"
                     (click)="revoke(s)"
                     [disabled]="revokingId() === s.id"
-                    class="text-xs text-rose-600 hover:text-rose-800 disabled:opacity-50"
+                    class="text-xs text-red-500 hover:text-red-400 disabled:opacity-50"
                   >
                     {{ revokingId() === s.id ? 'Signing out…' : 'Sign out' }}
                   </button>

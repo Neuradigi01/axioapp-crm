@@ -1,18 +1,22 @@
 <div>
   @if (loadError(); as err) {
-    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div
+      class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+    >
       {{ err }}
     </div>
   }
 
   @if (loading()) {
-    <div class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
+    <div
+      class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+    >
       Loading…
     </div>
   } @else if (mode() === 'list') {
     <!-- List view -->
     <div class="mb-3 flex items-center justify-between">
-      <p class="text-sm text-zinc-500">
+      <p class="text-sm text-muted">
         {{ roles().length }} {{ roles().length === 1 ? 'role' : 'roles' }} defined for this
         organisation
       </p>
@@ -22,8 +26,8 @@
             <button
               type="button"
               (click)="toggleTemplatePicker()"
-              [class.bg-zinc-100]="showTemplatePicker()"
-              class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              [class.bg-surface-2]="showTemplatePicker()"
+              class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
             >
               + Add from template
             </button>
@@ -31,7 +35,7 @@
           <button
             type="button"
             (click)="startCreate()"
-            class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+            class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
           >
             Create role
           </button>
@@ -40,22 +44,22 @@
     </div>
 
     @if (showTemplatePicker() && availableTemplates().length > 0) {
-      <div class="mb-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+      <div class="mb-3 rounded-lg border border-subtle bg-surface-2 p-3">
         <div class="mb-2 flex items-center justify-between">
-          <p class="text-xs font-medium uppercase tracking-wide text-zinc-600">
+          <p class="text-xs font-medium uppercase tracking-wide text-muted">
             Add a role from a preset
           </p>
           <button
             type="button"
             (click)="toggleTemplatePicker()"
-            class="text-xs text-zinc-500 hover:text-zinc-900"
+            class="text-xs text-muted hover:text-default"
           >
             Close
           </button>
         </div>
         @if (templateError(); as err) {
           <div
-            class="mb-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+            class="mb-2 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
           >
             {{ err }}
           </div>
@@ -63,12 +67,12 @@
         <ul class="space-y-2">
           @for (t of availableTemplates(); track t.key) {
             <li
-              class="flex items-start justify-between gap-3 rounded-md border border-zinc-200 bg-white px-3 py-2"
+              class="flex items-start justify-between gap-3 rounded-md border border-subtle bg-surface px-3 py-2"
             >
               <div class="min-w-0">
-                <p class="truncate text-sm font-medium text-zinc-900">{{ t.name }}</p>
-                <p class="mt-0.5 text-xs text-zinc-500">{{ t.description }}</p>
-                <p class="mt-0.5 text-[11px] text-zinc-400">
+                <p class="truncate text-sm font-medium text-default">{{ t.name }}</p>
+                <p class="mt-0.5 text-xs text-muted">{{ t.description }}</p>
+                <p class="mt-0.5 text-[11px] text-faint">
                   {{ t.permission_keys.length }}
                   {{ t.permission_keys.length === 1 ? 'permission' : 'permissions' }}
                 </p>
@@ -77,7 +81,7 @@
                 type="button"
                 (click)="installTemplate(t)"
                 [disabled]="installingKey() !== null"
-                class="shrink-0 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                class="shrink-0 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {{ installingKey() === t.key ? 'Adding…' : 'Add to my org' }}
               </button>
@@ -89,28 +93,28 @@
 
     @if (roles().length === 0) {
       <div
-        class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
+        class="rounded-lg border border-dashed border-subtle bg-surface p-12 text-center text-sm text-muted"
       >
         No roles defined yet.
       </div>
     } @else {
-      <ul class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <ul class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
         @for (r of roles(); track r.id) {
           <li
-            class="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3 last:border-b-0"
+            class="flex items-center justify-between gap-3 border-b border-subtle px-4 py-3 last:border-b-0"
           >
             <div class="min-w-0">
               <div class="flex items-center gap-2">
-                <p class="truncate text-sm font-medium text-zinc-900">{{ r.name }}</p>
+                <p class="truncate text-sm font-medium text-default">{{ r.name }}</p>
                 @if (r.is_system) {
                   <span
-                    class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200"
+                    class="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400 ring-1 border-blue-500/20"
                   >
                     System
                   </span>
                 }
               </div>
-              <p class="mt-0.5 text-xs text-zinc-500">
+              <p class="mt-0.5 text-xs text-muted">
                 {{ r.permission_count }}
                 {{ r.permission_count === 1 ? 'permission' : 'permissions' }} · {{ r.member_count }}
                 {{ r.member_count === 1 ? 'member' : 'members' }}
@@ -120,7 +124,7 @@
               <button
                 type="button"
                 (click)="startEdit(r)"
-                class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
               >
                 {{ r.is_system ? 'View' : 'Edit' }}
               </button>
@@ -136,7 +140,7 @@
                         ' member(s) still use this role. Reassign them first.'
                       : 'Delete role'
                   "
-                  class="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="rounded-md border border-red-500/30 bg-surface px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Delete
                 </button>
@@ -150,12 +154,12 @@
     <!-- Editor view -->
     <form [formGroup]="nameForm" (ngSubmit)="saveEditor()" class="space-y-4">
       <div class="flex items-center justify-between">
-        <h3 class="text-base font-semibold text-zinc-900">
+        <h3 class="text-base font-semibold text-default">
           @if (editingRole(); as r) {
             {{ isReadOnly() ? 'View role' : 'Edit role' }}: {{ r.name }}
             @if (r.is_system) {
               <span
-                class="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200"
+                class="ml-2 inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400 ring-1 border-blue-500/20"
               >
                 System (read-only)
               </span>
@@ -167,53 +171,53 @@
         <button
           type="button"
           (click)="cancelEditor()"
-          class="text-sm text-zinc-500 hover:text-zinc-900"
+          class="text-sm text-muted hover:text-default"
         >
           ← Back to roles
         </button>
       </div>
 
       <label class="block">
-        <span class="mb-1 block text-xs font-medium text-zinc-600">Role name</span>
+        <span class="mb-1 block text-xs font-medium text-muted">Role name</span>
         <input
           type="text"
           formControlName="name"
           autocomplete="off"
           [attr.readonly]="isReadOnly() ? '' : null"
-          [class.bg-zinc-50]="isReadOnly()"
-          class="w-full max-w-md rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          [class.bg-surface-2]="isReadOnly()"
+          class="w-full max-w-md rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
         />
       </label>
 
       <div>
-        <p class="mb-2 text-xs font-medium text-zinc-600">
+        <p class="mb-2 text-xs font-medium text-muted">
           Permissions ({{ selectedKeys().size }} selected)
         </p>
-        <div class="space-y-3 rounded-lg border border-zinc-200 bg-white p-3">
+        <div class="space-y-3 rounded-lg border border-subtle bg-surface p-3">
           @for (group of permissionsByModule(); track group.module) {
-            <details class="rounded-md border border-zinc-100 bg-zinc-50/50" open>
+            <details class="rounded-md border border-subtle bg-surface-2/50" open>
               <summary
-                class="cursor-pointer select-none px-3 py-2 text-xs font-medium uppercase tracking-wide text-zinc-600 hover:text-zinc-900"
+                class="cursor-pointer select-none px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted hover:text-default"
               >
                 {{ group.module }}
-                <span class="ml-2 text-zinc-400 normal-case"> ({{ group.perms.length }}) </span>
+                <span class="ml-2 text-faint normal-case"> ({{ group.perms.length }}) </span>
               </summary>
               <div class="grid grid-cols-1 gap-1 px-3 pb-3 pt-1 md:grid-cols-2">
                 @for (p of group.perms; track p.id) {
                   <label
-                    class="flex items-start gap-2 rounded px-1.5 py-1 text-sm hover:bg-zinc-100"
+                    class="flex items-start gap-2 rounded px-1.5 py-1 text-sm hover:bg-surface-2"
                   >
                     <input
                       type="checkbox"
                       [checked]="isChecked(p.key)"
                       [disabled]="isReadOnly()"
                       (change)="toggleKey(p.key, $any($event.target).checked)"
-                      class="mt-0.5 h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      class="mt-0.5 h-4 w-4 rounded border-subtle text-default focus:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     <span class="min-w-0">
-                      <span class="block font-mono text-xs text-zinc-700">{{ p.key }}</span>
+                      <span class="block font-mono text-xs text-default">{{ p.key }}</span>
                       @if (p.description) {
-                        <span class="block text-[11px] text-zinc-500">{{ p.description }}</span>
+                        <span class="block text-[11px] text-muted">{{ p.description }}</span>
                       }
                     </span>
                   </label>
@@ -225,7 +229,9 @@
       </div>
 
       @if (editorError(); as err) {
-        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+        >
           {{ err }}
         </div>
       }
@@ -234,7 +240,7 @@
         <button
           type="button"
           (click)="cancelEditor()"
-          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         >
           {{ isReadOnly() ? 'Close' : 'Cancel' }}
         </button>
@@ -242,7 +248,7 @@
           <button
             type="submit"
             [disabled]="nameForm.invalid || saving()"
-            class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+            class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {{ saving() ? 'Saving…' : editingRole() ? 'Save changes' : 'Create role' }}
           </button>

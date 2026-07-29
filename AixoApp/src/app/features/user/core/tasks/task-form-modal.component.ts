@@ -11,7 +11,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, ValidatorFn } from '@angular/forms';
 import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
@@ -53,6 +53,8 @@ const FOLLOWUP_OPTIONS: ReadonlyArray<{
   { value: 'meeting', label: 'Meeting' },
   { value: 'other', label: 'Other' },
 ];
+
+const FOLLOWUP_VALUES: readonly string[] = FOLLOWUP_OPTIONS.map((o) => o.value);
 
 /**
  * Create-or-edit task modal. Same form for both flows; `task` input
@@ -100,14 +102,17 @@ export class TaskFormModalComponent extends BaseFormModalComponent {
 
     const setReq = (
       ctrl: 'description' | 'due_at' | 'assigned_to_id',
+      base: ValidatorFn[],
       row: StandardFieldRendered | undefined,
     ): void => {
-      this.form.controls[ctrl].setValidators(withRequiredIf([], row));
+      this.form.controls[ctrl].setValidators(withRequiredIf(base, row));
       this.form.controls[ctrl].updateValueAndValidity({ emitEvent: false });
     };
-    setReq('description', map['description']);
-    setReq('due_at', map['due_at']);
-    setReq('assigned_to_id', map['assigned_to_id']);
+    setReq('description', [commonValidators.maxLength(2000)], map['description']);
+    // due_at always blocks past values (no retrospective task-logging surface);
+    // required layered on top when the override says so.
+    setReq('due_at', [commonValidators.dateNotPast], map['due_at']);
+    setReq('assigned_to_id', [], map['assigned_to_id']);
   }
 
   /** When set, the modal is in edit mode for this task. */
@@ -129,11 +134,11 @@ export class TaskFormModalComponent extends BaseFormModalComponent {
 
   protected readonly form = this.fb.nonNullable.group({
     title: ['', [commonValidators.required, commonValidators.maxLength(255)]],
-    description: [''],
-    due_at: [''],
+    description: ['', [commonValidators.maxLength(2000)]],
+    due_at: ['', [commonValidators.dateNotPast]],
     priority: ['med' as TaskPriority, commonValidators.required],
     assigned_to_id: [''],
-    followup_type: ['' as '' | TaskFollowupType],
+    followup_type: ['' as '' | TaskFollowupType, [commonValidators.picklist(FOLLOWUP_VALUES)]],
   });
 
   protected readonly hasAssigneeDropdown = computed(() => this.assignees.length > 0);

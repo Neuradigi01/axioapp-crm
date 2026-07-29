@@ -1,7 +1,27 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 
+import { commonValidators } from '../../shared/validators';
 import { HtmlComposerComponent } from './html-composer.component';
+
+/**
+ * Group-level guard: the backend accepts either `body_text` OR `body_html`
+ * (auto-derives the missing side per `body_text_fallback_auto`) but at
+ * least one must be non-empty. Mirrored client-side so the submit
+ * button reflects the real state instead of failing on POST.
+ */
+function emailBodyPresenceValidator(group: AbstractControl): ValidationErrors | null {
+  const text = String(group.get('body_text')?.value ?? '').trim();
+  const html = String(group.get('body_html')?.value ?? '').trim();
+  return text.length === 0 && html.length === 0 ? { bodyMissing: true } : null;
+}
 
 /**
  * Email sub-form — subject + preview text + plain body + HTML body.
@@ -49,31 +69,35 @@ export class EmailFormComponent {
   }
 
   static build(): EmailFormGroup {
-    return new FormGroup({
-      subject: new FormControl<string>('', {
-        nonNullable: true,
-        validators: [Validators.required, Validators.maxLength(998)],
-      }),
-      preview_text: new FormControl<string>('', {
-        nonNullable: true,
-        validators: [Validators.maxLength(190)],
-      }),
-      // Not required at the form level any more — the backend accepts
-      // Email templates with only body_html, and derives body_text
-      // automatically when the fallback flag is on. The parent editor
-      // guards "at least one of body_text / body_html" before submit.
-      body_text: new FormControl<string>('', {
-        nonNullable: true,
-        validators: [Validators.maxLength(65535)],
-      }),
-      // Campaigns v1 Step 04 — HTML source. Sanitised server-side.
-      body_html: new FormControl<string>('', {
-        nonNullable: true,
-        validators: [Validators.maxLength(200000)],
-      }),
-      body_text_fallback_auto: new FormControl<boolean>(true, {
-        nonNullable: true,
-      }),
-    });
+    return new FormGroup(
+      {
+        subject: new FormControl<string>('', {
+          nonNullable: true,
+          validators: [commonValidators.trimmedRequired, Validators.maxLength(998)],
+        }),
+        preview_text: new FormControl<string>('', {
+          nonNullable: true,
+          validators: [Validators.maxLength(190)],
+        }),
+        // Not required at the control level — either body_text OR body_html
+        // is acceptable. The group-level `emailBodyPresenceValidator` enforces
+        // "at least one non-empty" so the submit button reflects reality.
+        body_text: new FormControl<string>('', {
+          nonNullable: true,
+          validators: [Validators.maxLength(65535)],
+        }),
+        // Campaigns v1 Step 04 — HTML source. Sanitised server-side. Cap
+        // matches common ESP limits (100 KB) — bigger templates are
+        // essentially always a copy-paste accident.
+        body_html: new FormControl<string>('', {
+          nonNullable: true,
+          validators: [Validators.maxLength(100000)],
+        }),
+        body_text_fallback_auto: new FormControl<boolean>(true, {
+          nonNullable: true,
+        }),
+      },
+      { validators: [emailBodyPresenceValidator] },
+    );
   }
 }

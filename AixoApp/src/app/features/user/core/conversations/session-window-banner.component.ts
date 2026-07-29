@@ -66,7 +66,7 @@ import { WhatsAppSessionState } from './conversations-api.service';
           <button
             type="button"
             (click)="pickTemplate.emit()"
-            class="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100"
+            class="rounded-md border border-amber-300 bg-surface px-2.5 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100"
           >
             Pick template
           </button>

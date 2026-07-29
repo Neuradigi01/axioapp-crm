@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -14,6 +14,7 @@ import { forkJoin } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
 import { FurnitureAuthService } from '../../auth/auth.service';
+import { commonValidators } from '../../shared/validators';
 import { initials } from '@core/services/text.util';
 import { extractApiError } from '@core/services/api-error.util';
 import {
@@ -44,13 +45,13 @@ interface RoleRow {
 }
 
 /**
- * Team tab â€” manage users in the active org.
+ * Team tab — manage users in the active org.
  *
  * Reads /api/v1/users + /api/v1/roles and joins them client-side so the
  * row shows the role NAME (the users payload only carries `role_id`).
  *
  * Admins (`users.write`) can edit a user inline (full_name, phone,
- * role) and toggle their is_active flag. Email is immutable â€”
+ * role) and toggle their is_active flag. Email is immutable —
  * changing email is handled by the invite flow (step 2.5.6, where the
  * Invite-member button gets wired up to it).
  *
@@ -107,7 +108,7 @@ export class TeamTabComponent {
   protected readonly revokingInviteId = signal<string | null>(null);
 
   protected readonly inviteForm = this.fb.nonNullable.group({
-    email: ['', [Validators.required, Validators.email]],
+    email: ['', [Validators.required, commonValidators.email, commonValidators.maxLength(254)]],
     role_id: ['', Validators.required],
   });
 
@@ -118,8 +119,8 @@ export class TeamTabComponent {
   });
 
   protected readonly editForm = this.fb.nonNullable.group({
-    full_name: ['', [Validators.required, Validators.maxLength(255)]],
-    phone: [''],
+    full_name: ['', [Validators.required, commonValidators.name, Validators.maxLength(255)]],
+    phone: ['', [commonValidators.phone()]],
     role_id: ['', Validators.required],
   });
 
@@ -246,6 +247,20 @@ export class TeamTabComponent {
         next: ({ users, roles }) => {
           this.items.set(users);
           this.roles.set(roles);
+          // Now that we know the allowed role IDs, layer a picklist
+          // validator on both role_id controls so an invalid stale
+          // selection can't slip through on save.
+          const roleIds = roles.map((r) => r.id);
+          this.editForm.controls.role_id.setValidators([
+            Validators.required,
+            commonValidators.picklist(roleIds),
+          ]);
+          this.editForm.controls.role_id.updateValueAndValidity({ emitEvent: false });
+          this.inviteForm.controls.role_id.setValidators([
+            Validators.required,
+            commonValidators.picklist(roleIds),
+          ]);
+          this.inviteForm.controls.role_id.updateValueAndValidity({ emitEvent: false });
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
@@ -270,7 +285,7 @@ export class TeamTabComponent {
         next: (rows) => this.invitations.set(rows),
         error: (err: HttpErrorResponse) => {
           this.invitations.set([]);
-          // 403 (no users.read) is silent â€” non-admins shouldn't see
+          // 403 (no users.read) is silent — non-admins shouldn't see
           // this section at all and the UI hides it when canWrite is
           // false. Anything else is a real load failure.
           if (err.status !== 403) {

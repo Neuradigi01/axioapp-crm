@@ -5,7 +5,7 @@
       [formControl]="text"
       rows="3"
       placeholder="Add a note (visible to everyone in your org)…"
-      class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
     ></textarea>
   </label>
 
@@ -13,13 +13,15 @@
     <p class="text-xs text-red-600">
       @if (text.errors?.['required']) {
         Please enter some text.
+      } @else if (text.errors?.['minlength']) {
+        Note is too short (at least 2 characters).
       } @else if (text.errors?.['maxlength']) {
         Notes are limited to 4,000 characters.
       }
     </p>
   }
   @if (submitError(); as err) {
-    <p class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+    <p class="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20">
       {{ err }}
     </p>
   }
@@ -28,7 +30,7 @@
     <button
       type="submit"
       [disabled]="submitting()"
-      class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+      class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:bg-surface-2"
     >
       {{ submitting() ? 'Saving…' : 'Add note' }}
     </button>

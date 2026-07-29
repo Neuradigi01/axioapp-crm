@@ -36,7 +36,7 @@ import { BlockListService, BlockReason } from '../../whatsapp/block-list/block-l
       <div class="relative inline-block">
         <button
           type="button"
-          class="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
+          class="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-surface px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10"
           (click)="toggle(); $event.stopPropagation()"
           aria-label="Block this number"
         >
@@ -45,14 +45,14 @@ import { BlockListService, BlockReason } from '../../whatsapp/block-list/block-l
         </button>
         @if (open()) {
           <div
-            class="absolute right-0 z-50 mt-1 w-64 rounded-md border border-zinc-200 bg-white p-3 text-xs shadow-lg"
+            class="absolute right-0 z-50 mt-1 w-64 rounded-md border border-subtle bg-surface p-3 text-xs shadow-lg"
             (click)="$event.stopPropagation()"
           >
-            <p class="mb-2 font-semibold text-zinc-800">Block {{ phoneNumber() }}</p>
+            <p class="mb-2 font-semibold text-default">Block {{ phoneNumber() }}</p>
             <label class="mb-2 block">
-              <span class="mb-1 block text-zinc-700">Reason</span>
+              <span class="mb-1 block text-default">Reason</span>
               <select
-                class="w-full rounded-md border border-zinc-300 px-2 py-1"
+                class="w-full rounded-md border border-subtle px-2 py-1"
                 [ngModel]="reason()"
                 (ngModelChange)="reason.set($event)"
               >
@@ -64,22 +64,22 @@ import { BlockListService, BlockReason } from '../../whatsapp/block-list/block-l
               </select>
             </label>
             <label class="mb-2 block">
-              <span class="mb-1 block text-zinc-700">Notes</span>
+              <span class="mb-1 block text-default">Notes</span>
               <textarea
                 rows="2"
-                class="w-full rounded-md border border-zinc-300 px-2 py-1"
+                class="w-full rounded-md border border-subtle px-2 py-1"
                 [ngModel]="notes()"
                 (ngModelChange)="notes.set($event)"
               ></textarea>
             </label>
             @if (error(); as err) {
-              <p class="mb-1 text-[11px] text-rose-700">{{ err }}</p>
+              <p class="mb-1 text-[11px] text-red-400">{{ err }}</p>
             }
             <div class="flex justify-end gap-1">
               <button
                 type="button"
                 (click)="close()"
-                class="rounded border border-zinc-300 bg-white px-2 py-1 text-zinc-700 hover:bg-zinc-50"
+                class="rounded border border-subtle bg-surface px-2 py-1 text-default hover:bg-surface-2"
               >
                 Cancel
               </button>
@@ -87,7 +87,7 @@ import { BlockListService, BlockReason } from '../../whatsapp/block-list/block-l
                 type="button"
                 [disabled]="busy()"
                 (click)="submit()"
-                class="rounded bg-rose-600 px-2 py-1 font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+                class="rounded bg-red-500 px-2 py-1 font-semibold text-white hover:bg-red-400 disabled:opacity-50"
               >
                 {{ busy() ? 'Blocking…' : 'Block' }}
               </button>

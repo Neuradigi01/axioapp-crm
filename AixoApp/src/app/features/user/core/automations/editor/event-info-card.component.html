@@ -1,11 +1,11 @@
 @if (entry(); as e) {
-  <div class="mt-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs">
-    <p class="font-medium text-zinc-700">{{ e.label }}</p>
-    <p class="mt-0.5 text-zinc-600">{{ e.description }}</p>
+  <div class="mt-2 rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs">
+    <p class="font-medium text-default">{{ e.label }}</p>
+    <p class="mt-0.5 text-muted">{{ e.description }}</p>
     <button
       type="button"
       (click)="toggleExpanded()"
-      class="mt-2 inline-flex items-center gap-1 rounded text-[10px] font-medium uppercase tracking-wide text-zinc-500 hover:text-zinc-700"
+      class="mt-2 inline-flex items-center gap-1 rounded text-[10px] font-medium uppercase tracking-wide text-muted hover:text-default"
     >
       @if (expanded()) {
         <lucide-icon name="chevron-down" size="10" />
@@ -17,12 +17,12 @@
     </button>
     @if (expanded()) {
       <pre
-        class="mt-1 overflow-x-auto rounded bg-white px-2 py-1.5 font-mono text-[11px] leading-snug text-zinc-700 ring-1 ring-zinc-200"
+        class="mt-1 overflow-x-auto rounded bg-surface px-2 py-1.5 font-mono text-[11px] leading-snug text-default ring-1 border-subtle"
         >{{ samplePayloadJson() }}</pre
       >
-      <p class="mt-1 text-[10px] text-zinc-500">
+      <p class="mt-1 text-[10px] text-muted">
         Reference any path above in conditions or templates — e.g.
-        <code class="rounded bg-zinc-100 px-1 font-mono">contact.email</code>.
+        <code class="rounded bg-surface-2 px-1 font-mono">contact.email</code>.
       </p>
     }
   </div>

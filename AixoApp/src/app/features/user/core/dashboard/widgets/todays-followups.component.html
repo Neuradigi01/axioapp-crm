@@ -1,35 +1,32 @@
-<div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
+<div class="card">
   <!-- Header -->
-  <div class="border-b border-zinc-100 px-4 py-3">
+  <div>
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <h2 class="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+      <h3 class="card-title flex items-center gap-2">
         Today's Follow-ups
-        <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">
-          {{ total() }}
-        </span>
+        <span class="badge-muted badge">{{ total() }}</span>
         @if (refreshing()) {
           <lucide-icon
             name="loader-2"
             size="12"
-            class="animate-spin text-zinc-400"
+            class="animate-spin text-faint"
             aria-hidden="true"
           ></lucide-icon>
         }
-      </h2>
+      </h3>
       <div class="flex items-center gap-2">
         <button
           type="button"
           (click)="toggleFilters()"
-          [class.text-zinc-900]="showFilters()"
-          class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+          [class]="
+            showFilters() ? 'btn btn-secondary btn-sm !text-default' : 'btn btn-secondary btn-sm'
+          "
           [attr.aria-expanded]="showFilters()"
         >
           <lucide-icon name="sliders-horizontal" size="12" aria-hidden="true"></lucide-icon>
           Filters
         </button>
-        <a routerLink="/user/tasks" class="text-xs font-medium text-zinc-500 hover:text-zinc-900"
-          >View all →</a
-        >
+        <a routerLink="/user/tasks" class="card-link">View all →</a>
       </div>
     </div>
 
@@ -39,18 +36,14 @@
         <button
           type="button"
           (click)="pickBucket(chip.key)"
-          [class]="
-            bucket() === chip.key
-              ? 'inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white'
-              : 'inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2.5 py-1 text-[11px] font-medium text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-100'
-          "
+          [class]="bucket() === chip.key ? 'chip chip-active' : 'chip'"
         >
           {{ chip.label }}
           <span
             [class]="
               bucket() === chip.key
-                ? 'rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold'
-                : 'rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700'
+                ? 'ml-1 rounded-full bg-surface/25 px-1.5 py-0.5 font-mono text-[10px] font-semibold'
+                : 'ml-1 rounded-full bg-surface px-1.5 py-0.5 font-mono text-[10px] font-semibold text-default'
             "
           >
             {{ countFor(chip) }}
@@ -66,7 +59,7 @@
         <lucide-icon
           name="search"
           size="14"
-          class="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400"
+          class="absolute left-3 top-1/2 -translate-y-1/2 text-faint"
           aria-hidden="true"
         ></lucide-icon>
         <input
@@ -75,20 +68,20 @@
           (input)="onSearchInput($event)"
           placeholder="Search by title or contact…"
           autocomplete="off"
-          class="block w-full rounded-md border border-zinc-300 bg-white py-1.5 pl-7 pr-3 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="input pl-9"
         />
       </label>
 
       @if (showFilters()) {
         <div
-          class="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-zinc-50 p-2 text-xs text-zinc-600 ring-1 ring-zinc-200"
+          class="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-subtle bg-app p-2.5 text-xs text-muted"
         >
           <label class="flex items-center gap-1">
             <span>Type</span>
             <select
               [ngModel]="filterType()"
               (ngModelChange)="filterType.set($event); onFilterChanged()"
-              class="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none"
+              class="select !h-7 !py-0 !text-xs"
             >
               <option value="">Any</option>
               <option value="call">Call</option>
@@ -104,7 +97,7 @@
             <select
               [ngModel]="filterPriority()"
               (ngModelChange)="filterPriority.set($event); onFilterChanged()"
-              class="rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none"
+              class="select !h-7 !py-0 !text-xs"
             >
               <option value="">Any</option>
               <option value="high">High</option>
@@ -115,7 +108,7 @@
           <button
             type="button"
             (click)="clearFilters()"
-            class="ml-auto text-[11px] font-medium text-zinc-500 hover:text-zinc-900"
+            class="ml-auto text-[11px] font-medium text-accent hover:opacity-80"
           >
             Clear filters
           </button>
@@ -127,32 +120,26 @@
   <!-- Body -->
   @if (error(); as err) {
     <div
-      class="m-4 flex items-center justify-between gap-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+      class="mt-3 flex items-center justify-between gap-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-500"
     >
       <span>{{ err }}</span>
-      <button
-        type="button"
-        (click)="refresh()"
-        class="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100"
-      >
-        Retry
-      </button>
+      <button type="button" (click)="refresh()" class="btn btn-secondary btn-sm">Retry</button>
     </div>
   } @else if (loading()) {
-    <div class="p-4">
+    <div class="mt-3">
       @for (i of [1, 2, 3]; track i) {
-        <div class="mb-2 h-16 animate-pulse rounded bg-zinc-50"></div>
+        <div class="mb-2 h-16 animate-pulse rounded bg-surface-2"></div>
       }
     </div>
   } @else if (items().length === 0) {
-    <div class="flex flex-col items-center justify-center px-4 py-10 text-center">
+    <div class="flex flex-col items-center justify-center px-4 py-5 md:py-8 text-center">
       <lucide-icon
         name="calendar-clock"
         size="32"
-        class="mb-2 text-zinc-300"
+        class="mb-2 text-faint"
         aria-hidden="true"
       ></lucide-icon>
-      <p class="text-sm font-medium text-zinc-700">
+      <p class="text-sm font-medium text-default">
         @switch (bucket()) {
           @case ('today') {
             No follow-ups scheduled for today.
@@ -171,23 +158,21 @@
           }
         }
       </p>
-      <button
-        type="button"
-        (click)="navigateToNewTask()"
-        class="mt-3 inline-flex items-center gap-1 rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
-      >
+      <button type="button" (click)="navigateToNewTask()" class="btn btn-primary btn-sm mt-3">
         <lucide-icon name="plus" size="14" aria-hidden="true"></lucide-icon>
         Add a task
       </button>
     </div>
   } @else {
-    <ul class="divide-y divide-zinc-100">
+    <ul class="mt-2 divide-y divide-subtle">
       @for (row of items(); track trackByRow($index, row)) {
-        <li class="px-4 py-3">
+        <li class="py-3">
           <div class="flex flex-wrap items-start gap-3">
             <!-- Left: due time chip -->
             <div class="w-16 shrink-0 text-xs">
-              <div class="rounded bg-zinc-50 px-1.5 py-1 text-center font-medium text-zinc-700">
+              <div
+                class="rounded bg-surface-2 px-1.5 py-1 text-center font-mono font-medium text-default"
+              >
                 {{ dueTimeShort(row.due_at) }}
               </div>
             </div>
@@ -195,10 +180,10 @@
             <!-- Middle: title + linked-entity + type -->
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
-                <p class="truncate text-sm font-medium text-zinc-900">{{ row.title }}</p>
+                <p class="truncate text-sm font-medium text-default">{{ row.title }}</p>
                 <span
                   [class]="
-                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ring-zinc-200 ' +
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ' +
                     priorityMeta(row.priority).text
                   "
                 >
@@ -209,7 +194,7 @@
                 </span>
               </div>
 
-              <div class="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+              <div class="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
                 <span class="inline-flex items-center gap-1">
                   <lucide-icon
                     [name]="typeMeta(row.followup_type).icon"
@@ -223,7 +208,7 @@
                     · {{ le.type }}:
                     <a
                       [routerLink]="openLink(row)"
-                      class="font-medium text-zinc-700 hover:underline"
+                      class="font-medium text-accent hover:opacity-80"
                     >
                       {{ le.label }}
                     </a>
@@ -233,7 +218,7 @@
               </div>
 
               @if (row.notes_preview) {
-                <p class="mt-1 line-clamp-2 text-xs text-zinc-500">“{{ row.notes_preview }}”</p>
+                <p class="mt-1 line-clamp-2 text-xs text-muted">“{{ row.notes_preview }}”</p>
               }
 
               @if (reschedulingId() === row.id) {
@@ -250,7 +235,7 @@
                     type="button"
                     (click)="onComplete(row)"
                     [disabled]="row.status === 'done'"
-                    class="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-400 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <lucide-icon name="check-check" size="12" aria-hidden="true"></lucide-icon>
                     {{ row.status === 'done' ? 'Completed' : 'Complete' }}
@@ -259,7 +244,7 @@
                     type="button"
                     (click)="onReschedule(row)"
                     [disabled]="row.status === 'done' || row.status === 'missed'"
-                    class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="btn btn-secondary btn-sm !h-7 !px-2 !text-[11px]"
                   >
                     <lucide-icon name="clock" size="12" aria-hidden="true"></lucide-icon>
                     Reschedule
@@ -268,7 +253,7 @@
                     <button
                       type="button"
                       (click)="onMarkMissed(row)"
-                      class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100"
+                      class="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-1 text-[11px] font-medium text-red-400 transition hover:brightness-110"
                       title="Close this follow-up as missed (customer non-responsive)"
                     >
                       <lucide-icon name="x-circle" size="12" aria-hidden="true"></lucide-icon>
@@ -277,7 +262,7 @@
                   }
                   <a
                     [routerLink]="openLink(row)"
-                    class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-50"
+                    class="btn btn-secondary btn-sm !h-7 !px-2 !text-[11px]"
                   >
                     <lucide-icon name="external-link" size="12" aria-hidden="true"></lucide-icon>
                     Open
@@ -289,7 +274,7 @@
             <!-- Right: status badge -->
             <span
               [class]="
-                'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ' +
+                'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ' +
                 statusBadge(row).classes
               "
             >

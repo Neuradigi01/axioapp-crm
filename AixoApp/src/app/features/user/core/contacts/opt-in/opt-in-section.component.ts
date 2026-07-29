@@ -32,11 +32,11 @@ import { OptInChipComponent } from './opt-in-chip.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, OptInChipComponent, ContactDataExportButtonComponent],
   template: `
-    <section class="rounded-md border border-zinc-200 bg-white p-4">
+    <section class="rounded-md border border-subtle bg-surface p-4">
       <header class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">WhatsApp opt-in</p>
-          <p class="text-[11px] text-zinc-500">DPDP-grade consent record.</p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">WhatsApp opt-in</p>
+          <p class="text-[11px] text-muted">DPDP-grade consent record.</p>
         </div>
         <div class="flex items-center gap-2">
           <app-contact-data-export-button [contactId]="contactId()" />
@@ -47,28 +47,28 @@ import { OptInChipComponent } from './opt-in-chip.component';
       </header>
 
       @if (loading()) {
-        <p class="text-[11px] text-zinc-500">Loading…</p>
+        <p class="text-[11px] text-muted">Loading…</p>
       }
       @if (error(); as err) {
-        <p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
           {{ err }}
         </p>
       }
       @if (history(); as h) {
         <dl class="mb-3 grid grid-cols-2 gap-2 text-xs">
           <div>
-            <dt class="text-[10px] uppercase text-zinc-500">Source</dt>
-            <dd class="text-zinc-800">{{ h.source ?? '—' }}</dd>
+            <dt class="text-[10px] uppercase text-muted">Source</dt>
+            <dd class="text-default">{{ h.source ?? '—' }}</dd>
           </div>
           <div>
-            <dt class="text-[10px] uppercase text-zinc-500">Recorded</dt>
-            <dd class="text-zinc-800">{{ formatDate(h.recorded_at) }}</dd>
+            <dt class="text-[10px] uppercase text-muted">Recorded</dt>
+            <dd class="text-default">{{ formatDate(h.recorded_at) }}</dd>
           </div>
           @if (h.opt_out_recorded_at) {
             <div
-              class="col-span-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-rose-700"
+              class="col-span-2 rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1 text-red-400"
             >
-              <dt class="text-[10px] uppercase text-rose-700">Opted out</dt>
+              <dt class="text-[10px] uppercase text-red-400">Opted out</dt>
               <dd>
                 {{ formatDate(h.opt_out_recorded_at) }}
                 @if (h.opt_out_reason) {
@@ -83,7 +83,7 @@ import { OptInChipComponent } from './opt-in-chip.component';
           <div class="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button
               type="button"
-              class="rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+              class="rounded-md border border-emerald-300 bg-surface px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
               [disabled]="busy() || h.status === 'opted_in'"
               (click)="manualOptIn()"
             >
@@ -91,7 +91,7 @@ import { OptInChipComponent } from './opt-in-chip.component';
             </button>
             <button
               type="button"
-              class="rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+              class="rounded-md border border-red-500/30 bg-surface px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
               [disabled]="busy() || h.status === 'opted_out'"
               (click)="manualOptOut()"
             >
@@ -99,7 +99,7 @@ import { OptInChipComponent } from './opt-in-chip.component';
             </button>
           </div>
           <textarea
-            class="mb-2 w-full rounded-md border border-zinc-300 px-2 py-1 text-xs"
+            class="mb-2 w-full rounded-md border border-subtle px-2 py-1 text-xs"
             rows="2"
             placeholder="Optional reason — recorded on the consent log."
             [ngModel]="reason()"
@@ -107,7 +107,7 @@ import { OptInChipComponent } from './opt-in-chip.component';
             maxlength="500"
           ></textarea>
         } @else {
-          <p class="text-[11px] text-zinc-500">
+          <p class="text-[11px] text-muted">
             Manual override requires the
             <code>whatsapp.opt_in.manage</code> permission.
           </p>
@@ -115,25 +115,25 @@ import { OptInChipComponent } from './opt-in-chip.component';
 
         <details>
           <summary
-            class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700"
+            class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-muted hover:text-default"
           >
             Consent log ({{ h.events.length }})
           </summary>
           @if (h.events.length === 0) {
-            <p class="mt-1 text-[11px] text-zinc-500">No events yet.</p>
+            <p class="mt-1 text-[11px] text-muted">No events yet.</p>
           } @else {
             <ul class="mt-2 space-y-1.5 text-xs">
               @for (e of h.events; track e.id) {
-                <li class="rounded border border-zinc-100 px-2 py-1">
+                <li class="rounded border border-subtle px-2 py-1">
                   <div class="flex items-baseline justify-between">
-                    <span class="font-medium text-zinc-800">
+                    <span class="font-medium text-default">
                       {{ e.old_status ?? '∅' }} → {{ e.new_status }}
                     </span>
-                    <span class="text-[10px] text-zinc-500">
+                    <span class="text-[10px] text-muted">
                       {{ formatDate(e.recorded_at) }}
                     </span>
                   </div>
-                  <p class="text-[11px] text-zinc-600">
+                  <p class="text-[11px] text-muted">
                     {{ humanSource(e.source) }}{{ e.reason ? ' — ' + e.reason : '' }}
                   </p>
                 </li>

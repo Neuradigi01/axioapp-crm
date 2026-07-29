@@ -1,21 +1,45 @@
-<div class="h-[calc(100vh-3.5rem)] flex flex-col bg-zinc-50">
+<div class="h-[calc(100vh-3.5rem)] flex flex-col bg-surface-2">
   <!-- Header bar -->
-  <header class="h-14 flex items-center gap-3 px-4 bg-white border-b border-zinc-200 shrink-0">
+  <header
+    class="h-14 flex items-center gap-2 md:gap-3 px-3 md:px-4 bg-surface border-b border-subtle shrink-0"
+  >
     <a
       routerLink="/user/workflows"
-      class="p-1.5 rounded text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
+      class="p-1.5 rounded text-muted hover:text-default hover:bg-surface-2"
       title="Back to workflows"
     >
-      <lucide-icon name="ArrowLeft" class="w-4 h-4"></lucide-icon>
+      <lucide-icon name="arrow-left" class="w-4 h-4"></lucide-icon>
     </a>
+
+    <!-- Mobile: open node palette -->
+    <button
+      type="button"
+      (click)="toggleMobilePalette()"
+      class="p-1.5 rounded text-muted hover:text-default hover:bg-surface-2 md:hidden"
+      title="Node palette"
+      aria-label="Toggle node palette"
+    >
+      <lucide-icon name="layout-grid" class="w-4 h-4"></lucide-icon>
+    </button>
 
     <input
       type="text"
-      class="flex-1 max-w-md text-base font-medium bg-transparent text-zinc-800 focus:outline-none focus:border-b focus:border-zinc-400 px-1"
+      class="flex-1 max-w-md text-sm md:text-base font-medium bg-transparent text-default focus:outline-none focus:border-b focus:border-subtle px-1 min-w-0"
       [ngModel]="state.name()"
       (ngModelChange)="state.setName($event)"
       placeholder="Untitled workflow"
     />
+
+    <!-- Mobile: open right inspector -->
+    <button
+      type="button"
+      (click)="toggleMobileInspector()"
+      class="p-1.5 rounded text-muted hover:text-default hover:bg-surface-2 md:hidden"
+      title="Inspector"
+      aria-label="Toggle inspector"
+    >
+      <lucide-icon name="more-vertical" class="w-4 h-4"></lucide-icon>
+    </button>
 
     <app-workflow-status-badge [status]="state.status()" />
 
@@ -23,33 +47,33 @@
       <span class="text-[11px] text-amber-600 font-medium">• Unsaved</span>
     }
     @if (saving()) {
-      <span class="text-[11px] text-zinc-500">Saving…</span>
+      <span class="text-[11px] text-muted">Saving…</span>
     }
 
     <div class="flex-1"></div>
 
     <button
       type="button"
-      class="px-3 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      class="px-3 py-1.5 text-xs rounded text-muted hover:bg-surface-2"
       [disabled]="!state.canUndo()"
       (click)="state.undo()"
       title="Undo (Ctrl+Z)"
     >
-      <lucide-icon name="Undo2" class="w-4 h-4"></lucide-icon>
+      <lucide-icon name="undo-2" class="w-4 h-4"></lucide-icon>
     </button>
     <button
       type="button"
-      class="px-3 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      class="px-3 py-1.5 text-xs rounded text-muted hover:bg-surface-2"
       [disabled]="!state.canRedo()"
       (click)="state.redo()"
       title="Redo (Ctrl+Y)"
     >
-      <lucide-icon name="Redo2" class="w-4 h-4"></lucide-icon>
+      <lucide-icon name="redo-2" class="w-4 h-4"></lucide-icon>
     </button>
 
     <button
       type="button"
-      class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+      class="px-3 py-1.5 text-xs rounded border border-subtle text-default hover:bg-surface-2"
       (click)="discard()"
       [disabled]="!state.dirty() || saving()"
     >
@@ -60,42 +84,42 @@
     @if (state.workflowId(); as wfId) {
       <a
         [routerLink]="['/user/workflows', wfId, 'analytics']"
-        class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+        class="px-2 py-1.5 text-xs rounded text-muted hover:bg-surface-2"
         title="Analytics dashboard"
       >
-        <lucide-icon name="BarChart3" class="w-4 h-4"></lucide-icon>
+        <lucide-icon name="bar-chart-3" class="w-4 h-4"></lucide-icon>
       </a>
     }
     <button
       type="button"
-      class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      class="px-2 py-1.5 text-xs rounded text-muted hover:bg-surface-2"
       [disabled]="!state.workflowId()"
       (click)="toggleVersionDrawer()"
       title="Version history"
     >
-      <lucide-icon name="History" class="w-4 h-4"></lucide-icon>
+      <lucide-icon name="history" class="w-4 h-4"></lucide-icon>
     </button>
     <button
       type="button"
-      class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      class="px-2 py-1.5 text-xs rounded text-muted hover:bg-surface-2"
       [disabled]="!state.workflowId()"
       (click)="exportWorkflow()"
       title="Export JSON"
     >
-      <lucide-icon name="Download" class="w-4 h-4"></lucide-icon>
+      <lucide-icon name="download" class="w-4 h-4"></lucide-icon>
     </button>
     <button
       type="button"
-      class="px-2 py-1.5 text-xs rounded text-zinc-600 hover:bg-zinc-100"
+      class="px-2 py-1.5 text-xs rounded text-muted hover:bg-surface-2"
       (click)="openImportModal()"
       title="Import JSON"
     >
-      <lucide-icon name="Upload" class="w-4 h-4"></lucide-icon>
+      <lucide-icon name="upload" class="w-4 h-4"></lucide-icon>
     </button>
 
     <button
       type="button"
-      class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+      class="px-3 py-1.5 text-xs rounded border border-subtle text-default hover:bg-surface-2"
       (click)="testFire()"
       [disabled]="!state.workflowId() || testFireBusy()"
     >
@@ -109,11 +133,11 @@
     @if (state.workflowId() && !isABPaired()) {
       <button
         type="button"
-        class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50 inline-flex items-center gap-1.5"
+        class="px-3 py-1.5 text-xs rounded border border-subtle text-default hover:bg-surface-2 inline-flex items-center gap-1.5"
         (click)="openPairModal()"
         title="Run an A/B test against a sibling draft"
       >
-        <lucide-icon name="Beaker" class="w-3.5 h-3.5"></lucide-icon>
+        <lucide-icon name="beaker" class="w-3.5 h-3.5"></lucide-icon>
         Run A/B test
       </button>
     }
@@ -138,7 +162,7 @@
 
     <button
       type="button"
-      class="px-3 py-1.5 text-xs rounded bg-zinc-900 text-white hover:bg-zinc-800"
+      class="px-3 py-1.5 text-xs rounded bg-accent text-white hover:brightness-95"
       (click)="save()"
       [disabled]="!state.dirty() || saving() || viewingVersion() !== null"
       [title]="viewingVersion() !== null ? 'Exit version preview to save' : 'Save draft'"
@@ -149,13 +173,13 @@
 
   @if (viewingVersion() !== null) {
     <div
-      class="px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-900 text-xs flex items-center gap-2"
+      class="px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-300 text-xs flex items-center gap-2"
     >
-      <lucide-icon name="History" class="w-3.5 h-3.5"></lucide-icon>
+      <lucide-icon name="history" class="w-3.5 h-3.5"></lucide-icon>
       Previewing version <strong>v{{ viewingVersion() }}</strong> — read-only.
       <button
         type="button"
-        class="ml-2 px-2 py-0.5 rounded bg-white border border-amber-300 text-amber-900 hover:bg-amber-100"
+        class="ml-2 px-2 py-0.5 rounded bg-surface border border-amber-300 text-amber-300 hover:bg-amber-500/10"
         (click)="backToCurrentFromVersion()"
       >
         Back to current
@@ -164,7 +188,7 @@
   }
 
   @if (error()) {
-    <div class="px-4 py-2 bg-rose-50 border-b border-rose-200 text-rose-800 text-xs">
+    <div class="px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-red-400 text-xs">
       {{ error() }}
     </div>
   }
@@ -175,10 +199,24 @@
 
   <!-- Main 3-column layout -->
   <div class="flex-1 flex min-h-0">
-    <!-- Left palette -->
-    <aside class="w-[300px] shrink-0">
+    <!-- Left palette. On desktop: always visible in-flow at 300px.
+         On mobile: fixed slide-over from the left, toggled by the header
+         "layout-grid" button. -->
+    <aside
+      class="fixed inset-y-0 left-0 z-40 w-[280px] max-w-[85vw] shrink-0 transform border-r border-subtle bg-surface transition-transform duration-200 ease-out md:relative md:z-auto md:w-[300px] md:translate-x-0 md:border-r-0"
+      [class.-translate-x-full]="!mobilePaletteOpen()"
+    >
       <app-node-palette />
     </aside>
+
+    <!-- Backdrop when any mobile overlay is open -->
+    @if (mobilePaletteOpen() || mobileInspectorOpen()) {
+      <div
+        class="fixed inset-0 z-30 bg-black/50 md:hidden"
+        (click)="closeMobileOverlays()"
+        aria-hidden="true"
+      ></div>
+    }
 
     <!-- Canvas -->
     <main
@@ -187,13 +225,13 @@
       (drop)="onDrop($event)"
     >
       @if (loading()) {
-        <div class="absolute inset-0 flex items-center justify-center text-zinc-500 text-sm">
+        <div class="absolute inset-0 flex items-center justify-center text-muted text-sm">
           Loading workflow…
         </div>
       } @else {
         <svg
           #canvasRoot
-          class="absolute inset-0 w-full h-full bg-zinc-100"
+          class="absolute inset-0 w-full h-full bg-surface-2"
           (mousedown)="onCanvasMouseDown($event)"
           (wheel)="onWheel($event)"
           (contextmenu)="onCanvasContextMenu($event)"
@@ -258,56 +296,62 @@
 
         <!-- Floating control panel (bottom-right) -->
         <div
-          class="absolute bottom-4 right-4 flex items-center gap-1 bg-white border border-zinc-200 rounded-lg shadow-sm px-2 py-1.5"
+          class="absolute bottom-4 right-4 flex items-center gap-1 bg-surface border border-subtle rounded-lg shadow-sm px-2 py-1.5"
         >
           <button
             type="button"
-            class="px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 rounded"
+            class="px-2 py-1 text-xs text-muted hover:bg-surface-2 rounded"
             (click)="state.setZoom(state.zoom() / 1.2)"
             title="Zoom out"
           >
-            <lucide-icon name="ZoomOut" class="w-4 h-4"></lucide-icon>
+            <lucide-icon name="zoom-out" class="w-4 h-4"></lucide-icon>
           </button>
-          <span class="text-[11px] text-zinc-600 w-10 text-center"> {{ zoomPercent() }}% </span>
+          <span class="text-[11px] text-muted w-10 text-center"> {{ zoomPercent() }}% </span>
           <button
             type="button"
-            class="px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 rounded"
+            class="px-2 py-1 text-xs text-muted hover:bg-surface-2 rounded"
             (click)="state.setZoom(state.zoom() * 1.2)"
             title="Zoom in"
           >
-            <lucide-icon name="ZoomIn" class="w-4 h-4"></lucide-icon>
+            <lucide-icon name="zoom-in" class="w-4 h-4"></lucide-icon>
           </button>
-          <div class="w-px h-5 bg-zinc-200 mx-1"></div>
+          <div class="w-px h-5 bg-surface-2 mx-1"></div>
           <button
             type="button"
-            class="px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 rounded"
+            class="px-2 py-1 text-xs text-muted hover:bg-surface-2 rounded"
             (click)="fitToView()"
             title="Fit to view"
           >
-            <lucide-icon name="Maximize2" class="w-4 h-4"></lucide-icon>
+            <lucide-icon name="maximize-2" class="w-4 h-4"></lucide-icon>
           </button>
           <button
             type="button"
-            class="px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 rounded"
+            class="px-2 py-1 text-xs text-muted hover:bg-surface-2 rounded"
             (click)="resetZoom()"
             title="Reset zoom"
           >
-            <lucide-icon name="RotateCcw" class="w-4 h-4"></lucide-icon>
+            <lucide-icon name="rotate-ccw" class="w-4 h-4"></lucide-icon>
           </button>
           <button
             type="button"
-            class="px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 rounded"
+            class="px-2 py-1 text-xs text-muted hover:bg-surface-2 rounded"
             (click)="autoLayout()"
             title="Auto-layout"
           >
-            <lucide-icon name="LayoutGrid" class="w-4 h-4"></lucide-icon>
+            <lucide-icon name="layout-grid" class="w-4 h-4"></lucide-icon>
           </button>
         </div>
       }
     </main>
 
-    <!-- Right drawer — version history (Step 17) / typed node editor (Step 15) / test-fire trace -->
-    <aside class="w-[440px] shrink-0 bg-white border-l border-zinc-200 flex flex-col">
+    <!-- Right drawer — version history (Step 17) / typed node editor (Step 15) / test-fire trace.
+         Hidden on mobile so the canvas gets full width; desktop shows a
+         fixed-width right column. A future step will surface a floating
+         "open inspector" toggle for mobile users. -->
+    <aside
+      class="fixed inset-y-0 right-0 z-40 flex w-[380px] max-w-[85vw] shrink-0 transform flex-col border-l border-subtle bg-surface transition-transform duration-200 ease-out md:relative md:z-auto md:w-[440px] md:translate-x-0"
+      [class.translate-x-full]="!mobileInspectorOpen()"
+    >
       @if (showVersionDrawer() && state.workflowId(); as wfId) {
         <app-version-history-drawer
           [workflowId]="wfId"
@@ -320,8 +364,8 @@
       } @else if (selectedNode(); as node) {
         <app-node-editor [node]="node" (close)="state.selectNode(null)" />
       } @else {
-        <header class="px-4 py-3 border-b border-zinc-200 flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-zinc-700">
+        <header class="px-4 py-3 border-b border-subtle flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-default">
             @if (testFireTrace()) {
               Test fire trace
             } @else {
@@ -329,23 +373,21 @@
             }
           </h3>
         </header>
-        <div class="flex-1 overflow-y-auto px-4 py-4 text-sm text-zinc-700">
+        <div class="flex-1 overflow-y-auto px-4 py-4 text-sm text-default">
           @if (testFireTrace(); as trace) {
             <div class="space-y-2">
-              <p class="text-[11px] text-zinc-500">
-                Synthetic trace — no real sends were performed.
-              </p>
+              <p class="text-[11px] text-muted">Synthetic trace — no real sends were performed.</p>
               @for (hop of trace.steps; track $index) {
-                <div class="border border-zinc-200 rounded p-2 text-xs flex items-center gap-2">
-                  <span class="font-mono text-[10px] text-zinc-500 w-5">{{ $index + 1 }}.</span>
+                <div class="border border-subtle rounded p-2 text-xs flex items-center gap-2">
+                  <span class="font-mono text-[10px] text-muted w-5">{{ $index + 1 }}.</span>
                   <div class="flex-1 min-w-0">
-                    <div class="font-medium text-zinc-800 truncate">
+                    <div class="font-medium text-default truncate">
                       {{ hop.node_type }}
                     </div>
                     @if (hop.skip_reason) {
-                      <div class="text-rose-600 text-[10px]">skipped: {{ hop.skip_reason }}</div>
+                      <div class="text-red-500 text-[10px]">skipped: {{ hop.skip_reason }}</div>
                     } @else {
-                      <div class="text-emerald-700 text-[10px]">
+                      <div class="text-emerald-400 text-[10px]">
                         would execute
                         @if (hop.edge_label) {
                           — next: {{ hop.edge_label }}
@@ -355,12 +397,12 @@
                   </div>
                 </div>
               }
-              <div class="text-[11px] text-zinc-500 pt-2">
+              <div class="text-[11px] text-muted pt-2">
                 Outcome: <strong>{{ trace.outcome }}</strong>
               </div>
             </div>
           } @else {
-            <p class="text-xs text-zinc-500">
+            <p class="text-xs text-muted">
               Select a node to configure it, or click <em>Test fire</em> to dry-run the workflow.
             </p>
           }

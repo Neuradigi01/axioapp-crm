@@ -47,13 +47,13 @@ import { TagChipComponent } from './tag-chip.component';
   imports: [CommonModule, FormsModule, LucideAngularModule, TagChipComponent],
   template: `
     <div
-      class="absolute right-0 top-full z-30 mt-1 w-72 rounded-md border border-zinc-200 bg-white shadow-lg"
+      class="absolute right-0 top-full z-30 mt-1 w-72 rounded-md border border-subtle bg-surface shadow-lg"
       (click)="$event.stopPropagation()"
     >
-      <div class="border-b border-zinc-100 p-2">
-        <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Applied</p>
+      <div class="border-b border-subtle p-2">
+        <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">Applied</p>
         @if (assignedTags.length === 0) {
-          <p class="text-xs text-zinc-500">No tags yet.</p>
+          <p class="text-xs text-muted">No tags yet.</p>
         } @else {
           <div class="flex flex-wrap gap-1">
             @for (t of assignedTags; track t.id) {
@@ -63,29 +63,29 @@ import { TagChipComponent } from './tag-chip.component';
         }
       </div>
 
-      <div class="border-b border-zinc-100 p-2">
+      <div class="border-b border-subtle p-2">
         <div class="relative mb-1">
           <lucide-icon
             name="search"
-            class="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-400"
+            class="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-faint"
           />
           <input
             type="search"
             [ngModel]="query()"
             (ngModelChange)="onQueryChange($event)"
             placeholder="Search or create…"
-            class="w-full rounded-md border border-zinc-300 py-1 pl-7 pr-2 text-xs focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="w-full rounded-md border border-subtle py-1 pl-7 pr-2 text-xs focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
 
         @if (loadError(); as err) {
-          <p class="mb-1 text-[10px] text-rose-600">{{ err }}</p>
+          <p class="mb-1 text-[10px] text-red-500">{{ err }}</p>
         }
 
         <ul class="max-h-48 space-y-0.5 overflow-y-auto">
           @for (t of filteredTags(); track t.id) {
             <li
-              class="flex items-center justify-between gap-1 rounded px-1 py-0.5 hover:bg-zinc-50"
+              class="flex items-center justify-between gap-1 rounded px-1 py-0.5 hover:bg-surface-2"
             >
               <button
                 type="button"
@@ -96,8 +96,8 @@ import { TagChipComponent } from './tag-chip.component';
                 <span
                   [class]="'inline-block h-2.5 w-2.5 rounded-full ring-1 ' + swatchClass(t.color)"
                 ></span>
-                <span class="flex-1 truncate text-zinc-800">{{ t.name }}</span>
-                <span class="text-[10px] text-zinc-400">
+                <span class="flex-1 truncate text-default">{{ t.name }}</span>
+                <span class="text-[10px] text-faint">
                   {{ t.usage_count }}
                 </span>
               </button>
@@ -106,7 +106,7 @@ import { TagChipComponent } from './tag-chip.component';
                   type="button"
                   (click)="onDelete(t)"
                   [disabled]="busyTagId() === t.id"
-                  class="rounded p-0.5 text-zinc-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
+                  class="rounded p-0.5 text-faint hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
                   title="Delete tag"
                   aria-label="Delete tag"
                 >
@@ -118,8 +118,8 @@ import { TagChipComponent } from './tag-chip.component';
         </ul>
 
         @if (canManage() && query().trim().length > 0 && !hasExactMatch()) {
-          <div class="mt-2 rounded-md border border-dashed border-zinc-300 p-2">
-            <p class="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
+          <div class="mt-2 rounded-md border border-dashed border-subtle p-2">
+            <p class="mb-1 text-[10px] uppercase tracking-wide text-muted">
               Create "{{ query().trim() }}"
             </p>
             <div class="mb-1 flex flex-wrap gap-1">
@@ -140,7 +140,7 @@ import { TagChipComponent } from './tag-chip.component';
               type="button"
               (click)="onCreate()"
               [disabled]="creating()"
-              class="w-full rounded-md bg-zinc-900 px-2 py-1 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+              class="w-full rounded-md bg-accent px-2 py-1 text-xs font-semibold text-white hover:brightness-95 disabled:opacity-50"
             >
               {{ creating() ? 'Creating…' : 'Create + apply' }}
             </button>
@@ -152,7 +152,7 @@ import { TagChipComponent } from './tag-chip.component';
         <button
           type="button"
           (click)="close.emit()"
-          class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
         >
           Close
         </button>

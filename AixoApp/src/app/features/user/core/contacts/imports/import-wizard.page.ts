@@ -117,6 +117,10 @@ export class ContactImportWizardPageComponent {
   protected readonly commitError = signal<string | null>(null);
   protected readonly commitResult = signal<ContactImportCommitOut | null>(null);
 
+  // errors.csv download state
+  protected readonly downloadingErrors = signal(false);
+  protected readonly downloadErrorsMsg = signal<string | null>(null);
+
   // --- Derived --------------------------------------------------------
 
   protected readonly fileSizeLabel = computed(() => {
@@ -319,6 +323,36 @@ export class ContactImportWizardPageComponent {
         error: (err: HttpErrorResponse) => {
           this.committing.set(false);
           this.commitError.set(extractApiError(err) ?? 'Could not commit the import.');
+        },
+      });
+  }
+
+  /** Download the per-row errors as a CSV file. Available on the
+   *  preview step (after dry-run) and the success step (after commit)
+   *  whenever the import produced at least one error. */
+  protected downloadErrors(): void {
+    const meta = this.importMeta();
+    if (!meta || this.downloadingErrors()) return;
+    this.downloadingErrors.set(true);
+    this.downloadErrorsMsg.set(null);
+    this.api
+      .downloadImportErrors(meta.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => {
+          this.downloadingErrors.set(false);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `contact-import-${meta.id}-errors.csv`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.downloadingErrors.set(false);
+          this.downloadErrorsMsg.set(extractApiError(err) ?? 'Could not download the errors CSV.');
         },
       });
   }

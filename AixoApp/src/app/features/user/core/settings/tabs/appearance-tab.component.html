@@ -1,5 +1,5 @@
 <div>
-  <p class="mb-4 text-sm text-zinc-500">
+  <p class="mb-4 text-sm text-muted">
     Choose how the app looks. <b>System</b> follows your operating-system preference and updates
     automatically when you switch.
   </p>
@@ -10,20 +10,20 @@
         type="button"
         (click)="pick(opt.id)"
         class="rounded-lg border p-4 text-left transition"
-        [class.border-zinc-900]="choice() === opt.id"
-        [class.bg-zinc-50]="choice() === opt.id"
-        [class.border-zinc-200]="choice() !== opt.id"
+        [class.border-accent]="choice() === opt.id"
+        [class.bg-surface-2]="choice() === opt.id"
+        [class.border-subtle]="choice() !== opt.id"
       >
         <div
-          class="mb-2 h-16 rounded-md border border-zinc-200"
-          [class.bg-white]="opt.id === 'light'"
-          [class.bg-zinc-900]="opt.id === 'dark'"
+          class="mb-2 h-16 rounded-md border border-subtle"
+          [class.bg-surface]="opt.id === 'light'"
+          [class.bg-accent]="opt.id === 'dark'"
           [class.bg-gradient-to-r]="opt.id === 'system'"
           [class.from-white]="opt.id === 'system'"
           [class.to-zinc-900]="opt.id === 'system'"
         ></div>
-        <div class="text-sm font-medium text-zinc-900">{{ opt.label }}</div>
-        <div class="text-xs text-zinc-500">{{ opt.hint }}</div>
+        <div class="text-sm font-medium text-default">{{ opt.label }}</div>
+        <div class="text-xs text-muted">{{ opt.hint }}</div>
       </button>
     }
   </div>
