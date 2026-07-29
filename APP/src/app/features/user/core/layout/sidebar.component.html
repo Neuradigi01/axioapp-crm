@@ -37,7 +37,8 @@
 
     @if (wsMenuOpen()) {
       <div
-        class="absolute left-3 right-3 top-[52px] z-40 rounded-xl border border-subtle bg-surface-2 p-1.5 shadow-elevated"
+        class="absolute z-40 rounded-xl border border-subtle bg-surface-2 p-1.5 shadow-elevated"
+        [class]="expanded() ? 'left-3 right-3 top-[52px]' : 'left-full top-3 ml-2 w-64'"
       >
         <div class="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[.06em] text-faint">
           Workspace
