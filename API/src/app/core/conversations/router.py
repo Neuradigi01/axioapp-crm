@@ -75,6 +75,8 @@ from src.app.core.conversations.service import (
     get_conversation,
     list_conversations,
     list_messages,
+    mark_conversation_read,
+    mark_conversation_unread,
     patch_conversation,
     react_to_message,
     receive_webhook,
@@ -204,14 +206,29 @@ async def delete_tag_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+# Thread message page size — 50 is small enough to render fast on
+# cold open even with big media, large enough to cover an ordinary
+# WhatsApp session so most opens never need a "Load older" click.
+_THREAD_MESSAGES_PAGE_SIZE = 50
+
+
 @router.get("/{conversation_id}", response_model=ConversationDetail)
 async def get_detail_endpoint(
     conversation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("conversations.read")),
 ) -> ConversationDetail:
+    """Thread detail — returns the **most recent** page of messages,
+    not the full history.
+
+    Long-running WhatsApp threads (hundreds or thousands of messages
+    over months) used to fetch every row on every open. The paginated
+    read caps first-paint at 50 messages; the SPA hits
+    ``/{conversation_id}/messages?before_id=…`` when the operator
+    scrolls up to load older pages.
+    """
     conv = await get_conversation(db, conversation_id)
-    msgs = await list_messages(db, conversation_id)
+    msgs = await list_messages(db, conversation_id, limit=_THREAD_MESSAGES_PAGE_SIZE)
     conv_out = ConversationOut.model_validate(conv)
     conv_out.tags = await list_tags_for_conversation(db, conversation_id)
     # Step 15 — attach WhatsApp 24-hour session state only for
@@ -225,6 +242,38 @@ async def get_detail_endpoint(
         messages=[MessageOut.model_validate(m) for m in msgs],
         whatsapp_session_state=session_state,
     )
+
+
+@router.get(
+    "/{conversation_id}/messages",
+    response_model=list[MessageOut],
+    summary="Fetch an older page of messages on this conversation (infinite-scroll-up).",
+)
+async def list_older_messages_endpoint(
+    conversation_id: uuid.UUID,
+    before_id: uuid.UUID,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.read")),
+) -> list[MessageOut]:
+    """Return the page of messages **older than** ``before_id`` on this
+    conversation, oldest-first (append to the top of the rendered
+    thread). Caller passes the id of the currently-oldest visible row
+    as the ``before_id`` anchor. Empty list means there's nothing
+    older — the SPA hides the "Load older" button.
+
+    ``limit`` clamped to ``[1, 200]`` — same shape the inbox list uses.
+    Ties on ``created_at`` are broken by ``id`` so a webhook batch that
+    landed two messages in the same second doesn't get returned twice.
+    """
+    capped_limit = max(1, min(int(limit), 200))
+    # Existence check so a bad ``before_id`` returns 404 rather than
+    # silently walking the whole thread as if no anchor was supplied.
+    await get_conversation(db, conversation_id)
+    msgs = await list_messages(
+        db, conversation_id, limit=capped_limit, before_id=before_id
+    )
+    return [MessageOut.model_validate(m) for m in msgs]
 
 
 @router.post(
@@ -476,6 +525,46 @@ async def patch_endpoint(
     _user: User = Depends(require_permissions("conversations.write")),
 ) -> ConversationOut:
     conv = await patch_conversation(db, conversation_id=conversation_id, payload=payload)
+    return ConversationOut.model_validate(conv)
+
+
+@router.post(
+    "/{conversation_id}/mark-read",
+    response_model=ConversationOut,
+    summary="Zero the unread badge on this conversation.",
+)
+async def mark_read_endpoint(
+    conversation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.write")),
+) -> ConversationOut:
+    """Zero ``unread_count`` on the conversation. Idempotent — hitting
+    this on an already-read conversation is a no-op (no audit spam).
+
+    Was a Phase-1 UX gap: inbound webhooks bumped the counter but there
+    was no user-facing path to clear it. The SPA calls this on thread
+    open and from a right-click "Mark as read" menu on the list row.
+    """
+    conv = await mark_conversation_read(db, conversation_id=conversation_id)
+    return ConversationOut.model_validate(conv)
+
+
+@router.post(
+    "/{conversation_id}/mark-unread",
+    response_model=ConversationOut,
+    summary='Flip the unread badge back on ("come back to this later").',
+)
+async def mark_unread_endpoint(
+    conversation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.write")),
+) -> ConversationOut:
+    """Set ``unread_count = 1`` if it's currently 0. Matches Gmail /
+    Slack / Intercom — the badge signals "something to see" without
+    lying about how many messages are actually unseen. Idempotent when
+    the row is already unread.
+    """
+    conv = await mark_conversation_unread(db, conversation_id=conversation_id)
     return ConversationOut.model_validate(conv)
 
 

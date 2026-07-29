@@ -139,16 +139,61 @@ def insert_conversation(session: AsyncSession, conversation: Conversation) -> No
 
 
 async def list_messages_for_conversation(
-    session: AsyncSession, conversation_id: uuid.UUID
+    session: AsyncSession,
+    conversation_id: uuid.UUID,
+    *,
+    limit: int | None = None,
+    before_id: uuid.UUID | None = None,
 ) -> list[Message]:
-    """All messages on one conversation, oldest first (the inbox
-    thread view's default ordering)."""
-    stmt = (
-        select(Message)
-        .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at.asc())
-    )
-    return list((await session.execute(stmt)).scalars().all())
+    """Messages on one conversation, oldest first.
+
+    ``limit=None`` returns the whole thread — kept for export paths
+    (CSV / PDF) and any legacy caller that hasn't been updated. The
+    thread-view path passes ``limit`` (default 50 at the router)
+    and optionally ``before_id`` to fetch the page *older* than a
+    given anchor for infinite-scroll-up.
+
+    Keyset walk (``created_at DESC + id DESC`` then reversed) so
+    paging back through a 5k-message thread doesn't scan-and-sort
+    every prior page. The ``(conversation_id, created_at)`` index
+    (models.py:180) covers it.
+    """
+    if limit is None and before_id is None:
+        # Legacy fast path: whole thread ascending.
+        stmt = (
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.asc())
+        )
+        return list((await session.execute(stmt)).scalars().all())
+
+    stmt = select(Message).where(Message.conversation_id == conversation_id)
+
+    if before_id is not None:
+        # Resolve the anchor's timestamp so the walk is keyset-safe
+        # even across ties on ``created_at`` (webhook batches can
+        # land two messages with the same second).
+        anchor = (
+            await session.execute(
+                select(Message.created_at, Message.id).where(Message.id == before_id)
+            )
+        ).one_or_none()
+        if anchor is not None:
+            anchor_created_at, anchor_id = anchor
+            stmt = stmt.where(
+                (Message.created_at < anchor_created_at)
+                | ((Message.created_at == anchor_created_at) & (Message.id < anchor_id))
+            )
+
+    stmt = stmt.order_by(Message.created_at.desc(), Message.id.desc())
+    if limit is not None:
+        stmt = stmt.limit(limit)
+
+    # Fetch newest-first for keyset efficiency, then flip so the UI
+    # renders oldest-first the way the thread view expects.
+    rows = list((await session.execute(stmt)).scalars().all())
+    rows.reverse()
+    return rows
 
 
 async def get_message_by_id(session: AsyncSession, message_id: uuid.UUID) -> Message | None:

@@ -113,8 +113,20 @@ async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
     )
 
 
-async def list_messages(session: AsyncSession, conversation_id: uuid.UUID) -> list[Message]:
-    return await _da.list_messages_for_conversation(session, conversation_id)
+async def list_messages(
+    session: AsyncSession,
+    conversation_id: uuid.UUID,
+    *,
+    limit: int | None = None,
+    before_id: uuid.UUID | None = None,
+) -> list[Message]:
+    """Thin passthrough — service exists so the router can add
+    business rules later (visibility, redaction) without touching the
+    DAL contract. ``limit=None`` returns the whole thread (used by the
+    export paths); pass ``limit`` for the paginated thread view."""
+    return await _da.list_messages_for_conversation(
+        session, conversation_id, limit=limit, before_id=before_id
+    )
 
 
 # --- writes ----------------------------------------------------------------
@@ -705,6 +717,74 @@ async def patch_conversation(
             before=before,
             after=_snapshot(conv),
         )
+    return conv
+
+
+async def mark_conversation_read(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+) -> Conversation:
+    """Zero out ``unread_count`` on a conversation.
+
+    Was a Phase-1 UX gap flagged in J.6 — inbound webhooks bumped the
+    unread counter (see ``receive_webhook``) but there was no user-facing
+    path to clear it, so the list badge accumulated forever. This is the
+    write side of that read.
+
+    Idempotent: if the count is already 0 we skip the commit + audit so
+    the row keeps its previous ``updated_at`` and the audit trail isn't
+    spammed with no-op ``conversations.marked_read`` entries when the
+    thread is already open in another tab.
+    """
+    conv = await get_conversation(session, conversation_id)
+    if (conv.unread_count or 0) == 0:
+        return conv
+    before = _snapshot(conv)
+    conv.unread_count = 0
+    await session.commit()
+    await session.refresh(conv)
+    await audit.log(
+        "conversations.marked_read",
+        entity_type="conversation",
+        entity_id=conv.id,
+        before=before,
+        after=_snapshot(conv),
+    )
+    return conv
+
+
+async def mark_conversation_unread(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+) -> Conversation:
+    """Flip a conversation back to unread by setting ``unread_count = 1``
+    if it's currently 0.
+
+    Users need this to "come back to this later" after opening a thread
+    they can't address right now. Setting the count to exactly 1 (rather
+    than restoring the historical peak) matches how Gmail / Slack /
+    Intercom behave — the badge signals "something to see" without
+    lying about how many inbound messages are actually unseen; the next
+    inbound bumps it normally.
+
+    Idempotent: no-op (no audit spam) when the row is already unread.
+    """
+    conv = await get_conversation(session, conversation_id)
+    if (conv.unread_count or 0) > 0:
+        return conv
+    before = _snapshot(conv)
+    conv.unread_count = 1
+    await session.commit()
+    await session.refresh(conv)
+    await audit.log(
+        "conversations.marked_unread",
+        entity_type="conversation",
+        entity_id=conv.id,
+        before=before,
+        after=_snapshot(conv),
+    )
     return conv
 
 
