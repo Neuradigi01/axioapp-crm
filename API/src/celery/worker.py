@@ -66,6 +66,12 @@ celery.autodiscover_tasks(
         # ``open`` tasks whose ``due_at`` is > 7 days ago to ``missed``
         # so the dashboard's Overdue bucket doesn't grow unbounded.
         "src.app.core.tasks.tasks",
+        # Module B closing-pass fix — nightly janitor that hard-deletes
+        # organizations still stuck in ``template_id='pending'`` more
+        # than 48 hours after signup (abandoned onboarding). Without
+        # this entry the beat scheduler can't find ``sweep_orphan_
+        # pending_orgs`` and the orphan rows accumulate.
+        "src.app.core.tenants.tasks",
     ]
 )
 

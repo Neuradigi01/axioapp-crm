@@ -206,4 +206,17 @@ beat_schedule = {
         "task": "src.app.core.tasks.tasks.groom_stale_open_tasks",
         "schedule": crontab(hour=2, minute=0),
     },
+    # Module B closing-pass fix — daily 03:45 UTC sweep across
+    # tbl_organizations that hard-deletes orgs still in
+    # ``template_id='pending'`` more than 48 hours after signup. Users
+    # who registered but abandoned the onboarding picker leave those
+    # rows behind along with a ``trialing`` subscription and stale
+    # ``tbl_auth_sessions`` — none of which will ever activate. Freed
+    # emails also let the same person retry signup cleanly. Offset from
+    # the other daily sweeps at hour=0/2/3:30 so the DB pool isn't
+    # contended.
+    "tenants-sweep-orphan-pending-orgs": {
+        "task": "src.app.core.tenants.tasks.sweep_orphan_pending_orgs",
+        "schedule": crontab(hour=3, minute=45),
+    },
 }

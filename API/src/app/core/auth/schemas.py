@@ -129,6 +129,14 @@ class OnboardingCompleteResponse(BaseModel):
     organization_slug: str
     role_name: str
     needs_onboarding: bool = False
+    # Non-fatal errors from the pack installer. Each section of the
+    # installer runs under its own try/except and appends to this list
+    # instead of raising, so the user's org still onboards even if (say)
+    # a custom-field definition failed to seed. Was previously logged
+    # server-side and dropped on the floor — surfacing it lets the
+    # frontend show a non-blocking warning banner so the owner knows
+    # a re-run of `install_pack` may be needed.
+    install_warnings: list[str] = Field(default_factory=list)
 
 
 class SessionOut(BaseModel):

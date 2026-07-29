@@ -116,6 +116,13 @@ export interface OnboardingCompleteResponse {
   organization_slug: string;
   role_name: string;
   needs_onboarding: boolean;
+  /** Non-fatal errors emitted by the pack installer during onboarding.
+   *  Backend still returns 200 (org IS onboarded), but individual
+   *  sections (pipelines / custom fields / lead sources / call
+   *  outcomes) may have partially failed. Frontend surfaces these as a
+   *  warning snackbar so the user knows to re-run `install_pack` from
+   *  Settings if something is missing. Empty on a clean install. */
+  install_warnings: string[];
 }
 
 @Injectable({ providedIn: 'root' })

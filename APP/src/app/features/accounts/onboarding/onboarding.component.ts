@@ -162,7 +162,7 @@ export class OnboardingComponent implements OnInit {
     this.isSubmitting.set(true);
     const raw = this.form.getRawValue();
     try {
-      await firstValueFrom(
+      const res = await firstValueFrom(
         this.auth.completeOnboarding({
           organization_name: (raw.organization_name ?? '').trim(),
           template_id: templateId,
@@ -171,6 +171,23 @@ export class OnboardingComponent implements OnInit {
           team_size: raw.team_size || null,
         }),
       );
+
+      // Pack installer runs each section under its own try/except and
+      // reports non-fatal errors instead of raising. If any landed,
+      // tell the user before we navigate — the org IS created and the
+      // JWT IS rotated, but some seed data may be missing (e.g. a
+      // pipeline stage that clashed with an existing constraint).
+      // Rendered as a 8-second warning snackbar; user can retry
+      // `install_pack` from Settings later.
+      if (res.install_warnings?.length) {
+        const summary =
+          res.install_warnings.length === 1
+            ? `Workspace ready with one warning: ${res.install_warnings[0]}`
+            : `Workspace ready with ${res.install_warnings.length} warnings. Check Settings → Packs to review.`;
+        this.snackBar.open(summary, SNACKBAR_ACTION, {
+          duration: 8000,
+        });
+      }
       await this.router.navigateByUrl('/user');
     } catch (err: unknown) {
       const detail = (err as { error?: { detail?: unknown } })?.error?.detail;

@@ -806,4 +806,9 @@ async def complete_onboarding(
         organization_id=org.id,
         organization_slug=org.slug,
         role_name=role_name,
+        # Non-fatal installer errors carried through so the frontend
+        # can render a banner: onboarding still completes, but the org
+        # owner sees which sections partially failed and can retry
+        # `install_pack` from Settings later.
+        install_warnings=list(report.errors),
     )
