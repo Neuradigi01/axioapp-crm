@@ -180,6 +180,35 @@ async def find_due_for_reminder(
     return list((await session.execute(stmt)).scalars().all())
 
 
+async def list_appointments_by_ids_in_org(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> list[Appointment]:
+    """Batched hydrate for the bulk-op paths. Empty ``ids`` short-
+    circuits without a round-trip. Explicit ``org_id`` predicate
+    belts the RLS policy — same shape as
+    ``leads.list_leads_by_ids_in_org`` /
+    ``tasks.list_tasks_by_ids_in_org`` /
+    ``walk_ins.list_walk_ins_by_ids_in_org``.
+
+    Prior versions of ``bulk_reassign_appointments`` /
+    ``bulk_cancel_appointments`` walked ``ids`` and called
+    ``get_appointment_by_id`` per iteration — one SELECT per row
+    against the router's 200-cap. This is the one-shot version the
+    service now uses; the two-pass cancel path also reuses the same
+    hydrated list for its post-commit event publish so we don't
+    re-fetch a second time.
+    """
+    if not ids:
+        return []
+    result = await session.execute(
+        select(Appointment).where(Appointment.org_id == org_id, Appointment.id.in_(ids))
+    )
+    return list(result.scalars().all())
+
+
 async def user_has_active_membership(
     session: AsyncSession, *, org_id: uuid.UUID, user_uuid: uuid.UUID
 ) -> bool:
@@ -209,6 +238,7 @@ __all__ = [
     "get_appointment_by_id",
     "get_contact_name",
     "insert_appointment",
+    "list_appointments_by_ids_in_org",
     "list_appointments_query",
     "user_has_active_membership",
 ]

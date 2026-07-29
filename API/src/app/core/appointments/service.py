@@ -824,8 +824,14 @@ async def bulk_reassign_appointments(
 ) -> int:
     """Bulk variant of `reassign_appointment`. Appointments require an
     owner, so `assigned_to_id` must be non-null — the router enforces
-    this via schema. Per-row processing because rows with the same
-    owner are skipped (no-op, not an error)."""
+    this via schema. Rows with the same owner are skipped (no-op,
+    not an error).
+
+    Batched hydrate (``list_appointments_by_ids_in_org``) replaces the
+    prior per-id ``get_appointment`` loop, and every touched row now
+    emits an ``appointments.reassigned`` audit entry to match the
+    single-row path — bulk previously wrote timeline Activities but
+    no audit trail."""
     if assigned_to_id is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -833,18 +839,20 @@ async def bulk_reassign_appointments(
         )
     await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
+    # One SELECT for the whole batch; the DAL enforces org_id.
+    appts = await _da.list_appointments_by_ids_in_org(session, ids=ids, org_id=org_id)
+
     reassigned = 0
-    # Collect the appts we actually moved so we can fan out
-    # notifications after the commit lands. Keeping the list in memory
-    # is fine — bulk reassigns are typically <100 rows.
-    moved: list[Appointment] = []
-    for aid in ids:
-        appt = await get_appointment(session, aid)
-        if appt is None:
-            continue
+    # Collect (appt, before-snapshot) tuples so we can (1) fan out
+    # notifications after commit and (2) write one audit entry per
+    # touched row. Keeping the list in memory is fine — bulk reassigns
+    # are typically <100 rows.
+    moved: list[tuple[Appointment, dict[str, Any]]] = []
+    for appt in appts:
         if appt.assigned_to_id == assigned_to_id:
             continue
         before_id = appt.assigned_to_id
+        before_snap = snapshot(appt)
         appt.assigned_to_id = assigned_to_id
         await activities.record_in_session(
             session,
@@ -856,14 +864,26 @@ async def bulk_reassign_appointments(
             user_id=actor_user_id,
         )
         reassigned += 1
-        moved.append(appt)
+        moved.append((appt, before_snap))
 
     await session.commit()
+
+    # One audit-log row per reassigned appointment. Single-row reassign
+    # emits the same event via `audit.log`; bulk was silently skipping
+    # it.
+    for appt, before_snap in moved:
+        await log_entity_change(
+            action="appointments.reassigned",
+            entity_type=_APPT_ENTITY,
+            entity_id=appt.id,
+            before=before_snap,
+            after=snapshot(appt),
+        )
 
     # One notification per moved row for the new owner. Same
     # self-spam suppression as the single reassign path.
     if assigned_to_id != actor_user_id:
-        for appt in moved:
+        for appt, _snap in moved:
             await _notify_appointment_event(
                 session=session,
                 appt=appt,
@@ -887,21 +907,25 @@ async def bulk_cancel_appointments(
     """Move every row currently in `scheduled` to `cancelled`. Rows in
     any other state are skipped (counted as `skipped`) — same partial
     success semantic as walk-ins bulk-checkout. Each cancelled row
-    gets an audit `status_change` activity carrying the reason."""
+    gets an audit `status_change` activity carrying the reason.
+
+    Batched hydrate replaces the prior per-id ``get_appointment`` loop
+    AND the second post-commit refetch pass — we retain the mutated
+    ORM instances in ``cancelled_appts`` and reuse them for the
+    lifecycle event publish. Every cancelled row now emits an
+    ``appointments.cancelled`` audit entry to match the single-row
+    cancel path."""
+    appts = await _da.list_appointments_by_ids_in_org(session, ids=ids, org_id=org_id)
+
     cancelled = 0
     skipped = 0
-    for aid in ids:
-        appt = await get_appointment(session, aid)
-        if appt is None:
-            continue
-        if appt.org_id != org_id:
-            # Defence-in-depth: ORM filter scopes SELECTs but skip
-            # anything that somehow slipped through.
-            continue
+    cancelled_appts: list[tuple[Appointment, dict[str, Any]]] = []
+    for appt in appts:
         if appt.status != AppointmentStatus.scheduled:
             skipped += 1
             continue
         before_status = appt.status.value
+        before_snap = snapshot(appt)
         appt.status = AppointmentStatus.cancelled
         await activities.record_in_session(
             session,
@@ -917,25 +941,35 @@ async def bulk_cancel_appointments(
             user_id=actor_user_id,
         )
         cancelled += 1
+        cancelled_appts.append((appt, before_snap))
 
     await session.commit()
+
+    # Audit-log row per cancelled appointment. Matches single-row
+    # cancel's `audit.log` emission; bulk was silently skipping it.
+    for appt, before_snap in cancelled_appts:
+        await log_entity_change(
+            action="appointments.cancelled",
+            entity_type=_APPT_ENTITY,
+            entity_id=appt.id,
+            before=before_snap,
+            after=snapshot(appt),
+        )
 
     # tasks/automation-conditions/ follow-up — appointment.cancelled
     # for each bulk-cancelled row. Fire AFTER commit so a bus failure
     # can't roll back the cancellations. Fired individually since the
     # event carries per-appointment payload (recipient resolvers need
-    # the specific contact / assignee for each fire).
-    if cancelled:
-        for appt_id in ids:
-            appt = await get_appointment(session, appt_id)
-            if appt is not None and appt.status == AppointmentStatus.cancelled:
-                await _publish_appointment_lifecycle_event(
-                    session=session,
-                    org_id=org_id,
-                    appt=appt,
-                    event_type="appointment.cancelled",
-                    extras={"reason": reason} if reason else None,
-                )
+    # the specific contact / assignee for each fire). Reuses the
+    # already-hydrated instances instead of re-SELECTing each id.
+    for appt, _snap in cancelled_appts:
+        await _publish_appointment_lifecycle_event(
+            session=session,
+            org_id=org_id,
+            appt=appt,
+            event_type="appointment.cancelled",
+            extras={"reason": reason} if reason else None,
+        )
 
     return cancelled, skipped
 
