@@ -1,4 +1,4 @@
-﻿import {
+import {
   CdkDragDrop,
   DragDropModule,
   moveItemInArray,
@@ -50,13 +50,13 @@ import { StageEditorPopoverComponent } from './stage-editor-popover.component';
  *     different column. The parent is expected to PATCH the moved
  *     item's stage on the server and (optimistically or otherwise)
  *     refresh the `items` input. The board does NOT call the move
- *     endpoint itself â€” that lives on the entity router (leads,
+ *     endpoint itself — that lives on the entity router (leads,
  *     custom_orders) which knows about `move_card`.
  *
  * Item rendering: caller supplies a `<ng-template>` child with an
  * `let-item` binding. The board passes each item through via
  * `*ngTemplateOutlet` so the caller can render any card layout they
- * want without the board knowing anything about contacts, leads, â€¦
+ * want without the board knowing anything about contacts, leads, …
  *
  * Note on cdk-drag-drop + signals: cdk mutates the drop-list's `data`
  * array in place to reflect the visual drop. We mirror items into a
@@ -93,7 +93,7 @@ export class PipelineBoardComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
 
-  /** `{stageKey: PipelineItem[]}` â€” mutable so cdk-drag-drop works in place. */
+  /** `{stageKey: PipelineItem[]}` — mutable so cdk-drag-drop works in place. */
   protected readonly buckets = signal<Record<string, PipelineItem[]>>({});
 
   readonly stages = computed<PipelineStage[]>(() => this.pipeline()?.stages ?? []);
@@ -138,7 +138,7 @@ export class PipelineBoardComponent {
 
   protected onDrop(event: CdkDragDrop<PipelineItem[]>, toStage: string): void {
     if (event.previousContainer === event.container) {
-      // Reorder within the same column â€” purely visual, no server call.
+      // Reorder within the same column — purely visual, no server call.
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
     } else {
       transferArrayItem(
@@ -175,7 +175,7 @@ export class PipelineBoardComponent {
   protected stagePillClass(stage: PipelineStage): string {
     if (stage.is_won) return 'bg-emerald-100 text-emerald-700 ring-emerald-200';
     if (stage.is_lost) return 'bg-red-100 text-red-700 ring-red-200';
-    return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+    return 'bg-surface-2 text-default border-subtle';
   }
 
   private stageKeyFromDropListId(id: string): string {
@@ -190,7 +190,7 @@ export class PipelineBoardComponent {
       const key = item.pipeline_stage;
       if (next[key]) next[key].push(item);
       else {
-        // Item references an unknown stage â€” surface in a sentinel
+        // Item references an unknown stage — surface in a sentinel
         // bucket so the user still sees the item rather than losing it.
         // Won't render unless a column with this key exists, but the
         // emit-side won't see a phantom bucket either.

@@ -7,7 +7,11 @@
 
 @use 'tokens';
 
-:root {
+// Dark palette is the default when `data-theme` is `dark` OR unset (matches
+// AIXO's `aixo-tokens.scss` which also treats dark as the base `:root`).
+// Light applies via `[data-theme='light']` in `light.scss`.
+[data-theme='dark'],
+:root:not([data-theme='light']) {
   // ---------------------------------------------------------------------------
   // Page
   // ---------------------------------------------------------------------------

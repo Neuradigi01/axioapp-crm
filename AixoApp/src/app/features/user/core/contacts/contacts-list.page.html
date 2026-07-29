@@ -1,17 +1,19 @@
-<div class="mx-auto max-w-7xl p-6" [appUrlFilterState]="urlState">
-  <header class="flex items-center justify-between">
+<div class="mx-auto max-w-7xl p-4 md:p-6" [appUrlFilterState]="urlState">
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
     <div>
-      <h1 class="text-lg font-semibold text-zinc-900">Contacts</h1>
-      <p class="mt-0.5 text-xs text-zinc-500">
+      <h1 class="font-display text-[26px] font-bold leading-tight tracking-tight text-default">
+        Contacts
+      </h1>
+      <p class="mt-1 text-sm text-muted">
         Showroom walk-ins, leads, returning customers. {{ state.total() }} total.
       </p>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
       <button
         type="button"
         (click)="onExportCsv()"
         [disabled]="exporting()"
-        class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+        class="btn btn-secondary btn-sm"
       >
         @if (exporting()) {
           <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
@@ -21,25 +23,15 @@
           Export CSV
         }
       </button>
-      <a
-        routerLink="/user/contacts/import"
-        class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-      >
+      <a routerLink="/user/contacts/import" class="btn btn-secondary btn-sm">
         <lucide-icon name="upload" class="h-4 w-4" />
         Import
       </a>
-      <a
-        routerLink="/user/contacts/groups"
-        class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-      >
+      <a routerLink="/user/contacts/groups" class="btn btn-secondary btn-sm">
         <lucide-icon name="users" class="h-4 w-4" />
         Groups
       </a>
-      <button
-        type="button"
-        (click)="openCreate()"
-        class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-      >
+      <button type="button" (click)="openCreate()" class="btn btn-primary btn-sm">
         <lucide-icon name="plus" class="h-4 w-4" />
         New Contact
       </button>
@@ -47,59 +39,44 @@
   </header>
 
   <!-- Filters -->
-  <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-5">
+  <div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-5">
     <div class="sm:col-span-2">
       <label for="contacts_q" class="sr-only">Search</label>
       <div class="relative">
         <lucide-icon
           name="search"
-          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
         />
         <input
           id="contacts_q"
           type="search"
           [formControl]="searchControl"
           placeholder="Search by name, phone, or email…"
-          class="block w-full rounded-md border border-zinc-300 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="input pl-9"
         />
       </div>
     </div>
-
     <div>
       <label for="contacts_source" class="sr-only">Source</label>
-      <select
-        id="contacts_source"
-        [formControl]="sourceControl"
-        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-      >
+      <select id="contacts_source" [formControl]="sourceControl" class="select">
         <option value="">All sources</option>
         @for (s of sourceOptions(); track s) {
           <option [value]="s">{{ s }}</option>
         }
       </select>
     </div>
-
     <div>
       <label for="contacts_tag" class="sr-only">Tag</label>
-      <select
-        id="contacts_tag"
-        [formControl]="tagControl"
-        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-      >
+      <select id="contacts_tag" [formControl]="tagControl" class="select">
         <option value="">All tags</option>
         @for (t of tagOptions(); track t) {
           <option [value]="t">{{ t }}</option>
         }
       </select>
     </div>
-
     <div>
       <label for="contacts_assignee" class="sr-only">Owner</label>
-      <select
-        id="contacts_assignee"
-        [formControl]="assigneeControl"
-        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-      >
+      <select id="contacts_assignee" [formControl]="assigneeControl" class="select">
         <option value="">All owners</option>
         <option value="me">Me</option>
         @for (u of users(); track u.id) {
@@ -110,35 +87,35 @@
   </div>
 
   <!-- Body -->
-  <div class="mt-6 overflow-x-auto rounded-lg bg-white shadow-sm ring-1 ring-zinc-200">
+  <div class="overflow-x-auto rounded-xl border border-subtle bg-surface">
     @if (state.loadError(); as err) {
-      <div class="px-6 py-4 text-sm text-red-700">{{ err }}</div>
+      <div class="px-4 md:px-6 py-4 text-sm text-red-500">{{ err }}</div>
     } @else if (state.loading()) {
-      <div class="divide-y divide-zinc-200">
+      <div class="divide-y divide-subtle">
         @for (i of [0, 1, 2, 3, 4]; track i) {
-          <div class="flex items-center gap-4 px-6 py-4">
-            <div class="h-9 w-9 animate-pulse rounded-full bg-zinc-200"></div>
+          <div class="flex items-center gap-4 px-4 md:px-6 py-4">
+            <div class="h-9 w-9 animate-pulse rounded-full bg-surface-2"></div>
             <div class="flex-1">
-              <div class="h-3 w-40 animate-pulse rounded bg-zinc-200"></div>
-              <div class="mt-2 h-3 w-24 animate-pulse rounded bg-zinc-100"></div>
+              <div class="h-3 w-40 animate-pulse rounded bg-surface-2"></div>
+              <div class="mt-2 h-3 w-24 animate-pulse rounded bg-surface-2"></div>
             </div>
-            <div class="h-3 w-20 animate-pulse rounded bg-zinc-200"></div>
+            <div class="h-3 w-20 animate-pulse rounded bg-surface-2"></div>
           </div>
         }
       </div>
     } @else if (state.items().length === 0) {
-      <div class="px-6 py-12 text-center text-sm text-zinc-500">
-        No contacts found.
-        <span class="block text-xs text-zinc-400">Try a different search or clear filters.</span>
+      <div class="px-4 md:px-6 py-12 text-center">
+        <p class="text-sm font-medium text-default">No contacts found.</p>
+        <p class="mt-1 text-xs text-faint">Try a different search or clear filters.</p>
       </div>
     } @else {
-      <table class="w-full min-w-[1100px] divide-y divide-zinc-200">
-        <thead class="bg-zinc-50">
-          <tr>
+      <table class="w-full min-w-[1100px]">
+        <thead>
+          <tr class="border-b border-subtle bg-surface-2">
             <th scope="col" class="w-10 px-3 py-2.5 text-left">
               <input
                 type="checkbox"
-                class="h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                class="checkbox"
                 [checked]="state.allOnPageSelected()"
                 (change)="toggleAllOnPage()"
                 aria-label="Select all on this page"
@@ -146,11 +123,11 @@
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               <button
                 type="button"
-                class="inline-flex items-center gap-1 hover:text-zinc-900 focus:outline-none focus:text-zinc-900"
+                class="inline-flex items-center gap-1 transition hover:text-default focus:outline-none"
                 (click)="toggleSort('full_name')"
               >
                 Name
@@ -164,41 +141,41 @@
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               Phone
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               Email
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               Source
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               Owner
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               Tags
             </th>
             <th
               scope="col"
-              class="px-6 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-zinc-500"
+              class="px-4 md:px-6 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
             >
               <button
                 type="button"
-                class="inline-flex items-center gap-1 hover:text-zinc-900 focus:outline-none focus:text-zinc-900"
+                class="inline-flex items-center gap-1 transition hover:text-default focus:outline-none"
                 (click)="toggleSort('last_activity_at')"
               >
                 Last activity
@@ -212,28 +189,28 @@
             </th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-zinc-100 bg-white">
+        <tbody>
           @for (item of state.items(); track item.id) {
             <tr
               tabindex="0"
               (click)="onRowClick(item)"
               (keydown.enter)="onRowClick(item)"
-              class="cursor-pointer transition hover:bg-zinc-50 focus:bg-zinc-50 focus:outline-none"
-              [class.bg-zinc-50]="state.selectedIds().has(item.id)"
+              class="cursor-pointer border-b border-subtle transition last:border-b-0 hover:bg-surface-2 focus:bg-surface-2 focus:outline-none"
+              [class.bg-surface-2]="state.selectedIds().has(item.id)"
             >
               <td class="w-10 px-3 py-3" (click)="$event.stopPropagation()">
                 <input
                   type="checkbox"
-                  class="h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                  class="checkbox"
                   [checked]="state.selectedIds().has(item.id)"
                   (click)="toggleRow(item.id, $event)"
                   [attr.aria-label]="'Select ' + item.full_name"
                 />
               </td>
-              <td class="whitespace-nowrap px-6 py-3 text-sm font-medium text-zinc-900">
+              <td class="whitespace-nowrap px-4 md:px-6 py-3 text-sm font-medium text-default">
                 <div class="flex items-center gap-3">
                   <span
-                    class="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700"
+                    class="flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft font-display text-xs font-semibold text-accent"
                   >
                     {{ initials(item.full_name) }}
                   </span>
@@ -241,7 +218,7 @@
                     {{ item.full_name }}
                     @if (item.anonymised_at) {
                       <span
-                        class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 ring-1 ring-zinc-300"
+                        class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-faint"
                         title="This contact has been anonymised (DPDP right-to-be-forgotten). PII is wiped and both consent channels are opted-out."
                       >
                         Anonymised
@@ -257,74 +234,70 @@
                 </div>
               </td>
               <td
-                class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600"
+                class="whitespace-nowrap px-4 md:px-6 py-3 text-sm text-muted"
                 (click)="$event.stopPropagation()"
               >
                 @if (item.phone) {
                   <div class="inline-flex items-center gap-2">
-                    <a
-                      [appPhoneLink]="item.phone"
-                      class="text-zinc-700 hover:text-zinc-900 hover:underline"
-                    >
+                    <a [appPhoneLink]="item.phone" class="text-default hover:text-accent">
                       {{ item.phone }}
                     </a>
                     <a
                       [appWhatsappLink]="item.phone"
-                      class="text-emerald-600 hover:text-emerald-800"
+                      class="text-emerald-500 hover:text-emerald-400"
                     >
                       <lucide-icon name="message-circle" class="h-3.5 w-3.5" />
                     </a>
                   </div>
                 } @else {
-                  —
+                  <span class="text-faint">—</span>
                 }
               </td>
               <td
-                class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600"
+                class="whitespace-nowrap px-4 md:px-6 py-3 text-sm text-muted"
                 (click)="$event.stopPropagation()"
               >
                 @if (item.email) {
-                  <a
-                    [appMailLink]="item.email"
-                    class="text-zinc-700 hover:text-zinc-900 hover:underline"
-                  >
+                  <a [appMailLink]="item.email" class="text-default hover:text-accent">
                     {{ item.email }}
                   </a>
                 } @else {
-                  —
+                  <span class="text-faint">—</span>
                 }
               </td>
-              <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600">
+              <td class="whitespace-nowrap px-4 md:px-6 py-3 text-sm text-muted">
                 {{ item.source ?? '—' }}
               </td>
-              <td class="whitespace-nowrap px-6 py-3 text-sm text-zinc-600">
+              <td class="whitespace-nowrap px-4 md:px-6 py-3 text-sm text-muted">
                 @if (item.assigned_to_id) {
                   <div class="flex items-center gap-2">
                     <span
-                      class="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700"
+                      class="flex h-6 w-6 items-center justify-center rounded-full bg-accent-soft font-display text-[10px] font-semibold text-accent"
                     >
                       {{ initials(ownerLabel(item.assigned_to_id)) }}
                     </span>
                     <span>{{ ownerLabel(item.assigned_to_id) }}</span>
                   </div>
                 } @else {
-                  <span class="text-zinc-400">Unassigned</span>
+                  <span class="text-faint">Unassigned</span>
                 }
               </td>
-              <td class="px-6 py-3 text-sm text-zinc-600">
+              <td class="px-4 md:px-6 py-3 text-sm text-muted">
                 <div class="flex flex-wrap gap-1">
                   @for (tag of item.tags; track tag) {
                     <span
-                      class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+                      class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted"
                     >
                       {{ tag }}
                     </span>
                   } @empty {
-                    <span class="text-zinc-400">—</span>
+                    <span class="text-faint">—</span>
                   }
                 </div>
               </td>
-              <td class="whitespace-nowrap px-6 py-3 text-right text-sm text-zinc-600 tabular-nums">
+              <td
+                class="whitespace-nowrap px-4 md:px-6 py-3 text-right font-mono text-sm text-muted tabular-nums"
+              >
                 {{ item.last_activity_at | relativeTime }}
               </td>
             </tr>
@@ -336,18 +309,18 @@
 
   <!-- Pagination -->
   @if (!state.loading() && state.total() > 0) {
-    <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-600">
-      <span>
+    <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
+      <span class="font-mono">
         Page {{ state.page() }} of {{ state.totalPages() }} · {{ state.total() }} contact(s)
       </span>
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-1.5">
-          <label for="contacts_pagesize" class="text-zinc-500">Rows</label>
+          <label for="contacts_pagesize" class="text-faint">Rows</label>
           <select
             id="contacts_pagesize"
             [value]="state.pageSize()"
             (change)="setPageSize(+$any($event.target).value)"
-            class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="select !h-7 !py-0 !text-xs"
           >
             <option [value]="25">25</option>
             <option [value]="50">50</option>
@@ -358,7 +331,7 @@
           <div class="flex items-center gap-1">
             <button
               type="button"
-              class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              class="btn btn-secondary btn-sm"
               [disabled]="state.page() <= 1"
               (click)="goToPage(state.page() - 1)"
             >
@@ -366,7 +339,7 @@
             </button>
             <button
               type="button"
-              class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              class="btn btn-secondary btn-sm"
               [disabled]="state.page() >= state.totalPages()"
               (click)="goToPage(state.page() + 1)"
             >
@@ -426,33 +399,37 @@
 }
 
 @if (state.bulkModal() === 'tag') {
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-    <div class="w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
-      <header class="border-b border-zinc-200 px-5 py-3">
-        <h2 class="text-sm font-semibold text-zinc-900">
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+    style="animation: fadeIn 0.12s ease"
+  >
+    <div
+      class="w-full max-w-md overflow-hidden rounded-2xl border border-subtle bg-surface-2 shadow-elevated"
+      style="animation: popIn 0.12s ease"
+    >
+      <header class="border-b border-subtle px-5 py-4">
+        <h2 class="font-display text-base font-semibold text-default">
           Add tag to {{ state.selectedCount() }} contact{{ state.selectedCount() === 1 ? '' : 's' }}
         </h2>
       </header>
       <div class="px-5 py-4">
-        <label for="bulk_tag_input" class="block text-xs font-medium text-zinc-700">Tag</label>
+        <label for="bulk_tag_input" class="field-label">Tag</label>
         <input
           id="bulk_tag_input"
           type="text"
           [formControl]="tagInputControl"
-          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="input mt-1"
           placeholder="e.g. vip"
           maxlength="64"
         />
         @if (state.bulkError(); as err) {
-          <p class="mt-2 text-xs text-red-700">{{ err }}</p>
+          <p class="field-error mt-2">{{ err }}</p>
         }
       </div>
-      <footer
-        class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3 rounded-b-lg"
-      >
+      <footer class="flex items-center justify-end gap-2 border-t border-subtle px-5 py-4">
         <button
           type="button"
-          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          class="btn btn-secondary"
           [disabled]="state.bulkSubmitting()"
           (click)="closeBulkModal()"
         >
@@ -460,7 +437,7 @@
         </button>
         <button
           type="button"
-          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+          class="btn btn-primary"
           [disabled]="state.bulkSubmitting()"
           (click)="onBulkAddTag()"
         >

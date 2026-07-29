@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -25,7 +25,7 @@ import { deriveApiOrigin } from '@core/services/url.util';
 import { InventoryApiService, InventoryItem } from '../../inventory/inventory-api.service';
 import { BillingApiService, PaymentMethod, PosCheckoutResponse } from '../billing-api.service';
 
-/** A line in the live cart â€” keyed by inventory item id. */
+/** A line in the live cart — keyed by inventory item id. */
 interface CartLine {
   inv_id: string;
   catalog_item_id: string | null;
@@ -33,7 +33,7 @@ interface CartLine {
   display_name: string;
   unit_price: number;
   qty: number;
-  /** Max we can sell from default warehouse â€” surface so the +/- buttons can clamp. */
+  /** Max we can sell from default warehouse — surface so the +/- buttons can clamp. */
   qty_on_hand: number;
 }
 
@@ -49,7 +49,7 @@ const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: string }[] = [
 ];
 
 /** Empty contact-list response stream used when the phone query is too
- * short or the lookup errors â€” keeps the switchMap union narrow. */
+ * short or the lookup errors — keeps the switchMap union narrow. */
 const emptyResp$ = of<ContactListResponse>({
   items: [],
   total: 0,
@@ -113,7 +113,7 @@ export class PosTabComponent {
     const n = Number(raw || 0);
     if (!Number.isFinite(n) || n <= 0) return 0;
     if (this.discountMode() === 'flat') return n;
-    // percent â€” clamp to [0, 100]
+    // percent — clamp to [0, 100]
     const pct = Math.min(Math.max(n, 0), 100);
     return (this.cartSubtotal() * pct) / 100;
   });
@@ -134,13 +134,13 @@ export class PosTabComponent {
       this.cart().length > 0 && this.phoneControl.value.trim().length >= 3 && !this.submitting(),
   );
 
-  /** Total *after* discount but BEFORE tax â€” for the bill summary box. */
+  /** Total *after* discount but BEFORE tax — for the bill summary box. */
   protected readonly afterDiscount = computed(() =>
     Math.max(this.cartSubtotal() - this.discountAmount(), 0),
   );
 
   /** Live tax estimate using the inventory item count and 18% baseline
-   * â€” the *real* tax is applied server-side from org_settings at issue
+   * — the *real* tax is applied server-side from org_settings at issue
    * time. We show this as "estimated GST" so the cashier has a number
    * to read aloud; the printed receipt always carries the authoritative
    * snapshot. */
@@ -316,7 +316,7 @@ export class PosTabComponent {
     const parts: string[] = [item.sku];
     if (item.material) parts.push(item.material);
     if (item.color) parts.push(item.color);
-    return parts.join(' Â· ');
+    return parts.join(' · ');
   }
 
   protected resolveUnitPrice(item: InventoryItem): number {

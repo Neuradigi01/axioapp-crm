@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -27,7 +27,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { deriveApiOrigin } from '@core/services/url.util';
 
 /**
- * Catalog page â€” bare-minimum product table matching the reference
+ * Catalog page — bare-minimum product table matching the reference
  * Vercel layout's structural shape (header + KPI strip + search +
  * grid). The Phase 4 furniture pack will replace this with the
  * richer inventory page (stock + locations + alerts).

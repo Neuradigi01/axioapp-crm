@@ -39,59 +39,57 @@ type SortKey = 'median' | 'replies' | 'conversations' | 'p95' | 'name';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule],
   template: `
-    <div class="rounded-md border border-zinc-200 bg-white p-4">
+    <div class="rounded-md border border-subtle bg-surface p-4">
       <div class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Agent leaderboard
-          </p>
-          <p class="text-[11px] text-zinc-500">Who's responding fastest. AI replies excluded.</p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">Agent leaderboard</p>
+          <p class="text-[11px] text-muted">Who's responding fastest. AI replies excluded.</p>
         </div>
         @if (loading()) {
-          <span class="text-[11px] text-zinc-500">Loading…</span>
+          <span class="text-[11px] text-muted">Loading…</span>
         }
       </div>
 
       @if (error(); as err) {
-        <p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
           {{ err }}
         </p>
       } @else if (report(); as r) {
         @if (r.rows.length === 0) {
-          <p class="py-8 text-center text-xs text-zinc-500">
+          <p class="py-8 text-center text-xs text-muted">
             No human-replied conversations in this window.
           </p>
         } @else {
           <table class="w-full text-xs">
-            <thead class="text-zinc-500">
-              <tr class="border-b border-zinc-200">
+            <thead class="text-muted">
+              <tr class="border-b border-subtle">
                 <th class="py-1 text-left font-medium">#</th>
                 <th
-                  class="cursor-pointer py-1 text-left font-medium hover:text-zinc-700"
+                  class="cursor-pointer py-1 text-left font-medium hover:text-default"
                   (click)="setSort('name')"
                 >
                   Agent {{ sortMarker('name') }}
                 </th>
                 <th
-                  class="cursor-pointer py-1 text-right font-medium hover:text-zinc-700"
+                  class="cursor-pointer py-1 text-right font-medium hover:text-default"
                   (click)="setSort('replies')"
                 >
                   Replies {{ sortMarker('replies') }}
                 </th>
                 <th
-                  class="cursor-pointer py-1 text-right font-medium hover:text-zinc-700"
+                  class="cursor-pointer py-1 text-right font-medium hover:text-default"
                   (click)="setSort('conversations')"
                 >
                   Conversations {{ sortMarker('conversations') }}
                 </th>
                 <th
-                  class="cursor-pointer py-1 text-right font-medium hover:text-zinc-700"
+                  class="cursor-pointer py-1 text-right font-medium hover:text-default"
                   (click)="setSort('median')"
                 >
                   Median {{ sortMarker('median') }}
                 </th>
                 <th
-                  class="cursor-pointer py-1 text-right font-medium hover:text-zinc-700"
+                  class="cursor-pointer py-1 text-right font-medium hover:text-default"
                   (click)="setSort('p95')"
                 >
                   p95 {{ sortMarker('p95') }}
@@ -101,19 +99,19 @@ type SortKey = 'median' | 'replies' | 'conversations' | 'p95' | 'name';
             <tbody>
               @for (row of sortedRows(); track row.user_id; let i = $index) {
                 <tr
-                  class="cursor-pointer border-b border-zinc-100 last:border-0 hover:bg-zinc-50"
+                  class="cursor-pointer border-b border-subtle last:border-0 hover:bg-surface-2"
                   (click)="onRowClick(row.user_id)"
                 >
-                  <td class="py-1.5 text-zinc-500">{{ i + 1 }}</td>
-                  <td class="py-1.5 text-zinc-800">{{ row.name }}</td>
-                  <td class="py-1.5 text-right text-zinc-700">{{ row.replies }}</td>
-                  <td class="py-1.5 text-right text-zinc-700">
+                  <td class="py-1.5 text-muted">{{ i + 1 }}</td>
+                  <td class="py-1.5 text-default">{{ row.name }}</td>
+                  <td class="py-1.5 text-right text-default">{{ row.replies }}</td>
+                  <td class="py-1.5 text-right text-default">
                     {{ row.conversations_handled }}
                   </td>
-                  <td class="py-1.5 text-right text-zinc-700">
+                  <td class="py-1.5 text-right text-default">
                     {{ formatDuration(row.median_response_seconds) }}
                   </td>
-                  <td class="py-1.5 text-right text-zinc-700">
+                  <td class="py-1.5 text-right text-default">
                     {{ formatDuration(row.p95_response_seconds) }}
                   </td>
                 </tr>

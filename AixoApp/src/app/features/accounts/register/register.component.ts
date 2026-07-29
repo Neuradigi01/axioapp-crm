@@ -15,7 +15,13 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ValidationMessageComponent } from '@shared/components/validation-message/validation-message.component';
 import { CaptchaComponent } from '@shared/components/captcha/captcha.component';
 import { PasswordToggleDirective } from '@shared/directives/password-toggle.directive';
-import { matchFieldValidator } from '@shared/validators/custom-validators';
+import {
+  emailValidator,
+  matchFieldValidator,
+  nameValidator,
+  passwordStrengthValidator,
+  phoneValidator,
+} from '@shared/validators/custom-validators';
 import { AuthApiService } from '@app/services/auth-api.service';
 import { FurnitureAuthService } from '@app/features/user/core/auth/auth.service';
 import { firstValueFrom } from 'rxjs';
@@ -88,12 +94,15 @@ export class RegisterComponent implements OnInit, OnDestroy {
   // `/onboarding` (a dedicated step the new user lands on after this
   // form submits with `needs_onboarding=true`).
   readonly registerForm: FormGroup = this.fb.group({
-    password: ['', [Validators.required, Validators.minLength(8)]],
-    confirm_password: ['', [Validators.required, matchFieldValidator('password')]],
-    first_name: ['', Validators.required],
-    last_name: ['', Validators.required],
-    email: ['', [Validators.required, Validators.email]],
-    mobile_no: [''],
+    password: ['', [Validators.required, passwordStrengthValidator]],
+    confirm_password: [
+      '',
+      [Validators.required, Validators.maxLength(128), matchFieldValidator('password')],
+    ],
+    first_name: ['', [Validators.required, nameValidator]],
+    last_name: ['', [Validators.required, nameValidator]],
+    email: ['', [Validators.required, emailValidator, Validators.maxLength(254)]],
+    mobile_no: ['', [phoneValidator]],
     country_id: [null as number | null],
     state_id: [{ value: null as number | null, disabled: true }],
     referral_id: [''],

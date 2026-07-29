@@ -1,7 +1,7 @@
 <div class="relative inline-block">
   <button
     type="button"
-    class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+    class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
     [disabled]="!canPick()"
     [title]="!canPick() ? 'Connect to a contact to use templates' : null"
     (click)="toggle()"
@@ -17,24 +17,24 @@
 
   @if (open()) {
     <div
-      class="absolute bottom-full right-0 z-30 mb-2 w-80 rounded-lg border border-zinc-200 bg-white shadow-xl"
+      class="absolute bottom-full right-0 z-30 mb-2 w-80 rounded-lg border border-subtle bg-surface shadow-xl"
       role="dialog"
       aria-label="Pick a template"
     >
-      <div class="border-b border-zinc-200 p-2">
+      <div class="border-b border-subtle p-2">
         <label class="relative block">
           <span class="sr-only">Search templates</span>
           <lucide-icon
             name="search"
             size="12"
-            class="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400"
+            class="absolute left-2 top-1/2 -translate-y-1/2 text-faint"
             aria-hidden="true"
           ></lucide-icon>
           <input
             type="text"
             [formControl]="searchCtrl"
             placeholder="Search…"
-            class="block w-full rounded-md border border-zinc-300 bg-white py-1 pl-6 pr-2 text-xs shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="block w-full rounded-md border border-subtle bg-surface py-1 pl-6 pr-2 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             autofocus
           />
         </label>
@@ -42,7 +42,7 @@
 
       <div class="max-h-72 overflow-y-auto">
         @if (loading() && templates().length === 0) {
-          <p class="flex items-center gap-1 px-3 py-4 text-xs text-zinc-500">
+          <p class="flex items-center gap-1 px-3 py-4 text-xs text-muted">
             <lucide-icon
               name="loader-2"
               size="12"
@@ -52,36 +52,36 @@
             Loading…
           </p>
         } @else if (templates().length === 0) {
-          <p class="px-3 py-4 text-xs text-zinc-500">
+          <p class="px-3 py-4 text-xs text-muted">
             No templates match. Create one in
             <span class="font-medium">Settings → Email Templates</span>.
           </p>
         } @else {
-          <ul class="divide-y divide-zinc-100">
+          <ul class="divide-y divide-subtle">
             @for (t of templates(); track t.id) {
               <li>
                 <button
                   type="button"
-                  class="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-zinc-50 disabled:opacity-50"
+                  class="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-surface-2 disabled:opacity-50"
                   [disabled]="rendering() !== null"
                   (click)="pick(t)"
                 >
                   <div class="flex-1 min-w-0">
-                    <p class="truncate text-sm font-medium text-zinc-900">{{ t.name }}</p>
-                    <p class="truncate text-xs text-zinc-500">{{ t.subject }}</p>
+                    <p class="truncate text-sm font-medium text-default">{{ t.name }}</p>
+                    <p class="truncate text-xs text-muted">{{ t.subject }}</p>
                   </div>
                   @if (rendering() === t.id) {
                     <lucide-icon
                       name="loader-2"
                       size="14"
-                      class="mt-0.5 shrink-0 animate-spin text-zinc-400"
+                      class="mt-0.5 shrink-0 animate-spin text-faint"
                       aria-hidden="true"
                     ></lucide-icon>
                   } @else {
                     <lucide-icon
                       name="arrow-right"
                       size="14"
-                      class="mt-0.5 shrink-0 text-zinc-300"
+                      class="mt-0.5 shrink-0 text-faint"
                       aria-hidden="true"
                     ></lucide-icon>
                   }

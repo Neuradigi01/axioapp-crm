@@ -18,6 +18,7 @@ import { BaseFormModalComponent } from '../shared/components/base-form-modal.com
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import type { StandardFieldRendered } from '../standard-fields/types';
+import { commonValidators } from '../shared/validators';
 import { extractApiError } from '@core/services/api-error.util';
 import { nullableTrim } from '@core/services/form.util';
 import { QuickRegisterResponse, WalkInsApiService } from './walk-ins-api.service';
@@ -27,11 +28,11 @@ import { QuickRegisterResponse, WalkInsApiService } from './walk-ins-api.service
  * a phone number, we debounce + lookup an existing contact; if one
  * exists with that exact phone we show a banner ("Existing customer:
  * Asha Reddy"). The backend dedups regardless, so this is a UX hint
- * only â€” the operator can still type any name and submit.
+ * only — the operator can still type any name and submit.
  *
  * The Custom section renders `<app-dynamic-form>` against
  * `entity_type='walk_in'`. Contact custom fields are NOT enforced at
- * this surface â€” the backend's `quick-register` bypasses them on
+ * this surface — the backend's `quick-register` bypasses them on
  * contact creation (operator fills the rest later via Contacts page).
  */
 @Component({
@@ -55,23 +56,43 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
   protected readonly form = this.fb.group({
     phone: this.fb.control('', {
       nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(32)],
+      validators: [Validators.required, commonValidators.phone(), Validators.maxLength(32)],
     }),
     full_name: this.fb.control('', {
       nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(255)],
+      validators: [Validators.required, commonValidators.name, Validators.maxLength(255)],
     }),
-    email: this.fb.control('', { nonNullable: true }),
+    email: this.fb.control('', {
+      nonNullable: true,
+      validators: [commonValidators.email, commonValidators.maxLength(254)],
+    }),
     source: this.fb.control('walk_in', { nonNullable: true }),
-    requirement: this.fb.control('', { nonNullable: true }),
-    budget: this.fb.control('', { nonNullable: true }),
+    requirement: this.fb.control('', {
+      nonNullable: true,
+      validators: [commonValidators.maxLength(500)],
+    }),
+    budget: this.fb.control('', {
+      nonNullable: true,
+      validators: [commonValidators.numericInRange(0, 1_000_000_000)],
+    }),
     // W8 — party size (1–99). Empty = single visitor / not tracked.
-    party_size: this.fb.control('', { nonNullable: true }),
+    party_size: this.fb.control('', {
+      nonNullable: true,
+      validators: [commonValidators.numericInRange(1, 99)],
+    }),
     // W9 — queue arrival ISO. When present, the (time_in - wait_started_at)
     // delta populates the org's avg-wait metric. Empty = not tracked.
-    wait_started_at: this.fb.control('', { nonNullable: true }),
+    wait_started_at: this.fb.control('', {
+      nonNullable: true,
+      validators: [commonValidators.isoDateTime],
+    }),
     // W11 — "customer will return by" YYYY-MM-DD. Retention analytics.
-    expected_return_date: this.fb.control('', { nonNullable: true }),
+    // "Will return" is forward-looking — today doesn't make sense for
+    // an expected-return promise, so `dateFuture` (tomorrow onward).
+    expected_return_date: this.fb.control('', {
+      nonNullable: true,
+      validators: [commonValidators.isoDate, commonValidators.dateFuture],
+    }),
   });
 
   protected readonly hasMatch = computed(() => this.matchedContact() !== null);
@@ -89,10 +110,18 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
    * overrides; `budget` additionally accepts `min`/`max`.
    */
   protected applyStandardValidators(map: Record<string, StandardFieldRendered>): void {
-    this.form.controls.phone.setValidators([Validators.required, Validators.maxLength(32)]);
+    this.form.controls.phone.setValidators([
+      Validators.required,
+      commonValidators.phone(),
+      Validators.maxLength(32),
+    ]);
     this.form.controls.phone.updateValueAndValidity({ emitEvent: false });
 
-    this.form.controls.full_name.setValidators([Validators.required, Validators.maxLength(255)]);
+    this.form.controls.full_name.setValidators([
+      Validators.required,
+      commonValidators.name,
+      Validators.maxLength(255),
+    ]);
     this.form.controls.full_name.updateValueAndValidity({ emitEvent: false });
 
     const setReq = (
@@ -106,12 +135,13 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
       this.form.controls[ctrl].updateValueAndValidity({ emitEvent: false });
     };
 
-    setReq('email', [], map['email']);
+    setReq('email', [commonValidators.email, commonValidators.maxLength(254)], map['email']);
     setReq('source', [], map['source']);
-    setReq('requirement', [], map['requirement']);
+    setReq('requirement', [commonValidators.maxLength(500)], map['requirement']);
 
     const budgetRow = map['budget'];
-    const budgetV: ValidatorFn[] = [];
+    // Floor + ceiling always apply; override min/max tighten further if set.
+    const budgetV: ValidatorFn[] = [commonValidators.numericInRange(0, 1_000_000_000)];
     if (budgetRow?.is_required) budgetV.push(Validators.required);
     if (budgetRow?.min_value != null) budgetV.push(Validators.min(budgetRow.min_value));
     if (budgetRow?.max_value != null) budgetV.push(Validators.max(budgetRow.max_value));

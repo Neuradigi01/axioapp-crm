@@ -1,4 +1,4 @@
-﻿import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
@@ -7,6 +7,13 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { TokenStorageService } from '../../user/core/auth/token-storage.service';
 import { extractApiError } from '@core/services/api-error.util';
+import { ValidationMessageComponent } from '@shared/components/validation-message/validation-message.component';
+import {
+  matchFieldValidator,
+  nameValidator,
+  passwordStrengthValidator,
+  phoneValidator,
+} from '@shared/validators/custom-validators';
 
 interface InvitationPreview {
   email: string;
@@ -22,14 +29,14 @@ interface LoginResponse {
 }
 
 /**
- * `/accounts/accept-invite?token=â€¦` â€” recipient-side flow.
+ * `/accounts/accept-invite?token=…` — recipient-side flow.
  *
  * Three states inside one component:
- *   `loading`  â€” looking up the token via GET /api/v1/invitations/lookup
- *   `invalid`  â€” token missing / expired / already-accepted
- *   `ready`    â€” preview rendered + form open
+ *   `loading`  — looking up the token via GET /api/v1/invitations/lookup
+ *   `invalid`  — token missing / expired / already-accepted
+ *   `ready`    — preview rendered + form open
  *
- * On valid submit the API returns a JWT â€” we persist it via
+ * On valid submit the API returns a JWT — we persist it via
  * `TokenStorageService` (same path the login flow uses) and redirect
  * to `/user/dashboard`. The recipient never has to log in manually.
  */
@@ -37,7 +44,7 @@ interface LoginResponse {
   selector: 'app-accept-invite',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ValidationMessageComponent],
   templateUrl: './accept-invite.component.html',
 })
 export class AcceptInviteComponent {
@@ -59,11 +66,14 @@ export class AcceptInviteComponent {
   private rawToken: string | null = null;
 
   protected readonly form = this.fb.nonNullable.group({
-    first_name: ['', [Validators.required, Validators.maxLength(128)]],
-    last_name: ['', [Validators.maxLength(128)]],
-    phone: [''],
-    password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(255)]],
-    confirm_password: ['', [Validators.required]],
+    first_name: ['', [Validators.required, nameValidator, Validators.maxLength(128)]],
+    last_name: ['', [nameValidator, Validators.maxLength(128)]],
+    phone: ['', [phoneValidator]],
+    password: ['', [Validators.required, passwordStrengthValidator, Validators.maxLength(128)]],
+    confirm_password: [
+      '',
+      [Validators.required, Validators.maxLength(128), matchFieldValidator('password')],
+    ],
   });
 
   constructor() {
@@ -97,15 +107,12 @@ export class AcceptInviteComponent {
 
   protected submit(): void {
     if (this.submitting() || this.rawToken === null) return;
-    const raw = this.form.getRawValue();
     if (this.form.invalid) {
-      this.submitError.set('All required fields must be filled, password â‰¥ 8 chars.');
+      this.form.markAllAsTouched();
+      this.submitError.set('Please fix the highlighted fields.');
       return;
     }
-    if (raw.password !== raw.confirm_password) {
-      this.submitError.set('Password and confirmation do not match.');
-      return;
-    }
+    const raw = this.form.getRawValue();
     this.submitting.set(true);
     this.submitError.set(null);
 

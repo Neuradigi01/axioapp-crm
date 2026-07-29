@@ -1,20 +1,20 @@
 @if (workflowId(); as wid) {
-  <div class="fixed inset-0 z-40 flex justify-end bg-zinc-900/30" (click)="close()">
+  <div class="fixed inset-0 z-40 flex justify-end bg-accent/30" (click)="close()">
     <aside
-      class="flex h-full w-full max-w-2xl flex-col border-l border-zinc-200 bg-white shadow-xl"
+      class="flex h-full w-full max-w-2xl flex-col border-l border-subtle bg-surface shadow-xl"
       (click)="$event.stopPropagation()"
     >
-      <header class="flex items-center justify-between border-b border-zinc-200 px-5 py-3">
+      <header class="flex items-center justify-between border-b border-subtle px-5 py-3">
         <div>
-          <h2 class="text-sm font-semibold text-zinc-900">Run history</h2>
+          <h2 class="text-sm font-semibold text-default">Run history</h2>
           @if (workflowName(); as n) {
-            <p class="mt-0.5 text-xs text-zinc-500" [title]="n">{{ n }}</p>
+            <p class="mt-0.5 text-xs text-muted" [title]="n">{{ n }}</p>
           }
         </div>
         <button
           type="button"
           (click)="close()"
-          class="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+          class="rounded-md p-1 text-muted hover:bg-surface-2 hover:text-default"
           aria-label="Close run history"
         >
           <lucide-icon name="x" size="16" />
@@ -23,38 +23,40 @@
 
       <div class="flex-1 overflow-y-auto px-4 py-3">
         @if (loading()) {
-          <div class="flex items-center gap-2 text-sm text-zinc-500">
+          <div class="flex items-center gap-2 text-sm text-muted">
             <lucide-icon name="loader-2" size="14" class="animate-spin" />
             Loading run history…
           </div>
         } @else if (loadError(); as err) {
-          <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          <div
+            class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+          >
             {{ err }}
           </div>
         } @else if (runs().length === 0) {
           <div
-            class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+            class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-4 md:py-6 text-center text-sm text-muted"
           >
             No runs yet for this workflow.
           </div>
         } @else {
           <ul class="space-y-2">
             @for (run of runs(); track trackRun($index, run)) {
-              <li class="overflow-hidden rounded-md border border-zinc-200 bg-white">
+              <li class="overflow-hidden rounded-md border border-subtle bg-surface">
                 <button
                   type="button"
                   (click)="toggleRow(run)"
-                  class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-zinc-50"
+                  class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-surface-2"
                 >
                   <div class="flex flex-1 items-center gap-3 overflow-hidden">
                     <lucide-icon
                       [name]="isExpanded(run.id) ? 'chevron-down' : 'chevron-right'"
                       size="14"
-                      class="shrink-0 text-zinc-400"
+                      class="shrink-0 text-faint"
                     />
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-2">
-                        <span class="font-mono text-xs text-zinc-500">
+                        <span class="font-mono text-xs text-muted">
                           {{ run.id.substring(0, 8) }}
                         </span>
                         <span
@@ -65,13 +67,13 @@
                         </span>
                         @if (run.outcome) {
                           <span
-                            class="inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600 ring-1 ring-inset ring-zinc-200"
+                            class="inline-flex items-center rounded-md bg-surface-2 px-1.5 py-0.5 text-xs text-muted ring-1 ring-inset border-subtle"
                           >
                             {{ run.outcome }}
                           </span>
                         }
                       </div>
-                      <div class="mt-0.5 truncate text-xs text-zinc-500">
+                      <div class="mt-0.5 truncate text-xs text-muted">
                         v{{ run.version }} · started {{ run.started_at | date: 'short' }}
                         @if (run.current_node_id) {
                           · at <span class="font-mono">{{ run.current_node_id }}</span>
@@ -82,32 +84,32 @@
                 </button>
 
                 @if (isExpanded(run.id)) {
-                  <div class="border-t border-zinc-100 bg-zinc-50 px-3 py-2">
+                  <div class="border-t border-subtle bg-surface-2 px-3 py-2">
                     @if (stepsLoading()) {
-                      <div class="flex items-center gap-2 text-xs text-zinc-500">
+                      <div class="flex items-center gap-2 text-xs text-muted">
                         <lucide-icon name="loader-2" size="12" class="animate-spin" />
                         Loading steps…
                       </div>
                     } @else if (stepsError(); as err) {
                       <div
-                        class="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700"
+                        class="rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400"
                       >
                         {{ err }}
                       </div>
                     } @else if (steps().length === 0) {
-                      <div class="text-xs text-zinc-500">No step rows recorded yet.</div>
+                      <div class="text-xs text-muted">No step rows recorded yet.</div>
                     } @else {
                       <ol class="space-y-1.5">
                         @for (step of steps(); track trackStep($index, step)) {
                           <li class="flex items-start gap-2 text-xs">
                             <span
-                              class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700"
+                              class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[10px] font-semibold text-default"
                             >
                               {{ step.step_index + 1 }}
                             </span>
                             <div class="min-w-0 flex-1">
                               <div class="flex items-center gap-2">
-                                <span class="font-mono text-zinc-700">{{ step.node_id }}</span>
+                                <span class="font-mono text-default">{{ step.node_id }}</span>
                                 <span
                                   class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset"
                                   [class]="stepStatusClasses(step.status)"
@@ -115,22 +117,22 @@
                                   {{ step.status }}
                                 </span>
                                 @if (step.output_edge_label) {
-                                  <span class="text-zinc-500">→ {{ step.output_edge_label }}</span>
+                                  <span class="text-muted">→ {{ step.output_edge_label }}</span>
                                 }
                               </div>
-                              <div class="mt-0.5 text-zinc-500">
+                              <div class="mt-0.5 text-muted">
                                 {{ step.started_at | date: 'short' }}
                                 @if (step.completed_at) {
                                   · finished {{ step.completed_at | date: 'short' }}
                                 }
                               </div>
                               @if (step.skip_reason) {
-                                <div class="mt-0.5 text-amber-700">
+                                <div class="mt-0.5 text-amber-400">
                                   Skipped: {{ step.skip_reason }}
                                 </div>
                               }
                               @if (step.error) {
-                                <div class="mt-0.5 text-rose-700">{{ step.error }}</div>
+                                <div class="mt-0.5 text-red-400">{{ step.error }}</div>
                               }
                             </div>
                           </li>

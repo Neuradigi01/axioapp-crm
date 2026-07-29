@@ -1,15 +1,17 @@
 @if (loadError(); as err) {
-  <p class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+  <p class="rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 border-red-500/20">
     {{ err }}
   </p>
 } @else if (loading()) {
-  <div class="overflow-hidden rounded-lg ring-1 ring-zinc-200">
+  <div class="overflow-hidden rounded-lg ring-1 border-subtle">
     <table class="min-w-full">
-      <tbody class="divide-y divide-zinc-100">
+      <tbody class="divide-y divide-subtle">
         @for (i of [0, 1, 2]; track i) {
           <tr class="animate-pulse">
-            <td class="px-6 py-3"><div class="h-3 w-40 rounded bg-zinc-200"></div></td>
-            <td class="px-6 py-3"><div class="h-6 w-24 rounded-full bg-zinc-100"></div></td>
+            <td class="px-4 md:px-6 py-3"><div class="h-3 w-40 rounded bg-surface-2"></div></td>
+            <td class="px-4 md:px-6 py-3">
+              <div class="h-6 w-24 rounded-full bg-surface-2"></div>
+            </td>
           </tr>
         }
       </tbody>
@@ -17,52 +19,52 @@
   </div>
 } @else if (stages().length === 0) {
   <p
-    class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+    class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-4 md:py-6 text-center text-sm text-muted"
   >
     This pipeline has no stages defined.
   </p>
 } @else if (items().length === 0) {
   <p
-    class="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500"
+    class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-4 md:py-6 text-center text-sm text-muted"
   >
     No items.
   </p>
 } @else {
-  <div class="overflow-hidden rounded-lg ring-1 ring-zinc-200">
-    <table class="min-w-full divide-y divide-zinc-200">
-      <thead class="bg-zinc-50">
+  <div class="overflow-hidden rounded-lg ring-1 border-subtle">
+    <table class="min-w-full divide-y divide-subtle">
+      <thead class="bg-surface-2">
         <tr>
           <th
             scope="col"
-            class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+            class="px-4 md:px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted"
           >
             Item
           </th>
           <th
             scope="col"
-            class="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500"
+            class="px-4 md:px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted"
           >
             Stage
           </th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-zinc-100 bg-white">
+      <tbody class="divide-y divide-subtle bg-surface">
         @for (item of items(); track item.id) {
-          <tr class="hover:bg-zinc-50">
-            <td class="px-6 py-3 text-sm text-zinc-900">
+          <tr class="hover:bg-surface-2">
+            <td class="px-4 md:px-6 py-3 text-sm text-default">
               @if (itemTemplate(); as tpl) {
                 <ng-container
                   [ngTemplateOutlet]="tpl"
                   [ngTemplateOutletContext]="{ $implicit: item }"
                 />
               } @else {
-                <span class="text-zinc-500">Item {{ item.id }}</span>
+                <span class="text-muted">Item {{ item.id }}</span>
               }
             </td>
-            <td class="px-6 py-3 text-sm">
+            <td class="px-4 md:px-6 py-3 text-sm">
               <div class="flex items-center gap-2">
                 <span
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-zinc-200"
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 border-subtle"
                   [style]="stagePillStyle(stagesByKey()[item.pipeline_stage])"
                 >
                   {{ stageName(item.pipeline_stage) }}
@@ -71,7 +73,7 @@
                   [value]="item.pipeline_stage"
                   (change)="onStageChange(item, $event)"
                   [attr.aria-label]="'Change stage for item ' + item.id"
-                  class="block rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  class="block rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                 >
                   @for (s of stages(); track s.key) {
                     <option [value]="s.key">{{ s.name }}</option>

@@ -4,13 +4,13 @@
     <div>
       <a
         [routerLink]="['/user/properties']"
-        class="mb-1 inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800"
+        class="mb-1 inline-flex items-center gap-1 text-xs text-muted hover:text-default"
       >
         <lucide-icon name="chevron-left" class="h-3 w-3"></lucide-icon>
         Back to properties
       </a>
-      <h1 class="text-2xl font-semibold text-zinc-900">{{ title() }}</h1>
-      <p class="mt-1 text-sm text-zinc-500">
+      <h1 class="text-2xl font-semibold text-default">{{ title() }}</h1>
+      <p class="mt-1 text-sm text-muted">
         @if (isEdit()) {
           Update the listing and manage its image gallery below.
         } @else {
@@ -21,45 +21,45 @@
   </header>
 
   @if (loading()) {
-    <div class="rounded-xl border border-zinc-200 bg-white p-6 text-sm text-zinc-500">
+    <div class="rounded-xl border border-subtle bg-surface p-6 text-sm text-muted">
       Loading property…
     </div>
   } @else if (loadError()) {
-    <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
       {{ loadError() }}
     </div>
   } @else {
     <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-6">
       <!-- Basics -->
-      <section class="space-y-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <section class="space-y-4 rounded-xl border border-subtle bg-surface p-5 shadow-sm">
         <div>
-          <h2 class="text-sm font-semibold text-zinc-900">Basics</h2>
-          <p class="text-xs text-zinc-500">Title, type, category, price, description.</p>
+          <h2 class="text-sm font-semibold text-default">Basics</h2>
+          <p class="text-xs text-muted">Title, type, category, price, description.</p>
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label class="col-span-full block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">
-              Title <span class="text-rose-600">*</span>
+            <span class="mb-1 block text-xs font-medium text-muted">
+              Title <span class="text-red-500">*</span>
             </span>
             <input
               type="text"
               formControlName="title"
               placeholder="e.g. Sea-facing 3 BHK, Bandra West"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm placeholder:text-faint focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
             @if (fieldError('title'); as msg) {
-              <span class="mt-1 block text-xs text-rose-600">{{ msg }}</span>
+              <span class="mt-1 block text-xs text-red-500">{{ msg }}</span>
             }
           </label>
 
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">
-              Type <span class="text-rose-600">*</span>
+            <span class="mb-1 block text-xs font-medium text-muted">
+              Type <span class="text-red-500">*</span>
             </span>
             <select
               formControlName="property_type"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             >
               <option value="" disabled>Select a type…</option>
               @for (opt of TYPE_OPTIONS; track opt.key) {
@@ -67,17 +67,17 @@
               }
             </select>
             @if (fieldError('property_type'); as msg) {
-              <span class="mt-1 block text-xs text-rose-600">{{ msg }}</span>
+              <span class="mt-1 block text-xs text-red-500">{{ msg }}</span>
             }
           </label>
 
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">
-              Category <span class="text-rose-600">*</span>
+            <span class="mb-1 block text-xs font-medium text-muted">
+              Category <span class="text-red-500">*</span>
             </span>
             <select
               formControlName="category"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             >
               <option value="" disabled>Select a category…</option>
               @for (opt of CATEGORY_OPTIONS; track opt.key) {
@@ -85,137 +85,137 @@
               }
             </select>
             @if (fieldError('category'); as msg) {
-              <span class="mt-1 block text-xs text-rose-600">{{ msg }}</span>
+              <span class="mt-1 block text-xs text-red-500">{{ msg }}</span>
             }
           </label>
 
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Price</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Price</span>
             <input
               type="number"
               min="0"
               step="1"
               formControlName="price"
               placeholder="e.g. 25000000"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm placeholder:text-faint focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
 
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Currency</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Currency</span>
             <input
               type="text"
               maxlength="3"
               formControlName="currency"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm uppercase text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm uppercase text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
 
           <label class="col-span-full block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Description</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Description</span>
             <textarea
               rows="4"
               formControlName="description"
               placeholder="Highlight what makes this listing stand out…"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm placeholder:text-faint focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             ></textarea>
           </label>
         </div>
       </section>
 
       <!-- Location -->
-      <section class="space-y-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <section class="space-y-4 rounded-xl border border-subtle bg-surface p-5 shadow-sm">
         <div>
-          <h2 class="text-sm font-semibold text-zinc-900">Location</h2>
-          <p class="text-xs text-zinc-500">Address, city, state, country, pincode.</p>
+          <h2 class="text-sm font-semibold text-default">Location</h2>
+          <p class="text-xs text-muted">Address, city, state, country, pincode.</p>
         </div>
 
         <label class="block">
-          <span class="mb-1 block text-xs font-medium text-zinc-600">Address</span>
+          <span class="mb-1 block text-xs font-medium text-muted">Address</span>
           <textarea
             rows="2"
             formControlName="address_line"
-            class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+            class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
           ></textarea>
         </label>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">City</span>
+            <span class="mb-1 block text-xs font-medium text-muted">City</span>
             <input
               type="text"
               formControlName="city"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">State</span>
+            <span class="mb-1 block text-xs font-medium text-muted">State</span>
             <input
               type="text"
               formControlName="state"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Country</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Country</span>
             <input
               type="text"
               formControlName="country"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Pincode</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Pincode</span>
             <input
               type="text"
               formControlName="pincode"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
         </div>
       </section>
 
       <!-- Property details -->
-      <section class="space-y-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <section class="space-y-4 rounded-xl border border-subtle bg-surface p-5 shadow-sm">
         <div>
-          <h2 class="text-sm font-semibold text-zinc-900">Property details</h2>
-          <p class="text-xs text-zinc-500">Physical dimensions and amenities.</p>
+          <h2 class="text-sm font-semibold text-default">Property details</h2>
+          <p class="text-xs text-muted">Physical dimensions and amenities.</p>
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Bedrooms</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Bedrooms</span>
             <input
               type="number"
               min="0"
               formControlName="bedrooms"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Bathrooms</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Bathrooms</span>
             <input
               type="number"
               min="0"
               formControlName="bathrooms"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Area</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Area</span>
             <input
               type="number"
               min="0"
               step="0.01"
               formControlName="area_value"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Area unit</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Area unit</span>
             <select
               formControlName="area_unit"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             >
               <option value="">—</option>
               @for (opt of UNIT_OPTIONS; track opt.key) {
@@ -226,59 +226,59 @@
         </div>
 
         <label class="block">
-          <span class="mb-1 block text-xs font-medium text-zinc-600">Amenities</span>
+          <span class="mb-1 block text-xs font-medium text-muted">Amenities</span>
           <app-amenities-input formControlName="amenities" />
-          <span class="mt-1 block text-xs text-zinc-400">
+          <span class="mt-1 block text-xs text-faint">
             Type a tag and press Enter, or separate values with a comma.
           </span>
         </label>
       </section>
 
       <!-- Contact -->
-      <section class="space-y-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <section class="space-y-4 rounded-xl border border-subtle bg-surface p-5 shadow-sm">
         <div>
-          <h2 class="text-sm font-semibold text-zinc-900">Contact</h2>
-          <p class="text-xs text-zinc-500">
+          <h2 class="text-sm font-semibold text-default">Contact</h2>
+          <p class="text-xs text-muted">
             Displayed on the public listing so buyers can reach the right person.
           </p>
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Contact person</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Contact person</span>
             <input
               type="text"
               formControlName="contact_person"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Phone</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Phone</span>
             <input
               type="tel"
               formControlName="contact_phone"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
           <label class="block">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Email</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Email</span>
             <input
               type="email"
               formControlName="contact_email"
-              class="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
             @if (fieldError('contact_email'); as msg) {
-              <span class="mt-1 block text-xs text-rose-600">{{ msg }}</span>
+              <span class="mt-1 block text-xs text-red-500">{{ msg }}</span>
             }
           </label>
         </div>
       </section>
 
       <!-- Images (edit only) -->
-      <section class="space-y-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <section class="space-y-4 rounded-xl border border-subtle bg-surface p-5 shadow-sm">
         <div>
-          <h2 class="text-sm font-semibold text-zinc-900">Images</h2>
-          <p class="text-xs text-zinc-500">
+          <h2 class="text-sm font-semibold text-default">Images</h2>
+          <p class="text-xs text-muted">
             Multiple photos, drag to reorder, click to feature one on the public listing.
           </p>
         </div>
@@ -287,7 +287,7 @@
           <app-property-gallery [propertyId]="id" [initialImages]="initialImages()" />
         } @else {
           <div
-            class="rounded-md border border-dashed border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-xs text-zinc-500"
+            class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-6 text-center text-xs text-muted"
           >
             Save the property first to unlock the image gallery.
           </div>
@@ -296,20 +296,22 @@
 
       <!-- Error banner -->
       @if (submitError()) {
-        <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+        >
           {{ submitError() }}
         </div>
       }
 
       <!-- Sticky footer with status pill + row action menu (edit only) -->
       <div
-        class="sticky bottom-4 flex items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-white/95 p-3 shadow-lg backdrop-blur"
+        class="sticky bottom-4 flex items-center justify-between gap-2 rounded-xl border border-subtle bg-surface/95 p-3 shadow-lg backdrop-blur"
       >
         <div class="flex items-center gap-3">
           @if (currentProperty(); as p) {
-            <span class="text-xs uppercase tracking-wider text-zinc-400">Status</span>
+            <span class="text-xs uppercase tracking-wider text-faint">Status</span>
             <span
-              class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+              class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 border-subtle"
             >
               {{ p.status }}
             </span>
@@ -324,14 +326,14 @@
         <div class="flex items-center gap-2">
           <a
             [routerLink]="['/user/properties']"
-            class="inline-flex items-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            class="inline-flex items-center rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
           >
             Cancel
           </a>
           <button
             type="submit"
             [disabled]="saving()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-2 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             @if (saving()) {
               <lucide-icon name="loader-2" class="h-4 w-4 animate-spin"></lucide-icon>

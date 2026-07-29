@@ -1,34 +1,34 @@
 <form [formGroup]="form()" class="flex flex-col gap-4">
   <label class="block">
-    <span class="text-xs font-medium text-zinc-700">
+    <span class="text-xs font-medium text-default">
       Title
-      <span class="text-zinc-400"> ({{ titleLength() }} / {{ TITLE_MAX }} chars) </span>
+      <span class="text-faint"> ({{ titleLength() }} / {{ TITLE_MAX }} chars) </span>
     </span>
     <input
       type="text"
       formControlName="title"
       [maxlength]="TITLE_MAX"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
       placeholder="Your order is ready"
     />
-    <p class="mt-1 text-[10px] text-zinc-400">
+    <p class="mt-1 text-[10px] text-faint">
       Shown bold on the lock screen. Keeping it under 50 characters avoids truncation on iOS and
       Android.
     </p>
   </label>
 
   <label class="block">
-    <span class="text-xs font-medium text-zinc-700">
+    <span class="text-xs font-medium text-default">
       Body
-      <span class="text-zinc-400"> ({{ bodyLength() }} / {{ BODY_MAX }} chars) </span>
+      <span class="text-faint"> ({{ bodyLength() }} / {{ BODY_MAX }} chars) </span>
     </span>
     <textarea
       formControlName="body_text"
       [maxlength]="BODY_MAX"
       rows="4"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none"
       placeholder="Hi {{
         '{' + '{' + 'contact.first_name' + '}' + '}'
       }}, your order is ready for pickup."
@@ -36,25 +36,25 @@
   </label>
 
   <label class="block">
-    <span class="text-xs font-medium text-zinc-700">
+    <span class="text-xs font-medium text-default">
       Action URL
-      <span class="text-zinc-400">(optional)</span>
+      <span class="text-faint">(optional)</span>
     </span>
     <input
       type="url"
       formControlName="action_url"
       [maxlength]="URL_MAX"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
       placeholder="https://app.example/orders/{{ '{' + '{' + 'quote.id' + '}' + '}' }}"
     />
-    <p class="mt-1 text-[10px] text-zinc-400">
+    <p class="mt-1 text-[10px] text-faint">
       Optional deeplink the notification opens when tapped. Leave blank to open the app default
       screen.
     </p>
   </label>
 
-  <p class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] text-zinc-600">
+  <p class="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-[11px] text-muted">
     <strong>Note:</strong> Push notification transport is not yet enabled. Saving captures the
     template; the dispatcher will refuse the send with a clear "connect a push provider" message
     until the channel adapter ships. There is no external approval workflow for push notifications.

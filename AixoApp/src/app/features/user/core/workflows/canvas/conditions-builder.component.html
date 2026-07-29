@@ -2,22 +2,22 @@
   @if (tree(); as root) {
     <ng-container *ngTemplateOutlet="nodeTpl; context: { node: root, path: [] }"></ng-container>
   } @else {
-    <p class="text-[11px] text-zinc-500 italic">No conditions — this branch always matches.</p>
+    <p class="text-[11px] text-muted italic">No conditions — this branch always matches.</p>
   }
 
   <div class="flex items-center gap-2">
     <button
       type="button"
-      class="text-[11px] px-2 py-1 rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+      class="text-[11px] px-2 py-1 rounded border border-subtle text-default hover:bg-surface-2"
       (click)="addRootLeaf()"
     >
-      <lucide-icon name="Plus" class="inline-block w-3 h-3 mr-1"></lucide-icon>
+      <lucide-icon name="plus" class="inline-block w-3 h-3 mr-1"></lucide-icon>
       Add condition
     </button>
     @if (tree()) {
       <button
         type="button"
-        class="text-[11px] px-2 py-1 rounded text-rose-600 hover:bg-rose-50"
+        class="text-[11px] px-2 py-1 rounded text-red-500 hover:bg-red-500/10"
         (click)="clearAll()"
       >
         Clear all
@@ -37,10 +37,10 @@
         <button
           type="button"
           class="text-[10px] font-bold px-2 py-0.5 rounded uppercase"
-          [class.bg-sky-100]="node.kind === 'and'"
+          [class.bg-sky-500/10]="node.kind === 'and'"
           [class.text-sky-700]="node.kind === 'and'"
-          [class.bg-amber-100]="node.kind === 'or'"
-          [class.text-amber-700]="node.kind === 'or'"
+          [class.bg-amber-500/10]="node.kind === 'or'"
+          [class.text-amber-400]="node.kind === 'or'"
           (click)="toggleAndOr(path)"
           title="Toggle AND / OR"
         >
@@ -48,7 +48,7 @@
         </button>
         <button
           type="button"
-          class="text-[10px] text-zinc-500 hover:text-zinc-700"
+          class="text-[10px] text-muted hover:text-default"
           (click)="wrapInNot(path)"
           title="Wrap in NOT"
         >
@@ -57,11 +57,11 @@
         @if (path.length > 0) {
           <button
             type="button"
-            class="text-[10px] text-rose-500 hover:text-rose-700 ml-auto"
+            class="text-[10px] text-red-500 hover:text-red-400 ml-auto"
             (click)="removeAt(path)"
             title="Delete group"
           >
-            <lucide-icon name="X" class="w-3 h-3"></lucide-icon>
+            <lucide-icon name="x" class="w-3 h-3"></lucide-icon>
           </button>
         }
       </div>
@@ -73,14 +73,14 @@
       <div class="flex items-center gap-1 mt-1">
         <button
           type="button"
-          class="text-[10px] px-1.5 py-0.5 rounded text-zinc-600 hover:bg-zinc-100"
+          class="text-[10px] px-1.5 py-0.5 rounded text-muted hover:bg-surface-2"
           (click)="addChildLeaf(path)"
         >
           + condition
         </button>
         <button
           type="button"
-          class="text-[10px] px-1.5 py-0.5 rounded text-zinc-600 hover:bg-zinc-100"
+          class="text-[10px] px-1.5 py-0.5 rounded text-muted hover:bg-surface-2"
           (click)="addChildGroup(path)"
         >
           + group
@@ -88,12 +88,14 @@
       </div>
     </div>
   } @else if (isNot(node)) {
-    <div class="border-l-2 border-rose-300 pl-3 py-2">
+    <div class="border-l-2 border-red-500/30 pl-3 py-2">
       <div class="flex items-center gap-2 mb-1">
-        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700">NOT</span>
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/10 text-red-400"
+          >NOT</span
+        >
         <button
           type="button"
-          class="text-[10px] text-zinc-500 hover:text-zinc-700"
+          class="text-[10px] text-muted hover:text-default"
           (click)="unwrapNot(path)"
           title="Unwrap NOT"
         >
@@ -101,10 +103,10 @@
         </button>
         <button
           type="button"
-          class="text-[10px] text-rose-500 hover:text-rose-700 ml-auto"
+          class="text-[10px] text-red-500 hover:text-red-400 ml-auto"
           (click)="removeAt(path)"
         >
-          <lucide-icon name="X" class="w-3 h-3"></lucide-icon>
+          <lucide-icon name="x" class="w-3 h-3"></lucide-icon>
         </button>
       </div>
       <ng-container
@@ -119,12 +121,12 @@
         (input)="onLeafPathChange(path, $any($event.target).value)"
         list="conditions-builder-paths"
         placeholder="path (e.g. lead.score)"
-        class="flex-1 text-xs px-2 py-1 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500 min-w-0"
+        class="flex-1 text-xs px-2 py-1 rounded border border-subtle focus:outline-none focus:border-muted min-w-0"
       />
       <select
         [value]="node.op"
         (change)="onLeafOpChange(path, $any($event.target).value)"
-        class="text-xs px-1.5 py-1 rounded border border-zinc-300"
+        class="text-xs px-1.5 py-1 rounded border border-subtle"
       >
         @for (op of ops; track op.value) {
           <option [value]="op.value">{{ op.label }}</option>
@@ -136,16 +138,16 @@
           [value]="node.value ?? ''"
           (input)="onLeafValueChange(path, $any($event.target).value)"
           placeholder="value"
-          class="w-24 text-xs px-2 py-1 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+          class="w-24 text-xs px-2 py-1 rounded border border-subtle focus:outline-none focus:border-muted"
         />
       }
       <button
         type="button"
-        class="text-zinc-400 hover:text-rose-600"
+        class="text-faint hover:text-red-500"
         (click)="removeAt(path)"
         title="Delete"
       >
-        <lucide-icon name="X" class="w-3 h-3"></lucide-icon>
+        <lucide-icon name="x" class="w-3 h-3"></lucide-icon>
       </button>
     </div>
   }

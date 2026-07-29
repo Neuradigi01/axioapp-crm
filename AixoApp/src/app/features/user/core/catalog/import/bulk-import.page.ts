@@ -17,6 +17,7 @@ import {
   CatalogApiService,
   CatalogBulkImportResult,
   CatalogBulkImportRow,
+  CatalogBulkImportRowError,
 } from '../catalog-api.service';
 
 /**
@@ -101,6 +102,14 @@ export class CatalogBulkImportPageComponent {
   protected readonly commitLoading = signal(false);
   protected readonly commitError = signal<string | null>(null);
   protected readonly commitResult = signal<CatalogBulkImportResult | null>(null);
+
+  /** True when either dry-run or commit reported per-row errors — used
+   *  by the template to reveal the "Download errors CSV" button. */
+  protected readonly hasDownloadableErrors = computed(() => {
+    const dr = this.dryRunResult();
+    const cm = this.commitResult();
+    return (dr?.errors.length ?? 0) + (cm?.errors.length ?? 0) > 0;
+  });
 
   protected readonly canGoToPreview = computed(
     () => this.parsedRows().length > 0 && this.missingColumns().length === 0,
@@ -256,6 +265,28 @@ export class CatalogBulkImportPageComponent {
     this.commitError.set(null);
     this.showAllErrors.set(false);
   }
+
+  /** Compose an `errors.csv` client-side from whichever result carries
+   *  errors (commit takes precedence over dry-run). Matches the shape
+   *  the contacts / leads imports produce server-side: original catalog
+   *  columns + `__row_number` + `__column` + `__value` + `__error_reason`.
+   *  Catalog imports are synchronous, so the client already has all the
+   *  data needed to render this report — no server round-trip. */
+  protected downloadErrorsCsv(): void {
+    const result = this.commitResult() ?? this.dryRunResult();
+    if (!result || result.errors.length === 0) return;
+    const rows = this.parsedRows();
+    const csv = buildErrorsCsv(rows, result.errors);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'catalog-import-errors.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
 }
 
 // --- CSV parsing --------------------------------------------------------
@@ -407,4 +438,69 @@ function tokenizeCsv(text: string): string[][] {
     rows.push(row);
   }
   return rows;
+}
+
+// --- Errors CSV builder -------------------------------------------------
+
+/** Compose an `errors.csv` payload from the parsed rows + backend errors.
+ *  Output matches the shape the contacts / leads imports produce
+ *  server-side:
+ *
+ *      <original catalog columns…>, __row_number, __column, __value, __error_reason
+ *
+ *  Client-side generation is safe here because catalog imports are
+ *  synchronous — the browser still holds the parsed rows that were sent
+ *  to the backend, so no server round-trip is needed to render the
+ *  operator's fix-and-re-upload report. */
+function buildErrorsCsv(
+  rows: readonly CatalogBulkImportRow[],
+  errors: readonly CatalogBulkImportRowError[],
+): string {
+  const columns = [
+    'sku',
+    'name',
+    'description',
+    'category',
+    'price',
+    'cost_price',
+    'currency',
+    'is_active',
+    'tags',
+    '__row_number',
+    '__column',
+    '__value',
+    '__error_reason',
+  ];
+  const lines: string[] = [columns.join(',')];
+  for (const err of errors) {
+    const row = rows[err.row_index];
+    const record: Record<string, unknown> = row
+      ? {
+          sku: row.sku,
+          name: row.name,
+          description: row.description ?? '',
+          category: row.category ?? '',
+          price: row.price ?? '',
+          cost_price: row.cost_price ?? '',
+          currency: row.currency ?? '',
+          is_active: row.is_active === undefined ? '' : String(row.is_active),
+          tags: (row.tags ?? []).join('|'),
+        }
+      : { sku: err.sku };
+    record['__row_number'] = err.row_index + 1;
+    record['__column'] = err.column ?? '';
+    record['__value'] = err.value ?? '';
+    record['__error_reason'] = err.reason;
+    lines.push(columns.map((c) => csvEscape(record[c])).join(','));
+  }
+  return lines.join('\r\n') + '\r\n';
+}
+
+function csvEscape(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
 }

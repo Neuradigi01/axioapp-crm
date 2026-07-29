@@ -1,11 +1,8 @@
-<div>
-  <label
-    class="block text-xs font-medium text-zinc-700"
-    [attr.for]="def().field_type === 'multiselect' ? null : inputId()"
-  >
+<div class="field">
+  <label class="field-label" [attr.for]="def().field_type === 'multiselect' ? null : inputId()">
     {{ def().field_label }}
     @if (def().is_required) {
-      <span class="text-red-600" aria-hidden="true">*</span>
+      <span class="field-required" aria-hidden="true">*</span>
     }
   </label>
 
@@ -14,11 +11,11 @@
       <input
         [id]="inputId()"
         type="text"
+        class="input"
         [formControl]="control()"
         autocomplete="off"
         [attr.aria-invalid]="showError() ? 'true' : null"
         [attr.aria-describedby]="showError() ? errorId() : null"
-        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-500"
       />
     }
 
@@ -26,17 +23,17 @@
       <input
         [id]="inputId()"
         type="number"
+        class="input"
         [formControl]="control()"
         [attr.aria-invalid]="showError() ? 'true' : null"
         [attr.aria-describedby]="showError() ? errorId() : null"
-        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-500"
       />
     }
 
     @case ('currency') {
-      <div class="relative mt-1">
+      <div class="relative">
         <span
-          class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-zinc-500"
+          class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-muted"
           aria-hidden="true"
           >₹</span
         >
@@ -45,10 +42,10 @@
           type="number"
           step="0.01"
           inputmode="decimal"
+          class="input pl-7"
           [formControl]="control()"
           [attr.aria-invalid]="showError() ? 'true' : null"
           [attr.aria-describedby]="showError() ? errorId() : null"
-          class="block w-full rounded-md border border-zinc-300 bg-white py-2 pl-7 pr-3 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </div>
     }
@@ -58,10 +55,10 @@
         [id]="inputId()"
         type="email"
         autocomplete="email"
+        class="input"
         [formControl]="control()"
         [attr.aria-invalid]="showError() ? 'true' : null"
         [attr.aria-describedby]="showError() ? errorId() : null"
-        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       />
     }
 
@@ -71,10 +68,10 @@
         type="tel"
         inputmode="tel"
         autocomplete="tel"
+        class="input"
         [formControl]="control()"
         [attr.aria-invalid]="showError() ? 'true' : null"
         [attr.aria-describedby]="showError() ? errorId() : null"
-        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       />
     }
 
@@ -82,10 +79,12 @@
       <input
         [id]="inputId()"
         type="date"
+        class="input"
         [formControl]="control()"
+        min="1900-01-01"
+        max="9999-12-31"
         [attr.aria-invalid]="showError() ? 'true' : null"
         [attr.aria-describedby]="showError() ? errorId() : null"
-        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       />
     }
 
@@ -93,34 +92,36 @@
       <input
         [id]="inputId()"
         type="datetime-local"
+        class="input"
         [formControl]="control()"
+        min="1900-01-01T00:00"
+        max="9999-12-31T23:59"
         [attr.aria-invalid]="showError() ? 'true' : null"
         [attr.aria-describedby]="showError() ? errorId() : null"
-        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       />
     }
 
     @case ('boolean') {
-      <label class="mt-1 inline-flex items-center gap-2">
+      <label class="inline-flex items-center gap-2">
         <input
           [id]="inputId()"
           type="checkbox"
+          class="checkbox"
           [formControl]="control()"
           [attr.aria-invalid]="showError() ? 'true' : null"
           [attr.aria-describedby]="showError() ? errorId() : null"
-          class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
         />
-        <span class="text-sm text-zinc-700">Yes</span>
+        <span class="text-sm text-muted">Yes</span>
       </label>
     }
 
     @case ('select') {
       <select
         [id]="inputId()"
+        class="select"
         [formControl]="control()"
         [attr.aria-invalid]="showError() ? 'true' : null"
         [attr.aria-describedby]="showError() ? errorId() : null"
-        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
       >
         <option value="">— Select —</option>
         @for (choice of choices(); track choice) {
@@ -131,35 +132,35 @@
 
     @case ('multiselect') {
       <fieldset
-        class="mt-1 space-y-1 rounded-md border border-zinc-300 bg-white p-3"
+        class="space-y-2 rounded-lg border border-subtle bg-app p-3"
         [attr.aria-describedby]="showError() ? errorId() : null"
       >
         <legend class="sr-only">{{ def().field_label }}</legend>
         @for (choice of choices(); track choice) {
-          <label class="flex items-center gap-2 text-sm text-zinc-700">
+          <label class="flex items-center gap-2 text-sm text-default">
             <input
               type="checkbox"
+              class="checkbox"
               [checked]="isChecked(choice)"
               (change)="onMultiselectToggle(choice, $event)"
-              class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
             />
             {{ choice }}
           </label>
         } @empty {
-          <p class="text-xs text-zinc-500">No choices configured.</p>
+          <p class="text-xs text-faint">No choices configured.</p>
         }
       </fieldset>
     }
 
     @default {
-      <p class="mt-1 text-xs text-red-600">
-        Unsupported field type: <code>{{ def().field_type }}</code>
+      <p class="field-error">
+        Unsupported field type: <code class="font-mono">{{ def().field_type }}</code>
       </p>
     }
   }
 
   @if (errorMessage(); as msg) {
-    <p [id]="errorId()" class="mt-1 text-xs text-red-600" role="alert">
+    <p [id]="errorId()" class="field-error" role="alert">
       {{ msg }}
     </p>
   }

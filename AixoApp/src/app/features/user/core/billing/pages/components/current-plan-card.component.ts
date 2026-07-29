@@ -33,12 +33,11 @@ const STATUS_TONES: Record<string, StatusTone> = {
   cancelled: {
     label: 'Cancelled',
     pillClasses:
-      'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:ring-rose-900',
+      'bg-red-500/10 text-red-400 ring-red-500/20 dark:bg-red-300 dark:text-red-500/30 dark:ring-red-300',
   },
   archived: {
     label: 'Archived',
-    pillClasses:
-      'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600',
+    pillClasses: 'bg-surface-2 text-default border-subtle dark:ring-slate-600',
   },
 };
 
@@ -54,17 +53,11 @@ const STATUS_TONES: Record<string, StatusTone> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
-    <section
-      class="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
-    >
+    <section class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm">
       <div class="flex flex-wrap items-start justify-between gap-4 p-6">
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <p
-              class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400"
-            >
-              Current plan
-            </p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted">Current plan</p>
             <span
               class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1"
               [class]="statusTone().pillClasses"
@@ -72,20 +65,20 @@ const STATUS_TONES: Record<string, StatusTone> = {
               {{ statusTone().label }}
             </span>
           </div>
-          <h2 class="mt-2 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-slate-100">
+          <h2 class="mt-2 text-2xl font-semibold tracking-tight text-default">
             {{ subscription().plan.name }}
           </h2>
           @if (priceHeadline(); as price) {
             <div class="mt-2 flex items-baseline gap-1.5">
-              <span class="text-3xl font-semibold tabular-nums text-zinc-900 dark:text-slate-100">
+              <span class="text-3xl font-semibold tabular-nums text-default">
                 ₹{{ formatINR(price.amount) }}
               </span>
-              <span class="text-sm text-zinc-500 dark:text-slate-400">
+              <span class="text-sm text-muted">
                 {{ '/' + price.cycleLabel }}
               </span>
             </div>
           }
-          <p class="mt-2 text-sm text-zinc-600 dark:text-slate-400">
+          <p class="mt-2 text-sm text-muted">
             {{ contextLine() }}
           </p>
         </div>
@@ -93,24 +86,20 @@ const STATUS_TONES: Record<string, StatusTone> = {
         <button
           type="button"
           (click)="onUpgrade()"
-          class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+          class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95"
         >
           Upgrade plan
           <lucide-icon name="arrow-right" size="14" aria-hidden="true"></lucide-icon>
         </button>
       </div>
 
-      <dl
-        class="grid gap-px border-t border-zinc-200 bg-zinc-200 sm:grid-cols-2 dark:border-slate-700 dark:bg-slate-700"
-      >
+      <dl class="grid gap-px border-t border-subtle bg-surface-2 sm:grid-cols-2">
         @for (row of detailRows(); track row.label) {
-          <div class="bg-zinc-50 px-6 py-4 dark:bg-slate-800/60">
-            <dt
-              class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-slate-400"
-            >
+          <div class="bg-surface-2 px-6 py-4/60">
+            <dt class="text-xs font-medium uppercase tracking-wide text-muted">
               {{ row.label }}
             </dt>
-            <dd class="mt-1 text-sm font-medium tabular-nums text-zinc-900 dark:text-slate-100">
+            <dd class="mt-1 text-sm font-medium tabular-nums text-default">
               {{ row.value }}
             </dd>
           </div>

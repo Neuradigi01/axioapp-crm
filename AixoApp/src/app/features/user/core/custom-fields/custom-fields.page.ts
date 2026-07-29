@@ -1,4 +1,4 @@
-﻿import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -207,7 +207,7 @@ export class CustomFieldsPageComponent {
       case 'pack':
         return 'bg-sky-100 text-sky-800 ring-sky-200';
       case 'user':
-        return 'bg-zinc-100 text-zinc-800 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   }
 

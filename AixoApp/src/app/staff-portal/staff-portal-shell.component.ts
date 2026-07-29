@@ -15,10 +15,10 @@ import { StaffSessionService } from './staff-session.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * Tablet shell â€” minimal, no admin sidebar. Top bar carries:
+ * Tablet shell — minimal, no admin sidebar. Top bar carries:
  *
  *   left   : "FurnitureCRM" wordmark + greeting (full_name)
- *   centre : tab nav (Dashboard Â· Attendance Â· Activity Â· Sales Â· Stock Â· Field)
+ *   centre : tab nav (Dashboard · Attendance · Activity · Sales · Stock · Field)
  *   right  : clock-in/out widget + logout
  *
  * Clock-in/out lives on the shell (not on My Attendance) per the
@@ -113,7 +113,7 @@ export class StaffPortalShellComponent {
           this.openSession.set(open);
         },
         error: () => {
-          // Non-fatal â€” shell still usable without the badge.
+          // Non-fatal — shell still usable without the badge.
         },
       });
   }

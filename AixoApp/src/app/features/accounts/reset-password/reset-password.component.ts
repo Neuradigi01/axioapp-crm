@@ -5,7 +5,10 @@ import { LucideAngularModule } from 'lucide-angular';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ValidationMessageComponent } from '@shared/components/validation-message/validation-message.component';
 import { PasswordToggleDirective } from '@shared/directives/password-toggle.directive';
-import { matchFieldValidator } from '@shared/validators/custom-validators';
+import {
+  matchFieldValidator,
+  passwordStrengthValidator,
+} from '@shared/validators/custom-validators';
 import { AuthApiService } from '@app/services/auth-api.service';
 import { getRoute } from '@core/services/routes-helper.service';
 import { SNACKBAR_DURATION, SNACKBAR_ACTION } from '@core/constants/app.constants';
@@ -35,8 +38,11 @@ export class ResetPasswordComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
 
   readonly resetForm: FormGroup = this.fb.group({
-    new_password: ['', [Validators.required, Validators.minLength(8)]],
-    confirm_password: ['', [Validators.required, matchFieldValidator('new_password')]],
+    new_password: ['', [Validators.required, passwordStrengthValidator]],
+    confirm_password: [
+      '',
+      [Validators.required, Validators.maxLength(128), matchFieldValidator('new_password')],
+    ],
   });
 
   readonly isLoading = signal(false);

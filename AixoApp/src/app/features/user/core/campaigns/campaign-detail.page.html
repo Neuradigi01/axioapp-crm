@@ -1,13 +1,15 @@
-<div class="px-6 py-6">
+<div class="px-4 py-4 md:px-6 md:py-6">
   <a
     [routerLink]="['/user/campaigns']"
-    class="mb-3 inline-block text-xs text-zinc-500 hover:text-zinc-700"
+    class="mb-3 inline-block text-xs text-muted hover:text-default"
   >
     ← Back to campaigns
   </a>
 
   @if (loadError(); as err) {
-    <div class="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div
+      class="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+    >
       {{ err }}
     </div>
   }
@@ -15,8 +17,8 @@
   @if (campaign(); as c) {
     <header class="mb-6 flex items-start justify-between">
       <div>
-        <h1 class="text-2xl font-semibold text-zinc-900">{{ c.name }}</h1>
-        <p class="mt-1 text-sm text-zinc-500 capitalize">
+        <h1 class="text-2xl font-semibold text-default">{{ c.name }}</h1>
+        <p class="mt-1 text-sm text-muted capitalize">
           {{ c.channel }} · scheduled {{ formatDate(c.schedule_at) }}
         </p>
       </div>
@@ -33,7 +35,7 @@
 
     <!-- Step 21 — Overview / Analytics tab switcher. -->
     <div
-      class="mb-4 inline-flex items-center rounded-md border border-zinc-300 bg-white p-0.5 text-xs"
+      class="mb-4 inline-flex items-center rounded-md border border-subtle bg-surface p-0.5 text-xs"
       role="tablist"
       aria-label="Campaign detail tabs"
     >
@@ -42,9 +44,7 @@
         role="tab"
         [class]="
           'rounded px-3 py-1 ' +
-          (activeTab() === 'overview'
-            ? 'bg-zinc-900 text-white'
-            : 'text-zinc-700 hover:bg-zinc-100')
+          (activeTab() === 'overview' ? 'bg-accent text-white' : 'text-default hover:bg-surface-2')
         "
         (click)="setTab('overview')"
       >
@@ -55,9 +55,7 @@
         role="tab"
         [class]="
           'rounded px-3 py-1 ' +
-          (activeTab() === 'analytics'
-            ? 'bg-zinc-900 text-white'
-            : 'text-zinc-700 hover:bg-zinc-100')
+          (activeTab() === 'analytics' ? 'bg-accent text-white' : 'text-default hover:bg-surface-2')
         "
         (click)="setTab('analytics')"
       >
@@ -69,66 +67,66 @@
       <app-campaign-analytics-tab [campaignId]="id" />
     } @else {
       @if (stats(); as s) {
-        <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
-          <div class="rounded-lg border border-zinc-200 bg-white p-3 text-center">
-            <div class="text-[10px] uppercase tracking-wide text-zinc-500">Audience</div>
-            <div class="mt-1 text-xl font-semibold text-zinc-900">{{ s.audience_size }}</div>
+        <div class="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+          <div class="rounded-lg border border-subtle bg-surface p-3 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-muted">Audience</div>
+            <div class="mt-1 text-xl font-semibold text-default">{{ s.audience_size }}</div>
           </div>
-          <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
-            <div class="text-[10px] uppercase tracking-wide text-amber-700">Queued</div>
-            <div class="mt-1 text-xl font-semibold text-amber-900">{{ s.queued }}</div>
+          <div class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-amber-400">Queued</div>
+            <div class="mt-1 text-xl font-semibold text-amber-300">{{ s.queued }}</div>
           </div>
-          <div class="rounded-lg border border-sky-200 bg-sky-50 p-3 text-center">
+          <div class="rounded-lg border border-sky-200 bg-sky-500/10 p-3 text-center">
             <div class="text-[10px] uppercase tracking-wide text-sky-700">Sent</div>
             <div class="mt-1 text-xl font-semibold text-sky-900">{{ s.sent }}</div>
           </div>
-          <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center">
-            <div class="text-[10px] uppercase tracking-wide text-emerald-700">Delivered</div>
-            <div class="mt-1 text-xl font-semibold text-emerald-900">{{ s.delivered }}</div>
+          <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-center">
+            <div class="text-[10px] uppercase tracking-wide text-emerald-400">Delivered</div>
+            <div class="mt-1 text-xl font-semibold text-emerald-300">{{ s.delivered }}</div>
             @if (deliveryRate() !== null) {
-              <div class="text-[10px] text-emerald-700">{{ deliveryRate() }}% of sent</div>
+              <div class="text-[10px] text-emerald-400">{{ deliveryRate() }}% of sent</div>
             }
           </div>
           <!-- Campaigns v1 Step 05 — WA campaigns show Read; Email campaigns
                swap it for Opened + Clicked + Bounced. -->
           @if (isEmailCampaign()) {
-            <div class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-center">
+            <div class="rounded-lg border border-violet-200 bg-violet-500/10 p-3 text-center">
               <div class="text-[10px] uppercase tracking-wide text-violet-700">Opened</div>
               <div class="mt-1 text-xl font-semibold text-violet-900">{{ s.opened }}</div>
               <div class="text-[10px] text-violet-700">pixel</div>
             </div>
-            <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-center">
-              <div class="text-[10px] uppercase tracking-wide text-indigo-700">Clicked</div>
-              <div class="mt-1 text-xl font-semibold text-indigo-900">{{ s.clicked }}</div>
-              <div class="text-[10px] text-indigo-700">first click</div>
+            <div class="rounded-lg border border-indigo-200 bg-indigo-500/10 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-indigo-400">Clicked</div>
+              <div class="mt-1 text-xl font-semibold text-indigo-300">{{ s.clicked }}</div>
+              <div class="text-[10px] text-indigo-400">first click</div>
             </div>
-            <div class="rounded-lg border border-orange-200 bg-orange-50 p-3 text-center">
-              <div class="text-[10px] uppercase tracking-wide text-orange-700">Bounced</div>
-              <div class="mt-1 text-xl font-semibold text-orange-900">{{ s.bounced }}</div>
-              <div class="text-[10px] text-orange-700">hard / soft</div>
+            <div class="rounded-lg border border-orange-500/20 bg-orange-500/10 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-orange-400">Bounced</div>
+              <div class="mt-1 text-xl font-semibold text-orange-300">{{ s.bounced }}</div>
+              <div class="text-[10px] text-orange-400">hard / soft</div>
             </div>
           } @else {
-            <div class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-center">
+            <div class="rounded-lg border border-violet-200 bg-violet-500/10 p-3 text-center">
               <div class="text-[10px] uppercase tracking-wide text-violet-700">Read</div>
               <div class="mt-1 text-xl font-semibold text-violet-900">{{ s.read }}</div>
               @if (readRate() !== null) {
                 <div class="text-[10px] text-violet-700">{{ readRate() }}% of delivered</div>
               }
             </div>
-            <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-center">
-              <div class="text-[10px] uppercase tracking-wide text-rose-700">Failed</div>
-              <div class="mt-1 text-xl font-semibold text-rose-900">{{ s.failed }}</div>
+            <div class="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-red-400">Failed</div>
+              <div class="mt-1 text-xl font-semibold text-red-300">{{ s.failed }}</div>
               @if (failureRate() !== null) {
-                <div class="text-[10px] text-rose-700">{{ failureRate() }}% of attempts</div>
+                <div class="text-[10px] text-red-400">{{ failureRate() }}% of attempts</div>
               }
             </div>
           }
           @if (isEmailCampaign()) {
-            <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-center">
-              <div class="text-[10px] uppercase tracking-wide text-rose-700">Failed</div>
-              <div class="mt-1 text-xl font-semibold text-rose-900">{{ s.failed }}</div>
+            <div class="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-center">
+              <div class="text-[10px] uppercase tracking-wide text-red-400">Failed</div>
+              <div class="mt-1 text-xl font-semibold text-red-300">{{ s.failed }}</div>
               @if (failureRate() !== null) {
-                <div class="text-[10px] text-rose-700">{{ failureRate() }}% of attempts</div>
+                <div class="text-[10px] text-red-400">{{ failureRate() }}% of attempts</div>
               }
             </div>
           }
@@ -136,11 +134,11 @@
       }
 
       <div class="mb-3 flex items-baseline justify-between">
-        <h2 class="text-sm font-semibold text-zinc-900">Messages</h2>
+        <h2 class="text-sm font-semibold text-default">Messages</h2>
         <button
           type="button"
           (click)="refreshStatsAndMessages()"
-          class="text-xs text-zinc-500 hover:text-zinc-700"
+          class="text-xs text-muted hover:text-default"
         >
           Refresh now
         </button>
@@ -148,67 +146,67 @@
 
       @if (loading()) {
         <div
-          class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500"
+          class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
         >
           Loading…
         </div>
       } @else if (messages().length === 0) {
         <div
-          class="rounded-lg border border-dashed border-zinc-300 bg-white p-8 text-center text-sm text-zinc-500"
+          class="rounded-lg border border-dashed border-subtle bg-surface p-5 md:p-8 text-center text-sm text-muted"
         >
           No messages yet. Start the campaign to dispatch.
         </div>
       } @else {
-        <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
-          <table class="min-w-full divide-y divide-zinc-200 text-sm">
-            <thead class="bg-zinc-50">
+        <div class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
+          <table class="min-w-full divide-y divide-subtle text-sm">
+            <thead class="bg-surface-2">
               <tr>
                 <th
-                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-muted"
                 >
                   Contact
                 </th>
                 <th
-                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-muted"
                 >
                   Status
                 </th>
                 <th
-                  class="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                  class="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wide text-muted"
                 >
                   Tick
                 </th>
                 <th
-                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-muted"
                 >
                   Channel msg
                 </th>
                 <th
-                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-muted"
                 >
                   Error
                 </th>
                 <th
-                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                  class="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-muted"
                 >
                   Sent
                 </th>
                 <th
-                  class="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                  class="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-muted"
                 >
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-zinc-100">
+            <tbody class="divide-y divide-subtle">
               @for (m of messages(); track m.id) {
                 <tr>
-                  <td class="whitespace-nowrap px-3 py-2 text-xs text-zinc-700">
-                    <div class="font-medium text-zinc-900">
+                  <td class="whitespace-nowrap px-3 py-2 text-xs text-default">
+                    <div class="font-medium text-default">
                       {{ contactLabel(m.contact_id) }}
                     </div>
                     @if (contactSubtitle(m.contact_id); as sub) {
-                      <div class="font-mono text-[10px] text-zinc-500">{{ sub }}</div>
+                      <div class="font-mono text-[10px] text-muted">{{ sub }}</div>
                     }
                   </td>
                   <td class="px-3 py-2">
@@ -233,14 +231,14 @@
                       @case ('delivered') {
                         <lucide-icon
                           name="check-check"
-                          class="inline h-4 w-4 text-zinc-500"
+                          class="inline h-4 w-4 text-muted"
                           aria-label="Delivered"
                         />
                       }
                       @case ('sent') {
                         <lucide-icon
                           name="check"
-                          class="inline h-4 w-4 text-zinc-500"
+                          class="inline h-4 w-4 text-muted"
                           aria-label="Sent"
                         />
                       }
@@ -254,23 +252,23 @@
                       @case ('failed') {
                         <lucide-icon
                           name="x"
-                          class="inline h-4 w-4 text-rose-500"
+                          class="inline h-4 w-4 text-red-500"
                           aria-label="Failed"
                         />
                       }
                     }
                   </td>
-                  <td class="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-zinc-500">
+                  <td class="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-muted">
                     {{ m.channel_message_id || '—' }}
                   </td>
-                  <td class="max-w-xs px-3 py-2 text-xs text-rose-700">
+                  <td class="max-w-xs px-3 py-2 text-xs text-red-400">
                     @if (m.error) {
                       <span class="line-clamp-1">{{ m.error }}</span>
                     } @else {
-                      <span class="text-zinc-400">—</span>
+                      <span class="text-faint">—</span>
                     }
                   </td>
-                  <td class="whitespace-nowrap px-3 py-2 text-xs text-zinc-500">
+                  <td class="whitespace-nowrap px-3 py-2 text-xs text-muted">
                     {{ formatDate(m.sent_at) }}
                   </td>
                   <td class="whitespace-nowrap px-3 py-2 text-right">
@@ -279,7 +277,7 @@
                         type="button"
                         (click)="retry(m)"
                         [disabled]="retryingId() === m.id"
-                        class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                        class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
                       >
                         {{ retryingId() === m.id ? 'Retrying…' : 'Retry' }}
                       </button>

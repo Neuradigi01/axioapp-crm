@@ -130,6 +130,14 @@ export interface CatalogBulkImportRowError {
   row_index: number;
   sku: string;
   reason: string;
+  /** Column whose value tripped the validator (e.g. `sku`, `name`, `currency`).
+   *  `null` when the failure is row-scoped rather than field-scoped. Added
+   *  when the shared per-field validators landed server-side. */
+  column?: string | null;
+  /** The offending value, echoed back so operators can locate it in the
+   *  source file without cross-referencing. `null` when no single value
+   *  applies. */
+  value?: string | null;
 }
 
 export interface CatalogBulkImportResult {

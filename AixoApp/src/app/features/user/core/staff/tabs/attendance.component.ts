@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -17,7 +17,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { StaffApiService, AttendanceOut, StaffWithPerformance } from '../staff-api.service';
 
 /**
- * Attendance tab â€” picks one staff member (the first row by default),
+ * Attendance tab — picks one staff member (the first row by default),
  * lets the admin browse their month-grid via the shared calendar, and
  * lists the raw clock-in/out rows for that month below.
  *
@@ -91,7 +91,7 @@ export class StaffAttendanceTabComponent {
   }
 
   protected onDaySelected(_d: Date): void {
-    // Reserved for future drilldown â€” silenced for now.
+    // Reserved for future drilldown — silenced for now.
   }
 
   protected formatTime(iso: string): string {

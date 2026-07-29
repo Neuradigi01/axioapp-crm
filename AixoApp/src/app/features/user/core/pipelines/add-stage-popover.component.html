@@ -1,22 +1,22 @@
 <div
-  class="w-72 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg"
+  class="w-72 overflow-hidden rounded-md border border-subtle bg-surface shadow-lg"
   role="dialog"
   aria-label="Add stage"
 >
-  <header class="border-b border-zinc-200 px-3 py-2">
-    <h3 class="text-sm font-semibold text-zinc-900">Add stage</h3>
+  <header class="border-b border-subtle px-3 py-2">
+    <h3 class="text-sm font-semibold text-default">Add stage</h3>
   </header>
 
   <div class="space-y-3 px-3 py-3">
     <label class="block">
-      <span class="text-xs font-medium text-zinc-700">Name</span>
+      <span class="text-xs font-medium text-default">Name</span>
       <input
         type="text"
         [value]="nameValue()"
         (input)="onNameInput($any($event.target).value)"
         maxlength="128"
         placeholder="e.g. Demo Scheduled"
-        class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none"
+        class="mt-1 w-full rounded border border-subtle px-2 py-1.5 text-sm text-default focus:border-muted focus:outline-none"
       />
       @if (nameError(); as err) {
         <p class="mt-1 text-[11px] text-red-600">{{ err }}</p>
@@ -26,7 +26,7 @@
     </label>
 
     <div>
-      <span class="text-xs font-medium text-zinc-700">Colour</span>
+      <span class="text-xs font-medium text-default">Colour</span>
       <div class="mt-1 flex items-center gap-2">
         <div class="flex items-center gap-1.5">
           @for (preset of presetColors; track preset) {
@@ -35,8 +35,8 @@
               (click)="onSelectPreset(preset)"
               [attr.aria-label]="'Use colour ' + preset"
               [attr.aria-pressed]="colorValue() === preset"
-              class="h-5 w-5 rounded-full ring-2 ring-transparent transition hover:ring-zinc-300"
-              [class.ring-zinc-900]="colorValue() === preset"
+              class="h-5 w-5 rounded-full ring-2 ring-transparent transition hover:border-subtle"
+              [class.ring-accent]="colorValue() === preset"
               [style.background-color]="preset"
             ></button>
           }
@@ -47,7 +47,7 @@
           (input)="onColorInput($any($event.target).value)"
           placeholder="#a855f7"
           maxlength="9"
-          class="w-24 rounded border border-zinc-300 px-2 py-1 text-xs font-mono text-zinc-900 focus:border-zinc-500 focus:outline-none"
+          class="w-24 rounded border border-subtle px-2 py-1 text-xs font-mono text-default focus:border-muted focus:outline-none"
         />
       </div>
       @if (!colorValid()) {
@@ -56,11 +56,11 @@
     </div>
 
     <label class="block">
-      <span class="text-xs font-medium text-zinc-700">Insert</span>
+      <span class="text-xs font-medium text-default">Insert</span>
       <select
         [value]="afterStageKey() ?? ''"
         (change)="onAnchorChange($any($event.target).value)"
-        class="mt-1 w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none"
+        class="mt-1 w-full rounded border border-subtle bg-surface px-2 py-1.5 text-sm text-default focus:border-muted focus:outline-none"
       >
         <option value="">(at the end)</option>
         @for (stage of anchorOptions(); track stage.id) {
@@ -70,14 +70,14 @@
     </label>
   </div>
 
-  <footer class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-3 py-2">
+  <footer class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-3 py-2">
     @if (submitError(); as err) {
       <p class="mr-auto text-[11px] text-red-600">{{ err }}</p>
     }
     <button
       type="button"
       (click)="onCancel()"
-      class="rounded border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50"
+      class="rounded border border-subtle bg-surface px-3 py-1 text-xs font-medium text-default transition hover:bg-surface-2"
     >
       Cancel
     </button>
@@ -85,7 +85,7 @@
       type="button"
       (click)="onSubmit()"
       [disabled]="!canSubmit()"
-      class="rounded bg-zinc-900 px-3 py-1 text-xs font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+      class="rounded bg-accent px-3 py-1 text-xs font-medium text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
     >
       Add stage
     </button>

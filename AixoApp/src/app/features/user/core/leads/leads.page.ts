@@ -165,6 +165,15 @@ export class LeadsPageComponent {
     this.auth.currentPermissions().includes('leads.export'),
   );
 
+  /** Gates the "Owner" filter dropdown. Only users with ``users.read`` see
+   * the org-wide leads list (backend list endpoint clamps everyone else
+   * to their own rows — see ``api/src/app/core/leads/router.py``). Showing
+   * the dropdown to scoped roles is misleading because picking another
+   * owner would return an empty list. */
+  protected readonly canFilterByOwner = computed(() =>
+    this.auth.currentPermissions().includes('users.read'),
+  );
+
   readonly view = signal<View>('pipeline');
   readonly searchControl = new FormControl('', { nonNullable: true });
   readonly sourceControl = new FormControl('', { nonNullable: true });
@@ -997,7 +1006,7 @@ export class LeadsPageComponent {
       case 'won':
         return 'bg-emerald-100 text-emerald-800 ring-emerald-200';
       case 'lost':
-        return 'bg-rose-100 text-rose-800 ring-rose-200';
+        return 'bg-red-500/10 text-red-400 ring-red-500/20';
       default:
         return 'bg-blue-100 text-blue-800 ring-blue-200';
     }
@@ -1014,7 +1023,7 @@ export class LeadsPageComponent {
     if (score >= 90) return 'bg-red-100 text-red-800 ring-red-200';
     if (score >= 60) return 'bg-orange-100 text-orange-800 ring-orange-200';
     if (score >= 30) return 'bg-amber-100 text-amber-800 ring-amber-200';
-    return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+    return 'bg-surface-2 text-default border-subtle';
   }
 
   protected ownerLabel(assignedTo: string | null): string {

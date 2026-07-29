@@ -45,14 +45,14 @@ import {
           [class]="
             'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 transition ' +
             (selected().size > 0
-              ? 'bg-zinc-900 text-white ring-zinc-900'
-              : 'bg-white text-zinc-700 ring-zinc-300 hover:bg-zinc-50')
+              ? 'bg-accent text-white ring-zinc-900'
+              : 'bg-surface text-default border-subtle hover:bg-surface-2')
           "
         >
           <lucide-icon name="tag" size="11" />
           Tags
           @if (selected().size > 0) {
-            <span class="ml-0.5 rounded-full bg-white/20 px-1 text-[10px]">
+            <span class="ml-0.5 rounded-full bg-surface/20 px-1 text-[10px]">
               {{ selected().size }}
             </span>
           }
@@ -60,7 +60,7 @@ import {
 
         @if (open()) {
           <div
-            class="absolute right-0 top-full z-30 mt-1 w-56 rounded-md border border-zinc-200 bg-white p-1.5 shadow-lg"
+            class="absolute right-0 top-full z-30 mt-1 w-56 rounded-md border border-subtle bg-surface p-1.5 shadow-lg"
             (click)="$event.stopPropagation()"
           >
             <ul class="max-h-60 space-y-0.5 overflow-y-auto">
@@ -70,8 +70,8 @@ import {
                     type="button"
                     (click)="toggleTag(t.id)"
                     [class]="
-                      'flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-zinc-50 ' +
-                      (selected().has(t.id) ? 'bg-zinc-50' : '')
+                      'flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-surface-2 ' +
+                      (selected().has(t.id) ? 'bg-surface-2' : '')
                     "
                   >
                     <span
@@ -79,7 +79,7 @@ import {
                         'inline-block h-2.5 w-2.5 rounded-full ring-1 ' + swatchClass(t.color)
                       "
                     ></span>
-                    <span class="flex-1 truncate text-zinc-800">{{ t.name }}</span>
+                    <span class="flex-1 truncate text-default">{{ t.name }}</span>
                     @if (selected().has(t.id)) {
                       <lucide-icon name="check" size="12" />
                     }
@@ -91,7 +91,7 @@ import {
               <button
                 type="button"
                 (click)="clearAll()"
-                class="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-50"
+                class="mt-1 w-full rounded-md border border-subtle bg-surface px-2 py-1 text-[11px] font-medium text-default hover:bg-surface-2"
               >
                 Clear ({{ selected().size }})
               </button>

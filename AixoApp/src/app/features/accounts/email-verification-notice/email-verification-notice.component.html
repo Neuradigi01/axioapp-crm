@@ -1,31 +1,31 @@
-<div class="w-full rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
+<div class="w-full rounded-xl border border-subtle bg-surface p-6 shadow-sm sm:p-8">
   <div class="mb-6 text-center">
-    <h1 class="text-xl font-semibold text-zinc-900">Verify Your Email</h1>
+    <h1 class="text-xl font-semibold text-default">Verify Your Email</h1>
   </div>
 
   <div class="flex flex-col items-center text-center">
     <span
-      class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-zinc-500"
+      class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 text-muted"
     >
       <lucide-icon name="mail" class="h-6 w-6" />
     </span>
-    <p class="text-sm font-medium text-zinc-800">A verification email has been sent</p>
+    <p class="text-sm font-medium text-default">A verification email has been sent</p>
     @if (email) {
-      <p class="mt-1 text-sm text-zinc-500">
-        We've sent a verification link to <span class="font-medium text-zinc-700">{{ email }}</span
+      <p class="mt-1 text-sm text-muted">
+        We've sent a verification link to <span class="font-medium text-default">{{ email }}</span
         >. Please check your inbox and click the link to verify your email address.
       </p>
     } @else {
-      <p class="mt-1 text-sm text-zinc-500">
+      <p class="mt-1 text-sm text-muted">
         Please check your inbox and click the verification link to verify your email address.
       </p>
     }
-    <p class="mt-2 text-sm text-zinc-500">
+    <p class="mt-2 text-sm text-muted">
       Didn't receive the email? Try logging in again to resend it.
     </p>
   </div>
 
-  <p class="mt-6 text-center text-sm text-zinc-500">
-    <a [routerLink]="loginUrl" class="font-medium text-zinc-900 hover:underline">Back to Login</a>
+  <p class="mt-6 text-center text-sm text-muted">
+    <a [routerLink]="loginUrl" class="font-medium text-default hover:underline">Back to Login</a>
   </p>
 </div>

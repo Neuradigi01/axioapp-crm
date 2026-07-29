@@ -74,18 +74,20 @@ export class TrialBannerComponent {
     this.router.navigateByUrl('/user/subscription');
   }
 
-  /** Container classes per tone — kept in the component (not the
-   *  template) so the colour palette is greppable in one place. */
+  /** Container classes per tone. Info uses the accent-soft AIXO strip;
+   *  warning / urgent keep amber / red semantics via Tailwind's palette
+   *  because those states are not accent-colored. Kept in the component
+   *  (not the template) so the palette is greppable in one place. */
   protected readonly toneClasses = computed<string>(() => {
     const tone = this.vm()?.tone;
     switch (tone) {
       case 'warning':
-        return 'bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-800';
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
       case 'urgent':
-        return 'bg-red-50 dark:bg-red-950 text-red-900 dark:text-red-200 border-red-200 dark:border-red-900';
+        return 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20';
       case 'info':
       default:
-        return 'bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-900';
+        return 'bg-accent-soft text-default border-subtle';
     }
   });
 
@@ -93,12 +95,12 @@ export class TrialBannerComponent {
     const tone = this.vm()?.tone;
     switch (tone) {
       case 'warning':
-        return 'bg-amber-600 hover:bg-amber-700 text-white';
+        return 'text-amber-700 dark:text-amber-300 hover:opacity-80';
       case 'urgent':
-        return 'bg-red-600 hover:bg-red-700 text-white';
+        return 'text-red-700 dark:text-red-300 hover:opacity-80';
       case 'info':
       default:
-        return 'bg-blue-600 hover:bg-blue-700 text-white';
+        return 'text-accent hover:opacity-80';
     }
   });
 }

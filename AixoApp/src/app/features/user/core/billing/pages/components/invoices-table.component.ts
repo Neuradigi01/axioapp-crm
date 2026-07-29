@@ -24,11 +24,10 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
 const STATUS_TONE: Record<InvoiceStatus, string> = {
   paid: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:ring-emerald-900',
   open: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-900',
-  void: 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600',
+  void: 'bg-surface-2 text-muted ring-1 border-subtle dark:ring-slate-600',
   uncollectible:
-    'bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:ring-rose-900',
-  draft:
-    'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600',
+    'bg-red-500/10 text-red-400 ring-1 ring-red-500/20 dark:bg-red-300 dark:text-red-500/30 dark:ring-red-300',
+  draft: 'bg-surface-2 text-muted ring-1 border-subtle dark:ring-slate-600',
 };
 
 /**
@@ -48,40 +47,34 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
-    <section
-      class="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
-    >
-      <div class="flex items-center gap-3 border-b border-zinc-200 px-6 py-4 dark:border-slate-700">
+    <section class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm">
+      <div class="flex items-center gap-3 border-b border-subtle px-6 py-4">
         <div
-          class="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600"
+          class="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-2 text-default ring-1 border-subtle dark:ring-slate-600"
         >
           <lucide-icon name="receipt" size="18" aria-hidden="true"></lucide-icon>
         </div>
         <div>
-          <p
-            class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-slate-400"
-          >
-            Invoices
-          </p>
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-slate-100">Billing history</h2>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">Invoices</p>
+          <h2 class="text-base font-semibold text-default">Billing history</h2>
         </div>
       </div>
 
       @if (isLoading()) {
         <div class="space-y-2 p-6">
           @for (i of [0, 1, 2]; track i) {
-            <div class="h-10 rounded bg-zinc-100 animate-pulse dark:bg-slate-700"></div>
+            <div class="h-10 rounded bg-surface-2 animate-pulse"></div>
           }
         </div>
       } @else if (viewRows().length === 0) {
         <div class="px-6 py-12 text-center">
           <div
-            class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 dark:bg-slate-700 dark:text-slate-500"
+            class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 text-faint"
           >
             <lucide-icon name="receipt" size="18" aria-hidden="true"></lucide-icon>
           </div>
-          <p class="mt-3 text-sm font-medium text-zinc-700 dark:text-slate-200">No invoices yet</p>
-          <p class="mt-1 text-xs text-zinc-500 dark:text-slate-400">
+          <p class="mt-3 text-sm font-medium text-default">No invoices yet</p>
+          <p class="mt-1 text-xs text-muted">
             Once you upgrade and Stripe issues the first invoice, it'll appear here.
           </p>
         </div>
@@ -89,7 +82,7 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead
-              class="border-b border-zinc-200 bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400"
+              class="border-b border-subtle bg-surface-2 text-left text-xs uppercase tracking-wide text-muted/60"
             >
               <tr>
                 <th class="px-6 py-2.5 font-medium">Date</th>
@@ -99,11 +92,9 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
                 <th class="px-6 py-2.5 text-right font-medium">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-zinc-100 dark:divide-slate-700">
+            <tbody class="divide-y divide-subtle dark:divide-subtle">
               @for (row of viewRows(); track row.id) {
-                <tr
-                  class="text-zinc-700 transition-colors hover:bg-zinc-50 dark:text-slate-200 dark:hover:bg-slate-700/50"
-                >
+                <tr class="text-default transition-colors hover:bg-surface-2/50">
                   <td class="px-6 py-3 tabular-nums">{{ row.date }}</td>
                   <td class="px-6 py-3 font-mono text-xs">{{ row.number }}</td>
                   <td class="px-6 py-3 font-medium tabular-nums">
@@ -131,7 +122,7 @@ const STATUS_TONE: Record<InvoiceStatus, string> = {
                         Download
                       </a>
                     } @else {
-                      <span class="text-xs text-zinc-400">—</span>
+                      <span class="text-xs text-faint">—</span>
                     }
                   </td>
                 </tr>

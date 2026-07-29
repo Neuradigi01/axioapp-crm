@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -117,7 +117,7 @@ export class ContactsListPageComponent {
     initialValue: '',
   });
 
-  /** Distinct source/tag chips for filter dropdowns â€” derived from the loaded page. */
+  /** Distinct source/tag chips for filter dropdowns — derived from the loaded page. */
   readonly sourceOptions = computed(() => {
     const set = new Set<string>();
     for (const item of this.state.items()) {
@@ -230,7 +230,7 @@ export class ContactsListPageComponent {
         permissionKey: 'contacts.write',
       },
     ]);
-    // Initial load â€” runs after the effect below subscribes to the filter signals.
+    // Initial load — runs after the effect below subscribes to the filter signals.
     this.reload();
 
     // Reactive: any filter change resets to page 1 and re-fetches.

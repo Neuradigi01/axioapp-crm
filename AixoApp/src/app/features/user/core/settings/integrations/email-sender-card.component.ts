@@ -301,7 +301,7 @@ export class EmailSenderCardComponent implements OnInit {
   protected providerBadgeClasses(kind: UnifiedSenderKind): string {
     if (kind === 'gmail') return 'bg-blue-50 text-blue-700 ring-1 ring-blue-200';
     if (kind === 'microsoft') return 'bg-sky-50 text-sky-700 ring-1 ring-sky-200';
-    return 'bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200';
+    return 'bg-surface-2 text-default ring-1 border-subtle';
   }
 
   protected domainState(row: EmailSenderDomain): {
@@ -320,7 +320,7 @@ export class EmailSenderCardComponent implements OnInit {
   protected domainToneClass(tone: 'green' | 'amber' | 'zinc'): string {
     if (tone === 'green') return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
     if (tone === 'amber') return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200';
-    return 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200';
+    return 'bg-surface-2 text-muted ring-1 border-subtle';
   }
 
   // --- internals ----------------------------------------------

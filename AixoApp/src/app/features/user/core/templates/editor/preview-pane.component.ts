@@ -84,35 +84,35 @@ const VAR_RE = /\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}/g;
     @switch (channel()) {
       @case ('whatsapp') {
         <div
-          class="rounded-2xl border border-zinc-200 bg-[#e5ddd5] p-4 shadow-inner"
+          class="rounded-2xl border border-subtle bg-[#e5ddd5] p-4 shadow-inner"
           style="min-height: 320px; background-image: radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px); background-size: 12px 12px;"
         >
-          <p class="mb-2 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-600">
+          <p class="mb-2 text-center text-[10px] font-medium uppercase tracking-wide text-muted">
             Preview
           </p>
           <div class="flex flex-col items-start gap-1">
             <div
-              class="max-w-[85%] overflow-hidden rounded-2xl rounded-tl-sm bg-white text-sm text-zinc-900 shadow-sm"
+              class="max-w-[85%] overflow-hidden rounded-2xl rounded-tl-sm bg-surface text-sm text-default shadow-sm"
             >
               @if (waHeaderType() === 'text' && resolvedHeader()) {
-                <p class="px-3 pt-2 text-sm font-semibold text-zinc-900">
+                <p class="px-3 pt-2 text-sm font-semibold text-default">
                   {{ resolvedHeader() }}
                 </p>
               } @else if (waHeaderType() === 'image') {
                 <div
-                  class="flex h-24 items-center justify-center bg-zinc-100 text-[10px] uppercase tracking-wide text-zinc-500"
+                  class="flex h-24 items-center justify-center bg-surface-2 text-[10px] uppercase tracking-wide text-muted"
                 >
                   Image header
                 </div>
               } @else if (waHeaderType() === 'video') {
                 <div
-                  class="flex h-24 items-center justify-center bg-zinc-100 text-[10px] uppercase tracking-wide text-zinc-500"
+                  class="flex h-24 items-center justify-center bg-surface-2 text-[10px] uppercase tracking-wide text-muted"
                 >
                   Video header
                 </div>
               } @else if (waHeaderType() === 'document') {
                 <div
-                  class="flex h-16 items-center justify-center bg-zinc-100 text-[10px] uppercase tracking-wide text-zinc-500"
+                  class="flex h-16 items-center justify-center bg-surface-2 text-[10px] uppercase tracking-wide text-muted"
                 >
                   Document header
                 </div>
@@ -123,11 +123,11 @@ const VAR_RE = /\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}/g;
                   {{ resolvedBody() }}
                 </p>
               } @else {
-                <p class="px-3 py-2 text-xs italic text-zinc-400">Body text will appear here…</p>
+                <p class="px-3 py-2 text-xs italic text-faint">Body text will appear here…</p>
               }
 
               @if (waFooter()) {
-                <p class="px-3 pb-2 text-[11px] text-zinc-500">{{ waFooter() }}</p>
+                <p class="px-3 pb-2 text-[11px] text-muted">{{ waFooter() }}</p>
               }
             </div>
 
@@ -136,7 +136,7 @@ const VAR_RE = /\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}/g;
                 @for (btn of waButtons(); track $index) {
                   <button
                     type="button"
-                    class="flex items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-medium text-[#0088cc] shadow-sm"
+                    class="flex items-center justify-center gap-1.5 rounded-lg bg-surface px-3 py-2 text-sm font-medium text-[#0088cc] shadow-sm"
                     tabindex="-1"
                   >
                     @if (btn.type === 'url') {
@@ -155,32 +155,32 @@ const VAR_RE = /\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}/g;
         </div>
       }
       @case ('email') {
-        <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-          <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Preview</p>
+        <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+          <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted">Preview</p>
           @if (resolvedSubject(); as s) {
-            <div class="mb-2 border-b border-zinc-100 pb-2">
-              <p class="text-[10px] uppercase tracking-wide text-zinc-400">Subject</p>
-              <p class="text-sm font-semibold text-zinc-900">{{ s }}</p>
+            <div class="mb-2 border-b border-subtle pb-2">
+              <p class="text-[10px] uppercase tracking-wide text-faint">Subject</p>
+              <p class="text-sm font-semibold text-default">{{ s }}</p>
             </div>
           }
           @if (resolvedBody()) {
-            <pre class="whitespace-pre-wrap break-words font-sans text-sm text-zinc-800">{{
+            <pre class="whitespace-pre-wrap break-words font-sans text-sm text-default">{{
               resolvedBody()
             }}</pre>
           } @else {
-            <p class="text-xs italic text-zinc-400">Body will appear here as you type…</p>
+            <p class="text-xs italic text-faint">Body will appear here as you type…</p>
           }
         </div>
       }
       @default {
-        <div class="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-          <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Preview</p>
+        <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+          <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted">Preview</p>
           @if (resolvedBody()) {
-            <p class="whitespace-pre-wrap break-words text-sm text-zinc-800">
+            <p class="whitespace-pre-wrap break-words text-sm text-default">
               {{ resolvedBody() }}
             </p>
           } @else {
-            <p class="text-xs italic text-zinc-400">Body will appear here…</p>
+            <p class="text-xs italic text-faint">Body will appear here…</p>
           }
         </div>
       }

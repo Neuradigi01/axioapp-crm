@@ -61,8 +61,8 @@ export const TAG_PALETTE: TagColor[] = [
  * color to one without the other breaks rendering.
  */
 export const TAG_COLOR_CLASSES: Record<TagColor, string> = {
-  zinc: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
-  rose: 'bg-rose-100 text-rose-700 ring-rose-200',
+  zinc: 'bg-surface-2 text-default border-subtle',
+  rose: 'bg-red-500/10 text-red-400 ring-red-500/20',
   amber: 'bg-amber-100 text-amber-800 ring-amber-200',
   yellow: 'bg-yellow-100 text-yellow-800 ring-yellow-200',
   lime: 'bg-lime-100 text-lime-800 ring-lime-200',

@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 
+import { commonValidators } from '../shared/validators';
 import { Appointment } from './appointments-api.service';
 
 /**
@@ -59,7 +60,7 @@ export class RescheduleModalComponent {
 
   protected readonly dateControl = new FormControl<string>('', {
     nonNullable: true,
-    validators: [Validators.required],
+    validators: [Validators.required, commonValidators.isoDate],
   });
   protected readonly timeControl = new FormControl<string>('', {
     nonNullable: true,
@@ -67,11 +68,35 @@ export class RescheduleModalComponent {
   });
   protected readonly reasonControl = new FormControl<string>('', {
     nonNullable: true,
+    validators: [commonValidators.maxLength(500)],
+  });
+
+  /** Cross-field check: the new date+time must be a valid ISO datetime that is
+   *  (a) not in the past and (b) different from the appointment's original
+   *  `scheduled_at`. Surfaces messages via `crossFieldError()` so the
+   *  template can show one line under the fields. */
+  protected readonly crossFieldError = computed<string | null>(() => {
+    const d = this.dateControl.value;
+    const t = this.timeControl.value;
+    if (!d || !t) return null;
+    const parsed = new Date(`${d}T${t}`);
+    if (Number.isNaN(parsed.getTime())) return null;
+    // 5-min grace covers clock skew, matches `dateNotPastValidator`.
+    if (parsed.getTime() + 5 * 60 * 1000 < Date.now()) {
+      return 'New time cannot be in the past.';
+    }
+    const original = this._appointment()?.scheduled_at;
+    if (original && parsed.getTime() === new Date(original).getTime()) {
+      return 'Pick a different time — this matches the current slot.';
+    }
+    return null;
   });
 
   protected readonly canConfirm = computed(() => {
     if (this._submitting()) return false;
-    return Boolean(this.dateControl.value && this.timeControl.value);
+    if (!this.dateControl.value || !this.timeControl.value) return false;
+    if (this.reasonControl.invalid) return false;
+    return this.crossFieldError() === null;
   });
 
   protected onConfirm(): void {

@@ -1,19 +1,19 @@
-<div class="min-h-[calc(100vh-3.5rem)] bg-zinc-50">
+<div class="min-h-[calc(100vh-3.5rem)] bg-surface-2">
   <!-- Header bar -->
-  <header class="h-14 flex items-center gap-3 px-6 bg-white border-b border-zinc-200">
+  <header class="h-14 flex items-center gap-3 px-4 md:px-6 bg-surface border-b border-subtle">
     <a
       routerLink="/user/workflows"
-      class="p-1.5 rounded text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
+      class="p-1.5 rounded text-muted hover:text-default hover:bg-surface-2"
       title="Back to workflows"
     >
-      <lucide-icon name="ArrowLeft" class="w-4 h-4"></lucide-icon>
+      <lucide-icon name="arrow-left" class="w-4 h-4"></lucide-icon>
     </a>
-    <h1 class="text-base font-semibold text-zinc-800">Workflow templates</h1>
-    <span class="text-xs text-zinc-500"> — Start from a proven workflow shape. </span>
+    <h1 class="text-base font-semibold text-default">Workflow templates</h1>
+    <span class="text-xs text-muted"> — Start from a proven workflow shape. </span>
     <div class="flex-1"></div>
     <a
       routerLink="/user/workflows/new"
-      class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+      class="px-3 py-1.5 text-xs rounded border border-subtle text-default hover:bg-surface-2"
     >
       Skip — start blank
     </a>
@@ -21,24 +21,24 @@
 
   @if (error()) {
     <div
-      class="mx-6 mt-4 px-3 py-2 text-xs rounded bg-rose-50 border border-rose-200 text-rose-800"
+      class="mx-6 mt-4 px-3 py-2 text-xs rounded bg-red-500/10 border border-red-500/20 text-red-400"
     >
       {{ error() }}
     </div>
   }
 
   <!-- Category tabs -->
-  <div class="px-6 pt-4">
+  <div class="px-4 md:px-6 pt-4">
     <div class="flex flex-wrap gap-1.5">
       <button
         type="button"
         class="px-3 py-1.5 text-xs rounded-full border"
-        [class.bg-zinc-900]="activeCategory() === ALL_TAB"
+        [class.bg-accent]="activeCategory() === ALL_TAB"
         [class.text-white]="activeCategory() === ALL_TAB"
-        [class.border-zinc-900]="activeCategory() === ALL_TAB"
-        [class.bg-white]="activeCategory() !== ALL_TAB"
-        [class.text-zinc-700]="activeCategory() !== ALL_TAB"
-        [class.border-zinc-300]="activeCategory() !== ALL_TAB"
+        [class.border-accent]="activeCategory() === ALL_TAB"
+        [class.bg-surface]="activeCategory() !== ALL_TAB"
+        [class.text-default]="activeCategory() !== ALL_TAB"
+        [class.border-subtle]="activeCategory() !== ALL_TAB"
         (click)="setCategory(ALL_TAB)"
       >
         All templates
@@ -47,12 +47,12 @@
         <button
           type="button"
           class="px-3 py-1.5 text-xs rounded-full border"
-          [class.bg-zinc-900]="activeCategory() === cat"
+          [class.bg-accent]="activeCategory() === cat"
           [class.text-white]="activeCategory() === cat"
-          [class.border-zinc-900]="activeCategory() === cat"
-          [class.bg-white]="activeCategory() !== cat"
-          [class.text-zinc-700]="activeCategory() !== cat"
-          [class.border-zinc-300]="activeCategory() !== cat"
+          [class.border-accent]="activeCategory() === cat"
+          [class.bg-surface]="activeCategory() !== cat"
+          [class.text-default]="activeCategory() !== cat"
+          [class.border-subtle]="activeCategory() !== cat"
           (click)="setCategory(cat)"
         >
           {{ cat }}
@@ -62,63 +62,63 @@
   </div>
 
   <!-- Cards grid -->
-  <main class="px-6 py-6">
+  <main class="px-4 md:px-6 py-4 md:py-6">
     @if (loading()) {
-      <div class="text-sm text-zinc-500 italic">Loading templates…</div>
+      <div class="text-sm text-muted italic">Loading templates…</div>
     } @else if (filteredEntries().length === 0) {
-      <div class="text-sm text-zinc-500 italic">No templates in this category yet.</div>
+      <div class="text-sm text-muted italic">No templates in this category yet.</div>
     } @else {
       <div class="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         @for (entry of filteredEntries(); track entry.id) {
           <article
-            class="bg-white border border-zinc-200 rounded-lg p-4 flex flex-col shadow-sm hover:border-zinc-400 transition-colors"
+            class="bg-surface border border-subtle rounded-lg p-4 flex flex-col shadow-sm hover:border-subtle transition-colors"
           >
             <header class="flex items-start gap-2">
               <span
-                class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700"
+                class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-surface-2 text-default"
               >
                 {{ entry.category }}
               </span>
               <div class="flex-1"></div>
-              <span class="text-[10px] text-zinc-500">
-                <lucide-icon name="Clock" class="inline-block w-3 h-3 mr-0.5"></lucide-icon>
+              <span class="text-[10px] text-muted">
+                <lucide-icon name="clock" class="inline-block w-3 h-3 mr-0.5"></lucide-icon>
                 ~{{ entry.est_setup_time_minutes }}m
               </span>
             </header>
-            <h3 class="mt-2 text-sm font-semibold text-zinc-900">
+            <h3 class="mt-2 text-sm font-semibold text-default">
               {{ entry.name }}
             </h3>
-            <p class="mt-1 text-xs text-zinc-600 leading-snug flex-1">
+            <p class="mt-1 text-xs text-muted leading-snug flex-1">
               {{ entry.description }}
             </p>
             <div class="mt-3 flex items-center gap-1.5 flex-wrap">
               @for (channel of entry.channels; track channel) {
                 <span
-                  class="text-[10px] px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-sky-700 capitalize"
+                  class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-200 text-sky-700 capitalize"
                 >
                   {{ channel }}
                 </span>
               }
             </div>
-            <div class="mt-3 flex items-center gap-1.5 text-[10px] text-zinc-500">
-              <lucide-icon name="Target" class="w-3 h-3"></lucide-icon>
+            <div class="mt-3 flex items-center gap-1.5 text-[10px] text-muted">
+              <lucide-icon name="target" class="w-3 h-3"></lucide-icon>
               <span>Goal: {{ entry.goal_node_label }}</span>
             </div>
-            <div class="mt-3 flex items-center gap-1.5 text-[10px] text-emerald-700">
-              <lucide-icon name="TrendingUp" class="w-3 h-3"></lucide-icon>
+            <div class="mt-3 flex items-center gap-1.5 text-[10px] text-emerald-400">
+              <lucide-icon name="trending-up" class="w-3 h-3"></lucide-icon>
               <span>~{{ entry.est_completion_rate_pct }}% completion</span>
             </div>
             <footer class="mt-4 flex items-center gap-2">
               <button
                 type="button"
-                class="flex-1 text-xs px-3 py-1.5 rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+                class="flex-1 text-xs px-3 py-1.5 rounded border border-subtle text-default hover:bg-surface-2"
                 (click)="openPreview(entry)"
               >
                 Preview
               </button>
               <button
                 type="button"
-                class="flex-1 text-xs px-3 py-1.5 rounded bg-zinc-900 text-white hover:bg-zinc-800"
+                class="flex-1 text-xs px-3 py-1.5 rounded bg-accent text-white hover:brightness-95"
                 (click)="startClone(entry)"
               >
                 Use this template

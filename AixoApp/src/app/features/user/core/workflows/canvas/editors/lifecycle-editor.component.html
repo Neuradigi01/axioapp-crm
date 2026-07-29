@@ -1,11 +1,11 @@
 <div class="space-y-3">
   @if (isConvert()) {
     <div>
-      <label class="block text-[11px] font-medium text-zinc-600 mb-1">Conversion reason</label>
+      <label class="block text-[11px] font-medium text-muted mb-1">Conversion reason</label>
       <select
         [ngModel]="conversionReason()"
         (ngModelChange)="onConversionReasonChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
       >
         <option value="won">Won (deal closed)</option>
         <option value="qualified">Qualified</option>
@@ -15,13 +15,13 @@
   }
 
   <div>
-    <label class="block text-[11px] font-medium text-zinc-600 mb-1">Reason (audit note)</label>
+    <label class="block text-[11px] font-medium text-muted mb-1">Reason (audit note)</label>
     <textarea
       rows="2"
       [ngModel]="reason()"
       (ngModelChange)="onReasonChange($event)"
       placeholder="Optional — audit log records this"
-      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
     ></textarea>
   </div>
 </div>

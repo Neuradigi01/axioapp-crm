@@ -20,9 +20,9 @@ const DEFAULT_ORG_SLUG = 'demo';
 /**
  * Staff-portal login. Two-step UX matching the master prompt:
  *
- *   1. Picker â€” pulls active staff for `org_slug` and shows colored
+ *   1. Picker — pulls active staff for `org_slug` and shows colored
  *      avatar buttons.
- *   2. PIN â€” 4-digit keypad. Last 4 digits of the user's phone is
+ *   2. PIN — 4-digit keypad. Last 4 digits of the user's phone is
  *      the PIN. After 5 wrong attempts the server returns 429 and we
  *      surface the inline "Try again later" message.
  *

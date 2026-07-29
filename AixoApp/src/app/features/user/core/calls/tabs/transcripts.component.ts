@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -14,7 +14,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { Call, CallTranscript, CallsApiService } from '../calls-api.service';
 
 /**
- * Transcripts tab â€” left rail of calls (newest first), right pane shows
+ * Transcripts tab — left rail of calls (newest first), right pane shows
  * the transcript for the selected call. Admin can edit + save the
  * transcript (PUT replaces the single row per call).
  *

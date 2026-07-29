@@ -31,14 +31,14 @@ import { CostReport, ReportRange, WhatsAppReportsService } from './whatsapp-repo
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule],
   template: `
-    <div class="rounded-md border border-zinc-200 bg-white p-4">
+    <div class="rounded-md border border-subtle bg-surface p-4">
       <div class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Estimated cost</p>
-          <p class="text-[11px] text-zinc-500">List-rate estimate, not the Meta invoice.</p>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">Estimated cost</p>
+          <p class="text-[11px] text-muted">List-rate estimate, not the Meta invoice.</p>
         </div>
         <div
-          class="inline-flex items-center rounded-md border border-zinc-300 bg-white p-0.5 text-[11px]"
+          class="inline-flex items-center rounded-md border border-subtle bg-surface p-0.5 text-[11px]"
           role="tablist"
           aria-label="Region"
         >
@@ -47,7 +47,7 @@ import { CostReport, ReportRange, WhatsAppReportsService } from './whatsapp-repo
               type="button"
               [class]="
                 'rounded px-2 py-0.5 ' +
-                (region() === r ? 'bg-zinc-900 text-white' : 'text-zinc-700 hover:bg-zinc-100')
+                (region() === r ? 'bg-accent text-white' : 'text-default hover:bg-surface-2')
               "
               (click)="region.set(r)"
             >
@@ -58,19 +58,19 @@ import { CostReport, ReportRange, WhatsAppReportsService } from './whatsapp-repo
       </div>
 
       @if (loading()) {
-        <p class="text-[11px] text-zinc-500">Loading…</p>
+        <p class="text-[11px] text-muted">Loading…</p>
       }
       @if (error(); as err) {
-        <p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
           {{ err }}
         </p>
       } @else if (report(); as r) {
-        <p class="mb-3 text-2xl font-semibold text-zinc-900">
+        <p class="mb-3 text-2xl font-semibold text-default">
           {{ formatCurrency(r.total, r.currency) }}
         </p>
         <table class="w-full text-xs">
-          <thead class="text-zinc-500">
-            <tr class="border-b border-zinc-200">
+          <thead class="text-muted">
+            <tr class="border-b border-subtle">
               <th class="py-1 text-left font-medium">Category</th>
               <th class="py-1 text-right font-medium">Count</th>
               <th class="py-1 text-right font-medium">Rate</th>
@@ -79,13 +79,13 @@ import { CostReport, ReportRange, WhatsAppReportsService } from './whatsapp-repo
           </thead>
           <tbody>
             @for (l of r.lines; track l.category) {
-              <tr class="border-b border-zinc-100 last:border-0">
-                <td class="py-1 capitalize text-zinc-800">{{ l.category }}</td>
-                <td class="py-1 text-right text-zinc-700">{{ l.count }}</td>
-                <td class="py-1 text-right text-zinc-700">
+              <tr class="border-b border-subtle last:border-0">
+                <td class="py-1 capitalize text-default">{{ l.category }}</td>
+                <td class="py-1 text-right text-default">{{ l.count }}</td>
+                <td class="py-1 text-right text-default">
                   {{ formatCurrency(l.rate, l.currency) }}
                 </td>
-                <td class="py-1 text-right text-zinc-700">
+                <td class="py-1 text-right text-default">
                   {{ formatCurrency(l.total, l.currency) }}
                 </td>
               </tr>

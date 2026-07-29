@@ -113,6 +113,24 @@ export class WorkflowCanvasPageComponent {
   readonly testFireBusy = signal(false);
   readonly testFireTrace = signal<WorkflowTestFireResponse | null>(null);
 
+  // Mobile-only overlay toggles. On desktop (md+) both panels are always
+  // visible in-flow; on mobile they slide over the canvas.
+  readonly mobilePaletteOpen = signal(false);
+  readonly mobileInspectorOpen = signal(false);
+
+  toggleMobilePalette(): void {
+    this.mobilePaletteOpen.update((v) => !v);
+    if (this.mobilePaletteOpen()) this.mobileInspectorOpen.set(false);
+  }
+  toggleMobileInspector(): void {
+    this.mobileInspectorOpen.update((v) => !v);
+    if (this.mobileInspectorOpen()) this.mobilePaletteOpen.set(false);
+  }
+  closeMobileOverlays(): void {
+    this.mobilePaletteOpen.set(false);
+    this.mobileInspectorOpen.set(false);
+  }
+
   // Step 17 — version history + import/export.
   readonly showVersionDrawer = signal(false);
   readonly viewingVersion = signal<number | null>(null);

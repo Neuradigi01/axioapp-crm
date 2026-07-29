@@ -1,6 +1,6 @@
 <div class="space-y-3">
   <div>
-    <label class="block text-[11px] font-medium text-zinc-600 mb-1">
+    <label class="block text-[11px] font-medium text-muted mb-1">
       A / B split — variant A weight (% of runs)
     </label>
     <input
@@ -12,11 +12,11 @@
       (ngModelChange)="onWeightAChange($event)"
       class="w-full"
     />
-    <div class="flex items-center justify-between text-[11px] text-zinc-600 mt-1">
+    <div class="flex items-center justify-between text-[11px] text-muted mt-1">
       <span><strong>A</strong>: {{ weightA() }}%</span>
       <span><strong>B</strong>: {{ weightBLabel() }}%</span>
     </div>
-    <p class="text-[10px] text-zinc-500 mt-1">
+    <p class="text-[10px] text-muted mt-1">
       Per-recipient choice is deterministic on
       <code>sha256(run_id, node_id)</code>, so re-runs from the same enrolment land on the same
       variant.

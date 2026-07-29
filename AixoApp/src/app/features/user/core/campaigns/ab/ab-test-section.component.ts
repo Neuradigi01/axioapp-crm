@@ -20,11 +20,11 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <div [formGroup]="form()" class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs">
-      <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+    <div [formGroup]="form()" class="rounded-md border border-subtle bg-surface-2 p-3 text-xs">
+      <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
         A/B test configuration
       </p>
-      <p class="mb-3 text-[11px] text-zinc-500">
+      <p class="mb-3 text-[11px] text-muted">
         Split your audience between two templates. After the hold-back window, the winner is
         auto-selected by the metric you choose — minimum 50 recipients to keep the result
         statistically meaningful.
@@ -32,10 +32,10 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 
       <div class="mb-2 grid grid-cols-2 gap-2">
         <label>
-          <span class="mb-1 block font-medium text-zinc-700"> Variant A template </span>
+          <span class="mb-1 block font-medium text-default"> Variant A template </span>
           <select
             formControlName="variant_a_template_id"
-            class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5"
+            class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5"
           >
             <option [ngValue]="null">— Pick template A —</option>
             @for (t of templates(); track t.id) {
@@ -44,10 +44,10 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
           </select>
         </label>
         <label>
-          <span class="mb-1 block font-medium text-zinc-700"> Variant B template </span>
+          <span class="mb-1 block font-medium text-default"> Variant B template </span>
           <select
             formControlName="variant_b_template_id"
-            class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5"
+            class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5"
           >
             <option [ngValue]="null">— Pick template B —</option>
             @for (t of templates(); track t.id) {
@@ -58,7 +58,7 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
       </div>
 
       <label class="mb-2 block">
-        <span class="mb-1 block font-medium text-zinc-700">
+        <span class="mb-1 block font-medium text-default">
           Split ratio — % of audience that gets variant A ({{
             form().controls['split_ratio'].value
           }}%)
@@ -71,7 +71,7 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
           formControlName="split_ratio"
           class="w-full"
         />
-        <span class="mt-1 block text-[10px] text-zinc-500">
+        <span class="mt-1 block text-[10px] text-muted">
           Extremes (&lt; 10% or &gt; 90%) produce flaky winners on small audiences — capped at
           10–90%.
         </span>
@@ -79,10 +79,10 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 
       <div class="grid grid-cols-2 gap-2">
         <label>
-          <span class="mb-1 block font-medium text-zinc-700"> Winner metric </span>
+          <span class="mb-1 block font-medium text-default"> Winner metric </span>
           <select
             formControlName="winner_metric"
-            class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5"
+            class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5"
           >
             <option [ngValue]="null">— Pick a metric —</option>
             <option value="reply_rate">Reply rate</option>
@@ -91,10 +91,10 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
           </select>
         </label>
         <label>
-          <span class="mb-1 block font-medium text-zinc-700"> Hold-back window </span>
+          <span class="mb-1 block font-medium text-default"> Hold-back window </span>
           <select
             formControlName="winner_holdback_hours"
-            class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5"
+            class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5"
           >
             <option [ngValue]="6">6 hours</option>
             <option [ngValue]="12">12 hours</option>

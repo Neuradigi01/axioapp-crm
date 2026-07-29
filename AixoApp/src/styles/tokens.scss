@@ -10,9 +10,12 @@
   // ---------------------------------------------------------------------------
   // Brand Colors
   // ---------------------------------------------------------------------------
-  --brand-grad-1: #57bdff;
-  --brand-grad-2: #4f77fb;
-  --brand-grad-3: #6528cf;
+  // Remapped 2026-07-27 (design refresh Step 1) to the AIXO teal accent so
+  // brand-gradient surfaces (sidenav active accent, primary CTAs) match the
+  // new design system without any component-file changes.
+  --brand-grad-1: #0d9488;
+  --brand-grad-2: #0d9488;
+  --brand-grad-3: #4ac7b0;
   --brand-gradient: linear-gradient(
     135deg,
     var(--brand-grad-1),
@@ -23,28 +26,30 @@
   // ---------------------------------------------------------------------------
   // Primitive Colors — Dark Palette
   // ---------------------------------------------------------------------------
-  --c-dark-bg: #0b0f19;
-  --c-dark-surface-1: #131823;
-  --c-dark-surface-2: #1a2035;
-  --c-dark-surface-3: #212840;
-  --c-dark-text-primary: #e8eaf0;
-  --c-dark-text-secondary: #a0a8c0;
-  --c-dark-text-muted: #6b7280;
-  --c-dark-border: #2a3148;
-  --c-dark-divider: #1f2640;
+  // Remapped 2026-07-27 (design refresh Step 1) to AIXO's dark palette.
+  --c-dark-bg: #0b0c0e;
+  --c-dark-surface-1: #141619;
+  --c-dark-surface-2: #1c1f24;
+  --c-dark-surface-3: #262a31;
+  --c-dark-text-primary: #f2f4f7;
+  --c-dark-text-secondary: #98a2b3;
+  --c-dark-text-muted: #667085;
+  --c-dark-border: #262a31;
+  --c-dark-divider: #1c1f24;
 
   // ---------------------------------------------------------------------------
   // Primitive Colors — Light Palette
   // ---------------------------------------------------------------------------
-  --c-light-bg: #f4f9ff;
+  // Remapped 2026-07-27 (design refresh Step 1) to AIXO's light palette.
+  --c-light-bg: #fafafa;
   --c-light-surface-1: #ffffff;
-  --c-light-surface-2: #f0f4fa;
-  --c-light-surface-3: #e8edf5;
-  --c-light-text-primary: #1a1a2e;
-  --c-light-text-secondary: #4a5568;
-  --c-light-text-muted: #9ca3af;
-  --c-light-border: #e2e8f0;
-  --c-light-divider: #edf2f7;
+  --c-light-surface-2: #f2f4f7;
+  --c-light-surface-3: #e4e7ec;
+  --c-light-text-primary: #1d2939;
+  --c-light-text-secondary: #667085;
+  --c-light-text-muted: #98a2b3;
+  --c-light-border: #e4e7ec;
+  --c-light-divider: #f2f4f7;
 
   // ---------------------------------------------------------------------------
   // Overlay

@@ -59,10 +59,10 @@ interface FlowDraft {
     <div class="space-y-4">
       <header class="flex items-baseline justify-between gap-2">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">
             {{ existing() ? 'Edit flow' : 'New flow' }}
           </p>
-          <p class="text-[11px] text-zinc-500">
+          <p class="text-[11px] text-muted">
             Category: {{ humanCategory(draft().category) }}
             @if (existing(); as e) {
               · Status: <span class="capitalize">{{ e.status }}</span>
@@ -73,7 +73,7 @@ interface FlowDraft {
           <button
             type="button"
             (click)="cancel.emit()"
-            class="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+            class="rounded border border-subtle bg-surface px-3 py-1.5 text-xs text-default hover:bg-surface-2"
           >
             Cancel
           </button>
@@ -81,7 +81,7 @@ interface FlowDraft {
             type="button"
             [disabled]="busy() || !draft().name"
             (click)="save()"
-            class="rounded bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+            class="rounded bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95 disabled:opacity-50"
           >
             {{ busy() ? 'Saving…' : 'Save draft' }}
           </button>
@@ -89,22 +89,22 @@ interface FlowDraft {
       </header>
 
       @if (error(); as err) {
-        <p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
           {{ err }}
         </p>
       }
       @if (toast(); as msg) {
-        <p class="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+        <p class="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs text-default">
           {{ msg }}
         </p>
       }
 
       <label class="block text-xs">
-        <span class="mb-1 block font-medium text-zinc-700">Flow name</span>
+        <span class="mb-1 block font-medium text-default">Flow name</span>
         <input
           type="text"
           maxlength="128"
-          class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+          class="w-full rounded-md border border-subtle px-2.5 py-1.5"
           [ngModel]="draft().name"
           (ngModelChange)="patchName($event)"
         />
@@ -112,36 +112,34 @@ interface FlowDraft {
 
       <div class="space-y-3">
         @for (screen of draft().screens; track screen.id; let si = $index) {
-          <fieldset class="rounded-md border border-zinc-200 p-3">
-            <legend class="px-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+          <fieldset class="rounded-md border border-subtle p-3">
+            <legend class="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
               Screen {{ si + 1 }}
             </legend>
             <label class="mb-2 block text-xs">
-              <span class="mb-1 block text-zinc-700">Title</span>
+              <span class="mb-1 block text-default">Title</span>
               <input
                 type="text"
-                class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5"
+                class="w-full rounded-md border border-subtle px-2.5 py-1.5"
                 [ngModel]="screen.title"
                 (ngModelChange)="patchScreenTitle(screen.id, $event)"
               />
             </label>
-            <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-              Fields
-            </p>
+            <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Fields</p>
             <div class="space-y-1.5">
               @for (field of draft().fields[screen.id] || []; track field.name) {
                 <div class="grid grid-cols-12 items-center gap-2 text-xs">
-                  <span class="col-span-3 truncate font-mono text-[11px] text-zinc-500">
+                  <span class="col-span-3 truncate font-mono text-[11px] text-muted">
                     {{ field.name }}
                   </span>
                   <input
                     type="text"
-                    class="col-span-6 rounded-md border border-zinc-300 px-2 py-1"
+                    class="col-span-6 rounded-md border border-subtle px-2 py-1"
                     [ngModel]="field.label"
                     (ngModelChange)="patchFieldLabel(screen.id, field.name, $event)"
                     [placeholder]="field.name"
                   />
-                  <label class="col-span-3 flex items-center gap-1 text-[11px] text-zinc-600">
+                  <label class="col-span-3 flex items-center gap-1 text-[11px] text-muted">
                     <input
                       type="checkbox"
                       [checked]="field.required"
@@ -158,7 +156,7 @@ interface FlowDraft {
 
       <details>
         <summary
-          class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700"
+          class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-muted hover:text-default"
         >
           Preview
         </summary>
@@ -169,12 +167,12 @@ interface FlowDraft {
 
       <details>
         <summary
-          class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700"
+          class="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-muted hover:text-default"
         >
           Raw JSON (advanced)
         </summary>
         <pre
-          class="mt-2 max-h-72 overflow-auto rounded-md bg-zinc-900 p-3 text-[11px] text-zinc-100"
+          class="mt-2 max-h-72 overflow-auto rounded-md bg-accent p-3 text-[11px] text-default"
           >{{ rawJsonText() }}</pre
         >
       </details>

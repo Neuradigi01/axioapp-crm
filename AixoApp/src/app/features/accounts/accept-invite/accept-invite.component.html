@@ -1,25 +1,25 @@
 <div class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
   @if (state() === 'loading') {
     <div
-      class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500 shadow-sm"
+      class="rounded-lg border border-subtle bg-surface p-6 text-center text-sm text-muted shadow-sm"
     >
       Validating invitation…
     </div>
   } @else if (state() === 'invalid') {
-    <div class="rounded-lg border border-rose-200 bg-rose-50 p-6 text-center shadow-sm">
-      <h1 class="text-base font-semibold text-rose-800">Invitation unavailable</h1>
-      <p class="mt-2 text-sm text-rose-700">{{ invalidReason() }}</p>
+    <div class="rounded-lg border border-red-500/20 bg-red-500/10 p-6 text-center shadow-sm">
+      <h1 class="text-base font-semibold text-red-400">Invitation unavailable</h1>
+      <p class="mt-2 text-sm text-red-400">{{ invalidReason() }}</p>
       <a
         href="/accounts/login"
-        class="mt-4 inline-block rounded-md bg-rose-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-800"
+        class="mt-4 inline-block rounded-md bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
       >
         Go to login
       </a>
     </div>
   } @else if (preview(); as p) {
-    <div class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-      <h1 class="text-lg font-semibold text-zinc-900">You're invited to {{ p.org_name }}</h1>
-      <p class="mt-1 text-sm text-zinc-600">
+    <div class="rounded-lg border border-subtle bg-surface p-6 shadow-sm">
+      <h1 class="text-lg font-semibold text-default">You're invited to {{ p.org_name }}</h1>
+      <p class="mt-1 text-sm text-muted">
         Set your password to join <span class="font-medium">{{ p.org_name }}</span> as
         <span class="font-medium">{{ p.role_name }}</span
         >.
@@ -27,66 +27,97 @@
 
       <form [formGroup]="form" (ngSubmit)="submit()" class="mt-5 space-y-3">
         <label class="block text-sm">
-          <span class="mb-1 block text-xs font-medium text-zinc-600">Email</span>
+          <span class="mb-1 block text-xs font-medium text-muted">Email</span>
           <input
             type="email"
             [value]="p.email"
             readonly
-            class="w-full cursor-not-allowed rounded-md border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-600"
+            class="w-full cursor-not-allowed rounded-md border border-subtle bg-surface-2 px-3 py-1.5 text-sm text-muted"
           />
         </label>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label class="block text-sm">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">First name</span>
+            <span class="mb-1 block text-xs font-medium text-muted">First name</span>
             <input
               type="text"
               formControlName="first_name"
               autocomplete="given-name"
-              class="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            @if (form.controls.first_name.touched && form.controls.first_name.invalid) {
+              <p class="mt-1 text-xs text-red-500">
+                <app-validation-message [control]="form.controls.first_name" label="First name" />
+              </p>
+            }
           </label>
           <label class="block text-sm">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Last name</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Last name</span>
             <input
               type="text"
               formControlName="last_name"
               autocomplete="family-name"
-              class="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            @if (form.controls.last_name.touched && form.controls.last_name.invalid) {
+              <p class="mt-1 text-xs text-red-500">
+                <app-validation-message [control]="form.controls.last_name" label="Last name" />
+              </p>
+            }
           </label>
         </div>
         <label class="block text-sm">
-          <span class="mb-1 block text-xs font-medium text-zinc-600">Phone (optional)</span>
+          <span class="mb-1 block text-xs font-medium text-muted">Phone (optional)</span>
           <input
             type="tel"
             formControlName="phone"
             autocomplete="tel"
-            class="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
+          @if (form.controls.phone.touched && form.controls.phone.invalid) {
+            <p class="mt-1 text-xs text-red-500">
+              <app-validation-message [control]="form.controls.phone" label="Phone" />
+            </p>
+          }
         </label>
         <label class="block text-sm">
-          <span class="mb-1 block text-xs font-medium text-zinc-600">Password</span>
+          <span class="mb-1 block text-xs font-medium text-muted">Password</span>
           <input
             type="password"
             formControlName="password"
             autocomplete="new-password"
-            minlength="8"
-            class="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <span class="mt-1 block text-[11px] text-zinc-500">Minimum 8 characters.</span>
+          <span class="mt-1 block text-[11px] text-muted">
+            8–128 chars with upper, lower, digit, and special.
+          </span>
+          @if (form.controls.password.touched && form.controls.password.invalid) {
+            <p class="mt-1 text-xs text-red-500">
+              <app-validation-message [control]="form.controls.password" label="Password" />
+            </p>
+          }
         </label>
         <label class="block text-sm">
-          <span class="mb-1 block text-xs font-medium text-zinc-600">Confirm password</span>
+          <span class="mb-1 block text-xs font-medium text-muted">Confirm password</span>
           <input
             type="password"
             formControlName="confirm_password"
             autocomplete="new-password"
-            class="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
+          @if (form.controls.confirm_password.touched && form.controls.confirm_password.invalid) {
+            <p class="mt-1 text-xs text-red-500">
+              <app-validation-message
+                [control]="form.controls.confirm_password"
+                label="Confirm password"
+              />
+            </p>
+          }
         </label>
 
         @if (submitError(); as err) {
-          <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          <div
+            class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+          >
             {{ err }}
           </div>
         }
@@ -94,7 +125,7 @@
         <button
           type="submit"
           [disabled]="submitting()"
-          class="mt-2 w-full rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+          class="mt-2 w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {{ submitting() ? 'Creating account…' : 'Accept invitation' }}
         </button>

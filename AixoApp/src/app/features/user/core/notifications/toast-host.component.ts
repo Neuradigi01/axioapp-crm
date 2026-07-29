@@ -24,25 +24,25 @@ export class ToastHostComponent {
 
   readonly toasts = this.service.toasts;
 
-  protected toneClass(tone: ToastTone): string {
-    switch (tone) {
-      case 'success':
-        return 'border-emerald-200 bg-emerald-50';
-      case 'error':
-        return 'border-red-200 bg-red-50';
-      default:
-        return 'border-zinc-200 bg-white';
-    }
-  }
-
   protected toneIcon(tone: ToastTone): string {
     switch (tone) {
       case 'success':
-        return 'check';
+        return 'check-circle-2';
       case 'error':
-        return 'x';
+        return 'x-circle';
       default:
         return 'bell';
+    }
+  }
+
+  protected toneIconClass(tone: ToastTone): string {
+    switch (tone) {
+      case 'success':
+        return 'text-emerald-400';
+      case 'error':
+        return 'text-red-400';
+      default:
+        return 'text-accent';
     }
   }
 

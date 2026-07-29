@@ -1,4 +1,4 @@
-﻿import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { InrPipe } from '../../shared/pipes/inr.pipe';
@@ -6,7 +6,7 @@ import { StaffWithPerformance } from '../staff-api.service';
 import { initials } from '@core/services/text.util';
 
 /**
- * Overview tab â€” grid of staff "summary cards". One card per user
+ * Overview tab — grid of staff "summary cards". One card per user
  * showing the joined profile + performance numbers we have today.
  * Avatar background is a deterministic hash on user.id so the same
  * person keeps the same colour across reloads.
@@ -28,7 +28,7 @@ export class StaffOverviewTabComponent {
 
   protected avatarBg(id: string): string {
     const palette = [
-      'bg-rose-100 text-rose-700',
+      'bg-red-500/10 text-red-400',
       'bg-amber-100 text-amber-700',
       'bg-emerald-100 text-emerald-700',
       'bg-sky-100 text-sky-700',
@@ -58,12 +58,12 @@ export class StaffOverviewTabComponent {
       case 'terminated':
         return {
           label: 'Off-boarded',
-          cls: 'bg-rose-50 text-rose-700 ring-rose-200',
+          cls: 'bg-red-500/10 text-red-400 ring-red-500/20',
         };
       default:
         return {
           label: 'No profile',
-          cls: 'bg-zinc-100 text-zinc-600 ring-zinc-200',
+          cls: 'bg-surface-2 text-muted border-subtle',
         };
     }
   }

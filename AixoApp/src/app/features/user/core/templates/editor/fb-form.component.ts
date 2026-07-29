@@ -12,6 +12,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { commonValidators } from '../../shared/validators';
+
 /**
  * Facebook Messenger / Instagram Direct sub-form for the central
  * template editor (Step 13).
@@ -38,7 +40,7 @@ import { LucideAngularModule } from 'lucide-angular';
  * template / list template) are explicitly out of scope — the
  * template-library track ships text-only Messenger surfaces only.
  */
-const BODY_MAX = 1000;
+const BODY_MAX = 2000;
 const QUICK_REPLY_MAX_COUNT = 13;
 const QUICK_REPLY_MAX_LENGTH = 20;
 
@@ -120,7 +122,7 @@ export class FbFormComponent {
     return new FormGroup({
       body_text: new FormControl<string>('', {
         nonNullable: true,
-        validators: [Validators.required, Validators.maxLength(BODY_MAX)],
+        validators: [commonValidators.trimmedRequired, Validators.maxLength(BODY_MAX)],
       }),
       quick_replies: new FormArray<FbQuickReplyGroup>([]),
     });

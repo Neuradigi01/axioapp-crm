@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -20,14 +20,14 @@ import { InventoryApiService, InventoryItem, StockAlert } from '../inventory-api
  * Lists open alerts (high priority + most depleted first), shows the
  * matching item context, and exposes two actions per row:
  *
- *   - "Reorder"    â†’ opens a modal to confirm qty + supplier.
+ *   - "Reorder"    → opens a modal to confirm qty + supplier.
  *                    On confirm: PATCH alert.status='ordered'.
  *                    Supplier/qty entered in the modal are UX-only
- *                    inputs today (no `receipt_planned` ledger row â€”
+ *                    inputs today (no `receipt_planned` ledger row —
  *                    the alert status alone communicates "order in
  *                    flight"). When the real receipt is recorded, the
  *                    standard movement path auto-closes the alert.
- *   - "Mark Closed" â†’ PATCH alert.status='closed' for the operator
+ *   - "Mark Closed" → PATCH alert.status='closed' for the operator
  *                     who already restocked outside the system.
  */
 interface AlertRow {
@@ -51,7 +51,7 @@ export class StockAlertsTabComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
 
-  /** null = closed Â· AlertRow = reorder modal target. */
+  /** null = closed · AlertRow = reorder modal target. */
   protected readonly modalTarget = signal<AlertRow | null>(null);
   protected readonly busyAlertId = signal<string | null>(null);
 
@@ -90,7 +90,7 @@ export class StockAlertsTabComponent {
     return s === 'out'
       ? {
           label: 'Out of Stock',
-          cls: 'bg-rose-50 text-rose-700 ring-rose-200',
+          cls: 'bg-red-500/10 text-red-400 ring-red-500/20',
         }
       : {
           label: 'Low Stock',
@@ -106,7 +106,7 @@ export class StockAlertsTabComponent {
       case 'high':
         return {
           label: 'High',
-          cls: 'bg-rose-100 text-rose-800 ring-rose-300',
+          cls: 'bg-red-500/10 text-red-400 ring-red-500/30',
         };
       case 'med':
         return {
@@ -116,7 +116,7 @@ export class StockAlertsTabComponent {
       case 'low':
         return {
           label: 'Low',
-          cls: 'bg-zinc-100 text-zinc-700 ring-zinc-300',
+          cls: 'bg-surface-2 text-default border-subtle',
         };
     }
   }

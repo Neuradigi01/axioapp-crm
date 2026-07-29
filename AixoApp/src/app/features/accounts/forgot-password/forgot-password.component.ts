@@ -21,7 +21,7 @@ export class ForgotPasswordComponent {
   private readonly snackBar = inject(MatSnackBar);
 
   readonly forgotForm: FormGroup = this.fb.group({
-    identifier: ['', Validators.required],
+    identifier: ['', [Validators.required, Validators.maxLength(254)]],
   });
 
   readonly isLoading = signal(false);

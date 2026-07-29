@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, output, signal } fr
 import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { ThemeChoice, ThemeService } from '@core/services/theme.service';
+
 import { FurnitureAuthService, MeResponse } from '../auth/auth.service';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
 import { NotificationsPopoverComponent } from '../notifications/notifications-popover.component';
@@ -23,8 +25,12 @@ export class HeaderComponent implements OnInit {
   private readonly auth = inject(FurnitureAuthService);
   private readonly notifications = inject(NotificationsApiService);
   private readonly router = inject(Router);
+  private readonly themeService = inject(ThemeService);
 
   readonly toggleSidebar = output<void>();
+  /** Emitted when the header's search-pill is clicked. The shell owns
+   *  the `CommandPaletteComponent` instance and toggles it in response. */
+  readonly openPalette = output<void>();
 
   protected readonly user = signal<MeResponse | null>(null);
   protected readonly userMenuOpen = signal(false);
@@ -33,6 +39,13 @@ export class HeaderComponent implements OnInit {
 
   /** Live unread count for the bell badge. */
   protected readonly unreadCount = this.notifications.unreadCount;
+
+  /** Current theme choice (light/dark/system) — bound to the segmented toggle. */
+  protected readonly themeChoice = this.themeService.choice;
+
+  protected pickTheme(c: ThemeChoice): void {
+    this.themeService.set(c);
+  }
 
   ngOnInit(): void {
     this.auth.me().subscribe({

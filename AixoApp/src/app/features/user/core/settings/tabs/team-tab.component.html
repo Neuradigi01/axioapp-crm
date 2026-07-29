@@ -3,16 +3,16 @@
        `users.read` (same as the staff list itself) — the toggle hides
        for anyone who can only see their own row. -->
   @if (canWrite()) {
-    <nav class="mb-4 flex items-center gap-1 border-b border-zinc-200">
+    <nav class="mb-4 flex items-center gap-1 border-b border-subtle">
       <button
         type="button"
         (click)="subTab.set('users')"
         class="border-b-2 px-3 py-2 text-sm font-medium transition"
-        [class.border-zinc-900]="subTab() === 'users'"
-        [class.text-zinc-900]="subTab() === 'users'"
+        [class.border-accent]="subTab() === 'users'"
+        [class.text-default]="subTab() === 'users'"
         [class.border-transparent]="subTab() !== 'users'"
-        [class.text-zinc-500]="subTab() !== 'users'"
-        [class.hover:text-zinc-700]="subTab() !== 'users'"
+        [class.text-muted]="subTab() !== 'users'"
+        [class.hover:text-default]="subTab() !== 'users'"
       >
         Users
       </button>
@@ -20,11 +20,11 @@
         type="button"
         (click)="subTab.set('workload')"
         class="border-b-2 px-3 py-2 text-sm font-medium transition"
-        [class.border-zinc-900]="subTab() === 'workload'"
-        [class.text-zinc-900]="subTab() === 'workload'"
+        [class.border-accent]="subTab() === 'workload'"
+        [class.text-default]="subTab() === 'workload'"
         [class.border-transparent]="subTab() !== 'workload'"
-        [class.text-zinc-500]="subTab() !== 'workload'"
-        [class.hover:text-zinc-700]="subTab() !== 'workload'"
+        [class.text-muted]="subTab() !== 'workload'"
+        [class.hover:text-default]="subTab() !== 'workload'"
       >
         Workload
       </button>
@@ -37,7 +37,7 @@
 } @else {
   <div>
     <div class="mb-3 flex items-center justify-between">
-      <p class="text-sm text-zinc-500">
+      <p class="text-sm text-muted">
         {{ items().length }} {{ items().length === 1 ? 'member' : 'members' }} in this organisation
       </p>
       <div class="flex items-center gap-2">
@@ -45,7 +45,7 @@
           <button
             type="button"
             (click)="openTransferModal()"
-            class="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100"
+            class="rounded-md border border-amber-300 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-300 hover:bg-amber-500/10"
           >
             Transfer ownership
           </button>
@@ -54,7 +54,7 @@
           <button
             type="button"
             (click)="openInviteModal()"
-            class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+            class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
           >
             Invite member
           </button>
@@ -64,7 +64,7 @@
 
     @if (transferSuccess(); as msg) {
       <div
-        class="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+        class="mb-3 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400"
       >
         {{ msg }}
       </div>
@@ -72,56 +72,58 @@
 
     @if (loadError(); as err) {
       <div
-        class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+        class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
       >
         {{ err }}
       </div>
     }
 
     @if (loading()) {
-      <div class="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
+      <div
+        class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+      >
         Loading…
       </div>
     } @else if (items().length === 0) {
       <div
-        class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
+        class="rounded-lg border border-dashed border-subtle bg-surface p-12 text-center text-sm text-muted"
       >
         No users in this org yet.
       </div>
     } @else {
-      <ul class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <ul class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
         @for (u of items(); track u.id) {
-          <li class="border-b border-zinc-100 last:border-b-0">
+          <li class="border-b border-subtle last:border-b-0">
             @if (editingId() === u.id) {
               <form
                 [formGroup]="editForm"
                 (ngSubmit)="saveEdit(u)"
-                class="space-y-3 bg-zinc-50 px-4 py-4"
+                class="space-y-3 bg-surface-2 px-4 py-4"
               >
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
                   <label class="block text-sm">
-                    <span class="mb-1 block text-xs font-medium text-zinc-600">Full name</span>
+                    <span class="mb-1 block text-xs font-medium text-muted">Full name</span>
                     <input
                       type="text"
                       formControlName="full_name"
                       autocomplete="off"
-                      class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+                      class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
                     />
                   </label>
                   <label class="block text-sm">
-                    <span class="mb-1 block text-xs font-medium text-zinc-600">Phone</span>
+                    <span class="mb-1 block text-xs font-medium text-muted">Phone</span>
                     <input
                       type="text"
                       formControlName="phone"
                       autocomplete="off"
-                      class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+                      class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
                     />
                   </label>
                   <label class="block text-sm">
-                    <span class="mb-1 block text-xs font-medium text-zinc-600">Role</span>
+                    <span class="mb-1 block text-xs font-medium text-muted">Role</span>
                     <select
                       formControlName="role_id"
-                      class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+                      class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
                     >
                       @for (r of roles(); track r.id) {
                         <option [value]="r.id">{{ r.name }}</option>
@@ -129,14 +131,14 @@
                     </select>
                   </label>
                 </div>
-                <label class="block text-xs text-zinc-500">
-                  Email <span class="text-zinc-700">{{ u.email }}</span> is immutable — invite a new
+                <label class="block text-xs text-muted">
+                  Email <span class="text-default">{{ u.email }}</span> is immutable — invite a new
                   user to change it.
                 </label>
                 @if (rowError(); as e) {
                   @if (e.id === u.id) {
                     <div
-                      class="rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700"
+                      class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-400"
                     >
                       {{ e.message }}
                     </div>
@@ -146,14 +148,14 @@
                   <button
                     type="button"
                     (click)="cancelEdit()"
-                    class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                    class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     [disabled]="editForm.invalid || savingId() === u.id"
-                    class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {{ savingId() === u.id ? 'Saving…' : 'Save' }}
                   </button>
@@ -163,24 +165,24 @@
               <div class="flex items-center justify-between gap-3 px-4 py-3">
                 <div class="flex min-w-0 items-center gap-3">
                   <span
-                    class="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700"
+                    class="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-default"
                   >
                     {{ initials(u.full_name) }}
                   </span>
                   <div class="min-w-0">
-                    <p class="truncate text-sm font-medium text-zinc-900">{{ u.full_name }}</p>
-                    <p class="truncate text-xs text-zinc-500">{{ u.email }}</p>
+                    <p class="truncate text-sm font-medium text-default">{{ u.full_name }}</p>
+                    <p class="truncate text-xs text-muted">{{ u.email }}</p>
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
                   <span
-                    class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200"
+                    class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-default ring-1 border-subtle"
                   >
                     {{ roleNameOf(u) }}
                   </span>
                   @if (!u.is_active) {
                     <span
-                      class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700 ring-1 ring-rose-200"
+                      class="inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-400 ring-1 border-red-500/20"
                     >
                       Inactive
                     </span>
@@ -190,7 +192,7 @@
                       type="button"
                       (click)="startEdit(u)"
                       [disabled]="savingId() === u.id"
-                      class="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Edit
                     </button>
@@ -199,14 +201,14 @@
                       (click)="toggleStatus(u)"
                       [disabled]="savingId() === u.id"
                       class="rounded-md border px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
-                      [class.border-rose-300]="u.is_active"
-                      [class.bg-white]="u.is_active"
-                      [class.text-rose-700]="u.is_active"
-                      [class.hover:bg-rose-50]="u.is_active"
+                      [class.border-red-500/30]="u.is_active"
+                      [class.bg-surface]="u.is_active"
+                      [class.text-red-400]="u.is_active"
+                      [class.hover:bg-red-500/10]="u.is_active"
                       [class.border-emerald-300]="!u.is_active"
-                      [class.bg-emerald-50]="!u.is_active"
-                      [class.text-emerald-700]="!u.is_active"
-                      [class.hover:bg-emerald-100]="!u.is_active"
+                      [class.bg-emerald-500/10]="!u.is_active"
+                      [class.text-emerald-400]="!u.is_active"
+                      [class.hover:bg-emerald-500/10]="!u.is_active"
                     >
                       {{ savingId() === u.id ? '…' : u.is_active ? 'Deactivate' : 'Activate' }}
                     </button>
@@ -216,7 +218,7 @@
               @if (rowError(); as e) {
                 @if (e.id === u.id) {
                   <div
-                    class="border-t border-rose-200 bg-rose-50 px-4 py-1.5 text-xs text-rose-700"
+                    class="border-t border-red-500/20 bg-red-500/10 px-4 py-1.5 text-xs text-red-400"
                   >
                     {{ e.message }}
                   </div>
@@ -231,26 +233,26 @@
     <!-- Pending invitations (step 2.5.6) ------------------------------------- -->
     @if (canWrite() && (invitations().length > 0 || invitationsError())) {
       <section class="mt-6">
-        <h3 class="mb-2 text-sm font-medium text-zinc-900">
+        <h3 class="mb-2 text-sm font-medium text-default">
           Pending invitations
-          <span class="ml-1 text-xs font-normal text-zinc-500">({{ invitations().length }})</span>
+          <span class="ml-1 text-xs font-normal text-muted">({{ invitations().length }})</span>
         </h3>
         @if (invitationsError(); as err) {
           <div
-            class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+            class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
           >
             {{ err }}
           </div>
         }
         @if (invitations().length > 0) {
-          <ul class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+          <ul class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
             @for (inv of invitations(); track inv.id) {
               <li
-                class="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3 last:border-b-0"
+                class="flex items-center justify-between gap-3 border-b border-subtle px-4 py-3 last:border-b-0"
               >
                 <div class="min-w-0">
-                  <p class="truncate text-sm font-medium text-zinc-900">{{ inv.email }}</p>
-                  <p class="text-xs text-zinc-500">
+                  <p class="truncate text-sm font-medium text-default">{{ inv.email }}</p>
+                  <p class="text-xs text-muted">
                     Invited as <span class="font-medium">{{ roleNameOfId(inv.role_id) }}</span> ·
                     expires {{ inv.expires_at | date: 'medium' }}
                   </p>
@@ -259,7 +261,7 @@
                   type="button"
                   (click)="revokeInvite(inv)"
                   [disabled]="revokingInviteId() === inv.id"
-                  class="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="rounded-md border border-red-500/30 bg-surface px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {{ revokingInviteId() === inv.id ? 'Revoking…' : 'Revoke' }}
                 </button>
@@ -272,36 +274,42 @@
 
     <!-- Invite modal -------------------------------------------------------- -->
     @if (inviteModalOpen()) {
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
-        <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
-          <h3 class="mb-3 text-base font-semibold text-zinc-900">Invite a member</h3>
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        style="animation: fadeIn 0.12s ease"
+      >
+        <div
+          class="w-full max-w-md rounded-2xl border border-subtle bg-surface-2 p-5 shadow-elevated"
+          style="animation: popIn 0.12s ease"
+        >
+          <h3 class="mb-3 font-display text-base font-semibold text-default">Invite a member</h3>
           @if (lastInviteLink()) {
             <div class="space-y-3">
               <div
-                class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700"
+                class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400"
               >
                 Invitation sent. The recipient will receive an email with the accept link. (Dev:
                 copy it below.)
               </div>
-              <label class="block text-xs font-medium text-zinc-600">Accept link</label>
+              <label class="block text-xs font-medium text-muted">Accept link</label>
               <textarea
                 readonly
                 rows="3"
-                class="w-full break-all rounded-md border border-zinc-300 bg-zinc-50 p-2 font-mono text-[11px] text-zinc-700"
+                class="w-full break-all rounded-md border border-subtle bg-surface-2 p-2 font-mono text-[11px] text-default"
                 >{{ lastInviteLink() }}</textarea
               >
               <div class="flex justify-end gap-2">
                 <button
                   type="button"
                   (click)="copyInviteLink(lastInviteLink()!)"
-                  class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                  class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
                 >
                   Copy link
                 </button>
                 <button
                   type="button"
                   (click)="closeInviteModal()"
-                  class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+                  class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
                 >
                   Done
                 </button>
@@ -310,30 +318,43 @@
           } @else {
             <form [formGroup]="inviteForm" (ngSubmit)="sendInvite()" class="space-y-3">
               <label class="block text-sm">
-                <span class="mb-1 block text-xs font-medium text-zinc-600">Email</span>
+                <span class="mb-1 block text-xs font-medium text-muted">Email</span>
                 <input
                   type="email"
                   formControlName="email"
                   autocomplete="email"
-                  class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+                  placeholder="colleague@company.com"
+                  class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default placeholder:text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 />
+                @if (inviteForm.controls.email.touched && inviteForm.controls.email.invalid) {
+                  <p class="mt-1 text-xs text-red-500">
+                    @if (inviteForm.controls.email.errors?.['required']) {
+                      Email is required.
+                    } @else {
+                      Enter a valid email.
+                    }
+                  </p>
+                }
               </label>
               <label class="block text-sm">
-                <span class="mb-1 block text-xs font-medium text-zinc-600">Role</span>
+                <span class="mb-1 block text-xs font-medium text-muted">Role</span>
                 <select
                   formControlName="role_id"
-                  class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+                  class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 >
                   <option value="" disabled>Choose a role…</option>
                   @for (r of roles(); track r.id) {
                     <option [value]="r.id">{{ r.name }}</option>
                   }
                 </select>
+                @if (inviteForm.controls.role_id.touched && inviteForm.controls.role_id.invalid) {
+                  <p class="mt-1 text-xs text-red-500">Pick a role for this member.</p>
+                }
               </label>
 
               @if (inviteError(); as e) {
                 <div
-                  class="rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700"
+                  class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-400"
                 >
                   {{ e }}
                 </div>
@@ -343,14 +364,14 @@
                 <button
                   type="button"
                   (click)="closeInviteModal()"
-                  class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                  class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   [disabled]="inviteForm.invalid || inviteSending()"
-                  class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {{ inviteSending() ? 'Sending…' : 'Send invitation' }}
                 </button>
@@ -368,28 +389,30 @@
         role="presentation"
       ></div>
       <div
-        class="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-white shadow-2xl"
+        class="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-surface shadow-2xl"
         role="dialog"
         aria-label="Transfer ownership"
       >
-        <div class="border-b border-zinc-200 px-5 py-3">
-          <h3 class="text-sm font-semibold text-zinc-900">
+        <div class="border-b border-subtle px-5 py-3">
+          <h3 class="text-sm font-semibold text-default">
             Transfer ownership of {{ currentOrgName() }}
           </h3>
         </div>
 
         <form [formGroup]="transferForm" (ngSubmit)="submitTransfer()" class="space-y-4 px-5 py-4">
-          <div class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          <div
+            class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+          >
             <strong class="font-semibold">Warning:</strong> after transfer, you immediately lose
             Owner permissions and the recipient gains them.
             <span class="block mt-1">This cannot be undone without their cooperation.</span>
           </div>
 
           <label class="block text-sm">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">New Owner</span>
+            <span class="mb-1 block text-xs font-medium text-muted">New Owner</span>
             <select
               formControlName="target_user_id"
-              class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+              class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
             >
               <option value="">— Select an active member —</option>
               @for (m of transferTargets(); track m.id) {
@@ -397,44 +420,44 @@
               }
             </select>
             @if (transferTargets().length === 0) {
-              <span class="mt-1 block text-[11px] text-zinc-500">
+              <span class="mt-1 block text-[11px] text-muted">
                 No other active members in this org. Invite someone first.
               </span>
             }
           </label>
 
           <label class="block text-sm">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">Your new role</span>
+            <span class="mb-1 block text-xs font-medium text-muted">Your new role</span>
             <select
               formControlName="demote_to_role_id"
-              class="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+              class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
             >
               <option value="">Admin (default)</option>
               @for (r of demoteRoleOptions(); track r.id) {
                 <option [value]="r.id">{{ r.name }}</option>
               }
             </select>
-            <span class="mt-1 block text-[11px] text-zinc-500">
+            <span class="mt-1 block text-[11px] text-muted">
               Leave on default to take the Admin role after transfer.
             </span>
           </label>
 
           <label class="block text-sm">
-            <span class="mb-1 block text-xs font-medium text-zinc-600">
-              Type <span class="font-mono text-zinc-900">{{ currentOrgName() }}</span> to confirm
+            <span class="mb-1 block text-xs font-medium text-muted">
+              Type <span class="font-mono text-default">{{ currentOrgName() }}</span> to confirm
             </span>
             <input
               type="text"
               [value]="transferOrgConfirm()"
               (input)="onTransferOrgConfirmInput($any($event.target).value)"
               autocomplete="off"
-              class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+              class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
             />
           </label>
 
           @if (transferError(); as err) {
             <div
-              class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+              class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
             >
               {{ err }}
             </div>
@@ -444,14 +467,14 @@
             <button
               type="button"
               (click)="closeTransferModal()"
-              class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
             >
               Cancel
             </button>
             <button
               type="submit"
               [disabled]="!canSubmitTransfer()"
-              class="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-md bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {{ transferSubmitting() ? 'Transferring…' : 'Transfer ownership' }}
             </button>

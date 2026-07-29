@@ -37,9 +37,9 @@ import { WhatsAppNumbersService } from './whatsapp-numbers.service';
   template: `
     @if (numbersService.isMulti()) {
       <label class="flex items-center gap-2 text-xs">
-        <span class="font-medium text-zinc-600">{{ label() }}</span>
+        <span class="font-medium text-muted">{{ label() }}</span>
         <select
-          class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs"
+          class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs"
           [value]="effectiveValue()"
           (change)="onChange($any($event.target).value)"
         >

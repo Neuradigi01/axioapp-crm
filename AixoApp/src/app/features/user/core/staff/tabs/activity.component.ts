@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -47,7 +47,7 @@ const TYPE_META: Record<string, TypeMeta> = {
   status_change: {
     icon: 'check-square',
     label: 'Status change',
-    ring: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+    ring: 'bg-surface-2 text-default border-subtle',
   },
   task: {
     icon: 'check',
@@ -59,7 +59,7 @@ const TYPE_META: Record<string, TypeMeta> = {
 const FALLBACK_META: TypeMeta = {
   icon: 'sticky-note',
   label: 'Activity',
-  ring: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+  ring: 'bg-surface-2 text-default border-subtle',
 };
 
 interface DayGroup {
@@ -69,7 +69,7 @@ interface DayGroup {
 }
 
 /**
- * Activity Log tab â€” per-staff stream pulled from
+ * Activity Log tab — per-staff stream pulled from
  * `/api/v1/staff/{user_id}/activity`. Items group by local calendar
  * day, newest first; "Today" / "Yesterday" relabel matches the
  * timeline in Step 2.6 so admins read the same shape across views.
@@ -136,7 +136,7 @@ export class StaffActivityTabComponent {
   }
 
   protected entityLabel(a: StaffActivity): string {
-    return `${a.entity_type} Â· ${a.entity_id.slice(0, 8)}`;
+    return `${a.entity_type} · ${a.entity_id.slice(0, 8)}`;
   }
 
   private dayLabel(d: Date): string {

@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -11,6 +11,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
+import { commonValidators } from '../shared/validators';
 import { Activity, ActivitiesApiService } from './activities-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -23,7 +24,7 @@ import { extractApiError } from '@core/services/api-error.util';
  * on success.
  *
  * Reusable: same component will back the note composer for Leads and
- * Walk-ins later â€” no entity-type knowledge lives here.
+ * Walk-ins later — no entity-type knowledge lives here.
  */
 @Component({
   selector: 'app-add-note',
@@ -43,7 +44,11 @@ export class AddNoteComponent {
 
   readonly text = new FormControl('', {
     nonNullable: true,
-    validators: [Validators.required, Validators.maxLength(4000)],
+    validators: [
+      commonValidators.trimmedRequired,
+      Validators.minLength(2),
+      Validators.maxLength(4000),
+    ],
   });
 
   protected readonly submitting = signal(false);

@@ -1,41 +1,43 @@
-<div class="mx-auto max-w-2xl p-6 space-y-5">
+<div class="mx-auto max-w-2xl p-4 md:p-6 space-y-5">
   <header class="space-y-1">
-    <nav class="flex items-center gap-1 text-xs text-zinc-500">
-      <a routerLink="/user/leads" class="hover:text-zinc-700">Leads</a>
+    <nav class="flex items-center gap-1 text-xs text-muted">
+      <a routerLink="/user/leads" class="hover:text-default">Leads</a>
       <lucide-icon name="chevron-right" class="h-3 w-3" />
-      <a routerLink="/user/leads/import" class="hover:text-zinc-700">Import</a>
+      <a routerLink="/user/leads/import" class="hover:text-default">Import</a>
       <lucide-icon name="chevron-right" class="h-3 w-3" />
-      <span class="text-zinc-700">Result</span>
+      <span class="text-default">Result</span>
     </nav>
-    <h1 class="text-lg font-semibold text-zinc-900">Import result</h1>
+    <h1 class="text-lg font-semibold text-default">Import result</h1>
   </header>
 
   @if (loadError(); as err) {
-    <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    <p class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
       {{ err }}
     </p>
   } @else if (importRow(); as row) {
     <!-- Header card with status + filename -->
-    <div class="rounded-md border border-zinc-200 bg-white p-4">
+    <div class="rounded-md border border-subtle bg-surface p-4">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <p class="truncate text-sm font-medium text-zinc-900">{{ row.name }}</p>
-          <p class="truncate text-xs text-zinc-500">{{ row.original_filename }}</p>
+          <p class="truncate text-sm font-medium text-default">{{ row.name }}</p>
+          <p class="truncate text-xs text-muted">{{ row.original_filename }}</p>
         </div>
         <span
           class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1"
-          [class.bg-blue-100]="row.status === 'processing' || row.status === 'mapping_committed'"
-          [class.text-blue-700]="row.status === 'processing' || row.status === 'mapping_committed'"
-          [class.ring-blue-200]="row.status === 'processing' || row.status === 'mapping_committed'"
-          [class.bg-emerald-100]="row.status === 'completed'"
-          [class.text-emerald-700]="row.status === 'completed'"
-          [class.ring-emerald-200]="row.status === 'completed'"
-          [class.bg-red-100]="row.status === 'failed'"
-          [class.text-red-700]="row.status === 'failed'"
-          [class.ring-red-200]="row.status === 'failed'"
-          [class.bg-zinc-100]="row.status === 'cancelled'"
-          [class.text-zinc-700]="row.status === 'cancelled'"
-          [class.ring-zinc-200]="row.status === 'cancelled'"
+          [class.bg-blue-500/10]="row.status === 'processing' || row.status === 'mapping_committed'"
+          [class.text-blue-400]="row.status === 'processing' || row.status === 'mapping_committed'"
+          [class.border-blue-500/20]="
+            row.status === 'processing' || row.status === 'mapping_committed'
+          "
+          [class.bg-emerald-500/10]="row.status === 'completed'"
+          [class.text-emerald-400]="row.status === 'completed'"
+          [class.border-emerald-500/20]="row.status === 'completed'"
+          [class.bg-red-500/10]="row.status === 'failed'"
+          [class.text-red-400]="row.status === 'failed'"
+          [class.border-red-500/20]="row.status === 'failed'"
+          [class.bg-surface-2]="row.status === 'cancelled'"
+          [class.text-default]="row.status === 'cancelled'"
+          [class.border-subtle]="row.status === 'cancelled'"
         >
           @if (!isTerminal()) {
             <lucide-icon name="loader-2" class="h-3 w-3 animate-spin" />
@@ -47,27 +49,27 @@
 
     <!-- Counts card (only when finished) -->
     @if (isTerminal() && counts(); as c) {
-      <div class="grid grid-cols-3 gap-3">
-        <div class="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-center">
-          <p class="text-2xl font-semibold text-emerald-700">{{ c.imported ?? 0 }}</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        <div class="rounded-md border border-emerald-500/20 bg-emerald-500/10 p-4 text-center">
+          <p class="text-2xl font-semibold text-emerald-400">{{ c.imported ?? 0 }}</p>
           <p class="mt-0.5 text-xs uppercase tracking-wide text-emerald-600">Imported</p>
         </div>
-        <div class="rounded-md border border-indigo-200 bg-indigo-50 p-4 text-center">
-          <p class="text-2xl font-semibold text-indigo-700">{{ c.duplicates_skipped ?? 0 }}</p>
+        <div class="rounded-md border border-indigo-200 bg-indigo-500/10 p-4 text-center">
+          <p class="text-2xl font-semibold text-indigo-400">{{ c.duplicates_skipped ?? 0 }}</p>
           <p class="mt-0.5 text-xs uppercase tracking-wide text-indigo-600">Duplicates skipped</p>
         </div>
-        <div class="rounded-md border border-red-200 bg-red-50 p-4 text-center">
-          <p class="text-2xl font-semibold text-red-700">{{ c.errors ?? 0 }}</p>
+        <div class="rounded-md border border-red-500/20 bg-red-500/10 p-4 text-center">
+          <p class="text-2xl font-semibold text-red-400">{{ c.errors ?? 0 }}</p>
           <p class="mt-0.5 text-xs uppercase tracking-wide text-red-600">Errors</p>
         </div>
       </div>
 
       @if (skippedReasonList().length > 0) {
-        <div class="rounded-md border border-indigo-200 bg-indigo-50 px-4 py-3">
-          <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+        <div class="rounded-md border border-indigo-200 bg-indigo-500/10 px-4 py-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-indigo-400">
             Why rows were skipped
           </p>
-          <ul class="mt-2 space-y-1 text-sm text-indigo-900">
+          <ul class="mt-2 space-y-1 text-sm text-indigo-300">
             @for (r of skippedReasonList(); track r.label) {
               <li class="flex items-start gap-2">
                 <span class="min-w-[2.5rem] shrink-0 font-medium tabular-nums">
@@ -77,7 +79,7 @@
               </li>
             }
           </ul>
-          <p class="mt-2 text-xs text-indigo-700">
+          <p class="mt-2 text-xs text-indigo-400">
             Each skipped row was appended as a "touchpoint" activity on the existing lead — no data
             was lost. Download the report below to see which input rows collapsed onto which
             contact.
@@ -86,11 +88,11 @@
       }
 
       @if (warningReasonList().length > 0) {
-        <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
-          <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">
+        <div class="rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-amber-400">
             Imported with value fallbacks
           </p>
-          <ul class="mt-2 space-y-1 text-sm text-amber-900">
+          <ul class="mt-2 space-y-1 text-sm text-amber-300">
             @for (r of warningReasonList(); track r.label) {
               <li class="flex items-start gap-2">
                 <span class="min-w-[2.5rem] shrink-0 font-medium tabular-nums">
@@ -100,7 +102,7 @@
               </li>
             }
           </ul>
-          <p class="mt-2 text-xs text-amber-700">
+          <p class="mt-2 text-xs text-amber-400">
             Each affected lead was created and stamped with a timeline note recording the original
             CSV value. Download the report below to bulk-triage the substitutions, or open the leads
             individually to reclassify.
@@ -109,9 +111,9 @@
       }
 
       @if (errorReasonList().length > 0) {
-        <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3">
-          <p class="text-xs font-semibold uppercase tracking-wide text-red-700">Top errors</p>
-          <ul class="mt-2 space-y-1 text-sm text-red-900">
+        <div class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-red-400">Top errors</p>
+          <ul class="mt-2 space-y-1 text-sm text-red-300">
             @for (r of errorReasonList(); track r.label) {
               <li class="flex items-start gap-2">
                 <span class="min-w-[2.5rem] shrink-0 font-medium tabular-nums">
@@ -121,7 +123,7 @@
               </li>
             }
           </ul>
-          <p class="mt-2 text-xs text-red-700">
+          <p class="mt-2 text-xs text-red-400">
             Download the report below for the full per-row detail (original columns +
             <code>__row_number</code> + <code>__error</code>) so you can fix and re-upload.
           </p>
@@ -129,25 +131,27 @@
       }
 
       @if (c.fatal_error) {
-        <div class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+        >
           <p class="font-medium">Fatal error</p>
           <p class="mt-0.5">{{ c.fatal_error }}</p>
         </div>
       }
     } @else {
-      <p class="text-sm text-zinc-500">
+      <p class="text-sm text-muted">
         Your import is being processed. This usually takes a few seconds.
       </p>
     }
 
     <!-- Actions -->
-    <div class="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-200 pt-4">
+    <div class="flex flex-wrap items-center justify-end gap-2 border-t border-subtle pt-4">
       @if (hasSkipped()) {
         <button
           type="button"
           (click)="downloadSkipped()"
           [disabled]="downloadingSkipped()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
         >
           <lucide-icon name="download" class="h-4 w-4" />
           {{ downloadingSkipped() ? 'Downloading…' : 'Download duplicates report' }}
@@ -158,7 +162,7 @@
           type="button"
           (click)="downloadWarnings()"
           [disabled]="downloadingWarnings()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
         >
           <lucide-icon name="download" class="h-4 w-4" />
           {{ downloadingWarnings() ? 'Downloading…' : 'Download warnings report' }}
@@ -169,7 +173,7 @@
           type="button"
           (click)="downloadErrors()"
           [disabled]="downloading()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
         >
           <lucide-icon name="download" class="h-4 w-4" />
           {{ downloading() ? 'Downloading…' : 'Download error report' }}
@@ -177,13 +181,13 @@
       }
       <a
         routerLink="/user/leads"
-        class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
       >
         <lucide-icon name="arrow-right" class="h-4 w-4" />
         Back to leads
       </a>
     </div>
   } @else {
-    <p class="text-sm text-zinc-500">Loading import…</p>
+    <p class="text-sm text-muted">Loading import…</p>
   }
 </div>

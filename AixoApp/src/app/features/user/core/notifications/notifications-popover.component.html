@@ -1,20 +1,22 @@
 @if (open()) {
   <div
-    class="absolute right-0 top-full z-20 mt-1 w-96 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg"
+    class="absolute right-0 top-full z-30 mt-2 w-[320px] overflow-hidden rounded-xl border border-subtle bg-surface-2 shadow-elevated"
     role="dialog"
     aria-label="Notifications"
   >
-    <header class="flex items-center justify-between border-b border-zinc-200 px-3 py-2">
-      <h3 class="text-sm font-semibold text-zinc-900">Notifications</h3>
+    <header class="flex items-center justify-between border-b border-subtle px-3 py-2.5">
+      <h3 class="font-display text-sm font-semibold text-default">Notifications</h3>
       <div class="flex items-center gap-2">
-        <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
+        <span
+          class="rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[10px] font-medium text-accent"
+        >
           {{ unreadCount() }} unread
         </span>
         @if (hasUnread()) {
           <button
             type="button"
             (click)="onMarkAllRead()"
-            class="text-xs font-medium text-zinc-700 underline hover:text-zinc-900"
+            class="text-[11px] font-medium text-accent transition hover:opacity-80"
           >
             Mark all read
           </button>
@@ -24,44 +26,44 @@
 
     <div class="max-h-96 overflow-y-auto">
       @if (loadError(); as err) {
-        <p class="px-3 py-4 text-xs text-red-600">{{ err }}</p>
+        <p class="px-3 py-4 text-xs text-red-500">{{ err }}</p>
       } @else if (loading() && items().length === 0) {
-        <div class="space-y-2 px-3 py-3 animate-pulse">
-          <div class="h-3 w-40 rounded bg-zinc-200"></div>
-          <div class="h-10 w-full rounded bg-zinc-100"></div>
-          <div class="h-10 w-full rounded bg-zinc-100"></div>
+        <div class="animate-pulse space-y-2 px-3 py-3">
+          <div class="h-3 w-40 rounded bg-subtle"></div>
+          <div class="h-10 w-full rounded bg-subtle"></div>
+          <div class="h-10 w-full rounded bg-subtle"></div>
         </div>
       } @else if (items().length === 0) {
-        <p class="px-3 py-6 text-center text-xs text-zinc-500">You're all caught up.</p>
+        <p class="px-3 py-4 md:py-6 text-center text-xs text-faint">You're all caught up.</p>
       } @else {
-        <ul class="divide-y divide-zinc-100">
+        <ul class="divide-y divide-subtle">
           @for (n of items(); track n.id) {
             <li>
               <button
                 type="button"
                 (click)="onItemClick(n)"
-                class="block w-full px-3 py-2.5 text-left transition hover:bg-zinc-50"
-                [class.bg-sky-50]="n.read_at === null"
+                class="block w-full px-3 py-3 text-left transition hover:bg-surface"
+                [class.bg-accent-soft]="n.read_at === null"
               >
                 <div class="flex items-start gap-2">
                   @if (n.read_at === null) {
                     <span
-                      class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-sky-500"
+                      class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent"
                       aria-label="unread"
                     ></span>
                   } @else {
                     <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-transparent"></span>
                   }
                   <div class="min-w-0 flex-1">
-                    <p class="truncate text-xs font-medium text-zinc-900">
+                    <p class="truncate text-xs font-medium text-default">
                       {{ n.title }}
                     </p>
                     @if (n.body) {
-                      <p class="mt-0.5 line-clamp-2 text-[11px] text-zinc-600">
+                      <p class="mt-0.5 line-clamp-2 text-[11px] text-muted">
                         {{ n.body }}
                       </p>
                     }
-                    <p class="mt-0.5 text-[10px] text-zinc-500">
+                    <p class="mt-0.5 font-mono text-[10px] text-faint">
                       {{ n.type }} · {{ n.created_at | relativeTime }}
                     </p>
                   </div>

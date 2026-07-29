@@ -1,61 +1,51 @@
 @if (rows().length === 0) {
   <div
-    class="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center text-sm text-zinc-500"
+    class="rounded-lg border border-dashed border-subtle bg-surface p-12 text-center text-sm text-muted"
   >
     No staff to configure yet.
   </div>
 } @else {
-  <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
-    <table class="min-w-full divide-y divide-zinc-200">
-      <thead class="bg-zinc-50">
+  <div class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
+    <table class="min-w-full divide-y divide-subtle">
+      <thead class="bg-surface-2">
         <tr>
-          <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-zinc-500">
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
             Staff
           </th>
-          <th
-            class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-zinc-500"
-          >
+          <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-muted">
             Commission
           </th>
-          <th
-            class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-zinc-500"
-          >
+          <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-muted">
             Monthly target
           </th>
-          <th
-            class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-zinc-500"
-          >
+          <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-muted">
             Rating
           </th>
-          <th
-            class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-zinc-500"
-          >
+          <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-muted">
             Status
           </th>
-          <th
-            class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-zinc-500"
-          >
+          <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-muted">
             Actions
           </th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-zinc-100 bg-white">
+      <tbody class="divide-y divide-subtle bg-surface">
         @for (row of rows(); track row.staff.id) {
           <tr>
             <td class="px-4 py-3 text-sm">
-              <div class="font-medium text-zinc-900">{{ row.staff.full_name }}</div>
-              <div class="text-xs text-zinc-500">{{ row.staff.email }}</div>
+              <div class="font-medium text-default">{{ row.staff.full_name }}</div>
+              <div class="text-xs text-muted">{{ row.staff.email }}</div>
             </td>
-            <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-zinc-700">
+            <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-default">
               {{ row.performance.commission_rate }}%
             </td>
-            <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-zinc-700">
+            <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-default">
               {{ row.performance.monthly_target | formatINR: true }}
             </td>
-            <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-zinc-700">
+            <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-default">
               {{ row.performance.rating }} <span class="text-amber-500">★</span>
             </td>
-            <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-zinc-700">
+            <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-default">
               {{ row.staff.employment_status ?? '—' }}
             </td>
             <td class="whitespace-nowrap px-4 py-3 text-right text-sm">
@@ -63,7 +53,7 @@
                 <button
                   type="button"
                   (click)="startEdit(row)"
-                  class="rounded-md border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                  class="rounded-md border border-subtle bg-surface px-3 py-1 text-xs font-medium text-default hover:bg-surface-2"
                 >
                   Edit
                 </button>
@@ -71,49 +61,47 @@
             </td>
           </tr>
           @if (editingId() === row.staff.id) {
-            <tr class="bg-zinc-50">
+            <tr class="bg-surface-2">
               <td colspan="6" class="px-4 py-4">
                 <form [formGroup]="form" (ngSubmit)="save(row.staff.id)" class="space-y-3">
                   <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
                     <label class="block text-sm">
-                      <span class="block text-xs font-medium text-zinc-600">Commission %</span>
+                      <span class="block text-xs font-medium text-muted">Commission %</span>
                       <input
                         type="number"
                         step="0.01"
                         min="0"
                         max="100"
                         formControlName="commission_rate"
-                        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                        class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     </label>
                     <label class="block text-sm">
-                      <span class="block text-xs font-medium text-zinc-600"
-                        >Monthly target (₹)</span
-                      >
+                      <span class="block text-xs font-medium text-muted">Monthly target (₹)</span>
                       <input
                         type="number"
                         step="1"
                         min="0"
                         formControlName="monthly_target"
-                        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                        class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     </label>
                     <label class="block text-sm">
-                      <span class="block text-xs font-medium text-zinc-600">Rating (0–5)</span>
+                      <span class="block text-xs font-medium text-muted">Rating (0–5)</span>
                       <input
                         type="number"
                         step="0.1"
                         min="0"
                         max="5"
                         formControlName="rating"
-                        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                        class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     </label>
                     <label class="block text-sm">
-                      <span class="block text-xs font-medium text-zinc-600">Status</span>
+                      <span class="block text-xs font-medium text-muted">Status</span>
                       <select
                         formControlName="employment_status"
-                        class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                        class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                       >
                         <option value="active">Active</option>
                         <option value="leave">On Leave</option>
@@ -123,7 +111,7 @@
                   </div>
                   @if (submitError(); as err) {
                     <div
-                      class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+                      class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
                     >
                       {{ err }}
                     </div>
@@ -132,14 +120,14 @@
                     <button
                       type="button"
                       (click)="cancelEdit()"
-                      class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                      class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       [disabled]="submitting()"
-                      class="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+                      class="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-95 disabled:opacity-50"
                     >
                       {{ submitting() ? 'Saving…' : 'Save' }}
                     </button>

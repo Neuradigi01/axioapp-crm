@@ -7,7 +7,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { StaffPerformance, StaffPortalApiService } from '../staff-portal-api.service';
 
 /**
- * My Sales â€” leads/conversion + sales-MTD snapshot for the signed-in
+ * My Sales — leads/conversion + sales-MTD snapshot for the signed-in
  * staff. `sales` is the same Phase-5-placeholder zero today; the page
  * is shaped so the moment invoices ship the numbers will appear here
  * without UI changes.

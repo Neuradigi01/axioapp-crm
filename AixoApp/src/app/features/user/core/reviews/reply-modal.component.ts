@@ -1,4 +1,4 @@
-﻿import {
+import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -12,6 +12,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
+import { commonValidators } from '../shared/validators';
 import { Review, ReviewsApiService } from './reviews-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -38,7 +39,11 @@ export class ReviewReplyModalComponent {
 
   protected readonly textControl = new FormControl('', {
     nonNullable: true,
-    validators: [Validators.required, Validators.minLength(1)],
+    validators: [
+      commonValidators.trimmedRequired,
+      Validators.minLength(2),
+      Validators.maxLength(4000),
+    ],
   });
 
   protected readonly submitting = signal(false);
@@ -52,7 +57,7 @@ export class ReviewReplyModalComponent {
     this.submitting.set(true);
     this.submitError.set(null);
     this.api
-      .reply(this.review.id, this.textControl.value)
+      .reply(this.review.id, this.textControl.value.trim())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
@@ -71,6 +76,6 @@ export class ReviewReplyModalComponent {
   }
 
   protected stars(n: number): string {
-    return 'â˜…â˜…â˜…â˜…â˜…'.slice(0, n) + 'â˜†â˜†â˜†â˜†â˜†'.slice(0, 5 - n);
+    return '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
   }
 }

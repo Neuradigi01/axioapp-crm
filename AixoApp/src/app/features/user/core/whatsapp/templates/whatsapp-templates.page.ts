@@ -43,7 +43,7 @@ type WizardMode = 'create' | 'edit' | null;
 const STATUS_BADGE: Record<WhatsAppTemplateSubmissionStatus, { label: string; classes: string }> = {
   draft: {
     label: 'Draft',
-    classes: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+    classes: 'bg-surface-2 text-default border-subtle',
   },
   pending_review: {
     label: 'Pending',
@@ -55,7 +55,7 @@ const STATUS_BADGE: Record<WhatsAppTemplateSubmissionStatus, { label: string; cl
   },
   rejected: {
     label: 'Rejected',
-    classes: 'bg-rose-50 text-rose-700 ring-rose-200',
+    classes: 'bg-red-500/10 text-red-400 ring-red-500/20',
   },
   paused: {
     label: 'Paused',
@@ -63,7 +63,7 @@ const STATUS_BADGE: Record<WhatsAppTemplateSubmissionStatus, { label: string; cl
   },
   disabled: {
     label: 'Disabled',
-    classes: 'bg-zinc-100 text-zinc-500 ring-zinc-300',
+    classes: 'bg-surface-2 text-muted border-subtle',
   },
 };
 

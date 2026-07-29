@@ -1,15 +1,15 @@
-<div class="px-6 py-6" [appUrlFilterState]="urlState">
+<div class="px-4 py-4 md:px-6 md:py-6" [appUrlFilterState]="urlState">
   <!-- Header -->
   <header class="mb-4 flex flex-wrap items-end justify-between gap-3">
     <div>
-      <h1 class="text-2xl font-semibold text-zinc-900">Tasks</h1>
-      <p class="mt-1 flex items-center gap-3 text-xs text-zinc-500">
+      <h1 class="text-2xl font-semibold text-default">Tasks</h1>
+      <p class="mt-1 flex items-center gap-3 text-xs text-muted">
         <span class="inline-flex items-center gap-1.5">
-          <span class="h-2 w-2 rounded-full bg-zinc-400"></span>
+          <span class="h-2 w-2 rounded-full bg-surface-2"></span>
           {{ headlineCounts().open }} open
         </span>
         <span class="inline-flex items-center gap-1.5">
-          <span class="h-2 w-2 rounded-full bg-rose-500"></span>
+          <span class="h-2 w-2 rounded-full bg-red-500"></span>
           {{ headlineCounts().overdue }} overdue
         </span>
         <span class="inline-flex items-center gap-1.5">
@@ -21,7 +21,7 @@
     <button
       type="button"
       (click)="openCreate()"
-      class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+      class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
     >
       + Create task
     </button>
@@ -34,10 +34,10 @@
         <button
           type="button"
           (click)="selectChip(c.key)"
-          [class.bg-zinc-900]="activeChip() === c.key"
+          [class.bg-accent]="activeChip() === c.key"
           [class.text-white]="activeChip() === c.key"
-          [class.border-zinc-900]="activeChip() === c.key"
-          class="rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          [class.border-accent]="activeChip() === c.key"
+          class="rounded-full border border-subtle bg-surface px-3 py-1 text-xs font-medium text-default hover:bg-surface-2"
         >
           {{ c.label }}
         </button>
@@ -50,7 +50,7 @@
       @if (showAssigneeDropdown()) {
         <select
           [formControl]="assigneeControl"
-          class="rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-xs text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           aria-label="Filter by assignee"
         >
           <option value="">All owners</option>
@@ -67,42 +67,42 @@
         <button
           type="button"
           (click)="toggleViewsMenu()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
           title="Saved views"
           aria-haspopup="menu"
           [attr.aria-expanded]="viewsMenuOpen()"
         >
           <lucide-icon [name]="currentViewName() ? 'bookmark-check' : 'bookmark'" class="h-4 w-4" />
           {{ currentViewName() ?? 'Default view' }}
-          <lucide-icon name="chevron-down" class="h-3 w-3 text-zinc-400" />
+          <lucide-icon name="chevron-down" class="h-3 w-3 text-faint" />
         </button>
         @if (viewsMenuOpen()) {
           <div class="fixed inset-0 z-30" (click)="toggleViewsMenu()" role="presentation"></div>
           <div
-            class="absolute right-0 z-40 mt-1 w-64 rounded-md border border-zinc-200 bg-white shadow-lg"
+            class="absolute right-0 z-40 mt-1 w-64 rounded-md border border-subtle bg-surface shadow-lg"
           >
             <div class="max-h-64 overflow-auto py-1">
               @for (v of savedViews(); track v.id) {
                 <button
                   type="button"
                   (click)="applyView(v); toggleViewsMenu()"
-                  class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-zinc-700 hover:bg-zinc-50"
+                  class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-default hover:bg-surface-2"
                   [class.font-medium]="v.id === currentViewId()"
                 >
                   <span class="truncate">{{ v.name }}</span>
                   @if (v.shared) {
-                    <span class="ml-2 text-[10px] text-zinc-400">shared</span>
+                    <span class="ml-2 text-[10px] text-faint">shared</span>
                   }
                 </button>
               } @empty {
-                <p class="px-3 py-2 text-xs text-zinc-500">No saved views yet.</p>
+                <p class="px-3 py-2 text-xs text-muted">No saved views yet.</p>
               }
             </div>
-            <div class="border-t border-zinc-100 px-3 py-2">
+            <div class="border-t border-subtle px-3 py-2">
               <button
                 type="button"
                 (click)="openSaveView(); toggleViewsMenu()"
-                class="text-xs font-medium text-zinc-900 hover:underline"
+                class="text-xs font-medium text-default hover:underline"
               >
                 Save current filters as view…
               </button>
@@ -110,7 +110,7 @@
                 <button
                   type="button"
                   (click)="deleteCurrentView(); toggleViewsMenu()"
-                  class="ml-3 text-xs font-medium text-rose-600 hover:underline"
+                  class="ml-3 text-xs font-medium text-red-500 hover:underline"
                 >
                   Delete this view
                 </button>
@@ -123,13 +123,15 @@
         [formControl]="searchCtrl"
         type="text"
         placeholder="Search tasks…"
-        class="w-full max-w-xs rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none sm:w-64"
+        class="w-full max-w-xs rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none sm:w-64"
       />
     </div>
   </div>
 
   @if (state.loadError(); as err) {
-    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div
+      class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+    >
       {{ err }}
     </div>
   }
@@ -138,61 +140,61 @@
   @if (state.loading() && state.items().length === 0) {
     <div class="space-y-2">
       @for (i of [1, 2, 3, 4]; track i) {
-        <div class="h-12 animate-pulse rounded-lg border border-zinc-200 bg-zinc-50"></div>
+        <div class="h-12 animate-pulse rounded-lg border border-subtle bg-surface-2"></div>
       }
     </div>
   } @else if (state.items().length === 0) {
-    <div class="rounded-xl border border-dashed border-zinc-300 bg-white p-12 text-center">
-      <p class="text-sm text-zinc-500">No tasks match this filter.</p>
+    <div class="rounded-xl border border-dashed border-subtle bg-surface p-12 text-center">
+      <p class="text-sm text-muted">No tasks match this filter.</p>
       <button
         type="button"
         (click)="openCreate()"
-        class="mt-3 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+        class="mt-3 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
       >
         Create your first task
       </button>
     </div>
   } @else {
-    <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+    <div class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm">
       <table class="w-full text-sm">
-        <thead class="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
+        <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
           <tr>
             <th class="w-10 px-3 py-2"></th>
             <th class="w-10 px-3 py-2"></th>
             <th
-              class="cursor-pointer px-3 py-2 text-left font-medium hover:text-zinc-900"
+              class="cursor-pointer px-3 py-2 text-left font-medium hover:text-default"
               (click)="setSort('title')"
             >
               Title
               @if (sortBy() === 'title') {
-                <span class="ml-1 text-zinc-400">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
+                <span class="ml-1 text-faint">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
               }
             </th>
             <th
-              class="cursor-pointer px-3 py-2 text-left font-medium hover:text-zinc-900"
+              class="cursor-pointer px-3 py-2 text-left font-medium hover:text-default"
               (click)="setSort('priority')"
             >
               Priority
               @if (sortBy() === 'priority') {
-                <span class="ml-1 text-zinc-400">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
+                <span class="ml-1 text-faint">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
               }
             </th>
             <th
-              class="cursor-pointer px-3 py-2 text-left font-medium hover:text-zinc-900"
+              class="cursor-pointer px-3 py-2 text-left font-medium hover:text-default"
               (click)="setSort('due_at')"
             >
               Due
               @if (sortBy() === 'due_at') {
-                <span class="ml-1 text-zinc-400">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
+                <span class="ml-1 text-faint">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
               }
             </th>
             <th
-              class="cursor-pointer px-3 py-2 text-right font-medium hover:text-zinc-900"
+              class="cursor-pointer px-3 py-2 text-right font-medium hover:text-default"
               (click)="setSort('last_activity_at')"
             >
               Last activity
               @if (sortBy() === 'last_activity_at') {
-                <span class="ml-1 text-zinc-400">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
+                <span class="ml-1 text-faint">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
               }
             </th>
             <th class="px-3 py-2 text-left font-medium">Assignee</th>
@@ -203,15 +205,15 @@
             </th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-zinc-100">
+        <tbody class="divide-y divide-subtle">
           @for (t of state.items(); track t.id) {
-            <tr class="group hover:bg-zinc-50" [class.bg-zinc-50]="isSelected(t.id)">
+            <tr class="group hover:bg-surface-2" [class.bg-surface-2]="isSelected(t.id)">
               <!-- Selection checkbox (Step 2). Separate from the
                    quick-complete checkbox below. -->
               <td class="px-3 py-2 align-middle" (click)="$event.stopPropagation()">
                 <input
                   type="checkbox"
-                  class="h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                  class="h-4 w-4 cursor-pointer rounded border-subtle text-default focus:ring-accent"
                   [checked]="isSelected(t.id)"
                   (click)="toggleRow(t.id, $event)"
                   [attr.aria-label]="'Select task ' + t.title"
@@ -224,7 +226,7 @@
                   [checked]="t.status === 'done'"
                   [disabled]="togglingId() !== null"
                   (change)="toggleComplete(t, $any($event.target).checked)"
-                  class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 disabled:cursor-not-allowed"
+                  class="h-4 w-4 rounded border-subtle text-default focus:ring-accent disabled:cursor-not-allowed"
                   aria-label="Mark task complete"
                 />
               </td>
@@ -233,9 +235,9 @@
                   <button
                     type="button"
                     (click)="openEdit(t)"
-                    class="text-left text-sm font-medium text-zinc-900 hover:underline"
+                    class="text-left text-sm font-medium text-default hover:underline"
                     [class.line-through]="t.status === 'done' || t.status === 'missed'"
-                    [class.text-zinc-400]="t.status === 'done' || t.status === 'missed'"
+                    [class.text-faint]="t.status === 'done' || t.status === 'missed'"
                   >
                     {{ t.title }}
                   </button>
@@ -243,7 +245,7 @@
                        via `t.followup_type` (nullable). -->
                   @if (t.followup_type) {
                     <span
-                      class="inline-flex items-center rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 ring-1 ring-sky-200"
+                      class="inline-flex items-center rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 ring-1 ring-sky-200"
                       [title]="'Follow-up type: ' + t.followup_type"
                     >
                       {{ t.followup_type }}
@@ -252,7 +254,7 @@
                   <!-- T1 — Missed badge, only visible once terminal. -->
                   @if (t.status === 'missed') {
                     <span
-                      class="inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 ring-1 ring-rose-200"
+                      class="inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-400 ring-1 border-red-500/20"
                       title="Task was marked missed"
                     >
                       missed
@@ -260,7 +262,7 @@
                   }
                 </div>
                 @if (t.description) {
-                  <p class="mt-0.5 truncate text-[11px] text-zinc-500">{{ t.description }}</p>
+                  <p class="mt-0.5 truncate text-[11px] text-muted">{{ t.description }}</p>
                 }
               </td>
               <td class="px-3 py-2">
@@ -272,17 +274,17 @@
                 </span>
               </td>
               <td class="px-3 py-2 text-xs">
-                <span [class.text-rose-600]="isOverdue(t)" [class.font-medium]="isOverdue(t)">
+                <span [class.text-red-500]="isOverdue(t)" [class.font-medium]="isOverdue(t)">
                   {{ formatDue(t.due_at) }}
                 </span>
               </td>
-              <td class="whitespace-nowrap px-3 py-2 text-right text-xs text-zinc-600 tabular-nums">
+              <td class="whitespace-nowrap px-3 py-2 text-right text-xs text-muted tabular-nums">
                 {{ t.last_activity_at | relativeTime }}
               </td>
-              <td class="px-3 py-2 text-xs text-zinc-600">
+              <td class="px-3 py-2 text-xs text-muted">
                 {{ assigneeName(t) }}
               </td>
-              <td class="px-3 py-2 text-xs text-zinc-500">
+              <td class="px-3 py-2 text-xs text-muted">
                 {{ t.related_entity_type || '—' }}
               </td>
               <!-- T1/T2/T9 — row actions. Missed only visible for
@@ -297,7 +299,7 @@
                       type="button"
                       (click)="snoozeToTomorrow(t)"
                       [disabled]="togglingId() !== null"
-                      class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed"
+                      class="rounded-md p-1 text-faint hover:bg-surface-2 hover:text-default disabled:cursor-not-allowed"
                       title="Snooze to tomorrow 9am"
                       aria-label="Snooze to tomorrow"
                     >
@@ -308,7 +310,7 @@
                       type="button"
                       (click)="snoozeTask(t, 60 * 24 * 7)"
                       [disabled]="togglingId() !== null"
-                      class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed"
+                      class="rounded-md p-1 text-faint hover:bg-surface-2 hover:text-default disabled:cursor-not-allowed"
                       title="Snooze +1 week"
                       aria-label="Snooze +1 week"
                     >
@@ -319,7 +321,7 @@
                       type="button"
                       (click)="onMarkMissed(t)"
                       [disabled]="togglingId() !== null"
-                      class="rounded-md p-1 text-zinc-400 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed"
+                      class="rounded-md p-1 text-faint hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed"
                       title="Mark as missed"
                       aria-label="Mark task missed"
                     >
@@ -330,7 +332,7 @@
                   <button
                     type="button"
                     (click)="openDeleteRow(t)"
-                    class="rounded-md p-1 text-zinc-400 hover:bg-red-50 hover:text-red-700"
+                    class="rounded-md p-1 text-faint hover:bg-red-500/10 hover:text-red-400"
                     title="Delete task"
                     aria-label="Delete task"
                   >
@@ -342,7 +344,7 @@
           }
         </tbody>
       </table>
-      <div class="border-t border-zinc-100 bg-zinc-50 px-3 py-2 text-[11px] text-zinc-500">
+      <div class="border-t border-subtle bg-surface-2 px-3 py-2 text-[11px] text-muted">
         Showing {{ state.items().length }} of {{ state.total() }}
         @if (state.loading()) {
           <span class="ml-2">refreshing…</span>
@@ -433,43 +435,43 @@
 @if (saveViewOpen()) {
   <div class="fixed inset-0 z-40 bg-black/40" (click)="closeSaveView()" role="presentation"></div>
   <div
-    class="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-white shadow-2xl"
+    class="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-surface shadow-2xl"
     role="dialog"
     aria-label="Save view"
   >
-    <div class="border-b border-zinc-200 px-5 py-3">
-      <h3 class="text-sm font-semibold text-zinc-900">Save current filters as a view</h3>
-      <p class="mt-1 text-xs text-zinc-500">
+    <div class="border-b border-subtle px-5 py-3">
+      <h3 class="text-sm font-semibold text-default">Save current filters as a view</h3>
+      <p class="mt-1 text-xs text-muted">
         Captures the active chip, status, due filter, priority, and sort. Restore by picking the
         view from the bookmark menu.
       </p>
     </div>
     <div class="space-y-3 px-5 py-4">
       <label class="block text-sm">
-        <span class="mb-1 block text-xs font-medium text-zinc-600">Name</span>
+        <span class="mb-1 block text-xs font-medium text-muted">Name</span>
         <input
           type="text"
           [formControl]="saveViewName"
           placeholder="e.g. My overdue high-priority"
           maxlength="80"
-          class="w-full rounded-md border border-zinc-300 px-2.5 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"
+          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
         />
       </label>
-      <label class="flex items-center gap-2 text-xs text-zinc-700">
+      <label class="flex items-center gap-2 text-xs text-default">
         <input
           type="checkbox"
-          class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+          class="h-4 w-4 rounded border-subtle text-default focus:ring-accent"
           [checked]="saveViewShared()"
           (change)="saveViewShared.set($any($event.target).checked)"
         />
         Share with the team
       </label>
     </div>
-    <div class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-5 py-3">
+    <div class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-5 py-3">
       <button
         type="button"
         (click)="closeSaveView()"
-        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
       >
         Cancel
       </button>
@@ -477,7 +479,7 @@
         type="button"
         (click)="submitSaveView()"
         [disabled]="!saveViewName.value.trim()"
-        class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
       >
         Save view
       </button>

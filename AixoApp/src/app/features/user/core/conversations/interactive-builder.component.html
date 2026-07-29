@@ -7,19 +7,19 @@
     data-testid="interactive-builder-modal"
   >
     <div
-      class="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-xl"
+      class="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-xl"
     >
-      <header class="flex items-start justify-between border-b border-zinc-200 px-5 py-3">
+      <header class="flex items-start justify-between border-b border-subtle px-5 py-3">
         <div>
-          <h2 class="text-base font-semibold text-zinc-900">Interactive message</h2>
-          <p class="text-xs text-zinc-500">
+          <h2 class="text-base font-semibold text-default">Interactive message</h2>
+          <p class="text-xs text-muted">
             Build buttons or a list. Recipient taps land back in this conversation.
           </p>
         </div>
         <button
           type="button"
           (click)="onCancel()"
-          class="rounded p-1 text-zinc-500 hover:bg-zinc-100"
+          class="rounded p-1 text-muted hover:bg-surface-2"
           aria-label="Close"
         >
           <lucide-icon name="x" size="16" aria-hidden="true"></lucide-icon>
@@ -35,8 +35,8 @@
               [class]="
                 'flex-1 rounded-md border px-3 py-2 text-xs font-medium ' +
                 (kind() === 'reply_buttons'
-                  ? 'border-zinc-900 bg-zinc-900 text-white'
-                  : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+                  ? 'border-accent bg-accent text-white'
+                  : 'border-subtle bg-surface text-default hover:bg-surface-2')
               "
             >
               Reply buttons
@@ -47,8 +47,8 @@
               [class]="
                 'flex-1 rounded-md border px-3 py-2 text-xs font-medium ' +
                 (kind() === 'cta_url'
-                  ? 'border-zinc-900 bg-zinc-900 text-white'
-                  : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+                  ? 'border-accent bg-accent text-white'
+                  : 'border-subtle bg-surface text-default hover:bg-surface-2')
               "
             >
               CTA URL
@@ -59,8 +59,8 @@
               [class]="
                 'flex-1 rounded-md border px-3 py-2 text-xs font-medium ' +
                 (kind() === 'list'
-                  ? 'border-zinc-900 bg-zinc-900 text-white'
-                  : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+                  ? 'border-accent bg-accent text-white'
+                  : 'border-subtle bg-surface text-default hover:bg-surface-2')
               "
             >
               List
@@ -68,20 +68,20 @@
           </div>
 
           <label class="block">
-            <span class="text-xs font-medium text-zinc-700">Header (optional)</span>
+            <span class="text-xs font-medium text-default">Header (optional)</span>
             <input
               type="text"
               [ngModel]="headerText()"
               (ngModelChange)="onHeaderChange($event)"
               [maxlength]="LIMITS.headerMax"
               placeholder="Short title…"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </label>
 
           <label class="block">
-            <span class="text-xs font-medium text-zinc-700">
-              Body <span class="text-rose-600">*</span>
+            <span class="text-xs font-medium text-default">
+              Body <span class="text-red-500">*</span>
             </span>
             <textarea
               [ngModel]="body()"
@@ -89,33 +89,33 @@
               [maxlength]="LIMITS.bodyMax"
               rows="3"
               placeholder="The main message text…"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             ></textarea>
           </label>
 
           <label class="block">
-            <span class="text-xs font-medium text-zinc-700">Footer (optional)</span>
+            <span class="text-xs font-medium text-default">Footer (optional)</span>
             <input
               type="text"
               [ngModel]="footerText()"
               (ngModelChange)="onFooterChange($event)"
               [maxlength]="LIMITS.footerMax"
               placeholder="Small note at the bottom…"
-              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </label>
 
           @if (kind() === 'reply_buttons') {
-            <div class="space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+            <div class="space-y-2 rounded-md border border-subtle bg-surface-2 p-3">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-medium text-zinc-700">
+                <span class="text-xs font-medium text-default">
                   Buttons ({{ buttons().length }}/{{ LIMITS.buttonsMax }})
                 </span>
                 <button
                   type="button"
                   (click)="addButton()"
                   [disabled]="buttons().length >= LIMITS.buttonsMax"
-                  class="text-xs font-medium text-zinc-700 underline disabled:opacity-50"
+                  class="text-xs font-medium text-default underline disabled:opacity-50"
                 >
                   + Add button
                 </button>
@@ -123,31 +123,31 @@
               @for (b of buttons(); track $index) {
                 <div class="flex items-end gap-2">
                   <label class="flex-1">
-                    <span class="text-[10px] uppercase tracking-wide text-zinc-500">Title</span>
+                    <span class="text-[10px] uppercase tracking-wide text-muted">Title</span>
                     <input
                       type="text"
                       [ngModel]="b.title"
                       (ngModelChange)="updateButton($index, 'title', $event)"
                       [maxlength]="LIMITS.buttonTitleMax"
                       placeholder="Yes"
-                      class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                      class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                     />
                   </label>
                   <label class="flex-1">
-                    <span class="text-[10px] uppercase tracking-wide text-zinc-500">Id</span>
+                    <span class="text-[10px] uppercase tracking-wide text-muted">Id</span>
                     <input
                       type="text"
                       [ngModel]="b.id"
                       (ngModelChange)="updateButton($index, 'id', $event)"
                       [maxlength]="LIMITS.buttonIdMax"
-                      class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 font-mono text-xs focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                      class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 font-mono text-xs focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                     />
                   </label>
                   <button
                     type="button"
                     (click)="removeButton($index)"
                     [disabled]="buttons().length <= 1"
-                    class="rounded p-1.5 text-zinc-500 hover:bg-zinc-200 disabled:opacity-30"
+                    class="rounded p-1.5 text-muted hover:bg-surface-2 disabled:opacity-30"
                     aria-label="Remove button"
                   >
                     <lucide-icon name="x" size="14" aria-hidden="true"></lucide-icon>
@@ -156,46 +156,46 @@
               }
             </div>
           } @else if (kind() === 'cta_url') {
-            <div class="space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+            <div class="space-y-2 rounded-md border border-subtle bg-surface-2 p-3">
               <label class="block">
-                <span class="text-xs font-medium text-zinc-700">Button label</span>
+                <span class="text-xs font-medium text-default">Button label</span>
                 <input
                   type="text"
                   [ngModel]="ctaButtonText()"
                   (ngModelChange)="onCtaButtonTextChange($event)"
                   [maxlength]="LIMITS.buttonTitleMax"
                   placeholder="Open"
-                  class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                 />
               </label>
               <label class="block">
-                <span class="text-xs font-medium text-zinc-700">URL</span>
+                <span class="text-xs font-medium text-default">URL</span>
                 <input
                   type="url"
                   [ngModel]="ctaUrl()"
                   (ngModelChange)="onCtaUrlChange($event)"
                   [maxlength]="LIMITS.ctaUrlMax"
                   placeholder="https://example.com/path"
-                  class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-xs focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 font-mono text-xs focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                 />
-                <span class="mt-1 block text-[10px] text-zinc-500"
+                <span class="mt-1 block text-[10px] text-muted"
                   >Must start with http:// or https://</span
                 >
               </label>
             </div>
           } @else {
-            <div class="space-y-3 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+            <div class="space-y-3 rounded-md border border-subtle bg-surface-2 p-3">
               <label class="block">
-                <span class="text-xs font-medium text-zinc-700">List button label</span>
+                <span class="text-xs font-medium text-default">List button label</span>
                 <input
                   type="text"
                   [ngModel]="listButtonText()"
                   (ngModelChange)="onListButtonChange($event)"
                   [maxlength]="LIMITS.listButtonMax"
-                  class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                 />
               </label>
-              <div class="flex items-center justify-between text-xs text-zinc-700">
+              <div class="flex items-center justify-between text-xs text-default">
                 <span>
                   Sections: {{ sections().length }} · Rows total: {{ totalListRows() }}/{{
                     LIMITS.listRowsMax
@@ -211,10 +211,10 @@
                 </button>
               </div>
               @for (s of sections(); track $index; let sIdx = $index) {
-                <div class="space-y-2 rounded border border-zinc-200 bg-white p-2">
+                <div class="space-y-2 rounded border border-subtle bg-surface p-2">
                   <div class="flex items-end gap-2">
                     <label class="flex-1">
-                      <span class="text-[10px] uppercase tracking-wide text-zinc-500"
+                      <span class="text-[10px] uppercase tracking-wide text-muted"
                         >Section title</span
                       >
                       <input
@@ -222,24 +222,24 @@
                         [ngModel]="s.title"
                         (ngModelChange)="updateSectionTitle(sIdx, $event)"
                         [maxlength]="LIMITS.listSectionTitleMax"
-                        class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                        class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     </label>
                     <button
                       type="button"
                       (click)="removeSection(sIdx)"
                       [disabled]="sections().length <= 1"
-                      class="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30"
+                      class="rounded p-1.5 text-muted hover:bg-surface-2 disabled:opacity-30"
                       aria-label="Remove section"
                     >
                       <lucide-icon name="x" size="14" aria-hidden="true"></lucide-icon>
                     </button>
                   </div>
                   @for (r of s.rows; track $index; let rIdx = $index) {
-                    <div class="rounded border border-zinc-200 bg-zinc-50 p-2">
+                    <div class="rounded border border-subtle bg-surface-2 p-2">
                       <div class="flex items-end gap-2">
                         <label class="flex-1">
-                          <span class="text-[10px] uppercase tracking-wide text-zinc-500"
+                          <span class="text-[10px] uppercase tracking-wide text-muted"
                             >Row title</span
                           >
                           <input
@@ -247,33 +247,31 @@
                             [ngModel]="r.title"
                             (ngModelChange)="updateRow(sIdx, rIdx, 'title', $event)"
                             [maxlength]="LIMITS.listRowTitleMax"
-                            class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                            class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                           />
                         </label>
                         <label class="flex-1">
-                          <span class="text-[10px] uppercase tracking-wide text-zinc-500"
-                            >Row id</span
-                          >
+                          <span class="text-[10px] uppercase tracking-wide text-muted">Row id</span>
                           <input
                             type="text"
                             [ngModel]="r.id"
                             (ngModelChange)="updateRow(sIdx, rIdx, 'id', $event)"
                             [maxlength]="LIMITS.listRowIdMax"
-                            class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 font-mono text-xs focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                            class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 font-mono text-xs focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                           />
                         </label>
                         <button
                           type="button"
                           (click)="removeRow(sIdx, rIdx)"
                           [disabled]="s.rows.length <= 1"
-                          class="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30"
+                          class="rounded p-1.5 text-muted hover:bg-surface-2 disabled:opacity-30"
                           aria-label="Remove row"
                         >
                           <lucide-icon name="x" size="14" aria-hidden="true"></lucide-icon>
                         </button>
                       </div>
                       <label class="mt-1 block">
-                        <span class="text-[10px] uppercase tracking-wide text-zinc-500"
+                        <span class="text-[10px] uppercase tracking-wide text-muted"
                           >Description (optional)</span
                         >
                         <input
@@ -281,7 +279,7 @@
                           [ngModel]="r.description"
                           (ngModelChange)="updateRow(sIdx, rIdx, 'description', $event)"
                           [maxlength]="LIMITS.listRowDescriptionMax"
-                          class="mt-0.5 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                          class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                         />
                       </label>
                     </div>
@@ -290,7 +288,7 @@
                     type="button"
                     (click)="addRow(sIdx)"
                     [disabled]="totalListRows() >= LIMITS.listRowsMax"
-                    class="text-xs font-medium text-zinc-700 underline disabled:opacity-50"
+                    class="text-xs font-medium text-default underline disabled:opacity-50"
                   >
                     + Add row
                   </button>
@@ -301,21 +299,19 @@
         </section>
 
         <section class="w-full shrink-0 lg:w-72">
-          <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-            <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-              Preview
-            </p>
-            <div class="rounded-md bg-white p-3 text-sm shadow-sm">
+          <div class="rounded-lg border border-subtle bg-surface-2 p-3">
+            <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted">Preview</p>
+            <div class="rounded-md bg-surface p-3 text-sm shadow-sm">
               @if (headerText().trim()) {
-                <p class="mb-1 text-xs font-semibold text-zinc-700">
+                <p class="mb-1 text-xs font-semibold text-default">
                   {{ headerText() }}
                 </p>
               }
-              <p class="whitespace-pre-line text-zinc-800">
+              <p class="whitespace-pre-line text-default">
                 {{ body() || 'Body preview…' }}
               </p>
               @if (footerText().trim()) {
-                <p class="mt-1 text-[10px] text-zinc-500">
+                <p class="mt-1 text-[10px] text-muted">
                   {{ footerText() }}
                 </p>
               }
@@ -323,7 +319,7 @@
                 <div class="mt-2 space-y-1">
                   @for (b of buttons(); track $index) {
                     <div
-                      class="rounded border border-zinc-200 px-2 py-1 text-center text-xs font-medium text-zinc-700"
+                      class="rounded border border-subtle px-2 py-1 text-center text-xs font-medium text-default"
                     >
                       {{ b.title.trim() || '(button)' }}
                     </div>
@@ -331,13 +327,13 @@
                 </div>
               } @else if (kind() === 'cta_url') {
                 <div
-                  class="mt-2 rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-center text-xs font-medium text-emerald-700"
+                  class="mt-2 rounded border border-emerald-300 bg-emerald-500/10 px-2 py-1 text-center text-xs font-medium text-emerald-400"
                 >
                   {{ ctaButtonText().trim() || '(button)' }}
                 </div>
               } @else {
                 <div
-                  class="mt-2 rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-center text-xs font-medium text-zinc-700"
+                  class="mt-2 rounded border border-subtle bg-surface-2 px-2 py-1 text-center text-xs font-medium text-default"
                 >
                   {{ listButtonText().trim() || 'Choose' }}
                 </div>
@@ -349,7 +345,7 @@
 
       @if (validationError(); as err) {
         <div
-          class="flex items-start gap-2 border-t border-rose-200 bg-rose-50 px-5 py-2 text-xs text-rose-800"
+          class="flex items-start gap-2 border-t border-red-500/20 bg-red-500/10 px-5 py-2 text-xs text-red-400"
         >
           <lucide-icon
             name="alert-triangle"
@@ -362,12 +358,12 @@
       }
 
       <footer
-        class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-white px-5 py-3"
+        class="flex items-center justify-end gap-2 border-t border-subtle bg-surface px-5 py-3"
       >
         <button
           type="button"
           (click)="onCancel()"
-          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         >
           Cancel
         </button>
@@ -375,7 +371,7 @@
           type="button"
           (click)="onSubmit()"
           [disabled]="!canSubmit()"
-          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
         >
           Send
         </button>

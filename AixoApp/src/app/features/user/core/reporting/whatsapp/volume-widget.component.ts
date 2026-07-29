@@ -43,45 +43,45 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, NgApexchartsModule],
   template: `
-    <div class="rounded-md border border-zinc-200 bg-white p-4">
+    <div class="rounded-md border border-subtle bg-surface p-4">
       <div class="mb-3 flex items-center justify-between">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Message volume</p>
-          <p class="text-[11px] text-zinc-500">
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">Message volume</p>
+          <p class="text-[11px] text-muted">
             Customer + staff + AI traffic in the selected window.
           </p>
         </div>
         @if (loading()) {
-          <span class="text-[11px] text-zinc-500">Loading…</span>
+          <span class="text-[11px] text-muted">Loading…</span>
         }
       </div>
 
       @if (error(); as err) {
-        <p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        <p class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
           {{ err }}
         </p>
       } @else if (report(); as r) {
         <div class="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-          <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p class="text-[10px] uppercase text-zinc-500">Received</p>
-            <p class="text-lg font-semibold text-zinc-900">{{ r.total_received }}</p>
+          <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
+            <p class="text-[10px] uppercase text-muted">Received</p>
+            <p class="text-lg font-semibold text-default">{{ r.total_received }}</p>
           </div>
-          <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p class="text-[10px] uppercase text-zinc-500">Sent (human)</p>
-            <p class="text-lg font-semibold text-zinc-900">{{ r.total_sent }}</p>
+          <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
+            <p class="text-[10px] uppercase text-muted">Sent (human)</p>
+            <p class="text-lg font-semibold text-default">{{ r.total_sent }}</p>
           </div>
-          <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p class="text-[10px] uppercase text-zinc-500">Sent (AI)</p>
+          <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
+            <p class="text-[10px] uppercase text-muted">Sent (AI)</p>
             <p class="text-lg font-semibold text-violet-700">{{ r.total_ai_sent }}</p>
           </div>
-          <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <p class="text-[10px] uppercase text-zinc-500">Failed</p>
-            <p class="text-lg font-semibold text-rose-700">{{ r.total_failed }}</p>
+          <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
+            <p class="text-[10px] uppercase text-muted">Failed</p>
+            <p class="text-lg font-semibold text-red-400">{{ r.total_failed }}</p>
           </div>
         </div>
 
         @if (r.buckets.length === 0) {
-          <p class="py-8 text-center text-xs text-zinc-500">No messages in this window.</p>
+          <p class="py-8 text-center text-xs text-muted">No messages in this window.</p>
         } @else {
           <apx-chart
             [series]="series()"

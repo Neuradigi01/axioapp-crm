@@ -1,22 +1,22 @@
 @if (open()) {
   <div
-    class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-sm flex items-center justify-center p-6"
+    class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-6"
     (click)="busy() ? null : cancel.emit()"
   >
     <form
-      class="bg-white rounded-xl border border-zinc-200 shadow-xl w-full max-w-md"
+      class="bg-surface rounded-xl border border-subtle shadow-xl w-full max-w-md"
       (click)="$event.stopPropagation()"
       (submit)="onSubmit($event)"
     >
-      <header class="px-5 py-3 border-b border-zinc-200 flex items-center gap-2">
-        <h2 class="text-sm font-semibold text-zinc-800 flex-1">Describe this change (optional)</h2>
+      <header class="px-5 py-3 border-b border-subtle flex items-center gap-2">
+        <h2 class="text-sm font-semibold text-default flex-1">Describe this change (optional)</h2>
         <button
           type="button"
-          class="text-zinc-400 hover:text-zinc-700"
+          class="text-faint hover:text-default"
           [disabled]="busy()"
           (click)="cancel.emit()"
         >
-          <lucide-icon name="X" class="w-4 h-4"></lucide-icon>
+          <lucide-icon name="x" class="w-4 h-4"></lucide-icon>
         </button>
       </header>
 
@@ -30,20 +30,20 @@
           autofocus
           name="changeNote"
           maxlength="240"
-          class="w-full text-sm px-3 py-2 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500"
+          class="w-full text-sm px-3 py-2 rounded border border-subtle focus:outline-none focus:border-muted"
         />
-        <p class="text-[11px] text-zinc-500">
+        <p class="text-[11px] text-muted">
           This note lands on the version row so future-you can find this change in the
           version-history drawer. Leave blank to use "<code>{{ fallbackPlaceholder() }}</code
           >".
         </p>
       </div>
 
-      <footer class="px-5 py-3 border-t border-zinc-200 flex items-center gap-2">
+      <footer class="px-5 py-3 border-t border-subtle flex items-center gap-2">
         <div class="flex-1"></div>
         <button
           type="button"
-          class="px-3 py-1.5 text-xs rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+          class="px-3 py-1.5 text-xs rounded border border-subtle text-default hover:bg-surface-2"
           [disabled]="busy()"
           (click)="cancel.emit()"
         >
@@ -51,7 +51,7 @@
         </button>
         <button
           type="submit"
-          class="px-3 py-1.5 text-xs rounded bg-zinc-900 text-white hover:bg-zinc-800"
+          class="px-3 py-1.5 text-xs rounded bg-accent text-white hover:brightness-95"
           [disabled]="busy()"
         >
           @if (busy()) {

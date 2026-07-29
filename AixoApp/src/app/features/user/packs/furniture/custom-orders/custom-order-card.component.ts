@@ -1,11 +1,11 @@
-﻿import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { CustomOrder } from './custom-orders-api.service';
 import { fmtInr } from '@core/services/currency.util';
 
 /**
- * Single kanban card for a Custom Order. Dumb component â€” gets the
+ * Single kanban card for a Custom Order. Dumb component — gets the
  * row + an optional resolved contact-name pre-loaded by the parent.
  *
  * Layout matches the Vercel reference: title + status badge on top,
@@ -43,7 +43,7 @@ export class CustomOrderCardComponent {
       if (v === null || v === undefined || v === '') continue;
       parts.push(`${k}: ${String(v)}`);
     }
-    return parts.join(' Â· ');
+    return parts.join(' · ');
   });
 
   protected readonly deliveryLabel = computed(() => {
@@ -82,7 +82,7 @@ export class CustomOrderCardComponent {
       case 'cancelled':
         return 'bg-red-100 text-red-700 ring-red-200';
       default:
-        return 'bg-zinc-100 text-zinc-700 ring-zinc-200';
+        return 'bg-surface-2 text-default border-subtle';
     }
   });
 

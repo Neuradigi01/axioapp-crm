@@ -66,7 +66,7 @@ const PREFIX_DESCRIPTORS: Array<{
     descriptor: {
       label: 'Invoice',
       icon: 'receipt',
-      classes: 'bg-rose-50 text-rose-700 ring-rose-200',
+      classes: 'bg-red-500/10 text-red-400 ring-red-500/20',
     },
   },
   {
@@ -74,7 +74,7 @@ const PREFIX_DESCRIPTORS: Array<{
     descriptor: {
       label: 'Time',
       icon: 'clock',
-      classes: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+      classes: 'bg-surface-2 text-default border-subtle',
     },
   },
 ];
@@ -99,7 +99,7 @@ export class EventTypeChipComponent {
     return {
       label: et,
       icon: 'zap',
-      classes: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+      classes: 'bg-surface-2 text-default border-subtle',
       event_type: et,
     };
   });
