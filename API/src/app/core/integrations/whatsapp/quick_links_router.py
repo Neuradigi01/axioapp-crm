@@ -21,9 +21,7 @@ backend, see the risks section of the step spec)."""
 from __future__ import annotations
 
 import logging
-import time
 import uuid
-from collections import deque
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -32,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.shared.rate_limit_shared import rate_hit
 from src.app.core.integrations.whatsapp.qr_generator import (
     render_png,
     render_svg,
@@ -305,27 +304,19 @@ def _public_redirect_url(request: Request | None, code: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-# In-process sliding-window rate limit. Per-IP, 60 requests per
-# 60 seconds. Sufficient for the per-org scale Step 26 targets;
-# future Redis-backed lift lands in `shared/cache.py` when one
-# exists.
-_RATE_LIMIT_WINDOW_S = 60.0
+# Sliding-window rate limit backed by ``rate_limit_shared`` — Redis
+# when available, in-process fallback otherwise. Per-IP, 60 requests
+# per 60 seconds. Was previously in-process only; under a multi-
+# worker fronted-by-CDN deployment the effective limit was
+# workers × 60 rpm per IP, defeating the guard.
+_RATE_LIMIT_WINDOW_S = 60
 _RATE_LIMIT_HITS = 60
-_rate_buckets: dict[str, deque[float]] = {}
 
 
-def _rate_limit_ok(ip: str | None) -> bool:
+async def _rate_limit_ok(ip: str | None) -> bool:
     if not ip:
         return True
-    now = time.time()
-    bucket = _rate_buckets.setdefault(ip, deque())
-    cutoff = now - _RATE_LIMIT_WINDOW_S
-    while bucket and bucket[0] < cutoff:
-        bucket.popleft()
-    if len(bucket) >= _RATE_LIMIT_HITS:
-        return False
-    bucket.append(now)
-    return True
+    return await rate_hit(f"qlwa:{ip}", _RATE_LIMIT_HITS, _RATE_LIMIT_WINDOW_S)
 
 
 def _client_ip(request: Request) -> str | None:
@@ -376,7 +367,7 @@ async def public_redirect_endpoint(
     a plain text body — no leaking which tenant they would have
     belonged to."""
     ip = _client_ip(request)
-    if not _rate_limit_ok(ip):
+    if not await _rate_limit_ok(ip):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="rate limited — please retry shortly",

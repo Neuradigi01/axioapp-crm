@@ -881,63 +881,254 @@ class WhatsAppAdapter:
         return mode == "subscribe" and token == self._verify_token
 
 
+class WhatsAppWebAdapter:
+    """``ChannelAdapter`` implementation for the unofficial WhatsApp Web
+    (Baileys) provider.
+
+    Same public surface as :class:`WhatsAppAdapter` — the conversation
+    send path doesn't need to know which provider it's talking to.
+    All wire-level work is delegated to
+    :class:`~src.app.core.integrations.whatsapp_web.sidecar_client.SidecarClient`
+    which owns the HMAC-signed HTTP hop to the Node sidecar; this class
+    is just the shape adapter (attachment routing, envelope→sidecar arg
+    translation) plus the tenant-scoped session-id lookup.
+
+    Was a Phase-1 shape gap (K.14) — the sidecar and its send endpoint
+    have existed since the connect flow landed, but no adapter class
+    hooked them into the conversation send path. Every outbound send
+    silently routed to the Cloud API instead.
+
+    Feature parity notes vs Cloud API:
+
+    - **Text + media + reply-to**: supported via the sidecar's dedicated
+      ``send-text`` / ``send-media`` endpoints. The location, interactive
+      and reaction envelopes have no Baileys equivalent today; sending
+      those over this adapter raises :class:`WhatsAppSendError` with a
+      clear message so the composer can suppress the affordance for
+      unofficial-provider conversations.
+    - **Blocking / rate limits**: same ``BlockedNumberOutbound``
+      contract; sidecar 429 responses bubble as
+      :class:`WhatsAppRateLimited` for the campaign send-guard.
+    """
+
+    def __init__(
+        self,
+        *,
+        sidecar_session_id: str,
+        sidecar_client: Any | None = None,
+    ) -> None:
+        # Lazy import so the module-import path doesn't pull the sidecar
+        # client (and its aiohttp deps) into unrelated code paths.
+        if sidecar_client is None:
+            from src.app.core.integrations.whatsapp_web.sidecar_client import (
+                SidecarClient,
+            )
+
+            sidecar_client = SidecarClient()
+        self._sidecar_session_id = sidecar_session_id
+        self._sidecar = sidecar_client
+
+    async def send(
+        self,
+        *,
+        org_id: uuid.UUID,
+        external_id: str,
+        text: str,
+        attachments: list[dict[str, Any]],
+        interactive: dict[str, Any] | None = None,
+        reply_to_channel_message_id: str | None = None,
+    ) -> ChannelMessageRef:
+        """Route the outbound to the sidecar. See class docstring for the
+        media / interactive / location caveats."""
+        if interactive is not None:
+            raise WhatsAppSendError(
+                "Interactive messages (buttons / lists) are only supported "
+                "on the Cloud API provider. This conversation is served by "
+                "the WhatsApp Web provider — send plain text or media."
+            )
+
+        location = _first_location_attachment(attachments)
+        if location is not None:
+            raise WhatsAppSendError(
+                "Location messages are only supported on the Cloud API "
+                "provider. This conversation is served by the WhatsApp "
+                "Web provider — send plain text or media."
+            )
+
+        to = _normalize_phone(external_id).lstrip("+")
+        reply_to = (
+            {"message_id": reply_to_channel_message_id}
+            if reply_to_channel_message_id
+            else None
+        )
+
+        # Import here rather than at module scope so a sidecar-less
+        # deployment (Cloud-only) doesn't need the exception module.
+        from src.app.core.integrations.whatsapp_web.exceptions import (
+            SessionNotConnected,
+            SidecarRateLimited,
+            SidecarUnavailable,
+        )
+
+        media = _first_media_attachment(attachments)
+        try:
+            if media is not None:
+                # Media flow — the sidecar expects a base64 blob + mime.
+                # We accept two attachment shapes for compatibility with
+                # the existing media-upload path (which currently stages
+                # media through the Cloud API upload endpoint): either a
+                # ready-to-send base64 payload, or a media handle we
+                # can't re-materialise here. Latter path errors clearly.
+                b64 = media.get("base64") or media.get("base64_payload")
+                if not b64:
+                    raise WhatsAppSendError(
+                        "Media send on the WhatsApp Web provider requires "
+                        "the frontend to supply the base64 payload directly "
+                        "(the Cloud API media-id staging path is Meta-only)."
+                    )
+                result = await self._sidecar.send_media(
+                    sidecar_session_id=self._sidecar_session_id,
+                    to=to,
+                    media_type=str(media.get("type") or "document"),
+                    base64_payload=b64,
+                    mime_type=str(media.get("mime_type") or "application/octet-stream"),
+                    filename=media.get("filename"),
+                    caption=text or media.get("caption"),
+                )
+            else:
+                if not text:
+                    raise WhatsAppSendError(
+                        "Empty message — provide text or an attachment."
+                    )
+                result = await self._sidecar.send_text(
+                    sidecar_session_id=self._sidecar_session_id,
+                    to=to,
+                    body=text,
+                    reply_to=reply_to,
+                )
+        except SidecarRateLimited as exc:
+            raise WhatsAppRateLimited(
+                str(exc),
+                retry_after_seconds=exc.retry_after_seconds,
+            ) from exc
+        except SessionNotConnected as exc:
+            raise WhatsAppNotConnected(
+                "WhatsApp Web session is not currently connected — "
+                "reconnect it in Settings → Integrations."
+            ) from exc
+        except SidecarUnavailable as exc:
+            raise WhatsAppSendError(
+                f"WhatsApp Web sidecar unavailable: {exc}"
+            ) from exc
+
+        provider_message_id = str(
+            result.get("provider_message_id") or result.get("id") or ""
+        )
+        return ChannelMessageRef(
+            channel_message_id=provider_message_id,
+            sent_at=datetime.now(UTC),
+        )
+
+
 async def resolve_whatsapp_adapter(
     session: AsyncSession,
     *,
     phone_id: str | None = None,
-) -> WhatsAppAdapter:
-    """Build a fully-configured `WhatsAppAdapter` for the active tenant.
+) -> WhatsAppAdapter | WhatsAppWebAdapter:
+    """Build a fully-configured WhatsApp adapter for the active tenant.
 
-    ``phone_id`` (whatsapp-platform-upgrade Step 27a) — when set,
-    picks the specific WhatsApp config matching that Meta
-    phone-number-id. The campaign dispatcher passes
-    ``campaign.send_from_phone_id`` here; the manual reply composer
-    passes ``conversation.received_via_phone_id``. When ``None``,
-    we fall back to the org's *default* phone (the oldest config
-    row) — preserves the original single-number behaviour for every
-    legacy org and call site.
+    Dispatch:
 
-    Relies on the ORM tenant filter from `TenantScoped` for org
+    - If the org has an active WhatsApp Cloud integration (Meta official),
+      returns a :class:`WhatsAppAdapter`. Multi-number orgs pick the
+      specific config via ``phone_id`` (whatsapp-platform-upgrade
+      Step 27a); ``None`` falls back to the default (oldest) config.
+    - **Else if** the org has a connected WhatsApp Web (Baileys) session
+      (K.14 unofficial provider), returns a :class:`WhatsAppWebAdapter`.
+      This is the "unofficial fallback" tier — used by orgs that don't
+      have Meta approval yet.
+    - Otherwise raises :class:`WhatsAppNotConnected`.
+
+    Passing ``phone_id`` explicitly always targets the Cloud path
+    (phone_ids are Cloud-side identifiers). If the caller wants to
+    force the Baileys path, they should call the sidecar client
+    directly — this resolver's job is to pick the right provider for
+    the org's outbound.
+
+    Relies on the ORM tenant filter from ``TenantScoped`` for org
     isolation — the caller must be inside a request / Celery task
-    context where `app.org_id` is set. RLS authorises the read.
+    context where ``app.org_id`` is set. RLS authorises the read.
 
     Plaintext credentials (bearer token + app_secret) live only inside
     the returned adapter instance — never logged, never returned to
     any API response. The adapter falls out of scope as soon as the
     send completes, so the plaintext doesn't linger.
-
-    Raises `WhatsAppNotConnected` if the active tenant has not
-    connected WhatsApp (or has disconnected) — callers surface that
-    as a 409 / `CampaignMessage.failed` rather than a generic 500."""
+    """
     from src.app.core.integrations.crypto import decrypt
     from src.app.core.integrations.whatsapp.connect import get_active_config
 
     bundle = await get_active_config(session, phone_id=phone_id)
-    if bundle is None:
-        if phone_id is not None:
-            raise WhatsAppNotConnected(
-                f"WhatsApp phone {phone_id!r} is not connected for "
-                "this org. Pick another number or reconnect it from "
-                "Settings → Integrations."
-            )
-        raise WhatsAppNotConnected(
-            "WhatsApp is not connected for this org. Connect it in Settings → Integrations."
+    if bundle is not None:
+        integration, config = bundle
+        # `app_secret_enc` is NULL for orgs that connected via Embedded
+        # Signup — the webhook verifier falls back to the env-side
+        # `WHATSAPP_APP_SECRET`, and `send()` never touches the
+        # adapter's `_app_secret` attribute. Pass empty string so the
+        # constructor doesn't trip on None.
+        app_secret = decrypt(config.app_secret_enc) if config.app_secret_enc else ""
+        return WhatsAppAdapter(
+            phone_id=config.phone_id,
+            token=decrypt(integration.access_token_enc),
+            app_secret=app_secret,
+            verify_token=config.verify_token,
+            api_version=config.api_version,
         )
-    integration, config = bundle
-    # `app_secret_enc` is NULL for orgs that connected via Embedded
-    # Signup (whatsapp-platform-upgrade Step 2) — the webhook verifier
-    # falls back to the env-side `WHATSAPP_APP_SECRET`, and `send()`
-    # never touches the adapter's `_app_secret` attribute at all. Pass
-    # an empty string here so the constructor doesn't trip on `None`;
-    # the signature path keeps reading from env for ES-connected orgs.
-    app_secret = decrypt(config.app_secret_enc) if config.app_secret_enc else ""
-    return WhatsAppAdapter(
-        phone_id=config.phone_id,
-        token=decrypt(integration.access_token_enc),
-        app_secret=app_secret,
-        verify_token=config.verify_token,
-        api_version=config.api_version,
+
+    # Cloud isn't connected. Try the Baileys/WhatsApp Web fallback
+    # unless the caller pinned a specific Cloud phone_id — a targeted
+    # phone request should never silently fall through to a different
+    # provider.
+    if phone_id is None:
+        web_session_id = await _find_active_web_session_id(session)
+        if web_session_id is not None:
+            return WhatsAppWebAdapter(sidecar_session_id=web_session_id)
+
+    if phone_id is not None:
+        raise WhatsAppNotConnected(
+            f"WhatsApp phone {phone_id!r} is not connected for "
+            "this org. Pick another number or reconnect it from "
+            "Settings → Integrations."
+        )
+    raise WhatsAppNotConnected(
+        "WhatsApp is not connected for this org. Connect it in Settings → Integrations."
     )
+
+
+async def _find_active_web_session_id(session: AsyncSession) -> str | None:
+    """Return the sidecar session id for the org's connected Baileys
+    session, or ``None`` if the org hasn't set one up (or has since
+    disconnected / logged out from the phone).
+
+    Kept as a private helper so ``resolve_whatsapp_adapter`` doesn't
+    need to know the ``whatsapp_web`` module's model shape. Scoped by
+    the ORM tenant filter (same as ``get_active_config``). ``status``
+    on the WhatsAppWebSession row is a plain text column — the sidecar
+    reports one of ``pending / pairing / connected / reconnecting /
+    logged_out / disconnected / error``. Only ``connected`` is
+    outbound-ready; every other state either has no live socket
+    (pending / disconnected / logged_out / error) or is transient
+    (pairing / reconnecting).
+    """
+    from sqlalchemy import select as _select
+
+    from src.app.core.integrations.whatsapp_web.models import WhatsAppWebSession
+
+    result = await session.execute(
+        _select(WhatsAppWebSession.sidecar_session_id).where(
+            WhatsAppWebSession.status == "connected"
+        )
+    )
+    return result.scalar_one_or_none()
 
 
 # --- Step 3.5.12: Meta status events ------------------------------------

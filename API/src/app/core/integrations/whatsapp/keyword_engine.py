@@ -14,11 +14,13 @@ Two entry points:
     (``reply_text`` / ``reply_template`` / ``tag_conversation`` /
     ``assign_to_user`` / ``escalate_to_ai``).
 
-Cooldown is an in-process token bucket keyed on
-``(rule_id, contact_external_id)`` — matches the existing pattern
-used by `login_limiter` etc. A Redis-backed implementation is the
-right move once we run >1 worker per org; in-process keeps Step 17
-self-contained.
+Cooldown is a Redis-first token bucket keyed on
+``(rule_id, contact_external_id)`` via
+:mod:`src.app.shared.rate_limit_shared`. Falls back to a process-
+local map when Redis is unreachable (dev shells, transient blips)
+so keyword rules still work in single-worker setups. Was originally
+process-local only — under horizontal scale that let a contact
+receive N duplicate auto-replies in the same 60s window.
 
 Regex match safety: pattern length capped at the schema layer
 (200 chars); evaluation wrapped in try/except so an operator
@@ -29,7 +31,6 @@ from __future__ import annotations
 
 import logging
 import re
-import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -37,6 +38,11 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.app.shared.rate_limit_shared import (
+    acquire_cooldown as _acquire_cooldown,
+    is_on_cooldown as _is_on_cooldown,
+)
 
 from src.app.core import audit
 from src.app.core.conversations.adapters.whatsapp import (
@@ -72,31 +78,39 @@ _COOLDOWN_SECONDS = 60
 _REGEX_MAX_PATTERN_LEN = 200
 
 
-# --- in-process cooldown -------------------------------------------------
-
-# Module-level cache: `{(rule_id, contact_key): expiry_epoch_seconds}`.
-# Bounded growth is OK — inactive entries pile up but each is tiny;
-# worst case is a few-MB cache, which Celery worker recycling clears
-# anyway.
-_COOLDOWN_CACHE: dict[tuple[uuid.UUID, str], float] = {}
-
-
-def _cooldown_active(rule_id: uuid.UUID, contact_key: str) -> bool:
-    """Check + sweep expired entries. Returns True if the rule is on
-    cooldown for this contact."""
-    now = time.monotonic()
-    expiry = _COOLDOWN_CACHE.get((rule_id, contact_key))
-    if expiry is None:
-        return False
-    if expiry <= now:
-        # Lazy GC — drop the expired key on read.
-        _COOLDOWN_CACHE.pop((rule_id, contact_key), None)
-        return False
-    return True
+# --- Cross-worker cooldown -----------------------------------------------
+#
+# Backed by ``rate_limit_shared`` — Redis-first with an in-process
+# fallback for dev shells and outages. The single-worker key shape
+# ``(rule_id, contact_key)`` becomes the Redis-safe string
+# ``kwrl:{rule_id}:{contact_key}`` so distinct rules can't collide.
 
 
-def _set_cooldown(rule_id: uuid.UUID, contact_key: str) -> None:
-    _COOLDOWN_CACHE[(rule_id, contact_key)] = time.monotonic() + _COOLDOWN_SECONDS
+def _cooldown_key(rule_id: uuid.UUID, contact_key: str) -> str:
+    return f"kwrl:{rule_id}:{contact_key}"
+
+
+async def _cooldown_active(rule_id: uuid.UUID, contact_key: str) -> bool:
+    """Read-only check — used by the dry-run test path where we don't
+    want to actually consume a cooldown slot."""
+    return await _is_on_cooldown(_cooldown_key(rule_id, contact_key))
+
+
+async def _try_acquire_cooldown(rule_id: uuid.UUID, contact_key: str) -> bool:
+    """Atomically claim the cooldown slot for this rule+contact.
+
+    Returns True when the caller "won" (they should proceed with the
+    action dispatch), False when someone else already holds the slot
+    (this inbound is on cooldown — silently skip).
+
+    Uses the same primitive `SET NX PX` (Redis) / lock-checked map
+    (in-process). Previously ``dispatch_keyword_rules`` did a check-
+    then-set with two separate calls; under horizontal scale that
+    left a small race where two workers could both pass the check
+    before either set the flag."""
+    return await _acquire_cooldown(
+        _cooldown_key(rule_id, contact_key), _COOLDOWN_SECONDS
+    )
 
 
 # --- match helpers --------------------------------------------------------
@@ -376,14 +390,17 @@ async def dispatch_keyword_rules(
         return None
 
     contact_key = conversation.external_id or str(conversation.contact_id) or "anon"
-    if _cooldown_active(rule.id, contact_key):
+    # Atomic acquire — either we win the slot (proceed) or the slot's
+    # already held (skip). Replaces the prior check-then-set which
+    # was racy under horizontal scale.
+    acquired = await _try_acquire_cooldown(rule.id, contact_key)
+    if not acquired:
         logger.info(
             "keyword_engine: rule %s on cooldown for %s",
             rule.id,
             contact_key,
         )
         return None
-    _set_cooldown(rule.id, contact_key)
 
     for action in result.actions:
         config = action.action_config or {}

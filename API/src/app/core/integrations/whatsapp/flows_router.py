@@ -108,10 +108,23 @@ async def list_templates_endpoint(
 @router.get("", response_model=list[_FlowOut])
 async def list_flows_endpoint(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("whatsapp.flows.manage")),
+    user: User = Depends(require_permissions("whatsapp.flows.manage")),
 ) -> list[_FlowOut]:
+    # Belt + suspenders on tenant scope: block-list, templates, and
+    # keyword-rules all pair the RLS ``app.org_id`` gate with an
+    # explicit ``WHERE org_id = :caller_org_id``. Flows list used to
+    # rely on RLS alone — inconsistent with the rest of the module and
+    # exposes us if a future context-plumbing bug ever leaves
+    # ``app.org_id`` unset in this code path. The predicate below is
+    # the same shape ``list_blocked_entries`` uses.
     rows = (
-        (await db.execute(select(WhatsAppFlow).order_by(WhatsAppFlow.created_at.desc())))
+        (
+            await db.execute(
+                select(WhatsAppFlow)
+                .where(WhatsAppFlow.org_id == user.org_id)
+                .order_by(WhatsAppFlow.created_at.desc())
+            )
+        )
         .scalars()
         .all()
     )

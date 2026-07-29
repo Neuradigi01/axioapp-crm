@@ -71,13 +71,39 @@ router = APIRouter(
 
 
 async def _project(session: AsyncSession, rule: WhatsAppKeywordRule) -> KeywordRuleRead:
-    """Hydrate `actions[]` onto the rule projection. Done in a single
-    helper so the CRUD endpoints stay one-liners."""
-    actions = (
+    """Hydrate ``actions[]`` onto the rule projection. Kept for the
+    single-row CRUD endpoints (create / update / delete) — those only
+    ever project one rule so the extra round-trip is fine.
+
+    **List endpoints must use :func:`_project_many` instead** so 100
+    rules don't fire 101 SELECTs. This helper delegates to
+    ``_project_many`` with a single-rule list to keep the two paths
+    in sync."""
+    projections = await _project_many(session, [rule])
+    return projections[0]
+
+
+async def _project_many(
+    session: AsyncSession, rules: list[WhatsAppKeywordRule]
+) -> list[KeywordRuleRead]:
+    """Batched projection — one SELECT for all actions across all
+    supplied rules, then group in Python.
+
+    Prior versions of ``list_rules_endpoint`` called ``_project`` in a
+    loop, which fired one action-fetch per rule (classic N+1 —
+    101 queries for 100 rules). This helper does a single
+    ``WHERE rule_id IN (…)`` and buckets the result by rule_id so the
+    total round-trip count stays at 2 regardless of rule count.
+    """
+    if not rules:
+        return []
+
+    rule_ids = [r.id for r in rules]
+    action_rows = (
         (
             await session.execute(
                 select(WhatsAppKeywordAction)
-                .where(WhatsAppKeywordAction.rule_id == rule.id)
+                .where(WhatsAppKeywordAction.rule_id.in_(rule_ids))
                 .order_by(
                     WhatsAppKeywordAction.position.asc(),
                     WhatsAppKeywordAction.created_at.asc(),
@@ -87,28 +113,39 @@ async def _project(session: AsyncSession, rule: WhatsAppKeywordRule) -> KeywordR
         .scalars()
         .all()
     )
-    return KeywordRuleRead.model_validate(
-        {
-            "id": rule.id,
-            "name": rule.name,
-            "keywords": list(rule.keywords or []),
-            "match_type": rule.match_type.value,
-            "enabled": rule.enabled,
-            "priority": rule.priority,
-            "created_by_user_id": rule.created_by_user_id,
-            "created_at": rule.created_at,
-            "updated_at": rule.updated_at,
-            "actions": [
-                KeywordActionRead(
-                    id=a.id,
-                    action_type=a.action_type.value,
-                    action_config=a.action_config or {},
-                    position=a.position,
-                )
-                for a in actions
-            ],
-        }
-    )
+
+    # Group actions per rule_id preserving the ORDER BY above.
+    actions_by_rule: dict[uuid.UUID, list[WhatsAppKeywordAction]] = {
+        rid: [] for rid in rule_ids
+    }
+    for a in action_rows:
+        actions_by_rule.setdefault(a.rule_id, []).append(a)
+
+    return [
+        KeywordRuleRead.model_validate(
+            {
+                "id": rule.id,
+                "name": rule.name,
+                "keywords": list(rule.keywords or []),
+                "match_type": rule.match_type.value,
+                "enabled": rule.enabled,
+                "priority": rule.priority,
+                "created_by_user_id": rule.created_by_user_id,
+                "created_at": rule.created_at,
+                "updated_at": rule.updated_at,
+                "actions": [
+                    KeywordActionRead(
+                        id=a.id,
+                        action_type=a.action_type.value,
+                        action_config=a.action_config or {},
+                        position=a.position,
+                    )
+                    for a in actions_by_rule.get(rule.id, [])
+                ],
+            }
+        )
+        for rule in rules
+    ]
 
 
 async def _get_or_404(session: AsyncSession, rule_id: uuid.UUID) -> WhatsAppKeywordRule:
@@ -128,7 +165,7 @@ async def list_rules_endpoint(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("whatsapp.automation.manage")),
 ) -> list[KeywordRuleRead]:
-    rules = (
+    rules = list(
         (
             await db.execute(
                 select(WhatsAppKeywordRule).order_by(
@@ -140,7 +177,10 @@ async def list_rules_endpoint(
         .scalars()
         .all()
     )
-    return [await _project(db, r) for r in rules]
+    # Batched project — one SELECT for all actions across all rules
+    # (see ``_project_many`` docstring). Replaces the prior per-rule
+    # loop which was 1 SELECT + N per-rule fetches at any list size.
+    return await _project_many(db, rules)
 
 
 @router.post(
