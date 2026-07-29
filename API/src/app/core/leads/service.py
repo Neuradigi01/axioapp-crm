@@ -1252,19 +1252,24 @@ async def bulk_reassign_leads(
     if assigned_to_id is not None:
         await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
-    # Collect per-row (lead, prior_owner_id) pairs during the loop so
-    # we can fan out `lead.assigned` events AFTER the commit — the
-    # subscriber-facing snapshot needs the committed row + we don't
-    # want a misbehaving handler rolling back the whole batch.
+    # Batched hydrate — one SELECT instead of one round-trip per id.
+    # Matches the pattern the same module already uses in
+    # ``bulk_move_stage``. Prior version fired ``get_lead(session, lid)``
+    # inside the loop, which is a real N+1 at the 200-cap the router
+    # enforces (200 SELECTs to reassign 200 leads).
+    leads = await _da.list_leads_by_ids_in_org(session, ids=ids, org_id=org_id)
+
+    # Collect per-row (lead, prior_owner_id, before_snapshot) tuples
+    # so we can (1) fan out `lead.assigned` events after commit and
+    # (2) write one ``leads.reassigned`` audit-log entry per row —
+    # matching the single-row reassign path in ``reassign_lead``.
     reassigned = 0
-    assigned_rows: list[tuple[Lead, uuid.UUID | None]] = []
-    for lid in ids:
-        lead = await get_lead(session, lid)
-        if lead is None:
-            continue
+    assigned_rows: list[tuple[Lead, uuid.UUID | None, dict[str, Any]]] = []
+    for lead in leads:
         if lead.assigned_to_id == assigned_to_id:
             continue
         before_id = lead.assigned_to_id
+        before_snap = _snapshot(lead)
         lead.assigned_to_id = assigned_to_id
         await activities.record_in_session(
             session,
@@ -1276,15 +1281,28 @@ async def bulk_reassign_leads(
             user_id=actor_user_id,
         )
         reassigned += 1
-        assigned_rows.append((lead, before_id))
+        assigned_rows.append((lead, before_id, before_snap))
 
     await session.commit()
+
+    # One audit row per reassigned lead. Single-row reassign path
+    # calls the same helper — bulk was silently skipping it, leaving
+    # the audit trail with only the timeline Activities and no
+    # ``leads.reassigned`` rows.
+    for lead, _before_id, before_snap in assigned_rows:
+        await log_entity_change(
+            action="leads.reassigned",
+            entity_type="lead",
+            entity_id=lead.id,
+            before=before_snap,
+            after=_snapshot(lead),
+        )
 
     # Fan out `lead.assigned` events per touched row when the new
     # owner is a real user (unassign → null skips — no one to notify).
     # Same event the single-row reassign path publishes.
     if assigned_to_id is not None:
-        for lead, before_id in assigned_rows:
+        for lead, before_id, _snap in assigned_rows:
             await _publish_lead_assigned(
                 session,
                 org_id=org_id,
@@ -1302,9 +1320,43 @@ async def bulk_delete_leads(
     org_id: uuid.UUID,
 ) -> int:
     """Hard-delete N leads. Belt + suspenders: `org_id` in WHERE alongside
-    the per-tenant RLS policy."""
+    the per-tenant RLS policy.
+
+    Wraps FK RESTRICT ``IntegrityError`` into a clean 409 (same shape
+    the single-delete path returns) so an operator whose selection
+    contains a lead with dependent walk_ins / activities / tasks sees
+    an actionable error instead of a raw 500. Emits one
+    ``leads.deleted`` audit entry per row so bulk deletes leave the
+    same trail single deletes do.
+    """
+    # Snapshot every row before we drop it — the audit-log helper
+    # expects a ``before`` payload and the row is gone after DELETE.
+    # Batched hydrate avoids the N+1 the reassign path used to have.
+    leads = await _da.list_leads_by_ids_in_org(session, ids=ids, org_id=org_id)
+    snapshots = [(lead.id, _snapshot(lead)) for lead in leads]
+
     rowcount = await _da.bulk_delete_leads_by_ids(session, ids=ids, org_id=org_id)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "cannot delete one or more leads — walk-ins, activities, "
+                "or tasks reference them. Delete or reassign the "
+                "dependent rows first, or narrow the selection."
+            ),
+        ) from exc
+
+    for lead_id, before in snapshots:
+        await log_entity_change(
+            action="leads.deleted",
+            entity_type="lead",
+            entity_id=lead_id,
+            before=before,
+        )
+
     return rowcount
 
 
