@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Observable, finalize, shareReplay, tap } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import { TokenStorageService } from './token-storage.service';
@@ -9,12 +9,44 @@ export interface LoginRequest {
   email: string;
   password: string;
   org_slug?: string | null;
+  two_factor_code?: string | null;
+  two_factor_method?: 'authenticator' | 'email' | 'sms' | null;
 }
 
 export interface LoginResponse {
   access_token: string;
   token_type: string;
   expires_at: string;
+}
+
+/** Discriminated response when the user has 2FA enabled and no code
+ * was submitted with the first POST. The OTP (for email/sms) has
+ * already been dispatched; the UI navigates to `/accounts/two-factor`
+ * and re-POSTs `/auth/login` with the code. */
+export interface TwoFactorChallengeResponse {
+  requires_two_factor: true;
+  method: 'authenticator' | 'email' | 'sms';
+  available_methods: ('authenticator' | 'email' | 'sms')[];
+}
+
+export type LoginOutcome = LoginResponse | TwoFactorChallengeResponse;
+
+export function isTwoFactorChallenge(res: LoginOutcome): res is TwoFactorChallengeResponse {
+  return (res as TwoFactorChallengeResponse).requires_two_factor === true;
+}
+
+/** Body accepted by `POST /api/v1/auth/2fa/try-another-way` (layered
+ *  user path — the backend also accepts the legacy admin envelope). */
+export interface TryAnotherWayRequest {
+  email: string;
+  password: string;
+  method: 'authenticator' | 'email' | 'sms';
+  org_slug?: string | null;
+}
+
+export interface TryAnotherWayResponse {
+  method: string;
+  available_methods: string[];
 }
 
 export interface RegisterRequest {
@@ -125,12 +157,38 @@ export class FurnitureAuthService {
     return this.currentPermissions().includes(key);
   }
 
-  login(email: string, password: string, orgSlug?: string | null): Observable<LoginResponse> {
+  login(
+    email: string,
+    password: string,
+    orgSlug?: string | null,
+    twoFactorCode?: string | null,
+    twoFactorMethod?: 'authenticator' | 'email' | 'sms' | null,
+  ): Observable<LoginOutcome> {
     const body: LoginRequest = { email, password };
     if (orgSlug) body.org_slug = orgSlug;
-    return this.http
-      .post<LoginResponse>(`${environment.apiBaseUrl}/auth/login`, body)
-      .pipe(tap((res) => this.storage.setTokens(res.access_token, res.access_token)));
+    if (twoFactorCode) body.two_factor_code = twoFactorCode;
+    if (twoFactorMethod) body.two_factor_method = twoFactorMethod;
+    return this.http.post<LoginOutcome>(`${environment.apiBaseUrl}/auth/login`, body).pipe(
+      tap((res) => {
+        // Only persist the token on a real LoginResponse. A 2FA
+        // challenge carries no `access_token` — attempting to store
+        // it would silently overwrite any existing token with
+        // `undefined` and 401 the app on the next request.
+        if (!isTwoFactorChallenge(res)) {
+          this.storage.setTokens(res.access_token, res.access_token);
+        }
+      }),
+    );
+  }
+
+  /** Switch to a different 2FA method (email/sms/authenticator) mid-login.
+   *  Backend re-verifies the password, so the login page passes the
+   *  identifier + password it captured on the first submit. */
+  tryAnotherWay(req: TryAnotherWayRequest): Observable<TryAnotherWayResponse> {
+    return this.http.post<TryAnotherWayResponse>(
+      `${environment.apiBaseUrl}/auth/2fa/try-another-way`,
+      req,
+    );
   }
 
   register(req: RegisterRequest): Observable<RegisterResponse> {
@@ -150,10 +208,31 @@ export class FurnitureAuthService {
       );
   }
 
+  /** Dedup guard: while a refresh is in flight, every 401 that lands
+   *  reuses the SAME Observable. Prevents the multi-tab / parallel-
+   *  request race where two 401s each trigger their own POST /refresh
+   *  and end up racing to overwrite localStorage. Cleared on complete
+   *  or error so the next real 401 kicks off a fresh refresh. */
+  private refreshInFlight: Observable<LoginResponse> | null = null;
+
   refresh(): Observable<LoginResponse> {
-    return this.http
+    if (this.refreshInFlight) {
+      return this.refreshInFlight;
+    }
+    this.refreshInFlight = this.http
       .post<LoginResponse>(`${environment.apiBaseUrl}/auth/refresh`, {})
-      .pipe(tap((res) => this.storage.setTokens(res.access_token, res.access_token)));
+      .pipe(
+        tap((res) => this.storage.setTokens(res.access_token, res.access_token)),
+        finalize(() => {
+          this.refreshInFlight = null;
+        }),
+        // `shareReplay({ bufferSize: 1, refCount: false })` so every
+        // late subscriber (parallel 401 arriving after the response)
+        // still gets the cached new token instead of firing a second
+        // POST.
+        shareReplay({ bufferSize: 1, refCount: false }),
+      );
+    return this.refreshInFlight;
   }
 
   logout(): Observable<void> {

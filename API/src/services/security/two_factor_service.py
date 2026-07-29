@@ -58,20 +58,25 @@ async def setup_2fa_authenticator(db: AsyncSession, user_id: str, user_type: str
     if not record:
         return {"success": False, "message": messages.RECORD_NOT_FOUND}
 
-    secret = two_factor_provider.generate_totp_secret()
-    qr_code = two_factor_provider.generate_qr_code(secret, user_id)
+    # Generate plaintext once for the QR (the QR IS the secret in a
+    # QR-shaped envelope). Persist only the Fernet-encrypted form.
+    plaintext_secret = two_factor_provider.generate_totp_secret()
+    qr_code = two_factor_provider.generate_qr_code(plaintext_secret, user_id)
+    encrypted_secret = two_factor_provider.encrypt_totp_secret(plaintext_secret)
 
     if user_type == "User":
-        await user_da.set_two_factor_secret(db, user_id, secret)
+        await user_da.set_two_factor_secret(db, user_id, encrypted_secret)
     else:
-        await admin_da.set_two_factor_secret(db, user_id, secret)
+        await admin_da.set_two_factor_secret(db, user_id, encrypted_secret)
     await db.commit()
 
+    # Don't return the raw seed alongside the QR — the QR encodes it,
+    # and clients don't need a second copy. Cuts one extra JSON field
+    # of exposure surface (server logs, browser history, etc.).
     return {
         "success": True,
         "message": messages.OK,
         "data": {
-            "secret": secret,
             "qr_code": qr_code,
         },
     }

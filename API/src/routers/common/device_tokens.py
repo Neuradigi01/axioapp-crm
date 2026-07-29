@@ -44,4 +44,9 @@ async def unregister_token(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    return await device_token_service.unregister_device_token(db, req.fcm_token)
+    return await device_token_service.unregister_device_token(
+        db,
+        req.fcm_token,
+        user_id=token_payload["user_id"],
+        user_type=token_payload["role"],
+    )

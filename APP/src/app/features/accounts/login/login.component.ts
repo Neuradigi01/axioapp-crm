@@ -22,7 +22,10 @@ import { I2faRequiredData, IEmailVerificationRequiredData, ILoginPayload } from 
 import { ROLE_ADMIN, SNACKBAR_DURATION, SNACKBAR_ACTION } from '@core/constants/app.constants';
 import { MSG_ERROR_GENERIC, MSG_LOGIN_FAILED } from '@core/constants/messages.constants';
 import { DeviceInfoService } from '@core/services/device-info.service';
-import { FurnitureAuthService } from '@app/features/user/core/auth/auth.service';
+import {
+  FurnitureAuthService,
+  isTwoFactorChallenge,
+} from '@app/features/user/core/auth/auth.service';
 import { DemoPresetBusService } from '@app/features/dev-tools/demo-preset-bus.service';
 
 // When the demo-logins pill picks a preset, its slug lands here via
@@ -108,9 +111,31 @@ export class LoginComponent {
     // FurnitureCRM (layered) user login. Admin login keeps the legacy path below.
     if (!this.isAdmin) {
       try {
-        await firstValueFrom(
+        const outcome = await firstValueFrom(
           this.furnitureAuth.login(identifier, password, this.selectedOrgSlug()),
         );
+
+        // 2FA gate: backend returned a challenge instead of a token.
+        // Route to the /two-factor page carrying identifier + password
+        // + method so the code-entry screen can re-POST /auth/login
+        // with `two_factor_code`. Without this branch the challenge
+        // object was silently treated as a LoginResponse and the app
+        // stored `undefined` as the access token.
+        if (isTwoFactorChallenge(outcome)) {
+          this.router.navigate([getRoute('two_factor_authentication').url], {
+            state: {
+              identifier,
+              password,
+              userType: this.userType,
+              method: outcome.method,
+              availableMethods: outcome.available_methods,
+              rememberMe: this.loginForm.value.rememberMe,
+              orgSlug: this.selectedOrgSlug(),
+            },
+          });
+          return;
+        }
+
         // Honour ?return_url= if it came from a guard bounce, but only
         // if it's a same-origin path — never a full URL.
         const target = this.route.snapshot.queryParamMap.get('return_url') ?? '';

@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.auth import data_access as auth_da
-from src.app.core.permissions.service import list_permissions_for_role
+from src.app.core.permissions.service import list_permissions_for_role, template_keys_for_role
 from src.app.core.users import data_access as users_da
 from src.app.core.users.models import User
 from src.app.shared.context import get_context
@@ -107,6 +107,13 @@ def require_permissions(*required: str):
         db: AsyncSession = Depends(get_db),
     ) -> User:
         granted = {p.key for p in await list_permissions_for_role(db, user.role_id)}
+        # Additive template fallback: keys defined in the role's
+        # template (matched by name) count as granted even if the
+        # DB row lacks them, so orgs seeded before a new permission
+        # key was added still authorise the request. Only widens the
+        # grant set — user edits removing keys from Admin/Employee
+        # cannot re-add them via this path.
+        granted |= await template_keys_for_role(db, user.role_id)
         missing = [k for k in required if k not in granted]
         if missing:
             await audit.log(

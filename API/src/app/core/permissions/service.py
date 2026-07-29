@@ -29,9 +29,46 @@ async def list_permissions_for_role(session: AsyncSession, role_id: uuid.UUID) -
     return await _da.list_role_permissions_query(session, role_id)
 
 
+async def template_keys_for_role(session: AsyncSession, role_id: uuid.UUID) -> set[str]:
+    """Return the permission keys defined for this role in its role
+    template, if any.
+
+    System roles (Owner) are locked to their template; user-editable
+    template roles (Admin, Employee, Sales Manager, Support Agent) are
+    matched by ``name`` — new keys added to a template later still work
+    for existing installs without a manual re-sync. Only additive: we
+    never subtract from the DB grants via the template (respects user
+    edits to Admin/Employee).
+
+    Returns an empty set for custom roles or unknown template names.
+    """
+    role = await _da.get_role_by_id(session, role_id)
+    if role is None:
+        return set()
+    # Local import to avoid a circular dep at module load
+    # (role_templates → service → role_templates is otherwise
+    # possible if new helpers get added here).
+    from src.app.core.permissions.role_templates import ROLE_TEMPLATES
+
+    for template in ROLE_TEMPLATES.values():
+        if template.name == role.name and (
+            template.is_system == role.is_system or template.is_owner
+        ):
+            keys = template.permission_keys
+            if isinstance(keys, str):  # "*" wildcard placeholder
+                return set()
+            return set(keys)
+    return set()
+
+
 async def role_has_permission(session: AsyncSession, role_id: uuid.UUID, key: str) -> bool:
-    """`True` iff the role has been granted `key`."""
-    return await _da.role_has_permission_query(session, role_id=role_id, key=key)
+    """`True` iff the role has been granted `key` — either directly in
+    the DB or via the role's matching template. Template fallback keeps
+    Owner (and Admin/Employee where unedited) automatically current with
+    newly-added permission keys without a manual re-sync per org."""
+    if await _da.role_has_permission_query(session, role_id=role_id, key=key):
+        return True
+    return key in await template_keys_for_role(session, role_id)
 
 
 async def register_permission(
