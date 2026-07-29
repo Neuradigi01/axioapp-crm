@@ -26,7 +26,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
-from src.app.core.integrations.google.dlq import replay_dlq
+from src.app.core.integrations.google.dlq import replay_dlq as _replay_google_dlq
+from src.app.core.integrations.meta.dlq import replay_dlq as _replay_meta_dlq
 from src.app.core.integrations.google.router import router as google_router
 from src.app.core.integrations.google.webhook import (
     router as google_webhook_router,
@@ -57,6 +58,7 @@ from src.app.core.integrations.service import (
     create_subscription,
     delete_subscription,
     discard_dlq,
+    get_dlq,
     list_all,
     list_dlq,
     list_subscriptions,
@@ -374,6 +376,39 @@ async def replay_dlq_endpoint(
     """Re-enqueue a DLQ payload through the matching provider's
     Celery task. Marks the row as replayed (the row survives so an
     operator can see what's been retried). 404 if missing, 409 if the
-    original integration has been hard-deleted."""
-    row = await replay_dlq(db, dlq_id=dlq_id, actor_id=user.legacy_uuid)
-    return IntegrationDLQRead.model_validate(row)
+    original integration has been hard-deleted.
+
+    Dispatches on ``row.provider`` so the shared DLQ UI can hit one
+    endpoint regardless of which channel the failure came from.
+    Google + Meta share the same DLQ table but need different re-
+    enqueue tasks (each provider's payload shape + Celery worker
+    differ). New providers add themselves to ``_REPLAY_DISPATCH``
+    below.
+    """
+    row = await get_dlq(db, dlq_id=dlq_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="DLQ row not found",
+        )
+    handler = _REPLAY_DISPATCH.get(row.provider)
+    if handler is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Provider {row.provider.value} has no replay handler wired up yet."
+            ),
+        )
+    replayed = await handler(db, dlq_id=dlq_id, actor_id=user.legacy_uuid)
+    return IntegrationDLQRead.model_validate(replayed)
+
+
+# Provider → replay dispatcher. Each entry is an async callable with
+# the same signature ``(session, *, dlq_id, actor_id)`` returning the
+# updated ``IntegrationDLQ`` row. Add a new key when wiring a new
+# provider's replay path — the shared endpoint above finds the right
+# handler without touching the router.
+_REPLAY_DISPATCH: dict[IntegrationProvider, object] = {
+    IntegrationProvider.google_ads: _replay_google_dlq,
+    IntegrationProvider.meta_ads: _replay_meta_dlq,
+}

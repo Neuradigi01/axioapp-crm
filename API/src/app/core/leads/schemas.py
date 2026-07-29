@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -161,6 +161,26 @@ class LeadOut(TimestampedOrgScopedOut):
     # first entry into an is_won / is_lost stage.
     won_at: datetime | None = None
     lost_at: datetime | None = None
+
+
+class LeadIngestOut(LeadOut):
+    """Response body for ``POST /leads`` and any other channel-agnostic
+    create endpoint that funnels through ``leads.ingest.ingest()``.
+
+    Extends :class:`LeadOut` with the discriminator the ingest layer
+    already computes — ``"created"`` when a fresh row was inserted,
+    ``"merged"`` when the picked contact already had an OPEN lead and
+    the timeline got a "Touchpoint via <source>" activity instead. The
+    UI reads this to show the right toast ("New lead created" vs
+    "Existing lead updated") rather than sniffing a response header,
+    which requires CORS ``Access-Control-Expose-Headers`` plumbing and
+    breaks any client that goes through a proxy that strips it.
+
+    The header stays too — for existing callers — but the body is the
+    canonical channel going forward.
+    """
+
+    ingest_action: Literal["created", "merged"]
 
 
 class LeadListResponse(BaseModel):

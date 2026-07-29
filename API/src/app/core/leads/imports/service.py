@@ -21,6 +21,7 @@ from __future__ import annotations
 import csv
 import io
 import uuid
+from collections import OrderedDict
 from dataclasses import dataclass
 
 from fastapi import HTTPException, status
@@ -413,7 +414,19 @@ async def cancel_import(
     return row
 
 
-def read_preview(import_row: LeadImport, limit: int) -> PreviewPayload:
+# Small process-local cache so a caller that hits /preview twice for
+# the same (import_id, limit) — dev-tools refresh, retry after a
+# transient network error, an over-eager mapping UI that re-fires on
+# preset switch — doesn't re-parse the source file every time. LRU
+# bounded at 64 entries so the worker's memory footprint stays
+# predictable even for orgs with hundreds of concurrent imports;
+# storage_path is part of the key so a fresh upload that reuses the
+# same import_id can never hand back the previous file's rows.
+_PREVIEW_CACHE_MAX = 64
+_preview_cache: OrderedDict[tuple[str, str, int], "PreviewPayload"] = OrderedDict()
+
+
+def read_preview(import_row: LeadImport, limit: int) -> "PreviewPayload":
     """Read the first `limit` data rows from the import's source file.
 
     Returns the original column header + a list-of-lists of stringified
@@ -424,10 +437,21 @@ def read_preview(import_row: LeadImport, limit: int) -> PreviewPayload:
     Reuses `parser.parse_rows()` with an empty mapping — only the
     `raw` dict is needed (one entry per source column). Rows are
     returned in source column order; missing cells surface as None.
+
+    Cached in-process by ``(import_id, storage_path, capped_limit)``
+    so repeated calls for the same import ID reuse the parsed rows —
+    the mapping UI only fetches once per page load today but a future
+    tab-switch or preset-preview flow can hit this cheaply.
     """
     from src.app.core.leads.imports.parser import parse_rows
 
     capped_limit = max(1, min(int(limit), 50))
+    cache_key = (str(import_row.id), import_row.storage_path or "", capped_limit)
+    hit = _preview_cache.get(cache_key)
+    if hit is not None:
+        _preview_cache.move_to_end(cache_key)
+        return hit
+
     header, rows_iter = parse_rows(import_row.storage_path, mapping={})
 
     rows: list[list[str | None]] = []
@@ -443,7 +467,12 @@ def read_preview(import_row: LeadImport, limit: int) -> PreviewPayload:
         # and its underlying file handle leaks per preview call.
         rows_iter.close()
 
-    return PreviewPayload(columns=header.columns, rows=rows)
+    payload = PreviewPayload(columns=header.columns, rows=rows)
+    _preview_cache[cache_key] = payload
+    _preview_cache.move_to_end(cache_key)
+    while len(_preview_cache) > _PREVIEW_CACHE_MAX:
+        _preview_cache.popitem(last=False)
+    return payload
 
 
 @dataclass(frozen=True, slots=True)
