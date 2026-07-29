@@ -24,7 +24,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
@@ -400,14 +400,45 @@ async def merge_contacts(
     # Repoint every FK / polymorphic ref before deleting the secondary.
     # RESTRICT-FK tables (appointments, leads, walk-ins) would otherwise
     # block the DELETE — the DAL handles them first.
-    rows_reassigned = await data_access.reassign_contact_references(
-        session,
-        org_id=org_id,
-        primary_id=primary.id,
-        secondary_id=secondary.id,
-    )
-    await data_access.delete_contact_row(session, secondary)
-    await session.commit()
+    try:
+        rows_reassigned = await data_access.reassign_contact_references(
+            session,
+            org_id=org_id,
+            primary_id=primary.id,
+            secondary_id=secondary.id,
+        )
+        await data_access.delete_contact_row(session, secondary)
+        await session.commit()
+    except IntegrityError as exc:
+        # Some table still references the secondary despite the DAL
+        # sweep — surface a 409 with the underlying constraint so the
+        # operator (and support) know which table needs a follow-up
+        # repoint rather than seeing the generic "unknown error".
+        await session.rollback()
+        constraint = getattr(getattr(exc, "orig", None), "diag", None)
+        constraint_name = getattr(constraint, "constraint_name", None) if constraint else None
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "cannot merge — a related row still references the "
+                "secondary contact"
+                + (f" (constraint: {constraint_name})" if constraint_name else "")
+                + ". Report this to support so we can add the missing repoint."
+            ),
+        ) from exc
+    except SQLAlchemyError as exc:
+        # Any other DB-layer failure: expose the driver-level message
+        # (missing table / column / bad syntax) so the operator can
+        # diagnose instead of getting the opaque middleware fallback
+        # ("An unknown error occurred!"). ``exc.orig`` carries the
+        # psycopg error text with the actual relation/column name.
+        await session.rollback()
+        orig = getattr(exc, "orig", None)
+        driver_msg = str(orig) if orig is not None else str(exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"merge failed at commit: {type(exc).__name__}: {driver_msg[:400]}",
+        ) from exc
     await session.refresh(primary)
 
     # Audit rows: one on each side so both timelines carry the merge.

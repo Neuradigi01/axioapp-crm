@@ -357,7 +357,7 @@ async def reassign_contact_references(
 
     * **Direct FK columns.** appointments · leads · walk-ins · calls ·
       campaign_messages · conversations · reviews · automation_runs ·
-      workflow_runs (2 columns) · invoices · consent_events ·
+      workflow_runs · invoices · consent_events ·
       email_sequence_enrollments · whatsapp_flow_submissions ·
       custom_orders (furniture pack) — a straight UPDATE ... WHERE
       contact_id = :secondary.
@@ -374,28 +374,44 @@ async def reassign_contact_references(
     secondary DELETE isn't blocked. Then SET NULL / CASCADE targets.
     Order doesn't affect correctness but keeps the failure surface
     small.
+
+    Missing-table tolerance: every UPDATE first checks the target
+    exists via ``to_regclass`` and skips silently if not. Local dev DBs
+    that lag on migrations or optional integrations (whatsapp-flows,
+    email-sequences) still allow merges to complete rather than 500ing
+    with an opaque ``ProgrammingError`` on a table that isn't installed.
     """
     counts: dict[str, int] = {}
 
+    async def _table_exists(table_name: str) -> bool:
+        row = (
+            await session.execute(
+                text("SELECT to_regclass(:t) IS NOT NULL"),
+                {"t": table_name},
+            )
+        ).scalar()
+        return bool(row)
+
     # Group memberships: dedupe (drop secondary rows for groups the
     # primary is already in) then reassign the rest.
-    dedupe_group_members = text(
-        """
-        DELETE FROM tbl_contact_group_members
-        WHERE org_id = :org_id
-          AND contact_id = :secondary
-          AND group_id IN (
-            SELECT group_id FROM tbl_contact_group_members
-            WHERE org_id = :org_id AND contact_id = :primary
-          )
-        """
-    )
-    counts["contact_group_members_deduped"] = (
-        await session.execute(
-            dedupe_group_members,
-            {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+    if await _table_exists("tbl_contact_group_members"):
+        dedupe_group_members = text(
+            """
+            DELETE FROM tbl_contact_group_members
+            WHERE org_id = :org_id
+              AND contact_id = :secondary
+              AND group_id IN (
+                SELECT group_id FROM tbl_contact_group_members
+                WHERE org_id = :org_id AND contact_id = :primary
+              )
+            """
         )
-    ).rowcount or 0
+        counts["contact_group_members_deduped"] = (
+            await session.execute(
+                dedupe_group_members,
+                {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+            )
+        ).rowcount or 0
 
     # Every direct-FK table shares the same UPDATE shape. Iterate a
     # (table, count-key) list so the map is populated per-table with
@@ -420,6 +436,8 @@ async def reassign_contact_references(
         ("tbl_whatsapp_flow_submissions", "whatsapp_flow_submissions"),
     )
     for tbl, key in _FK_TARGETS:
+        if not await _table_exists(tbl):
+            continue
         stmt = text(
             f"UPDATE {tbl} SET contact_id = :primary "
             f"WHERE org_id = :org_id AND contact_id = :secondary"
@@ -431,14 +449,13 @@ async def reassign_contact_references(
             )
         ).rowcount or 0
 
-    # Workflow runs carry two contact refs (subject + latest actor);
-    # both need updating.
-    for column in ("contact_id", "latest_contact_id"):
+    # Workflow runs carry a single subject contact_id.
+    if await _table_exists("tbl_workflow_runs"):
         stmt = text(
-            f"UPDATE tbl_workflow_runs SET {column} = :primary "
-            f"WHERE org_id = :org_id AND {column} = :secondary"
+            "UPDATE tbl_workflow_runs SET contact_id = :primary "
+            "WHERE org_id = :org_id AND contact_id = :secondary"
         )
-        counts[f"workflow_runs_{column}"] = (
+        counts["workflow_runs_contact_id"] = (
             await session.execute(
                 stmt,
                 {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
@@ -446,29 +463,31 @@ async def reassign_contact_references(
         ).rowcount or 0
 
     # Polymorphic-entity tables: activities + tasks.
-    activities_stmt = text(
-        "UPDATE tbl_activities SET entity_id = :primary "
-        "WHERE org_id = :org_id "
-        "AND entity_type = 'contact' AND entity_id = :secondary"
-    )
-    counts["activities"] = (
-        await session.execute(
-            activities_stmt,
-            {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+    if await _table_exists("tbl_activities"):
+        activities_stmt = text(
+            "UPDATE tbl_activities SET entity_id = :primary "
+            "WHERE org_id = :org_id "
+            "AND entity_type = 'contact' AND entity_id = :secondary"
         )
-    ).rowcount or 0
+        counts["activities"] = (
+            await session.execute(
+                activities_stmt,
+                {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+            )
+        ).rowcount or 0
 
-    tasks_stmt = text(
-        "UPDATE tbl_tasks SET related_entity_id = :primary "
-        "WHERE org_id = :org_id "
-        "AND related_entity_type = 'contact' AND related_entity_id = :secondary"
-    )
-    counts["tasks"] = (
-        await session.execute(
-            tasks_stmt,
-            {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+    if await _table_exists("tbl_tasks"):
+        tasks_stmt = text(
+            "UPDATE tbl_tasks SET related_entity_id = :primary "
+            "WHERE org_id = :org_id "
+            "AND related_entity_type = 'contact' AND related_entity_id = :secondary"
         )
-    ).rowcount or 0
+        counts["tasks"] = (
+            await session.execute(
+                tasks_stmt,
+                {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+            )
+        ).rowcount or 0
 
     return counts
 
