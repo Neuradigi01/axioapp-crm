@@ -4,7 +4,9 @@ import {
   Component,
   DestroyRef,
   computed,
+  effect,
   inject,
+  input,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -130,11 +132,45 @@ export class TodaysFollowupsComponent {
 
     // Initial load + start the 60s poll. `takeUntilDestroyed` unsubscribes
     // both the search stream and the poll when the widget tears down.
+    // The tick is gated on `document.visibilityState === 'visible'` so
+    // background tabs and locked mobile screens don't burn battery
+    // hammering the API every minute. When the tab comes back to the
+    // foreground we do an immediate silent fetch to catch up on
+    // whatever changed while we were hidden.
     this.fetch({ silent: false });
     interval(60_000)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.fetch({ silent: true }));
+      .subscribe(() => {
+        if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+          this.fetch({ silent: true });
+        }
+      });
+
+    if (typeof document !== 'undefined') {
+      const onVisibility = () => {
+        if (document.visibilityState === 'visible') {
+          this.fetch({ silent: true });
+        }
+      };
+      document.addEventListener('visibilitychange', onVisibility);
+      this.destroyRef.onDestroy(() => {
+        document.removeEventListener('visibilitychange', onVisibility);
+      });
+    }
+
+    // Fan-in from the dashboard page's Refresh button. Skip the
+    // initial value (tick=0) so mount doesn't fire a duplicate fetch
+    // on top of the one queued above.
+    effect(() => {
+      const tick = this.refreshTick();
+      if (tick > 0) {
+        this.fetch({ silent: true });
+      }
+    });
   }
+
+  /** Monotonic tick from the dashboard page's Refresh button. */
+  readonly refreshTick = input<number>(0);
 
   // --- view helpers ------------------------------------------------------
 

@@ -7,6 +7,7 @@ import {
   DestroyRef,
   effect,
   inject,
+  input,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -144,10 +145,19 @@ export class TrendChartComponent {
     padding: { left: 8, right: 8 },
   }));
 
+  /** Monotonic tick from the dashboard page's Refresh button. Bumping
+   *  it forces a re-fetch even if metric + range haven't changed —
+   *  otherwise the effect below wouldn't re-run because the signal
+   *  values it reads are identical. */
+  readonly refreshTick = input<number>(0);
+
   constructor() {
     effect(() => {
       const m = this.metric();
       const r = dashboardRange();
+      // Reading the tick here subscribes the effect to it; changes
+      // trigger the same load path as switching metric or range.
+      this.refreshTick();
       this.load(m, r);
     });
   }

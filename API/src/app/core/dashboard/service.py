@@ -186,23 +186,29 @@ async def _assemble_org_cards(
 
     cards: list[DashboardCard] = []
 
-    # leads.new_today  vs  leads created yesterday
-    leads_new_today = (
+    # leads.new_today  vs  leads created yesterday — one SELECT with
+    # two conditional aggregates so we save a round-trip. The narrow
+    # (yesterday .. tomorrow) window on Lead.created_at bounds the scan
+    # so the composite `(org_id, created_at)` index (Alembic 0011 +
+    # 0070) does the heavy lifting; the CASE filters inside the count.
+    _lead_pair_start = datetime.combine(yesterday, datetime.min.time(), tzinfo=UTC)
+    _lead_pair_end = datetime.combine(today + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
+    _row = (
         await session.execute(
-            select(func.count(Lead.id)).where(
+            select(
+                func.count(case((func.date(Lead.created_at) == today, Lead.id))).label("today_c"),
+                func.count(case((func.date(Lead.created_at) == yesterday, Lead.id))).label(
+                    "prev_c"
+                ),
+            ).where(
                 Lead.org_id == org_id,
-                func.date(Lead.created_at) == today,
+                Lead.created_at >= _lead_pair_start,
+                Lead.created_at < _lead_pair_end,
             )
         )
-    ).scalar_one()
-    leads_new_prev = (
-        await session.execute(
-            select(func.count(Lead.id)).where(
-                Lead.org_id == org_id,
-                func.date(Lead.created_at) == yesterday,
-            )
-        )
-    ).scalar_one()
+    ).one()
+    leads_new_today = int(_row.today_c or 0)
+    leads_new_prev = int(_row.prev_c or 0)
     cards.append(
         _scalar_card(
             key="leads.new_today",
@@ -285,25 +291,29 @@ async def _assemble_org_cards(
         )
     )
 
-    # appointments.today  vs  yesterday
-    appts_today = (
+    # appointments.today  vs  yesterday — combined into one round-trip
+    # bounded by the 2-day scheduled_at window and pre-filtered on
+    # status=scheduled (matches the composite `(org_id, scheduled_at)`
+    # index from Alembic 0012).
+    _appts_row = (
         await session.execute(
-            select(func.count(Appointment.id)).where(
+            select(
+                func.count(case((func.date(Appointment.scheduled_at) == today, Appointment.id))).label(
+                    "today_c"
+                ),
+                func.count(
+                    case((func.date(Appointment.scheduled_at) == yesterday, Appointment.id))
+                ).label("prev_c"),
+            ).where(
                 Appointment.org_id == org_id,
-                func.date(Appointment.scheduled_at) == today,
                 Appointment.status == AppointmentStatus.scheduled,
+                Appointment.scheduled_at >= _lead_pair_start,
+                Appointment.scheduled_at < _lead_pair_end,
             )
         )
-    ).scalar_one()
-    appts_prev = (
-        await session.execute(
-            select(func.count(Appointment.id)).where(
-                Appointment.org_id == org_id,
-                func.date(Appointment.scheduled_at) == yesterday,
-                Appointment.status == AppointmentStatus.scheduled,
-            )
-        )
-    ).scalar_one()
+    ).one()
+    appts_today = int(_appts_row.today_c or 0)
+    appts_prev = int(_appts_row.prev_c or 0)
     cards.append(
         _scalar_card(
             key="appointments.today",
@@ -317,24 +327,27 @@ async def _assemble_org_cards(
 
     # calls.this_week  vs  same week-to-date offset in the previous
     # week (so on Wed at 3pm we compare Mon 00:00 → Wed 3pm vs the
-    # equivalent range one week earlier).
-    calls_this_week = (
+    # equivalent range one week earlier). Combined into a single
+    # 2-week scan bounded by `started_at >= prev_week_start`; the
+    # composite `(org_id, started_at)` index (Alembic 0019) drives
+    # the range walk, CASEs partition the counts.
+    _calls_row = (
         await session.execute(
-            select(func.count(Call.id)).where(
-                Call.org_id == org_id,
-                Call.started_at >= week_start,
-            )
-        )
-    ).scalar_one()
-    calls_prev_week = (
-        await session.execute(
-            select(func.count(Call.id)).where(
+            select(
+                func.count(case((Call.started_at >= week_start, Call.id))).label("this_c"),
+                func.count(
+                    case(
+                        ((Call.started_at >= prev_week_start) & (Call.started_at < prev_week_cutoff), Call.id)
+                    )
+                ).label("prev_c"),
+            ).where(
                 Call.org_id == org_id,
                 Call.started_at >= prev_week_start,
-                Call.started_at < prev_week_cutoff,
             )
         )
-    ).scalar_one()
+    ).one()
+    calls_this_week = int(_calls_row.this_c or 0)
+    calls_prev_week = int(_calls_row.prev_c or 0)
     cards.append(
         _scalar_card(
             key="calls.this_week",
@@ -346,18 +359,21 @@ async def _assemble_org_cards(
         )
     )
 
-    # contacts.total (cumulative)  vs  cumulative count as-of 30d ago
-    contacts_total = (
-        await session.execute(select(func.count(Contact.id)).where(Contact.org_id == org_id))
-    ).scalar_one()
-    contacts_prev = (
+    # contacts.total (cumulative)  vs  cumulative count as-of 30d ago —
+    # both scan the same rows (all contacts in the org), so the CASE
+    # collapse is free.
+    _contacts_row = (
         await session.execute(
-            select(func.count(Contact.id)).where(
-                Contact.org_id == org_id,
-                Contact.created_at < thirty_days_ago,
-            )
+            select(
+                func.count(Contact.id).label("total_c"),
+                func.count(case((Contact.created_at < thirty_days_ago, Contact.id))).label(
+                    "prev_c"
+                ),
+            ).where(Contact.org_id == org_id)
         )
-    ).scalar_one()
+    ).one()
+    contacts_total = int(_contacts_row.total_c or 0)
+    contacts_prev = int(_contacts_row.prev_c or 0)
     cards.append(
         _scalar_card(
             key="contacts.total",
@@ -717,25 +733,26 @@ async def _recent_activity(
     are filtered out entirely either way — those are security signals,
     not "activity."
     """
+    # Push the include-list filter into SQL so we don't fetch 40 rows
+    # only to drop 30 of them in Python. Postgres uses the composite
+    # (org_id, created_at DESC) index (see migration 0171) to walk the
+    # tail of the org's audit log, applies the action predicate row-
+    # by-row, and stops as soon as LIMIT 10 is satisfied — no client-
+    # side re-filter needed.
+    action_predicate = or_(
+        AuditLog.action.in_(list(_ACTIVITY_INCLUDE_EXACT)),
+        *[AuditLog.action.startswith(p) for p in _ACTIVITY_INCLUDE_PREFIXES],
+    )
     stmt = (
         select(AuditLog)
-        .where(AuditLog.org_id == org_id)
+        .where(AuditLog.org_id == org_id, action_predicate)
         .order_by(AuditLog.created_at.desc())
-        .limit(40)
+        .limit(10)
     )
     if personal_only:
         stmt = stmt.where(AuditLog.user_id == caller_uuid)
 
-    rows = (await session.execute(stmt)).scalars().all()
-
-    visible: list[AuditLog] = []
-    for r in rows:
-        if r.action in _ACTIVITY_INCLUDE_EXACT or any(
-            r.action.startswith(p) for p in _ACTIVITY_INCLUDE_PREFIXES
-        ):
-            visible.append(r)
-        if len(visible) >= 10:
-            break
+    visible = list((await session.execute(stmt)).scalars().all())
 
     # Batch-resolve entity labels by type so we don't N+1 over the
     # 10-row window. Each block does one SELECT WHERE id IN (...).

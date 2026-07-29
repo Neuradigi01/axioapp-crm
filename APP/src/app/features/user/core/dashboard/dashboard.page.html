@@ -98,8 +98,8 @@
 
   <!-- Trend + funnel chart row -->
   <section class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-    <app-dashboard-trend-chart />
-    <app-dashboard-funnel-chart />
+    <app-dashboard-trend-chart [refreshTick]="refreshTick()" />
+    <app-dashboard-funnel-chart [refreshTick]="refreshTick()" />
   </section>
 
   <!-- Secondary KPI cards grid -->
@@ -147,7 +147,7 @@
     id="todays-followups-widget"
     class="mt-6 grid grid-cols-1 gap-4 scroll-mt-6 lg:grid-cols-2"
   >
-    <app-todays-followups />
+    <app-todays-followups [refreshTick]="refreshTick()" />
 
     <!-- Appointments — Today by default, Next 5 on demand -->
     <div class="card">

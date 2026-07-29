@@ -7,6 +7,7 @@ import {
   DestroyRef,
   effect,
   inject,
+  input,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -150,9 +151,17 @@ export class FunnelChartComponent {
   constructor() {
     effect(() => {
       const r = dashboardRange();
+      // Subscribe to the parent's Refresh tick — bumping it re-fires
+      // the effect and re-runs `load`, even if `dashboardRange` is
+      // unchanged. Same wiring as trend-chart.
+      this.refreshTick();
       this.load(r);
     });
   }
+
+  /** Monotonic tick from the dashboard page's Refresh button. See the
+   *  trend chart's copy of this input for the shape rationale. */
+  readonly refreshTick = input<number>(0);
 
   private load(range: DashboardRange): void {
     this.loading.set(true);
