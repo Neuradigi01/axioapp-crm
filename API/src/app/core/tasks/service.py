@@ -368,8 +368,13 @@ async def bulk_reassign_tasks(
 ) -> int:
     """Bulk reassign. Tasks require an owner (the column is NOT NULL),
     so `None` is rejected with 422 even though the schema typing is
-    optional. Per-row processing because rows already owned by the
-    target are skipped (no-op, not an error)."""
+    optional. Rows already owned by the target are skipped (no-op,
+    not an error).
+
+    Batched hydrate (``list_tasks_by_ids_in_org``) replaces the prior
+    per-id ``get_task`` loop, and every touched row now emits a
+    ``tasks.reassigned`` audit entry to match the single-row path —
+    bulk previously wrote timeline Activities but no audit trail."""
     if assigned_to_id is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -377,14 +382,19 @@ async def bulk_reassign_tasks(
         )
     await _assert_user_in_org(session, org_id=org_id, user_uuid=assigned_to_id)
 
+    # One SELECT for the whole batch; the DAL enforces org_id.
+    tasks = await _da.list_tasks_by_ids_in_org(session, ids=ids, org_id=org_id)
+
+    # Collect per-row before/after snapshots so we can write audit
+    # entries AFTER commit — a subscriber crash mid-loop then can't
+    # roll back a whole reassign batch.
     reassigned = 0
-    for tid in ids:
-        task = await get_task(session, tid)
-        if task is None:
-            continue
+    audit_batch: list[tuple[uuid.UUID, dict[str, Any], dict[str, Any]]] = []
+    for task in tasks:
         if task.assigned_to_id == assigned_to_id:
             continue
         before_id = task.assigned_to_id
+        before_snap = snapshot(task)
         task.assigned_to_id = assigned_to_id
         await activities.record_in_session(
             session,
@@ -395,9 +405,19 @@ async def bulk_reassign_tasks(
             payload=_reassign_payload(from_id=before_id, to_id=assigned_to_id, note=note),
             user_id=actor_user_id,
         )
+        audit_batch.append((task.id, before_snap, snapshot(task)))
         reassigned += 1
 
     await session.commit()
+
+    for task_id, before_snap, after_snap in audit_batch:
+        await log_entity_change(
+            action="tasks.reassigned",
+            entity_type=_TASK_ENTITY,
+            entity_id=task_id,
+            before=before_snap,
+            after=after_snap,
+        )
     return reassigned
 
 
@@ -407,23 +427,39 @@ async def bulk_mark_done_tasks(
     ids: list[uuid.UUID],
     org_id: uuid.UUID,
 ) -> tuple[int, int]:
-    """Move every `open` (or `cancelled`) task in the batch to `done`."""
+    """Move every open (or cancelled) task in the batch to ``done``.
+
+    Batched hydrate replaces the prior per-id ``get_task`` loop, and
+    every flipped row now emits a ``tasks.marked_done`` audit entry —
+    the single-row PATCH path calls ``tasks.updated`` with before/after
+    snapshots; bulk was previously silent, so subscribers listening
+    for task completion (e.g. workflow triggers) never saw bulk-done
+    events."""
+    tasks = await _da.list_tasks_by_ids_in_org(session, ids=ids, org_id=org_id)
+
     done = 0
     skipped = 0
-    for tid in ids:
-        task = await get_task(session, tid)
-        if task is None:
-            continue
-        if task.org_id != org_id:
-            continue
+    audit_batch: list[tuple[uuid.UUID, dict[str, Any], dict[str, Any]]] = []
+    for task in tasks:
         if task.status == TaskStatus.done:
             skipped += 1
             continue
+        before_snap = snapshot(task)
         task.status = TaskStatus.done
         task.last_activity_at = datetime.now(UTC)
+        audit_batch.append((task.id, before_snap, snapshot(task)))
         done += 1
 
     await session.commit()
+
+    for task_id, before_snap, after_snap in audit_batch:
+        await log_entity_change(
+            action="tasks.marked_done",
+            entity_type=_TASK_ENTITY,
+            entity_id=task_id,
+            before=before_snap,
+            after=after_snap,
+        )
     return done, skipped
 
 
@@ -434,9 +470,30 @@ async def bulk_delete_tasks(
     org_id: uuid.UUID,
 ) -> int:
     """Hard delete in bulk. Single DELETE statement scoped by org_id
-    so a misconfigured tenant context can't leak cross-org rows."""
+    so a misconfigured tenant context can't leak cross-org rows.
+
+    Snapshots each row *before* the DELETE so we can write one
+    ``tasks.deleted`` audit entry per gone row (matches the single-row
+    ``delete_task`` path — the bulk path used to be silent, so any
+    operator or subscriber replaying the audit trail would see rows
+    vanish with no explanation).
+
+    Tasks have no outbound FK RESTRICT dependents at the DB level so
+    there is nothing to catch — leads.bulk_delete needs the
+    IntegrityError wrap; tasks does not."""
+    tasks = await _da.list_tasks_by_ids_in_org(session, ids=ids, org_id=org_id)
+    snapshots = [(t.id, snapshot(t)) for t in tasks]
+
     rowcount = await _da.bulk_delete_tasks_by_ids(session, ids=ids, org_id=org_id)
     await session.commit()
+
+    for task_id, before_snap in snapshots:
+        await log_entity_change(
+            action="tasks.deleted",
+            entity_type=_TASK_ENTITY,
+            entity_id=task_id,
+            before=before_snap,
+        )
     return rowcount
 
 

@@ -106,6 +106,29 @@ async def bulk_delete_tasks_by_ids(
     return int(result.rowcount or 0)
 
 
+async def list_tasks_by_ids_in_org(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> list[Task]:
+    """Batched hydrate for the bulk-op paths. Empty ``ids`` short-circuits
+    without a round-trip. Explicit ``org_id`` predicate belts the RLS
+    policy — same shape ``leads.data_access.list_leads_by_ids_in_org``
+    uses.
+
+    Prior versions of ``bulk_reassign_tasks`` / ``bulk_mark_done_tasks``
+    walked ``ids`` and called ``get_task_by_id`` per iteration, giving
+    the router-cap 200 ids ≡ 200 SELECTs. This is the one-shot version
+    the service now uses."""
+    if not ids:
+        return []
+    result = await session.execute(
+        select(Task).where(Task.org_id == org_id, Task.id.in_(ids))
+    )
+    return list(result.scalars().all())
+
+
 # --- Cross-module verifier ----------------------------------------------
 
 
@@ -134,6 +157,7 @@ __all__ = [
     "delete_task_row",
     "get_task_by_id",
     "insert_task",
+    "list_tasks_by_ids_in_org",
     "list_tasks_for_entity_query",
     "paginate_tasks_select",
     "user_has_active_membership",
