@@ -17,6 +17,7 @@ import {
   Conversation,
   ConversationDetail,
   ConversationMessage,
+  ConversationStatus,
   ConversationTagRef,
   MessageReaction,
 } from './conversations-api.service';
@@ -103,6 +104,45 @@ export class ChatThreadComponent implements AfterViewChecked {
    *  banner. Parent decides where to route (templates page today;
    *  future Step 16 might wire to in-thread template send). */
   @Output() readonly pickTemplate = new EventEmitter<void>();
+
+  /** J.16 fix — the user picked a new status from the header status
+   *  menu (open / snoozed / closed). Parent owns the PATCH; header
+   *  just surfaces the choice. Snoozed conversations get an inbound-
+   *  wake in ``receive_webhook``; closed ones stay closed until the
+   *  operator reopens them explicitly. */
+  @Output() readonly statusChange = new EventEmitter<ConversationStatus>();
+
+  /** Header status-menu open flag — flipped by the pill click. */
+  protected readonly statusMenuOpen = signal<boolean>(false);
+
+  protected toggleStatusMenu(): void {
+    this.statusMenuOpen.update((v) => !v);
+  }
+
+  protected closeStatusMenu(): void {
+    this.statusMenuOpen.set(false);
+  }
+
+  protected pickStatus(next: ConversationStatus): void {
+    this.closeStatusMenu();
+    if (next === this.conversation.status) return;
+    this.statusChange.emit(next);
+  }
+
+  /** Human label for the header pill — used for the trigger button
+   *  and read out in the menu items. */
+  protected readonly statusLabel: Record<ConversationStatus, string> = {
+    open: 'Open',
+    snoozed: 'Snoozed',
+    closed: 'Closed',
+  };
+
+  /** Menu options in fixed order so the DOM structure is stable. */
+  protected readonly statusOptions: readonly ConversationStatus[] = [
+    'open',
+    'snoozed',
+    'closed',
+  ] as const;
 
   protected toggleTagManager(): void {
     this.tagManagerOpen.update((v) => !v);

@@ -56,6 +56,64 @@
           {{ staffNameFor(conversation.assigned_to_id) }}
         </span>
       }
+      <!-- J.16 fix — status pill + menu. Backend already accepts
+           `open` / `snoozed` / `closed` via PATCH; the UI now has
+           a control to emit that. Menu closes on selection. -->
+      <div class="relative">
+        <button
+          type="button"
+          (click)="toggleStatusMenu(); $event.stopPropagation()"
+          [class]="
+            'inline-flex items-center gap-1 rounded-full border border-subtle px-2.5 py-1 text-xs font-medium capitalize transition hover:bg-surface-2 ' +
+            (conversation.status === 'closed'
+              ? 'bg-zinc-500/10 text-zinc-500'
+              : conversation.status === 'snoozed'
+                ? 'bg-sky-500/10 text-sky-600'
+                : 'bg-emerald-500/10 text-emerald-700')
+          "
+          [attr.aria-expanded]="statusMenuOpen()"
+          aria-haspopup="menu"
+          [title]="'Status — ' + statusLabel[conversation.status]"
+        >
+          <lucide-icon
+            [name]="
+              conversation.status === 'closed'
+                ? 'check-circle-2'
+                : conversation.status === 'snoozed'
+                  ? 'clock'
+                  : 'circle-dot'
+            "
+            class="h-3 w-3"
+          />
+          {{ statusLabel[conversation.status] }}
+        </button>
+        @if (statusMenuOpen()) {
+          <div
+            role="menu"
+            class="absolute right-0 z-30 mt-1 w-40 rounded-md border border-subtle bg-surface p-1 shadow-lg"
+          >
+            @for (opt of statusOptions; track opt) {
+              <button
+                type="button"
+                role="menuitem"
+                (click)="pickStatus(opt); $event.stopPropagation()"
+                [class]="
+                  'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs capitalize transition hover:bg-surface-2 ' +
+                  (opt === conversation.status ? 'font-semibold text-default' : 'text-muted')
+                "
+              >
+                <lucide-icon
+                  [name]="
+                    opt === 'closed' ? 'check-circle-2' : opt === 'snoozed' ? 'clock' : 'circle-dot'
+                  "
+                  class="h-3 w-3"
+                />
+                {{ statusLabel[opt] }}
+              </button>
+            }
+          </div>
+        }
+      </div>
       <!-- Step 14 — Tags button with chip-row preview + manager dropdown -->
       <div class="relative">
         <button

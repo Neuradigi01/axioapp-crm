@@ -31,8 +31,17 @@ import {
 } from '../shared/reassign-modal/reassign-modal.component';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { Contact, ContactsApiService } from '../contacts/contacts-api.service';
+import { PipelineStage, PipelinesApiService } from '../pipelines/pipelines-api.service';
 import { Lead, LeadCreate, LeadUpdate, LeadsApiService } from './leads-api.service';
 import { LeadFormModalComponent } from './lead-form-modal.component';
+import {
+  LostReasonConfirm,
+  LostReasonModalComponent,
+} from './lost-reason-modal/lost-reason-modal.component';
+import {
+  WonCaptureConfirm,
+  WonCaptureModalComponent,
+} from './won-capture-modal/won-capture-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
 
@@ -75,6 +84,8 @@ const STAGE_TONES: Record<string, { bg: string; text: string; ring: string }> = 
     PhoneLinkDirective,
     WhatsappLinkDirective,
     MailLinkDirective,
+    LostReasonModalComponent,
+    WonCaptureModalComponent,
   ],
   templateUrl: './lead-detail.page.html',
 })
@@ -82,6 +93,7 @@ export class LeadDetailPageComponent implements OnInit {
   protected readonly initials = initials;
   private readonly api = inject(LeadsApiService);
   private readonly contactsApi = inject(ContactsApiService);
+  private readonly pipelinesApi = inject(PipelinesApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -123,6 +135,31 @@ export class LeadDetailPageComponent implements OnInit {
   readonly modalOpen = computed(() => this.editingLead() !== null);
   readonly submitting = signal(false);
   readonly formError = signal<string | null>(null);
+
+  /** Loaded lead pipeline stages — used to pre-check `is_won` / `is_lost`
+   *  on the destination stage when the Edit modal reports a
+   *  ``moveStageTo``, so the correct capture modal (Won / Lost) opens
+   *  before we dispatch the move. Empty until the pipeline API responds. */
+  readonly pipelineStages = signal<PipelineStage[]>([]);
+
+  /** Pending payload waiting on a Lost-reason. Mirrors the leads-list
+   *  page pattern — same picker component, same downstream call. Held
+   *  here so the reason modal can re-issue the update + move-stage on
+   *  confirm. */
+  readonly pendingLostSave = signal<{ update: LeadUpdate; toStage: string } | null>(null);
+  readonly lostReasonSubmitting = signal(false);
+  readonly lostReasonError = signal<string | null>(null);
+
+  /** Pending payload waiting on Won-capture. Same up-front check as the
+   *  kanban: the backend doesn't 422 on missing won fields, so we open
+   *  the modal proactively when the target stage has ``is_won=true``. */
+  readonly pendingWonSave = signal<{ update: LeadUpdate; toStage: string } | null>(null);
+  readonly wonCaptureSubmitting = signal(false);
+  readonly wonCaptureError = signal<string | null>(null);
+
+  /** Suggestion feed for the Won modal's "closed amount" input —
+   *  seeds with the lead's own `budget`. */
+  readonly pendingWonSuggestion = signal<string | null>(null);
 
   protected onNoteCreated(activity: Activity): void {
     this.timeline()?.prepend(activity);
@@ -183,6 +220,7 @@ export class LeadDetailPageComponent implements OnInit {
     }
     this.loadLead(id);
     this.loadFields();
+    this.loadPipelineStages();
   }
 
   protected setTab(tab: DetailTab): void {
@@ -207,17 +245,114 @@ export class LeadDetailPageComponent implements OnInit {
   }): void {
     const l = this.lead();
     if (!event.update || !l) return;
-    this.submitting.set(true);
-    this.formError.set(null);
     // ``pipeline_stage`` transitions never flow through the plain
     // PATCH — the backend `LeadUpdate` schema deliberately omits it
     // so kanban moves go through `move-stage` (which stamps activity
-    // + audit + status sync). Mirror the leads-list page pattern:
-    // apply the field-level update, then chain the stage move when
-    // the modal reported one.
-    const update$ = this.api.update(l.id, event.update);
-    const final$ = event.moveStageTo
-      ? update$.pipe(switchMap(() => this.api.moveStage(l.id, event.moveStageTo!)))
+    // + audit + status sync). When the modal reports a
+    // ``moveStageTo`` we pre-check the destination stage: if it's
+    // Lost we open the reason picker, if it's Won we open the capture
+    // modal; either flow re-issues the PATCH + move-stage with the
+    // right fields on confirm.
+    if (event.moveStageTo) {
+      const targetStage = this.pipelineStages().find((s) => s.key === event.moveStageTo);
+      if (targetStage?.is_lost) {
+        this.pendingLostSave.set({ update: event.update, toStage: event.moveStageTo });
+        this.lostReasonError.set(null);
+        return;
+      }
+      if (targetStage?.is_won) {
+        this.pendingWonSave.set({ update: event.update, toStage: event.moveStageTo });
+        this.pendingWonSuggestion.set(l.budget ?? null);
+        this.wonCaptureError.set(null);
+        return;
+      }
+    }
+    this.dispatchSave(l.id, event.update, event.moveStageTo);
+  }
+
+  protected onLostReasonConfirm(payload: LostReasonConfirm): void {
+    const pending = this.pendingLostSave();
+    const l = this.lead();
+    if (!pending || !l) return;
+    this.lostReasonSubmitting.set(true);
+    this.lostReasonError.set(null);
+    this.api
+      .update(l.id, pending.update)
+      .pipe(
+        switchMap(() =>
+          this.api.moveStage(l.id, pending.toStage, {
+            lost_reason: payload.lost_reason,
+            lost_reason_other: payload.lost_reason_other,
+          }),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (updated) => {
+          this.lead.set(updated);
+          this.lostReasonSubmitting.set(false);
+          this.pendingLostSave.set(null);
+          this.closeModal();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.lostReasonSubmitting.set(false);
+          this.lostReasonError.set(extractApiError(err) ?? 'Could not mark lead as Lost.');
+        },
+      });
+  }
+
+  protected onLostReasonCancel(): void {
+    this.pendingLostSave.set(null);
+    this.lostReasonError.set(null);
+    this.lostReasonSubmitting.set(false);
+  }
+
+  protected onWonCaptureConfirm(payload: WonCaptureConfirm): void {
+    const pending = this.pendingWonSave();
+    const l = this.lead();
+    if (!pending || !l) return;
+    this.wonCaptureSubmitting.set(true);
+    this.wonCaptureError.set(null);
+    this.api
+      .update(l.id, pending.update)
+      .pipe(
+        switchMap(() =>
+          this.api.moveStage(l.id, pending.toStage, {
+            won_value: payload.won_value,
+            close_date: payload.close_date,
+            won_reason: payload.won_reason,
+          }),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (updated) => {
+          this.lead.set(updated);
+          this.wonCaptureSubmitting.set(false);
+          this.pendingWonSave.set(null);
+          this.pendingWonSuggestion.set(null);
+          this.closeModal();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.wonCaptureSubmitting.set(false);
+          this.wonCaptureError.set(extractApiError(err) ?? 'Could not mark lead as Won.');
+        },
+      });
+  }
+
+  protected onWonCaptureCancel(): void {
+    this.pendingWonSave.set(null);
+    this.pendingWonSuggestion.set(null);
+    this.wonCaptureError.set(null);
+    this.wonCaptureSubmitting.set(false);
+  }
+
+  private dispatchSave(id: string, update: LeadUpdate, moveStageTo?: string): void {
+    this.submitting.set(true);
+    this.formError.set(null);
+    const update$ = this.api.update(id, update);
+    const final$ = moveStageTo
+      ? update$.pipe(switchMap(() => this.api.moveStage(id, moveStageTo)))
       : update$;
     final$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (updated) => {
@@ -336,6 +471,19 @@ export class LeadDetailPageComponent implements OnInit {
       .subscribe({
         next: (defs) => this.fields.set(defs),
         error: () => this.fields.set([]),
+      });
+  }
+
+  private loadPipelineStages(): void {
+    this.pipelinesApi
+      .getByKey('leads')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (p) => this.pipelineStages.set(p.stages ?? []),
+        // Non-blocking: if the pipeline load fails, the Lost/Won
+        // interception silently no-ops and the standard save path
+        // handles it. Field-level errors surface elsewhere on the page.
+        error: () => this.pipelineStages.set([]),
       });
   }
 

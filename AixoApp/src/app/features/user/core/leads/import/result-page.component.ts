@@ -9,8 +9,6 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { Subscription, interval } from 'rxjs';
-import { startWith } from 'rxjs/operators';
 
 import { ImportsApiService, LeadImport, LeadImportStatus } from './imports-api.service';
 
@@ -37,7 +35,13 @@ import { ImportsApiService, LeadImport, LeadImportStatus } from './imports-api.s
  * cleanly — first tick fetches, sees a terminal status, stops.
  */
 
-const POLL_INTERVAL_MS = 2000;
+// Backoff schedule for the status poll. First few ticks are quick so
+// small imports (dev inline, sub-second Celery hop) feel instant; the
+// interval then grows so a genuinely long-running 10-min bulk import
+// isn't hammered with 300 requests. Cap at 30s — long enough to spare
+// the API, short enough that a completed import doesn't feel stuck.
+const POLL_BACKOFF_MS: readonly number[] = [2000, 2000, 5000, 5000, 10000, 15000, 30000];
+const POLL_MAX_MS = POLL_BACKOFF_MS[POLL_BACKOFF_MS.length - 1];
 
 const TERMINAL_STATUSES = new Set<LeadImportStatus>(['completed', 'failed', 'cancelled']);
 
@@ -127,23 +131,31 @@ export class ResultPageComponent {
       .sort((a, b) => b.count - a.count);
   }
 
-  private pollSub: Subscription | null = null;
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private pollTick = 0;
 
   constructor() {
     if (!this.importId) {
       this.loadError.set('No import id in the route.');
       return;
     }
-    this.startPolling();
+    // Immediate first fetch — subsequent ticks are scheduled with a
+    // backoff so a 10-min import doesn't fire 300 status polls.
+    this.fetch();
+    this.destroyRef.onDestroy(() => this.stopPolling());
   }
 
-  private startPolling(): void {
-    // First-tick-immediate via `startWith(0)` so the UI fills as soon
-    // as the page loads; subsequent ticks fire every 2s. We stop the
-    // subscription as soon as the row reaches a terminal status.
-    this.pollSub = interval(POLL_INTERVAL_MS)
-      .pipe(startWith(0), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.fetch());
+  private scheduleNextPoll(): void {
+    const delay = POLL_BACKOFF_MS[this.pollTick] ?? POLL_MAX_MS;
+    this.pollTick += 1;
+    this.pollTimer = setTimeout(() => this.fetch(), delay);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer !== null) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 
   private fetch(): void {
@@ -154,14 +166,14 @@ export class ResultPageComponent {
         next: (row) => {
           this.importRow.set(row);
           if (TERMINAL_STATUSES.has(row.status)) {
-            this.pollSub?.unsubscribe();
-            this.pollSub = null;
+            this.stopPolling();
+            return;
           }
+          this.scheduleNextPoll();
         },
         error: () => {
           this.loadError.set('Could not load this import.');
-          this.pollSub?.unsubscribe();
-          this.pollSub = null;
+          this.stopPolling();
         },
       });
   }

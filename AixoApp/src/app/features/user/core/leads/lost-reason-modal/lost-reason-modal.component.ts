@@ -98,9 +98,13 @@ export class LostReasonModalComponent {
 
   protected readonly canConfirm = computed(() => {
     if (this._submitting()) return false;
-    if (this.reasonControl.invalid) return false;
-    if (this.otherRequired() && !(this.otherValue() ?? '').trim()) return false;
-    if (this.otherControl.invalid) return false;
+    const reason = this.reasonValue();
+    if (!reason) return false;
+    if (reason === 'other') {
+      const other = (this.otherValue() ?? '').trim();
+      if (!other) return false;
+      if (other.length > 500) return false;
+    }
     return true;
   });
 

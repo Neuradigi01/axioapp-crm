@@ -110,6 +110,13 @@ export class DashboardPageComponent {
   protected readonly error = signal<string | null>(null);
   protected readonly refreshing = signal(false);
 
+  /** Monotonic counter bumped on every user-initiated Refresh click.
+   *  Trend / funnel / follow-ups widgets consume this via an `input`
+   *  and refetch on change so a single "Refresh" click reloads the
+   *  entire dashboard instead of just `/dashboard/summary`. Starts at
+   *  0 so the initial value never fires a duplicate fetch on mount. */
+  protected readonly refreshTick = signal(0);
+
   /** Which slice of appointments to fetch for the Appointments widget.
    *  Default matches the widget's default chip. Flipping this triggers
    *  a re-fetch of `/dashboard/summary?upcoming_scope=…`. */
@@ -175,6 +182,12 @@ export class DashboardPageComponent {
 
   protected refresh(): void {
     this.load(true);
+    // Fan out to every child widget by bumping the tick signal — their
+    // input-linked effects re-fire and hit their own endpoints. Keeps
+    // widget owners in charge of what to refetch (trend obeys metric
+    // + range, funnel obeys range, follow-ups is bucket-scoped) while
+    // one button reloads the whole page from the user's perspective.
+    this.refreshTick.update((n) => n + 1);
   }
 
   /** Flip the Appointments widget's Today ↔ Next 5 toggle. Refetches
