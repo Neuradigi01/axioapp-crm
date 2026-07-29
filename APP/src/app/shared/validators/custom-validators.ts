@@ -22,6 +22,7 @@ export const REASON = {
   dateMustBeFuture: 'date must be after today',
   dateInFuture: 'date cannot be in the future',
   dateTooOld: 'date is older than allowed',
+  dateTooFarAhead: 'date is further ahead than allowed',
   fileTooLarge: 'file exceeds the maximum size',
   unsupportedFileType: 'file type is not allowed',
   invalidChoice: 'value is not an allowed option',
@@ -290,6 +291,47 @@ export function dateWithinPastDays(n: number): ValidatorFn {
     const earliest = Date.now() - n * 24 * 60 * 60 * 1000;
     if (parsed.getTime() < earliest) {
       return { dateTooOld: REASON.dateTooOld, days: n };
+    }
+    return null;
+  };
+}
+
+/**
+ * Rejects values more than `n` hours in the past. Same shape as
+ * `dateWithinPastDays` but sub-day granularity — for queue / wait-time
+ * fields where "yesterday" is already suspicious. Future values pass;
+ * pair with `dateNotFutureValidator` for a full past-only window.
+ */
+export function dateWithinPastHours(n: number): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const raw = control.value;
+    if (isEmpty(raw)) return null;
+    const parsed = new Date(String(raw).trim());
+    if (Number.isNaN(parsed.getTime())) return null;
+    const earliest = Date.now() - n * 60 * 60 * 1000;
+    if (parsed.getTime() < earliest) {
+      return { dateTooOld: REASON.dateTooOld, hours: n };
+    }
+    return null;
+  };
+}
+
+/**
+ * Rejects values more than `n` days in the future. Mirror of
+ * `dateWithinPastDays` for forward-looking fields (expected return
+ * date, forecast close date) where a year-out cap is enough — anything
+ * further is a typo (e.g. year 3025). Past values pass; pair with
+ * `dateFutureValidator` for a strict tomorrow-onward window.
+ */
+export function dateWithinFutureDays(n: number): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const raw = control.value;
+    if (isEmpty(raw)) return null;
+    const parsed = new Date(String(raw).trim());
+    if (Number.isNaN(parsed.getTime())) return null;
+    const latest = Date.now() + n * 24 * 60 * 60 * 1000;
+    if (parsed.getTime() > latest) {
+      return { dateTooFarAhead: REASON.dateTooFarAhead, days: n };
     }
     return null;
   };

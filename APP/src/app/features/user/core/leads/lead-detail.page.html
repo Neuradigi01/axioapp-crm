@@ -413,3 +413,32 @@
     (cancel)="closeDelete()"
   />
 }
+
+<!-- Lost-reason modal: opens when the Edit-lead modal reports a
+     ``moveStageTo`` that targets an ``is_lost=true`` stage. The reason
+     picker collects lost_reason (+ optional other) and we re-issue the
+     PATCH + move-stage together on confirm. -->
+@if (pendingLostSave()) {
+  <app-lost-reason-modal
+    [submitting]="lostReasonSubmitting()"
+    [error]="lostReasonError()"
+    [currentReason]="lead()?.lost_reason ?? null"
+    [currentReasonOther]="lead()?.lost_reason_other ?? null"
+    (confirm)="onLostReasonConfirm($event)"
+    (cancel)="onLostReasonCancel()"
+  />
+}
+
+<!-- Won-capture modal: opens when the Edit-lead modal reports a
+     ``moveStageTo`` that targets an ``is_won=true`` stage. Symmetric to
+     Lost — capture won_value / close_date / won_reason, then re-issue
+     the PATCH + move-stage together on confirm. -->
+@if (pendingWonSave()) {
+  <app-won-capture-modal
+    [submitting]="wonCaptureSubmitting()"
+    [error]="wonCaptureError()"
+    [suggestedValue]="pendingWonSuggestion()"
+    (confirm)="onWonCaptureConfirm($event)"
+    (cancel)="onWonCaptureCancel()"
+  />
+}
