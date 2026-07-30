@@ -31,12 +31,30 @@ type SettingsTab =
   | 'standard-fields'
   | 'embed';
 
+type SettingsGroup = 'account' | 'workspace' | 'automation' | 'data';
+
 interface TabDef {
   id: SettingsTab;
   label: string;
+  group: SettingsGroup;
   /** If set, the tab is hidden unless the current user holds this permission. */
   permission?: string;
 }
+
+interface GroupedTabs {
+  id: SettingsGroup;
+  label: string;
+  tabs: ReadonlyArray<TabDef>;
+}
+
+const GROUP_LABELS: Record<SettingsGroup, string> = {
+  account: 'Account',
+  workspace: 'Workspace',
+  automation: 'Automation',
+  data: 'Data & Fields',
+};
+
+const GROUP_ORDER: ReadonlyArray<SettingsGroup> = ['account', 'workspace', 'automation', 'data'];
 
 /**
  * Tabs that mutate org-wide state are gated by an explicit permission
@@ -45,41 +63,45 @@ interface TabDef {
  * straight on it when they open `/user/settings`.
  */
 const TABS: ReadonlyArray<TabDef> = [
-  { id: 'profile', label: 'Profile' },
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'two-factor', label: 'Two-factor' },
-  { id: 'login-history', label: 'Login history' },
-  { id: 'store', label: 'Store Profile', permission: 'settings.write' },
-  { id: 'team', label: 'Team', permission: 'users.read' },
-  { id: 'roles', label: 'Roles', permission: 'roles.read' },
+  { id: 'profile', label: 'Profile', group: 'account' },
+  { id: 'appearance', label: 'Appearance', group: 'account' },
+  { id: 'notifications', label: 'Notifications', group: 'account' },
+  { id: 'two-factor', label: 'Two-factor', group: 'account' },
+  { id: 'login-history', label: 'Login history', group: 'account' },
+  { id: 'store', label: 'Store Profile', group: 'workspace', permission: 'settings.write' },
+  { id: 'team', label: 'Team', group: 'workspace', permission: 'users.read' },
+  { id: 'roles', label: 'Roles', group: 'workspace', permission: 'roles.read' },
   // Email Accounts + Sender Setup tabs were consolidated into the
   // per-org Email Sender card on Settings → Integrations.
   // tasks/workflows Step 20 — the Email Sequences tab was absorbed
   // into Workflows. The standalone tab + builder routes redirect to
   // /user/workflows?category=Marketing (see user.routes.ts).
-  { id: 'ai', label: 'AI Settings', permission: 'settings.write' },
+  { id: 'ai', label: 'AI Settings', group: 'automation', permission: 'settings.write' },
   {
     // tasks/automation-engine Step 13 — quiet hours, frequency cap,
     // DPDP marketing-consent note. Owner / Admin only via
     // `settings.write`.
     id: 'send-rules',
     label: 'Send Rules',
+    group: 'automation',
     permission: 'settings.write',
   },
   {
     id: 'custom-fields',
     label: 'Custom Fields',
+    group: 'data',
     permission: 'custom_fields.write',
   },
   {
     id: 'standard-fields',
     label: 'Standard Fields',
+    group: 'data',
     permission: 'settings.standard_fields.manage',
   },
   {
     id: 'embed',
     label: 'Embed Widget',
+    group: 'data',
     permission: 'settings.integrations.embed.manage',
   },
 ];
@@ -112,6 +134,15 @@ export class SettingsPageComponent {
   readonly tabs = computed(() =>
     TABS.filter((t) => !t.permission || this.auth.hasPermission(t.permission)),
   );
+
+  readonly groupedTabs = computed<ReadonlyArray<GroupedTabs>>(() => {
+    const visible = this.tabs();
+    return GROUP_ORDER.map((g) => ({
+      id: g,
+      label: GROUP_LABELS[g],
+      tabs: visible.filter((t) => t.group === g),
+    })).filter((g) => g.tabs.length > 0);
+  });
 
   // Initial tab resolution priority (Step 7):
   //   1. route.data.tab (set by /user/settings/integrations alias)
