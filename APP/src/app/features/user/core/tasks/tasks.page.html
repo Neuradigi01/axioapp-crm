@@ -144,7 +144,7 @@
       }
     </div>
   } @else if (state.items().length === 0) {
-    <div class="rounded-xl border border-dashed border-subtle bg-surface p-12 text-center">
+    <div class="rounded-xl border border-dashed border-subtle bg-surface p-6 md:p-12 text-center">
       <p class="text-sm text-muted">No tasks match this filter.</p>
       <button
         type="button"
@@ -155,7 +155,7 @@
       </button>
     </div>
   } @else {
-    <div class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm">
+    <div class="overflow-x-auto rounded-xl border border-subtle bg-surface shadow-sm">
       <table class="w-full text-sm">
         <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
           <tr>

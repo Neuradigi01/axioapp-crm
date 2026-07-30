@@ -78,7 +78,7 @@ type Mode = 'list' | 'pick' | 'build';
           @if (loading()) {
             <p class="text-[11px] text-muted">Loading…</p>
           }
-          <div class="overflow-hidden rounded-md border border-subtle bg-surface">
+          <div class="overflow-x-auto rounded-xl border border-subtle bg-surface">
             <table class="w-full text-xs">
               <thead class="bg-surface-2 text-muted">
                 <tr>

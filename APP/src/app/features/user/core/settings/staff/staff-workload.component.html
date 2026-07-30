@@ -36,12 +36,12 @@
     </div>
   } @else if (rows().length === 0) {
     <div
-      class="rounded-lg border border-dashed border-subtle bg-surface p-12 text-center text-sm text-muted"
+      class="rounded-lg border border-dashed border-subtle bg-surface p-6 md:p-12 text-center text-sm text-muted"
     >
       No active teammates yet.
     </div>
   } @else {
-    <div class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm">
+    <div class="overflow-x-auto rounded-xl border border-subtle bg-surface shadow-sm">
       <table class="w-full text-sm">
         <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
           <tr>

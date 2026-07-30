@@ -3,7 +3,7 @@
     {{ err }}
   </p>
 } @else if (loading()) {
-  <div class="overflow-hidden rounded-lg ring-1 border-subtle">
+  <div class="overflow-x-auto rounded-xl border border-subtle">
     <table class="min-w-full">
       <tbody class="divide-y divide-subtle">
         @for (i of [0, 1, 2]; track i) {
@@ -30,7 +30,7 @@
     No items.
   </p>
 } @else {
-  <div class="overflow-hidden rounded-lg ring-1 border-subtle">
+  <div class="overflow-x-auto rounded-xl border border-subtle">
     <table class="min-w-full divide-y divide-subtle">
       <thead class="bg-surface-2">
         <tr>

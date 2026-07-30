@@ -78,7 +78,7 @@ const REASONS: ReadonlyArray<{ value: BlockReason; label: string }> = [
         </p>
       }
 
-      <div class="overflow-hidden rounded-md border border-subtle bg-surface">
+      <div class="overflow-x-auto rounded-xl border border-subtle bg-surface">
         <table class="w-full text-xs">
           <thead class="bg-surface-2 text-muted">
             <tr>
