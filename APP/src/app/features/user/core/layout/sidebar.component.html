@@ -118,7 +118,7 @@
             <a
               [routerLink]="m.frontend_route"
               routerLinkActive="!bg-accent-soft !text-accent"
-              class="group flex items-center gap-3 rounded-3xl px-2 py-1.5 text-[13.5px] font-medium text-muted transition hover:bg-surface-2 hover:text-default"
+              class="group flex items-center gap-3 rounded-lg px-2 py-1.5 text-[13.5px] font-medium text-muted transition hover:bg-surface-2 hover:text-default"
               [class.md:justify-center]="!expanded()"
               [attr.title]="m.name"
               (click)="close.emit()"
@@ -145,7 +145,7 @@
       aria-label="Open profile"
     >
       <span
-        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-subtle bg-accent-soft font-display text-xs font-semibold text-accent"
+        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent font-display text-xs font-semibold text-white"
       >
         {{ userInitial() }}
       </span>
