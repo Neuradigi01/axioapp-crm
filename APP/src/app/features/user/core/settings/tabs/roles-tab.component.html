@@ -9,7 +9,7 @@
 
   @if (loading()) {
     <div
-      class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+      class="rounded-xl border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
     >
       Loading…
     </div>
@@ -44,7 +44,7 @@
     </div>
 
     @if (showTemplatePicker() && availableTemplates().length > 0) {
-      <div class="mb-3 rounded-lg border border-subtle bg-surface-2 p-3">
+      <div class="mb-3 rounded-xl border border-subtle bg-surface-2 p-3">
         <div class="mb-2 flex items-center justify-between">
           <p class="text-xs font-medium uppercase tracking-wide text-muted">
             Add a role from a preset
@@ -98,7 +98,7 @@
         No roles defined yet.
       </div>
     } @else {
-      <ul class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
+      <ul class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm">
         @for (r of roles(); track r.id) {
           <li
             class="flex items-center justify-between gap-3 border-b border-subtle px-4 py-3 last:border-b-0"
@@ -193,7 +193,7 @@
         <p class="mb-2 text-xs font-medium text-muted">
           Permissions ({{ selectedKeys().size }} selected)
         </p>
-        <div class="space-y-3 rounded-lg border border-subtle bg-surface p-3">
+        <div class="space-y-3 rounded-xl border border-subtle bg-surface p-3">
           @for (group of permissionsByModule(); track group.module) {
             <details class="rounded-md border border-subtle bg-surface-2/50" open>
               <summary

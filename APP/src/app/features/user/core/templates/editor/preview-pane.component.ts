@@ -155,7 +155,7 @@ const VAR_RE = /\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}/g;
         </div>
       }
       @case ('email') {
-        <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+        <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
           <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted">Preview</p>
           @if (resolvedSubject(); as s) {
             <div class="mb-2 border-b border-subtle pb-2">
@@ -173,7 +173,7 @@ const VAR_RE = /\{\{\s*([a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)\s*\}\}/g;
         </div>
       }
       @default {
-        <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+        <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
           <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted">Preview</p>
           @if (resolvedBody()) {
             <p class="whitespace-pre-wrap break-words text-sm text-default">

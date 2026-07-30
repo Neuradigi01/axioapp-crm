@@ -99,7 +99,7 @@
       <!-- left: the 4 cards -->
       <form [formGroup]="form" class="flex flex-col gap-4">
         <!-- Header / identity -->
-        <div class="rounded-lg border border-subtle bg-surface p-4">
+        <div class="rounded-xl border border-subtle bg-surface p-4">
           <label class="block">
             <span class="text-xs font-medium text-default">Name</span>
             <input
@@ -121,7 +121,7 @@
         </div>
 
         <!-- 1. When this happens -->
-        <div class="rounded-lg border border-subtle bg-surface p-4">
+        <div class="rounded-xl border border-subtle bg-surface p-4">
           <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">
             1. When this happens
           </p>
@@ -143,7 +143,7 @@
         </div>
 
         <!-- 2. Only if -->
-        <div class="rounded-lg border border-subtle bg-surface p-4">
+        <div class="rounded-xl border border-subtle bg-surface p-4">
           <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">2. Only if</p>
           <p class="mt-0.5 text-xs text-muted">
             Add conditions to filter which events trigger this automation. Leave empty to fire on
@@ -186,7 +186,7 @@
         </div>
 
         <!-- 3. Then send -->
-        <div class="rounded-lg border border-subtle bg-surface p-4">
+        <div class="rounded-xl border border-subtle bg-surface p-4">
           <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">3. Then send</p>
           <div class="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label class="block">
@@ -243,7 +243,7 @@
         </div>
 
         <!-- 4. To -->
-        <div class="rounded-lg border border-subtle bg-surface p-4">
+        <div class="rounded-xl border border-subtle bg-surface p-4">
           <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">4. To</p>
           <div class="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label class="block">
@@ -289,7 +289,7 @@
 
       <!-- right: sample payload tester -->
       <aside class="sticky top-4 self-start">
-        <div class="rounded-lg border border-subtle bg-surface p-4">
+        <div class="rounded-xl border border-subtle bg-surface p-4">
           <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">
             Sample payload tester
           </p>
@@ -327,7 +327,7 @@
     (click)="closeTestModal()"
   >
     <div
-      class="w-full max-w-2xl rounded-lg border border-subtle bg-surface shadow-xl"
+      class="w-full max-w-2xl rounded-xl border border-subtle bg-surface shadow-xl"
       (click)="$event.stopPropagation()"
     >
       <header class="flex items-center justify-between border-b border-subtle px-4 py-3">

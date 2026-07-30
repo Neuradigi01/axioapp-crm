@@ -27,7 +27,7 @@
 
   @if (loading()) {
     <div
-      class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+      class="rounded-xl border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
     >
       Loading…
     </div>
@@ -41,7 +41,7 @@
     <ul class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
       @for (c of items(); track c.id) {
         <li
-          class="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface p-3 shadow-sm"
+          class="flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface p-3 shadow-sm"
         >
           <div class="flex min-w-0 items-center gap-3">
             <span

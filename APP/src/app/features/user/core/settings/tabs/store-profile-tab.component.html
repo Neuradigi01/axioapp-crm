@@ -8,14 +8,14 @@
   }
   @if (loading()) {
     <div
-      class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+      class="rounded-xl border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
     >
       Loading…
     </div>
   } @else {
     <form [formGroup]="form" (ngSubmit)="save()" class="space-y-5">
       @if (org(); as o) {
-        <section class="rounded-lg border border-subtle bg-surface-2 px-4 py-3">
+        <section class="rounded-xl border border-subtle bg-surface-2 px-4 py-3">
           <h3 class="mb-2 text-sm font-semibold text-default">Organization</h3>
           <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
             <div>

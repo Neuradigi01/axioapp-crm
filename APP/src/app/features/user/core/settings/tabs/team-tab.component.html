@@ -80,7 +80,7 @@
 
     @if (loading()) {
       <div
-        class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+        class="rounded-xl border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
       >
         Loading…
       </div>
@@ -91,7 +91,7 @@
         No users in this org yet.
       </div>
     } @else {
-      <ul class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
+      <ul class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm">
         @for (u of items(); track u.id) {
           <li class="border-b border-subtle last:border-b-0">
             @if (editingId() === u.id) {
@@ -245,7 +245,7 @@
           </div>
         }
         @if (invitations().length > 0) {
-          <ul class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
+          <ul class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm">
             @for (inv of invitations(); track inv.id) {
               <li
                 class="flex items-center justify-between gap-3 border-b border-subtle px-4 py-3 last:border-b-0"

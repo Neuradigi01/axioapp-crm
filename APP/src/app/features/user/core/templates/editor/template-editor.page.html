@@ -231,7 +231,7 @@
       <div class="flex flex-col gap-4">
         <form
           [formGroup]="headerForm"
-          class="flex flex-col gap-3 rounded-lg border border-subtle bg-surface p-4"
+          class="flex flex-col gap-3 rounded-xl border border-subtle bg-surface p-4"
         >
           <label class="block">
             <span class="text-xs font-medium text-default">Template name</span>
@@ -288,23 +288,23 @@
         </form>
 
         @if (channel() === 'whatsapp' && waForm(); as f) {
-          <div class="rounded-lg border border-subtle bg-surface p-4">
+          <div class="rounded-xl border border-subtle bg-surface p-4">
             <app-wa-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
           </div>
         } @else if (channel() === 'email' && emailForm(); as f) {
-          <div class="rounded-lg border border-subtle bg-surface p-4">
+          <div class="rounded-xl border border-subtle bg-surface p-4">
             <app-email-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
           </div>
         } @else if (channel() === 'sms' && smsForm(); as f) {
-          <div class="rounded-lg border border-subtle bg-surface p-4">
+          <div class="rounded-xl border border-subtle bg-surface p-4">
             <app-sms-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
           </div>
         } @else if ((channel() === 'facebook' || channel() === 'instagram') && fbForm(); as f) {
-          <div class="rounded-lg border border-subtle bg-surface p-4">
+          <div class="rounded-xl border border-subtle bg-surface p-4">
             <app-fb-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
           </div>
         } @else if (channel() === 'push' && pushForm(); as f) {
-          <div class="rounded-lg border border-subtle bg-surface p-4">
+          <div class="rounded-xl border border-subtle bg-surface p-4">
             <app-push-form [form]="f" [trackFocus]="trackFocus" [disabled]="locked()" />
           </div>
         } @else {
@@ -319,7 +319,7 @@
       <!-- middle: variable picker -->
       @if (channel(); as c) {
         <aside
-          class="sticky top-4 max-h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-subtle bg-surface"
+          class="sticky top-4 max-h-[calc(100vh-8rem)] overflow-hidden rounded-xl border border-subtle bg-surface"
         >
           <app-variable-picker [channel]="c" (insert)="onInsertVariable($event)" />
         </aside>

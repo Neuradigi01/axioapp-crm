@@ -140,7 +140,7 @@
   @if (state.loading() && state.items().length === 0) {
     <div class="space-y-2">
       @for (i of [1, 2, 3, 4]; track i) {
-        <div class="h-12 animate-pulse rounded-lg border border-subtle bg-surface-2"></div>
+        <div class="h-12 animate-pulse rounded-xl border border-subtle bg-surface-2"></div>
       }
     </div>
   } @else if (state.items().length === 0) {

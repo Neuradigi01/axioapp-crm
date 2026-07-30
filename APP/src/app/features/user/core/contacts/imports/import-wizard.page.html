@@ -61,7 +61,7 @@
   <!-- Step 1 — Upload                                                 -->
   <!-- ============================================================== -->
   @if (step() === 1) {
-    <section class="space-y-4 rounded-lg border border-subtle bg-surface p-4 md:p-6">
+    <section class="space-y-4 rounded-xl border border-subtle bg-surface p-4 md:p-6">
       <div>
         <h2 class="text-sm font-semibold text-default">Choose a file</h2>
         <p class="text-xs text-muted">.xlsx or .csv · up to 10 MB · 50,000 rows max.</p>
@@ -153,7 +153,7 @@
   <!-- Step 2 — Map columns                                            -->
   <!-- ============================================================== -->
   @if (step() === 2 && importMeta(); as meta) {
-    <section class="space-y-5 rounded-lg border border-subtle bg-surface p-4 md:p-6">
+    <section class="space-y-5 rounded-xl border border-subtle bg-surface p-4 md:p-6">
       <div class="flex items-start justify-between gap-4">
         <div>
           <h2 class="text-sm font-semibold text-default">Map columns</h2>
@@ -312,7 +312,7 @@
   <!-- Step 3 — Preview & commit                                       -->
   <!-- ============================================================== -->
   @if (step() === 3 && dryRunResult(); as result) {
-    <section class="space-y-5 rounded-lg border border-subtle bg-surface p-4 md:p-6">
+    <section class="space-y-5 rounded-xl border border-subtle bg-surface p-4 md:p-6">
       <div>
         <h2 class="text-sm font-semibold text-default">Preview</h2>
         <p class="text-xs text-muted">
@@ -656,7 +656,7 @@
         </div>
       </section>
     } @else if (isCancelled()) {
-      <section class="space-y-5 rounded-lg border border-subtle bg-surface p-5 md:p-8 text-center">
+      <section class="space-y-5 rounded-xl border border-subtle bg-surface p-5 md:p-8 text-center">
         <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-2">
           <lucide-icon name="ban" class="h-6 w-6 text-muted" />
         </div>

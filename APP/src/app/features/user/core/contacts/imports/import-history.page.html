@@ -23,7 +23,7 @@
   </header>
 
   <!-- Filter bar -->
-  <div class="flex flex-wrap items-center gap-3 rounded-lg border border-subtle bg-surface p-3">
+  <div class="flex flex-wrap items-center gap-3 rounded-xl border border-subtle bg-surface p-3">
     <label class="text-xs font-medium text-muted" for="status-filter">Status</label>
     <select
       id="status-filter"
@@ -39,7 +39,7 @@
   </div>
 
   <!-- Table -->
-  <div class="overflow-hidden rounded-lg border border-subtle bg-surface">
+  <div class="overflow-hidden rounded-xl border border-subtle bg-surface">
     @if (loading()) {
       <div class="flex items-center justify-center gap-2 p-8 text-sm text-muted">
         <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />

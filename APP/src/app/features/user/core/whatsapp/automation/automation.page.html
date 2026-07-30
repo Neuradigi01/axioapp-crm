@@ -118,7 +118,7 @@
     </section>
   } @else if (activeTab() === 'assignment') {
     <section class="flex-1 px-4 md:px-6 py-4">
-      <div class="overflow-hidden rounded-lg border border-subtle bg-surface">
+      <div class="overflow-hidden rounded-xl border border-subtle bg-surface">
         @if (assignmentRules().length === 0) {
           <div class="px-4 md:px-6 py-12 text-center">
             <p class="text-sm font-medium text-default">No assignment rules yet.</p>
@@ -284,7 +284,7 @@
       </div>
 
       <!-- Rules list -->
-      <div class="overflow-hidden rounded-lg border border-subtle bg-surface">
+      <div class="overflow-hidden rounded-xl border border-subtle bg-surface">
         @if (loading()) {
           <div class="px-4 md:px-6 py-5 md:py-8 text-center text-sm text-muted">Loading…</div>
         } @else if (rules().length === 0) {

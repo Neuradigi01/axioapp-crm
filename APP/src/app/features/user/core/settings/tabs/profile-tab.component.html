@@ -13,14 +13,14 @@
 
   @if (loading()) {
     <div
-      class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+      class="rounded-xl border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
     >
       Loading…
     </div>
   } @else if (me(); as m) {
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <!-- Profile sub-form -->
-      <section class="rounded-lg border border-subtle bg-surface p-5 shadow-sm">
+      <section class="rounded-xl border border-subtle bg-surface p-5 shadow-sm">
         <h2 class="mb-3 text-sm font-semibold text-default">Profile</h2>
         <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="space-y-3">
           <label class="block text-sm">
@@ -82,7 +82,7 @@
       </section>
 
       <!-- Password sub-form -->
-      <section class="rounded-lg border border-subtle bg-surface p-5 shadow-sm">
+      <section class="rounded-xl border border-subtle bg-surface p-5 shadow-sm">
         <h2 class="mb-3 text-sm font-semibold text-default">Password</h2>
         <form [formGroup]="passwordForm" (ngSubmit)="changePassword()" class="space-y-3">
           <label class="block text-sm">
