@@ -3,8 +3,10 @@
     <div>
       <h2 class="text-base font-semibold text-default">Custom fields</h2>
       <p class="mt-1 text-xs text-muted">
-        Add fields to an entity, rename labels, mark required, hide, or reorder by dragging. System
-        and Pack fields can be relabelled / hidden / reordered but not deleted.
+        Add fields to an entity, rename labels, mark required, hide, or reorder by dragging. Pack
+        and system fields are labelled so you know where they came from — you can delete them too,
+        but if the pack&rsquo;s imports or workflows reference the key you&rsquo;ll need to re-add
+        it later.
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -103,15 +105,13 @@
               >
                 Edit
               </button>
-              @if (field.source === 'user') {
-                <button
-                  type="button"
-                  class="text-xs font-medium text-red-600 hover:text-red-400"
-                  (click)="onDelete(field)"
-                >
-                  Delete
-                </button>
-              }
+              <button
+                type="button"
+                class="text-xs font-medium text-red-600 hover:text-red-400"
+                (click)="onDelete(field)"
+              >
+                Delete
+              </button>
             </span>
           </li>
         }
@@ -129,4 +129,74 @@
     (save)="onSave($event)"
     (cancel)="closeForm()"
   ></app-field-form>
+}
+
+<!-- In-app delete confirmation. Replaces window.confirm so the dialog
+     matches the app's styling (same shape as the merge-contact modal).
+     Amber warning box shows for pack + system fields so the operator
+     sees the extra consequence before wiping a pack-installed row. -->
+@if (pendingDelete(); as field) {
+  <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+    <div class="w-full max-w-md rounded-lg bg-surface shadow-xl ring-1 border-subtle">
+      <header class="border-b border-subtle px-4 md:px-6 py-4">
+        <h2 class="text-base font-semibold text-default">Delete field</h2>
+        <p class="mt-1 text-xs text-muted">
+          Removes the definition and all existing values from records.
+          <span class="text-red-500">This cannot be undone.</span>
+        </p>
+      </header>
+
+      <div class="space-y-3 px-4 md:px-6 py-5 text-sm">
+        <p class="text-default">
+          You are about to delete
+          <span class="font-semibold">&ldquo;{{ field.field_label }}&rdquo;</span>
+          (<code class="font-mono text-xs">{{ field.field_key }}</code
+          >).
+        </p>
+
+        @if (field.source === 'pack') {
+          <div
+            class="rounded-md border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+          >
+            <p class="font-semibold text-amber-100">Installed by a vertical pack.</p>
+            <p class="mt-1">
+              Pack imports, workflows, and dynamic forms that key on
+              <code class="font-mono">{{ field.field_key }}</code>
+              will need to be re-created or fixed. If you delete this by mistake, re-add it manually
+              &mdash; there is no auto-repair.
+            </p>
+          </div>
+        } @else if (field.source === 'system') {
+          <div
+            class="rounded-md border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+          >
+            <p class="font-semibold text-amber-100">System field.</p>
+            <p class="mt-1">
+              This field ships with the core CRM. Deleting it may affect built-in behaviour that
+              expects this key.
+            </p>
+          </div>
+        }
+      </div>
+
+      <footer class="flex items-center justify-end gap-2 border-t border-subtle px-4 md:px-6 py-3">
+        <button
+          type="button"
+          (click)="cancelDelete()"
+          [disabled]="deleting()"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          (click)="confirmDelete()"
+          [disabled]="deleting()"
+          class="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {{ deleting() ? 'Deleting…' : 'Delete field' }}
+        </button>
+      </footer>
+    </div>
+  </div>
 }
