@@ -8,14 +8,14 @@ This file is the master list of **every user-facing functionality in Core CRM**,
 
 curity)** — plus whatever else the flow touches: Celery/Redis jobs, WebSockets, local file storage, Stripe, WhatsApp (Cloud API / Baileys sidecar), Google & Meta OAuth and webhooks, Gmail/Microsoft OAuth, Firebase, and the AI provider.
 
-A review is not just "does it work". Each item is judged on **correctness, security, performance, code organization, and design fit** — the last one asking whether the feature is even the *right shape* compared to how mature CRMs solve the same problem. When an item is done, its status flips and it is never re-reviewed unless the code changes.
+A review is not just "does it work". Each item is judged on **correctness, security, performance, code organization, design fit, and absence** — design fit asking whether the feature is even the *right shape* compared to how mature CRMs solve the same problem, and absence hunting for the case nobody thought about, which no amount of reading the code will surface on its own. When an item is done, its status flips and it is never re-reviewed unless the code changes.
 
 ---
 
 ## 2. How to use this file — for the human
 
 1. **Pick the next item.** Either scan for the first row marked `NOT_REVIEWED`, or just ask the agent: *"next pending item"* / *"review E.4"*.
-2. **Read what the agent presents.** It will give you a full trace plus its own observations, security, performance, organization, and design-fit findings — then stop.
+2. **Read what the agent presents.** It will give you a full trace plus its own observations, security, performance, organization, design-fit, and absence findings — then stop. On items touching money, auth, webhooks, files, deletion, or a tenant boundary it traces once and hands that trace to three parallel reviewers (§3.3.1), so the findings arrive grouped by reviewer.
 3. **Decide and record.** Flip that row's `Status` to:
    - `REVIEWED` — you're happy, nothing to change.
    - `NEEDS_FIX` — something needs work. Add a one-line note in the `Notes` column (e.g. *"no org scoping on export query — see security finding"*).
@@ -100,10 +100,27 @@ When asked for the next pending item or a specific ID:
    - **PERFORMANCE audit** — see §3.5.
    - **CODE-ORGANIZATION audit** — see §3.6.
    - **DESIGN FIT** — see §3.7.
+   - **ABSENCE audit** — see §3.8.
 
 4. **Use clickable links with line numbers** — `[router.py:42](API/src/app/core/leads/router.py#L42)`.
 5. **Keep the trace factual; put opinions in the Observations section.** Opine freely there, but always cite `file:line` — never vague advice.
 6. **STOP after ONE functionality.** Do not start the next until asked.
+
+### 3.3.1 Trace once, then fan out
+
+**What this means:** the trace in step 3 — re-reading the components, services, router, service, DAL, and queries — is the expensive part of a review. The lenses that follow are cheap by comparison. So do the trace **once**, then hand that finished trace to **three reviewers running in parallel**, instead of walking all the lenses yourself in sequence.
+
+**Why it matters:** one generalist walking five lenses in a row finds one class of problem well and then satisfices — the later lenses get the tired pass. Three narrow reviewers don't overlap, because each is *only* looking for its own class. Sharing the trace costs one exploration rather than three.
+
+| Reviewer | Given | Brief |
+|---|---|---|
+| **Attacker** | the trace | §3.4, hostile framing |
+| **Architect** | the trace | §3.6 + §3.7 — shape, benchmark, design fit, code organisation |
+| **Absence** | the trace | §3.8 only — what isn't there |
+
+Hand each one **the trace and its own lens section, and nothing else** — not your observations, not the other reviewers' findings. A reviewer shown your conclusions will agree with them. Tell every reviewer explicitly: **do not run any git command.** Nothing is auto-applied: consolidate most-severe-first, say where you disagree and why, then present and stop as usual.
+
+**Tier it — this is not for every row.** Fan out when the item touches **money, auth or permissions, webhooks, file handling, deletion or retention, or anything crossing a tenant boundary**. A settings toggle, a display-only list, or a cosmetic widget gets a single pass — spawning three reviewers for a sidebar collapse state is waste.
 
 ### 3.4 The SECURITY lens
 
@@ -115,7 +132,11 @@ Walk every one of these:
 
 - **Authorization & tenant scoping (IDOR).** Can user A reach user B's — or org A reach org B's — data? Is **every** query scoped to the tenant *and*, where relevant, the record owner? Is the `org_id` taken from the **JWT/`TenantContextMiddleware`**, never from a client-supplied field? *Concretely: if changing `/api/v1/leads/{id}` to another org's UUID returns that lead, that's a critical IDOR.*
 - **Authentication & route guards.** Is the endpoint actually authenticated? Does the frontend `permissionGuard` have a matching **server-side** permission check? (A hidden button is not access control — the endpoint is.)
-- **Input validation.** Are Pydantic schemas strict? Any unbounded strings, unchecked enums, mass-assignment of fields the user shouldn't set?
+- **Input validation.** Are Pydantic schemas strict? Any unbounded strings, unchecked enums, missing length caps?
+- **Mass assignment.** Can the request body write a field the caller doesn't own? Name them: `org_id`, `role` / `role_id`, `owner_id` / `assigned_to`, `is_active`, `is_verified`, `user_type`, subscription tier / plan, credit or wallet balances, `created_by`. *Concretely: if `PATCH /api/v1/users/{id}` accepts `role_id` from the body and the service passes the dict straight to the DAL, any Employee promotes themselves to Owner.* Check that server-derived fields are excluded from the update schema, not merely absent from the UI.
+- **Webhook & callback forgery.** This product ingests Meta lead-ads, WhatsApp Cloud API, Stripe, and Google/Microsoft OAuth callbacks. For each: is the signature verified **before any side effect** (not after the row is written)? Is the comparison **constant-time** (`hmac.compare_digest`, never `==`)? Are **replays rejected** — timestamp window plus a seen-event-id check? Is the verify-token / shared secret read from config rather than hardcoded? *Concretely: an unsigned `POST` to the lead-ads webhook that creates leads before signature check lets anyone inject leads into any org.*
+- **File-upload attacks.** Storage is the **local filesystem** at `./storage/{org_id}/{entity}/{file_id}`, so path handling is the whole defence. Check: **path traversal** — is the stored filename server-generated, or is any part of a client-supplied name (`../`, absolute paths, NTFS streams) used to build the path? **Content-type spoofing** — is the type sniffed from bytes or trusted from the `Content-Type` header / extension? **Size and bomb limits** — is there a byte cap before the write, and a row/expansion cap on CSV and archive parsing? **Serving** — is the download route auth'd and `org_id`-scoped, or is the storage directory reachable through a static mount that skips both? Surfaces to check: catalog images, property images, call recordings, and the three CSV imports.
+- **Token, session & claim attacks.** Replay (can a captured token be reused after logout?), fixation, refresh-token reuse (is a rotated refresh token invalidated, and does reuse revoke the family?), and OTP/reset-link expiry plus attempt caps. Then the **claim** question, which is where this class actually bites: *can a second user claim something the first already holds* — a device push token, a phone number, an email, an invite token, a public slug? Whoever claims it last must not silently inherit what belonged to the first. *This is exactly how the device-token hijack (commit `0edf48fb`) worked.*
 - **Injection of every kind** — SQL (raw `text()` with interpolation), SSRF (any URL the *server* fetches: webhooks, image fetches, OAuth redirects), XSS (any HTML rendered from user input — template bodies especially), command and template injection (merge-field/variable rendering).
 - **Secret handling.** Tokens/API keys encrypted at rest, masked in responses and logs, never returned to the client.
 - **Rate limiting / abuse / DoS.** Especially on **public, unauthenticated** endpoints — widget submission, tracking pixels, quick-link redirects, webhooks, public property pages.
@@ -177,6 +198,23 @@ Step back and judge the feature as a *product decision*, against both the rest o
 - Would a user coming from HubSpot/Zoho/Intercom find this where they expect it, working the way they expect?
 
 If the design is already right, say so and why. If not, **name the better shape** and spell out what would change across UI / API / DB to get there.
+
+### 3.8 The ABSENCE lens
+
+**What this means:** every other lens examines what the code *does*. This one hunts for what **isn't there** — the case nobody thought about, so nobody wrote it, so nothing in the code points at it.
+
+**Why it matters:** absence is invisible to normal review. Reading code naturally checks the code in front of you; a missing case leaves no line to catch your eye. So it has to be a **separate, deliberate pass** with its own questions, or it does not happen. Every one of the misses below shipped through a plan, an implementation, and a lint gate without anyone noticing — because nothing was *wrong*, something was *absent*.
+
+**The worked example — what the shape of this miss looks like.** `tbl_consent_events` was designed in [`tasks/whatsapp-platform-upgrade/step-22-opt-in-capture.md`](tasks/whatsapp-platform-upgrade/step-22-opt-in-capture.md) as an append-only DPDP/GDPR audit trail, with a DB trigger blocking **both UPDATE and DELETE**. That is correct for the goal it was written against: a consent history must never be silently rewritten. The question nobody asked was *"what happens to these rows when the contact carrying them is merged or deleted?"* — because contact merge was planned in a different track. The result, quoting migration `0174`'s own note: **"Merges therefore always fail for any customer who has ever given / withdrawn WhatsApp consent — which is anyone whose `whatsapp_opt_in` has ever moved."** Right-to-be-forgotten was silently impossible for the same reason. It was found by **a real customer report on 2026-07-30** — not by a test, and not by this checklist: row **D.11** was still `NOT_REVIEWED`. Nothing in the consent code was wrong. The interaction with a feature in another track simply had no line anywhere to review.
+
+Walk every one of these, for the functionality in front of you:
+
+- **The two-user version.** Which case was built picturing only **one** user? Write it out: **"A does X, then B does X — then what?"** Concurrently, and in sequence. Does the second actor overwrite, inherit, get blocked, or silently take over the first's record? *This is exactly the device push-token hijack (`0edf48fb`): register-by-token re-parented the row to whoever POSTed last, handing an attacker every future push notification for that device.*
+- **What starts and never finishes.** Every multi-step, async, or wizard flow: what if the user abandons it, the browser closes, or the Celery job dies mid-run? Is there a terminal state, a timeout, or a sweep — and **who cleans it up**? *This is the orphan pending-organization sweep (`a9f0b446`): signup created a placeholder org, abandoned onboarding left it forever, and a 257-line nightly task had to be retrofitted.*
+- **What is created but never deleted, expired, or re-claimed.** Tokens, invites, OTPs, uploaded files, exports, drafts, enrollments, scheduled jobs, webhook subscriptions. And the parent question: **what happens to this record when its parent is merged, deleted, or reassigned?** Does the FK cascade actually run, or is it blocked by a trigger, a constraint, or an RLS policy?
+- **What the caller asserts that the code treats as proven.** Any value that arrives from the client and is then trusted: an `org_id` in a body, a "verified" flag, a price or total computed on the frontend, a step-completed marker, an already-checked permission. Name each one and say where it is actually *proven* server-side — or that it isn't.
+
+If the flow genuinely has none of these, say so **per question** ("abandoned imports are swept by `X`; consent rows cascade on contact delete since `0174`") — never a bare "none". A blanket "none" here means the pass wasn't run.
 
 ---
 

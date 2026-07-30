@@ -6,7 +6,7 @@ This is **Core CRM**, a multi-tenant SaaS CRM platform. It is being built increm
 
 In conversation, refer to the project as **"Core CRM"** (or plain "CRM"). Code, paths, and identifiers (e.g. `packs/furniture/`, `furnicrm` DOM classes, the master-prompt filename) stay as-is — renaming them is a breaking change.
 
-The single source of truth for the build is the master prompt at [`crm-agent-prompt.md`](crm-agent-prompt.md). The 76-step task tree under [`tasks/`](tasks/) breaks that prompt into self-contained, individually verifiable steps. Always start at [`tasks/README.md`](tasks/README.md).
+The single source of truth for the build is the master prompt at [`furniture-crm-agent-prompt.md`](furniture-crm-agent-prompt.md). The 76-step task tree under [`tasks/`](tasks/) breaks that prompt into self-contained, individually verifiable steps. Always start at [`tasks/README.md`](tasks/README.md).
 
 ## Project status snapshot
 
@@ -175,7 +175,21 @@ These are project-specific deviations from a clean-slate build:
 - **Folders renamed lowercase:** `API/` → `api/`, `APP/` → `app/`. **`Flutter/` untouched** (not part of this product).
 - **Old template docs** under `api/docs/` and `app/docs/` remain as **reference** for the existing auth code's patterns. They describe the legacy template, not Core CRM, and should not drive new code.
 
+## Gate 0 — Discovery before building something new
+
+When the user describes a product idea, or a feature in an area this project has never built before, **do not start planning or writing code.** Run discovery first per [`DISCOVERY_RULES.md`](DISCOVERY_RULES.md), and create or extend `PRODUCT_BRIEF.md`.
+
+Run discovery when: no `PRODUCT_BRIEF.md` exists · the request touches a surface the brief does not cover · a decision is expensive to reverse and the brief does not answer it.
+
+Do **NOT** run discovery for: a field, page, filter, report or setting, or any ordinary feature work. Those benchmark against the existing brief.
+
+If unsure which it is, say so and ask — do not default to building.
+
+The brief is the reference every later plan is checked against. When discovery surfaces a platform constraint (something a provider or regulation makes impossible, capped, approval-gated or time-windowed), promote it into this file as a hard architecture rule so it is enforced rather than remembered.
+
 ## Step execution discipline
+
+**Before writing a track plan (`tasks/<track>/README.md`) or any step files, read [`PLANNING_RULES.md`](PLANNING_RULES.md)** — the design-time gate that must clear before step files are written.
 
 For every step (defined in `tasks/phase-X/step-X.Y-*.md`):
 
