@@ -63,6 +63,16 @@ export class CustomFieldsPageComponent {
   readonly submitting = signal(false);
   readonly formError = signal<string | null>(null);
 
+  /** Delete-confirmation modal state. ``null`` = closed, a field = open
+   *  with that row queued for deletion. Replaces ``window.confirm`` so
+   *  the confirm dialog uses the app's own Tailwind styling
+   *  (matches the merge-contact / delete-lead modals) instead of the
+   *  browser's ugly native "localhost:4207 says" box. Source-aware
+   *  copy — pack + system fields show an amber warning; user fields
+   *  get the plain destructive confirm. */
+  readonly pendingDelete = signal<CustomField | null>(null);
+  readonly deleting = signal(false);
+
   constructor() {
     this.reload();
   }
@@ -156,20 +166,44 @@ export class CustomFieldsPageComponent {
       });
   }
 
+  /** Open the in-app delete-confirm modal. Actual delete fires from
+   *  ``confirmDelete()`` when the operator hits the destructive
+   *  button; ``cancelDelete()`` closes without touching anything. */
   protected onDelete(field: CustomField): void {
-    if (field.source !== 'user') return; // belt + braces; UI hides the button.
-    const ok = window.confirm(`Delete field "${field.field_label}"? This cannot be undone.`);
-    if (!ok) return;
+    this.pendingDelete.set(field);
+  }
+
+  protected cancelDelete(): void {
+    if (this.deleting()) return;
+    this.pendingDelete.set(null);
+  }
+
+  protected confirmDelete(): void {
+    const field = this.pendingDelete();
+    if (!field || this.deleting()) return;
+    this.deleting.set(true);
+
+    // Optimistic remove — restored on error like the original
+    // ``window.confirm`` path did. Keeps the list snappy without
+    // waiting for the API round-trip.
     const snapshot = this.fields();
     this.fields.update((rows) => rows.filter((f) => f.id !== field.id));
+
     this.api
       .delete(field.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
+        next: () => {
+          this.deleting.set(false);
+          this.pendingDelete.set(null);
+        },
         error: (err: HttpErrorResponse) => {
-          // Revert + surface.
+          // Revert + surface. Keep the modal open so the operator can
+          // read the error against the field they were deleting.
           this.fields.set(snapshot);
+          this.deleting.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not delete field.');
+          this.pendingDelete.set(null);
         },
       });
   }

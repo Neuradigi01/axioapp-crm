@@ -199,17 +199,25 @@ async def update_field(
     field_id: uuid.UUID,
     payload: CustomFieldUpdate,
 ) -> CustomFieldDefinition:
-    """Apply an update respecting the source rules.
+    """Apply an update to a custom-field definition.
 
-    Rules:
-      - `system`: label, display_order, is_required, validation editable;
-        is_hidden NOT editable (system fields are always visible by intent).
-      - `pack`:   label, display_order, is_hidden, validation editable;
-        is_required NOT editable (pack defines its own requirements).
-      - `user`:   anything in the update payload may change.
+    Any attribute in the Update payload is editable regardless of the
+    field's ``source``. Previously ``system`` and ``pack`` sources
+    had per-source whitelists (e.g. pack rejected ``is_required`` +
+    ``options`` edits, system rejected ``is_hidden``). Those were
+    overly defensive — pack self-healing / integrity re-checks don't
+    exist in this codebase, so the lock was guarding against a
+    failure mode that couldn't self-correct anyway; users just got
+    nagged into workarounds. Full mutability now.
 
-    `field_key`, `field_type`, `source`, `pack_id` are immutable on every
-    source — the Update schema doesn't accept them.
+    ``field_key``, ``field_type``, ``source``, ``pack_id`` are still
+    immutable on every source — the Update schema itself doesn't
+    accept them, so this function never has to reject them
+    explicitly.
+
+    ``options`` when supplied is still shape-validated against
+    ``field_type`` (only select-type fields carry options), because
+    that's a data-integrity check, not a source restriction.
     """
     field = await get_field(session, field_id)
     if field is None:
@@ -221,39 +229,7 @@ async def update_field(
     before = _snapshot(field)
     changes = payload.model_dump(exclude_unset=True)
 
-    if field.source is FieldSource.system:
-        forbidden = set(changes) - {
-            "field_label",
-            "display_order",
-            "is_required",
-            "validation",
-        }
-        if forbidden:
-            raise CustomFieldError(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=(
-                    "system fields only allow updates to "
-                    f"label/display_order/is_required/validation (got {sorted(forbidden)})"
-                ),
-            )
-    elif field.source is FieldSource.pack:
-        forbidden = set(changes) - {
-            "field_label",
-            "display_order",
-            "is_hidden",
-            "validation",
-        }
-        if forbidden:
-            raise CustomFieldError(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=(
-                    "pack fields only allow updates to "
-                    f"label/display_order/is_hidden/validation (got {sorted(forbidden)})"
-                ),
-            )
-
     if "options" in changes:
-        # User-source only — system/pack reject options edits above.
         _validate_options(field.field_type, changes["options"])
 
     for key, value in changes.items():
@@ -272,21 +248,28 @@ async def update_field(
 
 
 async def delete_field(session: AsyncSession, *, field_id: uuid.UUID) -> None:
-    """Delete a definition. Only `source=user` is deletable via HTTP."""
+    """Delete a custom-field definition.
+
+    Deletable regardless of ``source``. Previously only ``source=user``
+    fields could be deleted; ``system`` / ``pack`` fields were locked
+    to prevent an operator from breaking pack-installed forms /
+    imports / workflows that keyed off those columns. In practice the
+    codebase has no pack self-healing (installers are one-way, there
+    is no "pack update" / integrity re-check), so the lock was
+    guarding against a failure mode that couldn't self-correct anyway
+    — the operator was just being nagged into using ``is_hidden``
+    instead of Delete.
+
+    The ``source`` value is still preserved on the audit-log ``before``
+    snapshot so we can trace which fields originated from a pack if a
+    Real-Estate / Furniture operator later reports "how did this
+    field get here?".
+    """
     field = await get_field(session, field_id)
     if field is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="custom field not found",
-        )
-
-    if field.source is not FieldSource.user:
-        raise CustomFieldError(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                f"{field.source.value} fields cannot be deleted; hide it "
-                "with is_hidden=true instead"
-            ),
         )
 
     before = _snapshot(field)

@@ -127,6 +127,7 @@
               <img
                 [src]="src"
                 [alt]="item.name"
+                (error)="onImageError(item.id)"
                 class="h-12 w-12 shrink-0 rounded-md object-cover ring-1 border-subtle"
               />
             } @else {

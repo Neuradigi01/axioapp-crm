@@ -1,4 +1,4 @@
-<div class="flex h-[calc(100vh-4rem)] flex-col">
+<div class="flex min-h-0 flex-1 flex-col">
   <header class="border-b border-subtle bg-surface px-4 py-3 md:px-6">
     <div class="flex items-center justify-between">
       <div>
@@ -67,6 +67,16 @@
       [class.md:flex]="!selectedId()"
     >
       @if (selectedConversation(); as conv) {
+        <!-- Mobile-only back button to return to the list pane -->
+        <button
+          type="button"
+          (click)="deselect()"
+          class="flex items-center gap-1.5 border-b border-subtle bg-surface px-3 py-2 text-left text-xs font-medium text-muted transition hover:text-default md:hidden"
+          aria-label="Back to conversations"
+        >
+          <lucide-icon name="chevron-left" class="h-3.5 w-3.5" />
+          Back to conversations
+        </button>
         <app-chat-thread
           [conversation]="conv"
           [detail]="detail()"

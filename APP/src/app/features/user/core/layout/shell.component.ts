@@ -6,6 +6,7 @@ import { QuickAddFabComponent } from '../shared/quick-add-fab/quick-add-fab.comp
 import { CommandPaletteComponent } from '../shared/command-palette/command-palette.component';
 import { TrialBannerComponent } from '../billing/components/trial-banner/trial-banner.component';
 import { UpgradeModalComponent } from '../billing/components/upgrade-modal/upgrade-modal.component';
+import { FooterComponent } from './footer.component';
 import { SidebarComponent } from './sidebar.component';
 import { HeaderComponent } from './header.component';
 
@@ -18,6 +19,7 @@ const SIDEBAR_STORAGE_KEY = 'furniturecrm:sidebar-open';
     RouterOutlet,
     SidebarComponent,
     HeaderComponent,
+    FooterComponent,
     ToastHostComponent,
     QuickAddFabComponent,
     CommandPaletteComponent,

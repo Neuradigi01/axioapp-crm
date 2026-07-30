@@ -18,8 +18,11 @@
   <div class="flex min-w-0 flex-1 flex-col">
     <app-header (toggleSidebar)="toggleMobileMenu()" (openPalette)="openPalette()" />
     <crm-trial-banner />
-    <main class="flex-1 overflow-x-hidden">
-      <router-outlet />
+    <main class="flex flex-1 flex-col overflow-x-hidden">
+      <div class="flex-1">
+        <router-outlet />
+      </div>
+      <app-footer />
     </main>
   </div>
 </div>
