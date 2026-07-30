@@ -312,6 +312,8 @@ async def commit_import(
     seen_phones_in_file: set[str] = set()
     inserted_ids: list[uuid.UUID] = []
     errors: list[dict[str, Any]] = []
+    duplicates: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
     opt_in_recorded_at = datetime.now(UTC) if effective_opt_in_source else None
 
     for row_no, raw in parsed_rows:
@@ -335,7 +337,9 @@ async def commit_import(
 
         phone_norm = _normalise_phone(mapped.get("phone") or "")
         if phone_norm and (phone_norm in existing_phones or phone_norm in seen_phones_in_file):
-            errors.append(
+            # 3-CSV split (2026-07-30): duplicates are a soft skip, not
+            # a hard error. Operator downloads skipped.csv to see them.
+            duplicates.append(
                 {
                     "row": row_no,
                     "column": "phone",
@@ -356,9 +360,26 @@ async def commit_import(
         )
         tags: list[str] = []
         for t in raw_tags:
-            cleaned = str(t).strip()[:64]
+            original = str(t).strip()
+            cleaned = original[:64]
             if cleaned and cleaned not in tags:
                 tags.append(cleaned)
+            # Emit a per-row warning when a tag got truncated so the
+            # operator can shorten it in the source and re-import.
+            # Silent truncation used to hide bad data; warnings.csv
+            # now surfaces it (mirror of leads' warnings pattern).
+            if original and len(original) > 64:
+                warnings.append(
+                    {
+                        "row": row_no,
+                        "column": "tag",
+                        "value": original,
+                        "reason": (
+                            f"tag truncated to 64 chars (was {len(original)}); "
+                            f"kept {cleaned!r}"
+                        ),
+                    }
+                )
         contact = Contact(
             id=contact_id,
             org_id=org_id,
@@ -419,6 +440,10 @@ async def commit_import(
     row.success_count = len(inserted_ids)
     row.error_count = len(errors)
     row.error_log = errors[:MAX_STORED_ERRORS]
+    row.duplicate_count = len(duplicates)
+    row.duplicate_log = duplicates[:MAX_STORED_ERRORS]
+    row.warning_count = len(warnings)
+    row.warning_log = warnings[:MAX_STORED_ERRORS]
     row.created_group_id = created_group_id
     if effective_opt_in_source:
         row.opt_in_source = effective_opt_in_source
@@ -433,6 +458,8 @@ async def commit_import(
         after={
             "success_count": row.success_count,
             "error_count": row.error_count,
+            "duplicate_count": row.duplicate_count,
+            "warning_count": row.warning_count,
             "group_id": str(created_group_id) if created_group_id else None,
         },
     )
@@ -608,23 +635,24 @@ async def _dedupe_key_hits(
     return hits
 
 
-# --- errors.csv download --------------------------------------------------
+# --- CSV download helpers -------------------------------------------------
 
 
-async def build_errors_csv_response(
+async def _build_report_csv_response(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
     import_id: uuid.UUID,
+    kind: str,
 ) -> StreamingResponse:
-    """Stream a CSV of every failed row for a completed import.
+    """Shared body for the three per-import report downloads.
 
-    Columns are the original file columns + `__row_number`, `__column`,
-    `__value`, `__error_reason` — same shape the shared
-    `shared.import_errors.write_errors_csv` helper produces for the
-    other two import surfaces. Content is derived from the persisted
-    `error_log` (dry-run or commit) so the operator gets exactly what
-    they were shown in the wizard preview.
+    ``kind`` is one of ``"errors"`` / ``"skipped"`` / ``"warnings"`` and
+    selects which persisted JSONB log to render. All three share the
+    ``shared.import_errors.write_errors_csv`` output shape — original
+    columns + ``__row_number`` / ``__column`` / ``__value`` /
+    ``__error_reason`` — so a downstream tool that parses one file
+    parses all three.
     """
     row = await _get_import(session, import_id)
     if row.org_id != org_id:
@@ -635,6 +663,15 @@ async def build_errors_csv_response(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="contact import not found",
         )
+
+    if kind == "errors":
+        persisted = row.error_log or []
+    elif kind == "skipped":
+        persisted = row.duplicate_log or []
+    elif kind == "warnings":
+        persisted = row.warning_log or []
+    else:  # pragma: no cover - internal-only guard
+        raise ValueError(f"unknown report kind: {kind!r}")
 
     # Load the original file so the CSV echoes back the offending row
     # data verbatim — operators fix the source spreadsheet against the
@@ -648,10 +685,9 @@ async def build_errors_csv_response(
 
     original_rows: list[dict[str, Any]] = [raw for _row_no, raw in parsed_rows]
 
-    persisted = row.error_log or []
-    errors_out: list[import_errors.ImportRowError] = []
+    records_out: list[import_errors.ImportRowError] = []
     for record in persisted:
-        errors_out.append(
+        records_out.append(
             import_errors.ImportRowError(
                 row_number=int(record.get("row", 0)),
                 column=record.get("column"),
@@ -667,14 +703,47 @@ async def build_errors_csv_response(
     body = import_errors.write_errors_csv(
         original_headers=headers,
         original_rows=original_rows,
-        errors=errors_out,
+        errors=records_out,
     )
 
-    filename = f"contact-import-{import_id}-errors.csv"
+    filename = f"contact-import-{import_id}-{kind}.csv"
     return StreamingResponse(
         iter([body]),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+async def build_errors_csv_response(
+    session: AsyncSession, *, org_id: uuid.UUID, import_id: uuid.UUID
+) -> StreamingResponse:
+    """Stream the errors CSV (hard failures — required missing, invalid
+    shape). Content is derived from the persisted ``error_log`` so the
+    operator gets exactly what they were shown in the wizard preview."""
+    return await _build_report_csv_response(
+        session, org_id=org_id, import_id=import_id, kind="errors"
+    )
+
+
+async def build_skipped_csv_response(
+    session: AsyncSession, *, org_id: uuid.UUID, import_id: uuid.UUID
+) -> StreamingResponse:
+    """Stream the skipped-duplicates CSV (rows whose phone collapsed
+    onto an existing contact or an earlier row in the same file).
+    Mirrors ``GET /leads/imports/{id}/skipped.csv``."""
+    return await _build_report_csv_response(
+        session, org_id=org_id, import_id=import_id, kind="skipped"
+    )
+
+
+async def build_warnings_csv_response(
+    session: AsyncSession, *, org_id: uuid.UUID, import_id: uuid.UUID
+) -> StreamingResponse:
+    """Stream the warnings CSV (rows that imported but had a value
+    coerced — e.g. tag truncation). Mirrors
+    ``GET /leads/imports/{id}/warnings.csv``."""
+    return await _build_report_csv_response(
+        session, org_id=org_id, import_id=import_id, kind="warnings"
     )
 
 
@@ -683,6 +752,8 @@ __all__ = [
     "MAX_ROW_COUNT",
     "MAX_STORED_ERRORS",
     "build_errors_csv_response",
+    "build_skipped_csv_response",
+    "build_warnings_csv_response",
     "commit_import",
     "dry_run_import",
     "upload_file",

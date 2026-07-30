@@ -103,6 +103,12 @@ class ImportCommitOut(BaseModel):
     row_count: int
     success_count: int
     error_count: int
+    # 3-CSV parity with the leads-import surface (2026-07-30). Rows
+    # that collide on phone land in ``duplicate_count`` / skipped.csv;
+    # rows that imported successfully but had a value coerced (e.g.
+    # tag truncation) land in ``warning_count`` / warnings.csv.
+    duplicate_count: int = 0
+    warning_count: int = 0
     created_group_id: uuid.UUID | None = None
 
 

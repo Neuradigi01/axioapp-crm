@@ -210,6 +210,12 @@ export interface ContactImportCommitOut {
   row_count: number;
   success_count: number;
   error_count: number;
+  /** 3-CSV parity with leads (2026-07-30): rows skipped as phone
+   *  duplicates, downloadable via `/skipped.csv`. Zero when no dupes. */
+  duplicate_count: number;
+  /** 3-CSV parity with leads: rows imported but with a value coerced
+   *  (e.g. tag truncated to 64 chars), downloadable via `/warnings.csv`. */
+  warning_count: number;
   created_group_id: string | null;
 }
 
@@ -415,6 +421,25 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
    *  the import had no errors. */
   downloadImportErrors(importId: string): Observable<Blob> {
     return this.http.get(`${this.base}/imports/${importId}/errors.csv`, {
+      responseType: 'blob',
+    });
+  }
+
+  /** Download the per-row skipped-duplicates CSV. Rows here collapsed
+   *  onto an existing contact (or an earlier row in the same file) on
+   *  the phone dedup key — same shape as the errors CSV, streamed
+   *  under `contact-import-{id}-skipped.csv`. */
+  downloadImportSkipped(importId: string): Observable<Blob> {
+    return this.http.get(`${this.base}/imports/${importId}/skipped.csv`, {
+      responseType: 'blob',
+    });
+  }
+
+  /** Download the per-row warnings CSV — rows that imported
+   *  successfully but had a value coerced (e.g. tag truncated to 64
+   *  chars). Same shape as the errors CSV. */
+  downloadImportWarnings(importId: string): Observable<Blob> {
+    return this.http.get(`${this.base}/imports/${importId}/warnings.csv`, {
       responseType: 'blob',
     });
   }

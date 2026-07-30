@@ -398,6 +398,21 @@
         </details>
       }
 
+      <!-- Duplicates preview note. The full skipped.csv is only
+           populated after commit (dry-run just counts) so the
+           download button is deferred to Step 4. -->
+      @if (result.duplicate_phone > 0) {
+        <div
+          class="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-400"
+        >
+          <lucide-icon name="alert-triangle" class="mt-0.5 h-4 w-4" />
+          <div class="text-xs">
+            {{ result.duplicate_phone }} row(s) will be skipped as phone duplicates. After you
+            commit, download the full duplicates CSV from the success screen.
+          </div>
+        </div>
+      }
+
       @if (commitError(); as msg) {
         <div
           class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
@@ -451,7 +466,13 @@
         <p class="mt-1 text-sm text-muted">
           {{ outcome.success_count }} contact(s) added.
           @if (outcome.error_count > 0) {
-            {{ outcome.error_count }} row(s) skipped.
+            {{ outcome.error_count }} row(s) failed.
+          }
+          @if (outcome.duplicate_count > 0) {
+            {{ outcome.duplicate_count }} row(s) skipped as duplicates.
+          }
+          @if (outcome.warning_count > 0) {
+            {{ outcome.warning_count }} row(s) imported with warnings.
           }
           @if (outcome.created_group_id) {
             Group <span class="font-medium text-default">{{ groupName() }}</span>
@@ -479,6 +500,28 @@
             {{ downloadingErrors() ? 'Preparing…' : 'Download errors CSV' }}
           </button>
         }
+        @if (outcome.duplicate_count > 0) {
+          <button
+            type="button"
+            (click)="downloadSkipped()"
+            [disabled]="downloadingSkipped()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <lucide-icon name="download" class="h-4 w-4" />
+            {{ downloadingSkipped() ? 'Preparing…' : 'Download duplicates CSV' }}
+          </button>
+        }
+        @if (outcome.warning_count > 0) {
+          <button
+            type="button"
+            (click)="downloadWarnings()"
+            [disabled]="downloadingWarnings()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <lucide-icon name="download" class="h-4 w-4" />
+            {{ downloadingWarnings() ? 'Preparing…' : 'Download warnings CSV' }}
+          </button>
+        }
         @if (outcome.created_group_id) {
           <button
             type="button"
@@ -491,6 +534,12 @@
         }
       </div>
       @if (downloadErrorsMsg(); as msg) {
+        <p class="text-center text-xs text-red-500">{{ msg }}</p>
+      }
+      @if (downloadSkippedMsg(); as msg) {
+        <p class="text-center text-xs text-red-500">{{ msg }}</p>
+      }
+      @if (downloadWarningsMsg(); as msg) {
         <p class="text-center text-xs text-red-500">{{ msg }}</p>
       }
     </section>

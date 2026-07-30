@@ -45,6 +45,23 @@ class ContactImport(Base, TenantScoped):
     row_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     success_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     error_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    # Rows dropped because their phone collided with an existing contact
+    # (or an earlier row in the same file). Split out from `error_log`
+    # so operators can download a separate `skipped.csv` — the leads
+    # import surface already splits hard errors from soft skips this
+    # way and the parity was called out on 2026-07-30.
+    duplicate_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    duplicate_log: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    # Rows that imported successfully but where the importer had to
+    # coerce or truncate a value (e.g. tag longer than 64 chars).
+    # Warnings never block the insert; they only feed the downloadable
+    # `warnings.csv` so the operator can decide whether to fix the source.
+    warning_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    warning_log: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
     # Per-row errors: [{"row": int, "reason": str, "raw": {col: val, ...}}]
     error_log: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, server_default=text("'[]'::jsonb")

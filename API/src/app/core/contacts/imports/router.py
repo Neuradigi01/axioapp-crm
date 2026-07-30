@@ -1,9 +1,11 @@
 """HTTP routes for the contact-imports surface.
 
-  POST /api/v1/contacts/imports/upload         → multipart, returns import_id + mapping suggestion
-  POST /api/v1/contacts/imports/{id}/dry-run   → count without writing
-  POST /api/v1/contacts/imports/{id}/commit    → insert + optional group creation
-  GET  /api/v1/contacts/imports/{id}/errors.csv → downloadable per-row error report
+  POST /api/v1/contacts/imports/upload           → multipart, returns import_id + mapping suggestion
+  POST /api/v1/contacts/imports/{id}/dry-run     → count without writing
+  POST /api/v1/contacts/imports/{id}/commit      → insert + optional group creation
+  GET  /api/v1/contacts/imports/{id}/errors.csv  → per-row hard-failure report
+  GET  /api/v1/contacts/imports/{id}/skipped.csv → per-row duplicate-phone report
+  GET  /api/v1/contacts/imports/{id}/warnings.csv → per-row coerced-value report
 
 All endpoints gate on `contacts.write` — same key used by the
 contacts create/edit endpoints. No new permission key.
@@ -35,6 +37,8 @@ from src.app.core.contacts.imports.schemas import (
 from src.app.core.contacts.imports.service import (
     MAX_FILE_SIZE_BYTES,
     build_errors_csv_response,
+    build_skipped_csv_response,
+    build_warnings_csv_response,
     commit_import,
     dry_run_import,
     upload_file,
@@ -125,6 +129,8 @@ async def commit_endpoint(
         row_count=row.row_count,
         success_count=row.success_count,
         error_count=row.error_count,
+        duplicate_count=row.duplicate_count,
+        warning_count=row.warning_count,
         created_group_id=row.created_group_id,
     )
 
@@ -135,13 +141,54 @@ async def download_errors_csv_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("contacts.write")),
 ) -> StreamingResponse:
-    """Stream a CSV of every failed row from a completed import.
+    """Stream a CSV of every hard-failure row from a completed import.
 
     Columns are the original file columns + `__row_number`, `__column`,
     `__value`, `__error_reason`. Available after dry-run or commit;
     contents match the operator's persisted `error_log` snapshot.
     """
     return await build_errors_csv_response(
+        db,
+        org_id=user.org_id,
+        import_id=import_id,
+    )
+
+
+@router.get("/{import_id}/skipped.csv")
+async def download_skipped_csv_endpoint(
+    import_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.write")),
+) -> StreamingResponse:
+    """Stream a CSV of every row skipped as a phone duplicate.
+
+    Same shape as ``errors.csv`` — original columns + the four
+    ``__*`` diagnostic columns. Only rows that collapsed onto an
+    existing contact (or an earlier row in the same file) appear here;
+    hard failures live in ``errors.csv``. Empty CSV if the import
+    had no duplicates.
+    """
+    return await build_skipped_csv_response(
+        db,
+        org_id=user.org_id,
+        import_id=import_id,
+    )
+
+
+@router.get("/{import_id}/warnings.csv")
+async def download_warnings_csv_endpoint(
+    import_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.write")),
+) -> StreamingResponse:
+    """Stream a CSV of every row that imported successfully but had a
+    value coerced (e.g. tag truncated to 64 chars).
+
+    Same shape as ``errors.csv``. Empty CSV if the import had no
+    warnings — the FE gates the download button on
+    ``warning_count > 0`` so the empty case is never hit in practice.
+    """
+    return await build_warnings_csv_response(
         db,
         org_id=user.org_id,
         import_id=import_id,

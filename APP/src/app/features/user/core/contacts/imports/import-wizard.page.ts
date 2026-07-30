@@ -121,6 +121,14 @@ export class ContactImportWizardPageComponent {
   protected readonly downloadingErrors = signal(false);
   protected readonly downloadErrorsMsg = signal<string | null>(null);
 
+  // skipped.csv download state (3-CSV parity with leads).
+  protected readonly downloadingSkipped = signal(false);
+  protected readonly downloadSkippedMsg = signal<string | null>(null);
+
+  // warnings.csv download state (3-CSV parity with leads).
+  protected readonly downloadingWarnings = signal(false);
+  protected readonly downloadWarningsMsg = signal<string | null>(null);
+
   // --- Derived --------------------------------------------------------
 
   protected readonly fileSizeLabel = computed(() => {
@@ -341,20 +349,73 @@ export class ContactImportWizardPageComponent {
       .subscribe({
         next: (blob) => {
           this.downloadingErrors.set(false);
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `contact-import-${meta.id}-errors.csv`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
+          this.triggerBlobDownload(blob, `contact-import-${meta.id}-errors.csv`);
         },
         error: (err: HttpErrorResponse) => {
           this.downloadingErrors.set(false);
           this.downloadErrorsMsg.set(extractApiError(err) ?? 'Could not download the errors CSV.');
         },
       });
+  }
+
+  /** Download the per-row skipped-duplicates CSV. Same shape as the
+   *  errors CSV; only populated for rows that collapsed onto an
+   *  existing contact on the phone dedup key. */
+  protected downloadSkipped(): void {
+    const meta = this.importMeta();
+    if (!meta || this.downloadingSkipped()) return;
+    this.downloadingSkipped.set(true);
+    this.downloadSkippedMsg.set(null);
+    this.api
+      .downloadImportSkipped(meta.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => {
+          this.downloadingSkipped.set(false);
+          this.triggerBlobDownload(blob, `contact-import-${meta.id}-skipped.csv`);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.downloadingSkipped.set(false);
+          this.downloadSkippedMsg.set(
+            extractApiError(err) ?? 'Could not download the duplicates CSV.',
+          );
+        },
+      });
+  }
+
+  /** Download the per-row warnings CSV — rows that imported but had a
+   *  value coerced (e.g. tag truncated to 64 chars). */
+  protected downloadWarnings(): void {
+    const meta = this.importMeta();
+    if (!meta || this.downloadingWarnings()) return;
+    this.downloadingWarnings.set(true);
+    this.downloadWarningsMsg.set(null);
+    this.api
+      .downloadImportWarnings(meta.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => {
+          this.downloadingWarnings.set(false);
+          this.triggerBlobDownload(blob, `contact-import-${meta.id}-warnings.csv`);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.downloadingWarnings.set(false);
+          this.downloadWarningsMsg.set(
+            extractApiError(err) ?? 'Could not download the warnings CSV.',
+          );
+        },
+      });
+  }
+
+  private triggerBlobDownload(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   // --- Step 4 handlers ------------------------------------------------
