@@ -187,7 +187,7 @@
                     [class.focus:border-muted]="!duplicateTargets().has(mapping()[col])"
                     [class.focus:ring-accent]="!duplicateTargets().has(mapping()[col])"
                   >
-                    @for (t of fieldTargets; track t.value) {
+                    @for (t of fieldTargets(); track t.value) {
                       <option [value]="t.value">{{ t.label }}</option>
                     }
                   </select>

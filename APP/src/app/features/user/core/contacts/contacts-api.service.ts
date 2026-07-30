@@ -158,7 +158,12 @@ export interface ContactListQuery {
 /** Targets the operator can map a CSV column to. Mirrors the
  * `ContactFieldTarget` literal in the backend schemas — keep both
  * lists in sync. */
-export type ContactFieldTarget = 'full_name' | 'phone' | 'email' | 'source' | 'tag' | 'skip';
+/** Standard contact-field targets. Custom-field targets are dynamic
+ * per-org and follow the shape ``custom_data.<field_key>``; hence the
+ * union widens to plain ``string`` — the backend's ``_validate_mapping``
+ * is the source of truth on which values are actually accepted. */
+export type ContactStandardTarget = 'full_name' | 'phone' | 'email' | 'source' | 'tag' | 'skip';
+export type ContactFieldTarget = ContactStandardTarget | (string & {});
 
 /** Response from `POST /contacts/imports/upload`. */
 export interface ContactImportUploadOut {

@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  OnInit,
   computed,
   inject,
   signal,
@@ -48,7 +49,7 @@ interface FieldTargetOption {
   label: string;
 }
 
-const FIELD_TARGETS: FieldTargetOption[] = [
+const STANDARD_FIELD_TARGETS: FieldTargetOption[] = [
   { value: 'skip', label: 'Skip this column' },
   { value: 'full_name', label: 'Full name' },
   { value: 'phone', label: 'Phone' },
@@ -56,8 +57,6 @@ const FIELD_TARGETS: FieldTargetOption[] = [
   { value: 'source', label: 'Source' },
   { value: 'tag', label: 'Tag' },
 ];
-
-const VALID_TARGET_SET = new Set<ContactFieldTarget>(FIELD_TARGETS.map((t) => t.value));
 
 const ACCEPT_EXTENSIONS = ['.xlsx', '.csv'] as const;
 
@@ -72,7 +71,7 @@ const ERROR_VISIBLE_LIMIT = 50;
   imports: [RouterLink, LucideAngularModule, BulkImportOptInStepComponent],
   templateUrl: './import-wizard.page.html',
 })
-export class ContactImportWizardPageComponent {
+export class ContactImportWizardPageComponent implements OnInit {
   /** Step 22 — DPDP opt-in provenance picked on the map step.
    *  Null until the operator picks one; gates the Continue button. */
   protected readonly optInSource = signal<WhatsAppOptInSource | null>(null);
@@ -85,8 +84,48 @@ export class ContactImportWizardPageComponent {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly fieldTargets = FIELD_TARGETS;
+  /** Custom-field targets for entity ``contact`` in this org — loaded
+   *  once on init from ``GET /custom-fields/contact/render`` and
+   *  concatenated onto the standard targets so the mapping dropdown
+   *  surfaces them alongside Full name / Phone / etc. Empty until
+   *  the render call returns; the dropdown works fine in that
+   *  window with just the standard targets. */
+  protected readonly customFieldTargets = signal<FieldTargetOption[]>([]);
+
+  protected readonly fieldTargets = computed<FieldTargetOption[]>(() => [
+    ...STANDARD_FIELD_TARGETS,
+    ...this.customFieldTargets(),
+  ]);
+
+  /** Set of every currently-legal target value. Used to coerce the
+   *  backend's suggested mapping on upload — an unknown or stale
+   *  target snaps to ``'skip'`` so the dropdown never shows a value
+   *  it can't render. Recomputes when custom fields load. */
+  protected readonly validTargetSet = computed<Set<ContactFieldTarget>>(
+    () => new Set(this.fieldTargets().map((t) => t.value)),
+  );
+
   protected readonly errorVisibleLimit = ERROR_VISIBLE_LIMIT;
+
+  ngOnInit(): void {
+    this.api
+      .renderFields()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (defs) => {
+          this.customFieldTargets.set(
+            defs.map((f) => ({
+              value: `custom_data.${f.field_key}` as ContactFieldTarget,
+              label: `Custom · ${f.field_label}`,
+            })),
+          );
+        },
+        // Silent: if the render call hiccups the wizard still works
+        // with just the six standard targets — losing the custom
+        // fields is a degrade, not a blocker.
+        error: () => undefined,
+      });
+  }
 
   /** 1=upload · 2=map · 3=preview · 4=success card. */
   protected readonly step = signal<1 | 2 | 3 | 4>(1);
@@ -249,7 +288,7 @@ export class ContactImportWizardPageComponent {
           const safe: Record<string, ContactFieldTarget> = {};
           for (const col of meta.headers) {
             const guess = meta.suggested_mapping[col];
-            safe[col] = VALID_TARGET_SET.has(guess) ? guess : 'skip';
+            safe[col] = this.validTargetSet().has(guess) ? guess : 'skip';
           }
           this.mapping.set(safe);
           this.step.set(2);

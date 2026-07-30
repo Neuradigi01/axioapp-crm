@@ -28,8 +28,14 @@ from src.app.core.contacts.imports.schemas import (
     RowError,
 )
 from src.app.core.contacts.models import Contact
+from src.app.core.custom_fields.data_access import list_fields_for_entity
+from src.app.core.custom_fields.models import CustomFieldDefinition
 from src.app.shared import import_errors, validators
+from src.app.shared.custom_fields.coercion import coerce_value
 from src.app.shared.storage import get_storage
+
+_CONTACT_ENTITY = "contact"
+_CUSTOM_TARGET_PREFIX = "custom_data."
 
 # Hard caps — 10 MB / 50K rows, matching the leads-import surface's
 # ``_MAX_BYTES`` / ``_MAX_ROWS`` (see ``leads/imports/service.py``).
@@ -185,7 +191,8 @@ async def dry_run_import(
 
     Same parse pass the commit step uses — keeps the contract honest."""
     row = await _get_import(session, import_id)
-    _validate_mapping(mapping)
+    custom_defs = await _load_contact_custom_field_defs(session)
+    _validate_mapping(mapping, custom_keys=set(custom_defs))
     storage = get_storage()
     file_bytes = _read_file_bytes(storage, row.storage_path)
 
@@ -239,6 +246,18 @@ async def dry_run_import(
             errors.append(method_error)
             will_skip += 1
             continue
+
+        # Custom-data coercion (typed cells against custom field defs).
+        # Failures block the row so the operator fixes the value in the
+        # source spreadsheet before commit — same treatment as a bad
+        # standard-field shape.
+        raw_custom = mapped.get("custom_data") or {}
+        if raw_custom:
+            _, cf_error = _coerce_custom_data_row(row_no, raw_custom, custom_defs)
+            if cf_error is not None:
+                errors.append(cf_error)
+                will_skip += 1
+                continue
 
         phone_norm = _normalise_phone(mapped.get("phone") or "")
         if phone_norm and (phone_norm in existing_phones or phone_norm in seen_phones_in_file):
@@ -319,7 +338,8 @@ async def commit_import(
     if row.status == ContactImportStatus.committed:
         return row
 
-    _validate_mapping(mapping)
+    custom_defs = await _load_contact_custom_field_defs(session)
+    _validate_mapping(mapping, custom_keys=set(custom_defs))
 
     # Fold the effective opt-in source: prefer the fresh caller value,
     # otherwise use what dry-run stashed on the row.
@@ -370,6 +390,20 @@ async def commit_import(
             errors.append(method_error.model_dump())
             continue
 
+        # Coerce mapped custom_data.<key> values against the org's
+        # contact custom-field defs. A per-value failure (e.g. non-
+        # numeric cell against a numeric field) blocks the row so the
+        # source spreadsheet gets corrected before commit.
+        cleaned_custom: dict[str, Any] = {}
+        raw_custom = mapped.get("custom_data") or {}
+        if raw_custom:
+            cleaned_custom, cf_error = _coerce_custom_data_row(
+                row_no, raw_custom, custom_defs
+            )
+            if cf_error is not None:
+                errors.append(cf_error.model_dump())
+                continue
+
         phone_norm = _normalise_phone(mapped.get("phone") or "")
         if phone_norm and (phone_norm in existing_phones or phone_norm in seen_phones_in_file):
             # 3-CSV split (2026-07-30): duplicates are a soft skip, not
@@ -413,6 +447,7 @@ async def commit_import(
             email=mapped.get("email") or None,
             source=mapped.get("source") or None,
             tags=tags,
+            custom_data=cleaned_custom,
         )
         if effective_opt_in_source:
             # DPDP: stamp the operator-chosen provenance on each row.
@@ -607,10 +642,68 @@ def _check_row_shape(row_no: int, mapped: dict[str, Any]) -> RowError | None:
     return None
 
 
-def _validate_mapping(mapping: dict[str, str]) -> None:
+_STANDARD_TARGETS: frozenset[str] = frozenset(
+    {"full_name", "phone", "email", "source", "tag"}
+)
+
+
+async def _load_contact_custom_field_defs(
+    session: AsyncSession,
+) -> dict[str, CustomFieldDefinition]:
+    """Load the org's contact custom-field defs once, keyed by
+    ``field_key``. Hidden fields are excluded to match the FE loader.
+
+    Callers use this both to gate `_validate_mapping` (via the key set)
+    and to coerce per-row values (via the full defs). Loading once per
+    import instead of once per row keeps the loop O(N) instead of
+    O(N × k) round-trips.
+    """
+    fields = await list_fields_for_entity(
+        session, entity_type=_CONTACT_ENTITY, include_hidden=False
+    )
+    return {f.field_key: f for f in fields}
+
+
+def _coerce_custom_data_row(
+    row_no: int,
+    custom_data: dict[str, Any],
+    defs: dict[str, CustomFieldDefinition],
+) -> tuple[dict[str, Any], RowError | None]:
+    """Coerce a single row's custom-data dict against the pre-loaded
+    field defs. Returns ``(cleaned, error)``; ``error`` is populated
+    when any single value fails type coercion (e.g. non-numeric cell
+    against a numeric field). Stops at the first failing key so the
+    operator fixes them one at a time — matches ``_check_row_shape``.
+
+    Uses ``coerce_value`` inline rather than ``validate_custom_data``
+    to avoid a DB round-trip per row.
+    """
+    cleaned: dict[str, Any] = {}
+    for key, value in custom_data.items():
+        defn = defs.get(key)
+        if defn is None:  # pragma: no cover - mapping validator rejects unknowns
+            return cleaned, RowError(
+                row=row_no,
+                column=f"custom_data.{key}",
+                value=str(value) if value is not None else None,
+                reason=f"custom field {key!r} is not defined for entity 'contact'",
+            )
+        try:
+            cleaned[key] = coerce_value(defn.field_type, key, value)
+        except HTTPException as exc:
+            return cleaned, RowError(
+                row=row_no,
+                column=f"custom_data.{key}",
+                value=str(value) if value is not None else None,
+                reason=str(exc.detail),
+            )
+    return cleaned, None
+
+
+def _validate_mapping(mapping: dict[str, str], *, custom_keys: set[str]) -> None:
     """Reject mappings the import loop cannot honour.
 
-    Two shapes get a 422 at dry-run/commit entry, before any row work:
+    Three shapes get a 422 at dry-run/commit entry, before any row work:
 
     1. **Required target unmapped.** ``full_name`` must appear as a
        target on some column — without it every row fails the required
@@ -619,18 +712,39 @@ def _validate_mapping(mapping: dict[str, str]) -> None:
        direct API caller (or a stale FE build) can't sneak in an
        empty-outcome import.
 
-    2. **Duplicate non-tag targets.** Silent last-write-wins on
-       ``full_name`` / ``phone`` / ``email`` / ``source`` corrupts
-       data — surface the conflict so the operator picks one column
-       and marks the other ``skip``. Duplicate ``tag`` targets are
-       allowed (they aggregate via ``_apply_mapping``).
+    2. **Unknown targets.** A target must be either ``"skip"``, one of
+       the standard fields (``full_name`` / ``phone`` / ``email`` /
+       ``source`` / ``tag``), or ``custom_data.<key>`` where ``<key>``
+       is a defined custom field for entity ``contact`` in this tenant.
+       Junk targets from a stale FE build get rejected with the exact
+       list so the operator sees which columns need re-mapping.
+
+    3. **Duplicate non-tag targets.** Silent last-write-wins on
+       ``full_name`` / ``phone`` / ``email`` / ``source`` / any
+       ``custom_data.<key>`` corrupts data — surface the conflict so
+       the operator picks one column and marks the other ``skip``.
+       Duplicate ``tag`` targets are allowed (they aggregate via
+       ``_apply_mapping``).
     """
     non_tag_seen: dict[str, str] = {}
     conflicts: list[str] = []
     targets_seen: set[str] = set()
+    unknown: list[str] = []
     for column, target in mapping.items():
         if not target or target == "skip":
             continue
+        # Bucket the target by shape so we can validate it.
+        if target in _STANDARD_TARGETS:
+            pass
+        elif target.startswith(_CUSTOM_TARGET_PREFIX):
+            key = target[len(_CUSTOM_TARGET_PREFIX) :]
+            if not key or key not in custom_keys:
+                unknown.append(target)
+                continue
+        else:
+            unknown.append(target)
+            continue
+
         targets_seen.add(target)
         if target == "tag":
             continue
@@ -639,6 +753,17 @@ def _validate_mapping(mapping: dict[str, str]) -> None:
             conflicts.append(f"{prior!r} and {column!r} both map to {target!r}")
         else:
             non_tag_seen[target] = column
+    if unknown:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Mapping references unknown targets: "
+                f"{sorted(set(unknown))}. Allowed standard targets: "
+                f"{sorted(_STANDARD_TARGETS)}; custom-field targets must be of "
+                "the form 'custom_data.<key>' where <key> is a defined custom "
+                "field for entity 'contact'."
+            ),
+        )
     if "full_name" not in targets_seen:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -656,12 +781,24 @@ def _apply_mapping(raw: dict[str, str], mapping: dict[str, str]) -> dict[str, An
     the operator's mapping. Columns mapped to `'skip'` (or absent from
     the mapping) are dropped.
 
-    Special-cases ``target='tag'``: the value is returned as a list so
-    two CSV columns both mapped to ``tag`` (or a single column carrying
-    comma-separated tags like ``"vip, priority, hot"``) aggregate
-    into the contact's ``tags`` array instead of last-write-wins."""
+    Special-cases:
+
+    - ``target='tag'`` — values are aggregated into a list so two CSV
+      columns both mapped to ``tag`` (or a single column carrying
+      comma-separated tags like ``"vip, priority, hot"``) merge into
+      the contact's ``tags`` array instead of last-write-wins.
+
+    - ``target='custom_data.<key>'`` — values collect into a
+      ``custom_data`` dict on the returned mapping. Blank cells are
+      dropped so the downstream ``validate_custom_data`` doesn't
+      complain about empty strings against typed fields (numeric,
+      date, …). ``<key>`` is trusted to be a valid contact custom
+      field — ``_validate_mapping`` rejected the mapping upstream if
+      it wasn't.
+    """
     out: dict[str, Any] = {}
     tags_bucket: list[str] = []
+    custom_bucket: dict[str, Any] = {}
     for column, value in raw.items():
         target = mapping.get(column, "skip")
         if target == "skip" or not target:
@@ -671,9 +808,16 @@ def _apply_mapping(raw: dict[str, str], mapping: dict[str, str]) -> dict[str, An
                 if chunk and chunk not in tags_bucket:
                     tags_bucket.append(chunk)
             continue
+        if target.startswith(_CUSTOM_TARGET_PREFIX):
+            key = target[len(_CUSTOM_TARGET_PREFIX) :]
+            if key and value not in (None, ""):
+                custom_bucket[key] = value
+            continue
         out[target] = value
     if tags_bucket:
         out["tag"] = tags_bucket
+    if custom_bucket:
+        out["custom_data"] = custom_bucket
     return out
 
 
