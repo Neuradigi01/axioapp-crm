@@ -195,7 +195,16 @@ export const userRoutes: Routes = [
       {
         // MUST precede `contacts/:id` — same reason as the `groups`
         // route below: otherwise `:id` would try to load "import"
-        // as a contact UUID.
+        // as a contact UUID. The `/history` child MUST come before
+        // the parent `import` for the same static-vs-param reason.
+        path: 'contacts/import/history',
+        canActivate: [permissionGuard('contacts.write')],
+        loadComponent: () =>
+          import('./core/contacts/imports/import-history.page').then(
+            (m) => m.ContactImportHistoryPageComponent,
+          ),
+      },
+      {
         path: 'contacts/import',
         canActivate: [permissionGuard('contacts.write')],
         loadComponent: () =>

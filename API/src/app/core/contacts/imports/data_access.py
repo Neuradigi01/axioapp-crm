@@ -12,7 +12,7 @@ from src.app.core.contacts.groups.models import (
     ContactGroup,
     ContactGroupMember,
 )
-from src.app.core.contacts.imports.models import ContactImport
+from src.app.core.contacts.imports.models import ContactImport, ContactImportStatus
 from src.app.core.contacts.models import Contact
 
 
@@ -97,11 +97,46 @@ async def list_matching_phones_by_suffix(
     return list(rows)
 
 
+async def count_imports_filtered(
+    session: AsyncSession,
+    *,
+    status_filter: ContactImportStatus | None,
+) -> int:
+    """Return the total count of import rows for the caller's org that
+    match the optional status filter. Tenant scope is applied by the
+    ORM filter on :class:`ContactImport`."""
+    stmt = select(func.count(ContactImport.id))
+    if status_filter is not None:
+        stmt = stmt.where(ContactImport.status == status_filter)
+    result = await session.execute(stmt)
+    return int(result.scalar_one() or 0)
+
+
+async def list_imports_page(
+    session: AsyncSession,
+    *,
+    status_filter: ContactImportStatus | None,
+    offset: int,
+    limit: int,
+) -> list[ContactImport]:
+    """One page of import rows ordered newest-first. Mirrors the shape
+    of the leads-import history query so both wizard-history pages
+    render the same way."""
+    stmt = select(ContactImport).order_by(ContactImport.created_at.desc())
+    if status_filter is not None:
+        stmt = stmt.where(ContactImport.status == status_filter)
+    stmt = stmt.offset(offset).limit(limit)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
 __all__ = [
     "add_contact",
     "add_group",
     "add_import",
     "bulk_upsert_group_members",
+    "count_imports_filtered",
     "get_import_by_id",
+    "list_imports_page",
     "list_matching_phones_by_suffix",
 ]

@@ -22,8 +22,10 @@ from src.app.shared.orm import TenantScoped
 class ContactImportStatus(str, enum.Enum):
     uploaded = "uploaded"  # file parsed; headers detected; nothing inserted
     dry_run = "dry_run"  # mapping committed; dry-run counts cached
+    processing = "processing"  # commit dispatched to Celery; worker running
     committed = "committed"  # rows inserted
     failed = "failed"  # catastrophic failure (unreadable file, etc.)
+    cancelled = "cancelled"  # operator aborted before completion
 
 
 class ContactImport(Base, TenantScoped):

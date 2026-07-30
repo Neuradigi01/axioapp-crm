@@ -156,6 +156,26 @@ export class ContactImportWizardPageComponent implements OnInit {
   protected readonly commitError = signal<string | null>(null);
   protected readonly commitResult = signal<ContactImportCommitOut | null>(null);
 
+  // Async pivot (2026-07-30) — polling state for the processing screen.
+  protected readonly cancelling = signal(false);
+  protected readonly cancelError = signal<string | null>(null);
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+  protected readonly isProcessing = computed(() => {
+    const r = this.commitResult();
+    return r !== null && r.status === 'processing';
+  });
+
+  protected readonly isFailed = computed(() => {
+    const r = this.commitResult();
+    return r !== null && r.status === 'failed';
+  });
+
+  protected readonly isCancelled = computed(() => {
+    const r = this.commitResult();
+    return r !== null && r.status === 'cancelled';
+  });
+
   // errors.csv download state
   protected readonly downloadingErrors = signal(false);
   protected readonly downloadErrorsMsg = signal<string | null>(null);
@@ -381,14 +401,23 @@ export class ContactImportWizardPageComponent implements OnInit {
     if (!meta || !this.canCommit()) return;
     this.committing.set(true);
     this.commitError.set(null);
+    this.cancelError.set(null);
     this.api
       .commitImport(meta.id, this.buildRunBody())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (result) => {
-          this.committing.set(false);
+          // Async pivot (2026-07-30): backend may return `status='processing'`
+          // when the Celery worker is queued but hasn't finished. Show a
+          // processing screen and poll until terminal, then show success.
           this.commitResult.set(result);
-          this.step.set(4);
+          if (this.isTerminalStatus(result.status)) {
+            this.committing.set(false);
+            this.step.set(4);
+          } else {
+            this.step.set(4);
+            this.startPolling(meta.id);
+          }
         },
         error: (err: HttpErrorResponse) => {
           this.committing.set(false);
@@ -465,6 +494,80 @@ export class ContactImportWizardPageComponent implements OnInit {
           this.downloadWarningsMsg.set(
             extractApiError(err) ?? 'Could not download the warnings CSV.',
           );
+        },
+      });
+  }
+
+  /** Terminal statuses stop the poll loop and unfreeze the UI. */
+  private isTerminalStatus(status: string): boolean {
+    return status === 'committed' || status === 'failed' || status === 'cancelled';
+  }
+
+  /** Start polling the import row until it reaches a terminal status.
+   *  Backs off gently — 1s for the first 10 polls, 2s afterwards —
+   *  so a fast dev commit clears in ~1s and a big prod commit doesn't
+   *  hammer the API. Polling stops on component destroy via the
+   *  ``destroyRef`` cleanup. */
+  private startPolling(importId: string): void {
+    this.stopPolling();
+    let ticks = 0;
+    const poll = () => {
+      this.api
+        .getImport(importId)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (result) => {
+            this.commitResult.set(result);
+            if (this.isTerminalStatus(result.status)) {
+              this.committing.set(false);
+              this.stopPolling();
+              return;
+            }
+            ticks += 1;
+            const delay = ticks < 10 ? 1000 : 2000;
+            this.pollTimer = setTimeout(poll, delay);
+          },
+          // On a transient poll error, back off and try again — the
+          // worker is still running, we just lost one round-trip.
+          error: () => {
+            this.pollTimer = setTimeout(poll, 3000);
+          },
+        });
+    };
+    // Small initial delay so the first poll lands after the dispatch
+    // ack has propagated through the DB.
+    this.pollTimer = setTimeout(poll, 500);
+    this.destroyRef.onDestroy(() => this.stopPolling());
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer !== null) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+
+  /** Cancel an in-flight processing import. Available on Step 4 when
+   *  the status is ``processing``. On success, the poll loop picks up
+   *  the ``cancelled`` status on its next tick. */
+  protected cancelProcessing(): void {
+    const meta = this.importMeta();
+    if (!meta || this.cancelling()) return;
+    this.cancelling.set(true);
+    this.cancelError.set(null);
+    this.api
+      .cancelImport(meta.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.cancelling.set(false);
+          this.commitResult.set(result);
+          this.committing.set(false);
+          this.stopPolling();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.cancelling.set(false);
+          this.cancelError.set(extractApiError(err) ?? 'Could not cancel import.');
         },
       });
   }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -125,12 +126,43 @@ class ImportCommitOut(BaseModel):
     created_group_id: uuid.UUID | None = None
 
 
+class ImportListItem(ORMModel):
+    """One row on the wizard's history page. Slim projection of
+    ``ContactImport`` — includes the outcome counts + status so the
+    page can render badges and download buttons without a second
+    round-trip."""
+
+    id: uuid.UUID
+    filename: str
+    row_count: int
+    success_count: int
+    error_count: int
+    duplicate_count: int
+    warning_count: int
+    status: str
+    created_group_id: uuid.UUID | None = None
+    created_at: datetime
+
+
+class ImportListResponse(BaseModel):
+    """Wire response for ``GET /contacts/imports`` — mirror shape of
+    :class:`LeadImportListResponse` so the FE history component is
+    interchangeable between the two entities."""
+
+    items: list[ImportListItem]
+    total: int
+    page: int
+    size: int
+
+
 __all__ = [
     "ContactFieldTarget",
     "ImportCommitIn",
     "ImportCommitOut",
     "ImportDryRunIn",
     "ImportDryRunOut",
+    "ImportListItem",
+    "ImportListResponse",
     "ImportUploadOut",
     "OptInSource",
     "RowError",

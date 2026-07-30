@@ -214,6 +214,30 @@ export interface ContactImportDryRunOut {
   warnings: ContactImportRowError[];
 }
 
+/** One row on the wizard's history page. Slim projection of the
+ *  ContactImport ORM row — used by ``GET /contacts/imports``. Mirror
+ *  of ``LeadImport`` so the history UI patterns can stay in sync
+ *  between the two entities. */
+export interface ContactImportListItem {
+  id: string;
+  filename: string;
+  row_count: number;
+  success_count: number;
+  error_count: number;
+  duplicate_count: number;
+  warning_count: number;
+  status: string;
+  created_group_id: string | null;
+  created_at: string;
+}
+
+export interface ContactImportListResponse {
+  items: ContactImportListItem[];
+  total: number;
+  page: number;
+  size: number;
+}
+
 /** Response from `POST /contacts/imports/{id}/commit`. */
 export interface ContactImportCommitOut {
   id: string;
@@ -405,6 +429,23 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
     return this.http.post<ConsentEvent>(`${this.base}/${contactId}/opt-out`, body);
   }
 
+  /** Paginated history of past imports for the caller's org. Powers
+   *  the wizard's history page (parity with the leads-import history). */
+  listImports(
+    opts: {
+      status?: 'uploaded' | 'dry_run' | 'processing' | 'committed' | 'failed' | 'cancelled';
+      page?: number;
+      size?: number;
+    } = {},
+  ): Observable<ContactImportListResponse> {
+    const params = buildHttpParams({
+      status: opts.status,
+      page: opts.page,
+      size: opts.size,
+    });
+    return this.http.get<ContactImportListResponse>(`${this.base}/imports`, { params });
+  }
+
   /** Step 1 of bulk import: stream the file to the backend, get back
    * the import id + detected headers + suggested column mapping. */
   uploadImport(file: File): Observable<ContactImportUploadOut> {
@@ -419,10 +460,27 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
     return this.http.post<ContactImportDryRunOut>(`${this.base}/imports/${importId}/dry-run`, body);
   }
 
-  /** Step 3 of bulk import: write the contacts. Backend is idempotent
-   * on `importId` so re-clicks don't double-insert. */
+  /** Step 3 of bulk import: dispatch the async commit worker. Backend
+   * is idempotent on `importId` so re-clicks don't double-dispatch.
+   * Response `status` is `'processing'` (worker running) in prod and
+   * usually `'committed'` (fast path) in dev where the fallback awaits
+   * inline. The FE polls `getImport` when it sees `processing`. */
   commitImport(importId: string, body: ContactImportRunIn): Observable<ContactImportCommitOut> {
     return this.http.post<ContactImportCommitOut>(`${this.base}/imports/${importId}/commit`, body);
+  }
+
+  /** Single-row read — used by the wizard to poll the ``processing
+   *  → committed`` transition after commit. Same response shape as
+   *  ``commitImport`` so the wizard success handler is unchanged. */
+  getImport(importId: string): Observable<ContactImportCommitOut> {
+    return this.http.get<ContactImportCommitOut>(`${this.base}/imports/${importId}`);
+  }
+
+  /** Abort a pre-terminal import (uploaded / dry_run / processing).
+   *  409 on any other state. Worker checks status on entry so a
+   *  running commit exits on its next row batch. */
+  cancelImport(importId: string): Observable<ContactImportCommitOut> {
+    return this.http.post<ContactImportCommitOut>(`${this.base}/imports/${importId}/cancel`, {});
   }
 
   /** Download the per-row error CSV for a completed import. The blob

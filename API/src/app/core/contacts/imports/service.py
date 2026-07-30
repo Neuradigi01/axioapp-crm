@@ -85,6 +85,82 @@ async def _get_import(session: AsyncSession, import_id: uuid.UUID) -> ContactImp
     return row
 
 
+# --- single-row read (used for polling) -----------------------------------
+
+
+async def get_import(session: AsyncSession, import_id: uuid.UUID) -> ContactImport:
+    """Public single-row fetch. Powers ``GET /contacts/imports/{id}``
+    which the wizard polls after commit to watch the ``processing →
+    committed`` transition."""
+    return await _get_import(session, import_id)
+
+
+# --- cancel ---------------------------------------------------------------
+
+
+async def cancel_import(
+    session: AsyncSession,
+    *,
+    import_id: uuid.UUID,
+) -> ContactImport:
+    """Operator-triggered abort. Allowed only on pre-terminal states
+    (``uploaded`` / ``dry_run`` / ``processing``); a completed or
+    already-cancelled row raises 409. Terminal transition is a simple
+    status flip — the worker checks status on entry so a running job
+    exits early on its next batch instead of being force-killed."""
+    row = await _get_import(session, import_id)
+    if row.status not in (
+        ContactImportStatus.uploaded,
+        ContactImportStatus.dry_run,
+        ContactImportStatus.processing,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Cannot cancel: import is in '{row.status.value}'. "
+                "Cancel only works while uploaded, in dry-run, or processing."
+            ),
+        )
+    row.status = ContactImportStatus.cancelled
+    await session.commit()
+    await session.refresh(row)
+
+    await audit.log(
+        "contacts.import.cancelled",
+        entity_type="contact_import",
+        entity_id=row.id,
+        after={"prior_status": row.status.value},
+    )
+    return row
+
+
+# --- history page ---------------------------------------------------------
+
+
+async def list_imports(
+    session: AsyncSession,
+    *,
+    status_filter: ContactImportStatus | None = None,
+    page: int = 1,
+    size: int = 20,
+) -> tuple[list[ContactImport], int]:
+    """Paginated list of contact-import rows for the caller's org.
+
+    Powers the wizard's history page (parity with the leads-import
+    history at ``GET /leads/import``). Tenant scope flows through the
+    ORM filter on :class:`ContactImport`, so callers from foreign orgs
+    see an empty list rather than a leak.
+    """
+    total = await data_access.count_imports_filtered(session, status_filter=status_filter)
+    rows = await data_access.list_imports_page(
+        session,
+        status_filter=status_filter,
+        offset=(page - 1) * size,
+        limit=size,
+    )
+    return rows, total
+
+
 # --- upload ---------------------------------------------------------------
 
 
@@ -321,29 +397,105 @@ async def commit_import(
     group_name: str | None = None,
     opt_in_source: str | None = None,
 ) -> ContactImport:
-    """Insert rows. Same parse + dedupe logic as dry-run; same errors
-    surface in the persisted `error_log`. Optionally bundles the
-    successfully-inserted contacts into a new static contact group.
+    """Validate the request, persist the operator's intent, and hand
+    the row loop off to Celery.
 
-    Idempotent: once ``row.status`` is ``committed`` a re-invocation
-    returns the existing row without touching contacts. Guards a
-    network-stall rage-click from inserting the whole file a second
-    time.
+    Two-phase (2026-07-30 async pivot):
+
+    1. **Validate + reserve** (this function, called under the request
+       session): custom-field defs load, mapping validated, effective
+       opt-in source folded onto the row, status flipped to
+       ``processing``. Response returns immediately with the reserved
+       row so the frontend can start polling.
+
+    2. **Row loop** (``_run_commit`` below, invoked by the Celery
+       worker in ``tasks.py``): parse + insert + persist counts,
+       transition to ``committed`` / ``failed``.
+
+    Idempotency: a re-hit while the row is already ``committed`` or
+    ``processing`` returns the current state without re-dispatching —
+    guards a rage-click on a slow response and a Celery retry that
+    lands during the request window. ``cancelled`` rows raise 409
+    so the operator sees why nothing happened.
     """
     row = await _get_import(session, import_id)
 
-    # Idempotency: refuse to re-commit an already-committed import row.
-    # Prior behaviour was a silent re-insert of every contact — the
-    # frontend comment claimed idempotency the backend didn't have.
     if row.status == ContactImportStatus.committed:
         return row
+    if row.status == ContactImportStatus.processing:
+        return row  # already dispatched — worker will finalise
+    if row.status == ContactImportStatus.cancelled:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This import was cancelled. Re-upload the file to import again.",
+        )
 
     custom_defs = await _load_contact_custom_field_defs(session)
     _validate_mapping(mapping, custom_keys=set(custom_defs))
 
-    # Fold the effective opt-in source: prefer the fresh caller value,
-    # otherwise use what dry-run stashed on the row.
+    # Persist the operator's intent so the worker can rehydrate without
+    # extra dispatch args.
+    row.applied_mapping = dict(mapping)
     effective_opt_in_source = opt_in_source or row.opt_in_source
+    if effective_opt_in_source:
+        row.opt_in_source = effective_opt_in_source
+    row.status = ContactImportStatus.processing
+    await session.commit()
+    await session.refresh(row)
+
+    # Dispatch — Celery in prod, inline await in dev (no broker).
+    # Local import breaks a circular dependency (tasks imports
+    # ``_run_commit`` from this module).
+    from src.app.core.contacts.imports.tasks import (
+        HAS_CELERY,
+        process_contact_import,
+        process_contact_import_async,
+    )
+
+    if HAS_CELERY:
+        process_contact_import.delay(
+            str(row.id), str(org_id), str(user_id), create_group, group_name
+        )
+    else:
+        await process_contact_import_async(
+            row.id, org_id, user_id, create_group, group_name
+        )
+        await session.refresh(row)
+
+    return row
+
+
+async def _run_commit(
+    session: AsyncSession,
+    *,
+    import_id: uuid.UUID,
+    org_id: uuid.UUID,
+    user_id: uuid.UUID,
+    create_group: bool,
+    group_name: str | None,
+) -> ContactImport:
+    """Worker body — reads the row's persisted ``applied_mapping`` +
+    ``opt_in_source``, executes the row loop, and transitions to
+    ``committed``. Called by both the async Celery task and the
+    sync/dev fallback in :func:`commit_import`.
+
+    Preconditions:
+      - ``row.status == processing`` (set by ``commit_import``)
+      - ``row.applied_mapping`` populated (ditto)
+
+    Skips silently if the operator flipped the row to ``cancelled``
+    while the worker was queued.
+    """
+    row = await _get_import(session, import_id)
+    if row.status == ContactImportStatus.cancelled:
+        return row
+    if row.status != ContactImportStatus.processing:
+        # Row already terminal (committed / failed) — no-op.
+        return row
+
+    mapping = dict(row.applied_mapping or {})
+    effective_opt_in_source = row.opt_in_source
+    custom_defs = await _load_contact_custom_field_defs(session)
 
     storage = get_storage()
     file_bytes = _read_file_bytes(storage, row.storage_path)
@@ -981,7 +1133,10 @@ __all__ = [
     "build_errors_csv_response",
     "build_skipped_csv_response",
     "build_warnings_csv_response",
+    "cancel_import",
     "commit_import",
     "dry_run_import",
+    "get_import",
+    "list_imports",
     "upload_file",
 ]
