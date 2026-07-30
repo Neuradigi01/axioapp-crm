@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
+import { LucideAngularModule } from 'lucide-angular';
 
 import {
   Conversation,
@@ -62,6 +63,7 @@ import { extractApiError } from '@core/services/api-error.util';
     ComposeBarComponent,
     InteractiveBuilderComponent,
     ReassignModalComponent,
+    LucideAngularModule,
   ],
   templateUrl: './conversations.page.html',
 })
@@ -272,6 +274,14 @@ export class ConversationsPageComponent {
   protected onSelect(id: string): void {
     this.selectedId.set(id);
     this.loadDetail(id);
+  }
+
+  /** Mobile back button — clears the selection so the list pane
+   *  re-appears full-width on <md screens. Desktop keeps both panes
+   *  visible so the button is hidden there. */
+  protected deselect(): void {
+    this.selectedId.set(null);
+    this.replyingTo.set(null);
   }
 
   protected onSendText(text: string): void {
