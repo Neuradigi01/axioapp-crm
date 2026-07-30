@@ -178,6 +178,27 @@ export class ContactImportWizardPageComponent {
     return this.errorsExpanded() ? errs : errs.slice(0, ERROR_VISIBLE_LIMIT);
   });
 
+  protected readonly duplicatesExpanded = signal(false);
+  protected readonly warningsExpanded = signal(false);
+
+  protected readonly visibleDuplicates = computed(() => {
+    const rows = this.dryRunResult()?.duplicates ?? [];
+    return this.duplicatesExpanded() ? rows : rows.slice(0, ERROR_VISIBLE_LIMIT);
+  });
+
+  protected readonly visibleWarnings = computed(() => {
+    const rows = this.dryRunResult()?.warnings ?? [];
+    return this.warningsExpanded() ? rows : rows.slice(0, ERROR_VISIBLE_LIMIT);
+  });
+
+  protected toggleDuplicatesExpanded(): void {
+    this.duplicatesExpanded.update((v) => !v);
+  }
+
+  protected toggleWarningsExpanded(): void {
+    this.warningsExpanded.update((v) => !v);
+  }
+
   // --- Step 1 handlers ------------------------------------------------
 
   protected onDragOver(event: DragEvent): void {
@@ -288,6 +309,8 @@ export class ContactImportWizardPageComponent {
     this.dryRunError.set(null);
     this.dryRunResult.set(null);
     this.errorsExpanded.set(false);
+    this.duplicatesExpanded.set(false);
+    this.warningsExpanded.set(false);
     this.api
       .dryRunImport(meta.id, this.buildRunBody())
       .pipe(takeUntilDestroyed(this.destroyRef))

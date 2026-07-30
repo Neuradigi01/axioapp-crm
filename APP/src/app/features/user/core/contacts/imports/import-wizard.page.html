@@ -53,7 +53,7 @@
     <section class="space-y-4 rounded-lg border border-subtle bg-surface p-4 md:p-6">
       <div>
         <h2 class="text-sm font-semibold text-default">Choose a file</h2>
-        <p class="text-xs text-muted">.xlsx or .csv · up to 5 MB · 10,000 rows max.</p>
+        <p class="text-xs text-muted">.xlsx or .csv · up to 10 MB · 50,000 rows max.</p>
       </div>
 
       @if (selectedFile(); as file) {
@@ -309,24 +309,30 @@
         </p>
       </div>
 
-      <!-- Counts -->
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <!-- Counts — one tile per outcome bucket (matches the 3 CSVs). -->
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
           <p class="text-xs uppercase tracking-wide text-emerald-400">Will be added</p>
           <p class="mt-1 text-2xl font-semibold text-emerald-300">
             {{ result.will_insert }}
           </p>
         </div>
-        <div class="rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3">
-          <p class="text-xs uppercase tracking-wide text-amber-400">Duplicate phone</p>
-          <p class="mt-1 text-2xl font-semibold text-amber-300">
-            {{ result.duplicate_phone }}
-          </p>
-        </div>
         <div class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3">
-          <p class="text-xs uppercase tracking-wide text-red-400">Errors / skipped</p>
+          <p class="text-xs uppercase tracking-wide text-red-400">Errors</p>
           <p class="mt-1 text-2xl font-semibold text-red-300">
             {{ result.will_skip }}
+          </p>
+        </div>
+        <div class="rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-amber-400">Duplicates</p>
+          <p class="mt-1 text-2xl font-semibold text-amber-300">
+            {{ result.duplicate_count }}
+          </p>
+        </div>
+        <div class="rounded-md border border-sky-500/20 bg-sky-500/10 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-sky-400">Warnings</p>
+          <p class="mt-1 text-2xl font-semibold text-sky-300">
+            {{ result.warning_count }}
           </p>
         </div>
       </div>
@@ -398,19 +404,141 @@
         </details>
       }
 
-      <!-- Duplicates preview note. The full skipped.csv is only
-           populated after commit (dry-run just counts) so the
-           download button is deferred to Step 4. -->
-      @if (result.duplicate_phone > 0) {
-        <div
-          class="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-400"
+      <!-- Duplicates table + download (populated by dry-run since
+           2026-07-30 for full preview parity with the errors table). -->
+      @if (result.duplicates.length > 0) {
+        <details
+          class="rounded-md border border-subtle"
+          [attr.open]="result.duplicates.length <= errorVisibleLimit ? '' : null"
         >
-          <lucide-icon name="alert-triangle" class="mt-0.5 h-4 w-4" />
-          <div class="text-xs">
-            {{ result.duplicate_phone }} row(s) will be skipped as phone duplicates. After you
-            commit, download the full duplicates CSV from the success screen.
+          <summary
+            class="cursor-pointer select-none px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          >
+            {{ result.duplicates.length }} duplicate row(s)
+          </summary>
+          <div class="border-t border-subtle">
+            <table class="w-full text-sm">
+              <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
+                <tr>
+                  <th class="px-3 py-2 text-left font-medium">Row</th>
+                  <th class="px-3 py-2 text-left font-medium">Column</th>
+                  <th class="px-3 py-2 text-left font-medium">Value</th>
+                  <th class="px-3 py-2 text-left font-medium">Reason</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-subtle">
+                @for (d of visibleDuplicates(); track d.row) {
+                  <tr>
+                    <td class="px-3 py-2 text-default">{{ d.row }}</td>
+                    <td class="px-3 py-2 text-muted">{{ d.column ?? '—' }}</td>
+                    <td class="px-3 py-2 text-muted">{{ d.value ?? '—' }}</td>
+                    <td class="px-3 py-2 text-default">{{ d.reason }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            @if (result.duplicates.length > errorVisibleLimit) {
+              <div class="border-t border-subtle bg-surface-2 px-4 py-2 text-xs">
+                <button
+                  type="button"
+                  (click)="toggleDuplicatesExpanded()"
+                  class="font-medium text-default hover:text-default"
+                >
+                  @if (duplicatesExpanded()) {
+                    Show first {{ errorVisibleLimit }} only
+                  } @else {
+                    Show all {{ result.duplicates.length }} duplicates
+                  }
+                </button>
+              </div>
+            }
+            <div
+              class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-4 py-2 text-xs"
+            >
+              @if (downloadSkippedMsg(); as msg) {
+                <span class="text-red-500">{{ msg }}</span>
+              }
+              <button
+                type="button"
+                (click)="downloadSkipped()"
+                [disabled]="downloadingSkipped()"
+                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <lucide-icon name="download" class="h-3.5 w-3.5" />
+                {{ downloadingSkipped() ? 'Preparing…' : 'Download duplicates CSV' }}
+              </button>
+            </div>
           </div>
-        </div>
+        </details>
+      }
+
+      <!-- Warnings table + download. Rows in this table WILL still
+           import; the warning surfaces coerced values (e.g. tag
+           truncated to 64 chars). -->
+      @if (result.warnings.length > 0) {
+        <details
+          class="rounded-md border border-subtle"
+          [attr.open]="result.warnings.length <= errorVisibleLimit ? '' : null"
+        >
+          <summary
+            class="cursor-pointer select-none px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          >
+            {{ result.warnings.length }} warning(s)
+          </summary>
+          <div class="border-t border-subtle">
+            <table class="w-full text-sm">
+              <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
+                <tr>
+                  <th class="px-3 py-2 text-left font-medium">Row</th>
+                  <th class="px-3 py-2 text-left font-medium">Column</th>
+                  <th class="px-3 py-2 text-left font-medium">Value</th>
+                  <th class="px-3 py-2 text-left font-medium">Reason</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-subtle">
+                @for (w of visibleWarnings(); track w.row) {
+                  <tr>
+                    <td class="px-3 py-2 text-default">{{ w.row }}</td>
+                    <td class="px-3 py-2 text-muted">{{ w.column ?? '—' }}</td>
+                    <td class="px-3 py-2 text-muted">{{ w.value ?? '—' }}</td>
+                    <td class="px-3 py-2 text-default">{{ w.reason }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            @if (result.warnings.length > errorVisibleLimit) {
+              <div class="border-t border-subtle bg-surface-2 px-4 py-2 text-xs">
+                <button
+                  type="button"
+                  (click)="toggleWarningsExpanded()"
+                  class="font-medium text-default hover:text-default"
+                >
+                  @if (warningsExpanded()) {
+                    Show first {{ errorVisibleLimit }} only
+                  } @else {
+                    Show all {{ result.warnings.length }} warnings
+                  }
+                </button>
+              </div>
+            }
+            <div
+              class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-4 py-2 text-xs"
+            >
+              @if (downloadWarningsMsg(); as msg) {
+                <span class="text-red-500">{{ msg }}</span>
+              }
+              <button
+                type="button"
+                (click)="downloadWarnings()"
+                [disabled]="downloadingWarnings()"
+                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <lucide-icon name="download" class="h-3.5 w-3.5" />
+                {{ downloadingWarnings() ? 'Preparing…' : 'Download warnings CSV' }}
+              </button>
+            </div>
+          </div>
+        </details>
       }
 
       @if (commitError(); as msg) {

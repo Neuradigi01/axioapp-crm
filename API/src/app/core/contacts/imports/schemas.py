@@ -82,12 +82,25 @@ class RowError(BaseModel):
 
 
 class ImportDryRunOut(BaseModel):
-    """Counts from the dry-run — nothing is inserted yet."""
+    """Counts + per-row detail from the dry-run — nothing is inserted yet.
+
+    The three per-row lists (``errors`` / ``duplicates`` / ``warnings``)
+    match the three downloadable CSVs the operator gets after commit,
+    so the wizard's Preview step can render exactly what the commit
+    will produce. Split adopted 2026-07-30 to mirror the leads-import
+    surface's 3-CSV pattern.
+    """
 
     will_insert: int
     will_skip: int  # rows missing required fields, malformed, etc.
-    duplicate_phone: int  # rows whose phone already exists
+    # Kept for backwards compatibility with older FE builds that read
+    # this instead of `duplicate_count`. Same value as `duplicate_count`.
+    duplicate_phone: int
+    duplicate_count: int = 0
+    warning_count: int = 0
     errors: list[RowError]
+    duplicates: list[RowError] = []
+    warnings: list[RowError] = []
 
 
 class ImportCommitIn(ImportDryRunIn):

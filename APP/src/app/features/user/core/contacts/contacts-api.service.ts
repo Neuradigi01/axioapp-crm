@@ -199,8 +199,14 @@ export interface ContactImportRowError {
 export interface ContactImportDryRunOut {
   will_insert: number;
   will_skip: number;
+  /** Kept for backwards compatibility — same value as `duplicate_count`. */
   duplicate_phone: number;
+  /** 3-CSV parity with leads (2026-07-30). */
+  duplicate_count: number;
+  warning_count: number;
   errors: ContactImportRowError[];
+  duplicates: ContactImportRowError[];
+  warnings: ContactImportRowError[];
 }
 
 /** Response from `POST /contacts/imports/{id}/commit`. */

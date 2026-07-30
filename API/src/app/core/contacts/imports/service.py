@@ -31,11 +31,14 @@ from src.app.core.contacts.models import Contact
 from src.app.shared import import_errors, validators
 from src.app.shared.storage import get_storage
 
-# Hard caps — `(a) 5 MB / 10K rows` per Step 3.5.10's recommendation.
-# Predictable memory profile for inline processing; future Celery
-# pathway lifts these.
-MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
-MAX_ROW_COUNT = 10_000
+# Hard caps — 10 MB / 50K rows, matching the leads-import surface's
+# ``_MAX_BYTES`` / ``_MAX_ROWS`` (see ``leads/imports/service.py``).
+# Aligned 2026-07-30 so operators moving between the two wizards see
+# identical size guidance. Inline processing means memory scales with
+# row count, but 50K rows × ~1KB/row is still well under 100MB —
+# safe for the current sync pathway.
+MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+MAX_ROW_COUNT = 50_000
 
 # Cap persisted error records so an import with 10K rows that all fail
 # does not bloat the `error_log` JSONB into a multi-MB blob. The CSV
@@ -200,8 +203,9 @@ async def dry_run_import(
 
     will_insert = 0
     will_skip = 0
-    duplicate_phone = 0
     errors: list[RowError] = []
+    duplicates: list[RowError] = []
+    warnings: list[RowError] = []
     seen_phones_in_file: set[str] = set()
 
     for row_no, raw in parsed_rows:
@@ -227,15 +231,33 @@ async def dry_run_import(
             will_skip += 1
             continue
 
-        phone_norm = _normalise_phone(mapped.get("phone") or "")
-        if phone_norm and phone_norm in existing_phones:
-            duplicate_phone += 1
+        # Reachability rule: a contact with no phone AND no email is
+        # unreachable — reject as a hard error so the operator fixes
+        # the source file rather than importing dead weight.
+        method_error = _check_contact_method(row_no, mapped)
+        if method_error is not None:
+            errors.append(method_error)
+            will_skip += 1
             continue
-        if phone_norm and phone_norm in seen_phones_in_file:
-            duplicate_phone += 1
+
+        phone_norm = _normalise_phone(mapped.get("phone") or "")
+        if phone_norm and (phone_norm in existing_phones or phone_norm in seen_phones_in_file):
+            duplicates.append(
+                RowError(
+                    row=row_no,
+                    column="phone",
+                    value=mapped.get("phone"),
+                    reason=f"duplicate phone {phone_norm}",
+                )
+            )
             continue
         if phone_norm:
             seen_phones_in_file.add(phone_norm)
+
+        # Warnings never skip — the row would insert, we're just
+        # flagging the value the importer had to coerce.
+        for w in _collect_row_warnings(row_no, mapped):
+            warnings.append(RowError(**w))
         will_insert += 1
 
     # Persist the dry-run snapshot — operator's commit click should
@@ -246,6 +268,10 @@ async def dry_run_import(
     row.status = ContactImportStatus.dry_run
     row.error_count = len(errors)
     row.error_log = [e.model_dump() for e in errors[:MAX_STORED_ERRORS]]
+    row.duplicate_count = len(duplicates)
+    row.duplicate_log = [d.model_dump() for d in duplicates[:MAX_STORED_ERRORS]]
+    row.warning_count = len(warnings)
+    row.warning_log = [w.model_dump() for w in warnings[:MAX_STORED_ERRORS]]
     if opt_in_source is not None:
         row.opt_in_source = opt_in_source
     await session.commit()
@@ -253,8 +279,12 @@ async def dry_run_import(
     return ImportDryRunOut(
         will_insert=will_insert,
         will_skip=will_skip,
-        duplicate_phone=duplicate_phone,
+        duplicate_phone=len(duplicates),
+        duplicate_count=len(duplicates),
+        warning_count=len(warnings),
         errors=errors,
+        duplicates=duplicates,
+        warnings=warnings,
     )
 
 
@@ -335,6 +365,11 @@ async def commit_import(
             errors.append(shape_error.model_dump())
             continue
 
+        method_error = _check_contact_method(row_no, mapped)
+        if method_error is not None:
+            errors.append(method_error.model_dump())
+            continue
+
         phone_norm = _normalise_phone(mapped.get("phone") or "")
         if phone_norm and (phone_norm in existing_phones or phone_norm in seen_phones_in_file):
             # 3-CSV split (2026-07-30): duplicates are a soft skip, not
@@ -349,37 +384,27 @@ async def commit_import(
             )
             continue
 
+        # Row-level warnings (currently just tag truncation). Same
+        # helper the dry-run uses so preview and commit stay in sync.
+        warnings.extend(_collect_row_warnings(row_no, mapped))
+
         contact_id = uuid.uuid4()
         tag_value = mapped.get("tag")
         # Normalise, dedupe, trim, and cap. `Contact.tags` is
         # `ARRAY(String(64))` — an unbounded tag from a CSV cell
         # otherwise raises `DataError` mid-batch and rolls back every
-        # already-inserted row up to that point.
-        raw_tags: list[str] = tag_value if isinstance(tag_value, list) else (
-            [tag_value] if isinstance(tag_value, str) else []
+        # already-inserted row up to that point. Warning emission for
+        # the truncation lives in `_collect_row_warnings` above.
+        raw_tags: list[str] = (
+            tag_value
+            if isinstance(tag_value, list)
+            else ([tag_value] if isinstance(tag_value, str) else [])
         )
         tags: list[str] = []
         for t in raw_tags:
-            original = str(t).strip()
-            cleaned = original[:64]
+            cleaned = str(t).strip()[:64]
             if cleaned and cleaned not in tags:
                 tags.append(cleaned)
-            # Emit a per-row warning when a tag got truncated so the
-            # operator can shorten it in the source and re-import.
-            # Silent truncation used to hide bad data; warnings.csv
-            # now surfaces it (mirror of leads' warnings pattern).
-            if original and len(original) > 64:
-                warnings.append(
-                    {
-                        "row": row_no,
-                        "column": "tag",
-                        "value": original,
-                        "reason": (
-                            f"tag truncated to 64 chars (was {len(original)}); "
-                            f"kept {cleaned!r}"
-                        ),
-                    }
-                )
         contact = Contact(
             id=contact_id,
             org_id=org_id,
@@ -476,6 +501,64 @@ def _read_file_bytes(storage, storage_path: str) -> bytes:
 
     full = Path("./storage").resolve() / storage_path.lstrip("/")
     return full.read_bytes()
+
+
+def _check_contact_method(row_no: int, mapped: dict[str, Any]) -> RowError | None:
+    """Reject rows that carry neither a phone nor an email.
+
+    Every contact needs at least one channel to be reachable from the
+    CRM — without one, the row is useless clutter (no way to call, no
+    way to email, no way to WhatsApp). Enforced 2026-07-30 after
+    operator feedback that blank-phone-blank-email imports were slipping
+    through. ``full_name``-only prospect lists must supply at least one
+    channel; empty rows should be filtered from the source spreadsheet
+    before upload.
+    """
+    phone_raw = (mapped.get("phone") or "").strip()
+    email_raw = (mapped.get("email") or "").strip()
+    if not phone_raw and not email_raw:
+        return RowError(
+            row=row_no,
+            column="phone",
+            value=None,
+            reason="row has neither phone nor email — at least one contact method is required",
+        )
+    return None
+
+
+def _collect_row_warnings(row_no: int, mapped: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the per-row warnings (import succeeds but a value was
+    coerced). Shared between dry-run and commit so the preview reflects
+    exactly what the commit CSV will contain.
+
+    Today the only warning is **tag truncation** — ``Contact.tags`` is
+    ``ARRAY(String(64))`` and anything longer gets cut to 64 chars.
+    Add new warning kinds here rather than in the commit loop so the
+    dry-run preview never drifts.
+    """
+    tag_value = mapped.get("tag")
+    raw_tags: list[str] = (
+        tag_value
+        if isinstance(tag_value, list)
+        else ([tag_value] if isinstance(tag_value, str) else [])
+    )
+    out: list[dict[str, Any]] = []
+    for t in raw_tags:
+        original = str(t).strip()
+        if original and len(original) > 64:
+            cleaned = original[:64]
+            out.append(
+                {
+                    "row": row_no,
+                    "column": "tag",
+                    "value": original,
+                    "reason": (
+                        f"tag truncated to 64 chars (was {len(original)}); "
+                        f"kept {cleaned!r}"
+                    ),
+                }
+            )
+    return out
 
 
 def _check_row_shape(row_no: int, mapped: dict[str, Any]) -> RowError | None:
