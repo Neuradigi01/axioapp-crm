@@ -28,7 +28,7 @@ from src.app.core.contacts.imports.schemas import (
     RowError,
 )
 from src.app.core.contacts.models import Contact
-from src.app.core.custom_fields.data_access import list_fields_for_entity
+from src.app.core.custom_fields.data_access import list_fields_query
 from src.app.core.custom_fields.models import CustomFieldDefinition
 from src.app.shared import import_errors, validators
 from src.app.shared.custom_fields.coercion import coerce_value
@@ -810,7 +810,7 @@ async def _load_contact_custom_field_defs(
     import instead of once per row keeps the loop O(N) instead of
     O(N × k) round-trips.
     """
-    fields = await list_fields_for_entity(
+    fields = await list_fields_query(
         session, entity_type=_CONTACT_ENTITY, include_hidden=False
     )
     return {f.field_key: f for f in fields}
