@@ -16,6 +16,7 @@ import {
   ConversationDetail,
   ConversationListQuery,
   ConversationMessage,
+  ConversationStatus,
   ConversationTagRef,
   ConversationsApiService,
 } from './conversations-api.service';
@@ -712,6 +713,29 @@ export class ConversationsPageComponent {
       });
   }
 
+  /**
+   * J.16 fix — header status pill emitted a new choice. PATCH,
+   * update both the list-row and thread detail on success so the
+   * status filter chip counts + the header pill re-render in one
+   * pass without a full list reload.
+   */
+  protected onStatusChange(next: ConversationStatus): void {
+    const id = this.selectedId();
+    if (!id) return;
+    this.api
+      .patch(id, { status: next })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loadError.set(extractApiError(err) ?? 'Could not update conversation status.');
+        },
+      });
+  }
+
   protected reloadList(): void {
     this.loading.set(true);
     this.loadError.set(null);
@@ -740,6 +764,22 @@ export class ConversationsPageComponent {
         next: (d) => {
           this.detail.set(d);
           this.threadLoading.set(false);
+          // If the row we just opened has an unread badge, clear it
+          // server-side. The endpoint is idempotent so we don't need
+          // to gate on the count locally — the backend no-ops when
+          // it's already 0. Best-effort: notification-refresh will
+          // pick up the fresh count for the list badge.
+          if ((d.conversation.unread_count ?? 0) > 0) {
+            this.api
+              .markRead(id)
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
+                next: () => this.reloadList(),
+                // Silent failure — the badge stays lit until next open
+                // or reload. Not worth surfacing to the operator.
+                error: () => undefined,
+              });
+          }
         },
         error: (err: HttpErrorResponse) => {
           this.detail.set(null);

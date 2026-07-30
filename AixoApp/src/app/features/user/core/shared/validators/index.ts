@@ -5,7 +5,9 @@ import {
   dateFutureValidator,
   dateNotFutureValidator,
   dateNotPastValidator,
+  dateWithinFutureDays,
   dateWithinPastDays,
+  dateWithinPastHours,
   emailValidator,
   fileUploadValidator,
   hostnameApexValidator,
@@ -67,6 +69,8 @@ export const commonValidators = {
   dateNotFuture: dateNotFutureValidator as ValidatorFn,
   dateFuture: dateFutureValidator as ValidatorFn,
   dateWithinPastDays: (n: number): ValidatorFn => dateWithinPastDays(n),
+  dateWithinPastHours: (n: number): ValidatorFn => dateWithinPastHours(n),
+  dateWithinFutureDays: (n: number): ValidatorFn => dateWithinFutureDays(n),
   fileUpload: (opts: { maxMb: number; exts: readonly string[] }): ValidatorFn =>
     fileUploadValidator(opts),
   picklist: (allowed: readonly (string | number)[]): ValidatorFn => picklistValidator(allowed),

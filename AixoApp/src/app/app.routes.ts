@@ -38,13 +38,17 @@ export const appRoutes: Routes = [
     // Onboarding picker — landed on after self-signup, while the
     // user's org is still in `template_id="pending"`. Top-level (not under
     // `/user`) because the user has no fully-set-up org yet, so any
-    // `/user/...` query would 404 or render a broken shell. The
-    // component bounces unauthenticated visitors to `/accounts/login`.
+    // `/user/...` query would 404 or render a broken shell. Gated
+    // by `furnitureAuthGuard` so anonymous visitors are bounced at the
+    // route boundary rather than briefly loading the component and then
+    // redirected from ngOnInit — defense-in-depth against the
+    // load-flash + spared component initialisation.
     path: 'onboarding',
     loadComponent: () =>
       import('./features/accounts/onboarding/onboarding.component').then(
         (m) => m.OnboardingComponent,
       ),
+    canActivate: [furnitureAuthGuard],
   },
   {
     // Public Real Estate pack surfaces — `/properties?org=<slug>` grid

@@ -202,6 +202,24 @@ export class ConversationsApiService {
     return this.http.get<ConversationDetail>(`${this.base}/${id}`);
   }
 
+  /**
+   * Fetch an older page of messages (infinite-scroll-up). Returns
+   * oldest-first so the caller can prepend it to the top of the
+   * rendered thread. Empty array means the thread is fully loaded.
+   *
+   * ``beforeId`` is the id of the current oldest visible message —
+   * the backend keyset-walks past it. Backend caps ``limit`` at 200.
+   */
+  loadOlderMessages(
+    conversationId: string,
+    beforeId: string,
+    limit = 50,
+  ): Observable<ConversationMessage[]> {
+    return this.http.get<ConversationMessage[]>(`${this.base}/${conversationId}/messages`, {
+      params: { before_id: beforeId, limit: String(limit) },
+    });
+  }
+
   send(
     id: string,
     text: string,
@@ -237,6 +255,25 @@ export class ConversationsApiService {
       `${this.base}/${conversationId}/messages/${messageId}/reactions`,
       { emoji },
     );
+  }
+
+  /**
+   * Zero the unread badge on a conversation. Idempotent — safe to
+   * fire on every thread open even if the counter is already 0. The
+   * SPA calls this from the thread-open effect + the list row's
+   * "Mark as read" context-menu item.
+   */
+  markRead(conversationId: string): Observable<Conversation> {
+    return this.http.post<Conversation>(`${this.base}/${conversationId}/mark-read`, {});
+  }
+
+  /**
+   * Flip a conversation back to unread by setting ``unread_count = 1``
+   * if it's currently 0. Powers the "come back to this later" row
+   * action.
+   */
+  markUnread(conversationId: string): Observable<Conversation> {
+    return this.http.post<Conversation>(`${this.base}/${conversationId}/mark-unread`, {});
   }
 
   /**

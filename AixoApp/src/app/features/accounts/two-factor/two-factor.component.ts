@@ -11,8 +11,13 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { firstValueFrom } from 'rxjs';
 import { AuthApiService } from '@app/services/auth-api.service';
 import { AuthService } from '@core/services/auth.service';
+import {
+  FurnitureAuthService,
+  isTwoFactorChallenge,
+} from '@app/features/user/core/auth/auth.service';
 import { getRoute } from '@core/services/routes-helper.service';
 import { UserType, TwoFactorMethod } from '@app/schemas/common';
 import {
@@ -43,6 +48,7 @@ import { DeviceInfoService } from '@core/services/device-info.service';
 export class TwoFactorComponent implements OnInit, OnDestroy {
   private readonly authApi = inject(AuthApiService);
   private readonly auth = inject(AuthService);
+  private readonly furnitureAuth = inject(FurnitureAuthService);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly deviceInfo = inject(DeviceInfoService);
@@ -66,6 +72,10 @@ export class TwoFactorComponent implements OnInit, OnDestroy {
   private password = '';
   private userType: UserType = 'User';
   private rememberMe = false;
+  /** Layered login can be scoped to a specific org via slug (demo pill).
+   *  Carried through the challenge so the verify-code re-POST keeps
+   *  targeting the same tenant the first submit resolved. */
+  private orgSlug: string | null = null;
 
   get methodLabel(): string {
     return TFA_METHOD_LABELS[this.method()] ?? this.method();
@@ -101,6 +111,7 @@ export class TwoFactorComponent implements OnInit, OnDestroy {
     this.password = state.password;
     this.userType = state.userType ?? 'User';
     this.rememberMe = state.rememberMe ?? false;
+    this.orgSlug = state.orgSlug ?? null;
     this.method.set(state.method ?? 'authenticator');
     this.availableMethods.set(state.availableMethods ?? []);
     this.loginUrl.set(
@@ -196,6 +207,33 @@ export class TwoFactorComponent implements OnInit, OnDestroy {
     this.errorMessage.set('');
 
     try {
+      if (this.userType !== ROLE_ADMIN) {
+        // Layered path — talks straight to `/api/v1/auth/2fa/try-
+        // another-way` which accepts the {email,password,org_slug,
+        // method} envelope.
+        const res = await firstValueFrom(
+          this.furnitureAuth.tryAnotherWay({
+            email: this.identifier,
+            password: this.password,
+            org_slug: this.orgSlug,
+            method,
+          }),
+        );
+        this.method.set(res.method as TwoFactorMethod);
+        this.availableMethods.set(res.available_methods as TwoFactorMethod[]);
+        this.resetDigits();
+        this.showMethodOptions.set(false);
+        this.restartExpiryTimer();
+        if (this.isOtpMethod) {
+          this.startResendCooldown();
+        }
+        this.snackBar.open(MSG_2FA_METHOD_SWITCHED, SNACKBAR_ACTION, {
+          duration: SNACKBAR_DURATION,
+        });
+        return;
+      }
+
+      // Legacy admin path — unchanged.
       const response = await this.authApi.tryAnotherWay({
         identifier: this.identifier,
         password: this.password,
@@ -236,6 +274,22 @@ export class TwoFactorComponent implements OnInit, OnDestroy {
     this.errorMessage.set('');
 
     try {
+      if (this.userType !== ROLE_ADMIN) {
+        await firstValueFrom(
+          this.furnitureAuth.tryAnotherWay({
+            email: this.identifier,
+            password: this.password,
+            org_slug: this.orgSlug,
+            method: this.method(),
+          }),
+        );
+        this.resetDigits();
+        this.restartExpiryTimer();
+        this.startResendCooldown();
+        this.snackBar.open(MSG_2FA_CODE_RESENT, SNACKBAR_ACTION, { duration: SNACKBAR_DURATION });
+        return;
+      }
+
       const response = await this.authApi.tryAnotherWay({
         identifier: this.identifier,
         password: this.password,
@@ -267,11 +321,42 @@ export class TwoFactorComponent implements OnInit, OnDestroy {
     this.errorMessage.set('');
 
     try {
-      const loginFn =
-        this.userType === ROLE_ADMIN
-          ? this.authApi.adminLogin.bind(this.authApi)
-          : this.authApi.login.bind(this.authApi);
-      const response = await loginFn({
+      // Layered (FurnitureCRM) user path: re-POST /auth/login with the
+      // code. The response is a real LoginResponse — the tap in
+      // FurnitureAuthService.login stores the token. If the code is
+      // wrong the backend raises 401; we surface that as a form error.
+      if (this.userType !== ROLE_ADMIN) {
+        try {
+          const outcome = await firstValueFrom(
+            this.furnitureAuth.login(
+              this.identifier,
+              this.password,
+              this.orgSlug,
+              code,
+              this.method(),
+            ),
+          );
+          if (isTwoFactorChallenge(outcome)) {
+            // Shouldn't happen — we submitted a code. Treat as invalid.
+            this.errorMessage.set(MSG_2FA_CODE_INVALID);
+            this.resetDigits();
+            return;
+          }
+          this.router.navigate([getRoute('user_dashboard').url]);
+          return;
+        } catch (err: unknown) {
+          const msg =
+            (err as { error?: { detail?: string; message?: string } })?.error?.detail ??
+            (err as { error?: { detail?: string; message?: string } })?.error?.message ??
+            MSG_2FA_CODE_INVALID;
+          this.errorMessage.set(msg);
+          this.resetDigits();
+          return;
+        }
+      }
+
+      // Admin (legacy) path — unchanged.
+      const response = await this.authApi.adminLogin({
         identifier: this.identifier,
         password: this.password,
         two_factor_code: code,

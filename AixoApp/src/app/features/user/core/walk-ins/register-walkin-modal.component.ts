@@ -53,6 +53,45 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
 
   protected readonly matchedContact = signal<ContactListItem | null>(null);
 
+  /** Browser-side bounds for the two date inputs, captured once at
+   *  construction. The modal is short-lived so a "now" that's a few
+   *  minutes stale is fine — the validators are authoritative.
+   *
+   *  Queue arrival (`<input type="datetime-local">`): [4h ago, now]
+   *  in the `YYYY-MM-DDTHH:mm` shape the input expects.
+   *
+   *  Expected return (`<input type="date">`): [tomorrow, +365 days]
+   *  in `YYYY-MM-DD`. */
+  protected readonly waitStartedMin: string;
+  protected readonly waitStartedMax: string;
+  protected readonly expectedReturnMin: string;
+  protected readonly expectedReturnMax: string;
+
+  constructor() {
+    super();
+    const now = new Date();
+    const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+    this.waitStartedMin = this.toLocalDateTimeInput(fourHoursAgo);
+    this.waitStartedMax = this.toLocalDateTimeInput(now);
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const yearOut = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 365);
+    this.expectedReturnMin = this.toLocalDateInput(tomorrow);
+    this.expectedReturnMax = this.toLocalDateInput(yearOut);
+  }
+
+  private toLocalDateTimeInput(d: Date): string {
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    return (
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+      `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    );
+  }
+
+  private toLocalDateInput(d: Date): string {
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
   protected readonly form = this.fb.group({
     phone: this.fb.control('', {
       nonNullable: true,
@@ -82,16 +121,27 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
     }),
     // W9 — queue arrival ISO. When present, the (time_in - wait_started_at)
     // delta populates the org's avg-wait metric. Empty = not tracked.
+    // Reception-queue standard: within the last 4 hours, never future
+    // (a wait that "started" yesterday is a data-entry mistake).
     wait_started_at: this.fb.control('', {
       nonNullable: true,
-      validators: [commonValidators.isoDateTime],
+      validators: [
+        commonValidators.isoDateTime,
+        commonValidators.dateNotFuture,
+        commonValidators.dateWithinPastHours(4),
+      ],
     }),
     // W11 — "customer will return by" YYYY-MM-DD. Retention analytics.
     // "Will return" is forward-looking — today doesn't make sense for
-    // an expected-return promise, so `dateFuture` (tomorrow onward).
+    // an expected-return promise, so `dateFuture` (tomorrow onward);
+    // cap at one year out (anything further is a typo).
     expected_return_date: this.fb.control('', {
       nonNullable: true,
-      validators: [commonValidators.isoDate, commonValidators.dateFuture],
+      validators: [
+        commonValidators.isoDate,
+        commonValidators.dateFuture,
+        commonValidators.dateWithinFutureDays(365),
+      ],
     }),
   });
 

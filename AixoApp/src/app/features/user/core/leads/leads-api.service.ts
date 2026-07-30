@@ -102,6 +102,20 @@ export interface LeadCreate {
   source?: LeadSource;
 }
 
+/** Response body returned by ``POST /leads``.
+ *
+ *  Every field on :class:`Lead` plus ``ingest_action`` — the ingest
+ *  layer's discriminator so the UI can show a contextual toast:
+ *
+ *  - ``"created"`` — a fresh lead row was inserted.
+ *  - ``"merged"`` — the picked contact already had an OPEN lead; its
+ *    timeline gained a "Touchpoint via <source>" activity and this
+ *    response carries that existing lead's fields.
+ */
+export interface LeadIngestResult extends Lead {
+  ingest_action: 'created' | 'merged';
+}
+
 export type LeadUpdate = Partial<{
   contact_id: string;
   assigned_to_id: string | null;
@@ -224,6 +238,15 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
     return this.http.get<LeadListResponse>(this.base, {
       params: this.buildParams(query),
     });
+  }
+
+  /** Override the base ``create`` so the response body carries
+   *  ``ingest_action`` — the discriminator the UI reads to show
+   *  "New lead created" vs "Existing lead updated". Backend also
+   *  still sets an ``X-Lead-Ingest-Action`` header for legacy
+   *  clients; new consumers read the body. */
+  override create(payload: LeadCreate): Observable<LeadIngestResult> {
+    return this.http.post<LeadIngestResult>(this.base, payload);
   }
 
   /** Trigger a CSV download for the current filter set. Uses the auth
@@ -352,13 +375,20 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
    *  an open lead — no new row was inserted and the returned lead is
    *  the pre-existing one with a touchpoint activity appended. The
    *  UI uses this to switch its success toast from "New lead
-   *  created" to "Existing lead updated with a new touchpoint". */
+   *  created" to "Existing lead updated with a new touchpoint".
+   *
+   *  Reads ``ingest_action`` from the response body (backend Fix I.2).
+   *  The prior ``X-Lead-Ingest-Action`` header path is still populated
+   *  by the backend for legacy clients but the body is safer: any
+   *  CORS-transparent proxy or middleware that strips response headers
+   *  used to silently regress this to "created". */
   createWithAction(payload: LeadCreate): Observable<{ lead: Lead; action: 'created' | 'merged' }> {
-    return this.http.post<Lead>(this.base, payload, { observe: 'response' }).pipe(
-      map((resp) => {
-        const raw = (resp.headers.get('X-Lead-Ingest-Action') || 'created').toLowerCase();
-        const action: 'created' | 'merged' = raw === 'merged' ? 'merged' : 'created';
-        return { lead: resp.body as Lead, action };
+    return this.http.post<LeadIngestResult>(this.base, payload).pipe(
+      map((body) => {
+        const action: 'created' | 'merged' = body.ingest_action === 'merged' ? 'merged' : 'created';
+        const { ingest_action: _drop, ...lead } = body;
+        void _drop;
+        return { lead: lead as Lead, action };
       }),
     );
   }
