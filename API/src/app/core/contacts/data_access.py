@@ -340,7 +340,7 @@ async def reassign_contact_references(
     org_id: uuid.UUID,
     primary_id: uuid.UUID,
     secondary_id: uuid.UUID,
-) -> dict[str, int]:
+) -> tuple[dict[str, int], list[uuid.UUID]]:
     """Repoint every cross-module row that references ``secondary_id``
     to ``primary_id`` inside the given org.
 
@@ -349,9 +349,18 @@ async def reassign_contact_references(
     would guarantee isolation — belt + suspenders, matches every other
     DAL statement in the codebase.
 
-    Returns a per-table row-count map (``{"activities": 3, "leads": 1,
-    ...}``) so the service can render a "merged X activities + Y leads"
-    audit line.
+    Returns ``(counts, moved_lead_ids)``:
+
+    - ``counts`` — per-table row-count map (``{"activities": 3,
+      "leads": 1, ...}``) so the service can render a "merged X
+      activities + Y leads" audit line.
+    - ``moved_lead_ids`` — the ids of leads whose ``contact_id`` was
+      re-pointed. The service writes a per-lead attribution
+      Activity ("This lead was originally on 'Anjali Desai'…") on
+      each so the operator can identify what came from the merge
+      when they open the lead's timeline. Kept out of ``counts`` so
+      the return shape stays simple — no other DAL caller needs
+      per-row ids.
 
     Tables covered (grouped by relationship shape):
 
@@ -445,19 +454,37 @@ async def reassign_contact_references(
         ("tbl_workflow_event_waits", "workflow_event_waits"),
         ("tbl_fp_custom_orders", "fp_custom_orders"),
     )
+    moved_lead_ids: list[uuid.UUID] = []
     for tbl, key in _FK_TARGETS:
         if not await _table_exists(tbl):
             continue
-        stmt = text(
-            f"UPDATE {tbl} SET contact_id = :primary "
-            f"WHERE org_id = :org_id AND contact_id = :secondary"
-        )
-        counts[key] = (
-            await session.execute(
+        # tbl_leads uses ``RETURNING id`` so the service can annotate
+        # each moved lead with a per-lead attribution note; every
+        # other table takes the plain UPDATE (we only need the count).
+        if tbl == "tbl_leads":
+            stmt = text(
+                "UPDATE tbl_leads SET contact_id = :primary "
+                "WHERE org_id = :org_id AND contact_id = :secondary "
+                "RETURNING id"
+            )
+            result = await session.execute(
                 stmt,
                 {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
             )
-        ).rowcount or 0
+            returned_ids = [row[0] for row in result.fetchall()]
+            moved_lead_ids.extend(returned_ids)
+            counts[key] = len(returned_ids)
+        else:
+            stmt = text(
+                f"UPDATE {tbl} SET contact_id = :primary "
+                f"WHERE org_id = :org_id AND contact_id = :secondary"
+            )
+            counts[key] = (
+                await session.execute(
+                    stmt,
+                    {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+                )
+            ).rowcount or 0
 
     # Consent events — append-only trigger blocks UPDATE, so instead
     # of moving rows we INSERT clones onto the primary preserving
@@ -534,7 +561,7 @@ async def reassign_contact_references(
             )
         ).rowcount or 0
 
-    return counts
+    return counts, moved_lead_ids
 
 
 async def list_contacts_for_export(

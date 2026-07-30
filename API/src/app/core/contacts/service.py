@@ -400,8 +400,18 @@ async def merge_contacts(
     # Repoint every FK / polymorphic ref before deleting the secondary.
     # RESTRICT-FK tables (appointments, leads, walk-ins) would otherwise
     # block the DELETE — the DAL handles them first.
+    #
+    # ``moved_lead_ids`` — captured now so we can write a per-lead
+    # attribution note ("This lead was originally on <secondary
+    # name>…") after commit. Every mature CRM (HubSpot, Zoho,
+    # Pipedrive) does this so a rep opening a lead can tell which
+    # merged-from contact it belonged to originally, without needing
+    # a special filter on the list. The IDs come back inside the
+    # merge transaction, but we defer the annotation writes until
+    # after the commit lands so a failure writing a note doesn't
+    # roll back a successful merge.
     try:
-        rows_reassigned = await data_access.reassign_contact_references(
+        rows_reassigned, moved_lead_ids = await data_access.reassign_contact_references(
             session,
             org_id=org_id,
             primary_id=primary.id,
@@ -482,6 +492,37 @@ async def merge_contacts(
         )
     except Exception:  # noqa: BLE001 — best-effort audit breadcrumb.
         pass
+
+    # Per-lead attribution: one note per moved lead so its Activities
+    # tab shows "This lead was originally on <secondary name>, merged
+    # into <primary name>." Same best-effort semantics as the summary
+    # note above — a note-write failure never rolls back the merge.
+    # Loop bounded by the number of leads the secondary owned (never
+    # more than the org's total leads), so worst-case is a per-lead
+    # timeline insert.
+    secondary_name = before_secondary.get("full_name") or "another contact"
+    primary_name = _snapshot(primary).get("full_name") or "this contact"
+    for lead_id in moved_lead_ids:
+        try:
+            await activities_service.log(
+                entity_type="lead",
+                entity_id=lead_id,
+                type=ActivityType.note,
+                payload={
+                    "text": (
+                        f"This lead was originally on contact "
+                        f"'{secondary_name}' and was moved to "
+                        f"'{primary_name}' during a contact merge."
+                    ),
+                    "merged_from_contact_id": str(secondary.id),
+                    "merged_from_contact_name": secondary_name,
+                    "system": True,
+                },
+                org_id=org_id,
+            )
+        except Exception:  # noqa: BLE001 — best-effort per-lead note.
+            # One lead's note failure must not stop the others.
+            continue
 
     return primary, rows_reassigned
 
