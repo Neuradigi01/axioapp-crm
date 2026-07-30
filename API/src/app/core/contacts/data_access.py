@@ -416,6 +416,11 @@ async def reassign_contact_references(
     # Every direct-FK table shares the same UPDATE shape. Iterate a
     # (table, count-key) list so the map is populated per-table with
     # zero repetition.
+    #
+    # ``tbl_consent_events`` used to live in this loop but the
+    # append-only trigger (0109) forbids UPDATE against it. Handled
+    # separately below via INSERT-clone-then-cascade so the merged
+    # primary keeps the customer's full consent audit trail.
     _FK_TARGETS: tuple[tuple[str, str], ...] = (
         ("tbl_appointments", "appointments"),
         ("tbl_leads", "leads"),
@@ -426,7 +431,6 @@ async def reassign_contact_references(
         ("tbl_reviews", "reviews"),
         ("tbl_automation_runs", "automation_runs"),
         ("tbl_invoices", "invoices"),
-        ("tbl_consent_events", "consent_events"),
         ("tbl_email_sequence_enrollments", "email_sequence_enrollments"),
         ("tbl_contact_group_members", "contact_group_members"),
         # WhatsApp Flows submissions. FK is `SET NULL` on delete so the
@@ -434,6 +438,12 @@ async def reassign_contact_references(
         # silently loses the customer's flow-submission history. Move
         # it to the primary instead.
         ("tbl_whatsapp_flow_submissions", "whatsapp_flow_submissions"),
+        # Same "would silently null on cascade" story. Both are
+        # ``ondelete='SET NULL'`` so the secondary DELETE never
+        # blocked; they were just being dropped on the floor instead
+        # of following the merge.
+        ("tbl_workflow_event_waits", "workflow_event_waits"),
+        ("tbl_fp_custom_orders", "fp_custom_orders"),
     )
     for tbl, key in _FK_TARGETS:
         if not await _table_exists(tbl):
@@ -445,6 +455,41 @@ async def reassign_contact_references(
         counts[key] = (
             await session.execute(
                 stmt,
+                {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
+            )
+        ).rowcount or 0
+
+    # Consent events — append-only trigger blocks UPDATE, so instead
+    # of moving rows we INSERT clones onto the primary preserving
+    # every original field including ``recorded_at`` so the merged
+    # timeline stays chronologically honest. The secondary rows then
+    # get cascade-deleted when the secondary contact is deleted
+    # (post 0172 the trigger no longer blocks DELETE).
+    #
+    # ``id`` is server-generated (gen_random_uuid()) so we omit it and
+    # let PG mint a fresh key for each clone; this is important
+    # because primary + secondary could theoretically share an id
+    # collision if a client bug ever supplied it explicitly (they
+    # don't today, but belt-and-suspenders).
+    if await _table_exists("tbl_consent_events"):
+        clone_stmt = text(
+            """
+            INSERT INTO tbl_consent_events (
+                org_id, contact_id, channel, old_status, new_status,
+                source, actor_user_id, ip_address, reason,
+                request_evidence, recorded_at
+            )
+            SELECT
+                org_id, :primary, channel, old_status, new_status,
+                source, actor_user_id, ip_address, reason,
+                request_evidence, recorded_at
+            FROM tbl_consent_events
+            WHERE org_id = :org_id AND contact_id = :secondary
+            """
+        )
+        counts["consent_events"] = (
+            await session.execute(
+                clone_stmt,
                 {"org_id": org_id, "primary": primary_id, "secondary": secondary_id},
             )
         ).rowcount or 0
