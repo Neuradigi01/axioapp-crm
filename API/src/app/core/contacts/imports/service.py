@@ -498,24 +498,42 @@ def _check_row_shape(row_no: int, mapped: dict[str, Any]) -> RowError | None:
 
 
 def _validate_mapping(mapping: dict[str, str]) -> None:
-    """Reject a mapping where two columns land on the same non-tag
-    target. Silent last-write-wins on `full_name` / `phone` / `email`
-    / `source` corrupts data — surface the conflict as a 422 so the
-    operator picks one column and marks the other `skip`.
+    """Reject mappings the import loop cannot honour.
 
-    Duplicate `tag` targets are allowed (they aggregate via
-    `_apply_mapping`).
+    Two shapes get a 422 at dry-run/commit entry, before any row work:
+
+    1. **Required target unmapped.** ``full_name`` must appear as a
+       target on some column — without it every row fails the required
+       check and the import wastes a full parse pass. The frontend
+       gates this via ``canRunDryRun``; the backend re-enforces so a
+       direct API caller (or a stale FE build) can't sneak in an
+       empty-outcome import.
+
+    2. **Duplicate non-tag targets.** Silent last-write-wins on
+       ``full_name`` / ``phone`` / ``email`` / ``source`` corrupts
+       data — surface the conflict so the operator picks one column
+       and marks the other ``skip``. Duplicate ``tag`` targets are
+       allowed (they aggregate via ``_apply_mapping``).
     """
     non_tag_seen: dict[str, str] = {}
     conflicts: list[str] = []
+    targets_seen: set[str] = set()
     for column, target in mapping.items():
-        if not target or target == "skip" or target == "tag":
+        if not target or target == "skip":
+            continue
+        targets_seen.add(target)
+        if target == "tag":
             continue
         prior = non_tag_seen.get(target)
         if prior is not None:
             conflicts.append(f"{prior!r} and {column!r} both map to {target!r}")
         else:
             non_tag_seen[target] = column
+    if "full_name" not in targets_seen:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Map one column to 'Full name' — it's required for every contact.",
+        )
     if conflicts:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
