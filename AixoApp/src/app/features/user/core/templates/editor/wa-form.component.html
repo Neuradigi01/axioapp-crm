@@ -5,7 +5,7 @@
       <span class="text-xs font-medium text-default">Language</span>
       <select
         formControlName="language"
-        class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
+        class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
       >
         @for (lang of LANGUAGE_OPTIONS; track lang.value) {
           <option [value]="lang.value">{{ lang.label }}</option>
@@ -48,7 +48,7 @@
         <span class="text-xs font-medium text-default">Header</span>
         <select
           formControlName="header_type"
-          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
+          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
         >
           <option value="">None</option>
           <option value="text">Text</option>
@@ -65,7 +65,7 @@
             formControlName="header_text"
             maxlength="60"
             (focus)="onFocus($event)"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
+            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
             placeholder="e.g. Diwali Special"
           />
           <div class="mt-0.5 text-right text-[10px] text-faint">
@@ -93,7 +93,7 @@
       maxlength="1024"
       rows="8"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none"
+      class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none"
       placeholder="Hi {{ '{' + '{' + 'contact.first_name' + '}' + '}' }}, …"
     ></textarea>
     <div class="mt-1 flex items-center justify-between text-[10px] text-faint">
@@ -119,7 +119,7 @@
       formControlName="footer_text"
       maxlength="60"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
+      class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
       placeholder="e.g. Reply STOP to unsubscribe"
     />
     <div class="mt-0.5 text-right text-[10px] text-faint">
@@ -138,7 +138,7 @@
         type="button"
         (click)="addButton('url')"
         [disabled]="disabled() || !canAddButton()"
-        class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+        class="rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
       >
         + Add button
       </button>
@@ -148,13 +148,13 @@
       @for (btn of form().controls.buttons.controls; track $index) {
         <div
           [formGroupName]="$index"
-          class="grid grid-cols-[110px_140px_1fr_28px] items-start gap-2 rounded-md border border-subtle bg-surface p-2"
+          class="grid grid-cols-[110px_140px_1fr_28px] items-start gap-2 rounded-lg border border-subtle bg-surface p-2"
         >
           <label class="block">
             <span class="text-[10px] font-medium text-muted">Type</span>
             <select
               formControlName="type"
-              class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs focus:border-muted focus:outline-none"
+              class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs focus:border-muted focus:outline-none"
             >
               <option value="url">URL</option>
               <option value="phone_number">Phone</option>
@@ -169,7 +169,7 @@
               formControlName="text"
               maxlength="25"
               placeholder="Shop now"
-              class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs focus:border-muted focus:outline-none"
+              class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs focus:border-muted focus:outline-none"
             />
           </label>
 
@@ -180,7 +180,7 @@
                 type="url"
                 formControlName="url"
                 placeholder="https://your-site.com/landing"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 font-mono text-xs focus:border-muted focus:outline-none"
+                class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 font-mono text-xs focus:border-muted focus:outline-none"
               />
             </label>
           } @else if (btn.controls.type.value === 'phone_number') {
@@ -190,7 +190,7 @@
                 type="tel"
                 formControlName="phone_number"
                 placeholder="+91 98765 43210"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 font-mono text-xs focus:border-muted focus:outline-none"
+                class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 font-mono text-xs focus:border-muted focus:outline-none"
               />
             </label>
           } @else {

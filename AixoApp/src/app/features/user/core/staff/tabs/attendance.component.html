@@ -1,6 +1,6 @@
 @if (rows().length === 0) {
   <div
-    class="rounded-lg border border-dashed border-subtle bg-surface p-12 text-center text-sm text-muted"
+    class="rounded-lg border border-dashed border-subtle bg-surface p-6 md:p-12 text-center text-sm text-muted"
   >
     No staff to inspect yet.
   </div>
@@ -11,7 +11,7 @@
       <label class="text-sm font-medium text-default">Staff member</label>
       <select
         (change)="pickStaff($event)"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       >
         @for (row of rows(); track row.staff.id) {
           <option [value]="row.staff.id" [selected]="row.staff.id === selectedUserId()">
@@ -32,7 +32,7 @@
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <!-- Calendar -->
-      <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+      <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
         <app-calendar
           [viewMonth]="viewMonth()"
           [events]="events()"
@@ -42,7 +42,7 @@
       </div>
 
       <!-- Session list -->
-      <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+      <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
         <div class="mb-3 flex items-baseline justify-between">
           <h3 class="text-sm font-semibold text-default">Sessions this month</h3>
           <span class="text-xs text-muted">

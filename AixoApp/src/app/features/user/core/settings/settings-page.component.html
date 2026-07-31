@@ -1,65 +1,105 @@
 <div class="p-4 md:p-8">
   <header class="mb-6">
-    <h1 class="text-2xl font-semibold text-default">Settings</h1>
-    <p class="mt-1 text-sm text-muted">Tenant configuration for this organisation.</p>
+    <h1 class="font-display text-2xl font-semibold tracking-tight text-default">Settings</h1>
+    <p class="mt-1 text-[14px] text-muted">Tenant configuration for this organisation.</p>
   </header>
 
-  <nav class="mb-6 flex flex-wrap gap-2 border-b border-subtle">
-    @for (tab of tabs(); track tab.id) {
-      <button
-        type="button"
-        class="-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors"
-        [class.border-accent]="active() === tab.id"
-        [class.text-default]="active() === tab.id"
-        [class.border-transparent]="active() !== tab.id"
-        [class.text-muted]="active() !== tab.id"
-        [class.hover:text-default]="active() !== tab.id"
-        (click)="active.set(tab.id)"
-      >
-        {{ tab.label }}
-      </button>
-    }
-  </nav>
+  <!-- Mobile: grouped dropdown selector -->
+  <div class="mb-5 md:hidden">
+    <label class="field-label mb-1.5 block" for="settings-tab-select">Section</label>
+    <select
+      id="settings-tab-select"
+      class="select"
+      [value]="active()"
+      (change)="active.set($any($event.target).value)"
+    >
+      @for (group of groupedTabs(); track group.id) {
+        <optgroup [label]="group.label">
+          @for (tab of group.tabs; track tab.id) {
+            <option [value]="tab.id">{{ tab.label }}</option>
+          }
+        </optgroup>
+      }
+    </select>
+  </div>
 
-  @switch (active()) {
-    @case ('profile') {
-      <app-settings-profile-tab />
-    }
-    @case ('appearance') {
-      <app-settings-appearance-tab />
-    }
-    @case ('two-factor') {
-      <app-settings-two-factor-tab />
-    }
-    @case ('login-history') {
-      <app-settings-login-history-tab />
-    }
-    @case ('store') {
-      <app-settings-store-profile-tab />
-    }
-    @case ('team') {
-      <app-settings-team-tab />
-    }
-    @case ('roles') {
-      <app-settings-roles-tab />
-    }
-    @case ('notifications') {
-      <app-settings-notifications-tab />
-    }
-    @case ('ai') {
-      <app-settings-ai-tab />
-    }
-    @case ('send-rules') {
-      <app-settings-automation-tab />
-    }
-    @case ('custom-fields') {
-      <app-custom-fields-page />
-    }
-    @case ('standard-fields') {
-      <app-settings-standard-fields-tab />
-    }
-    @case ('embed') {
-      <app-settings-embed-tab />
-    }
-  }
+  <div class="md:grid md:grid-cols-[220px_1fr] md:gap-8">
+    <!-- Desktop sub-nav -->
+    <aside
+      class="hidden md:sticky md:top-6 md:flex md:max-h-[calc(100vh-3rem)] md:flex-col md:gap-5 md:self-start md:overflow-y-auto md:pr-1"
+    >
+      @for (group of groupedTabs(); track group.id) {
+        <div>
+          <div
+            class="mb-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+          >
+            {{ group.label }}
+          </div>
+          <ul class="flex flex-col gap-0.5">
+            @for (tab of group.tabs; track tab.id) {
+              <li>
+                <button
+                  type="button"
+                  class="flex w-full items-center rounded-lg px-2.5 py-1.5 text-left text-[13px] font-medium transition"
+                  [class.bg-accent-soft]="active() === tab.id"
+                  [class.text-accent]="active() === tab.id"
+                  [class.text-muted]="active() !== tab.id"
+                  [class.hover:bg-surface-2]="active() !== tab.id"
+                  [class.hover:text-default]="active() !== tab.id"
+                  (click)="active.set(tab.id)"
+                >
+                  {{ tab.label }}
+                </button>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+    </aside>
+
+    <!-- Right content -->
+    <div class="min-w-0">
+      @switch (active()) {
+        @case ('profile') {
+          <app-settings-profile-tab />
+        }
+        @case ('appearance') {
+          <app-settings-appearance-tab />
+        }
+        @case ('two-factor') {
+          <app-settings-two-factor-tab />
+        }
+        @case ('login-history') {
+          <app-settings-login-history-tab />
+        }
+        @case ('store') {
+          <app-settings-store-profile-tab />
+        }
+        @case ('team') {
+          <app-settings-team-tab />
+        }
+        @case ('roles') {
+          <app-settings-roles-tab />
+        }
+        @case ('notifications') {
+          <app-settings-notifications-tab />
+        }
+        @case ('ai') {
+          <app-settings-ai-tab />
+        }
+        @case ('send-rules') {
+          <app-settings-automation-tab />
+        }
+        @case ('custom-fields') {
+          <app-custom-fields-page />
+        }
+        @case ('standard-fields') {
+          <app-settings-standard-fields-tab />
+        }
+        @case ('embed') {
+          <app-settings-embed-tab />
+        }
+      }
+    </div>
+  </div>
 </div>

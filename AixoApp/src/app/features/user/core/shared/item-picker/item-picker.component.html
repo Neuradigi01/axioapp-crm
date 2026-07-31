@@ -16,7 +16,7 @@
       type="button"
       (click)="clear()"
       [disabled]="disabledState()"
-      class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+      class="rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
     >
       Change
     </button>
@@ -30,7 +30,7 @@
       [disabled]="disabledState()"
       (input)="onInput($event)"
       autocomplete="off"
-      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surface-2"
+      class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surface-2"
     />
     @if (open() && results().length > 0) {
       <ul

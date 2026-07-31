@@ -158,7 +158,12 @@ export interface ContactListQuery {
 /** Targets the operator can map a CSV column to. Mirrors the
  * `ContactFieldTarget` literal in the backend schemas — keep both
  * lists in sync. */
-export type ContactFieldTarget = 'full_name' | 'phone' | 'email' | 'source' | 'tag' | 'skip';
+/** Standard contact-field targets. Custom-field targets are dynamic
+ * per-org and follow the shape ``custom_data.<field_key>``; hence the
+ * union widens to plain ``string`` — the backend's ``_validate_mapping``
+ * is the source of truth on which values are actually accepted. */
+export type ContactStandardTarget = 'full_name' | 'phone' | 'email' | 'source' | 'tag' | 'skip';
+export type ContactFieldTarget = ContactStandardTarget | (string & {});
 
 /** Response from `POST /contacts/imports/upload`. */
 export interface ContactImportUploadOut {
@@ -199,8 +204,38 @@ export interface ContactImportRowError {
 export interface ContactImportDryRunOut {
   will_insert: number;
   will_skip: number;
+  /** Kept for backwards compatibility — same value as `duplicate_count`. */
   duplicate_phone: number;
+  /** 3-CSV parity with leads (2026-07-30). */
+  duplicate_count: number;
+  warning_count: number;
   errors: ContactImportRowError[];
+  duplicates: ContactImportRowError[];
+  warnings: ContactImportRowError[];
+}
+
+/** One row on the wizard's history page. Slim projection of the
+ *  ContactImport ORM row — used by ``GET /contacts/imports``. Mirror
+ *  of ``LeadImport`` so the history UI patterns can stay in sync
+ *  between the two entities. */
+export interface ContactImportListItem {
+  id: string;
+  filename: string;
+  row_count: number;
+  success_count: number;
+  error_count: number;
+  duplicate_count: number;
+  warning_count: number;
+  status: string;
+  created_group_id: string | null;
+  created_at: string;
+}
+
+export interface ContactImportListResponse {
+  items: ContactImportListItem[];
+  total: number;
+  page: number;
+  size: number;
 }
 
 /** Response from `POST /contacts/imports/{id}/commit`. */
@@ -210,6 +245,12 @@ export interface ContactImportCommitOut {
   row_count: number;
   success_count: number;
   error_count: number;
+  /** 3-CSV parity with leads (2026-07-30): rows skipped as phone
+   *  duplicates, downloadable via `/skipped.csv`. Zero when no dupes. */
+  duplicate_count: number;
+  /** 3-CSV parity with leads: rows imported but with a value coerced
+   *  (e.g. tag truncated to 64 chars), downloadable via `/warnings.csv`. */
+  warning_count: number;
   created_group_id: string | null;
 }
 
@@ -388,6 +429,23 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
     return this.http.post<ConsentEvent>(`${this.base}/${contactId}/opt-out`, body);
   }
 
+  /** Paginated history of past imports for the caller's org. Powers
+   *  the wizard's history page (parity with the leads-import history). */
+  listImports(
+    opts: {
+      status?: 'uploaded' | 'dry_run' | 'processing' | 'committed' | 'failed' | 'cancelled';
+      page?: number;
+      size?: number;
+    } = {},
+  ): Observable<ContactImportListResponse> {
+    const params = buildHttpParams({
+      status: opts.status,
+      page: opts.page,
+      size: opts.size,
+    });
+    return this.http.get<ContactImportListResponse>(`${this.base}/imports`, { params });
+  }
+
   /** Step 1 of bulk import: stream the file to the backend, get back
    * the import id + detected headers + suggested column mapping. */
   uploadImport(file: File): Observable<ContactImportUploadOut> {
@@ -402,10 +460,27 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
     return this.http.post<ContactImportDryRunOut>(`${this.base}/imports/${importId}/dry-run`, body);
   }
 
-  /** Step 3 of bulk import: write the contacts. Backend is idempotent
-   * on `importId` so re-clicks don't double-insert. */
+  /** Step 3 of bulk import: dispatch the async commit worker. Backend
+   * is idempotent on `importId` so re-clicks don't double-dispatch.
+   * Response `status` is `'processing'` (worker running) in prod and
+   * usually `'committed'` (fast path) in dev where the fallback awaits
+   * inline. The FE polls `getImport` when it sees `processing`. */
   commitImport(importId: string, body: ContactImportRunIn): Observable<ContactImportCommitOut> {
     return this.http.post<ContactImportCommitOut>(`${this.base}/imports/${importId}/commit`, body);
+  }
+
+  /** Single-row read — used by the wizard to poll the ``processing
+   *  → committed`` transition after commit. Same response shape as
+   *  ``commitImport`` so the wizard success handler is unchanged. */
+  getImport(importId: string): Observable<ContactImportCommitOut> {
+    return this.http.get<ContactImportCommitOut>(`${this.base}/imports/${importId}`);
+  }
+
+  /** Abort a pre-terminal import (uploaded / dry_run / processing).
+   *  409 on any other state. Worker checks status on entry so a
+   *  running commit exits on its next row batch. */
+  cancelImport(importId: string): Observable<ContactImportCommitOut> {
+    return this.http.post<ContactImportCommitOut>(`${this.base}/imports/${importId}/cancel`, {});
   }
 
   /** Download the per-row error CSV for a completed import. The blob
@@ -415,6 +490,25 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
    *  the import had no errors. */
   downloadImportErrors(importId: string): Observable<Blob> {
     return this.http.get(`${this.base}/imports/${importId}/errors.csv`, {
+      responseType: 'blob',
+    });
+  }
+
+  /** Download the per-row skipped-duplicates CSV. Rows here collapsed
+   *  onto an existing contact (or an earlier row in the same file) on
+   *  the phone dedup key — same shape as the errors CSV, streamed
+   *  under `contact-import-{id}-skipped.csv`. */
+  downloadImportSkipped(importId: string): Observable<Blob> {
+    return this.http.get(`${this.base}/imports/${importId}/skipped.csv`, {
+      responseType: 'blob',
+    });
+  }
+
+  /** Download the per-row warnings CSV — rows that imported
+   *  successfully but had a value coerced (e.g. tag truncated to 64
+   *  chars). Same shape as the errors CSV. */
+  downloadImportWarnings(importId: string): Observable<Blob> {
+    return this.http.get(`${this.base}/imports/${importId}/warnings.csv`, {
       responseType: 'blob',
     });
   }

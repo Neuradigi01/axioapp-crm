@@ -7,7 +7,7 @@
         [formControl]="fromControl"
         min="1900-01-01"
         max="9999-12-31"
-        class="mt-1 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="mt-1 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       />
     </label>
     <label class="block text-sm">
@@ -15,7 +15,7 @@
       <input
         type="date"
         [formControl]="toControl"
-        class="mt-1 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="mt-1 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       />
     </label>
     <button
@@ -41,19 +41,19 @@
 
   @if (loading()) {
     <div
-      class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+      class="rounded-xl border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
     >
       Loading…
     </div>
   } @else if (!data() || totalCalls() === 0) {
     <div
-      class="rounded-lg border border-dashed border-subtle bg-surface p-12 text-center text-sm text-muted"
+      class="rounded-lg border border-dashed border-subtle bg-surface p-6 md:p-12 text-center text-sm text-muted"
     >
       No calls in this window yet. Log a call or widen the date range.
     </div>
   } @else {
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+      <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
         <h3 class="mb-2 text-sm font-semibold text-default">Outcomes</h3>
         <div class="relative h-64">
           <canvas
@@ -64,7 +64,7 @@
           ></canvas>
         </div>
       </div>
-      <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+      <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
         <h3 class="mb-2 text-sm font-semibold text-default">Direction split</h3>
         <div class="relative h-64">
           <canvas
@@ -75,7 +75,7 @@
           ></canvas>
         </div>
       </div>
-      <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm lg:col-span-2">
+      <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm lg:col-span-2">
         <h3 class="mb-2 text-sm font-semibold text-default">Daily volume</h3>
         <div class="relative h-64">
           <canvas baseChart [type]="'bar'" [data]="dailyChart()" [options]="barOptions"></canvas>

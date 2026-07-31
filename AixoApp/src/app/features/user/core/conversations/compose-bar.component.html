@@ -10,7 +10,7 @@
 >
   <!-- Mode toggle (Reply / Note) — Step 13 -->
   <div
-    class="mb-2 inline-flex items-center gap-0.5 rounded-md border border-subtle bg-surface p-0.5 text-xs"
+    class="mb-2 inline-flex items-center gap-0.5 rounded-lg border border-subtle bg-surface p-0.5 text-xs"
   >
     <button
       type="button"
@@ -168,7 +168,7 @@
       <button
         type="button"
         (click)="openFilePicker()"
-        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface text-muted hover:bg-surface-2"
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface text-muted hover:bg-surface-2"
         aria-label="Attach a file"
         title="Attach a file"
         data-testid="compose-attach-button"
@@ -178,7 +178,7 @@
       <button
         type="button"
         (click)="requestInteractive()"
-        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface text-muted hover:bg-surface-2"
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface text-muted hover:bg-surface-2"
         aria-label="Send an interactive message"
         title="Interactive message"
         data-testid="compose-interactive-button"
@@ -190,7 +190,7 @@
         <button
           type="button"
           (click)="openLocationDialog()"
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface text-muted hover:bg-surface-2"
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface text-muted hover:bg-surface-2"
           aria-label="Share a location"
           title="Share a location"
           data-testid="compose-location-button"
@@ -234,7 +234,7 @@
       ></textarea>
       @if (mentionOpen() && isNoteMode()) {
         <ul
-          class="absolute bottom-full left-0 right-0 mb-1 max-h-48 overflow-y-auto rounded-md border border-subtle bg-surface shadow-lg"
+          class="absolute bottom-full left-0 right-0 mb-1 max-h-48 overflow-y-auto rounded-lg border border-subtle bg-surface shadow-lg"
         >
           @if (mentionCandidates().length === 0) {
             <li class="px-3 py-2 text-xs text-muted">No matches.</li>
@@ -314,7 +314,7 @@
     (click)="closeLocationDialog()"
   >
     <div
-      class="w-full max-w-md rounded-md border border-subtle bg-surface p-4 shadow-lg"
+      class="w-full max-w-md rounded-lg border border-subtle bg-surface p-4 shadow-lg"
       (click)="$event.stopPropagation()"
     >
       <p class="mb-2 text-sm font-semibold text-default">Share a location</p>
@@ -368,7 +368,7 @@
         <button
           type="button"
           (click)="useMyLocation()"
-          class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs text-default hover:bg-surface-2"
+          class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-xs text-default hover:bg-surface-2"
         >
           <lucide-icon name="map-pin" size="12" aria-hidden="true"></lucide-icon>
           Use my location
@@ -377,7 +377,7 @@
           <button
             type="button"
             (click)="closeLocationDialog()"
-            class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs text-default hover:bg-surface-2"
+            class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-xs text-default hover:bg-surface-2"
           >
             Cancel
           </button>

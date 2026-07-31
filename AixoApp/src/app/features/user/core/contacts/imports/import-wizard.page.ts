@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  OnInit,
   computed,
   inject,
   signal,
@@ -48,7 +49,7 @@ interface FieldTargetOption {
   label: string;
 }
 
-const FIELD_TARGETS: FieldTargetOption[] = [
+const STANDARD_FIELD_TARGETS: FieldTargetOption[] = [
   { value: 'skip', label: 'Skip this column' },
   { value: 'full_name', label: 'Full name' },
   { value: 'phone', label: 'Phone' },
@@ -56,8 +57,6 @@ const FIELD_TARGETS: FieldTargetOption[] = [
   { value: 'source', label: 'Source' },
   { value: 'tag', label: 'Tag' },
 ];
-
-const VALID_TARGET_SET = new Set<ContactFieldTarget>(FIELD_TARGETS.map((t) => t.value));
 
 const ACCEPT_EXTENSIONS = ['.xlsx', '.csv'] as const;
 
@@ -72,7 +71,7 @@ const ERROR_VISIBLE_LIMIT = 50;
   imports: [RouterLink, LucideAngularModule, BulkImportOptInStepComponent],
   templateUrl: './import-wizard.page.html',
 })
-export class ContactImportWizardPageComponent {
+export class ContactImportWizardPageComponent implements OnInit {
   /** Step 22 — DPDP opt-in provenance picked on the map step.
    *  Null until the operator picks one; gates the Continue button. */
   protected readonly optInSource = signal<WhatsAppOptInSource | null>(null);
@@ -85,8 +84,48 @@ export class ContactImportWizardPageComponent {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly fieldTargets = FIELD_TARGETS;
+  /** Custom-field targets for entity ``contact`` in this org — loaded
+   *  once on init from ``GET /custom-fields/contact/render`` and
+   *  concatenated onto the standard targets so the mapping dropdown
+   *  surfaces them alongside Full name / Phone / etc. Empty until
+   *  the render call returns; the dropdown works fine in that
+   *  window with just the standard targets. */
+  protected readonly customFieldTargets = signal<FieldTargetOption[]>([]);
+
+  protected readonly fieldTargets = computed<FieldTargetOption[]>(() => [
+    ...STANDARD_FIELD_TARGETS,
+    ...this.customFieldTargets(),
+  ]);
+
+  /** Set of every currently-legal target value. Used to coerce the
+   *  backend's suggested mapping on upload — an unknown or stale
+   *  target snaps to ``'skip'`` so the dropdown never shows a value
+   *  it can't render. Recomputes when custom fields load. */
+  protected readonly validTargetSet = computed<Set<ContactFieldTarget>>(
+    () => new Set(this.fieldTargets().map((t) => t.value)),
+  );
+
   protected readonly errorVisibleLimit = ERROR_VISIBLE_LIMIT;
+
+  ngOnInit(): void {
+    this.api
+      .renderFields()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (defs) => {
+          this.customFieldTargets.set(
+            defs.map((f) => ({
+              value: `custom_data.${f.field_key}` as ContactFieldTarget,
+              label: `Custom · ${f.field_label}`,
+            })),
+          );
+        },
+        // Silent: if the render call hiccups the wizard still works
+        // with just the six standard targets — losing the custom
+        // fields is a degrade, not a blocker.
+        error: () => undefined,
+      });
+  }
 
   /** 1=upload · 2=map · 3=preview · 4=success card. */
   protected readonly step = signal<1 | 2 | 3 | 4>(1);
@@ -117,9 +156,37 @@ export class ContactImportWizardPageComponent {
   protected readonly commitError = signal<string | null>(null);
   protected readonly commitResult = signal<ContactImportCommitOut | null>(null);
 
+  // Async pivot (2026-07-30) — polling state for the processing screen.
+  protected readonly cancelling = signal(false);
+  protected readonly cancelError = signal<string | null>(null);
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+  protected readonly isProcessing = computed(() => {
+    const r = this.commitResult();
+    return r !== null && r.status === 'processing';
+  });
+
+  protected readonly isFailed = computed(() => {
+    const r = this.commitResult();
+    return r !== null && r.status === 'failed';
+  });
+
+  protected readonly isCancelled = computed(() => {
+    const r = this.commitResult();
+    return r !== null && r.status === 'cancelled';
+  });
+
   // errors.csv download state
   protected readonly downloadingErrors = signal(false);
   protected readonly downloadErrorsMsg = signal<string | null>(null);
+
+  // skipped.csv download state (3-CSV parity with leads).
+  protected readonly downloadingSkipped = signal(false);
+  protected readonly downloadSkippedMsg = signal<string | null>(null);
+
+  // warnings.csv download state (3-CSV parity with leads).
+  protected readonly downloadingWarnings = signal(false);
+  protected readonly downloadWarningsMsg = signal<string | null>(null);
 
   // --- Derived --------------------------------------------------------
 
@@ -169,6 +236,27 @@ export class ContactImportWizardPageComponent {
     const errs = this.dryRunResult()?.errors ?? [];
     return this.errorsExpanded() ? errs : errs.slice(0, ERROR_VISIBLE_LIMIT);
   });
+
+  protected readonly duplicatesExpanded = signal(false);
+  protected readonly warningsExpanded = signal(false);
+
+  protected readonly visibleDuplicates = computed(() => {
+    const rows = this.dryRunResult()?.duplicates ?? [];
+    return this.duplicatesExpanded() ? rows : rows.slice(0, ERROR_VISIBLE_LIMIT);
+  });
+
+  protected readonly visibleWarnings = computed(() => {
+    const rows = this.dryRunResult()?.warnings ?? [];
+    return this.warningsExpanded() ? rows : rows.slice(0, ERROR_VISIBLE_LIMIT);
+  });
+
+  protected toggleDuplicatesExpanded(): void {
+    this.duplicatesExpanded.update((v) => !v);
+  }
+
+  protected toggleWarningsExpanded(): void {
+    this.warningsExpanded.update((v) => !v);
+  }
 
   // --- Step 1 handlers ------------------------------------------------
 
@@ -220,7 +308,7 @@ export class ContactImportWizardPageComponent {
           const safe: Record<string, ContactFieldTarget> = {};
           for (const col of meta.headers) {
             const guess = meta.suggested_mapping[col];
-            safe[col] = VALID_TARGET_SET.has(guess) ? guess : 'skip';
+            safe[col] = this.validTargetSet().has(guess) ? guess : 'skip';
           }
           this.mapping.set(safe);
           this.step.set(2);
@@ -280,6 +368,8 @@ export class ContactImportWizardPageComponent {
     this.dryRunError.set(null);
     this.dryRunResult.set(null);
     this.errorsExpanded.set(false);
+    this.duplicatesExpanded.set(false);
+    this.warningsExpanded.set(false);
     this.api
       .dryRunImport(meta.id, this.buildRunBody())
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -311,14 +401,23 @@ export class ContactImportWizardPageComponent {
     if (!meta || !this.canCommit()) return;
     this.committing.set(true);
     this.commitError.set(null);
+    this.cancelError.set(null);
     this.api
       .commitImport(meta.id, this.buildRunBody())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (result) => {
-          this.committing.set(false);
+          // Async pivot (2026-07-30): backend may return `status='processing'`
+          // when the Celery worker is queued but hasn't finished. Show a
+          // processing screen and poll until terminal, then show success.
           this.commitResult.set(result);
-          this.step.set(4);
+          if (this.isTerminalStatus(result.status)) {
+            this.committing.set(false);
+            this.step.set(4);
+          } else {
+            this.step.set(4);
+            this.startPolling(meta.id);
+          }
         },
         error: (err: HttpErrorResponse) => {
           this.committing.set(false);
@@ -341,20 +440,147 @@ export class ContactImportWizardPageComponent {
       .subscribe({
         next: (blob) => {
           this.downloadingErrors.set(false);
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `contact-import-${meta.id}-errors.csv`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
+          this.triggerBlobDownload(blob, `contact-import-${meta.id}-errors.csv`);
         },
         error: (err: HttpErrorResponse) => {
           this.downloadingErrors.set(false);
           this.downloadErrorsMsg.set(extractApiError(err) ?? 'Could not download the errors CSV.');
         },
       });
+  }
+
+  /** Download the per-row skipped-duplicates CSV. Same shape as the
+   *  errors CSV; only populated for rows that collapsed onto an
+   *  existing contact on the phone dedup key. */
+  protected downloadSkipped(): void {
+    const meta = this.importMeta();
+    if (!meta || this.downloadingSkipped()) return;
+    this.downloadingSkipped.set(true);
+    this.downloadSkippedMsg.set(null);
+    this.api
+      .downloadImportSkipped(meta.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => {
+          this.downloadingSkipped.set(false);
+          this.triggerBlobDownload(blob, `contact-import-${meta.id}-skipped.csv`);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.downloadingSkipped.set(false);
+          this.downloadSkippedMsg.set(
+            extractApiError(err) ?? 'Could not download the duplicates CSV.',
+          );
+        },
+      });
+  }
+
+  /** Download the per-row warnings CSV — rows that imported but had a
+   *  value coerced (e.g. tag truncated to 64 chars). */
+  protected downloadWarnings(): void {
+    const meta = this.importMeta();
+    if (!meta || this.downloadingWarnings()) return;
+    this.downloadingWarnings.set(true);
+    this.downloadWarningsMsg.set(null);
+    this.api
+      .downloadImportWarnings(meta.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => {
+          this.downloadingWarnings.set(false);
+          this.triggerBlobDownload(blob, `contact-import-${meta.id}-warnings.csv`);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.downloadingWarnings.set(false);
+          this.downloadWarningsMsg.set(
+            extractApiError(err) ?? 'Could not download the warnings CSV.',
+          );
+        },
+      });
+  }
+
+  /** Terminal statuses stop the poll loop and unfreeze the UI. */
+  private isTerminalStatus(status: string): boolean {
+    return status === 'committed' || status === 'failed' || status === 'cancelled';
+  }
+
+  /** Start polling the import row until it reaches a terminal status.
+   *  Backs off gently — 1s for the first 10 polls, 2s afterwards —
+   *  so a fast dev commit clears in ~1s and a big prod commit doesn't
+   *  hammer the API. Polling stops on component destroy via the
+   *  ``destroyRef`` cleanup. */
+  private startPolling(importId: string): void {
+    this.stopPolling();
+    let ticks = 0;
+    const poll = () => {
+      this.api
+        .getImport(importId)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (result) => {
+            this.commitResult.set(result);
+            if (this.isTerminalStatus(result.status)) {
+              this.committing.set(false);
+              this.stopPolling();
+              return;
+            }
+            ticks += 1;
+            const delay = ticks < 10 ? 1000 : 2000;
+            this.pollTimer = setTimeout(poll, delay);
+          },
+          // On a transient poll error, back off and try again — the
+          // worker is still running, we just lost one round-trip.
+          error: () => {
+            this.pollTimer = setTimeout(poll, 3000);
+          },
+        });
+    };
+    // Small initial delay so the first poll lands after the dispatch
+    // ack has propagated through the DB.
+    this.pollTimer = setTimeout(poll, 500);
+    this.destroyRef.onDestroy(() => this.stopPolling());
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer !== null) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+
+  /** Cancel an in-flight processing import. Available on Step 4 when
+   *  the status is ``processing``. On success, the poll loop picks up
+   *  the ``cancelled`` status on its next tick. */
+  protected cancelProcessing(): void {
+    const meta = this.importMeta();
+    if (!meta || this.cancelling()) return;
+    this.cancelling.set(true);
+    this.cancelError.set(null);
+    this.api
+      .cancelImport(meta.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.cancelling.set(false);
+          this.commitResult.set(result);
+          this.committing.set(false);
+          this.stopPolling();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.cancelling.set(false);
+          this.cancelError.set(extractApiError(err) ?? 'Could not cancel import.');
+        },
+      });
+  }
+
+  private triggerBlobDownload(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   // --- Step 4 handlers ------------------------------------------------

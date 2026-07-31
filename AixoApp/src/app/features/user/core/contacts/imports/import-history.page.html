@@ -1,0 +1,191 @@
+<div class="mx-auto max-w-6xl p-4 md:p-6 space-y-6">
+  <header class="space-y-1">
+    <nav class="flex items-center gap-1 text-xs text-muted">
+      <a routerLink="/user/contacts" class="hover:text-default">Contacts</a>
+      <lucide-icon name="chevron-right" class="h-3 w-3" />
+      <a routerLink="/user/contacts/import" class="hover:text-default">Import</a>
+      <lucide-icon name="chevron-right" class="h-3 w-3" />
+      <span class="text-default">History</span>
+    </nav>
+    <div class="flex items-center justify-between gap-4">
+      <div>
+        <h1
+          class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
+        >
+          Import history
+        </h1>
+        <p class="text-sm text-muted">Every contact import this org has run, newest first.</p>
+      </div>
+      <a
+        routerLink="/user/contacts/import"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
+      >
+        <lucide-icon name="upload-cloud" class="h-4 w-4" />
+        New import
+      </a>
+    </div>
+  </header>
+
+  <!-- Filter bar -->
+  <div class="flex flex-wrap items-center gap-3 rounded-xl border border-subtle bg-surface p-3">
+    <label class="text-xs font-medium text-muted" for="status-filter">Status</label>
+    <select
+      id="status-filter"
+      [value]="statusFilter()"
+      (change)="onStatusChange($event)"
+      class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+    >
+      @for (opt of statusOptions; track opt.value) {
+        <option [value]="opt.value">{{ opt.label }}</option>
+      }
+    </select>
+    <span class="ml-auto text-xs text-muted">{{ total() }} import(s)</span>
+  </div>
+
+  <!-- Table -->
+  <div class="overflow-hidden rounded-xl border border-subtle bg-surface">
+    @if (loading()) {
+      <div class="flex items-center justify-center gap-2 p-8 text-sm text-muted">
+        <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
+        Loading…
+      </div>
+    } @else if (loadError(); as msg) {
+      <div class="p-4 text-sm text-red-500">{{ msg }}</div>
+    } @else if (!hasResults()) {
+      <div class="p-10 text-center">
+        <lucide-icon name="inbox" class="mx-auto h-8 w-8 text-faint" />
+        <p class="mt-2 text-sm text-default">No imports yet.</p>
+        <p class="mt-1 text-[14px] text-muted">
+          Upload a CSV or Excel from the
+          <a class="text-indigo-600 hover:underline" routerLink="/user/contacts/import">
+            new import
+          </a>
+          page.
+        </p>
+      </div>
+    } @else {
+      <table class="w-full text-sm">
+        <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
+          <tr>
+            <th class="px-3 py-2 text-left font-medium">File</th>
+            <th class="px-3 py-2 text-left font-medium">Status</th>
+            <th class="px-3 py-2 text-right font-medium">Rows</th>
+            <th class="px-3 py-2 text-right font-medium">Added</th>
+            <th class="px-3 py-2 text-right font-medium">Errors</th>
+            <th class="px-3 py-2 text-right font-medium">Duplicates</th>
+            <th class="px-3 py-2 text-right font-medium">Warnings</th>
+            <th class="px-3 py-2 text-left font-medium">When</th>
+            <th class="px-3 py-2 text-right font-medium">Reports</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-subtle">
+          @for (row of rows(); track row.id) {
+            <tr>
+              <td class="px-3 py-2 text-default">
+                <div class="flex items-center gap-2">
+                  <lucide-icon name="file-spreadsheet" class="h-4 w-4 text-emerald-600" />
+                  <span class="max-w-xs truncate">{{ row.filename }}</span>
+                </div>
+              </td>
+              <td class="px-3 py-2">
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1"
+                  [class]="statusBadgeClass(row.status)"
+                >
+                  {{ statusLabel(row.status) }}
+                </span>
+              </td>
+              <td class="px-3 py-2 text-right text-default">{{ row.row_count }}</td>
+              <td class="px-3 py-2 text-right text-emerald-600">
+                {{ row.success_count }}
+              </td>
+              <td class="px-3 py-2 text-right" [class.text-red-600]="row.error_count > 0">
+                {{ row.error_count }}
+              </td>
+              <td class="px-3 py-2 text-right" [class.text-amber-600]="row.duplicate_count > 0">
+                {{ row.duplicate_count }}
+              </td>
+              <td class="px-3 py-2 text-right" [class.text-sky-600]="row.warning_count > 0">
+                {{ row.warning_count }}
+              </td>
+              <td class="px-3 py-2 text-muted" [attr.title]="absoluteTime(row.created_at)">
+                {{ relativeTime(row.created_at) }}
+              </td>
+              <td class="px-3 py-2">
+                <div class="flex items-center justify-end gap-1">
+                  @if (row.error_count > 0) {
+                    <button
+                      type="button"
+                      (click)="downloadErrors(row)"
+                      [disabled]="downloading() === row.id"
+                      class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      title="Download errors CSV"
+                    >
+                      <lucide-icon name="download" class="h-3 w-3" />
+                      Errors
+                    </button>
+                  }
+                  @if (row.duplicate_count > 0) {
+                    <button
+                      type="button"
+                      (click)="downloadSkipped(row)"
+                      [disabled]="downloading() === row.id"
+                      class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      title="Download duplicates CSV"
+                    >
+                      <lucide-icon name="download" class="h-3 w-3" />
+                      Dupes
+                    </button>
+                  }
+                  @if (row.warning_count > 0) {
+                    <button
+                      type="button"
+                      (click)="downloadWarnings(row)"
+                      [disabled]="downloading() === row.id"
+                      class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      title="Download warnings CSV"
+                    >
+                      <lucide-icon name="download" class="h-3 w-3" />
+                      Warns
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+
+  @if (downloadMsg(); as msg) {
+    <p class="text-right text-xs text-red-500">{{ msg }}</p>
+  }
+
+  <!-- Pagination -->
+  @if (hasResults()) {
+    <div class="flex items-center justify-between text-xs text-muted">
+      <span>Page {{ page() }} of {{ totalPages() }}</span>
+      <div class="flex items-center gap-1">
+        <button
+          type="button"
+          (click)="prevPage()"
+          [disabled]="page() <= 1"
+          class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <lucide-icon name="chevron-left" class="h-3 w-3" />
+          Prev
+        </button>
+        <button
+          type="button"
+          (click)="nextPage()"
+          [disabled]="page() >= totalPages()"
+          class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Next
+          <lucide-icon name="chevron-right" class="h-3 w-3" />
+        </button>
+      </div>
+    </div>
+  }
+</div>

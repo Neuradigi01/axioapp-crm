@@ -64,7 +64,7 @@
               No keys issued yet. Click <strong>Issue new key</strong> to create one.
             </div>
           } @else {
-            <div class="overflow-hidden rounded-md border border-subtle bg-surface">
+            <div class="overflow-x-auto rounded-xl border border-subtle bg-surface">
               <table class="min-w-full text-sm">
                 <thead class="bg-surface-2 text-xs font-medium uppercase tracking-wide text-muted">
                   <tr>
@@ -126,7 +126,7 @@
             </h3>
 
             <!-- Fields list -->
-            <div class="overflow-hidden rounded-md border border-subtle bg-surface">
+            <div class="overflow-x-auto rounded-xl border border-subtle bg-surface">
               <table class="min-w-full text-sm">
                 <thead class="bg-surface-2 text-xs font-medium uppercase tracking-wide text-muted">
                   <tr>
@@ -158,7 +158,7 @@
                           type="text"
                           [value]="f.label"
                           (input)="onFieldLabelInput(i, $event)"
-                          class="block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-sm"
+                          class="block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-sm"
                         />
                       </td>
                       <td class="px-3 py-2">
@@ -166,7 +166,7 @@
                           type="text"
                           [value]="f.placeholder ?? ''"
                           (input)="onFieldPlaceholderInput(i, $event)"
-                          class="block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-sm"
+                          class="block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-sm"
                         />
                       </td>
                       <td class="px-3 py-2">
@@ -219,7 +219,7 @@
                 <button
                   type="button"
                   (click)="openPicker()"
-                  class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
                 >
                   <lucide-icon name="plus" class="h-3.5 w-3.5" />
                   Add custom field to widget
@@ -253,7 +253,7 @@
                       <strong>Settings → Custom fields</strong>, then refresh this page.
                     </p>
                   } @else {
-                    <ul class="divide-y divide-subtle rounded-md border border-subtle bg-surface">
+                    <ul class="divide-y divide-subtle rounded-lg border border-subtle bg-surface">
                       @for (opt of pickerOptions(); track opt.entity + '.' + opt.field_key) {
                         <li class="flex items-center justify-between gap-2 px-3 py-2">
                           <div>
@@ -311,7 +311,7 @@
                   [value]="interestOptionsValue()"
                   (input)="onInterestOptionsInput($event)"
                   placeholder="Sofas, Beds, Dining, Wardrobes, Other"
-                  class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
+                  class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm"
                 />
               </div>
             }
@@ -326,7 +326,7 @@
                   type="text"
                   [value]="cfg.submit_button_label"
                   (input)="onSubmitLabelInput($event)"
-                  class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
+                  class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm"
                 />
               </div>
               <div>
@@ -339,7 +339,7 @@
                   [value]="cfg.thank_you_url ?? ''"
                   (input)="onThankYouUrlInput($event)"
                   placeholder="https://yoursite.com/thank-you"
-                  class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
+                  class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -350,7 +350,7 @@
                 type="text"
                 [value]="cfg.thank_you_message"
                 (input)="onThankYouMessageInput($event)"
-                class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
+                class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm"
               />
             </div>
 
@@ -362,7 +362,7 @@
                   type="color"
                   [value]="cfg.branding.accent_color"
                   (input)="onAccentInput($event)"
-                  class="h-10 w-full rounded-md border border-subtle bg-surface"
+                  class="h-10 w-full rounded-lg border border-subtle bg-surface"
                 />
               </div>
               <div class="md:col-span-2">
@@ -374,7 +374,7 @@
                   [value]="cfg.branding.logo_url ?? ''"
                   (input)="onLogoUrlInput($event)"
                   placeholder="https://yoursite.com/logo.png"
-                  class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
+                  class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -447,7 +447,7 @@
                       [value]="cfg.spam_protection.recaptcha_site_key ?? ''"
                       (input)="onRecaptchaSiteKeyInput($event)"
                       placeholder="6Lc…"
-                      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-mono"
+                      class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-mono"
                       autocomplete="off"
                     />
                   </div>
@@ -463,7 +463,7 @@
                       [value]="cfg.spam_protection.recaptcha_secret_key ?? ''"
                       (input)="onRecaptchaSecretKeyInput($event)"
                       placeholder="6Lc…"
-                      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-mono"
+                      class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-mono"
                       autocomplete="off"
                     />
                   </div>
@@ -524,7 +524,7 @@
               <button
                 type="button"
                 (click)="copySnippet()"
-                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
               >
                 @if (snippetCopied()) {
                   <lucide-icon name="check" class="h-4 w-4 text-emerald-600" />

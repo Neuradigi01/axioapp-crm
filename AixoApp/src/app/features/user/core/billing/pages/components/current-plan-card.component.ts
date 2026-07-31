@@ -53,58 +53,47 @@ const STATUS_TONES: Record<string, StatusTone> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
-    <section class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm">
-      <div class="flex flex-wrap items-start justify-between gap-4 p-6">
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-muted">Current plan</p>
-            <span
-              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1"
-              [class]="statusTone().pillClasses"
-            >
-              {{ statusTone().label }}
-            </span>
-          </div>
-          <h2 class="mt-2 text-2xl font-semibold tracking-tight text-default">
-            {{ subscription().plan.name }}
-          </h2>
-          @if (priceHeadline(); as price) {
-            <div class="mt-2 flex items-baseline gap-1.5">
-              <span class="text-3xl font-semibold tabular-nums text-default">
-                ₹{{ formatINR(price.amount) }}
-              </span>
-              <span class="text-sm text-muted">
-                {{ '/' + price.cycleLabel }}
-              </span>
-            </div>
-          }
-          <p class="mt-2 text-sm text-muted">
-            {{ contextLine() }}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          (click)="onUpgrade()"
-          class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95"
+    <section class="flex h-full flex-col rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+      <div class="flex items-start justify-between gap-3">
+        <p class="text-[13px] font-semibold text-default">Current plan</p>
+        <span
+          class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1"
+          [class]="statusTone().pillClasses"
         >
-          Upgrade plan
-          <lucide-icon name="arrow-right" size="14" aria-hidden="true"></lucide-icon>
-        </button>
+          {{ statusTone().label }}
+        </span>
       </div>
 
-      <dl class="grid gap-px border-t border-subtle bg-surface-2 sm:grid-cols-2">
-        @for (row of detailRows(); track row.label) {
-          <div class="bg-surface-2 px-6 py-4/60">
-            <dt class="text-xs font-medium uppercase tracking-wide text-muted">
-              {{ row.label }}
-            </dt>
-            <dd class="mt-1 text-sm font-medium tabular-nums text-default">
-              {{ row.value }}
-            </dd>
-          </div>
+      @if (priceHeadline(); as price) {
+        <div class="mt-4 flex items-baseline gap-1">
+          <span class="font-display text-[32px] font-bold leading-none tabular-nums text-default">
+            ₹{{ formatINR(price.amount) }}
+          </span>
+          <span class="font-mono text-[12px] text-faint">/{{ price.cycleLabel }}</span>
+        </div>
+      } @else {
+        <div class="mt-4 flex items-baseline gap-1">
+          <span class="font-display text-[32px] font-bold leading-none text-default">
+            {{ subscription().plan.name }}
+          </span>
+        </div>
+      }
+
+      <p class="mt-2 text-[13px] text-muted">
+        @if (priceHeadline()) {
+          {{ subscription().plan.name }} · {{ contextLine() }}
+        } @else {
+          {{ contextLine() }}
         }
-      </dl>
+      </p>
+
+      <button
+        type="button"
+        (click)="onUpgrade()"
+        class="mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-95"
+      >
+        Upgrade now
+      </button>
     </section>
   `,
 })

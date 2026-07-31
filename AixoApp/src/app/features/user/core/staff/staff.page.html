@@ -2,15 +2,17 @@
   <!-- Header -->
   <div class="mb-6 flex items-start justify-between">
     <div>
-      <h1 class="text-2xl font-semibold text-default">Staff Dashboard</h1>
-      <p class="mt-1 text-sm text-muted">
+      <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+        Staff Dashboard
+      </h1>
+      <p class="mt-1 text-[14px] text-muted">
         Performance, attendance, field ops, inventory &amp; marketing
       </p>
     </div>
     <button
       type="button"
       (click)="reload()"
-      class="inline-flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+      class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
     >
       <lucide-icon name="users" class="h-4 w-4"></lucide-icon>
       Refresh
@@ -19,7 +21,7 @@
 
   <!-- KPI cards -->
   <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-    <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+    <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
       <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
         <lucide-icon name="footprints" class="h-4 w-4 text-emerald-600"></lucide-icon>
         Present Today
@@ -28,7 +30,7 @@
         {{ presentToday() }}/{{ totalStaff() }}
       </div>
     </div>
-    <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+    <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
       <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
         <lucide-icon name="users" class="h-4 w-4 text-blue-600"></lucide-icon>
         Total Staff
@@ -37,7 +39,7 @@
         {{ totalStaff() }}
       </div>
     </div>
-    <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+    <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
       <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
         <lucide-icon name="target" class="h-4 w-4 text-violet-600"></lucide-icon>
         Total Revenue
@@ -46,14 +48,14 @@
         {{ totalRevenue() | formatINR: true }}
       </div>
     </div>
-    <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+    <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
       <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
         <lucide-icon name="check-square" class="h-4 w-4 text-amber-600"></lucide-icon>
         Avg Target Progress
       </div>
       <div class="mt-2 text-2xl font-semibold text-default">{{ avgConversionPct() }}%</div>
     </div>
-    <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+    <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
       <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
         <lucide-icon name="calendar" class="h-4 w-4 text-red-500"></lucide-icon>
         Today's Revenue
@@ -96,7 +98,7 @@
   <!-- Loading -->
   @if (loading()) {
     <div
-      class="rounded-md border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+      class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
     >
       Loading…
     </div>

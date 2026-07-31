@@ -1,9 +1,13 @@
 <div class="flex h-[calc(100vh-4rem)] flex-col">
   <header class="border-b border-subtle bg-surface px-4 py-3 md:px-6">
-    <h1 class="text-xl font-semibold text-default">Integrations</h1>
-    <p class="text-xs text-muted">
-      Connect ad platforms (Google Ads, Meta Ads) and messaging channels (WhatsApp) to your CRM.
-      Lead form submissions land in Leads; inbound messages land in Conversations.
+    <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+      Integrations
+    </h1>
+    <p class="mt-1 text-[14px] text-muted">
+      Connect the tools you already use. Lead forms flow into
+      <span class="font-semibold text-default">Leads</span>, inbound chats into
+      <span class="font-semibold text-default">Conversations</span>, and bookings sync to your
+      calendar — automatically.
     </p>
   </header>
 
@@ -81,40 +85,150 @@
         <app-dlq-list [visible]="dlqVisible()" (changed)="onDlqChanged()"></app-dlq-list>
       }
 
-      <!-- Provider cards (Google first per spec). -->
-      <app-google-card
-        [integration]="google()"
-        [subscriptions]="subscriptions()"
-        (changed)="onCardChanged()"
-        (editMapping)="openMappingEditor($event.subscription, $event.formFields, $event.formLabel)"
-      ></app-google-card>
+      <!-- Available connections grid (AIXO pattern). Compact summary
+           tiles for each connector — icon + name + type chip + status
+           dot + Connect/Manage button. Clicking a tile smooth-scrolls
+           to its full-featured card below so the detailed connect /
+           disconnect / mapping surfaces stay in the same page. -->
+      <section aria-labelledby="available-connections-heading">
+        <div class="mb-3 flex items-center justify-between">
+          <h2
+            id="available-connections-heading"
+            class="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint"
+          >
+            Available connections
+          </h2>
+        </div>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          @for (c of connectors(); track c.id) {
+            <div
+              class="flex flex-col rounded-2xl border border-subtle bg-surface p-5 shadow-sm transition hover:border-muted hover:shadow-md"
+            >
+              <div class="flex items-start gap-3">
+                <!-- Icon: letter for text-brand identities (G / f),
+                     lucide icon for the rest. Fixed 44px square keeps
+                     the row visually stable regardless of glyph. -->
+                <span
+                  class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ring-1 ring-black/10"
+                  [class]="c.iconBg"
+                >
+                  @if (c.letter) {
+                    <span
+                      class="font-display text-[19px] font-bold leading-none"
+                      [class]="c.iconText"
+                      aria-hidden="true"
+                      >{{ c.letter }}</span
+                    >
+                  } @else if (c.icon) {
+                    <lucide-icon
+                      [name]="c.icon"
+                      size="20"
+                      [class]="c.iconText"
+                      aria-hidden="true"
+                    ></lucide-icon>
+                  }
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5">
+                    <h3 class="truncate text-[15px] font-semibold text-default">
+                      {{ c.label }}
+                    </h3>
+                    <span
+                      class="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted ring-1 ring-subtle"
+                    >
+                      {{ c.type }}
+                    </span>
+                  </div>
+                  <div class="mt-1 flex items-center gap-1.5 text-[11.5px]">
+                    <span
+                      class="inline-block h-1.5 w-1.5 rounded-full"
+                      [class.bg-emerald-500]="c.status === 'connected'"
+                      [class.bg-amber-500]="c.status === 'error'"
+                      [class.bg-zinc-500]="c.status === 'not_connected'"
+                      aria-hidden="true"
+                    ></span>
+                    <span
+                      [class.text-emerald-400]="c.status === 'connected'"
+                      [class.text-amber-400]="c.status === 'error'"
+                      [class.text-muted]="c.status === 'not_connected'"
+                    >
+                      {{ c.statusLabel }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <p class="mt-4 flex-1 text-[13px] leading-[1.55] text-muted">
+                {{ c.description }}
+              </p>
+              <button
+                type="button"
+                class="mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-95"
+                (click)="toggleConnector(c.id, c.anchor)"
+              >
+                @if (expandedConnector() === c.id) {
+                  Hide
+                } @else {
+                  {{ c.status === 'connected' ? 'Manage' : 'Connect' }}
+                }
+              </button>
+            </div>
+          }
+        </div>
+      </section>
 
-      <!-- tasks/google-calendar-sync Step 5 — per-user Google Calendar
-           card. Distinct row per employee; not gated on org-level
-           `settings.integrations.manage` since it's the user's own
-           connection. -->
-      <app-google-calendar-card
-        [refreshTick]="calendarRefreshTick()"
-        (changed)="onCardChanged()"
-      ></app-google-calendar-card>
+      <!-- Detailed management surfaces — collapsed by default (AIXO
+           clean grid). Each block reveals when its summary tile above
+           is clicked. Anchor ids let the tile's toggle scroll the
+           opened block into view. -->
+      @if (expandedConnector() === 'google_ads') {
+        <div id="card-google-ads">
+          <app-google-card
+            [integration]="google()"
+            [subscriptions]="subscriptions()"
+            (changed)="onCardChanged()"
+            (editMapping)="
+              openMappingEditor($event.subscription, $event.formFields, $event.formLabel)
+            "
+          ></app-google-card>
+        </div>
+      }
 
-      <app-meta-card
-        [integration]="meta()"
-        [subscriptions]="subscriptions()"
-        (changed)="onCardChanged()"
-      ></app-meta-card>
+      @if (expandedConnector() === 'google_calendar') {
+        <div id="card-google-calendar">
+          <app-google-calendar-card
+            [refreshTick]="calendarRefreshTick()"
+            (changed)="onCardChanged()"
+          ></app-google-calendar-card>
+        </div>
+      }
 
-      <app-whatsapp-card [status]="whatsapp()" (changed)="onCardChanged()"></app-whatsapp-card>
+      @if (expandedConnector() === 'meta_ads') {
+        <div id="card-meta-ads">
+          <app-meta-card
+            [integration]="meta()"
+            [subscriptions]="subscriptions()"
+            (changed)="onCardChanged()"
+          ></app-meta-card>
+        </div>
+      }
 
-      <!-- Per-org outbound email sender identity — replaces the
-           Settings → Email Accounts + Sender Setup tabs. -->
-      <app-email-sender-card></app-email-sender-card>
+      @if (expandedConnector() === 'whatsapp') {
+        <div id="card-whatsapp">
+          <app-whatsapp-card [status]="whatsapp()" (changed)="onCardChanged()"></app-whatsapp-card>
+        </div>
+      }
+
+      @if (expandedConnector() === 'email') {
+        <div id="card-email-sender">
+          <app-email-sender-card></app-email-sender-card>
+        </div>
+      }
 
       <!-- Compact DLQ summary card (Step 7) — kept as a quick-access
          link to expand the inline table even when the status banner
          isn't showing. -->
       <section
-        class="rounded-lg border border-subtle bg-surface p-4 shadow-sm"
+        class="rounded-xl border border-subtle bg-surface p-4 shadow-sm"
         data-testid="dlq-summary"
       >
         <div class="flex items-center justify-between">

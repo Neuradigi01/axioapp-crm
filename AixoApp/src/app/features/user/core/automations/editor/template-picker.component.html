@@ -3,7 +3,7 @@
   (click)="onClose()"
 >
   <div
-    class="w-full max-w-2xl rounded-lg border border-subtle bg-surface shadow-xl"
+    class="w-full max-w-2xl rounded-xl border border-subtle bg-surface shadow-xl"
     (click)="$event.stopPropagation()"
   >
     <header class="flex items-center justify-between border-b border-subtle px-4 py-3">
@@ -20,7 +20,7 @@
       <button
         type="button"
         (click)="onClose()"
-        class="rounded-md border border-subtle bg-surface p-1 text-muted hover:bg-surface-2"
+        class="rounded-lg border border-subtle bg-surface p-1 text-muted hover:bg-surface-2"
         aria-label="Close"
       >
         <lucide-icon name="x" size="14" />
@@ -39,7 +39,7 @@
           [value]="searchQuery()"
           (input)="onSearch($any($event.target).value)"
           placeholder="Search by name…"
-          class="w-full rounded-md border border-subtle bg-surface py-1.5 pl-7 pr-3 text-xs text-default placeholder-zinc-400 focus:border-muted focus:outline-none"
+          class="w-full rounded-lg border border-subtle bg-surface py-1.5 pl-7 pr-3 text-xs text-default placeholder-zinc-400 focus:border-muted focus:outline-none"
         />
       </div>
     </div>
@@ -59,7 +59,7 @@
             <a
               routerLink="/user/templates/new"
               target="_blank"
-              class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default hover:bg-surface-2"
+              class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs text-default hover:bg-surface-2"
             >
               <lucide-icon name="plus" size="10" />
               Open templates module
@@ -82,7 +82,7 @@
                 <a
                   [routerLink]="['/user/templates', t.id]"
                   target="_blank"
-                  class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-[11px] text-muted hover:bg-surface-2"
+                  class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-[11px] text-muted hover:bg-surface-2"
                   title="Open template editor in new tab"
                   (click)="$event.stopPropagation()"
                 >

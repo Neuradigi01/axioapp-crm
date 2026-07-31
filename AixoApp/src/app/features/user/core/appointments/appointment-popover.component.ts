@@ -57,6 +57,7 @@ export class AppointmentPopoverComponent {
   @Output() readonly reassign = new EventEmitter<void>();
   @Output() readonly reschedule = new EventEmitter<void>();
   @Output() readonly markCompleted = new EventEmitter<void>();
+  @Output() readonly markNoShow = new EventEmitter<void>();
   @Output() readonly cancelAppt = new EventEmitter<void>();
   @Output() readonly dismiss = new EventEmitter<void>();
 
@@ -69,6 +70,13 @@ export class AppointmentPopoverComponent {
     const a = this._appointment();
     if (!a) return false;
     return this.canWrite() && ALLOWED_FROM_STATUS[a.status].includes('completed');
+  });
+
+  /** Status-machine gate for "Mark no-show" — only valid from `scheduled`. */
+  protected readonly canMarkNoShow = computed(() => {
+    const a = this._appointment();
+    if (!a) return false;
+    return this.canWrite() && ALLOWED_FROM_STATUS[a.status].includes('no_show');
   });
 
   /** Status-machine gate for "Cancel" — only valid from `scheduled`. */

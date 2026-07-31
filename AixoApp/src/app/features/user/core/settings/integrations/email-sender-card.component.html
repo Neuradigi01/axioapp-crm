@@ -1,5 +1,5 @@
 <section
-  class="rounded-lg border border-subtle bg-surface p-5 shadow-sm"
+  class="rounded-xl border border-subtle bg-surface p-5 shadow-sm"
   data-testid="email-sender-card"
 >
   <header class="flex items-start justify-between gap-4">
@@ -177,7 +177,7 @@
                     @if (row.kind === 'smtp' && !row.verified) {
                       <button
                         type="button"
-                        class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
+                        class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
                         (click)="resendVerification(row)"
                       >
                         <lucide-icon name="shield-check" size="12" aria-hidden="true"></lucide-icon>
@@ -204,9 +204,47 @@
                         Delete
                       </button>
                     } @else {
-                      <span class="text-[11px] text-faint"
-                        >Manage in Settings → Email Accounts</span
+                      <!-- Gmail / Microsoft OAuth rows — Reconnect
+                           re-runs the consent flow (upserts fresh
+                           tokens on the existing row); Disconnect
+                           soft-nulls tokens + flips sync_state so
+                           the operator can start over. -->
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
+                        [disabled]="reconnectingId() === row.id"
+                        (click)="reconnect(row)"
                       >
+                        @if (reconnectingId() === row.id) {
+                          <lucide-icon
+                            name="loader-2"
+                            size="12"
+                            class="animate-spin"
+                            aria-hidden="true"
+                          ></lucide-icon>
+                        } @else {
+                          <lucide-icon name="refresh-cw" size="12" aria-hidden="true"></lucide-icon>
+                        }
+                        Reconnect
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded-md border border-transparent px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-500/10 disabled:opacity-50"
+                        [disabled]="disconnectingId() === row.id"
+                        (click)="disconnect(row)"
+                      >
+                        @if (disconnectingId() === row.id) {
+                          <lucide-icon
+                            name="loader-2"
+                            size="12"
+                            class="animate-spin"
+                            aria-hidden="true"
+                          ></lucide-icon>
+                        } @else {
+                          <lucide-icon name="x-circle" size="12" aria-hidden="true"></lucide-icon>
+                        }
+                        Disconnect
+                      </button>
                     }
                   </div>
                 </td>
@@ -234,7 +272,7 @@
         </div>
         <button
           type="button"
-          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
           (click)="openAddDomain()"
         >
           <lucide-icon name="plus" size="12" aria-hidden="true"></lucide-icon>
@@ -347,7 +385,7 @@
                       <div class="inline-flex items-center gap-1">
                         <button
                           type="button"
-                          class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
+                          class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
                           (click)="showDns(row)"
                         >
                           <lucide-icon name="file-text" size="12" aria-hidden="true"></lucide-icon>
@@ -355,7 +393,7 @@
                         </button>
                         <button
                           type="button"
-                          class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                          class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
                           [disabled]="verifyingDomainId() === row.id"
                           (click)="verifyDomain(row)"
                         >

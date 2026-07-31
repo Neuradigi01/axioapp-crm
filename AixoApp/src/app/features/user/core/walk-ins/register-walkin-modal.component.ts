@@ -267,8 +267,15 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
     // W8/W9/W11 — coerce optional strings to their typed shape or null
     // before hitting the backend (which is Pydantic-strict on int / iso
     // datetime / iso date).
-    const partySize = raw.party_size.trim();
-    const partySizeNum = partySize ? Number.parseInt(partySize, 10) : null;
+    //
+    // `party_size` binds to <input type="number">, which Angular's
+    // NumberValueAccessor coerces to `number | null` regardless of the
+    // control's declared string type. Treat all three runtime shapes
+    // ('' when untouched, null when cleared, number when filled)
+    // uniformly instead of calling .trim() on a non-string.
+    const partySizeRaw = raw.party_size as unknown;
+    const partySizeNum =
+      typeof partySizeRaw === 'number' && Number.isFinite(partySizeRaw) ? partySizeRaw : null;
     const waitStr = raw.wait_started_at.trim();
     const returnStr = raw.expected_return_date.trim();
     this.api
@@ -280,7 +287,7 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
         requirement: nullableTrim(raw.requirement),
         budget: nullableTrim(raw.budget),
         custom_data: this.customValue() as Record<string, unknown>,
-        party_size: partySizeNum && Number.isFinite(partySizeNum) ? partySizeNum : null,
+        party_size: partySizeNum,
         wait_started_at: waitStr ? new Date(waitStr).toISOString() : null,
         expected_return_date: returnStr || null,
       })

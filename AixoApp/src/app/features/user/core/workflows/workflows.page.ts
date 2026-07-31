@@ -425,6 +425,149 @@ export class WorkflowsPageComponent {
     this.runHistoryWorkflow.set(null);
   }
 
+  // --- Move to folder ----------------------------------------------
+  //
+  // Works for every workflow — including the 15 default seeded rows
+  // and any pack-installed ones — because folder membership is a
+  // plain nullable FK, not part of the seed identity. Moving is
+  // safe: it never touches name / category / graph, so re-seeding or
+  // upgrades keep re-emitting the row with the same fingerprint and
+  // the DB just reads the operator's chosen folder_id.
+  //
+  // Single-row and bulk share the same modal — `moveMode()` switches
+  // between them. Single-row carries the target row for context;
+  // bulk consumes the current `selectedIds()` set.
+
+  protected readonly moveTargetRow = signal<WorkflowRead | null>(null);
+  protected readonly moveBulkOpen = signal(false);
+  protected readonly moveTargetFolderId = signal<string | null>(null);
+  protected readonly moveSaving = signal(false);
+  protected readonly moveError = signal<string | null>(null);
+
+  /** `'single'` when opened from a row's kebab; `'bulk'` when opened
+   *  from the multi-select bar; `null` when closed. */
+  protected readonly moveMode = computed<'single' | 'bulk' | null>(() => {
+    if (this.moveTargetRow() !== null) return 'single';
+    if (this.moveBulkOpen()) return 'bulk';
+    return null;
+  });
+
+  /** Count for the modal header. 1 for single, N for bulk. */
+  protected readonly moveCount = computed(() =>
+    this.moveMode() === 'bulk' ? this.selectedIds().size : 1,
+  );
+
+  /** Blocks the Move button when the selected target matches the
+   *  current folder of a single row (bulk always allows submit, since
+   *  rows in the set may have different current folders). */
+  protected readonly moveHasChange = computed(() => {
+    if (this.moveMode() !== 'single') return this.moveMode() !== null;
+    const row = this.moveTargetRow();
+    if (!row) return false;
+    return (row.folder_id ?? null) !== this.moveTargetFolderId();
+  });
+
+  protected openMove(row: WorkflowRead, event: MouseEvent): void {
+    event.stopPropagation();
+    this.closeMenu();
+    if (!this.canWrite()) return;
+    this.moveTargetRow.set(row);
+    this.moveBulkOpen.set(false);
+    this.moveTargetFolderId.set(row.folder_id ?? null);
+    this.moveError.set(null);
+  }
+
+  protected openBulkMove(): void {
+    if (!this.canWrite() || this.selectedIds().size === 0) return;
+    this.moveTargetRow.set(null);
+    this.moveBulkOpen.set(true);
+    this.moveTargetFolderId.set(null);
+    this.moveError.set(null);
+  }
+
+  protected setMoveTargetFolder(id: string | null): void {
+    this.moveTargetFolderId.set(id);
+  }
+
+  protected closeMove(): void {
+    if (this.moveSaving()) return; // don't dismiss mid-request
+    this.moveTargetRow.set(null);
+    this.moveBulkOpen.set(false);
+    this.moveTargetFolderId.set(null);
+    this.moveSaving.set(false);
+    this.moveError.set(null);
+  }
+
+  /** Bound to the modal's backdrop keydown so Esc closes it. Guarded
+   *  by the same not-saving check as the backdrop click. */
+  protected onMoveModalKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') this.closeMove();
+  }
+
+  protected confirmMove(): void {
+    const mode = this.moveMode();
+    if (mode === null) return;
+    const target = this.moveTargetFolderId();
+
+    if (mode === 'single') {
+      const row = this.moveTargetRow();
+      if (!row) return;
+      // No-op guard: don't PATCH when nothing actually changes.
+      if ((row.folder_id ?? null) === target) {
+        this.closeMove();
+        return;
+      }
+      this.moveSaving.set(true);
+      this.moveError.set(null);
+      this.api
+        .patch(row.id, { folder_id: target })
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (updated) => {
+            this.items.update((rows) => rows.map((r) => (r.id === row.id ? updated : r)));
+            this.moveSaving.set(false);
+            this.closeMove();
+            if (this.selectedFolderId() !== null) this.reload();
+          },
+          error: (err: HttpErrorResponse) => {
+            this.moveSaving.set(false);
+            this.moveError.set(extractApiError(err) ?? 'Could not move workflow.');
+          },
+        });
+      return;
+    }
+
+    // Bulk — fan out N PATCH requests via forkJoin. Matches the
+    // existing bulkActivate/pause/archive pattern; there's no
+    // server-side batch endpoint by design (per-row PATCH keeps the
+    // audit trail granular).
+    const ids = Array.from(this.selectedIds());
+    if (ids.length === 0) return;
+    this.moveSaving.set(true);
+    this.moveError.set(null);
+    forkJoin(ids.map((id) => this.api.patch(id, { folder_id: target })))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updatedList) => {
+          this.items.update((rows) =>
+            rows.map((r) => {
+              const found = updatedList.find((u) => u.id === r.id);
+              return found ?? r;
+            }),
+          );
+          this.moveSaving.set(false);
+          this.selectedIds.set(new Set());
+          this.closeMove();
+          if (this.selectedFolderId() !== null) this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.moveSaving.set(false);
+          this.moveError.set(extractApiError(err) ?? 'Some workflows could not be moved.');
+          this.reload();
+        },
+      });
+  }
+
   // --- derived helpers ---------------------------------------------
 
   /** Pick a representative channel chip from `enabled_event_types`. */

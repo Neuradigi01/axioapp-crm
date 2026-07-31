@@ -1,4 +1,4 @@
-<div class="flex min-h-[calc(100vh-4rem)] flex-col bg-surface-2 md:flex-row">
+<div class="flex flex-col bg-app md:flex-row md:items-start">
   <app-workflow-folders-sidebar
     [folders]="folders()"
     [selectedFolderId]="selectedFolderId()"
@@ -12,8 +12,12 @@
     <header class="border-b border-subtle bg-surface px-4 py-4">
       <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
         <div class="min-w-0 flex-1">
-          <h1 class="text-xl font-semibold text-default">Workflows</h1>
-          <p class="text-xs text-muted">
+          <h1
+            class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
+          >
+            Workflows
+          </h1>
+          <p class="mt-1 text-[14px] text-muted">
             Multi-step visual flows. Trigger on an event, branch on contact attributes, send across
             channels, and route work to the right team.
           </p>
@@ -21,7 +25,7 @@
         <div class="flex flex-wrap items-center gap-2 md:shrink-0">
           <a
             routerLink="/user/workflows/diagnostics"
-            class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+            class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
             title="Why didn't this workflow fire?"
           >
             <lucide-icon name="beaker" size="14" />
@@ -30,7 +34,7 @@
           @if (canWrite()) {
             <a
               routerLink="/user/workflows/gallery"
-              class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+              class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
             >
               <lucide-icon name="file-text" size="14" />
               Templates
@@ -68,14 +72,14 @@
             [value]="searchQuery()"
             (input)="onSearchInput($any($event.target).value)"
             placeholder="Search workflows…"
-            class="w-full min-w-[180px] rounded-md border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none sm:w-64"
+            class="w-full min-w-[180px] rounded-lg border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none sm:w-64"
           />
         </div>
 
         <select
           [value]="channelFilter()"
           (change)="onChannelChange($any($event.target).value)"
-          class="rounded-md border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
+          class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
         >
           @for (opt of CHANNEL_OPTIONS; track opt.value) {
             <option [value]="opt.value">{{ opt.label }}</option>
@@ -85,7 +89,7 @@
         <select
           [value]="categoryFilter()"
           (change)="onCategoryChange($any($event.target).value)"
-          class="rounded-md border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
+          class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
         >
           @for (opt of CATEGORY_OPTIONS; track opt.value) {
             <option [value]="opt.value">{{ opt.label }}</option>
@@ -95,7 +99,7 @@
         <select
           [value]="statusFilter()"
           (change)="onStatusChange($any($event.target).value)"
-          class="rounded-md border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
+          class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
         >
           @for (opt of STATUS_OPTIONS; track opt.value) {
             <option [value]="opt.value">{{ opt.label }}</option>
@@ -106,7 +110,7 @@
           <button
             type="button"
             (click)="clearFilters()"
-            class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1.5 text-xs text-default hover:bg-surface-2"
+            class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1.5 text-xs text-default hover:bg-surface-2"
           >
             <lucide-icon name="x" size="12" />
             Clear
@@ -145,12 +149,23 @@
               Pause
             </button>
           }
+          @if (canWrite()) {
+            <button
+              type="button"
+              (click)="openBulkMove()"
+              [disabled]="mutating() || moveSaving()"
+              class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+            >
+              <lucide-icon name="folder" size="11" />
+              Move to folder…
+            </button>
+          }
           @if (canWrite() && canBulkArchive()) {
             <button
               type="button"
               (click)="bulkArchive()"
               [disabled]="mutating()"
-              class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+              class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
             >
               <lucide-icon name="archive" size="11" />
               Archive
@@ -178,7 +193,7 @@
               No workflows yet
             }
           </h2>
-          <p class="mt-1 text-xs text-muted">
+          <p class="mt-1 text-[14px] text-muted">
             @if (hasFilters()) {
               Clear filters to see the full list.
             } @else {
@@ -190,15 +205,12 @@
             <div class="mt-4 flex justify-center gap-2">
               <a
                 routerLink="/user/workflows/gallery"
-                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
               >
                 <lucide-icon name="file-text" size="14" />
                 Start from template
               </a>
-              <a
-                routerLink="/user/workflows/new"
-                class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95"
-              >
+              <a routerLink="/user/workflows/new" class="btn btn-primary">
                 <lucide-icon name="plus" size="14" />
                 New workflow
               </a>
@@ -206,7 +218,7 @@
           }
         </div>
       } @else {
-        <div class="overflow-x-auto rounded-lg border border-subtle bg-surface">
+        <div class="overflow-x-auto rounded-xl border border-subtle bg-surface">
           <table class="w-full min-w-[760px] table-fixed text-sm">
             <thead class="bg-surface-2 text-xs text-muted">
               <tr>
@@ -334,7 +346,7 @@
                       </button>
                       @if (openMenuId() === row.id) {
                         <div
-                          class="absolute right-0 z-20 mt-1 w-40 rounded-md border border-subtle bg-surface py-1 text-sm shadow-lg"
+                          class="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-subtle bg-surface py-1 text-sm shadow-lg"
                           (click)="$event.stopPropagation()"
                         >
                           <button
@@ -353,6 +365,16 @@
                             >
                               <lucide-icon name="copy" size="13" />
                               Clone
+                            </button>
+                          }
+                          @if (canWrite()) {
+                            <button
+                              type="button"
+                              (click)="openMove(row, $event)"
+                              class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-default hover:bg-surface-2"
+                            >
+                              <lucide-icon name="folder" size="13" />
+                              Move to folder…
                             </button>
                           }
                           @if (canWrite() && row.status !== 'archived' && !row.is_system_default) {
@@ -382,7 +404,7 @@
               type="button"
               (click)="prevPage()"
               [disabled]="!hasPrev()"
-              class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-default hover:bg-surface-2 disabled:opacity-40"
+              class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-default hover:bg-surface-2 disabled:opacity-40"
             >
               <lucide-icon name="chevron-left" size="12" />
               Previous
@@ -391,7 +413,7 @@
               type="button"
               (click)="nextPage()"
               [disabled]="!hasNext()"
-              class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-default hover:bg-surface-2 disabled:opacity-40"
+              class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-default hover:bg-surface-2 disabled:opacity-40"
             >
               Next
               <lucide-icon name="chevron-right" size="12" />
@@ -415,4 +437,102 @@
     [workflowName]="runHistoryWorkflow()?.name ?? null"
     (closed)="closeRunHistory()"
   />
+
+  <!-- Move-to-folder picker. Shared by single-row (from the kebab)
+       and bulk (from the multi-select bar) paths — `moveMode()`
+       switches the header copy. Esc closes via the backdrop keydown;
+       the confirm button is disabled when the pick is a no-op. -->
+  @if (moveMode(); as mode) {
+    <div
+      class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
+      tabindex="-1"
+      (click)="closeMove()"
+      (keydown)="onMoveModalKeydown($event)"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="move-folder-title"
+        class="w-full max-w-md rounded-xl border border-subtle bg-surface p-5 shadow-xl"
+        (click)="$event.stopPropagation()"
+      >
+        <header class="mb-3">
+          <h3 id="move-folder-title" class="text-base font-semibold text-default">
+            @if (mode === 'bulk') {
+              Move {{ moveCount() }} workflow{{ moveCount() === 1 ? '' : 's' }} to folder
+            } @else {
+              Move to folder
+            }
+          </h3>
+          @if (mode === 'single' && moveTargetRow(); as row) {
+            <p class="mt-0.5 truncate text-xs text-muted" [title]="row.name">
+              {{ row.name }}
+            </p>
+          } @else if (mode === 'bulk') {
+            <p class="mt-0.5 text-xs text-muted">
+              Selected workflows will be reassigned to the folder you pick.
+            </p>
+          }
+        </header>
+
+        <div
+          class="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-subtle bg-surface-2 p-1"
+        >
+          <button
+            type="button"
+            (click)="setMoveTargetFolder(null)"
+            class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition"
+            [class.bg-accent-soft]="moveTargetFolderId() === null"
+            [class.text-accent]="moveTargetFolderId() === null"
+            [class.text-default]="moveTargetFolderId() !== null"
+            [class.hover:bg-surface]="moveTargetFolderId() !== null"
+          >
+            <lucide-icon name="folder" size="13" />
+            No folder
+          </button>
+          @for (f of folders(); track f.id) {
+            <button
+              type="button"
+              (click)="setMoveTargetFolder(f.id)"
+              class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition"
+              [class.bg-accent-soft]="moveTargetFolderId() === f.id"
+              [class.text-accent]="moveTargetFolderId() === f.id"
+              [class.text-default]="moveTargetFolderId() !== f.id"
+              [class.hover:bg-surface]="moveTargetFolderId() !== f.id"
+            >
+              <lucide-icon name="folder" size="13" />
+              {{ f.name }}
+            </button>
+          }
+        </div>
+
+        @if (moveError(); as err) {
+          <p
+            class="mt-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+          >
+            {{ err }}
+          </p>
+        }
+
+        <footer class="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            (click)="closeMove()"
+            [disabled]="moveSaving()"
+            class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            (click)="confirmMove()"
+            [disabled]="moveSaving() || !moveHasChange()"
+            class="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {{ moveSaving() ? 'Moving…' : 'Move' }}
+          </button>
+        </footer>
+      </div>
+    </div>
+  }
 </div>

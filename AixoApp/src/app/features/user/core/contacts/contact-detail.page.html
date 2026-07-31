@@ -35,7 +35,11 @@
             {{ initials(c.full_name) }}
           </span>
           <div>
-            <h1 class="text-lg font-semibold text-default">{{ c.full_name }}</h1>
+            <h1
+              class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
+            >
+              {{ c.full_name }}
+            </h1>
             <dl class="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
               <div class="flex items-center gap-1.5">
                 <dt class="font-medium text-muted">Phone</dt>
@@ -133,14 +137,14 @@
             <button
               type="button"
               (click)="openEdit()"
-              class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+              class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
             >
               Edit
             </button>
             <button
               type="button"
               (click)="openMerge()"
-              class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+              class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
               title="Merge another duplicate contact into this one"
             >
               Merge
@@ -364,7 +368,7 @@
           id="anonymise-reason"
           type="text"
           maxlength="500"
-          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="mt-1 w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-xs text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           placeholder="e.g. SAR-12345 or 'customer request'"
           [value]="anonymiseReason()"
           (input)="onAnonymiseReasonInput($event)"
@@ -379,7 +383,7 @@
         <button
           type="button"
           (click)="closeAnonymise()"
-          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+          class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
           [disabled]="anonymiseSubmitting()"
         >
           Cancel

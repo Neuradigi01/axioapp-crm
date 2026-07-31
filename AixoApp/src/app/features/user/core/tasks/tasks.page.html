@@ -2,7 +2,9 @@
   <!-- Header -->
   <header class="mb-4 flex flex-wrap items-end justify-between gap-3">
     <div>
-      <h1 class="text-2xl font-semibold text-default">Tasks</h1>
+      <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+        Tasks
+      </h1>
       <p class="mt-1 flex items-center gap-3 text-xs text-muted">
         <span class="inline-flex items-center gap-1.5">
           <span class="h-2 w-2 rounded-full bg-surface-2"></span>
@@ -67,7 +69,7 @@
         <button
           type="button"
           (click)="toggleViewsMenu()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
           title="Saved views"
           aria-haspopup="menu"
           [attr.aria-expanded]="viewsMenuOpen()"
@@ -79,7 +81,7 @@
         @if (viewsMenuOpen()) {
           <div class="fixed inset-0 z-30" (click)="toggleViewsMenu()" role="presentation"></div>
           <div
-            class="absolute right-0 z-40 mt-1 w-64 rounded-md border border-subtle bg-surface shadow-lg"
+            class="absolute right-0 z-40 mt-1 w-64 rounded-lg border border-subtle bg-surface shadow-lg"
           >
             <div class="max-h-64 overflow-auto py-1">
               @for (v of savedViews(); track v.id) {
@@ -140,11 +142,11 @@
   @if (state.loading() && state.items().length === 0) {
     <div class="space-y-2">
       @for (i of [1, 2, 3, 4]; track i) {
-        <div class="h-12 animate-pulse rounded-lg border border-subtle bg-surface-2"></div>
+        <div class="h-12 animate-pulse rounded-xl border border-subtle bg-surface-2"></div>
       }
     </div>
   } @else if (state.items().length === 0) {
-    <div class="rounded-xl border border-dashed border-subtle bg-surface p-12 text-center">
+    <div class="rounded-xl border border-dashed border-subtle bg-surface p-6 md:p-12 text-center">
       <p class="text-sm text-muted">No tasks match this filter.</p>
       <button
         type="button"
@@ -155,7 +157,7 @@
       </button>
     </div>
   } @else {
-    <div class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm">
+    <div class="overflow-x-auto rounded-xl border border-subtle bg-surface shadow-sm">
       <table class="w-full text-sm">
         <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
           <tr>
@@ -441,7 +443,7 @@
   >
     <div class="border-b border-subtle px-5 py-3">
       <h3 class="text-sm font-semibold text-default">Save current filters as a view</h3>
-      <p class="mt-1 text-xs text-muted">
+      <p class="mt-1 text-[14px] text-muted">
         Captures the active chip, status, due filter, priority, and sort. Restore by picking the
         view from the bookmark menu.
       </p>
@@ -471,7 +473,7 @@
       <button
         type="button"
         (click)="closeSaveView()"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
       >
         Cancel
       </button>

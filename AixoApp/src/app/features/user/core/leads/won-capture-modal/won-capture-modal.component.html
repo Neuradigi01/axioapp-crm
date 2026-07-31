@@ -24,7 +24,7 @@
           inputmode="decimal"
           [formControl]="valueControl"
           placeholder="e.g. 50000"
-          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="mt-1 w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
         @if (valueControl.invalid && valueControl.dirty) {
           <span class="mt-1 block text-xs text-red-600"
@@ -40,7 +40,7 @@
           [formControl]="closeDateControl"
           min="1900-01-01"
           max="9999-12-31"
-          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="mt-1 w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
         @if (closeDateControl.touched && closeDateControl.invalid) {
           <span class="mt-1 block text-xs text-red-600">
@@ -62,7 +62,7 @@
           maxlength="64"
           [formControl]="reasonControl"
           placeholder="e.g. Referral · Existing customer · Landing page"
-          class="mt-1 w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="mt-1 w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </label>
 
@@ -75,7 +75,7 @@
       <button
         type="button"
         (click)="cancel.emit()"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         [disabled]="_submitting()"
       >
         Cancel
@@ -83,7 +83,7 @@
       <button
         type="button"
         (click)="onSkip()"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-muted hover:bg-surface-2"
+        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-muted hover:bg-surface-2"
         [disabled]="_submitting()"
         title="Mark won without recording details"
       >

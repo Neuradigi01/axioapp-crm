@@ -1,4 +1,4 @@
-<div class="rounded-md border border-subtle bg-surface">
+<div class="rounded-lg border border-subtle bg-surface">
   <div
     class="flex flex-wrap items-center justify-between gap-2 border-b border-subtle bg-surface-2 px-3 py-2 text-xs"
   >
@@ -8,7 +8,7 @@
         Insert variable:
         <select
           (change)="onInsertTag($any($event.target).value); $any($event.target).value = ''"
-          class="ml-1 rounded-md border border-subtle bg-surface px-1.5 py-0.5 text-[10px] focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="ml-1 rounded-lg border border-subtle bg-surface px-1.5 py-0.5 text-[10px] focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         >
           <option value="">— pick —</option>
           @for (tag of mergeTags(); track tag.value) {
@@ -36,7 +36,7 @@
     <div class="min-h-40 overflow-auto bg-surface-2 p-3">
       <div class="mb-2 text-[10px] uppercase tracking-wide text-muted">Live preview</div>
       <div
-        class="rounded-md border border-subtle bg-surface p-3 text-sm text-default"
+        class="rounded-lg border border-subtle bg-surface p-3 text-sm text-default"
         [innerHTML]="value()"
       ></div>
       <div class="mt-2 text-[10px] text-muted">

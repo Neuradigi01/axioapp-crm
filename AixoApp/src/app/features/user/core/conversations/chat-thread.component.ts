@@ -61,6 +61,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
     VCardBubbleComponent,
   ],
   templateUrl: './chat-thread.component.html',
+  host: { class: 'flex min-h-0 flex-1 flex-col' },
 })
 export class ChatThreadComponent implements AfterViewChecked {
   private readonly auth = inject(FurnitureAuthService);

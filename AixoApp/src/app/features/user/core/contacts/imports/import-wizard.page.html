@@ -5,10 +5,25 @@
       <lucide-icon name="chevron-right" class="h-3 w-3" />
       <span class="text-default">Import</span>
     </nav>
-    <h1 class="text-lg font-semibold text-default">Import contacts</h1>
-    <p class="text-sm text-muted">
-      Upload an Excel or CSV file, map the columns, and preview the import before committing.
-    </p>
+    <div class="flex items-center justify-between gap-4">
+      <div>
+        <h1
+          class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
+        >
+          Import contacts
+        </h1>
+        <p class="text-sm text-muted">
+          Upload an Excel or CSV file, map the columns, and preview the import before committing.
+        </p>
+      </div>
+      <a
+        routerLink="/user/contacts/import/history"
+        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+      >
+        <lucide-icon name="history" class="h-4 w-4" />
+        View history
+      </a>
+    </div>
   </header>
 
   <!-- Step indicator -->
@@ -50,15 +65,15 @@
   <!-- Step 1 — Upload                                                 -->
   <!-- ============================================================== -->
   @if (step() === 1) {
-    <section class="space-y-4 rounded-lg border border-subtle bg-surface p-4 md:p-6">
+    <section class="space-y-4 rounded-xl border border-subtle bg-surface p-4 md:p-6">
       <div>
         <h2 class="text-sm font-semibold text-default">Choose a file</h2>
-        <p class="text-xs text-muted">.xlsx or .csv · up to 5 MB · 10,000 rows max.</p>
+        <p class="mt-1 text-[14px] text-muted">.xlsx or .csv · up to 10 MB · 50,000 rows max.</p>
       </div>
 
       @if (selectedFile(); as file) {
         <div
-          class="flex items-center justify-between rounded-md border border-subtle bg-surface px-4 py-3"
+          class="flex items-center justify-between rounded-lg border border-subtle bg-surface px-4 py-3"
         >
           <div class="flex min-w-0 items-center gap-3">
             <lucide-icon name="file-spreadsheet" class="h-5 w-5 shrink-0 text-emerald-600" />
@@ -66,7 +81,7 @@
               <p class="truncate text-sm font-medium text-default">
                 {{ file.name }}
               </p>
-              <p class="text-xs text-muted">{{ fileSizeLabel() }}</p>
+              <p class="mt-1 text-[14px] text-muted">{{ fileSizeLabel() }}</p>
             </div>
           </div>
           <button
@@ -94,7 +109,7 @@
             <span class="font-medium text-indigo-600">Click to browse</span>
             or drag a file here
           </div>
-          <p class="text-xs text-muted">.xlsx or .csv</p>
+          <p class="mt-1 text-[14px] text-muted">.xlsx or .csv</p>
           <input
             id="contact-import-file"
             type="file"
@@ -116,7 +131,7 @@
       <div class="flex items-center justify-end gap-2 pt-2">
         <a
           routerLink="/user/contacts"
-          class="rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          class="rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
         >
           Cancel
         </a>
@@ -142,11 +157,11 @@
   <!-- Step 2 — Map columns                                            -->
   <!-- ============================================================== -->
   @if (step() === 2 && importMeta(); as meta) {
-    <section class="space-y-5 rounded-lg border border-subtle bg-surface p-4 md:p-6">
+    <section class="space-y-5 rounded-xl border border-subtle bg-surface p-4 md:p-6">
       <div class="flex items-start justify-between gap-4">
         <div>
           <h2 class="text-sm font-semibold text-default">Map columns</h2>
-          <p class="text-xs text-muted">
+          <p class="mt-1 text-[14px] text-muted">
             {{ meta.row_count }} data row(s) detected in
             <span class="font-medium text-default">{{ meta.filename }}</span
             >. Map each column to a contact field, or skip it.
@@ -155,7 +170,7 @@
       </div>
 
       <!-- Mapping table -->
-      <div class="overflow-hidden rounded-md border border-subtle">
+      <div class="overflow-x-auto rounded-xl border border-subtle">
         <table class="w-full text-sm">
           <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
             <tr>
@@ -187,7 +202,7 @@
                     [class.focus:border-muted]="!duplicateTargets().has(mapping()[col])"
                     [class.focus:ring-accent]="!duplicateTargets().has(mapping()[col])"
                   >
-                    @for (t of fieldTargets; track t.value) {
+                    @for (t of fieldTargets(); track t.value) {
                       <option [value]="t.value">{{ t.label }}</option>
                     }
                   </select>
@@ -249,7 +264,7 @@
               (input)="onGroupNameInput($event)"
               maxlength="255"
               placeholder="e.g. Q3 Sales Leads"
-              class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
             @if (groupNameRequired()) {
               <p class="mt-1 text-xs text-red-600">Group name is required.</p>
@@ -274,7 +289,7 @@
         <button
           type="button"
           (click)="backToUpload()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
         >
           <lucide-icon name="arrow-left" class="h-4 w-4" />
           Back
@@ -301,32 +316,38 @@
   <!-- Step 3 — Preview & commit                                       -->
   <!-- ============================================================== -->
   @if (step() === 3 && dryRunResult(); as result) {
-    <section class="space-y-5 rounded-lg border border-subtle bg-surface p-4 md:p-6">
+    <section class="space-y-5 rounded-xl border border-subtle bg-surface p-4 md:p-6">
       <div>
         <h2 class="text-sm font-semibold text-default">Preview</h2>
-        <p class="text-xs text-muted">
+        <p class="mt-1 text-[14px] text-muted">
           Nothing has been inserted yet. Review the counts and commit when ready.
         </p>
       </div>
 
-      <!-- Counts -->
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <!-- Counts — one tile per outcome bucket (matches the 3 CSVs). -->
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
           <p class="text-xs uppercase tracking-wide text-emerald-400">Will be added</p>
           <p class="mt-1 text-2xl font-semibold text-emerald-300">
             {{ result.will_insert }}
           </p>
         </div>
-        <div class="rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3">
-          <p class="text-xs uppercase tracking-wide text-amber-400">Duplicate phone</p>
-          <p class="mt-1 text-2xl font-semibold text-amber-300">
-            {{ result.duplicate_phone }}
-          </p>
-        </div>
         <div class="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3">
-          <p class="text-xs uppercase tracking-wide text-red-400">Errors / skipped</p>
+          <p class="text-xs uppercase tracking-wide text-red-400">Errors</p>
           <p class="mt-1 text-2xl font-semibold text-red-300">
             {{ result.will_skip }}
+          </p>
+        </div>
+        <div class="rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-amber-400">Duplicates</p>
+          <p class="mt-1 text-2xl font-semibold text-amber-300">
+            {{ result.duplicate_count }}
+          </p>
+        </div>
+        <div class="rounded-md border border-sky-500/20 bg-sky-500/10 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-sky-400">Warnings</p>
+          <p class="mt-1 text-2xl font-semibold text-sky-300">
+            {{ result.warning_count }}
           </p>
         </div>
       </div>
@@ -388,10 +409,147 @@
                 type="button"
                 (click)="downloadErrors()"
                 [disabled]="downloadingErrors()"
-                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <lucide-icon name="download" class="h-3.5 w-3.5" />
                 {{ downloadingErrors() ? 'Preparing…' : 'Download errors CSV' }}
+              </button>
+            </div>
+          </div>
+        </details>
+      }
+
+      <!-- Duplicates table + download (populated by dry-run since
+           2026-07-30 for full preview parity with the errors table). -->
+      @if (result.duplicates.length > 0) {
+        <details
+          class="rounded-md border border-subtle"
+          [attr.open]="result.duplicates.length <= errorVisibleLimit ? '' : null"
+        >
+          <summary
+            class="cursor-pointer select-none px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          >
+            {{ result.duplicates.length }} duplicate row(s)
+          </summary>
+          <div class="border-t border-subtle">
+            <table class="w-full text-sm">
+              <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
+                <tr>
+                  <th class="px-3 py-2 text-left font-medium">Row</th>
+                  <th class="px-3 py-2 text-left font-medium">Column</th>
+                  <th class="px-3 py-2 text-left font-medium">Value</th>
+                  <th class="px-3 py-2 text-left font-medium">Reason</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-subtle">
+                @for (d of visibleDuplicates(); track d.row) {
+                  <tr>
+                    <td class="px-3 py-2 text-default">{{ d.row }}</td>
+                    <td class="px-3 py-2 text-muted">{{ d.column ?? '—' }}</td>
+                    <td class="px-3 py-2 text-muted">{{ d.value ?? '—' }}</td>
+                    <td class="px-3 py-2 text-default">{{ d.reason }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            @if (result.duplicates.length > errorVisibleLimit) {
+              <div class="border-t border-subtle bg-surface-2 px-4 py-2 text-xs">
+                <button
+                  type="button"
+                  (click)="toggleDuplicatesExpanded()"
+                  class="font-medium text-default hover:text-default"
+                >
+                  @if (duplicatesExpanded()) {
+                    Show first {{ errorVisibleLimit }} only
+                  } @else {
+                    Show all {{ result.duplicates.length }} duplicates
+                  }
+                </button>
+              </div>
+            }
+            <div
+              class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-4 py-2 text-xs"
+            >
+              @if (downloadSkippedMsg(); as msg) {
+                <span class="text-red-500">{{ msg }}</span>
+              }
+              <button
+                type="button"
+                (click)="downloadSkipped()"
+                [disabled]="downloadingSkipped()"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <lucide-icon name="download" class="h-3.5 w-3.5" />
+                {{ downloadingSkipped() ? 'Preparing…' : 'Download duplicates CSV' }}
+              </button>
+            </div>
+          </div>
+        </details>
+      }
+
+      <!-- Warnings table + download. Rows in this table WILL still
+           import; the warning surfaces coerced values (e.g. tag
+           truncated to 64 chars). -->
+      @if (result.warnings.length > 0) {
+        <details
+          class="rounded-md border border-subtle"
+          [attr.open]="result.warnings.length <= errorVisibleLimit ? '' : null"
+        >
+          <summary
+            class="cursor-pointer select-none px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          >
+            {{ result.warnings.length }} warning(s)
+          </summary>
+          <div class="border-t border-subtle">
+            <table class="w-full text-sm">
+              <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
+                <tr>
+                  <th class="px-3 py-2 text-left font-medium">Row</th>
+                  <th class="px-3 py-2 text-left font-medium">Column</th>
+                  <th class="px-3 py-2 text-left font-medium">Value</th>
+                  <th class="px-3 py-2 text-left font-medium">Reason</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-subtle">
+                @for (w of visibleWarnings(); track w.row) {
+                  <tr>
+                    <td class="px-3 py-2 text-default">{{ w.row }}</td>
+                    <td class="px-3 py-2 text-muted">{{ w.column ?? '—' }}</td>
+                    <td class="px-3 py-2 text-muted">{{ w.value ?? '—' }}</td>
+                    <td class="px-3 py-2 text-default">{{ w.reason }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            @if (result.warnings.length > errorVisibleLimit) {
+              <div class="border-t border-subtle bg-surface-2 px-4 py-2 text-xs">
+                <button
+                  type="button"
+                  (click)="toggleWarningsExpanded()"
+                  class="font-medium text-default hover:text-default"
+                >
+                  @if (warningsExpanded()) {
+                    Show first {{ errorVisibleLimit }} only
+                  } @else {
+                    Show all {{ result.warnings.length }} warnings
+                  }
+                </button>
+              </div>
+            }
+            <div
+              class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-4 py-2 text-xs"
+            >
+              @if (downloadWarningsMsg(); as msg) {
+                <span class="text-red-500">{{ msg }}</span>
+              }
+              <button
+                type="button"
+                (click)="downloadWarnings()"
+                [disabled]="downloadingWarnings()"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <lucide-icon name="download" class="h-3.5 w-3.5" />
+                {{ downloadingWarnings() ? 'Preparing…' : 'Download warnings CSV' }}
               </button>
             </div>
           </div>
@@ -411,7 +569,7 @@
           type="button"
           (click)="backToMapping()"
           [disabled]="committing()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <lucide-icon name="arrow-left" class="h-4 w-4" />
           Back
@@ -435,64 +593,186 @@
   }
 
   <!-- ============================================================== -->
-  <!-- Step 4 — Success                                                -->
+  <!-- Step 4 — Processing / Success / Failed / Cancelled              -->
+  <!-- Async pivot (2026-07-30): commit dispatches to Celery in prod   -->
+  <!-- and returns immediately with status='processing'. Wizard polls  -->
+  <!-- until terminal, then flips the panel accordingly.               -->
   <!-- ============================================================== -->
   @if (step() === 4 && commitResult(); as outcome) {
-    <section
-      class="space-y-5 rounded-lg border border-emerald-500/20 bg-surface p-5 md:p-8 text-center"
-    >
-      <div
-        class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10"
+    @if (isProcessing()) {
+      <section
+        class="space-y-5 rounded-lg border border-blue-500/20 bg-surface p-5 md:p-8 text-center"
       >
-        <lucide-icon name="check" class="h-6 w-6 text-emerald-600" />
-      </div>
-      <div>
-        <h2 class="text-lg font-semibold text-default">Import complete</h2>
-        <p class="mt-1 text-sm text-muted">
-          {{ outcome.success_count }} contact(s) added.
+        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10">
+          <lucide-icon name="loader-2" class="h-6 w-6 animate-spin text-blue-600" />
+        </div>
+        <div>
+          <h2 class="text-lg font-semibold text-default">Import in progress</h2>
+          <p class="mt-1 text-[14px] text-muted">
+            The worker is inserting {{ outcome.row_count }} row(s). This page updates automatically
+            — feel free to leave and come back.
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <a
+            routerLink="/user/contacts/import/history"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          >
+            <lucide-icon name="history" class="h-4 w-4" />
+            View history
+          </a>
+          <button
+            type="button"
+            (click)="cancelProcessing()"
+            [disabled]="cancelling()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-red-500/40 bg-surface px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <lucide-icon name="x" class="h-4 w-4" />
+            {{ cancelling() ? 'Cancelling…' : 'Cancel import' }}
+          </button>
+        </div>
+        @if (cancelError(); as msg) {
+          <p class="text-center text-xs text-red-500">{{ msg }}</p>
+        }
+      </section>
+    } @else if (isFailed()) {
+      <section
+        class="space-y-5 rounded-lg border border-red-500/20 bg-surface p-5 md:p-8 text-center"
+      >
+        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10">
+          <lucide-icon name="x-circle" class="h-6 w-6 text-red-600" />
+        </div>
+        <div>
+          <h2 class="text-lg font-semibold text-default">Import failed</h2>
+          <p class="mt-1 text-[14px] text-muted">
+            The worker hit a fatal error and stopped. Check the import history for details, or
+            re-upload the file.
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <a
+            routerLink="/user/contacts/import/history"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          >
+            <lucide-icon name="history" class="h-4 w-4" />
+            View history
+          </a>
+        </div>
+      </section>
+    } @else if (isCancelled()) {
+      <section class="space-y-5 rounded-xl border border-subtle bg-surface p-5 md:p-8 text-center">
+        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-2">
+          <lucide-icon name="ban" class="h-6 w-6 text-muted" />
+        </div>
+        <div>
+          <h2 class="text-lg font-semibold text-default">Import cancelled</h2>
+          <p class="mt-1 text-[14px] text-muted">
+            {{ outcome.success_count }} contact(s) were added before the cancel took effect. Any
+            remaining rows were not processed.
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            (click)="goToContacts()"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          >
+            <lucide-icon name="users" class="h-4 w-4" />
+            Back to contacts
+          </button>
+        </div>
+      </section>
+    } @else {
+      <section
+        class="space-y-5 rounded-lg border border-emerald-500/20 bg-surface p-5 md:p-8 text-center"
+      >
+        <div
+          class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10"
+        >
+          <lucide-icon name="check" class="h-6 w-6 text-emerald-600" />
+        </div>
+        <div>
+          <h2 class="text-lg font-semibold text-default">Import complete</h2>
+          <p class="mt-1 text-[14px] text-muted">
+            {{ outcome.success_count }} contact(s) added.
+            @if (outcome.error_count > 0) {
+              {{ outcome.error_count }} row(s) failed.
+            }
+            @if (outcome.duplicate_count > 0) {
+              {{ outcome.duplicate_count }} row(s) skipped as duplicates.
+            }
+            @if (outcome.warning_count > 0) {
+              {{ outcome.warning_count }} row(s) imported with warnings.
+            }
+            @if (outcome.created_group_id) {
+              Group <span class="font-medium text-default">{{ groupName() }}</span>
+              created.
+            }
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            (click)="goToContacts()"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          >
+            <lucide-icon name="users" class="h-4 w-4" />
+            Back to contacts
+          </button>
           @if (outcome.error_count > 0) {
-            {{ outcome.error_count }} row(s) skipped.
+            <button
+              type="button"
+              (click)="downloadErrors()"
+              [disabled]="downloadingErrors()"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <lucide-icon name="download" class="h-4 w-4" />
+              {{ downloadingErrors() ? 'Preparing…' : 'Download errors CSV' }}
+            </button>
+          }
+          @if (outcome.duplicate_count > 0) {
+            <button
+              type="button"
+              (click)="downloadSkipped()"
+              [disabled]="downloadingSkipped()"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <lucide-icon name="download" class="h-4 w-4" />
+              {{ downloadingSkipped() ? 'Preparing…' : 'Download duplicates CSV' }}
+            </button>
+          }
+          @if (outcome.warning_count > 0) {
+            <button
+              type="button"
+              (click)="downloadWarnings()"
+              [disabled]="downloadingWarnings()"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <lucide-icon name="download" class="h-4 w-4" />
+              {{ downloadingWarnings() ? 'Preparing…' : 'Download warnings CSV' }}
+            </button>
           }
           @if (outcome.created_group_id) {
-            Group <span class="font-medium text-default">{{ groupName() }}</span>
-            created.
+            <button
+              type="button"
+              (click)="goToGroup()"
+              class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-95"
+            >
+              Open group
+              <lucide-icon name="arrow-right" class="h-4 w-4" />
+            </button>
           }
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center justify-center gap-2">
-        <button
-          type="button"
-          (click)="goToContacts()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
-        >
-          <lucide-icon name="users" class="h-4 w-4" />
-          Back to contacts
-        </button>
-        @if (outcome.error_count > 0) {
-          <button
-            type="button"
-            (click)="downloadErrors()"
-            [disabled]="downloadingErrors()"
-            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <lucide-icon name="download" class="h-4 w-4" />
-            {{ downloadingErrors() ? 'Preparing…' : 'Download errors CSV' }}
-          </button>
+        </div>
+        @if (downloadErrorsMsg(); as msg) {
+          <p class="text-center text-xs text-red-500">{{ msg }}</p>
         }
-        @if (outcome.created_group_id) {
-          <button
-            type="button"
-            (click)="goToGroup()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-95"
-          >
-            Open group
-            <lucide-icon name="arrow-right" class="h-4 w-4" />
-          </button>
+        @if (downloadSkippedMsg(); as msg) {
+          <p class="text-center text-xs text-red-500">{{ msg }}</p>
         }
-      </div>
-      @if (downloadErrorsMsg(); as msg) {
-        <p class="text-center text-xs text-red-500">{{ msg }}</p>
-      }
-    </section>
+        @if (downloadWarningsMsg(); as msg) {
+          <p class="text-center text-xs text-red-500">{{ msg }}</p>
+        }
+      </section>
+    }
   }
 </div>

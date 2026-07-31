@@ -8,6 +8,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { UpperCasePipe } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -18,7 +19,7 @@ import { NotificationsApiService } from '../notifications/notifications-api.serv
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, LucideAngularModule],
+  imports: [RouterLink, RouterLinkActive, LucideAngularModule, UpperCasePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sidebar.component.html',
 })
@@ -48,6 +49,37 @@ export class SidebarComponent implements OnInit {
   protected readonly modules = signal<ModuleDescriptorOut[]>([]);
   protected readonly error = signal<string | null>(null);
 
+  /** Modules grouped into consecutive same-section RUNS (AIXO layout).
+   *
+   * AIXO deliberately alternates section headers by usage flow, so
+   * `My Work` and `Engage` legitimately appear twice each. We must NOT
+   * dedupe on section string — instead walk modules in `menu_position`
+   * order and open a new group every time `section` changes. Modules
+   * with `section=null` are excluded here and rendered in the pinned
+   * footer group at the bottom of the rail.
+   */
+  protected readonly groupedModules = computed<
+    Array<{ section: string; items: ModuleDescriptorOut[] }>
+  >(() => {
+    const groups: Array<{ section: string; items: ModuleDescriptorOut[] }> = [];
+    let current: { section: string; items: ModuleDescriptorOut[] } | null = null;
+    for (const mod of this.modules()) {
+      if (!mod.section) continue;
+      if (!current || current.section !== mod.section) {
+        current = { section: mod.section, items: [] };
+        groups.push(current);
+      }
+      current.items.push(mod);
+    }
+    return groups;
+  });
+
+  /** Modules with no `section` — render at the bottom of the rail
+   * (Integrations, Subscription, Settings, pack billing). No header. */
+  protected readonly footerModules = computed<ModuleDescriptorOut[]>(() =>
+    this.modules().filter((m) => !m.section),
+  );
+
   /** Workspace-switcher popover open state. */
   protected readonly wsMenuOpen = signal(false);
 
@@ -55,6 +87,25 @@ export class SidebarComponent implements OnInit {
   protected readonly wsInitial = computed(() => {
     const name = this.org()?.name ?? 'C';
     return name.charAt(0).toUpperCase();
+  });
+
+  /** Friendly pack/template display name shown under the org name in
+   *  the workspace card ("Real Estate" instead of "real_estate"). Falls
+   *  back to a title-cased slug so a new pack still renders sensibly. */
+  private readonly TEMPLATE_LABELS: Record<string, string> = {
+    base: 'CRM',
+    real_estate: 'Real Estate',
+    furniture: 'Furniture',
+    clinic: 'Clinic',
+    salon: 'Salon',
+    services: 'Services',
+  };
+
+  protected readonly workspaceLabel = computed<string>(() => {
+    const tid = this.org()?.template_id;
+    if (!tid) return 'CRM';
+    if (tid in this.TEMPLATE_LABELS) return this.TEMPLATE_LABELS[tid];
+    return tid.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   });
 
   /** Signed-in user's initial — bottom profile avatar. */

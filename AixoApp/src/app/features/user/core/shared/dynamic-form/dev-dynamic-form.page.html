@@ -1,7 +1,9 @@
 <div class="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
   <header>
-    <h1 class="text-lg font-semibold text-default">Dynamic Form — dev preview</h1>
-    <p class="mt-1 text-xs text-muted">
+    <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+      Dynamic Form — dev preview
+    </h1>
+    <p class="mt-1 text-[14px] text-muted">
       One field per supported <code class="font-mono">field_type</code>, rendered through
       <code class="font-mono">&lt;app-dynamic-form&gt;</code> against an in-memory definition list.
       Edit any field to see the live value &amp; validity update on the right.
@@ -15,7 +17,7 @@
         <button
           type="button"
           (click)="toggleLoading()"
-          class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
+          class="rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
         >
           {{ loading() ? 'Hide skeleton' : 'Show skeleton' }}
         </button>

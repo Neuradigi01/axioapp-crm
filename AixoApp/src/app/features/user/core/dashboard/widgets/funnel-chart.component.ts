@@ -33,6 +33,7 @@ interface FunnelStageBucket {
   stage_name: string;
   stage_order: number;
   count: number;
+  value_sum: number;
 }
 
 interface DashboardFunnelResponse {

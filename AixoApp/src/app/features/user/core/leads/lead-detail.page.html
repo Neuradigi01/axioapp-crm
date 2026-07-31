@@ -35,7 +35,11 @@
             {{ initials(headerTitle()) }}
           </span>
           <div>
-            <h1 class="text-lg font-semibold text-default">{{ headerTitle() }}</h1>
+            <h1
+              class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
+            >
+              {{ headerTitle() }}
+            </h1>
             <dl class="mt-1 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted">
               <div class="flex items-center gap-1">
                 <dt class="font-medium text-muted">Stage</dt>
@@ -110,7 +114,7 @@
           <button
             type="button"
             (click)="openEdit()"
-            class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+            class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
           >
             Edit
           </button>
@@ -272,7 +276,7 @@
                           {{ c.full_name }}
                         </a>
                         @if (c.source) {
-                          <p class="text-xs text-muted">{{ c.source }}</p>
+                          <p class="mt-1 text-[14px] text-muted">{{ c.source }}</p>
                         }
                       </div>
                     </div>

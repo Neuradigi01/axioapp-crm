@@ -1,19 +1,38 @@
-<div class="flex h-[calc(100vh-4rem)] flex-col">
+<div class="flex min-h-0 flex-1 flex-col">
   <header class="border-b border-subtle bg-surface px-4 py-3 md:px-6">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-xl font-semibold text-default">Conversations</h1>
-        <p class="text-xs text-muted">
+        <h1
+          class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
+        >
+          Conversations
+        </h1>
+        <p class="mt-1 text-[14px] text-muted">
           Unified inbox across WhatsApp, Instagram, web chat &amp; SMS
         </p>
       </div>
-      <button
-        type="button"
-        (click)="reloadList()"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
-      >
-        Refresh
-      </button>
+      <div class="flex items-center gap-2">
+        <!-- Status filter moved out of the list panel into the header so
+             the list keeps full height for messages. Small compact
+             select — Open/Snoozed/Closed cases stay a click away. -->
+        <select
+          [value]="statusFilter()"
+          (change)="onStatusFilterChange($event)"
+          class="rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          aria-label="Status filter"
+        >
+          @for (o of statusOptions; track o.value) {
+            <option [value]="o.value">{{ o.label }}</option>
+          }
+        </select>
+        <button
+          type="button"
+          (click)="reloadList()"
+          class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        >
+          Refresh
+        </button>
+      </div>
     </div>
     @if (loadError(); as err) {
       <div
@@ -40,7 +59,7 @@
     <!-- Left: list. Hidden on mobile once a conversation is picked so the
          thread pane can take the full width. -->
     <aside
-      class="flex w-full flex-col border-r border-subtle bg-surface md:w-80 md:min-w-[18rem]"
+      class="flex min-h-0 w-full flex-col border-r border-subtle bg-surface md:w-80 md:min-w-[18rem]"
       [class.hidden]="!!selectedId()"
       [class.md:flex]="!!selectedId()"
     >
@@ -49,6 +68,7 @@
         [loading]="loading()"
         [selectedId]="selectedId()"
         [staffById]="staffById()"
+        [contactsById]="contactsById()"
         [currentUserId]="currentUserId() ?? ''"
         [initialAssignee]="initialAssignee"
         [tagFilterIds]="tagFilterIds()"
@@ -67,6 +87,16 @@
       [class.md:flex]="!selectedId()"
     >
       @if (selectedConversation(); as conv) {
+        <!-- Mobile-only back button to return to the list pane -->
+        <button
+          type="button"
+          (click)="deselect()"
+          class="flex items-center gap-1.5 border-b border-subtle bg-surface px-3 py-2 text-left text-xs font-medium text-muted transition hover:text-default md:hidden"
+          aria-label="Back to conversations"
+        >
+          <lucide-icon name="chevron-left" class="h-3.5 w-3.5" />
+          Back to conversations
+        </button>
         <app-chat-thread
           [conversation]="conv"
           [detail]="detail()"

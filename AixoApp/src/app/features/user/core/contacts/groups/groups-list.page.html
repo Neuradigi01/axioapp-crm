@@ -1,8 +1,10 @@
 <div class="p-4 md:p-6 space-y-4">
   <header class="flex items-center justify-between">
     <div>
-      <h1 class="text-xl font-semibold text-default">Contact groups</h1>
-      <p class="mt-1 text-sm text-muted">
+      <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+        Contact groups
+      </h1>
+      <p class="mt-1 text-[14px] text-muted">
         Saved audiences for campaign targeting. Dynamic groups re-resolve on every send; static
         groups stay frozen at creation.
       </p>
@@ -10,7 +12,7 @@
     <div class="flex gap-2">
       <a
         routerLink="/user/contacts"
-        class="inline-flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+        class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
       >
         <lucide-icon name="arrow-left" class="h-4 w-4" />
         Back to contacts
@@ -55,7 +57,7 @@
       </a>
     </section>
   } @else {
-    <div class="overflow-hidden rounded-lg border border-subtle bg-surface">
+    <div class="overflow-x-auto rounded-xl border border-subtle bg-surface">
       <table class="min-w-full divide-y divide-subtle">
         <thead class="bg-surface-2">
           <tr>
@@ -126,7 +128,7 @@
               <td class="px-4 py-2 text-right text-sm space-x-2">
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
+                  class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
                   (click)="onEdit(g)"
                 >
                   <lucide-icon name="pencil" class="h-3 w-3" />
@@ -160,7 +162,7 @@
               id="groups_pagesize"
               [value]="pageSize()"
               (change)="onPageSizeChange(+$any($event.target).value)"
-              class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              class="rounded-lg border border-subtle bg-surface px-2 py-1 text-xs text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             >
               <option [value]="25">25</option>
               <option [value]="50">50</option>
@@ -171,7 +173,7 @@
             <div class="flex items-center gap-1">
               <button
                 type="button"
-                class="rounded-md border border-subtle bg-surface px-2.5 py-1 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                class="rounded-lg border border-subtle bg-surface px-2.5 py-1 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                 [disabled]="page() <= 1"
                 (click)="goToPage(page() - 1)"
               >
@@ -179,7 +181,7 @@
               </button>
               <button
                 type="button"
-                class="rounded-md border border-subtle bg-surface px-2.5 py-1 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                class="rounded-lg border border-subtle bg-surface px-2.5 py-1 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                 [disabled]="page() >= totalPages()"
                 (click)="goToPage(page() + 1)"
               >
@@ -202,7 +204,7 @@
         </span>
         <div>
           <h2 class="text-base font-semibold text-default">Delete "{{ target.name }}"?</h2>
-          <p class="mt-1 text-sm text-muted">
+          <p class="mt-1 text-[14px] text-muted">
             Campaigns referencing this group will resolve to an empty audience the next time they
             try to send. The group definition cannot be recovered.
           </p>
@@ -211,7 +213,7 @@
       <div class="mt-4 flex items-center justify-end gap-2">
         <button
           type="button"
-          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+          class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
           [disabled]="deleting()"
           (click)="onCancelDelete()"
         >

@@ -1,13 +1,13 @@
 @if (vm(); as banner) {
   <div
-    [class]="'flex items-center gap-3 border-b px-5 py-2 text-[13px] ' + toneClasses()"
+    [class]="'flex h-[46px] shrink-0 items-center gap-3 border-b px-5 text-[13px] ' + toneClasses()"
     role="status"
     aria-live="polite"
   >
     @if (banner.tone !== 'info') {
       <lucide-icon name="alert-triangle" class="h-3.5 w-3.5 shrink-0"></lucide-icon>
     } @else {
-      <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>
+      <span class="h-2 w-2 shrink-0 rounded-full bg-accent"></span>
     }
     <span class="min-w-0 flex-1 truncate leading-snug">{{ banner.message }}</span>
     <button

@@ -14,15 +14,15 @@
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-    <div class="rounded-lg border border-subtle bg-surface p-3 shadow-sm">
+    <div class="rounded-xl border border-subtle bg-surface p-3 shadow-sm">
       <p class="text-[11px] uppercase tracking-wide text-muted">Open</p>
       <p class="mt-1 text-xl font-semibold text-default">{{ counts().open }}</p>
     </div>
-    <div class="rounded-lg border border-subtle bg-surface p-3 shadow-sm">
+    <div class="rounded-xl border border-subtle bg-surface p-3 shadow-sm">
       <p class="text-[11px] uppercase tracking-wide text-muted">Completed</p>
       <p class="mt-1 text-xl font-semibold text-emerald-400">{{ counts().done }}</p>
     </div>
-    <div class="rounded-lg border border-subtle bg-surface p-3 shadow-sm">
+    <div class="rounded-xl border border-subtle bg-surface p-3 shadow-sm">
       <p class="text-[11px] uppercase tracking-wide text-muted">Total</p>
       <p class="mt-1 text-xl font-semibold text-default">{{ counts().total }}</p>
     </div>
@@ -45,7 +45,7 @@
       No field visits yet. Schedule one from the Field Operations page.
     </p>
   } @else {
-    <div class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
+    <div class="overflow-x-auto rounded-xl border border-subtle bg-surface shadow-sm">
       <table class="min-w-full divide-y divide-subtle text-sm">
         <thead class="bg-surface-2 text-[11px] uppercase tracking-wide text-muted">
           <tr>

@@ -106,7 +106,7 @@ import { SeatPreview } from '../../types/subscription.types';
             }
 
             <!-- Preview box -->
-            <div class="mt-5 rounded-lg border border-subtle bg-surface-2 px-4 py-3 text-sm">
+            <div class="mt-5 rounded-xl border border-subtle bg-surface-2 px-4 py-3 text-sm">
               @if (previewLoading()) {
                 <div class="h-12 animate-pulse rounded bg-surface-2"></div>
               } @else if (preview(); as p) {

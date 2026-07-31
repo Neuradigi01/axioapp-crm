@@ -70,6 +70,10 @@ export class ThemeService {
     // Both `aixo-tokens.scss` and the legacy `light.scss` / `dark.scss`
     // (loaded together into styles.scss) key off this attribute.
     document.documentElement.setAttribute('data-theme', theme);
+    // Also hint the browser's native chrome (scrollbars, autofill,
+    // native dropdowns/date-pickers) so they don't look mismatched
+    // against dark surface tokens.
+    document.documentElement.style.colorScheme = theme;
   }
 
   private getSystemPreference(): Theme {

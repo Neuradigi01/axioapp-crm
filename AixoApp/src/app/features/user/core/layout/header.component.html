@@ -1,5 +1,5 @@
 <header
-  class="sticky top-0 z-10 flex h-[52px] items-center gap-3 border-b border-subtle bg-surface px-4"
+  class="sticky top-0 z-10 flex h-[56px] shrink-0 items-center gap-3 border-b border-subtle bg-surface px-4"
 >
   <!-- Mobile: open sidebar drawer -->
   <button
@@ -11,27 +11,38 @@
     <lucide-icon name="menu" class="h-4 w-4" />
   </button>
 
-  <!-- Center: Cmd+K search trigger pill (desktop) -->
+  <!-- Left: Cmd+K search trigger pill (AIXO layout — left, 34px, 340px max) -->
   <button
     type="button"
-    class="hidden h-8 max-w-[480px] flex-1 items-center gap-2 rounded-lg border border-subtle bg-app px-3 text-left text-sm text-faint transition hover:border-muted hover:text-muted md:mx-auto md:flex"
+    class="hidden h-[34px] max-w-[340px] min-w-[220px] flex-1 items-center gap-2 rounded-[9px] border border-subtle bg-app px-3 text-left text-[13px] text-faint transition hover:border-muted hover:text-muted md:flex"
     (click)="openPalette.emit()"
     aria-label="Open command palette"
   >
     <lucide-icon name="search" class="h-3.5 w-3.5 shrink-0" />
     <span class="flex-1 truncate">Search or jump to…</span>
     <kbd
-      class="ml-auto hidden font-mono text-[10.5px] uppercase tracking-wider text-faint md:inline"
+      class="ml-auto hidden rounded border border-subtle bg-surface-2 px-1.5 py-0.5 font-mono text-[10.5px] uppercase tracking-wider text-faint md:inline"
     >
       ⌘K
     </kbd>
   </button>
 
-  <!-- Right cluster -->
+  <!-- Right cluster (AIXO layout — 34px controls, radius 9px) -->
   <div class="ml-auto flex items-center gap-2">
-    <!-- Theme toggle (Step 2) -->
+    <!-- Primary "+ New" CTA (matches AIXO) -->
+    <button
+      type="button"
+      (click)="onNew()"
+      class="inline-flex h-[34px] items-center gap-1.5 rounded-[9px] bg-accent px-3.5 text-[13px] font-semibold text-white transition hover:brightness-110"
+      aria-label="Create new"
+    >
+      <lucide-icon name="plus" class="h-4 w-4" />
+      <span class="hidden sm:inline">New</span>
+    </button>
+
+    <!-- Theme toggle (3-way segmented, 34px tall to match AIXO controls) -->
     <div
-      class="inline-flex items-center rounded-lg border border-subtle bg-app p-0.5"
+      class="hidden h-[34px] items-center rounded-[9px] border border-subtle bg-app px-1 sm:inline-flex"
       role="radiogroup"
       aria-label="Theme"
     >
@@ -39,10 +50,9 @@
         type="button"
         role="radio"
         [attr.aria-checked]="themeChoice() === 'light'"
-        class="inline-flex h-6 w-6 items-center justify-center rounded transition"
+        class="inline-flex h-7 w-7 items-center justify-center rounded-md transition"
         [class.bg-surface]="themeChoice() === 'light'"
         [class.text-default]="themeChoice() === 'light'"
-        [class.shadow-sm]="themeChoice() === 'light'"
         [class.text-muted]="themeChoice() !== 'light'"
         [class.hover:text-default]="themeChoice() !== 'light'"
         (click)="pickTheme('light')"
@@ -54,10 +64,9 @@
         type="button"
         role="radio"
         [attr.aria-checked]="themeChoice() === 'dark'"
-        class="inline-flex h-6 w-6 items-center justify-center rounded transition"
+        class="inline-flex h-7 w-7 items-center justify-center rounded-md transition"
         [class.bg-surface]="themeChoice() === 'dark'"
         [class.text-default]="themeChoice() === 'dark'"
-        [class.shadow-sm]="themeChoice() === 'dark'"
         [class.text-muted]="themeChoice() !== 'dark'"
         [class.hover:text-default]="themeChoice() !== 'dark'"
         (click)="pickTheme('dark')"
@@ -69,10 +78,9 @@
         type="button"
         role="radio"
         [attr.aria-checked]="themeChoice() === 'system'"
-        class="inline-flex h-6 w-6 items-center justify-center rounded transition"
+        class="inline-flex h-7 w-7 items-center justify-center rounded-md transition"
         [class.bg-surface]="themeChoice() === 'system'"
         [class.text-default]="themeChoice() === 'system'"
-        [class.shadow-sm]="themeChoice() === 'system'"
         [class.text-muted]="themeChoice() !== 'system'"
         [class.hover:text-default]="themeChoice() !== 'system'"
         (click)="pickTheme('system')"
@@ -82,11 +90,11 @@
       </button>
     </div>
 
-    <!-- My tasks -->
+    <!-- My tasks (34px bordered icon button to match AIXO controls) -->
     <div class="relative">
       <button
         type="button"
-        class="relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-default"
+        class="relative inline-flex h-[34px] w-[34px] items-center justify-center rounded-[9px] border border-subtle bg-app text-muted transition hover:bg-surface-2 hover:text-default"
         aria-label="My tasks"
         [attr.aria-expanded]="tasksOpen()"
         (click)="toggleTasks()"
@@ -96,11 +104,11 @@
       <app-my-tasks-popover [open]="tasksOpen()" />
     </div>
 
-    <!-- Notifications -->
+    <!-- Notifications (34px bordered icon button) -->
     <div class="relative">
       <button
         type="button"
-        class="relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-default"
+        class="relative inline-flex h-[34px] w-[34px] items-center justify-center rounded-[9px] border border-subtle bg-app text-muted transition hover:bg-surface-2 hover:text-default"
         aria-label="Notifications"
         [attr.aria-expanded]="notificationsOpen()"
         (click)="toggleNotifications()"
@@ -108,7 +116,7 @@
         <lucide-icon name="bell" class="h-4 w-4" />
         @if (unreadCount() > 0) {
           <span
-            class="absolute right-0 top-0 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 font-mono text-[10px] font-medium text-white"
+            class="absolute right-0.5 top-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 font-mono text-[10px] font-medium text-white"
           >
             {{ unreadCount() > 99 ? '99+' : unreadCount() }}
           </span>
@@ -120,11 +128,11 @@
       />
     </div>
 
-    <!-- Avatar / user menu -->
+    <!-- Avatar (AIXO: accent-soft bg, accent text, 34x34, radius 9px) -->
     <div class="relative">
       <button
         type="button"
-        class="inline-flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-subtle bg-accent-soft font-display text-sm font-semibold text-accent transition hover:brightness-105"
+        class="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[9px] bg-accent-soft font-display text-[13px] font-semibold text-accent transition hover:brightness-110"
         (click)="toggleUserMenu()"
         [attr.aria-expanded]="userMenuOpen()"
         aria-label="Account"

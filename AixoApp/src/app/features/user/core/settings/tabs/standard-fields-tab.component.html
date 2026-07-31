@@ -22,7 +22,7 @@
         <label class="block text-xs font-medium text-default" for="sft_entity">Entity</label>
         <select
           id="sft_entity"
-          class="mt-1 rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="mt-1 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           [value]="entity()"
           (change)="onEntityChange($event)"
         >
@@ -126,7 +126,7 @@
                   <div class="flex items-center justify-end gap-2">
                     <button
                       type="button"
-                      class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
+                      class="rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
                       (click)="openEdit(f)"
                     >
                       Edit
@@ -136,7 +136,7 @@
                         type="button"
                         [disabled]="resettingKey() === f.field_key"
                         (click)="resetRow(f)"
-                        class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                        class="rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
                       >
                         {{ resettingKey() === f.field_key ? 'Resetting…' : 'Reset' }}
                       </button>

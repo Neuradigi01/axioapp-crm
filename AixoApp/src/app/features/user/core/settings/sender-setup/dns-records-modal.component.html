@@ -37,7 +37,7 @@
 
     <div class="max-h-[60vh] space-y-4 overflow-y-auto p-4 md:p-6">
       @for (record of records(); track record.purpose) {
-        <section class="rounded-lg border border-subtle bg-surface-2 p-4">
+        <section class="rounded-xl border border-subtle bg-surface-2 p-4">
           <div class="flex items-center justify-between gap-2">
             <div>
               <span
@@ -49,7 +49,7 @@
             </div>
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
+              class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
               (click)="copy(record)"
             >
               @if (copiedPurpose() === record.purpose) {

@@ -14,8 +14,10 @@ import { Router, RouterLink } from '@angular/router';
 
 import { environment } from '../../../../../environments/environment';
 import { extractApiError } from '@core/services/api-error.util';
+import { FurnitureAuthService } from '../auth/auth.service';
 import { DashboardDateRangeComponent } from './shared/dashboard-date-range.component';
 import { DashboardKpiTileComponent } from './shared/dashboard-kpi-tile.component';
+import { DealPipelineStripComponent } from './widgets/deal-pipeline-strip.component';
 import { FunnelChartComponent } from './widgets/funnel-chart.component';
 import { QuickActionsComponent } from './widgets/quick-actions.component';
 import { TodaysFollowupsComponent } from './widgets/todays-followups.component';
@@ -88,6 +90,7 @@ interface DashboardSummary {
     DecimalPipe,
     DashboardDateRangeComponent,
     DashboardKpiTileComponent,
+    DealPipelineStripComponent,
     QuickActionsComponent,
     WhatsAppHealthWidgetComponent,
     TrendChartComponent,
@@ -100,6 +103,7 @@ export class DashboardPageComponent {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(FurnitureAuthService);
 
   /** Handle on the follow-ups widget so KPI-card clicks can drive
    *  its bucket filter without going through router state. */
@@ -167,6 +171,33 @@ export class DashboardPageComponent {
     if (!s) return [];
     const keys = this.HERO_KEYS[s.scope] ?? [];
     return keys.map((k) => s.cards.find((c) => c.key === k)).filter((c): c is DashboardCard => !!c);
+  });
+
+  /** Time-of-day greeting word to match AIXO's "Good afternoon, X". */
+  protected readonly timeOfDayGreeting = computed<string>(() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 18) return 'Good afternoon';
+    return 'Good evening';
+  });
+
+  /** Pack/template slug → display name for the AIXO subline "Here's
+   *  what's moving in your X workspace." Falls back to the raw slug
+   *  title-cased if unknown so a new pack still renders sensibly. */
+  private readonly TEMPLATE_LABELS: Record<string, string> = {
+    base: 'CRM',
+    real_estate: 'Real Estate',
+    furniture: 'Furniture',
+    clinic: 'Clinic',
+    salon: 'Salon',
+    services: 'Services',
+  };
+
+  protected readonly workspaceLabel = computed<string>(() => {
+    const tid = this.auth.currentOrg()?.template_id;
+    if (!tid) return 'CRM';
+    if (tid in this.TEMPLATE_LABELS) return this.TEMPLATE_LABELS[tid];
+    return tid.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   });
 
   protected readonly secondaryCards = computed<DashboardCard[]>(() => {

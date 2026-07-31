@@ -9,7 +9,7 @@
         type="search"
         [formControl]="searchControl"
         placeholder="Search by name or phone"
-        class="block w-full rounded-md border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="block w-full rounded-lg border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       />
     </div>
     <span class="text-xs text-muted">
@@ -27,13 +27,13 @@
 
   @if (loading()) {
     <div
-      class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+      class="rounded-xl border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
     >
       Loading…
     </div>
   } @else if (items().length === 0) {
     <div
-      class="rounded-lg border border-dashed border-subtle bg-surface p-12 text-center text-sm text-muted"
+      class="rounded-lg border border-dashed border-subtle bg-surface p-6 md:p-12 text-center text-sm text-muted"
     >
       No contacts with phone numbers to call.
     </div>
@@ -41,7 +41,7 @@
     <ul class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
       @for (c of items(); track c.id) {
         <li
-          class="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface p-3 shadow-sm"
+          class="flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface p-3 shadow-sm"
         >
           <div class="flex min-w-0 items-center gap-3">
             <span

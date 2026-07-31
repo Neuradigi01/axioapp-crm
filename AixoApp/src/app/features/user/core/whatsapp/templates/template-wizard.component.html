@@ -24,7 +24,7 @@
       }
     </ol>
 
-    <div class="flex-1 overflow-y-auto rounded-lg border border-subtle bg-surface p-4">
+    <div class="flex-1 overflow-y-auto rounded-xl border border-subtle bg-surface p-4">
       @switch (step()) {
         <!-- 1. Basics -->
         @case (1) {
@@ -395,7 +395,7 @@
       <button
         type="button"
         (click)="onCancel()"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
       >
         Cancel
       </button>
@@ -404,7 +404,7 @@
           <button
             type="button"
             (click)="goPrev()"
-            class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+            class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
           >
             Back
           </button>

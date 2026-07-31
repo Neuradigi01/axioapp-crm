@@ -1,13 +1,13 @@
 @if (sortedRows().length === 0) {
   <div
-    class="rounded-lg border border-dashed border-subtle bg-surface p-12 text-center text-sm text-muted"
+    class="rounded-lg border border-dashed border-subtle bg-surface p-6 md:p-12 text-center text-sm text-muted"
   >
     No staff members yet.
   </div>
 } @else {
   <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
     @for (row of sortedRows(); track row.staff.id) {
-      <div class="rounded-lg border border-subtle bg-surface p-4 shadow-sm">
+      <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
         <div class="flex items-start justify-between">
           <div class="flex items-center gap-3">
             <div

@@ -14,6 +14,7 @@ export interface ModuleDescriptorOut {
   permissions: string[];
   menu_position: number;
   parent: string | null;
+  section: string | null;
 }
 
 @Injectable({ providedIn: 'root' })

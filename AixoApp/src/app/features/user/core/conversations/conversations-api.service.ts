@@ -239,6 +239,23 @@ export class ConversationsApiService {
     return this.http.post<ConversationMessage>(`${this.base}/${id}/messages`, body);
   }
 
+  /** Reply to an email conversation from the unified inbox. Routes to
+   *  the typed email endpoint (the generic `/messages` guard rejects
+   *  email because it needs subject + sender-account). Body-only send
+   *  works — the backend auto-derives subject (`Re: (no subject)`),
+   *  picks the sender's first live connected mailbox, and threads the
+   *  reply to the newest inbound message. */
+  sendEmailReply(
+    id: string,
+    body: { bodyText: string; bodyHtml?: string; subject?: string; accountId?: string },
+  ): Observable<ConversationMessage> {
+    const payload: Record<string, unknown> = { body_text: body.bodyText };
+    if (body.bodyHtml) payload['body_html'] = body.bodyHtml;
+    if (body.subject) payload['subject'] = body.subject;
+    if (body.accountId) payload['account_id'] = body.accountId;
+    return this.http.post<ConversationMessage>(`${this.base}/${id}/email-reply`, payload);
+  }
+
   /**
    * Add / replace / remove a reaction on a message
    * (whatsapp-platform-upgrade Step 7). Pass `null` or `''` as

@@ -10,6 +10,11 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
+import { LucideAngularModule } from 'lucide-angular';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+
+import { ContactsApiService } from '../contacts/contacts-api.service';
 
 import {
   Conversation,
@@ -62,13 +67,16 @@ import { extractApiError } from '@core/services/api-error.util';
     ComposeBarComponent,
     InteractiveBuilderComponent,
     ReassignModalComponent,
+    LucideAngularModule,
   ],
   templateUrl: './conversations.page.html',
+  host: { class: 'flex min-h-0 flex-1 flex-col' },
 })
 export class ConversationsPageComponent {
   private readonly api = inject(ConversationsApiService);
   private readonly notifications = inject(NotificationsApiService);
   private readonly staffApi = inject(StaffApiService);
+  private readonly contactsApi = inject(ContactsApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -97,11 +105,28 @@ export class ConversationsPageComponent {
 
   protected readonly filters = signal<ConversationListQuery>({});
 
+  /** Status filter — lives in the page header (next to Refresh) so the
+   * list panel keeps its full height for messages. Default is "all
+   * statuses" so first-load matches previous behaviour. */
+  protected readonly statusFilter = signal<ConversationStatus | ''>('');
+  protected readonly statusOptions: Array<{ value: ConversationStatus | ''; label: string }> = [
+    { value: '', label: 'All statuses' },
+    { value: 'open', label: 'Open' },
+    { value: 'snoozed', label: 'Snoozed' },
+    { value: 'closed', label: 'Closed' },
+  ];
+
   /** Staff list indexed by user id — resolves `assigned_to_id` and
    * `sender_user_id` to display names. Loaded once at page construct
    * via `GET /api/v1/staff`; the list is small (org-wide staff) and
    * rarely changes within a session. */
   protected readonly staffById = signal<Map<string, StaffListItem>>(new Map());
+
+  /** Contact-name lookup for the list rows — resolves each row's
+   *  `contact_id` to a display name so the list shows "Ananya Rao"
+   *  instead of the raw phone/email `external_id`. Hydrated lazily
+   *  after each `reloadList()`; already-fetched ids are skipped. */
+  protected readonly contactsById = signal<Record<string, { id: string; full_name: string }>>({});
 
   /** Step 13 — flat staff array for the @-mention picker in the
    *  composer. Derived from `staffById` (single source of truth). */
@@ -177,9 +202,26 @@ export class ConversationsPageComponent {
   }
 
   protected onFiltersChange(next: ConversationListQuery): void {
-    // Preserve assigned_to across channel/status/q updates.
-    const assigned_to = this.filters().assigned_to;
-    this.filters.set({ ...next, ...(assigned_to ? { assigned_to } : {}) });
+    // Preserve assigned_to + status across channel/q updates — the list
+    // child owns channel + search, the page header owns status, so
+    // neither should clobber the other.
+    const { assigned_to, status } = this.filters();
+    this.filters.set({
+      ...next,
+      ...(assigned_to ? { assigned_to } : {}),
+      ...(status ? { status } : {}),
+    });
+    this.reloadList();
+  }
+
+  /** Page-header status filter — patches the list query and reloads. */
+  protected onStatusFilterChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as ConversationStatus | '';
+    this.statusFilter.set(value);
+    this.filters.update((prev) => {
+      const { status: _omit, ...rest } = prev;
+      return value ? { ...rest, status: value } : rest;
+    });
     this.reloadList();
   }
 
@@ -274,6 +316,14 @@ export class ConversationsPageComponent {
     this.loadDetail(id);
   }
 
+  /** Mobile back button — clears the selection so the list pane
+   *  re-appears full-width on <md screens. Desktop keeps both panes
+   *  visible so the button is hidden there. */
+  protected deselect(): void {
+    this.selectedId.set(null);
+    this.replyingTo.set(null);
+  }
+
   protected onSendText(text: string): void {
     const id = this.selectedId();
     if (!id || !text.trim()) return;
@@ -311,35 +361,42 @@ export class ConversationsPageComponent {
     // resolves the adapter against the chosen phone.
     const sendFromPhoneId = this.composeBar?.currentSendFromPhoneId() ?? null;
 
-    this.api
-      .send(id, text, replyTarget?.id ?? null, sendFromPhoneId)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (real) => {
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.map((m) => (m.id === optimistic.id ? real : m)),
-                }
-              : d,
-          );
-          this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
-        },
-        error: (err: HttpErrorResponse) => {
-          // Roll the optimistic row back; show the error inline on the
-          // thread so the user notices.
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.filter((m) => m.id !== optimistic.id),
-                }
-              : d,
-          );
-          this.loadError.set(extractApiError(err) ?? 'Could not send message.');
-        },
-      });
+    // Route by channel: email goes to the typed email-reply endpoint
+    // (subject + connected-mailbox account); everything else uses the
+    // generic /messages send. The email path ignores reply-target /
+    // send-from-phone — those are WhatsApp / SMS concerns.
+    const conv = this.selectedConversation();
+    const sendCall =
+      conv?.channel === 'email'
+        ? this.api.sendEmailReply(id, { bodyText: text })
+        : this.api.send(id, text, replyTarget?.id ?? null, sendFromPhoneId);
+
+    sendCall.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (real) => {
+        this.detail.update((d) =>
+          d
+            ? {
+                ...d,
+                messages: d.messages.map((m) => (m.id === optimistic.id ? real : m)),
+              }
+            : d,
+        );
+        this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
+      },
+      error: (err: HttpErrorResponse) => {
+        // Roll the optimistic row back; show the error inline on the
+        // thread so the user notices.
+        this.detail.update((d) =>
+          d
+            ? {
+                ...d,
+                messages: d.messages.filter((m) => m.id !== optimistic.id),
+              }
+            : d,
+        );
+        this.loadError.set(extractApiError(err) ?? 'Could not send message.');
+      },
+    });
   }
 
   // --- Internal note (Step 13) ---------------------------------------
@@ -746,12 +803,38 @@ export class ConversationsPageComponent {
         next: (resp) => {
           this.items.set(resp.items);
           this.loading.set(false);
+          this.hydrateContacts(resp.items);
         },
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load conversations.');
         },
+      });
+  }
+
+  /** Fetch contact rows for any `contact_id` we haven't seen yet, so
+   *  the list can show the person's name instead of the raw
+   *  `external_id`. Individual failures are swallowed — a missing
+   *  contact just falls back to the external id in the template. */
+  private hydrateContacts(rows: Conversation[]): void {
+    const ids = new Set<string>();
+    for (const r of rows) {
+      if (r.contact_id) ids.add(r.contact_id);
+    }
+    const cache = this.contactsById();
+    const missing = [...ids].filter((id) => !cache[id]);
+    if (missing.length === 0) return;
+    forkJoin(missing.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((results) => {
+        this.contactsById.update((current) => {
+          const next = { ...current };
+          for (const c of results) {
+            if (c) next[c.id] = { id: c.id, full_name: c.full_name };
+          }
+          return next;
+        });
       });
   }
 

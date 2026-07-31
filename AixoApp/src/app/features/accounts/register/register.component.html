@@ -16,7 +16,7 @@
           type="text"
           formControlName="first_name"
           autocomplete="given-name"
-          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="input"
         />
         @if (
           registerForm.controls['first_name'].invalid &&
@@ -37,7 +37,7 @@
           type="text"
           formControlName="last_name"
           autocomplete="family-name"
-          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="input"
         />
         @if (
           registerForm.controls['last_name'].invalid &&
@@ -102,7 +102,7 @@
           type="text"
           formControlName="email_otp_code"
           autocomplete="one-time-code"
-          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="input"
         />
       </div>
     }
@@ -148,7 +148,7 @@
           type="text"
           formControlName="mobile_otp_code"
           autocomplete="one-time-code"
-          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="input"
         />
       </div>
     }
@@ -161,7 +161,7 @@
           id="country_id"
           formControlName="country_id"
           (change)="onCountryChange()"
-          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="input"
         >
           <option [ngValue]="null">-- Select --</option>
           @for (country of countries(); track country.id) {
@@ -171,11 +171,7 @@
       </div>
       <div>
         <label for="state_id" class="mb-1 block text-sm font-medium text-default">State</label>
-        <select
-          id="state_id"
-          formControlName="state_id"
-          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-faint"
-        >
+        <select id="state_id" formControlName="state_id" class="input">
           <option [ngValue]="null">{{ statesLoading() ? 'Loading…' : '-- Select --' }}</option>
           @for (state of states(); track state.id) {
             <option [ngValue]="state.id">{{ state.name }}</option>
@@ -193,7 +189,7 @@
           formControlName="password"
           [type]="pwToggle.type()"
           autocomplete="new-password"
-          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 pr-10 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="input pr-10"
         />
         <button
           type="button"
@@ -225,7 +221,7 @@
           formControlName="confirm_password"
           [type]="cpToggle.type()"
           autocomplete="new-password"
-          class="w-full rounded-md border border-subtle bg-surface px-3 py-2 pr-10 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="input pr-10"
         />
         <button
           type="button"
@@ -255,12 +251,7 @@
       <label for="referral_id" class="mb-1 block text-sm font-medium text-default"
         >Referral ID (optional)</label
       >
-      <input
-        id="referral_id"
-        type="text"
-        formControlName="referral_id"
-        class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-      />
+      <input id="referral_id" type="text" formControlName="referral_id" class="input" />
     </div>
 
     <!-- Captcha -->

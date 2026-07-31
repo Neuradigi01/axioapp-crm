@@ -13,7 +13,7 @@
       type="button"
       (click)="reload()"
       [disabled]="loading()"
-      class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+      class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
     >
       <lucide-icon name="refresh-cw" class="h-3.5 w-3.5" />
       Refresh
@@ -30,18 +30,18 @@
 
   @if (loading() && rows().length === 0) {
     <div
-      class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+      class="rounded-xl border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
     >
       Loading…
     </div>
   } @else if (rows().length === 0) {
     <div
-      class="rounded-lg border border-dashed border-subtle bg-surface p-12 text-center text-sm text-muted"
+      class="rounded-lg border border-dashed border-subtle bg-surface p-6 md:p-12 text-center text-sm text-muted"
     >
       No active teammates yet.
     </div>
   } @else {
-    <div class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
+    <div class="overflow-x-auto rounded-xl border border-subtle bg-surface shadow-sm">
       <table class="w-full text-sm">
         <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
           <tr>

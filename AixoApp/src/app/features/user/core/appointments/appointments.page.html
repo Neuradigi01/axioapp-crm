@@ -1,23 +1,26 @@
-<div class="mx-auto max-w-7xl p-4 md:p-6 space-y-5" [appUrlFilterState]="urlState">
-  <header class="flex flex-wrap items-start justify-between gap-3">
+<div class="mx-auto max-w-[1180px] space-y-5 p-4 md:p-6" [appUrlFilterState]="urlState">
+  <header class="flex flex-wrap items-end justify-between gap-3">
     <div>
-      <h1 class="text-lg font-semibold text-default">Appointments</h1>
-      <p class="mt-0.5 text-xs text-muted">
-        Showroom visits, measurements, deliveries — anything you need to be somewhere at a specific
-        time.
+      <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+        Appointments
+      </h1>
+      <p class="mt-1 text-[14px] text-muted">
+        {{ state.items().length | number }}
+        {{ state.items().length === 1 ? 'appointment' : 'appointments' }}
       </p>
     </div>
     <div class="flex items-center gap-2">
-      <!-- View toggle: List | Calendar -->
-      <div class="inline-flex overflow-hidden rounded-md ring-1 border-subtle bg-surface">
+      <!-- View toggle: List | Calendar — AIXO segmented pill -->
+      <div
+        class="inline-flex h-[34px] items-center rounded-[10px] border border-subtle bg-surface p-1"
+      >
         <button
           type="button"
           (click)="setView('list')"
-          class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition"
-          [class.bg-accent]="view() === 'list'"
-          [class.text-white]="view() === 'list'"
-          [class.text-default]="view() !== 'list'"
-          [class.hover:bg-surface-2]="view() !== 'list'"
+          class="inline-flex h-[26px] items-center gap-1 rounded-[7px] px-2.5 font-mono text-[12px] font-semibold transition"
+          [class.bg-accent-soft]="view() === 'list'"
+          [class.text-accent]="view() === 'list'"
+          [class.text-faint]="view() !== 'list'"
           aria-label="List view"
         >
           <lucide-icon name="list" class="h-3.5 w-3.5" />
@@ -26,24 +29,19 @@
         <button
           type="button"
           (click)="setView('calendar')"
-          class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition"
-          [class.bg-accent]="view() === 'calendar'"
-          [class.text-white]="view() === 'calendar'"
-          [class.text-default]="view() !== 'calendar'"
-          [class.hover:bg-surface-2]="view() !== 'calendar'"
+          class="inline-flex h-[26px] items-center gap-1 rounded-[7px] px-2.5 font-mono text-[12px] font-semibold transition"
+          [class.bg-accent-soft]="view() === 'calendar'"
+          [class.text-accent]="view() === 'calendar'"
+          [class.text-faint]="view() !== 'calendar'"
           aria-label="Calendar view"
         >
           <lucide-icon name="calendar" class="h-3.5 w-3.5" />
           Calendar
         </button>
       </div>
-      <button
-        type="button"
-        (click)="openBook()"
-        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
-      >
+      <button type="button" (click)="openBook()" class="btn btn-primary">
         <lucide-icon name="plus" class="h-4 w-4" />
-        Book Appointment
+        Book
       </button>
     </div>
   </header>
@@ -60,10 +58,10 @@
       <button
         type="button"
         (click)="setFilter(chip.id)"
-        class="rounded-full px-3 py-1 font-medium ring-1 transition"
-        [class.bg-accent]="statusFilter() === chip.id"
-        [class.text-white]="statusFilter() === chip.id"
-        [class.ring-accent]="statusFilter() === chip.id"
+        class="rounded-full border px-3 py-1 text-[12.5px] font-medium transition"
+        [class.bg-accent-soft]="statusFilter() === chip.id"
+        [class.text-accent]="statusFilter() === chip.id"
+        [class.border-transparent]="statusFilter() === chip.id"
         [class.bg-surface]="statusFilter() !== chip.id"
         [class.text-default]="statusFilter() !== chip.id"
         [class.border-subtle]="statusFilter() !== chip.id"
@@ -145,7 +143,7 @@
           <h2 class="text-sm font-semibold text-default">
             {{ selectedDayLabel() }}
           </h2>
-          <p class="mt-0.5 text-xs text-muted">
+          <p class="mt-1 text-[14px] text-muted">
             {{ daysAppointments().length }} appointment{{
               daysAppointments().length === 1 ? '' : 's'
             }}
@@ -173,7 +171,7 @@
                     <p class="text-sm font-medium" [class]="palette.text">
                       {{ a.title }}
                     </p>
-                    <p class="text-xs text-muted">
+                    <p class="mt-1 text-[14px] text-muted">
                       {{ formatTime(a.scheduled_at) }} · {{ a.duration_min }} min
                     </p>
                   </div>
@@ -202,12 +200,14 @@
       </aside>
     </div>
   } @else {
-    <!-- List view -->
-    <section class="overflow-hidden rounded-lg bg-surface shadow-sm ring-1 border-subtle">
+    <!-- List view — AIXO row layout: time + colored bar + title/customer + status pill.
+         Owner + last activity + actions collapse to the right side as compact chips
+         so no data or interaction from the old table is lost. -->
+    <section class="rounded-xl border border-subtle bg-surface">
       @if (state.loading() && state.items().length === 0) {
         <div class="divide-y divide-subtle">
           @for (i of [0, 1, 2, 3, 4]; track i) {
-            <div class="flex items-center gap-4 px-4 md:px-6 py-4">
+            <div class="flex items-center gap-4 px-4 py-4 md:px-6">
               <div class="h-9 w-9 animate-pulse rounded-full bg-surface-2"></div>
               <div class="flex-1">
                 <div class="h-3 w-40 animate-pulse rounded bg-surface-2"></div>
@@ -217,161 +217,126 @@
           }
         </div>
       } @else if (state.items().length === 0) {
-        <div class="px-4 md:px-6 py-10 text-center text-sm text-muted">
+        <div class="px-4 py-10 text-center text-sm text-muted md:px-6">
           No appointments match the current filters.
           <span class="block text-xs text-faint">Try "All" status + "All" scope.</span>
         </div>
       } @else {
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-subtle">
-            <thead class="bg-surface-2">
-              <tr>
-                <th class="w-10 px-3 py-2.5"></th>
-                <th
-                  class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted"
-                >
-                  Customer
-                </th>
-                <th
-                  class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted"
-                >
-                  Title
-                </th>
-                <th
-                  class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted"
-                >
-                  Scheduled
-                </th>
-                <th
-                  class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted"
-                >
-                  Status
-                </th>
-                <th
-                  class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted"
-                >
-                  Owner
-                </th>
-                <th
-                  class="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-muted"
-                >
-                  Last activity
-                </th>
-                <th
-                  class="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-muted"
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-subtle bg-surface">
-              @for (a of state.items(); track a.id) {
-                @let palette = ownerPalette(a.assigned_to_id);
-                <tr class="hover:bg-surface-2" [class.bg-surface-2]="isSelected(a.id)">
-                  <td class="w-10 px-3 py-3" (click)="$event.stopPropagation()">
-                    <input
-                      type="checkbox"
-                      class="h-4 w-4 cursor-pointer rounded border-subtle text-default focus:ring-accent"
-                      [checked]="isSelected(a.id)"
-                      (click)="toggleRow(a.id, $event)"
-                      [attr.aria-label]="'Select appointment ' + a.title"
-                    />
-                  </td>
-                  <td class="px-4 py-3 text-sm">
-                    <div class="flex items-start gap-2.5">
-                      <span
-                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-default"
-                      >
-                        {{ initials(contactName(a.contact_id)) }}
-                      </span>
-                      <div class="min-w-0">
-                        <div class="truncate text-sm font-medium text-default">
-                          {{ contactName(a.contact_id) }}
-                        </div>
-                        <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-                          @if (contactPhone(a.contact_id); as phone) {
-                            <a
-                              [appPhoneLink]="phone"
-                              class="text-default hover:text-default hover:underline"
-                              (click)="$event.stopPropagation()"
-                            >
-                              {{ phone }}
-                            </a>
-                            <a
-                              [appWhatsappLink]="phone"
-                              class="text-emerald-600 hover:text-emerald-400"
-                              (click)="$event.stopPropagation()"
-                            >
-                              <lucide-icon name="message-circle" class="h-3 w-3" />
-                            </a>
-                          }
-                          @if (contactEmail(a.contact_id); as email) {
-                            <a
-                              [appMailLink]="email"
-                              class="text-default hover:text-default hover:underline"
-                              (click)="$event.stopPropagation()"
-                            >
-                              <lucide-icon name="mail" class="h-3 w-3" />
-                            </a>
-                          }
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="px-4 py-3 text-sm text-default">
-                    <span class="block max-w-xs truncate">{{ a.title }}</span>
-                    @if (a.purpose) {
-                      <span
-                        class="mt-0.5 inline-flex items-center rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-muted ring-1 border-subtle"
-                      >
-                        {{ a.purpose }}
-                      </span>
-                    }
-                  </td>
-                  <td class="whitespace-nowrap px-4 py-3 text-sm text-muted">
-                    {{ formatDateTime(a.scheduled_at) }}
-                    <span class="block text-[10px] text-faint">{{ a.duration_min }} min</span>
-                  </td>
-                  <td class="px-4 py-3 text-sm">
+        <ul class="divide-y divide-subtle">
+          @for (a of state.items(); track a.id) {
+            @let palette = ownerPalette(a.assigned_to_id);
+            <li
+              class="group flex items-center gap-4 px-4 py-3.5 transition hover:bg-surface-2 md:px-5"
+              [class.bg-surface-2]="isSelected(a.id)"
+            >
+              <!-- Checkbox (only visible on hover / when any row selected) -->
+              <input
+                type="checkbox"
+                class="h-4 w-4 shrink-0 cursor-pointer rounded border-subtle text-default focus:ring-accent"
+                [class.invisible]="!isSelected(a.id) && state.selectedCount() === 0"
+                [class.group-hover:visible]="!isSelected(a.id)"
+                [checked]="isSelected(a.id)"
+                (click)="toggleRow(a.id, $event)"
+                [attr.aria-label]="'Select appointment ' + a.title"
+              />
+
+              <!-- Time (mono) — 60px column -->
+              <div
+                class="w-[60px] shrink-0 text-right font-mono text-[13px] leading-tight tabular-nums text-muted"
+              >
+                {{ formatTime(a.scheduled_at) }}
+                <div class="text-[10px] text-faint">{{ a.duration_min }}m</div>
+              </div>
+
+              <!-- Colored status bar (AIXO signature) — one solid hue per
+                   appointment status so the row's outcome reads at a glance. -->
+              <span
+                class="h-[38px] w-[3px] shrink-0 rounded-[2px]"
+                [class]="statusBarClass(a.status)"
+                [title]="'Status: ' + a.status"
+                aria-hidden="true"
+              ></span>
+
+              <!-- Title + customer + optional purpose chip -->
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <p class="truncate text-[14px] font-semibold text-default">{{ a.title }}</p>
+                  @if (a.purpose) {
                     <span
-                      class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1"
-                      [class]="statusClass(a.status)"
+                      class="inline-flex shrink-0 items-center rounded-full border border-subtle bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-muted"
                     >
-                      {{ a.status }}
+                      {{ a.purpose }}
                     </span>
-                  </td>
-                  <td class="whitespace-nowrap px-4 py-3 text-sm">
-                    <span
-                      class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1"
-                      [class]="palette.bg + ' ' + palette.text + ' ' + palette.ring"
+                  }
+                </div>
+                <div class="mt-0.5 flex items-center gap-2 text-[12.5px] text-muted">
+                  <span class="truncate">{{ contactName(a.contact_id) }}</span>
+                  @if (contactPhone(a.contact_id); as phone) {
+                    <a
+                      [appPhoneLink]="phone"
+                      class="text-faint hover:text-default"
+                      (click)="$event.stopPropagation()"
+                      title="Call"
                     >
-                      <lucide-icon name="circle-dot" class="h-3 w-3" />
-                      {{ ownerLabel(a.assigned_to_id) }}
-                    </span>
-                  </td>
-                  <td
-                    class="whitespace-nowrap px-4 py-3 text-right text-sm text-muted tabular-nums"
-                  >
-                    {{ a.last_activity_at | relativeTime }}
-                  </td>
-                  <td
-                    class="whitespace-nowrap px-4 py-3 text-right text-sm"
-                    (click)="$event.stopPropagation()"
-                  >
-                    <button
-                      type="button"
-                      (click)="openPopover(a)"
-                      class="rounded-md border border-subtle bg-surface px-2 py-1 text-[11px] font-medium text-default hover:bg-surface-2"
-                      title="Actions"
+                      <lucide-icon name="phone" class="h-3 w-3" />
+                    </a>
+                    <a
+                      [appWhatsappLink]="phone"
+                      class="text-emerald-500 hover:text-emerald-400"
+                      (click)="$event.stopPropagation()"
+                      title="WhatsApp"
                     >
-                      <lucide-icon name="more-vertical" class="h-3.5 w-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
+                      <lucide-icon name="message-circle" class="h-3 w-3" />
+                    </a>
+                  }
+                  @if (contactEmail(a.contact_id); as email) {
+                    <a
+                      [appMailLink]="email"
+                      class="text-faint hover:text-default"
+                      (click)="$event.stopPropagation()"
+                      title="Email"
+                    >
+                      <lucide-icon name="mail" class="h-3 w-3" />
+                    </a>
+                  }
+                </div>
+              </div>
+
+              <!-- Right cluster: status pill + owner chip + last-activity + actions -->
+              <div class="flex shrink-0 items-center gap-3" (click)="$event.stopPropagation()">
+                <span
+                  class="hidden whitespace-nowrap font-mono text-[11px] text-faint tabular-nums lg:inline"
+                  [title]="a.last_activity_at ? 'Last activity' : ''"
+                >
+                  {{ a.last_activity_at | relativeTime }}
+                </span>
+                <span
+                  class="hidden items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 md:inline-flex"
+                  [class]="palette.bg + ' ' + palette.text + ' ' + palette.ring"
+                  [title]="'Owner: ' + ownerLabel(a.assigned_to_id)"
+                >
+                  <lucide-icon name="circle-dot" class="h-3 w-3" />
+                  {{ ownerLabel(a.assigned_to_id) }}
+                </span>
+                <span
+                  class="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ring-1"
+                  [class]="statusClass(a.status)"
+                >
+                  {{ a.status }}
+                </span>
+                <button
+                  type="button"
+                  (click)="openPopover(a)"
+                  class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-subtle bg-surface text-muted transition hover:bg-surface-2 hover:text-default"
+                  title="Actions"
+                  [attr.aria-label]="'Actions for ' + a.title"
+                >
+                  <lucide-icon name="more-vertical" class="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </li>
+          }
+        </ul>
       }
     </section>
   }
@@ -470,6 +435,7 @@
     (reassign)="onPopoverReassign()"
     (reschedule)="onPopoverReschedule()"
     (markCompleted)="onPopoverMarkCompleted()"
+    (markNoShow)="onPopoverMarkNoShow()"
     (cancelAppt)="onPopoverCancel()"
     (dismiss)="closePopover()"
   />

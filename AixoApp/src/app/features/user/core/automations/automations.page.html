@@ -2,8 +2,12 @@
   <header class="border-b border-subtle bg-surface px-4 py-3 md:px-6 md:py-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0 flex-1">
-        <h1 class="text-xl font-semibold text-default">Automations</h1>
-        <p class="text-xs text-muted">
+        <h1
+          class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
+        >
+          Automations
+        </h1>
+        <p class="mt-1 text-[14px] text-muted">
           Single-event triggers — "when X happens, send template Y over channel Z". Two are seeded
           by default: a Welcome email on signup and a Lead Confirmation email when a lead arrives
           from any source.
@@ -11,10 +15,7 @@
       </div>
       <div class="flex items-center gap-2">
         @if (canWrite()) {
-          <a
-            routerLink="/user/automations/new"
-            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95"
-          >
+          <a routerLink="/user/automations/new" class="btn btn-primary">
             <lucide-icon name="plus" size="14" />
             New Automation
           </a>
@@ -44,14 +45,14 @@
           [value]="searchQuery()"
           (input)="onSearchInput($any($event.target).value)"
           placeholder="Search name or event…"
-          class="w-full min-w-[180px] rounded-md border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none sm:w-64"
+          class="w-full min-w-[180px] rounded-lg border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none sm:w-64"
         />
       </div>
 
       <select
         [value]="eventFilter()"
         (change)="onEventChange($any($event.target).value)"
-        class="rounded-md border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
+        class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
       >
         <option value="">All events</option>
         @for (entry of eventCatalog(); track entry.event_type) {
@@ -62,7 +63,7 @@
       <select
         [value]="channelFilter()"
         (change)="onChannelChange($any($event.target).value)"
-        class="rounded-md border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
+        class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
       >
         @for (opt of CHANNEL_OPTIONS; track opt.value) {
           <option [value]="opt.value">{{ opt.label }}</option>
@@ -72,7 +73,7 @@
       <select
         [value]="enabledFilter()"
         (change)="onEnabledChange($any($event.target).value)"
-        class="rounded-md border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
+        class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
       >
         @for (opt of ENABLED_OPTIONS; track opt.value) {
           <option [value]="opt.value">{{ opt.label }}</option>
@@ -83,7 +84,7 @@
         <button
           type="button"
           (click)="clearFilters()"
-          class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-muted hover:bg-surface-2"
+          class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs text-muted hover:bg-surface-2"
         >
           <lucide-icon name="x" size="10" />
           Clear filters
@@ -95,7 +96,7 @@
   <section class="flex-1 px-4 py-4 md:px-6">
     @if (loading() && items().length === 0) {
       <div
-        class="rounded-md border border-subtle bg-surface px-4 py-4 md:py-6 text-center text-sm text-muted"
+        class="rounded-lg border border-subtle bg-surface px-4 py-4 md:py-6 text-center text-sm text-muted"
       >
         Loading automations…
       </div>
@@ -105,13 +106,13 @@
       >
         <lucide-icon name="workflow" size="28" class="mx-auto mb-2 text-faint" />
         <p class="text-sm font-medium text-default">No automations match your filters.</p>
-        <p class="mt-1 text-xs text-muted">
+        <p class="mt-1 text-[14px] text-muted">
           The Welcome and Lead Confirmation triggers are seeded by default — clear filters above to
           see them.
         </p>
       </div>
     } @else {
-      <div class="overflow-hidden rounded-md border border-subtle bg-surface">
+      <div class="overflow-x-auto rounded-xl border border-subtle bg-surface">
         <table class="min-w-full divide-y divide-subtle text-sm">
           <thead class="bg-surface-2 text-left text-xs uppercase tracking-wide text-muted">
             <tr>
@@ -201,7 +202,7 @@
               type="button"
               (click)="prevPage()"
               [disabled]="!hasPrev()"
-              class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 hover:bg-surface-2 disabled:opacity-40"
+              class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 hover:bg-surface-2 disabled:opacity-40"
             >
               <lucide-icon name="chevron-left" size="12" />
               Prev
@@ -210,7 +211,7 @@
               type="button"
               (click)="nextPage()"
               [disabled]="!hasNext()"
-              class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 hover:bg-surface-2 disabled:opacity-40"
+              class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 hover:bg-surface-2 disabled:opacity-40"
             >
               Next
               <lucide-icon name="chevron-right" size="12" />

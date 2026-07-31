@@ -6,7 +6,9 @@
         <lucide-icon name="chevron-right" class="h-3 w-3" />
         <span class="text-default">Import</span>
       </nav>
-      <h1 class="text-lg font-semibold text-default">Import leads</h1>
+      <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+        Import leads
+      </h1>
       <p class="text-sm text-muted">
         Upload a CSV or Excel export from another CRM. After upload you'll map the columns to fields
         in this CRM.
@@ -14,7 +16,7 @@
     </div>
     <a
       routerLink="/user/leads/import-history"
-      class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+      class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
     >
       <lucide-icon name="history" class="h-4 w-4" />
       View history
@@ -26,13 +28,13 @@
     <label class="mb-1 block text-xs font-medium text-default">File</label>
     @if (selectedFile(); as file) {
       <div
-        class="flex items-center justify-between rounded-md border border-subtle bg-surface px-4 py-3"
+        class="flex items-center justify-between rounded-lg border border-subtle bg-surface px-4 py-3"
       >
         <div class="flex items-center gap-3 min-w-0">
           <lucide-icon name="file-spreadsheet" class="h-5 w-5 shrink-0 text-emerald-600" />
           <div class="min-w-0">
             <p class="truncate text-sm font-medium text-default">{{ file.name }}</p>
-            <p class="text-xs text-muted">{{ fileSizeLabel() }}</p>
+            <p class="mt-1 text-[14px] text-muted">{{ fileSizeLabel() }}</p>
           </div>
         </div>
         <button
@@ -60,7 +62,7 @@
           <span class="font-medium text-indigo-600">Click to browse</span>
           or drag a file here
         </div>
-        <p class="text-xs text-muted">CSV or Excel · 10 MB max · 50,000 rows max</p>
+        <p class="mt-1 text-[14px] text-muted">CSV or Excel · 10 MB max · 50,000 rows max</p>
         <input
           id="import-file"
           type="file"
@@ -81,13 +83,13 @@
       id="import-platform"
       [value]="sourcePlatform()"
       (change)="onPlatformChange($event)"
-      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+      class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
     >
       @for (p of platforms; track p.value) {
         <option [value]="p.value">{{ p.label }}</option>
       }
     </select>
-    <p class="mt-1 text-xs text-muted">
+    <p class="mt-1 text-[14px] text-muted">
       Picks the default column mapping for the next step. You can override every column.
     </p>
   </div>
@@ -103,7 +105,7 @@
       [value]="name()"
       (input)="onNameInput($event)"
       placeholder="Auto-named from the filename if left blank"
-      class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+      class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
     />
   </div>
 
@@ -118,7 +120,7 @@
   <div class="flex items-center justify-end gap-2 border-t border-subtle pt-4">
     <a
       routerLink="/user/leads"
-      class="rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+      class="rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
     >
       Cancel
     </a>

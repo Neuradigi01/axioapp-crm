@@ -217,20 +217,41 @@ export class CatalogPageComponent {
   /** Absolute URL for the backend-served `/files/...` image path. */
   private readonly apiOrigin = deriveApiOrigin();
   protected imageHref(item: CatalogItem): string | null {
-    return item.image_url ? `${this.apiOrigin}${item.image_url}` : null;
+    if (!item.image_url) return null;
+    if (this.brokenImages().has(item.id)) return null;
+    return `${this.apiOrigin}${item.image_url}`;
+  }
+
+  /** Tracks which product ids have already emitted an ``<img error>``
+   *  event this session — those switch to the emoji tile on next
+   *  change-detection tick instead of showing the alt-text glyph
+   *  Chrome renders for a 404. Common cause is a stale ``image_url``
+   *  in the DB where the physical file was cleared (dev shell
+   *  ``docker compose down -v``, storage volume reset, orphaned upload
+   *  after a container rebuild). Cleared on the next successful
+   *  ``list()`` because the row set gets re-read from the API. */
+  private readonly brokenImages = signal<Set<string>>(new Set());
+
+  protected onImageError(itemId: string): void {
+    this.brokenImages.update((prev) => {
+      if (prev.has(itemId)) return prev;
+      const next = new Set(prev);
+      next.add(itemId);
+      return next;
+    });
   }
 
   /** Pick an emoji based on the category for the card icon. */
   protected emojiFor(category: string | null): string {
-    if (!category) return 'ðŸ“¦';
+    if (!category) return '📦';
     const c = category.toLowerCase();
-    if (c.includes('sofa') || c.includes('couch')) return 'ðŸ›‹ï¸';
-    if (c.includes('bed')) return 'ðŸ›ï¸';
-    if (c.includes('chair')) return 'ðŸª‘';
-    if (c.includes('table')) return 'ðŸªŸ';
-    if (c.includes('dining')) return 'ðŸ½ï¸';
-    if (c.includes('storage') || c.includes('shelf') || c.includes('cabinet')) return 'ðŸ—„ï¸';
-    if (c.includes('light') || c.includes('lamp')) return 'ðŸ’¡';
-    return 'ðŸ“¦';
+    if (c.includes('sofa') || c.includes('couch')) return '🛋️';
+    if (c.includes('bed')) return '🛏️';
+    if (c.includes('chair')) return '🪑';
+    if (c.includes('table')) return '🪟';
+    if (c.includes('dining')) return '🍽️';
+    if (c.includes('storage') || c.includes('shelf') || c.includes('cabinet')) return '🗄️';
+    if (c.includes('light') || c.includes('lamp')) return '💡';
+    return '📦';
   }
 }

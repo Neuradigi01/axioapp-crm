@@ -81,7 +81,7 @@
                     </td>
                     <td class="px-2 py-2 align-middle">
                       <select
-                        class="w-full rounded-md border border-subtle bg-surface px-2 py-1 text-sm"
+                        class="w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-sm"
                         [value]="mapping()[field] || IGNORE"
                         (change)="setTarget(field, $any($event.target).value)"
                       >
@@ -124,7 +124,7 @@
       <div class="flex items-center gap-2">
         <button
           type="button"
-          class="rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          class="rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
           (click)="cancel()"
         >
           Cancel
