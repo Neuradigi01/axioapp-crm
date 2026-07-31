@@ -41,9 +41,12 @@ from src.app.core.contacts import service as contacts_service
 from src.app.core.contacts.models import Contact
 from src.app.core.conversations import data_access as _da
 from src.app.core.conversations.adapters import InboundMessage
+from src.app.core.conversations.adapters.email import send_email
 from src.app.core.conversations.adapters.whatsapp import (
     resolve_whatsapp_adapter,
 )
+from src.app.core.email import service as email_service
+from src.app.core.email.models import EmailAccountSyncState
 from src.app.core.conversations.models import (
     Conversation,
     ConversationChannel,
@@ -130,6 +133,86 @@ async def list_messages(
 
 
 # --- writes ----------------------------------------------------------------
+
+
+async def send_email_reply(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    user_id: uuid.UUID,
+    body_text: str,
+    body_html: str | None = None,
+    subject: str | None = None,
+    account_id: uuid.UUID | None = None,
+) -> Message:
+    """Email-channel counterpart to `send_outbound` — routes through
+    the typed `send_email(...)` path (subject + connected-mailbox
+    account) instead of the generic ChannelAdapter `.send()` (which
+    the email adapter guards with `EmailUseSendEmailEndpoint`).
+
+    Defaults so the composer's plain body-only send Just Works:
+      * `account_id` — the sender's first `live` connected mailbox.
+        Errors 400 when the sender has none.
+      * `subject` — pulled from the last inbound message's
+        `channel_message_id` metadata if available, otherwise a
+        neutral fallback. Callers may override to change wording.
+      * threading — auto-picks the newest inbound message id as
+        `in_reply_to_message_id` so replies thread in Gmail / Outlook.
+    """
+    conv = await get_conversation(session, conversation_id)
+    if conv.channel != ConversationChannel.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This endpoint is for email conversations only.",
+        )
+    if not conv.contact_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email conversation has no linked contact — cannot reply.",
+        )
+
+    # Default account: first live mailbox connected by the sending user.
+    if account_id is None:
+        accounts = await email_service.list_accounts(session, user_id=user_id)
+        live = [a for a in accounts if a.sync_state == EmailAccountSyncState.live]
+        if not live:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "You have no connected email account. "
+                    "Connect one in Settings → Email Accounts to reply from the inbox."
+                ),
+            )
+        account_id = live[0].id
+
+    # Auto-thread on the newest inbound message so Gmail / Outlook
+    # collapse the reply into the customer's original thread.
+    thread_messages = await _da.list_messages_for_conversation(
+        session, conversation_id, limit=50
+    )
+    last_inbound = next(
+        (m for m in reversed(thread_messages) if m.direction == MessageDirection.in_),
+        None,
+    )
+
+    # Subject: fall back to a neutral "Re:" — Gmail / Outlook thread on
+    # the `In-Reply-To` / `References` MIME headers we set below, so
+    # subject is display-only.
+    subject_final = subject or "Re: (no subject)"
+
+    result = await send_email(
+        session,
+        org_id=conv.org_id,
+        sender_user_id=user_id,
+        account_id=account_id,
+        contact_id=conv.contact_id,
+        subject=subject_final,
+        body_text=body_text,
+        body_html=body_html,
+        in_reply_to_message_id=last_inbound.id if last_inbound else None,
+        conversation_id=conversation_id,
+    )
+    return result.message
 
 
 async def send_outbound(

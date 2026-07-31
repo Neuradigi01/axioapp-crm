@@ -63,6 +63,7 @@ from src.app.core.conversations.schemas import (
     ConversationListResponse,
     ConversationOut,
     ConversationPatch,
+    EmailReplyPayload,
     MessageOut,
     MessageSendPayload,
     NoteCreate,
@@ -80,6 +81,7 @@ from src.app.core.conversations.service import (
     patch_conversation,
     react_to_message,
     receive_webhook,
+    send_email_reply,
     send_outbound,
 )
 from src.app.core.conversations.tags_service import (
@@ -352,6 +354,39 @@ async def send_message_endpoint(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return MessageOut.model_validate(msg)
+
+
+@router.post(
+    "/{conversation_id}/email-reply",
+    response_model=MessageOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def email_reply_endpoint(
+    conversation_id: uuid.UUID,
+    payload: EmailReplyPayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> MessageOut:
+    """Reply to an email conversation from the unified inbox
+    (Intercom-style). The generic ``/messages`` send guards email
+    with a 400 because it needs subject + sender-account context this
+    body carries. Defaults so the composer's body-only send works:
+      * ``account_id`` — first ``live`` mailbox the sender has connected.
+      * ``subject`` — neutral ``Re: (no subject)``; caller may override.
+      * threading — the newest inbound message on the thread is
+        auto-picked as ``in_reply_to_message_id`` so Gmail / Outlook
+        collapse the reply into the customer's original chain.
+    """
+    msg = await send_email_reply(
+        db,
+        conversation_id=conversation_id,
+        user_id=user.legacy_uuid,
+        body_text=payload.body_text,
+        body_html=payload.body_html,
+        subject=payload.subject,
+        account_id=payload.account_id,
+    )
     return MessageOut.model_validate(msg)
 
 

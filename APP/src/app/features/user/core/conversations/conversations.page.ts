@@ -332,35 +332,42 @@ export class ConversationsPageComponent {
     // resolves the adapter against the chosen phone.
     const sendFromPhoneId = this.composeBar?.currentSendFromPhoneId() ?? null;
 
-    this.api
-      .send(id, text, replyTarget?.id ?? null, sendFromPhoneId)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (real) => {
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.map((m) => (m.id === optimistic.id ? real : m)),
-                }
-              : d,
-          );
-          this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
-        },
-        error: (err: HttpErrorResponse) => {
-          // Roll the optimistic row back; show the error inline on the
-          // thread so the user notices.
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.filter((m) => m.id !== optimistic.id),
-                }
-              : d,
-          );
-          this.loadError.set(extractApiError(err) ?? 'Could not send message.');
-        },
-      });
+    // Route by channel: email goes to the typed email-reply endpoint
+    // (subject + connected-mailbox account); everything else uses the
+    // generic /messages send. The email path ignores reply-target /
+    // send-from-phone — those are WhatsApp / SMS concerns.
+    const conv = this.selectedConversation();
+    const sendCall =
+      conv?.channel === 'email'
+        ? this.api.sendEmailReply(id, { bodyText: text })
+        : this.api.send(id, text, replyTarget?.id ?? null, sendFromPhoneId);
+
+    sendCall.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (real) => {
+        this.detail.update((d) =>
+          d
+            ? {
+                ...d,
+                messages: d.messages.map((m) => (m.id === optimistic.id ? real : m)),
+              }
+            : d,
+        );
+        this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
+      },
+      error: (err: HttpErrorResponse) => {
+        // Roll the optimistic row back; show the error inline on the
+        // thread so the user notices.
+        this.detail.update((d) =>
+          d
+            ? {
+                ...d,
+                messages: d.messages.filter((m) => m.id !== optimistic.id),
+              }
+            : d,
+        );
+        this.loadError.set(extractApiError(err) ?? 'Could not send message.');
+      },
+    });
   }
 
   // --- Internal note (Step 13) ---------------------------------------

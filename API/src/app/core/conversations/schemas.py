@@ -272,6 +272,23 @@ class NoteCreate(BaseModel):
     mentions: list[uuid.UUID] = Field(default_factory=list, max_length=5)
 
 
+class EmailReplyPayload(BaseModel):
+    """Body of ``POST /api/v1/conversations/{id}/email-reply`` — the
+    email-channel counterpart to the generic ``/messages`` send. Email
+    needs ``subject`` + a chosen ``account_id`` that the generic
+    payload doesn't carry; this schema layers those on top. Both are
+    optional — the service defaults ``account_id`` to the sender's
+    first ``live`` connected mailbox and derives ``subject`` from the
+    thread when omitted."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    body_text: str = Field(min_length=1, max_length=65536)
+    body_html: str | None = Field(default=None, max_length=131072)
+    subject: str | None = Field(default=None, max_length=512)
+    account_id: uuid.UUID | None = None
+
+
 class ReactionRequest(BaseModel):
     """Body of ``POST /conversations/{id}/messages/{message_id}/reactions``.
 
