@@ -7,6 +7,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -74,6 +75,7 @@ class AppointmentsListState extends ListPageState<Appointment> {}
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DecimalPipe,
     LucideAngularModule,
     ReactiveFormsModule,
     CalendarComponent,
@@ -520,6 +522,13 @@ export class AppointmentsPageComponent {
     this.advanceStatus(a, 'completed');
   }
 
+  protected onPopoverMarkNoShow(): void {
+    const a = this.popoverAppointment();
+    if (!a) return;
+    this.closePopover();
+    this.advanceStatus(a, 'no_show');
+  }
+
   protected onPopoverCancel(): void {
     const a = this.popoverAppointment();
     if (!a) return;
@@ -670,13 +679,29 @@ export class AppointmentsPageComponent {
   protected statusClass(status: Appointment['status']): string {
     switch (status) {
       case 'completed':
-        return 'bg-emerald-100 text-emerald-700 ring-emerald-200';
+        return 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/30';
       case 'cancelled':
-        return 'bg-surface-2 text-muted border-subtle';
+        return 'bg-red-500/10 text-red-400 ring-red-500/25';
       case 'no_show':
-        return 'bg-amber-100 text-amber-700 ring-amber-200';
+        return 'bg-amber-500/10 text-amber-400 ring-amber-500/30';
       default:
-        return 'bg-blue-100 text-blue-700 ring-blue-200';
+        return 'bg-zinc-500/10 text-muted ring-zinc-500/25';
+    }
+  }
+
+  /** Solid accent colour for the left status bar on each row (AIXO
+   * signature). Same palette as the pill so bar + pill read as one
+   * status signal per row. */
+  protected statusBarClass(status: Appointment['status']): string {
+    switch (status) {
+      case 'completed':
+        return 'bg-emerald-500';
+      case 'cancelled':
+        return 'bg-red-500';
+      case 'no_show':
+        return 'bg-amber-500';
+      default:
+        return 'bg-zinc-500';
     }
   }
 

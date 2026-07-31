@@ -852,7 +852,7 @@ async def bulk_reassign_appointments(
         if appt.assigned_to_id == assigned_to_id:
             continue
         before_id = appt.assigned_to_id
-        before_snap = snapshot(appt)
+        before_snap = _snapshot(appt)
         appt.assigned_to_id = assigned_to_id
         await activities.record_in_session(
             session,
@@ -877,7 +877,7 @@ async def bulk_reassign_appointments(
             entity_type=_APPT_ENTITY,
             entity_id=appt.id,
             before=before_snap,
-            after=snapshot(appt),
+            after=_snapshot(appt),
         )
 
     # One notification per moved row for the new owner. Same
@@ -925,7 +925,7 @@ async def bulk_cancel_appointments(
             skipped += 1
             continue
         before_status = appt.status.value
-        before_snap = snapshot(appt)
+        before_snap = _snapshot(appt)
         appt.status = AppointmentStatus.cancelled
         await activities.record_in_session(
             session,
@@ -953,7 +953,7 @@ async def bulk_cancel_appointments(
             entity_type=_APPT_ENTITY,
             entity_id=appt.id,
             before=before_snap,
-            after=snapshot(appt),
+            after=_snapshot(appt),
         )
 
     # tasks/automation-conditions/ follow-up — appointment.cancelled
