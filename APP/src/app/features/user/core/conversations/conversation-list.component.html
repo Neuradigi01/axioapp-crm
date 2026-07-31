@@ -13,24 +13,43 @@
         class="block w-full rounded-lg border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       />
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-      <select
-        (change)="onChannelChange($event)"
-        class="rounded-lg border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-      >
-        @for (o of channelOptions; track o.value) {
-          <option [value]="o.value">{{ o.label }}</option>
-        }
-      </select>
-      <select
-        (change)="onStatusChange($event)"
-        class="rounded-lg border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-      >
-        @for (o of statusOptions; track o.value) {
-          <option [value]="o.value">{{ o.label }}</option>
-        }
-      </select>
+    <!-- Channel filter pills (AIXO pattern). Brand-coloured icon +
+         label; selected pill fills with the same brand hue. Wraps on
+         narrow panes. Signal read inline (not via method) so change
+         detection tracks the dependency reliably inside @for. -->
+    <div class="flex flex-wrap gap-1.5">
+      @for (o of channelPillOptions; track o.value) {
+        @let active = (channelFilter() || '') === o.value;
+        <button
+          type="button"
+          (click)="setChannelFilter(o.value)"
+          class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-medium ring-1 transition"
+          [class]="
+            active
+              ? pillActiveClass[o.hue]
+              : 'bg-surface-2 text-default ring-subtle hover:bg-surface'
+          "
+        >
+          @if (o.icon) {
+            <lucide-icon
+              [name]="o.icon"
+              class="h-3 w-3"
+              [class]="active ? 'text-white' : pillIconHueClass[o.hue]"
+            />
+          }
+          {{ o.label }}
+        </button>
+      }
     </div>
+    <select
+      (change)="onStatusChange($event)"
+      class="rounded-lg border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+      aria-label="Status filter"
+    >
+      @for (o of statusOptions; track o.value) {
+        <option [value]="o.value">{{ o.label }}</option>
+      }
+    </select>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-1">
       @for (m of assigneeModes; track m.value) {
         <button
@@ -69,13 +88,13 @@
   <div class="min-h-0 flex-1 overflow-y-auto">
     @if (loading) {
       <div class="py-4 md:py-6 text-center text-sm text-muted">Loading…</div>
-    } @else if (displayItems().length === 0) {
+    } @else if (items.length === 0) {
       <div class="px-3 py-4 md:py-6 text-center text-sm text-muted">
         No conversations yet. Inbound messages will land here as customers reach out.
       </div>
     } @else {
       <ul class="divide-y divide-subtle">
-        @for (c of displayItems(); track c.id) {
+        @for (c of items; track c.id) {
           @let style = channelStyle(c.channel);
           @let owner = assigneeColor(c.assigned_to_id);
           <li>
@@ -83,56 +102,67 @@
               type="button"
               (click)="pick(c.id)"
               [class]="
-                'flex w-full items-start gap-2 px-3 py-3 text-left transition hover:bg-surface-2 ' +
+                'flex w-full items-start gap-3 px-3 py-3 text-left transition hover:bg-surface-2 ' +
                 (selectedId === c.id ? 'bg-surface-2' : '')
               "
             >
+              <!-- Avatar with brand-coloured channel badge overlay
+                   (AIXO pattern). The badge is a filled circle with
+                   the platform icon in white — WhatsApp / Instagram /
+                   Messenger / etc. — so the source channel reads at a
+                   glance without a separate chip row. -->
               <span
-                [class]="
-                  'mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ring-1 ' +
-                  owner.bg +
-                  ' ' +
-                  owner.text +
-                  ' ' +
-                  owner.ring
-                "
+                class="relative shrink-0"
                 [title]="
-                  c.assigned_to_id
+                  (c.assigned_to_id
                     ? (staffById.get(c.assigned_to_id)?.full_name ?? 'Unknown user')
-                    : 'Unassigned'
+                    : 'Unassigned') +
+                  ' · ' +
+                  style.label
                 "
               >
-                {{ assigneeInitials(c.assigned_to_id) }}
-              </span>
-              <span
-                [class]="
-                  'mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ' +
-                  style.bg
-                "
-              >
-                <span [class]="'inline-block h-1.5 w-1.5 rounded-full ' + style.dot"></span>
-                {{ style.label }}
+                <span
+                  [class]="
+                    'inline-flex h-10 w-10 items-center justify-center rounded-full text-[12px] font-semibold ring-1 ' +
+                    owner.bg +
+                    ' ' +
+                    owner.text +
+                    ' ' +
+                    owner.ring
+                  "
+                >
+                  {{ assigneeInitials(c.assigned_to_id) }}
+                </span>
+                <span
+                  [class]="
+                    'absolute -bottom-1 -right-1 inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-white ring-2 ring-surface ' +
+                    style.dot
+                  "
+                  [attr.aria-label]="style.label"
+                >
+                  <lucide-icon [name]="style.icon" class="h-2.5 w-2.5" />
+                </span>
               </span>
               <div class="min-w-0 flex-1">
                 <div class="flex items-baseline justify-between gap-2">
-                  <p class="truncate text-sm font-medium text-default">
-                    {{ c.external_id }}
+                  <p class="truncate text-sm font-semibold text-default">
+                    {{ rowName(c) }}
                   </p>
-                  <span class="shrink-0 text-[10px] text-muted">
+                  <span class="shrink-0 font-mono text-[10.5px] text-faint">
                     {{ formatTime(c.last_message_at) }}
                   </span>
                 </div>
-                <div class="flex items-center gap-2 text-xs text-muted">
+                <div class="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-muted">
                   <span class="capitalize">{{ c.status }}</span>
                   @if (c.ai_handling) {
                     <span
-                      class="rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-medium text-violet-700"
+                      class="rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-medium text-violet-400 ring-1 ring-violet-500/20"
                     >
                       AI Handled
                     </span>
                   } @else {
                     <span
-                      class="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400"
+                      class="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400 ring-1 ring-amber-500/20"
                     >
                       Needs Human
                     </span>

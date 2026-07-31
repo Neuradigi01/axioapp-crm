@@ -25,6 +25,11 @@ interface ChannelBadgeStyle {
   label: string;
   bg: string;
   dot: string;
+  /** Lucide icon for the channel filter pill. */
+  icon: string;
+  /** Accent hue used when the pill is unselected (icon + dot). Selected
+   * pills use the same hue as a filled background — see `channelPillClass`. */
+  hue: 'emerald' | 'fuchsia' | 'blue' | 'zinc' | 'violet' | 'sky';
 }
 
 /**
@@ -34,33 +39,45 @@ interface ChannelBadgeStyle {
 const CHANNEL_STYLES: Record<ConversationChannel, ChannelBadgeStyle> = {
   whatsapp: {
     label: 'WhatsApp',
-    bg: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    bg: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20',
     dot: 'bg-emerald-500',
+    icon: 'message-circle',
+    hue: 'emerald',
   },
   instagram: {
     label: 'Instagram',
-    bg: 'bg-gradient-to-r from-fuchsia-500 to-amber-400 text-white ring-fuchsia-200',
+    bg: 'bg-fuchsia-500/10 text-fuchsia-400 ring-fuchsia-500/20',
     dot: 'bg-fuchsia-500',
+    icon: 'instagram',
+    hue: 'fuchsia',
   },
   facebook: {
-    label: 'Facebook',
-    bg: 'bg-blue-50 text-blue-700 ring-blue-200',
+    label: 'Messenger',
+    bg: 'bg-blue-500/10 text-blue-400 ring-blue-500/20',
     dot: 'bg-blue-500',
+    icon: 'send',
+    hue: 'blue',
   },
   sms: {
     label: 'SMS',
-    bg: 'bg-surface-2 text-default border-subtle',
-    dot: 'bg-muted',
+    bg: 'bg-zinc-500/10 text-muted ring-zinc-500/20',
+    dot: 'bg-zinc-400',
+    icon: 'message-square',
+    hue: 'zinc',
   },
   email: {
     label: 'Email',
-    bg: 'bg-violet-50 text-violet-700 ring-violet-200',
+    bg: 'bg-violet-500/10 text-violet-400 ring-violet-500/20',
     dot: 'bg-violet-500',
+    icon: 'mail',
+    hue: 'violet',
   },
   web: {
     label: 'Web',
-    bg: 'bg-sky-50 text-sky-700 ring-sky-200',
+    bg: 'bg-sky-500/10 text-sky-400 ring-sky-500/20',
     dot: 'bg-sky-500',
+    icon: 'globe',
+    hue: 'sky',
   },
 };
 
@@ -71,13 +88,46 @@ const STATUS_OPTIONS: Array<{ value: ConversationStatus | ''; label: string }> =
   { value: 'closed', label: 'Closed' },
 ];
 
-const CHANNEL_OPTIONS: Array<{ value: ConversationChannel | ''; label: string }> = [
-  { value: '', label: 'All channels' },
-  { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'email', label: 'Email' },
-  { value: 'facebook', label: 'Messenger' },
-  { value: 'instagram', label: 'Instagram' },
+interface ChannelPillOption {
+  value: ConversationChannel | '';
+  label: string;
+  /** Empty for the "All" pill — no channel-brand icon. */
+  icon: string;
+  hue: 'emerald' | 'fuchsia' | 'blue' | 'zinc' | 'violet' | 'sky' | 'accent';
+}
+
+const CHANNEL_PILL_OPTIONS: ChannelPillOption[] = [
+  { value: '', label: 'All', icon: '', hue: 'accent' },
+  { value: 'whatsapp', label: 'WhatsApp', icon: 'message-circle', hue: 'emerald' },
+  { value: 'facebook', label: 'Messenger', icon: 'send', hue: 'blue' },
+  { value: 'instagram', label: 'Instagram', icon: 'instagram', hue: 'fuchsia' },
+  { value: 'email', label: 'Email', icon: 'mail', hue: 'violet' },
+  { value: 'sms', label: 'SMS', icon: 'message-square', hue: 'zinc' },
+  { value: 'web', label: 'Web', icon: 'globe', hue: 'sky' },
 ];
+
+/** Per-hue Tailwind class strings for the channel filter pill. Kept as
+ * static maps so the classes are picked up by the compiler's static
+ * analysis (dynamic string concat with a class name loses that). */
+const PILL_ACTIVE: Record<ChannelPillOption['hue'], string> = {
+  accent: 'bg-accent text-white ring-accent',
+  emerald: 'bg-emerald-500 text-white ring-emerald-500',
+  fuchsia: 'bg-fuchsia-500 text-white ring-fuchsia-500',
+  blue: 'bg-blue-500 text-white ring-blue-500',
+  zinc: 'bg-zinc-500 text-white ring-zinc-500',
+  violet: 'bg-violet-500 text-white ring-violet-500',
+  sky: 'bg-sky-500 text-white ring-sky-500',
+};
+
+const PILL_ICON_HUE: Record<ChannelPillOption['hue'], string> = {
+  accent: 'text-accent',
+  emerald: 'text-emerald-400',
+  fuchsia: 'text-fuchsia-400',
+  blue: 'text-blue-400',
+  zinc: 'text-muted',
+  violet: 'text-violet-400',
+  sky: 'text-sky-400',
+};
 
 type AssigneeMode = 'all' | 'mine' | 'unassigned' | 'specific';
 
@@ -100,6 +150,10 @@ export class ConversationListComponent {
   @Input() loading = false;
   @Input() selectedId: string | null = null;
   @Input() staffById: Map<string, StaffListItem> = new Map();
+  /** Contact-name lookup keyed by `contact_id`. Parent hydrates it
+   *  after each list load; the row falls back to `external_id` when
+   *  a contact hasn't been fetched yet (or is missing). */
+  @Input() contactsById: Record<string, { id: string; full_name: string }> = {};
   /** UUID of the logged-in user — drives the "Mine" assignee chip.
    * Empty string means we don't yet know (auth still loading);
    * the "Mine" chip simply emits `undefined` in that case. */
@@ -124,10 +178,15 @@ export class ConversationListComponent {
   @Input() tagFilterIds: string[] = [];
 
   protected readonly statusOptions = STATUS_OPTIONS;
-  protected readonly channelOptions = CHANNEL_OPTIONS;
+  protected readonly channelPillOptions = CHANNEL_PILL_OPTIONS;
   protected readonly assigneeModes = ASSIGNEE_MODES;
 
-  protected readonly channelFilter = signal<ConversationChannel | ''>('');
+  /** Public (protected) so the template can read the signal directly for
+   * the channel-pill active-state binding. */
+  readonly channelFilter = signal<ConversationChannel | ''>('');
+  /** Exposed to the template for the pill styling. */
+  protected readonly pillActiveClass = PILL_ACTIVE;
+  protected readonly pillIconHueClass = PILL_ICON_HUE;
   protected readonly statusFilter = signal<ConversationStatus | ''>('');
   protected readonly searchTerm = signal<string>('');
   protected readonly assigneeMode = signal<AssigneeMode>('all');
@@ -138,10 +197,23 @@ export class ConversationListComponent {
     Array.from(this.staffById.values()).sort((a, b) => a.full_name.localeCompare(b.full_name)),
   );
 
-  protected readonly displayItems = computed(() => this.items);
-
   protected channelStyle(channel: ConversationChannel): ChannelBadgeStyle {
     return CHANNEL_STYLES[channel];
+  }
+
+  /** Row display name: contact name when hydrated, else the raw
+   *  channel-specific id (phone / email / handle). */
+  protected rowName(c: Conversation): string {
+    if (c.contact_id) {
+      const contact = this.contactsById[c.contact_id];
+      if (contact) return contact.full_name;
+    }
+    return c.external_id;
+  }
+
+  protected setChannelFilter(value: ConversationChannel | ''): void {
+    this.channelFilter.set(value);
+    this.emit();
   }
 
   /** Two-letter initials for the staff member that owns this thread,

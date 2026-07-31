@@ -11,6 +11,10 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+
+import { ContactsApiService } from '../contacts/contacts-api.service';
 
 import {
   Conversation,
@@ -71,6 +75,7 @@ export class ConversationsPageComponent {
   private readonly api = inject(ConversationsApiService);
   private readonly notifications = inject(NotificationsApiService);
   private readonly staffApi = inject(StaffApiService);
+  private readonly contactsApi = inject(ContactsApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -104,6 +109,12 @@ export class ConversationsPageComponent {
    * via `GET /api/v1/staff`; the list is small (org-wide staff) and
    * rarely changes within a session. */
   protected readonly staffById = signal<Map<string, StaffListItem>>(new Map());
+
+  /** Contact-name lookup for the list rows — resolves each row's
+   *  `contact_id` to a display name so the list shows "Ananya Rao"
+   *  instead of the raw phone/email `external_id`. Hydrated lazily
+   *  after each `reloadList()`; already-fetched ids are skipped. */
+  protected readonly contactsById = signal<Record<string, { id: string; full_name: string }>>({});
 
   /** Step 13 — flat staff array for the @-mention picker in the
    *  composer. Derived from `staffById` (single source of truth). */
@@ -756,12 +767,38 @@ export class ConversationsPageComponent {
         next: (resp) => {
           this.items.set(resp.items);
           this.loading.set(false);
+          this.hydrateContacts(resp.items);
         },
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load conversations.');
         },
+      });
+  }
+
+  /** Fetch contact rows for any `contact_id` we haven't seen yet, so
+   *  the list can show the person's name instead of the raw
+   *  `external_id`. Individual failures are swallowed — a missing
+   *  contact just falls back to the external id in the template. */
+  private hydrateContacts(rows: Conversation[]): void {
+    const ids = new Set<string>();
+    for (const r of rows) {
+      if (r.contact_id) ids.add(r.contact_id);
+    }
+    const cache = this.contactsById();
+    const missing = [...ids].filter((id) => !cache[id]);
+    if (missing.length === 0) return;
+    forkJoin(missing.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((results) => {
+        this.contactsById.update((current) => {
+          const next = { ...current };
+          for (const c of results) {
+            if (c) next[c.id] = { id: c.id, full_name: c.full_name };
+          }
+          return next;
+        });
       });
   }
 
