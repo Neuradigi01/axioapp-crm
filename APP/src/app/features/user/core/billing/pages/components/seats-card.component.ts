@@ -17,87 +17,43 @@ import { SubscriptionCurrent } from '../../types/subscription.types';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
-    <section class="flex h-full flex-col rounded-xl border border-subtle bg-surface p-6 shadow-sm">
-      <div class="flex items-start justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <div
-            class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-100 dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-900"
-          >
-            <lucide-icon name="users" size="18" aria-hidden="true"></lucide-icon>
-          </div>
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-muted">Seats</p>
-            <h2 class="text-base font-semibold text-default">Team seats</h2>
-          </div>
-        </div>
+    <section class="flex h-full flex-col rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+      <p class="text-[13px] font-semibold text-default">Seats</p>
 
-        <button
-          type="button"
-          (click)="onManage()"
-          class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
-          [class.cursor-not-allowed]="manageDisabled()"
-          [class.border-subtle]="manageDisabled()"
-          [class.text-faint]="manageDisabled()"
-          [class.dark:border-subtle]="manageDisabled()"
-          [class.dark:text-muted]="manageDisabled()"
-          [class.border-subtle]="!manageDisabled()"
-          [class.bg-surface]="!manageDisabled()"
-          [class.text-default]="!manageDisabled()"
-          [class.hover:bg-surface-2]="!manageDisabled()"
-          [class.dark:border-subtle]="!manageDisabled()"
-          [class.dark:text-default]="!manageDisabled()"
-          [class.dark:hover:bg-surface]="!manageDisabled()"
-          [disabled]="manageDisabled()"
-          [title]="manageTooltip()"
-        >
-          Manage
-        </button>
+      <div class="mt-4 flex items-baseline gap-1">
+        <span class="font-display text-[32px] font-bold leading-none tabular-nums text-default">
+          {{ subscription().seats.in_use }}
+        </span>
+        <span class="font-mono text-[12px] text-faint">
+          / {{ subscription().seats.purchased }}
+        </span>
       </div>
 
-      <div class="mt-5">
-        <div class="flex items-baseline justify-between">
-          <p class="text-sm text-muted">In use</p>
-          <p class="text-sm font-semibold tabular-nums text-default">
-            {{ subscription().seats.in_use }} / {{ subscription().seats.purchased }}
-          </p>
-        </div>
-        <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-2">
-          <div
-            class="h-full rounded-full transition-all"
-            [class.bg-emerald-500]="seatTone() === 'green'"
-            [class.bg-amber-500]="seatTone() === 'yellow'"
-            [class.bg-red-500]="seatTone() === 'red'"
-            [style.width.%]="seatPercent()"
-          ></div>
-        </div>
-        <p class="mt-2 text-xs text-muted">
-          {{ helperLine() }}
-        </p>
+      <p class="mt-2 text-[13px] text-muted">
+        {{ seatsAvailable() }} seat{{ seatsAvailable() === 1 ? '' : 's' }} available
+      </p>
+
+      <!-- Progress bar — subtle indicator underneath the counts so the
+           card still shows utilisation at a glance. -->
+      <div class="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+        <div
+          class="h-full rounded-full transition-all"
+          [class.bg-emerald-500]="seatTone() === 'green'"
+          [class.bg-amber-500]="seatTone() === 'yellow'"
+          [class.bg-red-500]="seatTone() === 'red'"
+          [style.width.%]="seatPercent()"
+        ></div>
       </div>
 
-      <dl class="mt-6 grid flex-1 gap-4 sm:grid-cols-3">
-        <div>
-          <dt class="text-[11px] font-medium uppercase tracking-wide text-muted">Included</dt>
-          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default">
-            {{ subscription().seats.included }}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-[11px] font-medium uppercase tracking-wide text-muted">Active</dt>
-          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default">
-            {{ subscription().seats.in_use }}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-[11px] font-medium uppercase tracking-wide text-muted">Extra seat</dt>
-          <dd class="mt-0.5 text-sm font-semibold tabular-nums text-default">
-            {{ '$' + subscription().seats.extra_seat_cost_per_period_usd }}
-            <span class="text-xs font-normal text-muted">
-              /{{ subscription().billing_cycle === 'annual' ? 'yr' : 'mo' }}
-            </span>
-          </dd>
-        </div>
-      </dl>
+      <button
+        type="button"
+        (click)="onManage()"
+        class="mt-auto inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-subtle bg-surface-2 px-3 py-2.5 text-[13px] font-semibold text-default transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+        [disabled]="manageDisabled()"
+        [title]="manageTooltip()"
+      >
+        Invite teammate
+      </button>
     </section>
   `,
 })
@@ -132,6 +88,15 @@ export class SeatsCardComponent {
   protected onManage(): void {
     this.seatModal.open();
   }
+
+  /** Seats not yet occupied — powers the "N seats available" line
+   *  in the compact card layout. Clamped at 0 so an over-provisioned
+   *  read (in_use > purchased, e.g. seat-reduction lag) doesn't
+   *  render a negative. */
+  protected readonly seatsAvailable = computed(() => {
+    const s = this.subscription().seats;
+    return Math.max(0, s.purchased - s.in_use);
+  });
 
   protected readonly seatPercent = computed(() => {
     const seats = this.subscription().seats;
