@@ -7,7 +7,7 @@
     <div>
       @if (summary(); as s) {
         <h1
-          class="font-display text-[28px] font-bold leading-tight tracking-[-0.02em] text-default"
+          class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
         >
           {{ timeOfDayGreeting() }}, {{ s.greeting.first_name }}
         </h1>
@@ -110,14 +110,14 @@
   }
 
   <!-- Trend + funnel chart row -->
-  <section class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+  <section class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
     <app-dashboard-trend-chart [refreshTick]="refreshTick()" />
     <app-dashboard-funnel-chart [refreshTick]="refreshTick()" />
   </section>
 
   <!-- Secondary KPI cards grid -->
   @if (summary(); as s) {
-    <section class="mt-6 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+    <section class="mt-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
       @for (card of secondaryCards(); track card.key) {
         @if (card.link; as link) {
           <a [routerLink]="link" class="card group block transition hover:border-muted">
@@ -148,7 +148,7 @@
       }
     </section>
   } @else {
-    <section class="mt-6 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+    <section class="mt-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
       @for (i of [1, 2, 3, 4]; track i) {
         <div class="h-24 animate-pulse rounded-xl border border-subtle bg-surface"></div>
       }
@@ -158,7 +158,7 @@
   <!-- Follow-ups + Appointments pair -->
   <section
     id="todays-followups-widget"
-    class="mt-6 grid grid-cols-1 gap-4 scroll-mt-6 lg:grid-cols-2"
+    class="mt-5 grid grid-cols-1 gap-4 scroll-mt-6 lg:grid-cols-2"
   >
     <app-todays-followups [refreshTick]="refreshTick()" />
 
@@ -218,7 +218,7 @@
   </section>
 
   <!-- Recent activity -->
-  <section class="mt-6">
+  <section class="mt-5">
     <div class="card">
       <div class="card-header">
         <h3 class="card-title">Recent activity</h3>

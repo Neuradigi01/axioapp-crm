@@ -4,9 +4,7 @@
       <h1 class="font-display text-[26px] font-bold leading-tight tracking-tight text-default">
         Contacts
       </h1>
-      <p class="mt-1 text-[14px] text-muted">
-        Showroom walk-ins, leads, returning customers. {{ state.total() }} total.
-      </p>
+      <p class="mt-1 text-[14px] text-muted">{{ state.total() | number }} people</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <button
