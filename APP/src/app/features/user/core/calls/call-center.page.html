@@ -1,5 +1,5 @@
 <div class="px-4 py-4 md:px-6 md:py-6">
-  <header class="mb-6 flex items-start justify-between">
+  <header class="mb-6 flex items-start justify-between gap-3">
     <div>
       <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
         Call Center
@@ -8,6 +8,13 @@
         Log calls, browse the phone book, review transcripts &amp; analytics
       </p>
     </div>
+    <button
+      type="button"
+      (click)="onLogCall()"
+      class="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+    >
+      Log call
+    </button>
   </header>
 
   <!-- Tabs -->
@@ -32,7 +39,7 @@
 
   @switch (activeTab()) {
     @case ('logs') {
-      <app-call-logs-tab />
+      <app-call-logs-tab [openModalTrigger]="logCallTrigger()" />
     }
     @case ('phone-book') {
       <app-call-phone-book-tab />

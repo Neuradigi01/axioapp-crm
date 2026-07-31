@@ -1,20 +1,4 @@
 <div>
-  <div class="mb-3 flex items-center justify-between">
-    <div>
-      <h2 class="text-base font-semibold text-default">Recent calls</h2>
-      <p class="text-xs text-muted">
-        {{ items().length }} {{ items().length === 1 ? 'call' : 'calls' }} logged
-      </p>
-    </div>
-    <button
-      type="button"
-      (click)="openModal()"
-      class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
-    >
-      Log call
-    </button>
-  </div>
-
   @if (loadError(); as err) {
     <div
       class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
@@ -30,10 +14,19 @@
       Loading…
     </div>
   } @else if (items().length === 0) {
+    <!-- AIXO empty state — big dashed panel with a phone icon
+         medallion and a CTA hint referencing the header's "Log call"
+         button. -->
     <div
-      class="rounded-lg border border-dashed border-subtle bg-surface p-6 md:p-12 text-center text-sm text-muted"
+      class="flex flex-col items-center justify-center rounded-xl border border-dashed border-subtle bg-surface px-6 py-16 text-center"
     >
-      No calls logged yet. Click "Log call" to record one.
+      <span
+        class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-accent-soft text-accent ring-1 ring-accent/20"
+      >
+        <lucide-icon name="phone" size="22" aria-hidden="true"></lucide-icon>
+      </span>
+      <p class="text-[15px] font-semibold text-default">No calls logged yet</p>
+      <p class="mt-1 text-[13px] text-muted">Click "Log call" to record one.</p>
     </div>
   } @else {
     <div class="overflow-x-auto rounded-xl border border-subtle bg-surface shadow-sm">

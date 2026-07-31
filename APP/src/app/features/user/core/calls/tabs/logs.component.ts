@@ -2,10 +2,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  Input,
   computed,
   inject,
   signal,
 } from '@angular/core';
+import { LucideAngularModule } from 'lucide-angular';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -24,7 +26,7 @@ import { extractApiError } from '@core/services/api-error.util';
   selector: 'app-call-logs-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LogCallModalComponent, CallRecordingPlayerComponent],
+  imports: [LogCallModalComponent, CallRecordingPlayerComponent, LucideAngularModule],
   templateUrl: './logs.component.html',
 })
 export class CallLogsTabComponent {
@@ -32,6 +34,17 @@ export class CallLogsTabComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+
+  /** Bumped counter from the page header's "Log call" button. Any
+   *  value change (except the initial 0 → 0 during first render)
+   *  opens the modal. Setter form so we can observe changes. */
+  @Input() set openModalTrigger(v: number) {
+    if (v > 0 && v !== this._lastTrigger) {
+      this._lastTrigger = v;
+      this.openModal();
+    }
+  }
+  private _lastTrigger = 0;
 
   protected readonly items = signal<Call[]>([]);
   protected readonly outcomes = signal<CallOutcome[]>([]);
