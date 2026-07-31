@@ -425,6 +425,75 @@ export class WorkflowsPageComponent {
     this.runHistoryWorkflow.set(null);
   }
 
+  // --- Move to folder ----------------------------------------------
+  //
+  // Works for every workflow — including the 15 default seeded rows
+  // and any pack-installed ones — because folder membership is a
+  // plain nullable FK, not part of the seed identity. Moving is
+  // safe: it never touches name / category / graph, so re-seeding or
+  // upgrades keep re-emitting the row with the same fingerprint and
+  // the DB just reads the operator's chosen folder_id.
+
+  protected readonly moveTargetRow = signal<WorkflowRead | null>(null);
+  protected readonly moveTargetFolderId = signal<string | null>(null);
+  protected readonly moveSaving = signal(false);
+  protected readonly moveError = signal<string | null>(null);
+
+  protected openMove(row: WorkflowRead, event: MouseEvent): void {
+    event.stopPropagation();
+    this.closeMenu();
+    if (!this.canWrite()) return;
+    this.moveTargetRow.set(row);
+    this.moveTargetFolderId.set(row.folder_id ?? null);
+    this.moveError.set(null);
+  }
+
+  protected setMoveTargetFolder(id: string | null): void {
+    this.moveTargetFolderId.set(id);
+  }
+
+  protected closeMove(): void {
+    this.moveTargetRow.set(null);
+    this.moveTargetFolderId.set(null);
+    this.moveSaving.set(false);
+    this.moveError.set(null);
+  }
+
+  protected confirmMove(): void {
+    const row = this.moveTargetRow();
+    if (!row) return;
+    const target = this.moveTargetFolderId();
+    // No-op guard: don't PATCH when nothing actually changes.
+    if ((row.folder_id ?? null) === target) {
+      this.closeMove();
+      return;
+    }
+    this.moveSaving.set(true);
+    this.moveError.set(null);
+    this.api
+      .patch(row.id, { folder_id: target })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          // Update the row in place. If a folder filter is active and
+          // the row was moved out of it, the reload below drops it
+          // from the visible list.
+          this.items.update((rows) => rows.map((r) => (r.id === row.id ? updated : r)));
+          this.moveSaving.set(false);
+          this.closeMove();
+          // If a folder filter is active, re-fetch so a moved-out row
+          // disappears from view.
+          if (this.selectedFolderId() !== null) {
+            this.reload();
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.moveSaving.set(false);
+          this.moveError.set(extractApiError(err) ?? 'Could not move workflow.');
+        },
+      });
+  }
+
   // --- derived helpers ---------------------------------------------
 
   /** Pick a representative channel chip from `enabled_event_types`. */

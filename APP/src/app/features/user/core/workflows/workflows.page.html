@@ -356,6 +356,16 @@
                               Clone
                             </button>
                           }
+                          @if (canWrite()) {
+                            <button
+                              type="button"
+                              (click)="openMove(row, $event)"
+                              class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-default hover:bg-surface-2"
+                            >
+                              <lucide-icon name="folder" size="13" />
+                              Move to folder…
+                            </button>
+                          }
                           @if (canWrite() && row.status !== 'archived' && !row.is_system_default) {
                             <button
                               type="button"
@@ -416,4 +426,89 @@
     [workflowName]="runHistoryWorkflow()?.name ?? null"
     (closed)="closeRunHistory()"
   />
+
+  <!-- Move-to-folder picker. Renders when `moveTargetRow()` is set;
+       the outer overlay dismisses on backdrop click, the inner card
+       stops propagation so clicks inside don't close it. Radio-style
+       button list works for both mouse and keyboard operators.  -->
+  @if (moveTargetRow(); as row) {
+    <div
+      class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
+      (click)="closeMove()"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="move-folder-title"
+        class="w-full max-w-md rounded-xl border border-subtle bg-surface p-5 shadow-xl"
+        (click)="$event.stopPropagation()"
+      >
+        <header class="mb-3">
+          <h3 id="move-folder-title" class="text-base font-semibold text-default">
+            Move to folder
+          </h3>
+          <p class="mt-0.5 truncate text-xs text-muted" [title]="row.name">
+            {{ row.name }}
+          </p>
+        </header>
+
+        <div
+          class="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-subtle bg-surface-2 p-1"
+        >
+          <button
+            type="button"
+            (click)="setMoveTargetFolder(null)"
+            class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition"
+            [class.bg-accent-soft]="moveTargetFolderId() === null"
+            [class.text-accent]="moveTargetFolderId() === null"
+            [class.text-default]="moveTargetFolderId() !== null"
+            [class.hover:bg-surface]="moveTargetFolderId() !== null"
+          >
+            <lucide-icon name="folder" size="13" />
+            No folder
+          </button>
+          @for (f of folders(); track f.id) {
+            <button
+              type="button"
+              (click)="setMoveTargetFolder(f.id)"
+              class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition"
+              [class.bg-accent-soft]="moveTargetFolderId() === f.id"
+              [class.text-accent]="moveTargetFolderId() === f.id"
+              [class.text-default]="moveTargetFolderId() !== f.id"
+              [class.hover:bg-surface]="moveTargetFolderId() !== f.id"
+            >
+              <lucide-icon name="folder" size="13" />
+              {{ f.name }}
+            </button>
+          }
+        </div>
+
+        @if (moveError(); as err) {
+          <p
+            class="mt-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+          >
+            {{ err }}
+          </p>
+        }
+
+        <footer class="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            (click)="closeMove()"
+            class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            (click)="confirmMove()"
+            [disabled]="moveSaving()"
+            class="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {{ moveSaving() ? 'Moving…' : 'Move' }}
+          </button>
+        </footer>
+      </div>
+    </div>
+  }
 </div>
