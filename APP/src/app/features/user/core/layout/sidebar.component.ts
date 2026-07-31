@@ -8,6 +8,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { UpperCasePipe } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -18,7 +19,7 @@ import { NotificationsApiService } from '../notifications/notifications-api.serv
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, LucideAngularModule],
+  imports: [RouterLink, RouterLinkActive, LucideAngularModule, UpperCasePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sidebar.component.html',
 })

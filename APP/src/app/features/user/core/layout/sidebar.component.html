@@ -14,7 +14,7 @@
       aria-label="Switch workspace"
     >
       <span
-        class="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-accent-soft font-display text-sm font-bold text-accent"
+        class="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] bg-accent font-display text-sm font-bold text-white"
       >
         {{ wsInitial() }}
       </span>
@@ -98,12 +98,13 @@
     } @else {
       @for (group of groupedModules(); track group.section; let first = $first) {
         <div
-          class="px-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-[.02em] text-faint"
+          class="px-2.5 pb-1.5 text-[11px] text-faint"
+          style="font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em"
           [class.pt-3.5]="!first"
           [class.pt-2]="first"
           [class.md:hidden]="!expanded()"
         >
-          {{ group.section }}
+          {{ group.section | uppercase }}
         </div>
         <ul class="flex flex-col gap-0.5">
           @for (m of group.items; track m.id) {
@@ -111,7 +112,8 @@
               <a
                 [routerLink]="m.frontend_route"
                 routerLinkActive="!bg-accent-soft !text-accent"
-                class="group flex items-center gap-3 rounded-lg px-2 py-1.5 text-[13.5px] font-medium text-muted transition hover:bg-surface-2 hover:text-default"
+                class="group flex items-center gap-3 rounded-[8px] px-[7px] py-[5px] text-[13.5px] text-default transition hover:bg-surface-2"
+                style="font-weight: 600"
                 [class.md:justify-center]="!expanded()"
                 [attr.title]="m.name"
                 (click)="close.emit()"
@@ -136,7 +138,8 @@
           <a
             [routerLink]="m.frontend_route"
             routerLinkActive="!bg-accent-soft !text-accent"
-            class="group flex items-center gap-3 rounded-lg px-2 py-1.5 text-[13.5px] font-medium text-muted transition hover:bg-surface-2 hover:text-default"
+            class="group flex items-center gap-3 rounded-[8px] px-[7px] py-[5px] text-[13.5px] text-default transition hover:bg-surface-2"
+            style="font-weight: 600"
             [class.md:justify-center]="!expanded()"
             [attr.title]="m.name"
             (click)="close.emit()"
@@ -153,7 +156,8 @@
     <!-- Desktop collapse toggle (bottom of rail, AIXO layout) -->
     <button
       type="button"
-      class="mt-1 hidden w-full items-center gap-3 rounded-lg px-2 py-1.5 text-[13.5px] font-medium text-muted transition hover:bg-surface-2 hover:text-default md:flex"
+      class="mt-1 hidden w-full items-center gap-3 rounded-[8px] px-[7px] py-[5px] text-[13.5px] text-default transition hover:bg-surface-2 md:flex"
+      style="font-weight: 600"
       [class.md:justify-center]="!expanded()"
       (click)="toggle.emit()"
       [attr.aria-label]="expanded() ? 'Collapse sidebar' : 'Expand sidebar'"
