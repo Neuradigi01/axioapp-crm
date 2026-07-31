@@ -109,9 +109,13 @@ export class TaskFormModalComponent extends BaseFormModalComponent {
       this.form.controls[ctrl].updateValueAndValidity({ emitEvent: false });
     };
     setReq('description', [commonValidators.maxLength(2000)], map['description']);
-    // due_at always blocks past values (no retrospective task-logging surface);
-    // required layered on top when the override says so.
-    setReq('due_at', [commonValidators.dateNotPast], map['due_at']);
+    // due_at blocks past values on CREATE (no retrospective task-logging
+    // surface). On EDIT we skip the past-date guard so operators can
+    // reassign / re-prioritise an already-overdue task without being
+    // forced to also push the due date forward — the form was rejecting
+    // every save on rows whose due_at had drifted into the past.
+    const dueValidators = this.isEdit() ? [] : [commonValidators.dateNotPast];
+    setReq('due_at', dueValidators, map['due_at']);
     setReq('assigned_to_id', [], map['assigned_to_id']);
   }
 

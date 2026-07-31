@@ -394,7 +394,7 @@ async def bulk_reassign_tasks(
         if task.assigned_to_id == assigned_to_id:
             continue
         before_id = task.assigned_to_id
-        before_snap = snapshot(task)
+        before_snap = _snapshot(task)
         task.assigned_to_id = assigned_to_id
         await activities.record_in_session(
             session,
@@ -405,7 +405,7 @@ async def bulk_reassign_tasks(
             payload=_reassign_payload(from_id=before_id, to_id=assigned_to_id, note=note),
             user_id=actor_user_id,
         )
-        audit_batch.append((task.id, before_snap, snapshot(task)))
+        audit_batch.append((task.id, before_snap, _snapshot(task)))
         reassigned += 1
 
     await session.commit()
@@ -444,10 +444,10 @@ async def bulk_mark_done_tasks(
         if task.status == TaskStatus.done:
             skipped += 1
             continue
-        before_snap = snapshot(task)
+        before_snap = _snapshot(task)
         task.status = TaskStatus.done
         task.last_activity_at = datetime.now(UTC)
-        audit_batch.append((task.id, before_snap, snapshot(task)))
+        audit_batch.append((task.id, before_snap, _snapshot(task)))
         done += 1
 
     await session.commit()
@@ -482,7 +482,7 @@ async def bulk_delete_tasks(
     there is nothing to catch — leads.bulk_delete needs the
     IntegrityError wrap; tasks does not."""
     tasks = await _da.list_tasks_by_ids_in_org(session, ids=ids, org_id=org_id)
-    snapshots = [(t.id, snapshot(t)) for t in tasks]
+    snapshots = [(t.id, _snapshot(t)) for t in tasks]
 
     rowcount = await _da.bulk_delete_tasks_by_ids(session, ids=ids, org_id=org_id)
     await session.commit()
