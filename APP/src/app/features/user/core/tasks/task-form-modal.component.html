@@ -82,7 +82,7 @@
           </span>
           <select
             formControlName="priority"
-            class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
+            class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
           >
             <option value="low">Low</option>
             <option value="med">Medium</option>
@@ -105,7 +105,7 @@
         </span>
         <select
           formControlName="assigned_to_id"
-          class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
+          class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
         >
           @for (a of assignees; track a.id) {
             <option [value]="a.id">{{ a.full_name || a.email }}</option>
@@ -129,7 +129,7 @@
       </span>
       <select
         formControlName="followup_type"
-        class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
+        class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
       >
         @for (o of followupOptions; track o.value) {
           <option [value]="o.value">{{ o.label }}</option>
@@ -231,7 +231,7 @@
       <button
         type="button"
         (click)="onCancel()"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
       >
         Cancel
       </button>

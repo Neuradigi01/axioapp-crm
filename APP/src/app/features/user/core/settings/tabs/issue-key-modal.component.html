@@ -34,7 +34,7 @@
             <button
               type="button"
               (click)="copySecret()"
-              class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
             >
               @if (copied()) {
                 <lucide-icon name="check" class="h-4 w-4 text-emerald-600" />
@@ -84,7 +84,7 @@
           [value]="name()"
           (input)="onNameInput($event)"
           placeholder="e.g. Main site, Marketing landing page"
-          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
 
         @if (error(); as err) {
@@ -99,7 +99,7 @@
           <button
             type="button"
             (click)="close()"
-            class="rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default hover:bg-surface-2"
+            class="rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default hover:bg-surface-2"
           >
             Cancel
           </button>

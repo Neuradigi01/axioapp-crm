@@ -9,7 +9,7 @@
       [maxlength]="BODY_MAX"
       rows="6"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none"
+      class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none"
       placeholder="Hi {{ '{' + '{' + 'contact.first_name' + '}' + '}' }}, thanks for messaging us!"
     ></textarea>
     <p class="mt-1 text-[10px] text-faint">
@@ -36,13 +36,13 @@
             formControlName="text"
             [maxlength]="QUICK_REPLY_MAX_LENGTH"
             (focus)="onFocus($event)"
-            class="block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
+            class="block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
             placeholder="Tell me more"
           />
           <button
             type="button"
             (click)="removeQuickReply(i)"
-            class="inline-flex items-center justify-center rounded-md border border-subtle bg-surface p-1.5 text-muted hover:bg-surface-2"
+            class="inline-flex items-center justify-center rounded-lg border border-subtle bg-surface p-1.5 text-muted hover:bg-surface-2"
             aria-label="Remove quick reply"
           >
             <lucide-icon name="x" size="12" />
@@ -55,7 +55,7 @@
       type="button"
       (click)="addQuickReply()"
       [disabled]="!canAddQuickReply()"
-      class="mt-2 inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+      class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
     >
       <lucide-icon name="plus" size="10" />
       Add quick reply

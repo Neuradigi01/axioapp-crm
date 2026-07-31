@@ -7,9 +7,11 @@
       <lucide-icon name="chevron-right" class="h-3 w-3" />
       <span class="text-default">Map columns</span>
     </nav>
-    <h1 class="text-lg font-semibold text-default">Map columns</h1>
+    <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+      Map columns
+    </h1>
     @if (importRow(); as row) {
-      <p class="text-xs text-muted">
+      <p class="mt-1 text-[14px] text-muted">
         {{ row.original_filename }} · {{ row.row_count_estimate }} rows · source:
         {{ row.source_platform }}
       </p>
@@ -84,7 +86,7 @@
                 <select
                   [value]="mapping()[col] ?? ''"
                   (change)="onMappingChange(col, $event)"
-                  class="block w-full max-w-md rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="block w-full max-w-md rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                 >
                   <option value="">— Ignore —</option>
                   @if (targetGroups().contact.length > 0) {
@@ -140,7 +142,7 @@
         </tbody>
       </table>
     </div>
-    <p class="text-xs text-muted">
+    <p class="mt-1 text-[14px] text-muted">
       Auto-mapping is a best-effort suggestion based on column names — review every row.
     </p>
 
@@ -152,8 +154,8 @@
         </h2>
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           @for (row of previewMapped(); track $index) {
-            <div class="rounded-md border border-subtle bg-surface p-3 text-sm">
-              <p class="text-xs text-muted">Row {{ $index + 1 }}</p>
+            <div class="rounded-lg border border-subtle bg-surface p-3 text-sm">
+              <p class="mt-1 text-[14px] text-muted">Row {{ $index + 1 }}</p>
               <dl class="mt-1 space-y-0.5">
                 @if (row['contact.full_name']) {
                   <div class="font-medium text-default">{{ row['contact.full_name'] }}</div>
@@ -191,7 +193,7 @@
       <button
         type="button"
         (click)="openSavePreset()"
-        class="rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+        class="rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
       >
         Save as preset
       </button>
@@ -200,7 +202,7 @@
           type="button"
           (click)="cancelImport()"
           [disabled]="cancelling()"
-          class="rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+          class="rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
         >
           {{ cancelling() ? 'Cancelling…' : 'Cancel import' }}
         </button>
@@ -227,7 +229,7 @@
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div class="w-full max-w-md rounded-md bg-surface p-5 shadow-xl">
         <h2 class="text-base font-semibold text-default">Save mapping as preset</h2>
-        <p class="mt-1 text-xs text-muted">
+        <p class="mt-1 text-[14px] text-muted">
           Reuse this mapping on future imports from the same platform.
         </p>
         <label for="preset-name" class="mt-4 block text-xs font-medium text-default">
@@ -239,7 +241,7 @@
           [value]="presetName()"
           (input)="onPresetNameInput($event)"
           placeholder="Auto-named '<platform> vN' if blank"
-          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
         @if (savePresetError(); as err) {
           <p class="mt-2 text-xs text-red-600">{{ err }}</p>
@@ -248,7 +250,7 @@
           <button
             type="button"
             (click)="closeSavePreset()"
-            class="rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default hover:bg-surface-2"
+            class="rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default hover:bg-surface-2"
           >
             Cancel
           </button>

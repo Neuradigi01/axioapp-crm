@@ -10,13 +10,13 @@
         type="search"
         placeholder="Search by phone or handle"
         (input)="onSearchInput($event)"
-        class="block w-full rounded-md border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="block w-full rounded-lg border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       />
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
       <select
         (change)="onChannelChange($event)"
-        class="rounded-md border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="rounded-lg border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       >
         @for (o of channelOptions; track o.value) {
           <option [value]="o.value">{{ o.label }}</option>
@@ -24,7 +24,7 @@
       </select>
       <select
         (change)="onStatusChange($event)"
-        class="rounded-md border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="rounded-lg border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       >
         @for (o of statusOptions; track o.value) {
           <option [value]="o.value">{{ o.label }}</option>
@@ -51,7 +51,7 @@
       <select
         (change)="onSpecificUserChange($event)"
         [value]="specificUserId() ?? ''"
-        class="rounded-md border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="rounded-lg border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       >
         <option value="">— Select staff —</option>
         @for (s of staffOptions(); track s.id) {

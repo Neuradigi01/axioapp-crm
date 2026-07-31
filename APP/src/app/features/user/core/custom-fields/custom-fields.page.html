@@ -2,7 +2,7 @@
   <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
     <div>
       <h2 class="text-base font-semibold text-default">Custom fields</h2>
-      <p class="mt-1 text-xs text-muted">
+      <p class="mt-1 text-[14px] text-muted">
         Add fields to an entity, rename labels, mark required, hide, or reorder by dragging. Pack
         and system fields are labelled so you know where they came from — you can delete them too,
         but if the pack&rsquo;s imports or workflows reference the key you&rsquo;ll need to re-add
@@ -13,7 +13,7 @@
       <label for="entity-type" class="text-xs text-default">Entity</label>
       <select
         id="entity-type"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         [value]="entityType()"
         (change)="onEntityChange($any($event.target).value)"
       >
@@ -140,7 +140,7 @@
     <div class="w-full max-w-md rounded-lg bg-surface shadow-xl ring-1 border-subtle">
       <header class="border-b border-subtle px-4 md:px-6 py-4">
         <h2 class="text-base font-semibold text-default">Delete field</h2>
-        <p class="mt-1 text-xs text-muted">
+        <p class="mt-1 text-[14px] text-muted">
           Removes the definition and all existing values from records.
           <span class="text-red-500">This cannot be undone.</span>
         </p>
@@ -184,7 +184,7 @@
           type="button"
           (click)="cancelDelete()"
           [disabled]="deleting()"
-          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+          class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Cancel
         </button>

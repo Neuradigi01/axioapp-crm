@@ -73,7 +73,7 @@
                   [value]="item.pipeline_stage"
                   (change)="onStageChange(item, $event)"
                   [attr.aria-label]="'Change stage for item ' + item.id"
-                  class="block rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="block rounded-lg border border-subtle bg-surface px-2 py-1 text-xs text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                 >
                   @for (s of stages(); track s.key) {
                     <option [value]="s.key">{{ s.name }}</option>

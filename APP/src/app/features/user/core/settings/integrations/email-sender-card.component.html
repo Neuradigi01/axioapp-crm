@@ -177,7 +177,7 @@
                     @if (row.kind === 'smtp' && !row.verified) {
                       <button
                         type="button"
-                        class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
+                        class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
                         (click)="resendVerification(row)"
                       >
                         <lucide-icon name="shield-check" size="12" aria-hidden="true"></lucide-icon>
@@ -234,7 +234,7 @@
         </div>
         <button
           type="button"
-          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
           (click)="openAddDomain()"
         >
           <lucide-icon name="plus" size="12" aria-hidden="true"></lucide-icon>
@@ -347,7 +347,7 @@
                       <div class="inline-flex items-center gap-1">
                         <button
                           type="button"
-                          class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
+                          class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
                           (click)="showDns(row)"
                         >
                           <lucide-icon name="file-text" size="12" aria-hidden="true"></lucide-icon>
@@ -355,7 +355,7 @@
                         </button>
                         <button
                           type="button"
-                          class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                          class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
                           [disabled]="verifyingDomainId() === row.id"
                           (click)="verifyDomain(row)"
                         >

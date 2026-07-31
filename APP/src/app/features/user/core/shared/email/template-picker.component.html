@@ -1,7 +1,7 @@
 <div class="relative inline-block">
   <button
     type="button"
-    class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+    class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
     [disabled]="!canPick()"
     [title]="!canPick() ? 'Connect to a contact to use templates' : null"
     (click)="toggle()"
@@ -34,7 +34,7 @@
             type="text"
             [formControl]="searchCtrl"
             placeholder="Search…"
-            class="block w-full rounded-md border border-subtle bg-surface py-1 pl-6 pr-2 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            class="block w-full rounded-lg border border-subtle bg-surface py-1 pl-6 pr-2 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             autofocus
           />
         </label>

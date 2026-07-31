@@ -128,7 +128,7 @@
               formControlName="sku"
               [attr.placeholder]="stdField('sku')?.placeholder ?? 'e.g. SOF001'"
               autocomplete="off"
-              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm uppercase text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surface-2"
+              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm uppercase text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surface-2"
             />
             @if (stdField('sku')?.help_text; as help) {
               <p class="mt-1 text-xs text-muted">{{ help }}</p>
@@ -153,7 +153,7 @@
                 formControlName="category"
                 list="ci_category_options"
                 [attr.placeholder]="stdField('category')?.placeholder ?? 'Pick or type a new one'"
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               <datalist id="ci_category_options">
                 @for (c of categories(); track c.id) {
@@ -166,7 +166,7 @@
                 type="text"
                 formControlName="category"
                 [attr.placeholder]="stdField('category')?.placeholder ?? 'e.g. Sofa'"
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
             }
             @if (stdField('category')?.help_text; as help) {
@@ -187,7 +187,7 @@
             type="text"
             formControlName="name"
             [attr.placeholder]="stdField('name')?.placeholder ?? 'e.g. 3-seater Sofa'"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
           @if (stdField('name')?.help_text; as help) {
             <p class="mt-1 text-xs text-muted">{{ help }}</p>
@@ -205,7 +205,7 @@
           rows="3"
           formControlName="description"
           placeholder="Optional notes shown on the product detail page"
-          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         ></textarea>
       </div>
 
@@ -224,7 +224,7 @@
               [attr.step]="stdField('price')?.step_value ?? 0.01"
               formControlName="price"
               [attr.placeholder]="stdField('price')?.placeholder ?? '0.00'"
-              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
             @if (form.controls.price.touched && form.controls.price.invalid) {
               <p class="mt-1 text-xs text-red-600">
@@ -256,7 +256,7 @@
             step="0.01"
             formControlName="cost_price"
             placeholder="Optional — for margin analytics"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
           @if (form.controls.cost_price.touched && form.controls.cost_price.invalid) {
             <p class="mt-1 text-xs text-red-600">Must be zero or more.</p>
@@ -268,7 +268,7 @@
       <div>
         <label class="block text-xs font-medium text-default" for="ci_tags">Tags</label>
         <div
-          class="mt-1 flex flex-wrap items-center gap-1.5 rounded-md border border-subtle bg-surface px-2 py-1.5 shadow-sm focus-within:border-muted focus-within:ring-1 focus-within:ring-accent"
+          class="mt-1 flex flex-wrap items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2 py-1.5 shadow-sm focus-within:border-muted focus-within:ring-1 focus-within:ring-accent"
         >
           @for (tag of form.controls.tags.value; track tag) {
             <span
@@ -347,7 +347,7 @@
       <button
         type="button"
         (click)="cancel.emit()"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
       >
         Cancel
       </button>

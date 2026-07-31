@@ -24,7 +24,7 @@
           <input
             id="merge-search"
             type="search"
-            class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            class="w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             placeholder="Search by name, phone, or email…"
             [value]="searchTerm()"
             (input)="onSearchInput($event)"
@@ -104,7 +104,7 @@
       <button
         type="button"
         (click)="onCancel()"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         [disabled]="submitting()"
       >
         Cancel

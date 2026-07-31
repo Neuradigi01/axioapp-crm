@@ -36,7 +36,7 @@
             [formControl]="otherControl"
             maxlength="500"
             placeholder="e.g. switched to a custom-build vendor"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
           @if (otherControl.touched && otherControl.invalid) {
             <p class="mt-1 text-xs text-red-600">
@@ -65,7 +65,7 @@
         type="button"
         [disabled]="_submitting()"
         (click)="cancel.emit()"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
       >
         Cancel
       </button>

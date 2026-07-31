@@ -1,8 +1,10 @@
-<div class="mx-auto max-w-7xl p-4 md:p-6 space-y-5">
+<div class="mx-auto max-w-[1180px] p-4 md:p-6 space-y-5">
   <header class="flex flex-wrap items-start justify-between gap-3">
     <div>
-      <h1 class="text-lg font-semibold text-default">Catalog</h1>
-      <p class="mt-0.5 text-xs text-muted">
+      <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+        Catalog
+      </h1>
+      <p class="mt-1 text-[14px] text-muted">
         {{ totalProducts() }} product{{ totalProducts() === 1 ? '' : 's' }} · what your contacts
         &amp; leads can show interest in.
       </p>
@@ -10,7 +12,7 @@
     <div class="flex items-center gap-2">
       <a
         routerLink="/user/catalog/import"
-        class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
         title="Bulk-import products from CSV"
       >
         <lucide-icon name="upload" class="h-4 w-4" />
@@ -18,7 +20,7 @@
       </a>
       <a
         routerLink="/user/settings/catalog-categories"
-        class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
         title="Manage categories"
       >
         <lucide-icon name="folder" class="h-4 w-4" />
@@ -69,7 +71,7 @@
           type="search"
           [formControl]="searchControl"
           placeholder="Search by name or SKU…"
-          class="block w-full rounded-md border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="block w-full rounded-lg border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </div>
     </div>
@@ -82,7 +84,7 @@
       <select
         id="cat_category"
         [formControl]="categoryControl"
-        class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       >
         <option value="">All categories</option>
         @for (c of categoryOptions(); track c.id) {
@@ -143,7 +145,7 @@
                 {{ item.sku }}
               </p>
               <h3 class="mt-0.5 truncate text-sm font-semibold text-default">{{ item.name }}</h3>
-              <p class="mt-0.5 text-xs text-muted">
+              <p class="mt-1 text-[14px] text-muted">
                 {{ item.category ?? 'Uncategorized' }}
               </p>
             </div>
@@ -170,7 +172,7 @@
               <button
                 type="button"
                 (click)="openEdit(item)"
-                class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
+                class="rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
               >
                 Edit
               </button>

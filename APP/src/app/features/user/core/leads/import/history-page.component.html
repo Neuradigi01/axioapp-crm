@@ -6,8 +6,10 @@
         <lucide-icon name="chevron-right" class="h-3 w-3" />
         <span class="text-default">Import history</span>
       </nav>
-      <h1 class="text-lg font-semibold text-default">Import history</h1>
-      <p class="text-xs text-muted">
+      <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+        Import history
+      </h1>
+      <p class="mt-1 text-[14px] text-muted">
         Every bulk import this org has run. Download the original source file or the per-row error
         report from any past run.
       </p>
@@ -31,7 +33,7 @@
         id="status-filter"
         [value]="statusFilter()"
         (change)="onStatusChange($event)"
-        class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       >
         @for (opt of statusOptions; track opt.value) {
           <option [value]="opt.value">{{ opt.label }}</option>
@@ -46,7 +48,7 @@
         id="platform-filter"
         [value]="platformFilter()"
         (change)="onPlatformChange($event)"
-        class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       >
         @for (opt of platformOptions; track opt.value) {
           <option [value]="opt.value">{{ opt.label }}</option>
@@ -64,10 +66,10 @@
   @if (loading()) {
     <p class="text-sm text-muted">Loading imports…</p>
   } @else if (!hasResults()) {
-    <div class="rounded-md border border-subtle bg-surface p-5 md:p-8 text-center">
+    <div class="rounded-lg border border-subtle bg-surface p-5 md:p-8 text-center">
       <lucide-icon name="inbox" class="mx-auto h-8 w-8 text-faint" />
       <p class="mt-2 text-sm font-medium text-default">No imports yet</p>
-      <p class="mt-1 text-xs text-muted">
+      <p class="mt-1 text-[14px] text-muted">
         Upload a CSV or Excel file from another CRM to migrate your leads.
       </p>
       <a
@@ -80,7 +82,7 @@
     </div>
   } @else {
     <!-- Desktop table -->
-    <div class="hidden md:block overflow-visible rounded-md border border-subtle bg-surface">
+    <div class="hidden md:block overflow-visible rounded-lg border border-subtle bg-surface">
       <table class="min-w-full text-sm">
         <thead class="bg-surface-2 text-xs font-medium uppercase tracking-wide text-muted">
           <tr>
@@ -140,7 +142,7 @@
                 </button>
                 @if (isKebabOpen(row.id)) {
                   <div
-                    class="absolute right-4 top-10 z-10 w-48 rounded-md border border-subtle bg-surface py-1 shadow-lg"
+                    class="absolute right-4 top-10 z-10 w-48 rounded-lg border border-subtle bg-surface py-1 shadow-lg"
                     (click)="$event.stopPropagation()"
                   >
                     <button
@@ -183,11 +185,11 @@
     <!-- Mobile card list -->
     <div class="md:hidden space-y-2">
       @for (row of rows(); track row.id) {
-        <div class="rounded-md border border-subtle bg-surface p-3 space-y-2">
+        <div class="rounded-lg border border-subtle bg-surface p-3 space-y-2">
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
               <p class="truncate text-sm font-medium text-default">{{ row.name }}</p>
-              <p class="text-xs text-muted">
+              <p class="mt-1 text-[14px] text-muted">
                 {{ relativeTime(row.created_at) }} · {{ platformLabel(row.source_platform) }}
               </p>
             </div>
@@ -199,7 +201,7 @@
             </span>
           </div>
           @if (row.counts; as c) {
-            <p class="text-xs text-muted">
+            <p class="mt-1 text-[14px] text-muted">
               <span class="text-emerald-400">{{ c.imported ?? 0 }} ✓</span>
               · <span class="text-indigo-400">{{ c.duplicates_skipped ?? 0 }} dup</span> ·
               <span class="text-red-400">{{ c.errors ?? 0 }} err</span>
@@ -241,7 +243,7 @@
           type="button"
           [disabled]="page() <= 1"
           (click)="prevPage()"
-          class="rounded-md border border-subtle bg-surface px-3 py-1.5 hover:bg-surface-2 disabled:opacity-50"
+          class="rounded-lg border border-subtle bg-surface px-3 py-1.5 hover:bg-surface-2 disabled:opacity-50"
         >
           Previous
         </button>
@@ -249,7 +251,7 @@
           type="button"
           [disabled]="page() >= totalPages()"
           (click)="nextPage()"
-          class="rounded-md border border-subtle bg-surface px-3 py-1.5 hover:bg-surface-2 disabled:opacity-50"
+          class="rounded-lg border border-subtle bg-surface px-3 py-1.5 hover:bg-surface-2 disabled:opacity-50"
         >
           Next
         </button>

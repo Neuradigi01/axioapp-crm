@@ -195,7 +195,7 @@
             </p>
             <button
               type="button"
-              class="inline-flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+              class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
               (click)="openForm()"
               data-testid="whatsapp-open-manual-form"
             >
@@ -225,7 +225,7 @@
       @if (isConnected()) {
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
           [disabled]="testing()"
           (click)="test()"
         >
@@ -244,7 +244,7 @@
         </button>
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
           [disabled]="syncing()"
           (click)="syncTemplates()"
         >
@@ -263,7 +263,7 @@
         </button>
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
           [disabled]="disconnecting()"
           (click)="disconnect()"
         >
@@ -292,7 +292,7 @@
         </button>
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
           [disabled]="disconnecting()"
           (click)="disconnect()"
         >
@@ -550,7 +550,7 @@
           </span>
           <input
             type="text"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             placeholder="123456789012345"
             formControlName="phone_id"
             autocomplete="off"
@@ -562,7 +562,7 @@
           </span>
           <input
             type="text"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             placeholder="987654321098765"
             formControlName="waba_id"
             autocomplete="off"
@@ -576,7 +576,7 @@
         </span>
         <input
           type="password"
-          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           placeholder="EAA… (System User permanent token)"
           formControlName="access_token"
           autocomplete="off"
@@ -593,7 +593,7 @@
         </span>
         <input
           type="password"
-          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           placeholder="Meta App → Settings → Basic → App Secret"
           formControlName="app_secret"
           autocomplete="off"
@@ -609,7 +609,7 @@
         </span>
         <input
           type="text"
-          class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           placeholder="furniturecrm-verify-xyz123"
           formControlName="verify_token"
           autocomplete="off"
@@ -638,7 +638,7 @@
             <span class="text-xs font-medium text-default"> Graph API version </span>
             <input
               type="text"
-              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               formControlName="api_version"
               autocomplete="off"
             />
@@ -653,7 +653,7 @@
               type="number"
               min="1"
               max="1000"
-              class="mt-1 block w-32 rounded-md border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              class="mt-1 block w-32 rounded-lg border border-subtle bg-surface px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               formControlName="rate_limit_per_sec"
               autocomplete="off"
             />
@@ -668,7 +668,7 @@
       <div class="flex items-center justify-end gap-2 pt-2">
         <button
           type="button"
-          class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+          class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
           [disabled]="connecting()"
           (click)="cancelForm()"
         >

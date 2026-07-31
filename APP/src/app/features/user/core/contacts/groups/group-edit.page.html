@@ -1,10 +1,10 @@
 <div class="p-4 md:p-6 max-w-3xl">
   <header class="mb-5 flex items-center justify-between">
     <div>
-      <h1 class="text-xl font-semibold text-default">
+      <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
         {{ isEdit() ? 'Edit group' : 'New group' }}
       </h1>
-      <p class="mt-1 text-sm text-muted">
+      <p class="mt-1 text-[14px] text-muted">
         @if (isEdit()) {
           Update the group's name, description, and member set. Mode (Dynamic / Static) is locked
           after creation — delete and recreate to switch.
@@ -15,7 +15,7 @@
     </div>
     <a
       routerLink="/user/contacts/groups"
-      class="inline-flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+      class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
     >
       <lucide-icon name="arrow-left" class="h-4 w-4" />
       Back to list
@@ -47,7 +47,7 @@
               <lucide-icon name="refresh-cw" class="h-4 w-4" />
               <span class="font-medium text-default">Dynamic</span>
             </div>
-            <p class="mt-1 text-xs text-muted">
+            <p class="mt-1 text-[14px] text-muted">
               Filter-based; recomputes on every send. New matching contacts auto-include.
             </p>
           </button>
@@ -65,7 +65,7 @@
               <lucide-icon name="pin" class="h-4 w-4" />
               <span class="font-medium text-default">Static</span>
             </div>
-            <p class="mt-1 text-xs text-muted">
+            <p class="mt-1 text-[14px] text-muted">
               Fixed contact list; frozen at save. New matching contacts do NOT auto-include.
             </p>
           </button>
@@ -79,7 +79,7 @@
           <input
             type="text"
             formControlName="name"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             placeholder="Walk-in Sofa Shoppers"
           />
         </label>
@@ -88,7 +88,7 @@
           <textarea
             rows="2"
             formControlName="description"
-            class="mt-1 block w-full resize-none rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            class="mt-1 block w-full resize-none rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             placeholder="Q4 retention target — repeat campaigns"
           ></textarea>
         </label>
@@ -107,7 +107,7 @@
                 type="text"
                 formControlName="filter_q"
                 placeholder="name / phone / email"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm"
+                class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm"
               />
             </label>
             <label class="block text-sm">
@@ -116,7 +116,7 @@
                 type="text"
                 formControlName="filter_source"
                 placeholder="walk-in"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm"
+                class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm"
               />
             </label>
             <label class="block text-sm">
@@ -125,7 +125,7 @@
                 type="text"
                 formControlName="filter_tag"
                 placeholder="vip"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm"
+                class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm"
               />
             </label>
           </div>
@@ -145,7 +145,7 @@
               type="text"
               formControlName="contact_search"
               placeholder="Type a name, phone, or email…"
-              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </label>
 
@@ -157,7 +157,7 @@
           }
 
           @if (searchResults().length > 0) {
-            <ul class="mt-2 max-h-48 overflow-y-auto rounded-md border border-subtle bg-surface">
+            <ul class="mt-2 max-h-48 overflow-y-auto rounded-lg border border-subtle bg-surface">
               @for (c of searchResults(); track c.id) {
                 <li>
                   <button
@@ -242,7 +242,7 @@
       <div class="flex items-center justify-end gap-2 pt-2">
         <a
           routerLink="/user/contacts/groups"
-          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+          class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         >
           Cancel
         </a>

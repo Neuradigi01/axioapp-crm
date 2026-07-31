@@ -61,7 +61,7 @@
                   <button
                     type="button"
                     (click)="viewVersion(v)"
-                    class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default hover:bg-surface-2"
+                    class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs text-default hover:bg-surface-2"
                   >
                     <lucide-icon name="eye" size="11" />
                     View
@@ -71,7 +71,7 @@
                       type="button"
                       (click)="restore(v)"
                       [disabled]="restoring() !== null"
-                      class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default hover:bg-surface-2 disabled:opacity-50"
+                      class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                     >
                       @if (restoring() === v.version) {
                         <lucide-icon name="loader-2" size="11" class="animate-spin" />

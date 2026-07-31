@@ -2,8 +2,12 @@
   <header class="border-b border-subtle bg-surface px-4 md:px-6 py-4">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-xl font-semibold text-default">WhatsApp Business profile</h1>
-        <p class="text-xs text-muted">
+        <h1
+          class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
+        >
+          WhatsApp Business profile
+        </h1>
+        <p class="mt-1 text-[14px] text-muted">
           Edit how your business appears on WhatsApp. Set business hours and auto-reply messages
           used by automation.
         </p>
@@ -13,7 +17,7 @@
           type="button"
           (click)="refreshFromMeta()"
           [disabled]="refreshing() || loading()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
         >
           <lucide-icon name="refresh-cw" size="14" />
           {{ refreshing() ? 'Syncing…' : 'Refresh from Meta' }}
@@ -22,7 +26,7 @@
           type="button"
           (click)="save()"
           [disabled]="!dirty() || saving()"
-          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
+          class="btn btn-primary disabled:opacity-50"
         >
           {{ saving() ? 'Saving…' : 'Save' }}
         </button>
@@ -64,7 +68,7 @@
     <section class="grid grid-cols-1 gap-6 px-4 md:px-6 py-4 md:py-6 lg:grid-cols-3">
       <!-- Photo + verified name (left) -->
       <div class="space-y-4">
-        <div class="rounded-md border border-subtle bg-surface p-4">
+        <div class="rounded-lg border border-subtle bg-surface p-4">
           <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
             Profile picture
           </p>
@@ -86,7 +90,7 @@
               type="button"
               (click)="openPhotoPicker()"
               [disabled]="uploadingPhoto()"
-              class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
             >
               <lucide-icon name="upload" size="12" />
               {{ uploadingPhoto() ? 'Uploading…' : 'Upload new picture' }}
@@ -104,7 +108,7 @@
           </div>
         </div>
 
-        <div class="rounded-md border border-subtle bg-surface p-4">
+        <div class="rounded-lg border border-subtle bg-surface p-4">
           <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Number</p>
           <p class="text-sm font-medium text-default">
             {{ p.display_phone_number }}
@@ -125,7 +129,7 @@
 
       <!-- Profile fields (middle + right span 2) -->
       <div class="space-y-4 lg:col-span-2">
-        <div class="rounded-md border border-subtle bg-surface p-4">
+        <div class="rounded-lg border border-subtle bg-surface p-4">
           <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
             About + description
           </p>
@@ -226,7 +230,7 @@
         </div>
 
         <!-- Business hours -->
-        <div class="rounded-md border border-subtle bg-surface p-4">
+        <div class="rounded-lg border border-subtle bg-surface p-4">
           <div class="mb-3 flex items-center justify-between">
             <p class="text-xs font-semibold uppercase tracking-wide text-muted">Business hours</p>
             <button
@@ -301,7 +305,7 @@
         </div>
 
         <!-- Greeting + Away messages -->
-        <div class="rounded-md border border-subtle bg-surface p-4">
+        <div class="rounded-lg border border-subtle bg-surface p-4">
           <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
             Greeting message
           </p>

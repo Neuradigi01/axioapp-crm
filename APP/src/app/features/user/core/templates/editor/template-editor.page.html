@@ -10,7 +10,9 @@
           Back to list
         </a>
         <span class="text-faint">·</span>
-        <h1 class="text-lg font-semibold text-default">
+        <h1
+          class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
+        >
           @if (template(); as t) {
             {{ t.name }}
           } @else {
@@ -44,7 +46,7 @@
           <button
             type="button"
             (click)="openVersionsDrawer()"
-            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
           >
             <lucide-icon name="history" size="12" />
             Versions
@@ -54,7 +56,7 @@
           <button
             type="button"
             (click)="openTestSendModal()"
-            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
           >
             <lucide-icon name="send" size="12" />
             Test send
@@ -121,7 +123,7 @@
             type="button"
             (click)="refreshExternalStatus()"
             [disabled]="transitioning() !== null"
-            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
             title="Re-check Meta for the live status — same call the hourly sweep makes"
           >
             @if (transitioning() === 'sync_external') {
@@ -153,7 +155,7 @@
             type="button"
             (click)="archiveTemplate()"
             [disabled]="transitioning() !== null"
-            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
           >
             @if (transitioning() === 'archive') {
               <lucide-icon name="loader-2" size="12" class="animate-spin" />
@@ -168,7 +170,7 @@
             type="button"
             (click)="save()"
             [disabled]="saving()"
-            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
+            class="btn btn-primary disabled:opacity-50"
           >
             @if (saving()) {
               <lucide-icon name="loader-2" size="12" class="animate-spin" />
@@ -239,7 +241,7 @@
               type="text"
               formControlName="name"
               maxlength="120"
-              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
+              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
               [class.border-red-400]="waNameInvalid()"
               placeholder="e.g. welcome_lead"
             />
@@ -269,7 +271,7 @@
             <span class="text-xs font-medium text-default">Channel</span>
             <select
               formControlName="channel"
-              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
+              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
             >
               <option value="">— Pick a channel —</option>
               <option value="email">Email</option>

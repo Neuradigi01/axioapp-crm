@@ -8,22 +8,22 @@
     </p>
   } @else if (summary(); as s) {
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
-      <div class="rounded-md border border-subtle bg-surface p-4">
+      <div class="rounded-lg border border-subtle bg-surface p-4">
         <p class="text-[11px] font-medium uppercase tracking-wide text-muted">Accepted</p>
         <p class="mt-1 text-2xl font-semibold text-emerald-400">{{ countOf(s, 'accepted') }}</p>
         <p class="text-[10px] text-faint">Last 30 days</p>
       </div>
-      <div class="rounded-md border border-subtle bg-surface p-4">
+      <div class="rounded-lg border border-subtle bg-surface p-4">
         <p class="text-[11px] font-medium uppercase tracking-wide text-muted">Spam blocked</p>
         <p class="mt-1 text-2xl font-semibold text-orange-700">{{ countOf(s, 'rejected_spam') }}</p>
         <p class="text-[10px] text-faint">honeypot · min-time · reCAPTCHA</p>
       </div>
-      <div class="rounded-md border border-subtle bg-surface p-4">
+      <div class="rounded-lg border border-subtle bg-surface p-4">
         <p class="text-[11px] font-medium uppercase tracking-wide text-muted">Rate-limited</p>
         <p class="mt-1 text-2xl font-semibold text-amber-400">{{ countOf(s, 'rate_limited') }}</p>
         <p class="text-[10px] text-faint">per-key · per-IP</p>
       </div>
-      <div class="rounded-md border border-subtle bg-surface p-4">
+      <div class="rounded-lg border border-subtle bg-surface p-4">
         <p class="text-[11px] font-medium uppercase tracking-wide text-muted">Errors</p>
         <p class="mt-1 text-2xl font-semibold text-red-400">{{ countOf(s, 'invalid_payload') }}</p>
         <p class="text-[10px] text-faint">forged · stale config</p>
@@ -31,7 +31,7 @@
     </div>
 
     <!-- Bar chart -->
-    <div class="rounded-md border border-subtle bg-surface p-4">
+    <div class="rounded-lg border border-subtle bg-surface p-4">
       <div class="mb-2 flex items-center justify-between">
         <h4 class="text-sm font-semibold text-default">Submissions per day · last 30 days</h4>
         <button type="button" (click)="refresh()" class="text-xs text-muted hover:text-default">
@@ -56,7 +56,7 @@
             [class.bg-accent]="outcomeFilter() === opt.value"
             [class.text-white]="outcomeFilter() === opt.value"
             [class.text-muted]="outcomeFilter() !== opt.value"
-            class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs hover:bg-surface-2"
+            class="rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs hover:bg-surface-2"
           >
             {{ opt.label }}
           </button>
@@ -72,7 +72,7 @@
             [class.bg-accent]="rangePreset() === preset"
             [class.text-white]="rangePreset() === preset"
             [class.text-muted]="rangePreset() !== preset"
-            class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs hover:bg-surface-2"
+            class="rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs hover:bg-surface-2"
           >
             {{ preset }}
           </button>

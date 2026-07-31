@@ -107,7 +107,7 @@
       </button>
       <button
         type="button"
-        class="inline-flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+        class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
         (click)="disconnect()"
       >
         <lucide-icon name="trash-2" size="16" aria-hidden="true"></lucide-icon>
@@ -116,7 +116,7 @@
     } @else {
       <button
         type="button"
-        class="inline-flex items-center gap-2 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+        class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
         (click)="disconnect()"
       >
         <lucide-icon name="trash-2" size="16" aria-hidden="true"></lucide-icon>
@@ -142,7 +142,7 @@
           </code>
           <button
             type="button"
-            class="inline-flex shrink-0 items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
+            class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
             (click)="copyWebhookUrl()"
             aria-label="Copy webhook URL"
           >
@@ -236,7 +236,7 @@
                         @if (subscriptionsByForm()[form.form_id]) {
                           <button
                             type="button"
-                            class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
+                            class="rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
                             (click)="openMapping(form)"
                           >
                             Edit mapping

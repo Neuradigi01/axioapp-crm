@@ -145,7 +145,7 @@
                 <input
                   type="email"
                   autocomplete="off"
-                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   placeholder="hello@yourshop.com"
                   formControlName="from_address"
                 />
@@ -160,7 +160,7 @@
                 <input
                   type="text"
                   autocomplete="off"
-                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   placeholder="Your Shop Sales"
                   formControlName="display_name"
                 />
@@ -176,7 +176,7 @@
                 <input
                   type="text"
                   autocomplete="off"
-                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   placeholder="smtp.gmail.com"
                   formControlName="smtp_host"
                 />
@@ -190,7 +190,7 @@
                   type="number"
                   min="1"
                   max="65535"
-                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   placeholder="587"
                   formControlName="smtp_port"
                 />
@@ -203,7 +203,7 @@
                 <input
                   type="text"
                   autocomplete="off"
-                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   placeholder="hello@yourshop.com"
                   formControlName="smtp_username"
                 />
@@ -217,7 +217,7 @@
                   <input
                     [type]="passwordVisible() ? 'text' : 'password'"
                     autocomplete="new-password"
-                    class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 pr-10 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 pr-10 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                     placeholder="App password or SMTP secret"
                     formControlName="smtp_password"
                   />
@@ -242,7 +242,7 @@
               <label class="block sm:col-span-2">
                 <span class="text-xs font-medium text-default">TLS mode</span>
                 <select
-                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   formControlName="tls_mode"
                 >
                   <option value="starttls">STARTTLS (port 587, recommended)</option>
@@ -255,7 +255,7 @@
             <div class="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
-                class="inline-flex items-center rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                class="inline-flex items-center rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
                 [disabled]="submitting()"
                 (click)="cancel()"
               >

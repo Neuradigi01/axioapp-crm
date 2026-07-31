@@ -9,7 +9,7 @@
       formControlName="title"
       [maxlength]="TITLE_MAX"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
+      class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
       placeholder="Your order is ready"
     />
     <p class="mt-1 text-[10px] text-faint">
@@ -28,7 +28,7 @@
       [maxlength]="BODY_MAX"
       rows="4"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none"
+      class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none"
       placeholder="Hi {{
         '{' + '{' + 'contact.first_name' + '}' + '}'
       }}, your order is ready for pickup."
@@ -45,7 +45,7 @@
       formControlName="action_url"
       [maxlength]="URL_MAX"
       (focus)="onFocus($event)"
-      class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
+      class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
       placeholder="https://app.example/orders/{{ '{' + '{' + 'quote.id' + '}' + '}' }}"
     />
     <p class="mt-1 text-[10px] text-faint">

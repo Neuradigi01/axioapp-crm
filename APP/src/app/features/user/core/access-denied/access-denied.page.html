@@ -21,7 +21,9 @@
       </svg>
     </div>
 
-    <h1 class="text-lg font-semibold text-default">Access denied</h1>
+    <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+      Access denied
+    </h1>
 
     <p class="mt-2 text-sm text-muted">
       @if (missingKeys().length > 0) {
@@ -37,7 +39,7 @@
     </p>
 
     @if (roleName()) {
-      <p class="mt-1 text-xs text-muted">
+      <p class="mt-1 text-[14px] text-muted">
         Your role <span class="font-medium text-default">{{ roleName() }}</span> does not include
         it.
       </p>

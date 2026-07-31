@@ -15,14 +15,14 @@
           <input
             type="text"
             formControlName="name"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </label>
         <label class="block text-sm">
           <span class="block text-xs font-medium text-muted">Channel</span>
           <select
             formControlName="channel"
-            class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
           >
             @for (c of channels; track c.value) {
               <option [value]="c.value">{{ c.label }}</option>
@@ -74,7 +74,7 @@
               type="button"
               (click)="refreshCapacity()"
               [disabled]="capacityLoading()"
-              class="shrink-0 rounded-md border border-subtle bg-surface px-2 py-1 text-[10px] font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+              class="shrink-0 rounded-lg border border-subtle bg-surface px-2 py-1 text-[10px] font-medium text-default hover:bg-surface-2 disabled:opacity-50"
             >
               {{ capacityLoading() ? 'Refreshing…' : 'Refresh' }}
             </button>
@@ -136,7 +136,7 @@
             <select
               [value]="selectedGroupId() ?? ''"
               (change)="onSelectedGroupChange($any($event.target).value)"
-              class="block w-full rounded-md border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              class="block w-full rounded-lg border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             >
               <option value="">— Pick a saved group —</option>
               @for (g of groups(); track g.id) {
@@ -157,7 +157,7 @@
                 type="text"
                 formControlName="audience_q"
                 placeholder="name / phone / email"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </label>
             <label class="block text-sm">
@@ -166,7 +166,7 @@
                 type="text"
                 formControlName="audience_source"
                 placeholder="walk-in"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </label>
             <label class="block text-sm">
@@ -175,13 +175,13 @@
                 type="text"
                 formControlName="audience_tag"
                 placeholder="vip"
-                class="mt-0.5 block w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </label>
           </div>
 
           <!-- Live matching-contacts preview (Custom filter mode only) -->
-          <div class="mt-2 rounded-md border border-subtle bg-surface">
+          <div class="mt-2 rounded-lg border border-subtle bg-surface">
             <div
               class="flex items-center justify-between gap-2 border-b border-subtle px-2 py-1 text-[10px] uppercase tracking-wide text-muted"
               [class.border-b-0]="audiencePreviewCollapsed()"
@@ -263,7 +263,7 @@
 
         <!-- Selected contacts chip strip (Custom filter mode, non-empty) -->
         @if (selectedContactMap().size > 0) {
-          <div class="rounded-md border border-subtle bg-surface p-2">
+          <div class="rounded-lg border border-subtle bg-surface p-2">
             <div
               class="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted"
             >
@@ -403,7 +403,7 @@
                 </span>
                 <select
                   formControlName="email_account_id"
-                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                 >
                   <option [ngValue]="null">— Pick a mailbox —</option>
                   @for (a of emailAccounts() ?? []; track a.id) {
@@ -423,7 +423,7 @@
                   formControlName="sender_name"
                   maxlength="120"
                   placeholder="Your Shop"
-                  class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 <span class="mt-0.5 block text-[10px] text-muted">
                   Shown in inbox before the address.
@@ -438,7 +438,7 @@
                 formControlName="reply_to"
                 maxlength="320"
                 placeholder="hello@yourshop.com"
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               <span class="mt-0.5 block text-[10px] text-muted">
                 Where replies land. Defaults to the mailbox address at send time.
@@ -460,7 +460,7 @@
                 formControlName="subject"
                 maxlength="998"
                 [placeholder]="subjectPlaceholder"
-                class="block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               <span class="mt-1 flex items-center gap-2 text-[10px] text-muted">
                 Insert variable:
@@ -483,7 +483,7 @@
                 formControlName="preheader"
                 maxlength="200"
                 placeholder="Five picks for you, expires Sunday"
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               <span class="mt-0.5 block text-[10px] text-muted">
                 Preview snippet shown next to the subject in the inbox · ~90 chars for Gmail / Apple
@@ -511,7 +511,7 @@
           <div
             role="listbox"
             aria-label="Template"
-            class="max-h-64 divide-y divide-subtle overflow-y-auto rounded-md border border-subtle bg-surface"
+            class="max-h-64 divide-y divide-subtle overflow-y-auto rounded-lg border border-subtle bg-surface"
           >
             @for (t of templates(); track t.id) {
               <button
@@ -587,7 +587,7 @@
                     <select
                       [value]="variables()[n.toString()]?.kind ?? 'static'"
                       (change)="onVariableKindChange(n, $any($event.target).value)"
-                      class="col-span-3 rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                      class="col-span-3 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                     >
                       <option value="static">Static text</option>
                       <option value="field">Contact field</option>
@@ -596,7 +596,7 @@
                       <select
                         [value]="variables()[n.toString()]?.value ?? ''"
                         (change)="onVariableValueChange(n, $any($event.target).value)"
-                        class="col-span-7 rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                        class="col-span-7 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                       >
                         <option value="">— Select field —</option>
                         @for (f of contactFieldOptions; track f.value) {
@@ -609,7 +609,7 @@
                         [value]="variables()[n.toString()]?.value ?? ''"
                         (input)="onVariableValueChange(n, $any($event.target).value)"
                         placeholder="e.g. 30%"
-                        class="col-span-7 rounded-md border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                        class="col-span-7 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     }
                   </div>
@@ -660,7 +660,7 @@
           formControlName="template"
           [placeholder]="templatePlaceholder"
           [class.opacity-50]="selectedTemplateId()"
-          class="mt-1 block w-full resize-none rounded-md border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="mt-1 block w-full resize-none rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         ></textarea>
       </label>
 
@@ -691,7 +691,7 @@
         <input
           type="datetime-local"
           formControlName="schedule_at"
-          class="mt-1 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          class="mt-1 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </label>
 
@@ -739,7 +739,7 @@
         <button
           type="button"
           (click)="close()"
-          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+          class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         >
           Cancel
         </button>

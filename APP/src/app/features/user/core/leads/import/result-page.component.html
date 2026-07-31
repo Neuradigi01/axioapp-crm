@@ -7,7 +7,9 @@
       <lucide-icon name="chevron-right" class="h-3 w-3" />
       <span class="text-default">Result</span>
     </nav>
-    <h1 class="text-lg font-semibold text-default">Import result</h1>
+    <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+      Import result
+    </h1>
   </header>
 
   @if (loadError(); as err) {
@@ -16,7 +18,7 @@
     </p>
   } @else if (importRow(); as row) {
     <!-- Header card with status + filename -->
-    <div class="rounded-md border border-subtle bg-surface p-4">
+    <div class="rounded-lg border border-subtle bg-surface p-4">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
           <p class="truncate text-sm font-medium text-default">{{ row.name }}</p>
@@ -151,7 +153,7 @@
           type="button"
           (click)="downloadSkipped()"
           [disabled]="downloadingSkipped()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
         >
           <lucide-icon name="download" class="h-4 w-4" />
           {{ downloadingSkipped() ? 'Downloading…' : 'Download duplicates report' }}
@@ -162,7 +164,7 @@
           type="button"
           (click)="downloadWarnings()"
           [disabled]="downloadingWarnings()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
         >
           <lucide-icon name="download" class="h-4 w-4" />
           {{ downloadingWarnings() ? 'Downloading…' : 'Download warnings report' }}
@@ -173,7 +175,7 @@
           type="button"
           (click)="downloadErrors()"
           [disabled]="downloading()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
         >
           <lucide-icon name="download" class="h-4 w-4" />
           {{ downloading() ? 'Downloading…' : 'Download error report' }}

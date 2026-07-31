@@ -29,7 +29,7 @@
                 formControlName="phone"
                 autocomplete="tel"
                 [attr.placeholder]="stdField('phone')?.placeholder ?? '+91 9000000001'"
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               @if (form.controls.phone.touched && form.controls.phone.invalid) {
                 <p class="mt-1 text-xs text-red-600">
@@ -61,7 +61,7 @@
                 formControlName="full_name"
                 autocomplete="name"
                 [attr.placeholder]="stdField('full_name')?.placeholder ?? 'e.g. Asha Reddy'"
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               @if (form.controls.full_name.touched && form.controls.full_name.invalid) {
                 <p class="mt-1 text-xs text-red-600">
@@ -95,7 +95,7 @@
                 formControlName="email"
                 autocomplete="email"
                 [attr.placeholder]="stdField('email')?.placeholder"
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               @if (form.controls.email.touched && form.controls.email.invalid) {
                 <p class="mt-1 text-xs text-red-600">
@@ -130,7 +130,7 @@
                 [attr.placeholder]="
                   stdField('source')?.placeholder ?? 'walk_in / referral / phone / …'
                 "
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               @if (stdField('source')?.help_text; as help) {
                 <p class="mt-1 text-xs text-muted">{{ help }}</p>
@@ -178,7 +178,7 @@
                 [attr.placeholder]="
                   stdField('requirement')?.placeholder ?? 'e.g. 3-seater sofa, Teak preferred'
                 "
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               @if (stdField('requirement')?.help_text; as help) {
                 <p class="mt-1 text-xs text-muted">{{ help }}</p>
@@ -201,7 +201,7 @@
                 [attr.max]="stdField('budget')?.max_value"
                 formControlName="budget"
                 [attr.placeholder]="stdField('budget')?.placeholder ?? '0.00'"
-                class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
               />
               @if (form.controls.budget.touched && form.controls.budget.invalid) {
                 <p class="mt-1 text-xs text-red-600">
@@ -241,7 +241,7 @@
               step="1"
               formControlName="party_size"
               placeholder="e.g. 4 for a family"
-              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
             @if (form.controls.party_size.touched && form.controls.party_size.invalid) {
               <p class="mt-1 text-xs text-red-600">
@@ -269,7 +269,7 @@
               formControlName="expected_return_date"
               [min]="expectedReturnMin"
               [max]="expectedReturnMax"
-              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
             @if (
               form.controls.expected_return_date.touched &&
@@ -303,7 +303,7 @@
               formControlName="wait_started_at"
               [min]="waitStartedMin"
               [max]="waitStartedMax"
-              class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
             @if (form.controls.wait_started_at.touched && form.controls.wait_started_at.invalid) {
               <p class="mt-1 text-xs text-red-600">
@@ -368,7 +368,7 @@
       <button
         type="button"
         (click)="cancel.emit()"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
       >
         Cancel
       </button>

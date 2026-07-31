@@ -7,14 +7,18 @@
     </nav>
     <div class="flex items-center justify-between gap-4">
       <div>
-        <h1 class="text-lg font-semibold text-default">Import contacts</h1>
+        <h1
+          class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
+        >
+          Import contacts
+        </h1>
         <p class="text-sm text-muted">
           Upload an Excel or CSV file, map the columns, and preview the import before committing.
         </p>
       </div>
       <a
         routerLink="/user/contacts/import/history"
-        class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
       >
         <lucide-icon name="history" class="h-4 w-4" />
         View history
@@ -64,12 +68,12 @@
     <section class="space-y-4 rounded-xl border border-subtle bg-surface p-4 md:p-6">
       <div>
         <h2 class="text-sm font-semibold text-default">Choose a file</h2>
-        <p class="text-xs text-muted">.xlsx or .csv · up to 10 MB · 50,000 rows max.</p>
+        <p class="mt-1 text-[14px] text-muted">.xlsx or .csv · up to 10 MB · 50,000 rows max.</p>
       </div>
 
       @if (selectedFile(); as file) {
         <div
-          class="flex items-center justify-between rounded-md border border-subtle bg-surface px-4 py-3"
+          class="flex items-center justify-between rounded-lg border border-subtle bg-surface px-4 py-3"
         >
           <div class="flex min-w-0 items-center gap-3">
             <lucide-icon name="file-spreadsheet" class="h-5 w-5 shrink-0 text-emerald-600" />
@@ -77,7 +81,7 @@
               <p class="truncate text-sm font-medium text-default">
                 {{ file.name }}
               </p>
-              <p class="text-xs text-muted">{{ fileSizeLabel() }}</p>
+              <p class="mt-1 text-[14px] text-muted">{{ fileSizeLabel() }}</p>
             </div>
           </div>
           <button
@@ -105,7 +109,7 @@
             <span class="font-medium text-indigo-600">Click to browse</span>
             or drag a file here
           </div>
-          <p class="text-xs text-muted">.xlsx or .csv</p>
+          <p class="mt-1 text-[14px] text-muted">.xlsx or .csv</p>
           <input
             id="contact-import-file"
             type="file"
@@ -127,7 +131,7 @@
       <div class="flex items-center justify-end gap-2 pt-2">
         <a
           routerLink="/user/contacts"
-          class="rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          class="rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
         >
           Cancel
         </a>
@@ -157,7 +161,7 @@
       <div class="flex items-start justify-between gap-4">
         <div>
           <h2 class="text-sm font-semibold text-default">Map columns</h2>
-          <p class="text-xs text-muted">
+          <p class="mt-1 text-[14px] text-muted">
             {{ meta.row_count }} data row(s) detected in
             <span class="font-medium text-default">{{ meta.filename }}</span
             >. Map each column to a contact field, or skip it.
@@ -260,7 +264,7 @@
               (input)="onGroupNameInput($event)"
               maxlength="255"
               placeholder="e.g. Q3 Sales Leads"
-              class="block w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
             @if (groupNameRequired()) {
               <p class="mt-1 text-xs text-red-600">Group name is required.</p>
@@ -285,7 +289,7 @@
         <button
           type="button"
           (click)="backToUpload()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
         >
           <lucide-icon name="arrow-left" class="h-4 w-4" />
           Back
@@ -315,7 +319,7 @@
     <section class="space-y-5 rounded-xl border border-subtle bg-surface p-4 md:p-6">
       <div>
         <h2 class="text-sm font-semibold text-default">Preview</h2>
-        <p class="text-xs text-muted">
+        <p class="mt-1 text-[14px] text-muted">
           Nothing has been inserted yet. Review the counts and commit when ready.
         </p>
       </div>
@@ -405,7 +409,7 @@
                 type="button"
                 (click)="downloadErrors()"
                 [disabled]="downloadingErrors()"
-                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <lucide-icon name="download" class="h-3.5 w-3.5" />
                 {{ downloadingErrors() ? 'Preparing…' : 'Download errors CSV' }}
@@ -473,7 +477,7 @@
                 type="button"
                 (click)="downloadSkipped()"
                 [disabled]="downloadingSkipped()"
-                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <lucide-icon name="download" class="h-3.5 w-3.5" />
                 {{ downloadingSkipped() ? 'Preparing…' : 'Download duplicates CSV' }}
@@ -542,7 +546,7 @@
                 type="button"
                 (click)="downloadWarnings()"
                 [disabled]="downloadingWarnings()"
-                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <lucide-icon name="download" class="h-3.5 w-3.5" />
                 {{ downloadingWarnings() ? 'Preparing…' : 'Download warnings CSV' }}
@@ -565,7 +569,7 @@
           type="button"
           (click)="backToMapping()"
           [disabled]="committing()"
-          class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <lucide-icon name="arrow-left" class="h-4 w-4" />
           Back
@@ -604,7 +608,7 @@
         </div>
         <div>
           <h2 class="text-lg font-semibold text-default">Import in progress</h2>
-          <p class="mt-1 text-sm text-muted">
+          <p class="mt-1 text-[14px] text-muted">
             The worker is inserting {{ outcome.row_count }} row(s). This page updates automatically
             — feel free to leave and come back.
           </p>
@@ -612,7 +616,7 @@
         <div class="flex flex-wrap items-center justify-center gap-2">
           <a
             routerLink="/user/contacts/import/history"
-            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
           >
             <lucide-icon name="history" class="h-4 w-4" />
             View history
@@ -640,7 +644,7 @@
         </div>
         <div>
           <h2 class="text-lg font-semibold text-default">Import failed</h2>
-          <p class="mt-1 text-sm text-muted">
+          <p class="mt-1 text-[14px] text-muted">
             The worker hit a fatal error and stopped. Check the import history for details, or
             re-upload the file.
           </p>
@@ -648,7 +652,7 @@
         <div class="flex flex-wrap items-center justify-center gap-2">
           <a
             routerLink="/user/contacts/import/history"
-            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
           >
             <lucide-icon name="history" class="h-4 w-4" />
             View history
@@ -662,7 +666,7 @@
         </div>
         <div>
           <h2 class="text-lg font-semibold text-default">Import cancelled</h2>
-          <p class="mt-1 text-sm text-muted">
+          <p class="mt-1 text-[14px] text-muted">
             {{ outcome.success_count }} contact(s) were added before the cancel took effect. Any
             remaining rows were not processed.
           </p>
@@ -671,7 +675,7 @@
           <button
             type="button"
             (click)="goToContacts()"
-            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
           >
             <lucide-icon name="users" class="h-4 w-4" />
             Back to contacts
@@ -689,7 +693,7 @@
         </div>
         <div>
           <h2 class="text-lg font-semibold text-default">Import complete</h2>
-          <p class="mt-1 text-sm text-muted">
+          <p class="mt-1 text-[14px] text-muted">
             {{ outcome.success_count }} contact(s) added.
             @if (outcome.error_count > 0) {
               {{ outcome.error_count }} row(s) failed.
@@ -710,7 +714,7 @@
           <button
             type="button"
             (click)="goToContacts()"
-            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2"
           >
             <lucide-icon name="users" class="h-4 w-4" />
             Back to contacts
@@ -720,7 +724,7 @@
               type="button"
               (click)="downloadErrors()"
               [disabled]="downloadingErrors()"
-              class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <lucide-icon name="download" class="h-4 w-4" />
               {{ downloadingErrors() ? 'Preparing…' : 'Download errors CSV' }}
@@ -731,7 +735,7 @@
               type="button"
               (click)="downloadSkipped()"
               [disabled]="downloadingSkipped()"
-              class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <lucide-icon name="download" class="h-4 w-4" />
               {{ downloadingSkipped() ? 'Preparing…' : 'Download duplicates CSV' }}
@@ -742,7 +746,7 @@
               type="button"
               (click)="downloadWarnings()"
               [disabled]="downloadingWarnings()"
-              class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-4 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <lucide-icon name="download" class="h-4 w-4" />
               {{ downloadingWarnings() ? 'Preparing…' : 'Download warnings CSV' }}

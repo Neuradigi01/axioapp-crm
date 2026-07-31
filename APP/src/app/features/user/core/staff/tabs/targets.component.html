@@ -53,7 +53,7 @@
                 <button
                   type="button"
                   (click)="startEdit(row)"
-                  class="rounded-md border border-subtle bg-surface px-3 py-1 text-xs font-medium text-default hover:bg-surface-2"
+                  class="rounded-lg border border-subtle bg-surface px-3 py-1 text-xs font-medium text-default hover:bg-surface-2"
                 >
                   Edit
                 </button>
@@ -73,7 +73,7 @@
                         min="0"
                         max="100"
                         formControlName="commission_rate"
-                        class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                        class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     </label>
                     <label class="block text-sm">
@@ -83,7 +83,7 @@
                         step="1"
                         min="0"
                         formControlName="monthly_target"
-                        class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                        class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     </label>
                     <label class="block text-sm">
@@ -94,14 +94,14 @@
                         min="0"
                         max="5"
                         formControlName="rating"
-                        class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                        class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     </label>
                     <label class="block text-sm">
                       <span class="block text-xs font-medium text-muted">Status</span>
                       <select
                         formControlName="employment_status"
-                        class="mt-1 block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                        class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                       >
                         <option value="active">Active</option>
                         <option value="leave">On Leave</option>
@@ -120,7 +120,7 @@
                     <button
                       type="button"
                       (click)="cancelEdit()"
-                      class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
+                      class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
                     >
                       Cancel
                     </button>

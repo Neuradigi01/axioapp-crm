@@ -2,15 +2,19 @@
   <header class="border-b border-subtle bg-surface px-4 py-3 md:px-6">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-xl font-semibold text-default">Conversations</h1>
-        <p class="text-xs text-muted">
+        <h1
+          class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
+        >
+          Conversations
+        </h1>
+        <p class="mt-1 text-[14px] text-muted">
           Unified inbox across WhatsApp, Instagram, web chat &amp; SMS
         </p>
       </div>
       <button
         type="button"
         (click)="reloadList()"
-        class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
       >
         Refresh
       </button>

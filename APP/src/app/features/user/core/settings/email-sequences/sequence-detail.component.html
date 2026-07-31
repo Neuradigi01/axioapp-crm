@@ -32,7 +32,7 @@
     @if (canManageSequence() && sequence(); as s) {
       <a
         [routerLink]="['/user/settings/email-sequences', s.id, 'edit']"
-        class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
       >
         <lucide-icon name="pencil" size="12" aria-hidden="true"></lucide-icon>
         Edit
@@ -136,7 +136,7 @@
                         @if (canPause(row.state)) {
                           <button
                             type="button"
-                            class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                            class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
                             [disabled]="actingOn() === row.id"
                             (click)="pause(row)"
                             title="Pause"
@@ -152,7 +152,7 @@
                         @if (canResume(row.state)) {
                           <button
                             type="button"
-                            class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                            class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
                             [disabled]="actingOn() === row.id"
                             (click)="resume(row)"
                             title="Resume"
@@ -164,7 +164,7 @@
                         @if (canCancel(row.state)) {
                           <button
                             type="button"
-                            class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                            class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
                             [disabled]="actingOn() === row.id"
                             (click)="cancel(row)"
                             title="Cancel"

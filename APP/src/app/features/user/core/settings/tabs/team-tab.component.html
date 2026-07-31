@@ -123,7 +123,7 @@
                     <span class="mb-1 block text-xs font-medium text-muted">Role</span>
                     <select
                       formControlName="role_id"
-                      class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
+                      class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
                     >
                       @for (r of roles(); track r.id) {
                         <option [value]="r.id">{{ r.name }}</option>
@@ -148,7 +148,7 @@
                   <button
                     type="button"
                     (click)="cancelEdit()"
-                    class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+                    class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
                   >
                     Cancel
                   </button>
@@ -192,7 +192,7 @@
                       type="button"
                       (click)="startEdit(u)"
                       [disabled]="savingId() === u.id"
-                      class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+                      class="rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Edit
                     </button>
@@ -302,7 +302,7 @@
                 <button
                   type="button"
                   (click)="copyInviteLink(lastInviteLink()!)"
-                  class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+                  class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
                 >
                   Copy link
                 </button>
@@ -324,7 +324,7 @@
                   formControlName="email"
                   autocomplete="email"
                   placeholder="colleague@company.com"
-                  class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default placeholder:text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default placeholder:text-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 @if (inviteForm.controls.email.touched && inviteForm.controls.email.invalid) {
                   <p class="mt-1 text-xs text-red-500">
@@ -340,7 +340,7 @@
                 <span class="mb-1 block text-xs font-medium text-muted">Role</span>
                 <select
                   formControlName="role_id"
-                  class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 >
                   <option value="" disabled>Choose a role…</option>
                   @for (r of roles(); track r.id) {
@@ -364,7 +364,7 @@
                 <button
                   type="button"
                   (click)="closeInviteModal()"
-                  class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+                  class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
                 >
                   Cancel
                 </button>
@@ -412,7 +412,7 @@
             <span class="mb-1 block text-xs font-medium text-muted">New Owner</span>
             <select
               formControlName="target_user_id"
-              class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
+              class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
             >
               <option value="">— Select an active member —</option>
               @for (m of transferTargets(); track m.id) {
@@ -430,7 +430,7 @@
             <span class="mb-1 block text-xs font-medium text-muted">Your new role</span>
             <select
               formControlName="demote_to_role_id"
-              class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
+              class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
             >
               <option value="">Admin (default)</option>
               @for (r of demoteRoleOptions(); track r.id) {
@@ -467,7 +467,7 @@
             <button
               type="button"
               (click)="closeTransferModal()"
-              class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+              class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
             >
               Cancel
             </button>

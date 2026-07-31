@@ -1,4 +1,4 @@
-<div class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
+<div class="w-full">
   @if (state() === 'loading') {
     <div
       class="rounded-lg border border-subtle bg-surface p-6 text-center text-sm text-muted shadow-sm"
@@ -28,12 +28,7 @@
       <form [formGroup]="form" (ngSubmit)="submit()" class="mt-5 space-y-3">
         <label class="block text-sm">
           <span class="mb-1 block text-xs font-medium text-muted">Email</span>
-          <input
-            type="email"
-            [value]="p.email"
-            readonly
-            class="w-full cursor-not-allowed rounded-md border border-subtle bg-surface-2 px-3 py-1.5 text-sm text-muted"
-          />
+          <input type="email" [value]="p.email" readonly class="input" />
         </label>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label class="block text-sm">
@@ -42,7 +37,7 @@
               type="text"
               formControlName="first_name"
               autocomplete="given-name"
-              class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              class="input"
             />
             @if (form.controls.first_name.touched && form.controls.first_name.invalid) {
               <p class="mt-1 text-xs text-red-500">
@@ -56,7 +51,7 @@
               type="text"
               formControlName="last_name"
               autocomplete="family-name"
-              class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              class="input"
             />
             @if (form.controls.last_name.touched && form.controls.last_name.invalid) {
               <p class="mt-1 text-xs text-red-500">
@@ -67,12 +62,7 @@
         </div>
         <label class="block text-sm">
           <span class="mb-1 block text-xs font-medium text-muted">Phone (optional)</span>
-          <input
-            type="tel"
-            formControlName="phone"
-            autocomplete="tel"
-            class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          />
+          <input type="tel" formControlName="phone" autocomplete="tel" class="input" />
           @if (form.controls.phone.touched && form.controls.phone.invalid) {
             <p class="mt-1 text-xs text-red-500">
               <app-validation-message [control]="form.controls.phone" label="Phone" />
@@ -85,7 +75,7 @@
             type="password"
             formControlName="password"
             autocomplete="new-password"
-            class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            class="input"
           />
           <span class="mt-1 block text-[11px] text-muted">
             8–128 chars with upper, lower, digit, and special.
@@ -102,7 +92,7 @@
             type="password"
             formControlName="confirm_password"
             autocomplete="new-password"
-            class="w-full rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            class="input"
           />
           @if (form.controls.confirm_password.touched && form.controls.confirm_password.invalid) {
             <p class="mt-1 text-xs text-red-500">
