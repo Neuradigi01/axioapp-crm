@@ -41,6 +41,7 @@ from src.app.core.workflows.exceptions import (
     WorkflowLocked,
     WorkflowNotFound,
 )
+from src.app.shared.audit import log_entity_change
 from src.app.core.workflows.graph import validate_graph_with_db
 from src.app.core.workflows.models import (
     Workflow,
@@ -200,10 +201,39 @@ async def update_workflow(
     reactivates. Any graph change bumps ``current_version`` and
     writes a new row in ``tbl_workflow_versions``."""
     workflow = await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
-    if _is_marketing_locked(workflow):
-        raise WorkflowLocked("cannot edit an active marketing workflow; pause it first")
 
     changes = payload.model_dump(exclude_unset=True)
+
+    # Marketing lock — active marketing workflows reject edits that
+    # could disturb an in-flight enrolment (graph, name, category,
+    # trigger, etc.). Pure metadata moves (folder_id) are safe because
+    # they don't affect the running graph, so we allow those through
+    # even on locked rows. Same rationale as archive/activate not
+    # requiring a pause.
+    _METADATA_ONLY_KEYS: frozenset[str] = frozenset({"folder_id"})
+    is_metadata_only = bool(changes) and set(changes.keys()).issubset(_METADATA_ONLY_KEYS)
+    if not is_metadata_only and _is_marketing_locked(workflow):
+        raise WorkflowLocked("cannot edit an active marketing workflow; pause it first")
+
+    # Cross-org / non-existent folder guard. Turns an otherwise
+    # opaque 500 (FK violation from Postgres) into a friendly 404
+    # the SPA can render. RLS keeps ``get_folder`` scoped to the
+    # caller's tenant, so a cross-org uuid returns None.
+    if "folder_id" in changes and changes["folder_id"] is not None:
+        target_folder = await _da.get_folder(
+            session, org_id=org_id, folder_id=changes["folder_id"]
+        )
+        if target_folder is None:
+            raise WorkflowNotFound(f"folder {changes['folder_id']} not found")
+
+    # Snapshot the folder_id BEFORE we mutate so we can emit an audit
+    # entry after commit. Only capture when folder_id is actually in
+    # the payload — no point walking the audit path for pure graph
+    # edits. The workflow update path historically had no audit trail;
+    # adding it just for folder moves closes the compliance gap around
+    # organisational reshuffles (who moved what, when).
+    folder_before: uuid.UUID | None = workflow.folder_id if "folder_id" in changes else None
+    audit_folder_change = "folder_id" in changes and workflow.folder_id != changes["folder_id"]
 
     # Name uniqueness re-check when renaming.
     new_name = changes.get("name")
@@ -228,15 +258,20 @@ async def update_workflow(
         )
 
     # Apply scalar fields.
-    for key in (
-        "name",
-        "description",
-        "category",
-        "folder_id",
-        "is_marketing",
-        "goal_node_id",
-        "cost_per_run_cents",
-    ):
+    #
+    # Fields where an explicit ``null`` payload MUST be honoured (the
+    # user is clearing a nullable column — e.g. moving a workflow out
+    # of every folder into "No folder", or removing a goal node).
+    # Distinguished from the plain list below where NULL either isn't
+    # allowed by the DB or wouldn't make sense semantically.
+    for key in ("folder_id", "goal_node_id", "description"):
+        if key in changes:
+            setattr(workflow, key, changes[key])
+    # Remaining scalar fields keep the legacy "ignore null" guard —
+    # `name` / `category` / `is_marketing` / `cost_per_run_cents` are
+    # NOT NULL columns; the guard treats a null payload as "no change"
+    # rather than raising a DB IntegrityError.
+    for key in ("name", "category", "is_marketing", "cost_per_run_cents"):
         if key in changes and changes[key] is not None:
             setattr(workflow, key, changes[key])
 
@@ -272,6 +307,18 @@ async def update_workflow(
     workflow.updated_by_user_id = user_id
     await session.commit()
     await session.refresh(workflow)
+
+    # After-commit audit for folder moves — kept post-commit so an
+    # audit-sink failure can't roll the move back. Emits a minimal
+    # {before, after} folder_id pair keyed to the workflow entity.
+    if audit_folder_change:
+        await log_entity_change(
+            action="workflows.folder_changed",
+            entity_type="workflow",
+            entity_id=workflow.id,
+            before={"folder_id": str(folder_before) if folder_before else None},
+            after={"folder_id": str(workflow.folder_id) if workflow.folder_id else None},
+        )
     return workflow
 
 

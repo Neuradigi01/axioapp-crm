@@ -149,6 +149,17 @@
               Pause
             </button>
           }
+          @if (canWrite()) {
+            <button
+              type="button"
+              (click)="openBulkMove()"
+              [disabled]="mutating() || moveSaving()"
+              class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+            >
+              <lucide-icon name="folder" size="11" />
+              Move to folder…
+            </button>
+          }
           @if (canWrite() && canBulkArchive()) {
             <button
               type="button"
@@ -427,14 +438,16 @@
     (closed)="closeRunHistory()"
   />
 
-  <!-- Move-to-folder picker. Renders when `moveTargetRow()` is set;
-       the outer overlay dismisses on backdrop click, the inner card
-       stops propagation so clicks inside don't close it. Radio-style
-       button list works for both mouse and keyboard operators.  -->
-  @if (moveTargetRow(); as row) {
+  <!-- Move-to-folder picker. Shared by single-row (from the kebab)
+       and bulk (from the multi-select bar) paths — `moveMode()`
+       switches the header copy. Esc closes via the backdrop keydown;
+       the confirm button is disabled when the pick is a no-op. -->
+  @if (moveMode(); as mode) {
     <div
       class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
+      tabindex="-1"
       (click)="closeMove()"
+      (keydown)="onMoveModalKeydown($event)"
     >
       <div
         role="dialog"
@@ -445,11 +458,21 @@
       >
         <header class="mb-3">
           <h3 id="move-folder-title" class="text-base font-semibold text-default">
-            Move to folder
+            @if (mode === 'bulk') {
+              Move {{ moveCount() }} workflow{{ moveCount() === 1 ? '' : 's' }} to folder
+            } @else {
+              Move to folder
+            }
           </h3>
-          <p class="mt-0.5 truncate text-xs text-muted" [title]="row.name">
-            {{ row.name }}
-          </p>
+          @if (mode === 'single' && moveTargetRow(); as row) {
+            <p class="mt-0.5 truncate text-xs text-muted" [title]="row.name">
+              {{ row.name }}
+            </p>
+          } @else if (mode === 'bulk') {
+            <p class="mt-0.5 text-xs text-muted">
+              Selected workflows will be reassigned to the folder you pick.
+            </p>
+          }
         </header>
 
         <div
@@ -495,14 +518,15 @@
           <button
             type="button"
             (click)="closeMove()"
-            class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+            [disabled]="moveSaving()"
+            class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
             (click)="confirmMove()"
-            [disabled]="moveSaving()"
+            [disabled]="moveSaving() || !moveHasChange()"
             class="rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {{ moveSaving() ? 'Moving…' : 'Move' }}
