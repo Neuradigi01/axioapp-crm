@@ -21,4 +21,5 @@ MODULE = ModuleDescriptor(
     frontend_route="/user/dashboard",
     menu_position=10,
     permissions=[],
+    section="Overview",
 )

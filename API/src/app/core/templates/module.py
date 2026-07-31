@@ -28,5 +28,6 @@ MODULE = ModuleDescriptor(
     # 250 places "Templates" after the high-traffic operational modules
     # (Contacts / Leads / Conversations sit in the 100–200 band) but
     # before Settings / Reports (600+).
-    menu_position=250,
+    menu_position=610,
+    section="Engage",
 )

@@ -14,7 +14,7 @@ MODULE = ModuleDescriptor(
     layer="core",
     route="/api/v1/conversations",
     frontend_route="/user/conversations",
-    menu_position=500,
+    menu_position=310,
     permissions=[
         "conversations.read",
         "conversations.write",
@@ -25,4 +25,5 @@ MODULE = ModuleDescriptor(
         # default (they assign existing tags but don't manage the set).
         "settings.conversations.manage",
     ],
+    section="My Work",
 )

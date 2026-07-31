@@ -136,11 +136,12 @@ function makeTrialVM(sub: SubscriptionCurrent): BannerViewModel {
   const daysRemaining = sub.trial?.days_remaining ?? 0;
   const isUrgent = daysRemaining <= TRIAL_WARNING_THRESHOLD_DAYS;
   const dayWord = daysRemaining === 1 ? 'day' : 'days';
+  const planName = sub.plan?.name ?? 'Trial';
   return {
     tone: isUrgent ? 'warning' : 'info',
     message: isUrgent
-      ? `Only ${daysRemaining} ${dayWord} left on your trial.`
-      : `You're on a 14-day trial. ${daysRemaining} ${dayWord} left.`,
+      ? `Only ${daysRemaining} ${dayWord} left on your ${planName} trial.`
+      : `You're on the ${planName} trial — ${daysRemaining} ${dayWord} left.`,
     ctaLabel: 'Upgrade',
     ctaAction: 'upgrade',
   };

@@ -28,5 +28,6 @@ MODULE = ModuleDescriptor(
     route="/api/v1/workflows",
     frontend_route="/user/workflows",
     permissions=list(ALL_KEYS),
-    menu_position=270,
+    menu_position=710,
+    section="Automation",
 )

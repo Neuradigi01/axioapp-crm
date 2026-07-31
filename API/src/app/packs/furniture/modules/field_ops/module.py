@@ -9,9 +9,10 @@ MODULE = ModuleDescriptor(
     layer="pack",
     route="/api/v1/field-visits",
     frontend_route="/user/field-ops",
-    menu_position=40,
+    menu_position=315,
     permissions=[
         "field_visits.read",
         "field_visits.write",
     ],
+    section="My Work",
 )

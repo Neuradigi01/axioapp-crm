@@ -1105,11 +1105,17 @@ async def assemble_funnel(
         )
     ).all()
 
-    # Per-stage lead counts within the range. Group by the stage's
-    # stable key (the column leads actually store) so the dict lookup
-    # below is a direct hit.
+    # Per-stage lead counts + budget totals within the range. Grouped
+    # by the stage's stable key (the column leads actually store) so
+    # the two-dict lookup below is a direct hit. Budget nulls fold to
+    # 0 via `coalesce` so the sum column is always a real number the
+    # dashboard's Deal Pipeline strip can render as currency.
     lead_stmt = (
-        select(Lead.pipeline_stage, func.count(Lead.id))
+        select(
+            Lead.pipeline_stage,
+            func.count(Lead.id),
+            func.coalesce(func.sum(Lead.budget), 0),
+        )
         .where(
             Lead.org_id == org_id,
             Lead.created_at >= start,
@@ -1119,8 +1125,9 @@ async def assemble_funnel(
     )
     if not is_org_scope:
         lead_stmt = lead_stmt.where(Lead.assigned_to_id == caller_uuid)
-    count_by_key: dict[str, int] = {
-        key: int(count) for key, count in (await session.execute(lead_stmt)).all()
+    per_stage: dict[str, tuple[int, float]] = {
+        key: (int(count), float(value))
+        for key, count, value in (await session.execute(lead_stmt)).all()
     }
 
     stages: list[FunnelStageBucket] = [
@@ -1128,7 +1135,8 @@ async def assemble_funnel(
             stage_id=row.id,
             stage_name=row.name,
             stage_order=row.display_order,
-            count=count_by_key.get(row.key, 0),
+            count=per_stage.get(row.key, (0, 0.0))[0],
+            value_sum=per_stage.get(row.key, (0, 0.0))[1],
         )
         for row in stage_rows
     ]

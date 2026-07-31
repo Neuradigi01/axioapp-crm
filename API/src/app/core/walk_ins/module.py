@@ -15,6 +15,7 @@ MODULE = ModuleDescriptor(
     layer="core",
     route="/api/v1/walk-ins",
     frontend_route="/user/walk-ins",
-    menu_position=220,
+    menu_position=500,
     permissions=["walkins.read", "walkins.write", "walkins.reassign"],
+    section="My Work",
 )

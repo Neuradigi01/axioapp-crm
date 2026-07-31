@@ -14,6 +14,7 @@ MODULE = ModuleDescriptor(
     layer="core",
     route="/api/v1/staff",
     frontend_route="/user/staff",
-    menu_position=450,
+    menu_position=810,
     permissions=["staff.read", "staff.write", "attendance.write"],
+    section="Business",
 )

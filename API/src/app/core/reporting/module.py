@@ -24,8 +24,9 @@ MODULE = ModuleDescriptor(
     route="/api/v1/reports",
     frontend_route="/user/reports/whatsapp",
     # After Campaigns (560) and Reviews (570); before Settings (900).
-    menu_position=600,
+    menu_position=830,
     permissions=[
         "whatsapp.analytics.read",
     ],
+    section="Business",
 )

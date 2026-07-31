@@ -20,7 +20,7 @@ MODULE = ModuleDescriptor(
     layer="core",
     route="/api/v1/leads",
     frontend_route="/user/leads",
-    menu_position=250,
+    menu_position=200,
     permissions=[
         "leads.read",
         "leads.write",
@@ -45,4 +45,5 @@ MODULE = ModuleDescriptor(
         # per the RBAC track.
         "leads.scoring.manage",
     ],
+    section="Sales",
 )

@@ -68,6 +68,12 @@ class ModuleDescriptor:
     menu_position: int | None = 100
     parent: str | None = None
     always_visible: bool = False
+    # Sidebar section header this module lives under. Modules that share
+    # a `section` render inside one group with the section string as the
+    # micro-label above them. `None` renders in the footer group at the
+    # bottom of the rail without a header — reserved for chores like
+    # Integrations / Subscription / Settings.
+    section: str | None = None
     # Auto-populated by `discover_modules` for pack modules (extracted
     # from the import path `src.app.packs.<pack_id>.modules.<mod>`).
     # None for core modules. Filtered against `org.template_id` in

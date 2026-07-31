@@ -13,6 +13,7 @@ MODULE = ModuleDescriptor(
     layer="core",
     route="/api/v1/catalog",
     frontend_route="/user/catalog",
-    menu_position=400,
+    menu_position=800,
     permissions=["catalog.read", "catalog.write"],
+    section="Business",
 )

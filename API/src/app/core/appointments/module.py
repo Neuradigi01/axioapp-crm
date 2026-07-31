@@ -13,10 +13,11 @@ MODULE = ModuleDescriptor(
     layer="core",
     route="/api/v1/appointments",
     frontend_route="/user/appointments",
-    menu_position=350,
+    menu_position=300,
     permissions=[
         "appointments.read",
         "appointments.write",
         "appointments.reassign",
     ],
+    section="My Work",
 )

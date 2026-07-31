@@ -14,7 +14,7 @@ MODULE = ModuleDescriptor(
     layer="pack",
     route="/api/v1/pos",
     frontend_route="/user/billing",
-    menu_position=50,
+    menu_position=900,
     permissions=[
         "pos.use",
         "pos.refund",

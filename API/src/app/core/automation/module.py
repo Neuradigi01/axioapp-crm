@@ -27,5 +27,6 @@ MODULE = ModuleDescriptor(
     route="/api/v1/automations",
     frontend_route="/user/automations",
     permissions=list(ALL_KEYS),
-    menu_position=260,
+    menu_position=700,
+    section="Automation",
 )

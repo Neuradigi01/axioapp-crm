@@ -21,7 +21,7 @@ MODULE = ModuleDescriptor(
     layer="pack",
     route="/api/v1/property",
     frontend_route="/user/properties",
-    menu_position=15,
+    menu_position=210,
     permissions=[
         "property.read",
         "property.write",
@@ -29,4 +29,5 @@ MODULE = ModuleDescriptor(
         "property.archive",
         "property.delete",
     ],
+    section="Sales",
 )

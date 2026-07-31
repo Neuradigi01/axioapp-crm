@@ -15,6 +15,7 @@ MODULE = ModuleDescriptor(
     layer="core",
     route="/api/v1/contacts",
     frontend_route="/user/contacts",
-    menu_position=200,
+    menu_position=100,
     permissions=["contacts.read", "contacts.write", "contacts.reassign"],
+    section="Customers",
 )

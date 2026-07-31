@@ -19,7 +19,7 @@ MODULE = ModuleDescriptor(
     layer="core",
     route="/api/v1/integrations",
     frontend_route="/user/integrations",
-    menu_position=900,
+    menu_position=840,
     permissions=[
         "settings.integrations.manage",
         # whatsapp-platform-upgrade Step 8 — template management.
@@ -50,4 +50,5 @@ MODULE = ModuleDescriptor(
         # migration so existing orgs can use Flows immediately.
         "whatsapp.flows.manage",
     ],
+    section="Business",
 )

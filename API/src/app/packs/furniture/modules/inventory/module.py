@@ -22,11 +22,12 @@ MODULE = ModuleDescriptor(
     # `menu_position=20` slots Inventory near the top of the sidebar,
     # right after Dashboard. Other furniture pack modules (custom_orders,
     # field_ops, …) will pick adjacent positions in their own steps.
-    menu_position=20,
+    menu_position=220,
     permissions=[
         "inventory.read",
         "inventory.write",
         "inventory.dispatch",
         "inventory.transfer",
     ],
+    section="Sales",
 )

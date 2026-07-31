@@ -14,6 +14,7 @@ MODULE = ModuleDescriptor(
     layer="core",
     route="/api/v1/calls",
     frontend_route="/user/calls",
-    menu_position=520,
+    menu_position=820,
     permissions=["calls.read", "calls.write", "calls.outcomes.manage"],
+    section="Business",
 )

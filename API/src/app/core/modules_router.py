@@ -47,6 +47,7 @@ class ModuleOut(BaseModel):
     permissions: list[str]
     menu_position: int | None
     parent: str | None
+    section: str | None
 
     @classmethod
     def from_descriptor(cls, m: ModuleDescriptor) -> ModuleOut:

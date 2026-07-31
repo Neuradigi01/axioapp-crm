@@ -106,12 +106,19 @@ class DashboardTrendResponse(BaseModel):
 
 
 class FunnelStageBucket(BaseModel):
-    """One stage of the leads pipeline with its in-range lead count."""
+    """One stage of the leads pipeline with its in-range lead count.
+
+    `value_sum` is the sum of `Lead.budget` for every lead currently
+    parked in this stage within the range; it drives the "$ value"
+    line on the dashboard's Deal Pipeline signature strip. Leads
+    without a budget contribute 0.
+    """
 
     stage_id: uuid.UUID
     stage_name: str
     stage_order: int
     count: int
+    value_sum: float = 0.0
 
 
 class FollowupCounts(BaseModel):

@@ -13,6 +13,7 @@ MODULE = ModuleDescriptor(
     layer="core",
     route="/api/v1/reviews",
     frontend_route="/user/reviews",
-    menu_position=540,
+    menu_position=400,
     permissions=["reviews.read", "reviews.write"],
+    section="Engage",
 )

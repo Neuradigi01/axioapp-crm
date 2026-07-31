@@ -17,10 +17,11 @@ MODULE = ModuleDescriptor(
     layer="pack",
     route="/api/v1/custom-orders",
     frontend_route="/user/custom-orders",
-    menu_position=30,
+    menu_position=305,
     permissions=[
         "custom_orders.read",
         "custom_orders.write",
         "custom_orders.move",
     ],
+    section="My Work",
 )

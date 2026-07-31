@@ -14,6 +14,7 @@ MODULE = ModuleDescriptor(
     layer="core",
     route="/api/v1/campaigns",
     frontend_route="/user/campaigns",
-    menu_position=560,
+    menu_position=600,
     permissions=["campaigns.read", "campaigns.write", "campaigns.send"],
+    section="Engage",
 )
