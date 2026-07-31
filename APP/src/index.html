@@ -23,10 +23,12 @@
                 ? 'dark'
                 : 'light';
           document.documentElement.setAttribute('data-theme', t);
+          document.documentElement.style.colorScheme = t;
           var a = localStorage.getItem('app_accent');
           if (a) document.documentElement.setAttribute('data-accent', a);
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'light');
+          document.documentElement.style.colorScheme = 'light';
         }
       })();
     </script>
