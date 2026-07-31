@@ -130,6 +130,12 @@ export class IntegrationsPageComponent {
    *  completes OAuth in the same tab, and returns via the redirect. */
   protected readonly calendarRefreshTick = signal(0);
 
+  /** Which connector's detailed management card is currently open.
+   *  `null` = collapsed grid only (AIXO-clean default). Set by the
+   *  summary tile's Connect / Manage button; single-open so the
+   *  page stays scannable. */
+  protected readonly expandedConnector = signal<string | null>(null);
+
   // --- derived ------------------------------------------------------
 
   protected readonly google = computed(
@@ -138,6 +144,138 @@ export class IntegrationsPageComponent {
   protected readonly meta = computed(
     () => this.integrations().find((i) => i.provider === 'meta_ads') ?? null,
   );
+
+  /** Summary tiles for the "Available connections" grid (AIXO
+   *  pattern). Each card shows a connector's identity + a rolled-up
+   *  status; the buttons scroll to the corresponding detailed card
+   *  below where the actual connect / disconnect / subscribe UI
+   *  lives. Kept as a computed so status pill re-renders when the
+   *  underlying integration signal changes. */
+  protected readonly connectors = computed<
+    Array<{
+      id: string;
+      label: string;
+      type: string;
+      description: string;
+      /** When set, renders this letter as the icon (used for brands
+       *  best identified by initials — Google's `G`, Meta's `f`). */
+      letter: string | null;
+      /** When `letter` is null, this lucide icon renders instead. */
+      icon: string | null;
+      iconBg: string;
+      iconText: string;
+      status: 'connected' | 'error' | 'not_connected';
+      statusLabel: string;
+      anchor: string;
+    }>
+  >(() => {
+    const g = this.google();
+    const m = this.meta();
+    const w = this.whatsapp();
+    const statusFor = (
+      integ: Integration | null,
+    ): { status: 'connected' | 'error' | 'not_connected'; label: string } => {
+      if (!integ) return { status: 'not_connected', label: 'Not connected' };
+      const s = (integ.status ?? '').toLowerCase();
+      if (s === 'error' || s === 'expired') return { status: 'error', label: 'Reconnect required' };
+      if (s === 'active' || s === 'live' || s === 'connected')
+        return { status: 'connected', label: 'Connected' };
+      return { status: 'not_connected', label: 'Not connected' };
+    };
+    const gs = statusFor(g);
+    const ms = statusFor(m);
+    const ws: { status: 'connected' | 'error' | 'not_connected'; label: string } = w?.connected_at
+      ? { status: 'connected', label: 'Connected' }
+      : { status: 'not_connected', label: 'Not connected' };
+    return [
+      {
+        id: 'google_ads',
+        label: 'Google Ads',
+        type: 'Ad platform',
+        description:
+          'Lead Form Extensions → CRM. New form submissions land in Leads automatically.',
+        letter: 'G',
+        icon: null,
+        iconBg: 'bg-white',
+        iconText: 'text-blue-600',
+        status: gs.status,
+        statusLabel: gs.label,
+        anchor: 'card-google-ads',
+      },
+      {
+        id: 'meta_ads',
+        label: 'Meta Ads',
+        type: 'Ad platform',
+        description:
+          'Facebook + Instagram lead ads. Subscribe once and every Page lead flows into Leads.',
+        letter: 'f',
+        icon: null,
+        iconBg: 'bg-blue-600',
+        iconText: 'text-white',
+        status: ms.status,
+        statusLabel: ms.label,
+        anchor: 'card-meta-ads',
+      },
+      {
+        id: 'whatsapp',
+        label: 'WhatsApp',
+        type: 'Messaging',
+        description:
+          'Two-way inbox in Conversations. Send templates from Campaigns and Automations.',
+        letter: null,
+        icon: 'message-circle',
+        iconBg: 'bg-emerald-500',
+        iconText: 'text-white',
+        status: ws.status,
+        statusLabel: ws.label,
+        anchor: 'card-whatsapp',
+      },
+      {
+        id: 'google_calendar',
+        label: 'Google Calendar',
+        type: 'Calendar',
+        description: 'Mirror appointments into each rep’s Google Calendar. Per-user connection.',
+        letter: null,
+        icon: 'calendar',
+        iconBg: 'bg-white',
+        iconText: 'text-blue-600',
+        status: 'not_connected',
+        statusLabel: 'Per-user',
+        anchor: 'card-google-calendar',
+      },
+      {
+        id: 'email',
+        label: 'Email',
+        type: 'Messaging',
+        description:
+          'Send automation, workflow, and reply email from your Gmail / Outlook / SMTP mailbox.',
+        letter: null,
+        icon: 'mail',
+        iconBg: 'bg-violet-500',
+        iconText: 'text-white',
+        status: 'not_connected',
+        statusLabel: 'Manage below',
+        anchor: 'card-email-sender',
+      },
+    ];
+  });
+
+  /** Expand the clicked connector's detailed card (toggle: clicking
+   *  the same tile again collapses it). After expand, next tick,
+   *  scroll it into view so the operator lands on the flow they just
+   *  chose without hunting for it on long pages. */
+  toggleConnector(id: string, anchor: string): void {
+    const same = this.expandedConnector() === id;
+    this.expandedConnector.set(same ? null : id);
+    if (!same) {
+      // rAF gives Angular one CD tick to render the @if block before we
+      // measure + scroll — otherwise the element doesn't exist yet.
+      requestAnimationFrame(() => {
+        const el = document.getElementById(anchor);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  }
 
   constructor() {
     this._readCallbackQuery();

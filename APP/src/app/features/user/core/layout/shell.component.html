@@ -1,4 +1,4 @@
-<div class="flex min-h-screen bg-app text-default">
+<div class="flex h-screen overflow-hidden bg-app text-default">
   @if (mobileMenuOpen()) {
     <div
       class="fixed inset-0 z-40 bg-black/50 md:hidden"
@@ -15,11 +15,18 @@
     class="contents"
   />
 
-  <div class="flex min-w-0 flex-1 flex-col">
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
     <crm-trial-banner />
     <app-header (toggleSidebar)="toggleMobileMenu()" (openPalette)="openPalette()" />
-    <main class="flex flex-1 flex-col overflow-x-hidden">
-      <div class="flex-1">
+    <main class="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <!-- Inner scroll region. Ordinary pages scroll here as normal
+           (their content grows past the viewport). App-shell pages like
+           /user/conversations set their own root to `flex-1 min-h-0
+           flex-col` so they fill this box exactly and hand off scrolling
+           to their internal panes (list / thread). Keeping the outer
+           chain `overflow-hidden` and a single scroll container here
+           gives both patterns a stable height to compute against. -->
+      <div class="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
         <router-outlet />
       </div>
       <app-footer />

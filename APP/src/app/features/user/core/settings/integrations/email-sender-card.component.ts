@@ -34,6 +34,7 @@ import {
   EmailSenderSetupApiService,
 } from '../../services/email-sender-setup-api.service';
 import { AddSenderIdentityModalComponent } from './add-sender-identity-modal.component';
+import { EmailAccountsApiService } from '../../services/email-accounts-api.service';
 import {
   EmailSendersApiService,
   SmtpSender,
@@ -60,6 +61,7 @@ type Toast = { tone: 'success' | 'error'; message: string };
 })
 export class EmailSenderCardComponent implements OnInit {
   private readonly api = inject(EmailSendersApiService);
+  private readonly accountsApi = inject(EmailAccountsApiService);
   private readonly domainsApi = inject(EmailSenderSetupApiService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -74,6 +76,12 @@ export class EmailSenderCardComponent implements OnInit {
 
   protected readonly settingDefaultId = signal<string | null>(null);
   protected readonly deletingId = signal<string | null>(null);
+
+  /** Row-level busy flags for the OAuth Gmail / Microsoft actions.
+   *  Prevent double-click on Reconnect (which redirects) and on
+   *  Disconnect (soft-delete). */
+  protected readonly reconnectingId = signal<string | null>(null);
+  protected readonly disconnectingId = signal<string | null>(null);
 
   // --- Domain-authentication sub-section state (reused SPF/DKIM/DMARC UI).
   protected readonly domains = signal<EmailSenderDomain[] | null>(null);
@@ -188,6 +196,61 @@ export class EmailSenderCardComponent implements OnInit {
   resendVerification(row: UnifiedSender): void {
     if (row.kind !== 'smtp' || row.verified) return;
     this.verifyModal.set({ id: row.id, from: row.from_address });
+  }
+
+  /** Re-run Google / Microsoft OAuth for a Gmail / Microsoft row.
+   *  Reuses the same authorize URL as first-time connect — the
+   *  callback upserts the existing `email_accounts` row keyed on
+   *  `(provider, email_address)`, so this replaces the dead refresh
+   *  token with a fresh one without touching sender-identity state.
+   *  Redirect is a full-page navigation, so no unmount cleanup. */
+  reconnect(row: UnifiedSender): void {
+    if (row.kind !== 'gmail' && row.kind !== 'microsoft') return;
+    if (this.reconnectingId() !== null) return;
+    this.reconnectingId.set(row.id);
+    this.rowError.set(null);
+    const req$ =
+      row.kind === 'gmail'
+        ? this.accountsApi.authorizeGmail()
+        : this.accountsApi.authorizeMicrosoft();
+    req$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: ({ url }) => {
+        window.location.assign(url);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.reconnectingId.set(null);
+        this.rowError.set(extractApiError(err) ?? 'Could not start reconnect.');
+      },
+    });
+  }
+
+  /** Soft-disconnect a Gmail / Microsoft mailbox. Nulls the stored
+   *  tokens + flips `sync_state` to `disconnected`; the row is kept
+   *  so history survives. Inbox replies from this mailbox stop
+   *  working until the operator reconnects. */
+  disconnect(row: UnifiedSender): void {
+    if (row.kind !== 'gmail' && row.kind !== 'microsoft') return;
+    if (this.disconnectingId() !== null) return;
+    const confirmed = window.confirm(
+      `Disconnect ${row.from_address}? Inbox email replies from this mailbox will stop working until you reconnect it. Historical messages are kept.`,
+    );
+    if (!confirmed) return;
+    this.disconnectingId.set(row.id);
+    this.rowError.set(null);
+    this.accountsApi
+      .disconnect(row.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.disconnectingId.set(null);
+          this.toast.set({ tone: 'success', message: `Disconnected ${row.from_address}.` });
+          this._load();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.disconnectingId.set(null);
+          this.rowError.set(extractApiError(err) ?? 'Could not disconnect account.');
+        },
+      });
   }
 
   dismissToast(): void {

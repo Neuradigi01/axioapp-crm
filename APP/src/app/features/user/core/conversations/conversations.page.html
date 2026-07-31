@@ -11,13 +11,28 @@
           Unified inbox across WhatsApp, Instagram, web chat &amp; SMS
         </p>
       </div>
-      <button
-        type="button"
-        (click)="reloadList()"
-        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
-      >
-        Refresh
-      </button>
+      <div class="flex items-center gap-2">
+        <!-- Status filter moved out of the list panel into the header so
+             the list keeps full height for messages. Small compact
+             select — Open/Snoozed/Closed cases stay a click away. -->
+        <select
+          [value]="statusFilter()"
+          (change)="onStatusFilterChange($event)"
+          class="rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          aria-label="Status filter"
+        >
+          @for (o of statusOptions; track o.value) {
+            <option [value]="o.value">{{ o.label }}</option>
+          }
+        </select>
+        <button
+          type="button"
+          (click)="reloadList()"
+          class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        >
+          Refresh
+        </button>
+      </div>
     </div>
     @if (loadError(); as err) {
       <div
@@ -44,7 +59,7 @@
     <!-- Left: list. Hidden on mobile once a conversation is picked so the
          thread pane can take the full width. -->
     <aside
-      class="flex w-full flex-col border-r border-subtle bg-surface md:w-80 md:min-w-[18rem]"
+      class="flex min-h-0 w-full flex-col border-r border-subtle bg-surface md:w-80 md:min-w-[18rem]"
       [class.hidden]="!!selectedId()"
       [class.md:flex]="!!selectedId()"
     >

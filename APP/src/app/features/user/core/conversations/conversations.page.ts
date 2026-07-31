@@ -70,6 +70,7 @@ import { extractApiError } from '@core/services/api-error.util';
     LucideAngularModule,
   ],
   templateUrl: './conversations.page.html',
+  host: { class: 'flex min-h-0 flex-1 flex-col' },
 })
 export class ConversationsPageComponent {
   private readonly api = inject(ConversationsApiService);
@@ -103,6 +104,17 @@ export class ConversationsPageComponent {
   protected readonly threadLoading = signal(false);
 
   protected readonly filters = signal<ConversationListQuery>({});
+
+  /** Status filter — lives in the page header (next to Refresh) so the
+   * list panel keeps its full height for messages. Default is "all
+   * statuses" so first-load matches previous behaviour. */
+  protected readonly statusFilter = signal<ConversationStatus | ''>('');
+  protected readonly statusOptions: Array<{ value: ConversationStatus | ''; label: string }> = [
+    { value: '', label: 'All statuses' },
+    { value: 'open', label: 'Open' },
+    { value: 'snoozed', label: 'Snoozed' },
+    { value: 'closed', label: 'Closed' },
+  ];
 
   /** Staff list indexed by user id — resolves `assigned_to_id` and
    * `sender_user_id` to display names. Loaded once at page construct
@@ -190,9 +202,26 @@ export class ConversationsPageComponent {
   }
 
   protected onFiltersChange(next: ConversationListQuery): void {
-    // Preserve assigned_to across channel/status/q updates.
-    const assigned_to = this.filters().assigned_to;
-    this.filters.set({ ...next, ...(assigned_to ? { assigned_to } : {}) });
+    // Preserve assigned_to + status across channel/q updates — the list
+    // child owns channel + search, the page header owns status, so
+    // neither should clobber the other.
+    const { assigned_to, status } = this.filters();
+    this.filters.set({
+      ...next,
+      ...(assigned_to ? { assigned_to } : {}),
+      ...(status ? { status } : {}),
+    });
+    this.reloadList();
+  }
+
+  /** Page-header status filter — patches the list query and reloads. */
+  protected onStatusFilterChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as ConversationStatus | '';
+    this.statusFilter.set(value);
+    this.filters.update((prev) => {
+      const { status: _omit, ...rest } = prev;
+      return value ? { ...rest, status: value } : rest;
+    });
     this.reloadList();
   }
 

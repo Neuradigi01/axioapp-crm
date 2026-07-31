@@ -4,20 +4,18 @@ import {
   EventEmitter,
   Input,
   Output,
-  computed,
   signal,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
 import {
   Conversation,
   ConversationChannel,
   ConversationListQuery,
-  ConversationStatus,
 } from './conversations-api.service';
 import { StaffListItem } from '../staff/staff-api.service';
 import { OwnerColor, ownerColor, staffInitials } from '../shared/owner-color.util';
+import { ChannelBrandIconComponent } from './channel-brand-icon.component';
 import { TagChipComponent } from './tag-chip.component';
 import { TagFilterComponent } from './tag-filter.component';
 
@@ -25,8 +23,6 @@ interface ChannelBadgeStyle {
   label: string;
   bg: string;
   dot: string;
-  /** Lucide icon for the channel filter pill. */
-  icon: string;
   /** Accent hue used when the pill is unselected (icon + dot). Selected
    * pills use the same hue as a filled background — see `channelPillClass`. */
   hue: 'emerald' | 'fuchsia' | 'blue' | 'zinc' | 'violet' | 'sky';
@@ -41,92 +37,79 @@ const CHANNEL_STYLES: Record<ConversationChannel, ChannelBadgeStyle> = {
     label: 'WhatsApp',
     bg: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20',
     dot: 'bg-emerald-500',
-    icon: 'message-circle',
     hue: 'emerald',
   },
   instagram: {
     label: 'Instagram',
     bg: 'bg-fuchsia-500/10 text-fuchsia-400 ring-fuchsia-500/20',
     dot: 'bg-fuchsia-500',
-    icon: 'instagram',
     hue: 'fuchsia',
   },
   facebook: {
     label: 'Messenger',
     bg: 'bg-blue-500/10 text-blue-400 ring-blue-500/20',
     dot: 'bg-blue-500',
-    icon: 'send',
     hue: 'blue',
   },
   sms: {
     label: 'SMS',
     bg: 'bg-zinc-500/10 text-muted ring-zinc-500/20',
     dot: 'bg-zinc-400',
-    icon: 'message-square',
     hue: 'zinc',
   },
   email: {
     label: 'Email',
     bg: 'bg-violet-500/10 text-violet-400 ring-violet-500/20',
     dot: 'bg-violet-500',
-    icon: 'mail',
     hue: 'violet',
   },
   web: {
     label: 'Web',
     bg: 'bg-sky-500/10 text-sky-400 ring-sky-500/20',
     dot: 'bg-sky-500',
-    icon: 'globe',
     hue: 'sky',
   },
 };
 
-const STATUS_OPTIONS: Array<{ value: ConversationStatus | ''; label: string }> = [
-  { value: '', label: 'All statuses' },
-  { value: 'open', label: 'Open' },
-  { value: 'snoozed', label: 'Snoozed' },
-  { value: 'closed', label: 'Closed' },
-];
-
 interface ChannelPillOption {
   value: ConversationChannel | '';
   label: string;
-  /** Empty for the "All" pill — no channel-brand icon. */
-  icon: string;
   hue: 'emerald' | 'fuchsia' | 'blue' | 'zinc' | 'violet' | 'sky' | 'accent';
 }
 
 const CHANNEL_PILL_OPTIONS: ChannelPillOption[] = [
-  { value: '', label: 'All', icon: '', hue: 'accent' },
-  { value: 'whatsapp', label: 'WhatsApp', icon: 'message-circle', hue: 'emerald' },
-  { value: 'facebook', label: 'Messenger', icon: 'send', hue: 'blue' },
-  { value: 'instagram', label: 'Instagram', icon: 'instagram', hue: 'fuchsia' },
-  { value: 'email', label: 'Email', icon: 'mail', hue: 'violet' },
-  { value: 'sms', label: 'SMS', icon: 'message-square', hue: 'zinc' },
-  { value: 'web', label: 'Web', icon: 'globe', hue: 'sky' },
+  { value: '', label: 'All messengers', hue: 'accent' },
+  { value: 'whatsapp', label: 'WhatsApp', hue: 'emerald' },
+  { value: 'facebook', label: 'Messenger', hue: 'blue' },
+  { value: 'instagram', label: 'Instagram', hue: 'fuchsia' },
+  { value: 'email', label: 'Email', hue: 'violet' },
+  { value: 'sms', label: 'SMS', hue: 'zinc' },
+  { value: 'web', label: 'Web', hue: 'sky' },
 ];
 
 /** Per-hue Tailwind class strings for the channel filter pill. Kept as
  * static maps so the classes are picked up by the compiler's static
  * analysis (dynamic string concat with a class name loses that). */
-const PILL_ACTIVE: Record<ChannelPillOption['hue'], string> = {
-  accent: 'bg-accent text-white ring-accent',
-  emerald: 'bg-emerald-500 text-white ring-emerald-500',
-  fuchsia: 'bg-fuchsia-500 text-white ring-fuchsia-500',
-  blue: 'bg-blue-500 text-white ring-blue-500',
-  zinc: 'bg-zinc-500 text-white ring-zinc-500',
-  violet: 'bg-violet-500 text-white ring-violet-500',
-  sky: 'bg-sky-500 text-white ring-sky-500',
+const PILL_ACTIVE_OUTLINE: Record<ChannelPillOption['hue'], string> = {
+  accent: 'bg-accent/10 text-accent ring-accent',
+  emerald: 'bg-emerald-500/10 text-emerald-300 ring-emerald-500',
+  fuchsia: 'bg-fuchsia-500/10 text-fuchsia-300 ring-fuchsia-500',
+  blue: 'bg-blue-500/10 text-blue-300 ring-blue-500',
+  zinc: 'bg-zinc-500/10 text-zinc-200 ring-zinc-400',
+  violet: 'bg-violet-500/10 text-violet-300 ring-violet-500',
+  sky: 'bg-sky-500/10 text-sky-300 ring-sky-500',
 };
 
-const PILL_ICON_HUE: Record<ChannelPillOption['hue'], string> = {
-  accent: 'text-accent',
-  emerald: 'text-emerald-400',
-  fuchsia: 'text-fuchsia-400',
-  blue: 'text-blue-400',
-  zinc: 'text-muted',
-  violet: 'text-violet-400',
-  sky: 'text-sky-400',
+/** Solid brand-colour background for the small circular icon badge that
+ * sits inside each channel pill. Icon inside is white. */
+const PILL_BADGE_BG: Record<ChannelPillOption['hue'], string> = {
+  accent: 'bg-accent',
+  emerald: 'bg-emerald-500',
+  fuchsia: 'bg-fuchsia-500',
+  blue: 'bg-blue-500',
+  zinc: 'bg-zinc-500',
+  violet: 'bg-violet-500',
+  sky: 'bg-sky-500',
 };
 
 type AssigneeMode = 'all' | 'mine' | 'unassigned' | 'specific';
@@ -135,15 +118,15 @@ const ASSIGNEE_MODES: Array<{ value: AssigneeMode; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'mine', label: 'Mine' },
   { value: 'unassigned', label: 'Unassigned' },
-  { value: 'specific', label: 'Specific…' },
 ];
 
 @Component({
   selector: 'app-conversation-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, LucideAngularModule, TagChipComponent, TagFilterComponent],
+  imports: [LucideAngularModule, ChannelBrandIconComponent, TagChipComponent, TagFilterComponent],
   templateUrl: './conversation-list.component.html',
+  host: { class: 'flex min-h-0 flex-1 flex-col' },
 })
 export class ConversationListComponent {
   @Input() items: Conversation[] = [];
@@ -177,7 +160,6 @@ export class ConversationListComponent {
    *  doesn't reset the filter. */
   @Input() tagFilterIds: string[] = [];
 
-  protected readonly statusOptions = STATUS_OPTIONS;
   protected readonly channelPillOptions = CHANNEL_PILL_OPTIONS;
   protected readonly assigneeModes = ASSIGNEE_MODES;
 
@@ -185,17 +167,15 @@ export class ConversationListComponent {
    * the channel-pill active-state binding. */
   readonly channelFilter = signal<ConversationChannel | ''>('');
   /** Exposed to the template for the pill styling. */
-  protected readonly pillActiveClass = PILL_ACTIVE;
-  protected readonly pillIconHueClass = PILL_ICON_HUE;
-  protected readonly statusFilter = signal<ConversationStatus | ''>('');
+  protected readonly pillActiveOutlineClass = PILL_ACTIVE_OUTLINE;
+  protected readonly pillBadgeBgClass = PILL_BADGE_BG;
   protected readonly searchTerm = signal<string>('');
   protected readonly assigneeMode = signal<AssigneeMode>('all');
+  /** Set only via `applyHydratedAssignee` when a previously-saved
+   *  `?assigned_to=<uuid>` value gets restored. `emitAssignee`
+   *  forwards it to the parent so the filter stays applied across
+   *  refresh even without a visible "Specific…" chip. */
   protected readonly specificUserId = signal<string | null>(null);
-
-  /** Sorted list of staff names for the "Specific…" dropdown. */
-  protected readonly staffOptions = computed<StaffListItem[]>(() =>
-    Array.from(this.staffById.values()).sort((a, b) => a.full_name.localeCompare(b.full_name)),
-  );
 
   protected channelStyle(channel: ConversationChannel): ChannelBadgeStyle {
     return CHANNEL_STYLES[channel];
@@ -244,18 +224,6 @@ export class ConversationListComponent {
     return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   }
 
-  protected onChannelChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value as ConversationChannel | '';
-    this.channelFilter.set(value);
-    this.emit();
-  }
-
-  protected onStatusChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value as ConversationStatus | '';
-    this.statusFilter.set(value);
-    this.emit();
-  }
-
   protected onSearchInput(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.searchTerm.set(value);
@@ -273,12 +241,6 @@ export class ConversationListComponent {
     if (mode !== 'specific') {
       this.specificUserId.set(null);
     }
-    this.emitAssignee();
-  }
-
-  protected onSpecificUserChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value || null;
-    this.specificUserId.set(value);
     this.emitAssignee();
   }
 
@@ -327,7 +289,6 @@ export class ConversationListComponent {
   private emit(): void {
     const q: ConversationListQuery = {};
     if (this.channelFilter()) q.channel = this.channelFilter() as ConversationChannel;
-    if (this.statusFilter()) q.status = this.statusFilter() as ConversationStatus;
     const term = this.searchTerm().trim();
     if (term) q.q = term;
     this.filtersChange.emit(q);
