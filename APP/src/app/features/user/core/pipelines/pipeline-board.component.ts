@@ -120,6 +120,12 @@ export class PipelineBoardComponent {
   /** Pre-built list of `cdkDropList` ids for `cdkDropListConnectedTo`. */
   readonly dropListIds = computed(() => this.stages().map((s) => this.dropListIdFor(s.key)));
 
+  /** Stable reference for `[cdkDragStartDelay]`. Passing an object
+   *  literal in the template creates a new reference on every change
+   *  detection cycle, which makes CDK re-register the config and can
+   *  confuse the drag lifecycle. Freeze once and reuse. */
+  protected readonly dragStartDelay = Object.freeze({ touch: 180, mouse: 0 });
+
   constructor() {
     // Re-fetch pipeline whenever the key changes.
     effect(() => {
@@ -141,19 +147,23 @@ export class PipelineBoardComponent {
       // Reorder within the same column — purely visual, no server call.
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
     } else {
-      transferArrayItem(
-        event.previousContainer.data,
-        event.container.data,
-        event.previousIndex,
-        event.currentIndex,
-      );
-      const movedItem = event.container.data[event.currentIndex];
+      // `event.item.data` is bound via `[cdkDragData]="item"` and is
+      // the exact item the user dragged — the reliable identity source.
+      // Emit BEFORE mutating the arrays so a stale array read can never
+      // suppress the API call.
+      const movedItem = event.item.data as PipelineItem;
       const fromStage = this.stageKeyFromDropListId(event.previousContainer.id);
       this.itemMoved.emit({
         itemId: String(movedItem.id),
         fromStage,
         toStage,
       });
+      transferArrayItem(
+        event.previousContainer.data,
+        event.container.data,
+        event.previousIndex,
+        event.currentIndex,
+      );
     }
     // Force the buckets signal to emit so any computed downstream
     // (count badges, "empty column" view) re-evaluates.

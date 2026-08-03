@@ -90,7 +90,8 @@
           @for (item of bucket(stage.key); track item.id) {
             <div
               cdkDrag
-              [cdkDragStartDelay]="{ touch: 180, mouse: 0 }"
+              [cdkDragData]="item"
+              [cdkDragStartDelay]="dragStartDelay"
               class="touch-manipulation cursor-grab rounded-md bg-surface p-2 shadow-sm ring-1 border-subtle transition hover:border-subtle active:cursor-grabbing"
             >
               @if (itemTemplate(); as tpl) {
