@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   inject,
   signal,
@@ -200,6 +201,31 @@ export class PropertyFormPageComponent {
           this.loading.set(false);
         },
       });
+  }
+
+  /** Warn the user before they close the browser tab / hit refresh
+   *  with unsaved changes. Only fires when the form is `dirty` and
+   *  we're not already mid-submit. Angular router navigation isn't
+   *  covered here — for that see `cancelEdit()` which prompts on
+   *  the Cancel button click. */
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.form.dirty && !this.saving()) {
+      event.preventDefault();
+      // Legacy Chromium: setting returnValue triggers the native prompt.
+      event.returnValue = '';
+    }
+  }
+
+  /** Router-navigation cancel — if the form is dirty, ask before
+   *  discarding. Called from the Cancel button in the footer instead
+   *  of a plain `routerLink` so the confirm can intercept. */
+  protected cancelEdit(): void {
+    if (this.form.dirty && !this.saving()) {
+      const ok = window.confirm('Discard unsaved changes and leave this page?');
+      if (!ok) return;
+    }
+    this.router.navigate(['/user/properties']);
   }
 
   /** Toolbar row-menu handlers. */

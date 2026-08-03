@@ -155,6 +155,10 @@ export class CatalogPageComponent {
           this.items.set(resp.items);
           this.total.set(resp.total);
           this.loading.set(false);
+          // Reset the broken-image set on a fresh list: any product
+          // whose image was previously 404 might have been re-uploaded
+          // via edit — give it another chance to load before we hide it.
+          this.brokenImages.set(new Set());
         },
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
