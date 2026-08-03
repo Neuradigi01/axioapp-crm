@@ -401,7 +401,19 @@
     >
       <ng-template let-item>
         @let contact = contactFor(item.contact_id);
-        <button type="button" (click)="openEdit(item)" class="block w-full text-left">
+        <!-- `div` (not `button`) with `role="button"` — nesting a real
+             `<button>` inside `cdkDrag` swallows the mousedown/pointerdown
+             CDK needs to start (and finish) a drag, so kanban moves never
+             fire `onItemMoved`. -->
+        <div
+          role="button"
+          tabindex="0"
+          (click)="openEdit(item)"
+          (keydown.enter)="openEdit(item)"
+          (keydown.space)="openEdit(item); $event.preventDefault()"
+          draggable="false"
+          class="block w-full cursor-pointer text-left"
+        >
           <app-lead-card
             [lead]="item"
             [contactName]="contact?.full_name ?? null"
@@ -410,7 +422,7 @@
             [ownerName]="ownerLabel($any(item).assigned_to_id)"
             (reassignClick)="openSingleReassign(item)"
           />
-        </button>
+        </div>
       </ng-template>
     </app-pipeline-board>
   } @else {

@@ -96,7 +96,7 @@
     @if (error()) {
       <p class="px-2 py-1 text-xs text-red-500">{{ error() }}</p>
     } @else {
-      @for (group of groupedModules(); track group.section; let first = $first) {
+      @for (group of groupedModules(); track $index; let first = $first) {
         <div
           class="px-2.5 pb-1.5 text-[11px] text-faint"
           style="font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em"
