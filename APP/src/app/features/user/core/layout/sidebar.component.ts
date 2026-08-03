@@ -31,12 +31,8 @@ export class SidebarComponent implements OnInit {
 
   /** Desktop expand/collapse state. */
   readonly expanded = input.required<boolean>();
-  /** Mobile off-canvas drawer open state. */
-  readonly mobileOpen = input.required<boolean>();
   /** Desktop collapse/expand toggle (chevron button). */
   readonly toggle = output<void>();
-  /** Mobile drawer close (X button or nav-link tap). */
-  readonly close = output<void>();
 
   /** Current tenant — drives the workspace-switcher card at the top of
    * the rail. `null` until the first `/me` response lands. */

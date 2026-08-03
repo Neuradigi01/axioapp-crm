@@ -27,7 +27,6 @@ export class HeaderComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly themeService = inject(ThemeService);
 
-  readonly toggleSidebar = output<void>();
   /** Emitted when the header's search-pill is clicked. The shell owns
    *  the `CommandPaletteComponent` instance and toggles it in response. */
   readonly openPalette = output<void>();
