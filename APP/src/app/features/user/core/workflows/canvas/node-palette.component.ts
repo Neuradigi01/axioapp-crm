@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -33,6 +33,11 @@ export class NodePaletteComponent {
 
   readonly sections = PALETTE_SECTIONS;
 
+  /** Fires when the user taps a palette item (touch / accessibility
+   *  fallback for the HTML5 drag/drop, which is mouse-only). The
+   *  parent canvas adds the node at the current viewport centre. */
+  readonly nodeAdded = output<string>();
+
   readonly itemsByCategory = computed<Record<WorkflowNodeCategory, WorkflowNodeType[]>>(() => {
     const q = this.query().trim().toLowerCase();
     const filtered = q
@@ -64,5 +69,11 @@ export class NodePaletteComponent {
     // Also write `text/plain` so dropping outside the canvas (e.g. into a
     // text editor for inspection) doesn't drop a blob.
     event.dataTransfer.setData('text/plain', type.label);
+  }
+
+  /** Tap fallback: touch devices can't fire drag events, so tapping a
+   *  palette row asks the canvas to add the node at the viewport centre. */
+  onTap(type: WorkflowNodeType): void {
+    this.nodeAdded.emit(type.type);
   }
 }
