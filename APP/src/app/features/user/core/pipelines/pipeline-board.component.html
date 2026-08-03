@@ -90,7 +90,8 @@
           @for (item of bucket(stage.key); track item.id) {
             <div
               cdkDrag
-              class="cursor-grab rounded-md bg-surface p-2 shadow-sm ring-1 border-subtle transition hover:border-subtle active:cursor-grabbing"
+              [cdkDragStartDelay]="{ touch: 180, mouse: 0 }"
+              class="touch-manipulation cursor-grab rounded-md bg-surface p-2 shadow-sm ring-1 border-subtle transition hover:border-subtle active:cursor-grabbing"
             >
               @if (itemTemplate(); as tpl) {
                 <ng-container

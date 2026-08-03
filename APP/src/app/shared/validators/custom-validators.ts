@@ -10,7 +10,7 @@ import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 export const REASON = {
   requiredMissing: 'required field missing',
   invalidEmail: 'invalid email format',
-  invalidPhone: 'phone must be a 10-digit Indian mobile number (with optional +91)',
+  invalidPhone: 'phone must be 8–15 digits, optionally starting with + (E.164 format)',
   invalidName: 'name contains disallowed characters',
   weakPassword: 'password must be 8–128 chars with upper, lower, digit, and special',
   invalidUrl: 'invalid URL',
@@ -41,7 +41,7 @@ export const REASON = {
  */
 export const NAME_RE_SRC = "^[A-Za-zÀ-ÿ' .\\-]{2,100}$";
 export const EMAIL_RE_SRC = '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$';
-export const PHONE_RE_SRC = '^(?:\\+?91)?([6-9][0-9]{9})$';
+export const PHONE_RE_SRC = '^\\+?[0-9]{8,15}$';
 export const URL_RE_SRC = '^https?://[^\\s]+$';
 
 const NAME_RE = new RegExp(NAME_RE_SRC);
@@ -54,8 +54,15 @@ const URL_MAX = 2048;
 const PASSWORD_MIN = 8;
 const PASSWORD_MAX = 128;
 
-/** Strip common phone separators so `(415) 555-0132` becomes `4155550132`. */
-function stripPhoneSeparators(raw: string): string {
+/**
+ * E.164 phone validator (international format).
+ *
+ * Legacy helper — kept exported for the one or two call sites that
+ * still normalise phones before storage. The validator itself no
+ * longer strips: input must be strict per E.164 (optional `+` then
+ * 8–15 digits, nothing else).
+ */
+export function stripPhoneSeparators(raw: string): string {
   return raw.replace(/[\s()-]/g, '');
 }
 
@@ -109,19 +116,19 @@ export function emailValidator(control: AbstractControl): ValidationErrors | nul
 }
 
 /**
- * Indian mobile phone check. Strips spaces, `()`, and `-` first so
- * `+91 98765 43210` and `98765 43210` both pass. After stripping an
- * optional `+91` or `91` prefix, the result must be exactly 10 digits
- * starting with 6, 7, 8, or 9 (all Indian mobile-number prefixes).
- * Landlines and non-Indian numbers are rejected — the CRM's target
- * market is India and every downstream channel (SMS DLT, WhatsApp
- * Cloud API) expects a 10-digit MSISDN.
+ * E.164 international phone check. Strict: optional leading `+`,
+ * then 8–15 digits, and nothing else — no spaces, hyphens, parens,
+ * dots, or letters. Callers that want to accept pretty-printed input
+ * (e.g. `+1 (555) 123-4567`) should normalise via
+ * `stripPhoneSeparators` before setting the control's value.
+ *
+ * Empty input short-circuits to `null`; `Validators.required` owns
+ * the required-ness gate.
  */
 export function phoneValidator(control: AbstractControl): ValidationErrors | null {
   const raw = control.value;
   if (isEmpty(raw)) return null;
-  const stripped = stripPhoneSeparators(String(raw));
-  return PHONE_RE.test(stripped) ? null : { phoneInvalid: REASON.invalidPhone };
+  return PHONE_RE.test(String(raw)) ? null : { phoneInvalid: REASON.invalidPhone };
 }
 
 /**
