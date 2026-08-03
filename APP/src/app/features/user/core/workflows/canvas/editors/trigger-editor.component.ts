@@ -2,6 +2,10 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { CanvasNode } from '../canvas-state.service';
 import { ConditionsBuilderComponent } from '../conditions-builder.component';
 import { ConditionNode, EVENT_TYPES, variableGroupsForEvent } from './editor-contract';
@@ -46,7 +50,7 @@ const RE_ENROLLMENT_OPTIONS: Array<{
 @Component({
   selector: 'app-trigger-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, ConditionsBuilderComponent],
+  imports: [CommonModule, FormsModule, ConditionsBuilderComponent, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trigger-editor.component.html',
 })
@@ -57,6 +61,16 @@ export class TriggerEditorComponent {
 
   readonly eventTypes = EVENT_TYPES;
   readonly reEnrollmentOptions = RE_ENROLLMENT_OPTIONS;
+
+  /** `<crm-mobile-select>` needs a `{value, label}` list. Map each
+   *  registry entry once here so the template can bind directly. */
+  readonly eventTypeOptions = computed<ReadonlyArray<MobileSelectOption>>(() =>
+    EVENT_TYPES.map((e) => ({ value: e.type, label: `${e.label} (${e.type})` })),
+  );
+
+  readonly reEnrollmentSelectOptions: ReadonlyArray<MobileSelectOption> = RE_ENROLLMENT_OPTIONS.map(
+    (opt) => ({ value: opt.value, label: opt.label }),
+  );
 
   readonly eventType = computed<string>(() => (this.node().config?.['event_type'] as string) ?? '');
 

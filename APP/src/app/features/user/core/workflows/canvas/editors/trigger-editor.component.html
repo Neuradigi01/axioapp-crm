@@ -1,16 +1,12 @@
 <div class="space-y-4">
   <div>
     <label class="block text-[11px] font-medium text-muted mb-1"> Event type </label>
-    <select
-      [ngModel]="eventType()"
-      (ngModelChange)="onEventTypeChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-    >
-      <option value="">— pick an event —</option>
-      @for (e of eventTypes; track e.type) {
-        <option [value]="e.type">{{ e.label }} ({{ e.type }})</option>
-      }
-    </select>
+    <crm-mobile-select
+      [options]="eventTypeOptions()"
+      [value]="eventType()"
+      placeholder="— pick an event —"
+      (valueChange)="onEventTypeChange($event)"
+    />
     @if (eventType()) {
       <p class="text-[10px] text-muted mt-1">
         @for (e of eventTypes; track e.type) {
@@ -26,15 +22,11 @@
 
   <div>
     <label class="block text-[11px] font-medium text-muted mb-1"> Re-enrolment rule </label>
-    <select
-      [ngModel]="reEnrollmentRule()"
-      (ngModelChange)="onReEnrollmentChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-    >
-      @for (opt of reEnrollmentOptions; track opt.value) {
-        <option [value]="opt.value">{{ opt.label }}</option>
-      }
-    </select>
+    <crm-mobile-select
+      [options]="reEnrollmentSelectOptions"
+      [value]="reEnrollmentRule()"
+      (valueChange)="onReEnrollmentChange($any($event))"
+    />
     @for (opt of reEnrollmentOptions; track opt.value) {
       @if (opt.value === reEnrollmentRule()) {
         <p class="text-[10px] text-muted mt-1">{{ opt.description }}</p>
