@@ -47,7 +47,7 @@
           Reassign
         </button>
       }
-      @if (canWrite()) {
+      @if (canReschedule()) {
         <button
           type="button"
           (click)="reschedule.emit()"

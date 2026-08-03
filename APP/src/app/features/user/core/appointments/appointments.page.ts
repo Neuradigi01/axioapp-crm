@@ -705,6 +705,14 @@ export class AppointmentsPageComponent {
     }
   }
 
+  /** A `scheduled` appointment whose slot has already passed. Status
+   *  doesn't auto-flip on the backend — someone still owes it a proper
+   *  outcome (completed / no_show / cancelled). Surface it visually so
+   *  reps don't leave stale rows in "upcoming". */
+  protected isOverdue(a: Appointment): boolean {
+    return a.status === 'scheduled' && new Date(a.scheduled_at).getTime() < Date.now();
+  }
+
   protected ownerPalette(userId: string | null): OwnerColor {
     return this.ownerColor(userId);
   }
