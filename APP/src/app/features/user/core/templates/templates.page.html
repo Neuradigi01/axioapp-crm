@@ -119,50 +119,71 @@
         }
       </div>
     } @else {
-      <div class="overflow-x-auto rounded-xl border border-subtle bg-surface">
-        <table class="w-full text-sm">
-          <thead class="bg-surface-2 text-xs text-muted">
+      <div class="overflow-hidden rounded-xl border border-subtle bg-surface md:overflow-x-auto">
+        <table class="w-full table-fixed text-sm md:table-auto">
+          <thead class="bg-surface-2 text-[10px] text-muted md:text-xs">
             <tr>
-              <th class="px-4 py-2 text-left font-medium">Name</th>
-              <th class="px-4 py-2 text-left font-medium">Channel</th>
-              <th class="px-4 py-2 text-left font-medium">Status</th>
-              <th class="px-4 py-2 text-left font-medium">External</th>
-              <th class="px-4 py-2 text-left font-medium">Updated</th>
-              <th class="px-4 py-2 text-left font-medium">v</th>
+              <th
+                class="w-[26%] overflow-hidden px-1.5 py-2 text-left font-medium sm:w-[32%] md:w-auto md:px-4"
+              >
+                Name
+              </th>
+              <th
+                class="w-[26%] overflow-hidden px-1 py-2 text-left font-medium sm:w-[16%] md:w-auto md:px-4"
+              >
+                Channel
+              </th>
+              <th
+                class="w-[24%] overflow-hidden px-1 py-2 text-left font-medium sm:w-[18%] md:w-auto md:px-4"
+              >
+                Status
+              </th>
+              <th
+                class="w-[24%] overflow-hidden px-1 py-2 text-left font-medium sm:w-[18%] md:w-auto md:px-4"
+              >
+                External
+              </th>
+              <th class="hidden px-4 py-2 text-left font-medium md:table-cell">Updated</th>
+              <th class="hidden px-4 py-2 text-left font-medium md:table-cell">v</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-subtle">
             @for (row of items(); track trackById($index, row)) {
               <tr class="hover:bg-surface-2">
-                <td class="px-4 py-3">
+                <td class="overflow-hidden px-1.5 py-2 align-top md:px-4 md:py-3">
                   <a
                     [routerLink]="['/user/templates', row.id]"
-                    class="font-medium text-default hover:text-default"
+                    class="block text-[11px] leading-tight font-medium text-default [overflow-wrap:anywhere] hover:text-default md:truncate md:text-sm md:leading-normal"
                   >
                     {{ row.name }}
                   </a>
                   @if (row.subject) {
-                    <div class="mt-0.5 truncate text-xs text-muted" [title]="row.subject">
+                    <div
+                      class="mt-0.5 truncate text-[10px] text-muted md:text-xs"
+                      [title]="row.subject"
+                    >
                       {{ row.subject }}
                     </div>
                   }
                 </td>
-                <td class="px-4 py-3">
+                <td class="overflow-hidden px-1 py-2 align-top md:px-4 md:py-3">
                   <app-channel-chip [channel]="row.channel" />
                 </td>
-                <td class="px-4 py-3">
+                <td class="overflow-hidden px-1 py-2 align-top md:px-4 md:py-3">
                   <app-template-status-badge [internal]="row.internal_status" />
                 </td>
-                <td class="px-4 py-3">
+                <td class="overflow-hidden px-1 py-2 align-top md:px-4 md:py-3">
                   <app-template-status-badge
                     [external]="row.external_status"
                     [rejectionReason]="row.external_rejection_reason"
                   />
                 </td>
-                <td class="px-4 py-3 text-xs text-muted">
+                <td class="hidden px-4 py-3 text-xs whitespace-nowrap text-muted md:table-cell">
                   {{ row.updated_at | date: 'mediumDate' }}
                 </td>
-                <td class="px-4 py-3 text-xs text-muted">v{{ row.current_version }}</td>
+                <td class="hidden px-4 py-3 text-xs text-muted md:table-cell">
+                  v{{ row.current_version }}
+                </td>
               </tr>
             }
           </tbody>

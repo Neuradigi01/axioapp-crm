@@ -12,7 +12,7 @@
       [title]="'Meta rejection reason: ' + rejectionReason()"
     >
       <span
-        class="inline-flex cursor-help items-center rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
+        class="inline-flex max-w-full cursor-help items-center rounded-md px-1 py-0.5 text-[10px] leading-tight font-medium whitespace-nowrap ring-1 ring-inset md:px-1.5 md:text-xs"
         [class]="d.classes"
       >
         {{ d.label }}
@@ -37,7 +37,7 @@
     </span>
   } @else {
     <span
-      class="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
+      class="inline-flex max-w-full items-center rounded-md px-1 py-0.5 text-[10px] leading-tight font-medium whitespace-nowrap ring-1 ring-inset md:px-1.5 md:text-xs"
       [class]="d.classes"
     >
       {{ d.label }}

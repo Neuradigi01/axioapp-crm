@@ -1,20 +1,27 @@
-<div class="px-8 py-4 md:py-6">
+<div class="px-4 py-4 sm:px-6 md:px-8 md:py-6">
   <!-- ================= Header ================= -->
-  <header class="mb-6 flex items-start justify-between gap-3">
-    <div>
-      <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+  <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between md:mb-6">
+    <div class="min-w-0">
+      <h1
+        class="font-display text-[22px] font-bold leading-tight tracking-[-0.02em] text-default md:text-[26px]"
+      >
         Campaigns
       </h1>
-      <p class="mt-1 text-[14px] text-muted">Broadcast to your contacts on WhatsApp &amp; Email</p>
+      <p class="mt-0.5 text-[13px] text-muted md:mt-1 md:text-[14px]">
+        Broadcast to your contacts on WhatsApp &amp; Email
+      </p>
     </div>
-    <div class="flex items-center gap-2">
-      <!-- Split "Download CSV" button, mirroring preview.html -->
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- Split "Download CSV" button, mirroring preview.html. Label
+           collapses to just "CSV" on mobile so the split doesn't push
+           the primary CTA off-screen. -->
       <div class="inline-flex overflow-hidden rounded-md border border-subtle">
         <button
           type="button"
-          class="border-r border-subtle bg-surface px-3 py-1.5 text-[13px] text-default hover:bg-surface-2"
+          class="border-r border-subtle bg-surface px-2 py-1.5 text-[12px] text-default hover:bg-surface-2 sm:px-3 sm:text-[13px]"
         >
-          ↓ Download CSV
+          <span class="sm:hidden">↓ CSV</span>
+          <span class="hidden sm:inline">↓ Download CSV</span>
         </button>
         <button
           type="button"
@@ -27,9 +34,10 @@
       <button
         type="button"
         (click)="openModal()"
-        class="rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-white hover:brightness-95"
+        class="rounded-md bg-accent px-2.5 py-1.5 text-[12px] font-medium text-white hover:brightness-95 sm:px-3 sm:text-[13px]"
       >
-        + New Campaign
+        <span class="sm:hidden">+ New</span>
+        <span class="hidden sm:inline">+ New Campaign</span>
       </button>
     </div>
   </header>
@@ -216,13 +224,163 @@
         </button>
       </div>
     } @else {
-      <div class="overflow-x-auto">
-        <table class="w-full text-[13px]">
+      <!-- Mobile: stacked card per campaign so every field + button
+           stays visible on a narrow viewport. Table below takes over
+           at `md+`. -->
+      <ul class="flex flex-col gap-2.5 p-2.5 md:hidden">
+        @for (c of filteredItems(); track c.id) {
+          @let cs = channelStyle(c.channel);
+          @let ss = statusStyle(c.status);
+          <li
+            class="overflow-hidden rounded-xl border border-subtle bg-surface-2 shadow-sm transition hover:border-muted"
+          >
+            <!-- Header: checkbox + name + channel chip -->
+            <div class="flex items-start gap-2 px-3 pt-3 pb-2">
+              <input
+                type="checkbox"
+                [checked]="isSelected(c.id)"
+                (change)="toggleRow(c.id)"
+                class="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-subtle text-default focus:ring-accent"
+                [attr.aria-label]="'Select ' + c.name"
+              />
+              <a
+                [routerLink]="['/user/campaigns', c.id]"
+                class="min-w-0 flex-1 text-[14px] leading-snug font-semibold text-default [overflow-wrap:anywhere] hover:underline"
+              >
+                {{ c.name }}
+              </a>
+              <span
+                [class]="
+                  'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[14px] ' +
+                  cs.cls
+                "
+                [attr.title]="cs.label"
+                [attr.aria-label]="cs.label"
+              >
+                {{ cs.icon }}
+              </span>
+            </div>
+
+            <!-- Status pill + created-time (subtle sub-header divider) -->
+            <div class="flex items-center gap-2 border-b border-subtle px-3 pb-2.5">
+              <span
+                [class]="
+                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-medium ' +
+                  ss.cls
+                "
+              >
+                <span aria-hidden="true" [class]="'text-[8px] ' + ss.dot">●</span>
+                {{ ss.label }}
+              </span>
+              <span class="truncate text-[10.5px] text-faint">
+                · {{ relativeDate(c.created_at) }}
+              </span>
+            </div>
+
+            <!-- Field rows — icon + value per line. Cleaner than a
+                 label column, and each line stands on its own. -->
+            <dl class="flex flex-col gap-2 px-3 py-3 text-[12px]">
+              <div class="flex items-start gap-2">
+                <lucide-icon name="file-text" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-faint" />
+                <dt class="sr-only">Template</dt>
+                <dd class="line-clamp-2 min-w-0 text-default [overflow-wrap:anywhere]">
+                  {{ templatePreview(c) }}
+                </dd>
+              </div>
+              <div class="flex items-start gap-2">
+                <lucide-icon name="users" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-faint" />
+                <dt class="sr-only">Audience</dt>
+                <dd class="min-w-0 text-muted [overflow-wrap:anywhere]">
+                  {{ audiencePreview(c) }}
+                </dd>
+              </div>
+              <div class="flex items-start gap-2">
+                <lucide-icon name="clock" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-faint" />
+                <dt class="sr-only">Scheduled</dt>
+                <dd class="min-w-0 text-default [overflow-wrap:anywhere]">
+                  {{ formatSchedule(c.schedule_at, c.status) }}
+                </dd>
+              </div>
+              <div class="flex items-start gap-2">
+                <lucide-icon name="bar-chart-3" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-faint" />
+                <dt class="sr-only">Stats</dt>
+                <dd class="min-w-0">
+                  @if (c.status === 'draft' || c.status === 'scheduled') {
+                    <span class="text-faint">No sends yet</span>
+                  } @else {
+                    <a
+                      [routerLink]="['/user/campaigns', c.id]"
+                      class="text-default hover:underline"
+                    >
+                      View funnel →
+                    </a>
+                  }
+                </dd>
+              </div>
+              <div class="flex items-center gap-2">
+                <lucide-icon name="user" class="h-3.5 w-3.5 shrink-0 text-faint" />
+                <dt class="sr-only">Created by</dt>
+                <dd class="flex min-w-0 flex-1 items-center gap-1.5">
+                  <span
+                    [class]="
+                      'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ' +
+                      createdByBg(c)
+                    "
+                    [attr.title]="c.created_by_id ?? 'System'"
+                  >
+                    {{ createdByInitial(c) }}
+                  </span>
+                  <span class="truncate text-default">{{ createdByName(c) }}</span>
+                </dd>
+              </div>
+            </dl>
+
+            <!-- Actions footer -->
+            <div
+              class="flex flex-wrap items-center gap-1.5 border-t border-subtle bg-surface px-3 py-2"
+            >
+              @if (c.status === 'draft' || c.status === 'failed') {
+                <button
+                  type="button"
+                  (click)="start(c)"
+                  [disabled]="busyId() === c.id"
+                  class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                  title="Start"
+                >
+                  <lucide-icon name="play" class="h-3 w-3" />
+                  {{ busyId() === c.id ? '…' : 'Start' }}
+                </button>
+                <button
+                  type="button"
+                  (click)="remove(c)"
+                  [disabled]="busyId() === c.id"
+                  class="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-surface px-2.5 py-1 text-[11px] font-medium text-red-500 hover:bg-red-500/10 disabled:opacity-50"
+                  title="Delete"
+                >
+                  <lucide-icon name="trash-2" class="h-3 w-3" />
+                  Delete
+                </button>
+              }
+              <a
+                [routerLink]="['/user/campaigns', c.id]"
+                class="ml-auto inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-[11px] font-medium text-default hover:bg-surface-2"
+                title="Open details"
+              >
+                Details
+                <lucide-icon name="chevron-right" class="h-3 w-3" />
+              </a>
+            </div>
+          </li>
+        }
+      </ul>
+
+      <div class="hidden overflow-hidden md:block md:overflow-x-auto">
+        <table class="w-full table-fixed text-[13px] md:table-auto">
           <thead>
             <tr
-              class="border-b border-subtle bg-surface-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted"
+              class="border-b border-subtle bg-surface-2 text-left text-[9px] font-semibold tracking-wider text-muted uppercase sm:text-[10px]"
             >
-              <th class="w-8 px-4 py-3">
+              <th class="hidden w-8 px-4 py-3 md:table-cell">
                 <input
                   type="checkbox"
                   [checked]="allVisibleSelected()"
@@ -232,15 +390,29 @@
                   aria-label="Select all visible campaigns"
                 />
               </th>
-              <th class="px-4 py-3">Name</th>
-              <th class="w-16 px-4 py-3">Channel</th>
-              <th class="px-4 py-3">Template</th>
-              <th class="px-4 py-3">Audience</th>
-              <th class="px-4 py-3">Status</th>
-              <th class="px-4 py-3">Scheduled</th>
-              <th class="whitespace-nowrap px-4 py-3">Sent / Delivered / Read</th>
-              <th class="px-4 py-3">Created&nbsp;by</th>
-              <th class="w-8 px-4 py-3"></th>
+              <th class="w-[46%] overflow-hidden px-2 py-2 sm:w-[34%] md:w-auto md:px-4 md:py-3">
+                Name
+              </th>
+              <th
+                class="w-[16%] overflow-hidden px-1 py-2 text-center sm:w-[10%] md:w-16 md:px-4 md:py-3 md:text-left"
+              >
+                Ch.
+              </th>
+              <th class="hidden px-4 py-3 md:table-cell">Template</th>
+              <th
+                class="hidden overflow-hidden px-2 py-2 sm:table-cell sm:w-[18%] md:w-auto md:px-4 md:py-3"
+              >
+                Audience
+              </th>
+              <th class="w-[30%] overflow-hidden px-2 py-2 sm:w-[24%] md:w-auto md:px-4 md:py-3">
+                Status
+              </th>
+              <th class="hidden px-4 py-3 md:table-cell">Scheduled</th>
+              <th class="hidden px-4 py-3 whitespace-nowrap md:table-cell">
+                Sent / Delivered / Read
+              </th>
+              <th class="hidden px-4 py-3 md:table-cell">Created&nbsp;by</th>
+              <th class="w-[8%] px-1 py-2 sm:w-[14%] md:w-8 md:px-4 md:py-3"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-subtle">
@@ -248,7 +420,7 @@
               @let cs = channelStyle(c.channel);
               @let ss = statusStyle(c.status);
               <tr class="hover:bg-surface-2/60">
-                <td class="px-4 py-3.5 align-top">
+                <td class="hidden px-4 py-3.5 align-top md:table-cell">
                   <input
                     type="checkbox"
                     [checked]="isSelected(c.id)"
@@ -257,18 +429,20 @@
                     [attr.aria-label]="'Select ' + c.name"
                   />
                 </td>
-                <td class="px-4 py-3.5 align-top">
+                <td class="overflow-hidden px-2 py-2 align-top md:px-4 md:py-3.5">
                   <a
                     [routerLink]="['/user/campaigns', c.id]"
-                    class="text-[13px] font-semibold text-default hover:underline"
+                    class="block text-[12px] leading-tight font-semibold text-default [overflow-wrap:anywhere] hover:underline md:text-[13px] md:leading-normal"
                   >
                     {{ c.name }}
                   </a>
-                  <div class="mt-0.5 text-[11px] text-muted">
+                  <div class="mt-0.5 truncate text-[10px] text-muted md:text-[11px]">
                     Created {{ relativeDate(c.created_at) }}
                   </div>
                 </td>
-                <td class="px-4 py-3.5 align-top">
+                <td
+                  class="overflow-hidden px-1 py-2 text-center align-top md:px-4 md:py-3.5 md:text-left"
+                >
                   <span
                     [class]="
                       'inline-flex h-6 w-6 items-center justify-center rounded-md text-[13px] ' +
@@ -280,18 +454,20 @@
                     {{ cs.icon }}
                   </span>
                 </td>
-                <td class="max-w-[220px] px-4 py-4 align-top">
+                <td class="hidden max-w-[220px] px-4 py-4 align-top md:table-cell">
                   <span class="line-clamp-2 text-[12px] text-default">
                     {{ templatePreview(c) }}
                   </span>
                 </td>
-                <td class="px-4 py-4 align-top text-[12px] text-muted">
+                <td
+                  class="hidden overflow-hidden truncate px-2 py-2 align-top text-[11px] text-muted sm:table-cell md:px-4 md:py-4 md:text-[12px]"
+                >
                   {{ audiencePreview(c) }}
                 </td>
-                <td class="px-4 py-3.5 align-top">
+                <td class="overflow-hidden px-2 py-2 align-top md:px-4 md:py-3.5">
                   <span
                     [class]="
-                      'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ' +
+                      'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium md:px-2 md:text-[11px] ' +
                       ss.cls
                     "
                   >
@@ -299,10 +475,10 @@
                     {{ ss.label }}
                   </span>
                 </td>
-                <td class="px-4 py-4 align-top text-[12px] text-default">
+                <td class="hidden px-4 py-4 align-top text-[12px] text-default md:table-cell">
                   {{ formatSchedule(c.schedule_at, c.status) }}
                 </td>
-                <td class="px-4 py-4 align-top text-[12px] text-muted">
+                <td class="hidden px-4 py-4 align-top text-[12px] text-muted md:table-cell">
                   <!-- Per-row stats fetch lands in a follow-up. Drafts /
                        Scheduled: dash. Others: link into the detail
                        page's funnel. -->
@@ -317,7 +493,7 @@
                     </a>
                   }
                 </td>
-                <td class="px-4 py-3.5 align-top">
+                <td class="hidden px-4 py-3.5 align-top md:table-cell">
                   <div class="flex items-center gap-2">
                     <span
                       [class]="
@@ -331,7 +507,7 @@
                     <span class="text-[12px] text-default">{{ createdByName(c) }}</span>
                   </div>
                 </td>
-                <td class="px-4 py-3.5 align-top">
+                <td class="overflow-hidden px-1 py-2 align-top md:px-4 md:py-3.5">
                   @if (c.status === 'draft' || c.status === 'failed') {
                     <div class="flex items-center justify-end gap-1">
                       <button
