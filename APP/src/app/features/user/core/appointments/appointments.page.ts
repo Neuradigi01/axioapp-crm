@@ -257,7 +257,17 @@ export class AppointmentsPageComponent {
     },
   };
 
+  /** Clock signal that ticks every 30 seconds. `isOverdue()` reads
+   *  it so a slot that passes its scheduled_at silently in the
+   *  background gets its "Overdue" badge without needing a page
+   *  refresh or user interaction. */
+  protected readonly nowTick = signal(Date.now());
+
   constructor() {
+    // Kick the clock every 30s and stop cleanly on destroy.
+    const clock = window.setInterval(() => this.nowTick.set(Date.now()), 30_000);
+    this.destroyRef.onDestroy(() => window.clearInterval(clock));
+
     this.state.bulkActions.set([
       {
         key: 'reassign',
@@ -709,8 +719,11 @@ export class AppointmentsPageComponent {
    *  doesn't auto-flip on the backend — someone still owes it a proper
    *  outcome (completed / no_show / cancelled). Surface it visually so
    *  reps don't leave stale rows in "upcoming". */
+  /** Read `nowTick()` so the isOverdue verdict re-runs each time the
+   *  clock ticks (every 30s). Without this the badge stays stale after
+   *  a slot's scheduled_at passes silently in the background. */
   protected isOverdue(a: Appointment): boolean {
-    return a.status === 'scheduled' && new Date(a.scheduled_at).getTime() < Date.now();
+    return a.status === 'scheduled' && new Date(a.scheduled_at).getTime() < this.nowTick();
   }
 
   protected ownerPalette(userId: string | null): OwnerColor {
