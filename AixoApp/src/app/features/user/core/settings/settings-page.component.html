@@ -4,23 +4,62 @@
     <p class="mt-1 text-[14px] text-muted">Tenant configuration for this organisation.</p>
   </header>
 
-  <!-- Mobile: grouped dropdown selector -->
-  <div class="mb-5 md:hidden">
-    <label class="field-label mb-1.5 block" for="settings-tab-select">Section</label>
-    <select
-      id="settings-tab-select"
-      class="select"
-      [value]="active()"
-      (change)="active.set($any($event.target).value)"
+  <!-- Mobile: grouped picker. Native <select> + <optgroup> renders as
+       a browser-controlled popup that ignores the viewport width in
+       Chrome DevTools' mobile emulation (looks like it overflows even
+       though real mobile browsers show a nicely-sized sheet). Replaced
+       with an in-viewport dropdown that stays contained. -->
+  <div class="relative mb-5 md:hidden">
+    <label class="field-label mb-1.5 block" for="settings-tab-btn">Section</label>
+    <button
+      id="settings-tab-btn"
+      type="button"
+      class="flex w-full items-center justify-between rounded-lg border border-subtle bg-surface px-3 py-2 text-left text-sm text-default hover:bg-surface-2"
+      [attr.aria-expanded]="mobilePickerOpen()"
+      (click)="toggleMobilePicker()"
     >
-      @for (group of groupedTabs(); track group.id) {
-        <optgroup [label]="group.label">
+      <span class="truncate">{{ activeLabel() }}</span>
+      <lucide-icon
+        [name]="mobilePickerOpen() ? 'chevron-up' : 'chevron-down'"
+        class="h-4 w-4 shrink-0 text-faint"
+      />
+    </button>
+
+    @if (mobilePickerOpen()) {
+      <!-- Transparent backdrop; tap outside closes the picker. -->
+      <div
+        class="fixed inset-0 z-30"
+        (click)="mobilePickerOpen.set(false)"
+        aria-hidden="true"
+      ></div>
+      <div
+        class="absolute top-full right-0 left-0 z-40 mt-1 max-h-[60vh] overflow-y-auto rounded-lg border border-subtle bg-surface p-2 shadow-lg"
+        role="listbox"
+      >
+        @for (group of groupedTabs(); track group.id) {
+          <div
+            class="px-2 pt-2 pb-1 text-[10px] font-semibold tracking-[.06em] text-faint uppercase"
+          >
+            {{ group.label }}
+          </div>
           @for (tab of group.tabs; track tab.id) {
-            <option [value]="tab.id">{{ tab.label }}</option>
+            <button
+              type="button"
+              role="option"
+              [attr.aria-selected]="active() === tab.id"
+              class="flex w-full items-center rounded-md px-3 py-2 text-left text-[13px] font-medium transition"
+              [class.bg-accent-soft]="active() === tab.id"
+              [class.text-accent]="active() === tab.id"
+              [class.text-default]="active() !== tab.id"
+              [class.hover:bg-surface-2]="active() !== tab.id"
+              (click)="pickMobile(tab.id)"
+            >
+              {{ tab.label }}
+            </button>
           }
-        </optgroup>
-      }
-    </select>
+        }
+      </div>
+    }
   </div>
 
   <div class="md:grid md:grid-cols-[220px_1fr] md:gap-8">

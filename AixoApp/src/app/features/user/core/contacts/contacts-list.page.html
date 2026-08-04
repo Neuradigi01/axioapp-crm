@@ -1,97 +1,155 @@
 <div class="mx-auto max-w-[1180px] p-4 md:p-6" [appUrlFilterState]="urlState">
-  <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
+  <header
+    class="mb-5 flex flex-col gap-3 md:mb-6 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-4"
+  >
     <div>
-      <h1 class="font-display text-[26px] font-bold leading-tight tracking-tight text-default">
+      <h1
+        class="font-display text-[22px] font-bold leading-tight tracking-tight text-default md:text-[26px]"
+      >
         Contacts
       </h1>
-      <p class="mt-1 text-[14px] text-muted">{{ state.total() | number }} people</p>
+      <p class="mt-0.5 text-[13px] text-muted md:mt-1 md:text-[14px]">
+        {{ state.total() | number }} people
+      </p>
     </div>
-    <div class="flex flex-wrap items-center gap-2">
+    <!-- Buttons row — AIXO mobile packs Export/Import/Groups/+ New in one row
+         via wrap-inside-button. `whitespace-normal leading-[1.1] h-auto min-h-[34px]`
+         with tight `!px-2 !gap-1` and smaller `h-3.5 w-3.5` icons lets all 4
+         buttons fit at ~340px viewport. At sm+ we restore standard btn-sm. -->
+    <div class="flex flex-wrap items-stretch gap-1 sm:items-center sm:gap-2">
       <button
         type="button"
         (click)="onExportCsv()"
         [disabled]="exporting()"
-        class="btn btn-secondary btn-sm"
+        class="btn btn-secondary btn-sm !h-auto !min-h-[34px] !max-w-[86px] !gap-1 !px-2 !py-1 !text-[11.5px] !leading-[1.1] !whitespace-normal sm:!h-[30px] sm:!max-w-none sm:!gap-1.5 sm:!px-3 sm:!py-0 sm:!text-[12.5px] sm:!leading-none sm:!whitespace-nowrap"
+        [attr.aria-label]="'Export CSV'"
       >
         @if (exporting()) {
-          <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
-          Exporting…
+          <lucide-icon name="loader-2" class="h-3.5 w-3.5 shrink-0 animate-spin sm:h-4 sm:w-4" />
+          <span class="hidden sm:inline">Exporting…</span>
         } @else {
-          <lucide-icon name="download" class="h-4 w-4" />
-          Export CSV
+          <lucide-icon name="download" class="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+          <span>Export CSV</span>
         }
       </button>
-      <a routerLink="/user/contacts/import" class="btn btn-secondary btn-sm">
-        <lucide-icon name="upload" class="h-4 w-4" />
-        Import
+      <a
+        routerLink="/user/contacts/import"
+        class="btn btn-secondary btn-sm !h-auto !min-h-[34px] !gap-1 !px-2 !py-1 !text-[11.5px] !leading-[1.1] !whitespace-normal sm:!h-[30px] sm:!gap-1.5 sm:!px-3 sm:!py-0 sm:!text-[12.5px] sm:!leading-none sm:!whitespace-nowrap"
+        aria-label="Import contacts"
+      >
+        <lucide-icon name="upload" class="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+        <span>Import</span>
       </a>
-      <a routerLink="/user/contacts/groups" class="btn btn-secondary btn-sm">
-        <lucide-icon name="users" class="h-4 w-4" />
-        Groups
+      <a
+        routerLink="/user/contacts/groups"
+        class="btn btn-secondary btn-sm !h-[34px] !w-[34px] !p-0 sm:!h-[30px] sm:!w-auto sm:!gap-1.5 sm:!px-3"
+        aria-label="Groups"
+        title="Groups"
+      >
+        <lucide-icon name="users" class="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+        <span class="sr-only sm:not-sr-only">Groups</span>
       </a>
-      <button type="button" (click)="openCreate()" class="btn btn-primary btn-sm">
-        <lucide-icon name="plus" class="h-4 w-4" />
-        New Contact
+      <button
+        type="button"
+        (click)="openCreate()"
+        class="btn btn-primary btn-sm !h-auto !min-h-[34px] !max-w-[90px] !gap-1 !px-2 !py-1 !text-[11.5px] !leading-[1.1] !whitespace-normal sm:!h-[30px] sm:!max-w-none sm:!gap-1.5 sm:!px-3 sm:!py-0 sm:!text-[12.5px] sm:!leading-none sm:!whitespace-nowrap"
+      >
+        <lucide-icon name="plus" class="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+        <span>New contact</span>
       </button>
     </div>
   </header>
 
-  <!-- Filters -->
-  <div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-5">
-    <div class="sm:col-span-2">
+  <!-- Filters — AIXO chip row: search grows, filter chips are compact and wrap -->
+  <div class="mb-4 flex flex-wrap items-center gap-2 md:mb-5">
+    <div class="relative min-w-[140px] flex-1">
       <label for="contacts_q" class="sr-only">Search</label>
-      <div class="relative">
-        <lucide-icon
-          name="search"
-          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
-        />
-        <input
-          id="contacts_q"
-          type="search"
-          [formControl]="searchControl"
-          placeholder="Search by name, phone, or email…"
-          class="input pl-9"
-        />
-      </div>
+      <lucide-icon
+        name="search"
+        class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-faint"
+      />
+      <input
+        id="contacts_q"
+        type="search"
+        [formControl]="searchControl"
+        placeholder="Search contacts…"
+        class="input pl-9"
+      />
     </div>
-    <div>
-      <label for="contacts_source" class="sr-only">Source</label>
-      <select id="contacts_source" [formControl]="sourceControl" class="select">
-        <option value="">All sources</option>
+
+    <label
+      class="relative inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[9px] border border-subtle bg-app pr-8 pl-3 text-[13px] transition hover:border-muted"
+    >
+      <lucide-icon name="filter" class="h-3.5 w-3.5 shrink-0 text-faint" />
+      <span class="sr-only">Source</span>
+      <select
+        id="contacts_source"
+        [formControl]="sourceControl"
+        class="cursor-pointer appearance-none border-none bg-transparent text-default focus:outline-none"
+      >
+        <option value="">Source</option>
         @for (s of sourceOptions(); track s) {
           <option [value]="s">{{ s }}</option>
         }
       </select>
-    </div>
-    <div>
-      <label for="contacts_tag" class="sr-only">Tag</label>
-      <select id="contacts_tag" [formControl]="tagControl" class="select">
-        <option value="">All tags</option>
+      <lucide-icon
+        name="chevron-down"
+        class="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-faint"
+      />
+    </label>
+
+    <label
+      class="relative flex h-10 min-w-0 flex-1 basis-[calc(50%-0.25rem)] cursor-pointer items-center gap-1.5 rounded-[9px] border border-subtle bg-app pr-8 pl-3 text-[13px] transition hover:border-muted sm:inline-flex sm:flex-none sm:basis-auto"
+    >
+      <lucide-icon name="tag" class="h-3.5 w-3.5 shrink-0 text-faint" />
+      <span class="sr-only">Tag</span>
+      <select
+        id="contacts_tag"
+        [formControl]="tagControl"
+        class="min-w-0 flex-1 cursor-pointer appearance-none border-none bg-transparent text-default focus:outline-none"
+      >
+        <option value="">Tags</option>
         @for (t of tagOptions(); track t) {
           <option [value]="t">{{ t }}</option>
         }
       </select>
-    </div>
-    <div>
-      <label for="contacts_assignee" class="sr-only">Owner</label>
-      <select id="contacts_assignee" [formControl]="assigneeControl" class="select">
-        <option value="">All owners</option>
+      <lucide-icon
+        name="chevron-down"
+        class="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-faint"
+      />
+    </label>
+
+    <label
+      class="relative flex h-10 min-w-0 flex-1 basis-[calc(50%-0.25rem)] cursor-pointer items-center gap-1.5 rounded-[9px] border border-subtle bg-app pr-8 pl-3 text-[13px] transition hover:border-muted sm:inline-flex sm:flex-none sm:basis-auto"
+    >
+      <lucide-icon name="user" class="h-3.5 w-3.5 shrink-0 text-faint" />
+      <span class="sr-only">Owner</span>
+      <select
+        id="contacts_assignee"
+        [formControl]="assigneeControl"
+        class="min-w-0 flex-1 cursor-pointer appearance-none border-none bg-transparent text-default focus:outline-none"
+      >
+        <option value="">Owner</option>
         <option value="me">Me</option>
         @for (u of users(); track u.id) {
           <option [value]="u.id">{{ u.full_name }}</option>
         }
       </select>
-    </div>
+      <lucide-icon
+        name="chevron-down"
+        class="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-faint"
+      />
+    </label>
   </div>
 
   <!-- Body -->
-  <div class="overflow-x-auto rounded-xl border border-subtle bg-surface">
+  <div class="overflow-hidden rounded-xl border border-subtle bg-surface md:overflow-x-auto">
     @if (state.loadError(); as err) {
-      <div class="px-4 md:px-6 py-4 text-sm text-red-500">{{ err }}</div>
+      <div class="px-4 py-4 text-sm text-red-500 md:px-6">{{ err }}</div>
     } @else if (state.loading()) {
       <div class="divide-y divide-subtle">
         @for (i of [0, 1, 2, 3, 4]; track i) {
-          <div class="flex items-center gap-4 px-4 md:px-6 py-4">
+          <div class="flex items-center gap-4 px-4 py-4 md:px-6">
             <div class="h-9 w-9 animate-pulse rounded-full bg-surface-2"></div>
             <div class="flex-1">
               <div class="h-3 w-40 animate-pulse rounded bg-surface-2"></div>
@@ -102,15 +160,15 @@
         }
       </div>
     } @else if (state.items().length === 0) {
-      <div class="px-4 md:px-6 py-12 text-center">
+      <div class="px-4 py-12 text-center md:px-6">
         <p class="text-sm font-medium text-default">No contacts found.</p>
         <p class="mt-1 text-xs text-faint">Try a different search or clear filters.</p>
       </div>
     } @else {
-      <table class="w-full min-w-[1100px]">
+      <table class="w-full table-fixed md:table-auto md:min-w-[1100px]">
         <thead>
           <tr class="border-b border-subtle bg-surface-2">
-            <th scope="col" class="w-10 px-3 py-2.5 text-left">
+            <th scope="col" class="hidden w-10 px-3 py-2.5 text-left md:table-cell">
               <input
                 type="checkbox"
                 class="checkbox"
@@ -121,7 +179,7 @@
             </th>
             <th
               scope="col"
-              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="w-[32%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
             >
               <button
                 type="button"
@@ -139,37 +197,39 @@
             </th>
             <th
               scope="col"
-              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
-            >
-              Phone
-            </th>
-            <th
-              scope="col"
-              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="w-[26%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
             >
               Email
             </th>
             <th
               scope="col"
-              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="w-[20%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
             >
-              Source
+              Phone
             </th>
             <th
               scope="col"
-              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="w-[12%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
             >
-              Owner
+              <span class="sm:hidden">Src</span>
+              <span class="hidden sm:inline">Source</span>
             </th>
             <th
               scope="col"
-              class="px-4 md:px-6 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="w-[10%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
+            >
+              <lucide-icon name="user" class="inline h-3 w-3 sm:hidden" aria-label="Owner" />
+              <span class="hidden sm:inline">Owner</span>
+            </th>
+            <th
+              scope="col"
+              class="hidden px-4 py-2.5 text-left text-[11px] font-semibold tracking-[.06em] text-faint uppercase md:table-cell md:px-6"
             >
               Tags
             </th>
             <th
               scope="col"
-              class="px-4 md:px-6 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[.06em] text-faint"
+              class="hidden px-4 py-2.5 text-right text-[11px] font-semibold tracking-[.06em] text-faint uppercase md:table-cell md:px-6"
             >
               <button
                 type="button"
@@ -196,7 +256,7 @@
               class="cursor-pointer border-b border-subtle transition last:border-b-0 hover:bg-surface-2 focus:bg-surface-2 focus:outline-none"
               [class.bg-surface-2]="state.selectedIds().has(item.id)"
             >
-              <td class="w-10 px-3 py-3" (click)="$event.stopPropagation()">
+              <td class="hidden w-10 px-3 py-3 md:table-cell" (click)="$event.stopPropagation()">
                 <input
                   type="checkbox"
                   class="checkbox"
@@ -205,15 +265,19 @@
                   [attr.aria-label]="'Select ' + item.full_name"
                 />
               </td>
-              <td class="whitespace-nowrap px-4 md:px-6 py-3 text-sm font-medium text-default">
-                <div class="flex items-center gap-3">
+              <td
+                class="overflow-hidden px-1.5 py-2 align-top text-[11px] font-medium text-default sm:px-2 sm:text-[12px] md:px-6 md:py-3 md:text-sm md:whitespace-nowrap"
+              >
+                <div class="flex items-start gap-1.5 md:items-center md:gap-3">
                   <span
-                    class="flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft font-display text-xs font-semibold text-accent"
+                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-soft font-display text-[9px] font-semibold text-accent sm:h-7 sm:w-7 sm:text-[10px] md:h-8 md:w-8 md:text-xs"
                   >
                     {{ initials(item.full_name) }}
                   </span>
-                  <span class="flex items-center gap-2">
-                    {{ item.full_name }}
+                  <span class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 md:gap-2">
+                    <span class="min-w-0 leading-tight [overflow-wrap:anywhere]">
+                      {{ item.full_name }}
+                    </span>
                     @if (item.anonymised_at) {
                       <span
                         class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-faint"
@@ -232,27 +296,7 @@
                 </div>
               </td>
               <td
-                class="whitespace-nowrap px-4 md:px-6 py-3 text-sm text-muted"
-                (click)="$event.stopPropagation()"
-              >
-                @if (item.phone) {
-                  <div class="inline-flex items-center gap-2">
-                    <a [appPhoneLink]="item.phone" class="text-default hover:text-accent">
-                      {{ item.phone }}
-                    </a>
-                    <a
-                      [appWhatsappLink]="item.phone"
-                      class="text-emerald-500 hover:text-emerald-400"
-                    >
-                      <lucide-icon name="message-circle" class="h-3.5 w-3.5" />
-                    </a>
-                  </div>
-                } @else {
-                  <span class="text-faint">—</span>
-                }
-              </td>
-              <td
-                class="whitespace-nowrap px-4 md:px-6 py-3 text-sm text-muted"
+                class="overflow-hidden px-1.5 py-2 align-top text-[11px] leading-snug text-muted [overflow-wrap:anywhere] sm:px-2 sm:text-[12px] md:px-6 md:py-3 md:text-sm md:leading-normal md:break-normal md:whitespace-nowrap"
                 (click)="$event.stopPropagation()"
               >
                 @if (item.email) {
@@ -263,24 +307,56 @@
                   <span class="text-faint">—</span>
                 }
               </td>
-              <td class="whitespace-nowrap px-4 md:px-6 py-3 text-sm text-muted">
-                {{ item.source ?? '—' }}
+              <td
+                class="overflow-hidden px-1.5 py-2 align-top text-[11px] leading-snug text-muted [overflow-wrap:anywhere] sm:px-2 sm:text-[12px] md:px-6 md:py-3 md:text-sm md:leading-normal md:break-normal md:whitespace-nowrap"
+                (click)="$event.stopPropagation()"
+              >
+                @if (item.phone) {
+                  <span class="inline-flex flex-wrap items-center gap-1.5 md:gap-2">
+                    <a [appPhoneLink]="item.phone" class="text-default hover:text-accent">
+                      {{ item.phone }}
+                    </a>
+                    <a
+                      [appWhatsappLink]="item.phone"
+                      class="hidden text-emerald-500 hover:text-emerald-400 md:inline"
+                    >
+                      <lucide-icon name="message-circle" class="h-3.5 w-3.5" />
+                    </a>
+                  </span>
+                } @else {
+                  <span class="text-faint">—</span>
+                }
               </td>
-              <td class="whitespace-nowrap px-4 md:px-6 py-3 text-sm text-muted">
+              <td
+                class="overflow-hidden px-1.5 py-2 align-top text-[11px] leading-snug text-muted sm:px-2 sm:text-[12px] md:px-6 md:py-3 md:text-sm md:leading-normal md:whitespace-nowrap"
+              >
+                <span
+                  class="block truncate sm:whitespace-normal sm:[overflow-wrap:anywhere]"
+                  [attr.title]="item.source ?? ''"
+                >
+                  {{ item.source ?? '—' }}
+                </span>
+              </td>
+              <td
+                class="overflow-hidden px-1.5 py-2 align-top text-[11px] text-muted sm:px-2 sm:text-[12px] md:px-6 md:py-3 md:text-sm md:whitespace-nowrap"
+              >
                 @if (item.assigned_to_id) {
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-1.5 md:gap-2">
                     <span
-                      class="flex h-6 w-6 items-center justify-center rounded-full bg-accent-soft font-display text-[10px] font-semibold text-accent"
+                      class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-soft font-display text-[10px] font-semibold text-accent"
+                      [attr.title]="ownerLabel(item.assigned_to_id)"
                     >
                       {{ initials(ownerLabel(item.assigned_to_id)) }}
                     </span>
-                    <span>{{ ownerLabel(item.assigned_to_id) }}</span>
+                    <span class="hidden truncate md:inline md:whitespace-normal">
+                      {{ ownerLabel(item.assigned_to_id) }}
+                    </span>
                   </div>
                 } @else {
-                  <span class="text-faint">Unassigned</span>
+                  <span class="text-faint">—</span>
                 }
               </td>
-              <td class="px-4 md:px-6 py-3 text-sm text-muted">
+              <td class="hidden px-4 py-3 text-sm text-muted md:table-cell md:px-6">
                 <div class="flex flex-wrap gap-1">
                   @for (tag of item.tags; track tag) {
                     <span
@@ -294,7 +370,7 @@
                 </div>
               </td>
               <td
-                class="whitespace-nowrap px-4 md:px-6 py-3 text-right font-mono text-sm text-muted tabular-nums"
+                class="hidden px-4 py-3 text-right font-mono text-sm whitespace-nowrap text-muted tabular-nums md:table-cell md:px-6"
               >
                 {{ item.last_activity_at | relativeTime }}
               </td>

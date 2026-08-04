@@ -269,18 +269,14 @@
 
           <label class="block">
             <span class="text-xs font-medium text-default">Channel</span>
-            <select
-              formControlName="channel"
-              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
-            >
-              <option value="">— Pick a channel —</option>
-              <option value="email">Email</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="sms">SMS</option>
-              <option value="facebook">Facebook Messenger</option>
-              <option value="instagram">Instagram Direct</option>
-              <option value="push">Push notification</option>
-            </select>
+            <div class="mt-1">
+              <crm-mobile-select
+                [options]="channelOptions"
+                [value]="headerForm.controls.channel.value"
+                placeholder="— Pick a channel —"
+                (valueChange)="onChannelPicked($event)"
+              />
+            </div>
             @if (template()) {
               <p class="mt-1 text-[10px] text-faint">
                 Channel is locked after the first save — fork a new template to switch.

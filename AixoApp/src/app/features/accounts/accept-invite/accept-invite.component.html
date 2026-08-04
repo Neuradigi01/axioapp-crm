@@ -62,7 +62,16 @@
         </div>
         <label class="block text-sm">
           <span class="mb-1 block text-xs font-medium text-muted">Phone (optional)</span>
-          <input type="tel" formControlName="phone" autocomplete="tel" class="input" />
+          <input
+            type="tel"
+            inputmode="tel"
+            pattern="\+?[0-9]{8,15}"
+            maxlength="16"
+            placeholder="e.g. +919876543210"
+            formControlName="phone"
+            autocomplete="tel"
+            class="input"
+          />
           @if (form.controls.phone.touched && form.controls.phone.invalid) {
             <p class="mt-1 text-xs text-red-500">
               <app-validation-message [control]="form.controls.phone" label="Phone" />

@@ -41,20 +41,22 @@ const INTERNAL: Record<TemplateInternalStatus, BadgeDescriptor> = {
 const EXTERNAL: Record<TemplateExternalStatus, BadgeDescriptor | null> = {
   // n_a renders nothing — the channel doesn't need external review.
   n_a: null,
+  // Labels are single words — the column header "External" already
+  // disambiguates, and "Provider approved" was too wide for narrow cells.
   pending: {
-    label: 'Pending review',
+    label: 'Pending',
     classes: 'bg-amber-50 text-amber-700 ring-amber-200',
   },
   approved: {
-    label: 'Provider approved',
+    label: 'Approved',
     classes: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   },
   rejected: {
-    label: 'Provider rejected',
+    label: 'Rejected',
     classes: 'bg-red-500/10 text-red-400 ring-red-500/20',
   },
   paused: {
-    label: 'Provider paused',
+    label: 'Paused',
     classes: 'bg-orange-50 text-orange-700 ring-orange-200',
   },
 };

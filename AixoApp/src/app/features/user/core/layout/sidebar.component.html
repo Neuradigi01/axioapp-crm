@@ -1,6 +1,5 @@
 <aside
-  class="fixed inset-y-0 left-0 z-50 flex h-screen w-[220px] flex-col border-r border-subtle bg-surface transition-[width,transform] duration-200 ease-out md:sticky md:top-0 md:z-auto md:translate-x-0"
-  [class.-translate-x-full]="!mobileOpen()"
+  class="sticky top-0 z-auto hidden h-screen w-[220px] flex-col border-r border-subtle bg-surface transition-[width] duration-200 ease-out md:flex"
   [class.md:w-[64px]]="!expanded()"
 >
   <!-- ── Workspace switcher (top) ─────────────────────────────────── -->
@@ -79,16 +78,6 @@
         </button>
       </div>
     }
-
-    <!-- Mobile drawer close (top-right, only on mobile) -->
-    <button
-      type="button"
-      class="absolute right-3 top-3 rounded-lg p-1 text-muted transition hover:bg-surface-2 hover:text-default md:hidden"
-      (click)="close.emit()"
-      aria-label="Close menu"
-    >
-      <lucide-icon name="x" class="h-4 w-4" />
-    </button>
   </div>
 
   <!-- ── Nav (middle) — AIXO-style grouped sections ──────────────── -->
@@ -116,7 +105,6 @@
                 style="font-weight: 600"
                 [class.md:justify-center]="!expanded()"
                 [attr.title]="m.name"
-                (click)="close.emit()"
               >
                 <lucide-icon [name]="m.icon" class="h-4 w-4 shrink-0" />
                 <span class="truncate" [class.md:hidden]="!expanded()">
@@ -142,7 +130,6 @@
             style="font-weight: 600"
             [class.md:justify-center]="!expanded()"
             [attr.title]="m.name"
-            (click)="close.emit()"
           >
             <lucide-icon [name]="m.icon" class="h-4 w-4 shrink-0" />
             <span class="truncate" [class.md:hidden]="!expanded()">

@@ -72,7 +72,9 @@
     }
 
     @if (canChangeScope()) {
-      <div class="inline-flex overflow-hidden rounded-full ring-1 border-subtle bg-surface">
+      <div
+        class="hidden overflow-hidden rounded-full border-subtle bg-surface ring-1 md:inline-flex"
+      >
         @for (
           sc of [
             { v: 'mine', label: 'Mine' },
@@ -100,7 +102,7 @@
       <select
         [value]="sortKey() + ':' + sortOrder()"
         (change)="setSort($any($event.target).value)"
-        class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="hidden rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-muted focus:ring-1 focus:ring-accent focus:outline-none md:inline-block"
         aria-label="Sort"
       >
         <option value="scheduled_at:asc">Upcoming first</option>
@@ -114,7 +116,7 @@
 
     <select
       [formControl]="assigneeControl"
-      class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+      class="hidden rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-muted focus:ring-1 focus:ring-accent focus:outline-none md:inline-block"
       aria-label="Owner"
     >
       <option value="">All owners</option>
@@ -226,55 +228,66 @@
           @for (a of state.items(); track a.id) {
             @let palette = ownerPalette(a.assigned_to_id);
             <li
-              class="group flex items-center gap-4 px-4 py-3.5 transition hover:bg-surface-2 md:px-5"
+              class="group flex items-center gap-3 px-3 py-3 transition hover:bg-surface-2 md:gap-4 md:px-5 md:py-3.5"
               [class.bg-surface-2]="isSelected(a.id)"
+              (click)="openPopover(a)"
+              (keydown.enter)="openPopover(a)"
+              tabindex="0"
+              role="button"
+              [attr.aria-label]="'Open actions for ' + a.title"
             >
-              <!-- Checkbox (only visible on hover / when any row selected) -->
+              <!-- Checkbox — hidden on mobile (bulk actions live on md+ only) -->
               <input
                 type="checkbox"
-                class="h-4 w-4 shrink-0 cursor-pointer rounded border-subtle text-default focus:ring-accent"
-                [class.invisible]="!isSelected(a.id) && state.selectedCount() === 0"
-                [class.group-hover:visible]="!isSelected(a.id)"
+                class="hidden h-4 w-4 shrink-0 cursor-pointer rounded border-subtle text-default focus:ring-accent md:block"
+                [class.md:invisible]="!isSelected(a.id) && state.selectedCount() === 0"
+                [class.md:group-hover:visible]="!isSelected(a.id)"
                 [checked]="isSelected(a.id)"
                 (click)="toggleRow(a.id, $event)"
                 [attr.aria-label]="'Select appointment ' + a.title"
               />
 
-              <!-- Time (mono) — 60px column -->
+              <!-- Time (mono). Duration text hidden on mobile — AIXO look. -->
               <div
-                class="w-[60px] shrink-0 text-right font-mono text-[13px] leading-tight tabular-nums text-muted"
+                class="w-[46px] shrink-0 text-right font-mono text-[13px] leading-tight tabular-nums text-muted md:w-[60px]"
               >
                 {{ formatTime(a.scheduled_at) }}
-                <div class="text-[10px] text-faint">{{ a.duration_min }}m</div>
+                <div class="hidden text-[10px] text-faint md:block">{{ a.duration_min }}m</div>
               </div>
 
               <!-- Colored status bar (AIXO signature) — one solid hue per
-                   appointment status so the row's outcome reads at a glance. -->
+                   appointment status so the row's outcome reads at a glance.
+                   Past-scheduled slots go red to flag "overdue" alongside
+                   the pill on the right. -->
               <span
-                class="h-[38px] w-[3px] shrink-0 rounded-[2px]"
-                [class]="statusBarClass(a.status)"
-                [title]="'Status: ' + a.status"
+                class="h-[42px] w-[3px] shrink-0 rounded-[2px] md:h-[38px]"
+                [class]="isOverdue(a) ? 'bg-red-500' : statusBarClass(a.status)"
+                [title]="isOverdue(a) ? 'Overdue — needs an outcome' : 'Status: ' + a.status"
                 aria-hidden="true"
               ></span>
 
               <!-- Title + customer + optional purpose chip -->
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2">
-                  <p class="truncate text-[14px] font-semibold text-default">{{ a.title }}</p>
+                  <p
+                    class="line-clamp-2 min-w-0 text-[13px] leading-snug font-semibold text-default md:truncate md:text-[14px] md:leading-normal"
+                  >
+                    {{ a.title }}
+                  </p>
                   @if (a.purpose) {
                     <span
-                      class="inline-flex shrink-0 items-center rounded-full border border-subtle bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-muted"
+                      class="hidden shrink-0 items-center rounded-full border border-subtle bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-muted md:inline-flex"
                     >
                       {{ a.purpose }}
                     </span>
                   }
                 </div>
-                <div class="mt-0.5 flex items-center gap-2 text-[12.5px] text-muted">
+                <div class="mt-0.5 flex items-center gap-2 text-[12px] text-muted md:text-[12.5px]">
                   <span class="truncate">{{ contactName(a.contact_id) }}</span>
                   @if (contactPhone(a.contact_id); as phone) {
                     <a
                       [appPhoneLink]="phone"
-                      class="text-faint hover:text-default"
+                      class="hidden text-faint hover:text-default md:inline"
                       (click)="$event.stopPropagation()"
                       title="Call"
                     >
@@ -282,7 +295,7 @@
                     </a>
                     <a
                       [appWhatsappLink]="phone"
-                      class="text-emerald-500 hover:text-emerald-400"
+                      class="hidden text-emerald-500 hover:text-emerald-400 md:inline"
                       (click)="$event.stopPropagation()"
                       title="WhatsApp"
                     >
@@ -292,7 +305,7 @@
                   @if (contactEmail(a.contact_id); as email) {
                     <a
                       [appMailLink]="email"
-                      class="text-faint hover:text-default"
+                      class="hidden text-faint hover:text-default md:inline"
                       (click)="$event.stopPropagation()"
                       title="Email"
                     >
@@ -303,15 +316,18 @@
               </div>
 
               <!-- Right cluster: status pill + owner chip + last-activity + actions -->
-              <div class="flex shrink-0 items-center gap-3" (click)="$event.stopPropagation()">
+              <div
+                class="flex shrink-0 items-center gap-2 md:gap-3"
+                (click)="$event.stopPropagation()"
+              >
                 <span
-                  class="hidden whitespace-nowrap font-mono text-[11px] text-faint tabular-nums lg:inline"
+                  class="hidden font-mono text-[11px] whitespace-nowrap text-faint tabular-nums lg:inline"
                   [title]="a.last_activity_at ? 'Last activity' : ''"
                 >
                   {{ a.last_activity_at | relativeTime }}
                 </span>
                 <span
-                  class="hidden items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 md:inline-flex"
+                  class="hidden items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ring-1 md:inline-flex"
                   [class]="palette.bg + ' ' + palette.text + ' ' + palette.ring"
                   [title]="'Owner: ' + ownerLabel(a.assigned_to_id)"
                 >
@@ -319,15 +335,19 @@
                   {{ ownerLabel(a.assigned_to_id) }}
                 </span>
                 <span
-                  class="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ring-1"
-                  [class]="statusClass(a.status)"
+                  class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap ring-1 md:px-2 md:text-[11px]"
+                  [class]="
+                    isOverdue(a)
+                      ? 'bg-red-500/10 text-red-400 ring-red-500/30'
+                      : statusClass(a.status)
+                  "
                 >
-                  {{ a.status }}
+                  {{ isOverdue(a) ? 'Overdue' : a.status }}
                 </span>
                 <button
                   type="button"
-                  (click)="openPopover(a)"
-                  class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-subtle bg-surface text-muted transition hover:bg-surface-2 hover:text-default"
+                  (click)="openPopover(a); $event.stopPropagation()"
+                  class="hidden h-8 w-8 items-center justify-center rounded-lg border border-subtle bg-surface text-muted transition hover:bg-surface-2 hover:text-default md:inline-flex"
                   title="Actions"
                   [attr.aria-label]="'Actions for ' + a.title"
                 >

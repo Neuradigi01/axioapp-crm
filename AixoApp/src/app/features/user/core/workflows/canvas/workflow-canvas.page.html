@@ -206,7 +206,7 @@
       class="fixed inset-y-0 left-0 z-40 w-[280px] max-w-[85vw] shrink-0 transform border-r border-subtle bg-surface transition-transform duration-200 ease-out md:relative md:z-auto md:w-[300px] md:translate-x-0 md:border-r-0"
       [class.-translate-x-full]="!mobilePaletteOpen()"
     >
-      <app-node-palette />
+      <app-node-palette (nodeAdded)="onPaletteTap($event)" />
     </aside>
 
     <!-- Backdrop when any mobile overlay is open -->

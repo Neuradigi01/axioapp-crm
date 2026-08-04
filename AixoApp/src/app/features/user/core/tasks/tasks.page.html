@@ -157,7 +157,150 @@
       </button>
     </div>
   } @else {
-    <div class="overflow-x-auto rounded-xl border border-subtle bg-surface shadow-sm">
+    <!-- Mobile: card per task so every field + action stays visible on
+         a narrow viewport (no sideways scroll). Table below takes over
+         at `md+`. -->
+    <ul
+      class="divide-y divide-subtle overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm md:hidden"
+    >
+      @for (t of state.items(); track t.id) {
+        <li class="px-3 py-3" [class.bg-surface-2]="isSelected(t.id)">
+          <!-- Header row: select + complete + title + row-select checkbox -->
+          <div class="flex items-start gap-2">
+            <input
+              type="checkbox"
+              class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-subtle text-default focus:ring-accent"
+              [checked]="isSelected(t.id)"
+              (click)="toggleRow(t.id, $event)"
+              [attr.aria-label]="'Select task ' + t.title"
+            />
+            <input
+              type="checkbox"
+              [checked]="t.status === 'done'"
+              [disabled]="togglingId() !== null"
+              (change)="toggleComplete(t, $any($event.target).checked)"
+              class="mt-0.5 h-4 w-4 shrink-0 rounded border-subtle text-default focus:ring-accent disabled:cursor-not-allowed"
+              aria-label="Mark task complete"
+            />
+            <button
+              type="button"
+              (click)="openEdit(t)"
+              class="min-w-0 flex-1 text-left text-[13px] leading-tight font-semibold text-default [overflow-wrap:anywhere] hover:underline"
+              [class.line-through]="t.status === 'done' || t.status === 'missed'"
+              [class.text-faint]="t.status === 'done' || t.status === 'missed'"
+            >
+              {{ t.title }}
+            </button>
+          </div>
+
+          <!-- Priority + follow-up + missed badges + due date -->
+          <div class="mt-2 flex flex-wrap items-center gap-1.5 pl-11">
+            <span
+              class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1"
+              [class]="priorityClass(t.priority)"
+            >
+              {{ t.priority }}
+            </span>
+            @if (t.followup_type) {
+              <span
+                class="inline-flex items-center rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 ring-1 ring-sky-200"
+                [title]="'Follow-up type: ' + t.followup_type"
+              >
+                {{ t.followup_type }}
+              </span>
+            }
+            @if (t.status === 'missed') {
+              <span
+                class="inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-400 ring-1 border-red-500/20"
+              >
+                missed
+              </span>
+            }
+            <span
+              class="text-[11px]"
+              [class.text-red-500]="isOverdue(t)"
+              [class.font-medium]="isOverdue(t)"
+              [class.text-muted]="!isOverdue(t)"
+            >
+              Due: {{ formatDue(t.due_at) }}
+            </span>
+          </div>
+
+          <!-- Description if present -->
+          @if (t.description) {
+            <p class="mt-1.5 truncate pl-11 text-[11px] text-muted">{{ t.description }}</p>
+          }
+
+          <!-- Meta grid: Assignee + Related + Last activity -->
+          <dl class="mt-2 grid grid-cols-[68px_1fr] gap-x-2 gap-y-1 pl-11 text-[11px]">
+            <dt class="text-faint">Assignee</dt>
+            <dd class="truncate text-default">{{ assigneeName(t) }}</dd>
+            <dt class="text-faint">Related</dt>
+            <dd class="truncate text-muted">{{ t.related_entity_type || '—' }}</dd>
+            <dt class="text-faint">Activity</dt>
+            <dd class="font-mono text-muted tabular-nums">
+              {{ t.last_activity_at | relativeTime }}
+            </dd>
+          </dl>
+
+          <!-- Actions strip -->
+          <div class="mt-3 flex flex-wrap items-center gap-1.5 pl-11">
+            @if (t.status === 'open') {
+              <button
+                type="button"
+                (click)="snoozeToTomorrow(t)"
+                [disabled]="togglingId() !== null"
+                class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-[10.5px] font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed"
+                title="Snooze to tomorrow 9am"
+              >
+                <lucide-icon name="clock" class="h-3 w-3" />
+                +1d
+              </button>
+              <button
+                type="button"
+                (click)="snoozeTask(t, 60 * 24 * 7)"
+                [disabled]="togglingId() !== null"
+                class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-[10.5px] font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed"
+                title="Snooze +1 week"
+              >
+                <lucide-icon name="calendar-plus" class="h-3 w-3" />
+                +1w
+              </button>
+              <button
+                type="button"
+                (click)="onMarkMissed(t)"
+                [disabled]="togglingId() !== null"
+                class="inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-surface px-2 py-1 text-[10.5px] font-medium text-red-500 hover:bg-red-500/10 disabled:cursor-not-allowed"
+                title="Mark as missed"
+              >
+                <lucide-icon name="clock-alert" class="h-3 w-3" />
+                Missed
+              </button>
+            }
+            <button
+              type="button"
+              (click)="openDeleteRow(t)"
+              class="ml-auto inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-surface px-2 py-1 text-[10.5px] font-medium text-red-500 hover:bg-red-500/10"
+              title="Delete task"
+              aria-label="Delete task"
+            >
+              <lucide-icon name="trash-2" class="h-3 w-3" />
+              Delete
+            </button>
+          </div>
+        </li>
+      }
+      <div class="border-t border-subtle bg-surface-2 px-3 py-2 text-[11px] text-muted">
+        Showing {{ state.items().length }} of {{ state.total() }}
+        @if (state.loading()) {
+          <span class="ml-2">refreshing…</span>
+        }
+      </div>
+    </ul>
+
+    <div
+      class="hidden overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm md:block md:overflow-x-auto"
+    >
       <table class="w-full text-sm">
         <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
           <tr>

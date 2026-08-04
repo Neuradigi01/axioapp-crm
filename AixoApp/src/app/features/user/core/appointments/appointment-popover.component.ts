@@ -61,9 +61,25 @@ export class AppointmentPopoverComponent {
   @Output() readonly cancelAppt = new EventEmitter<void>();
   @Output() readonly dismiss = new EventEmitter<void>();
 
-  protected readonly canReassign = computed(() => this.auth.hasPermission('appointments.reassign'));
-
   protected readonly canWrite = computed(() => this.auth.hasPermission('appointments.write'));
+
+  /** Reassign is only meaningful on `scheduled` appointments — reassigning
+   *  a completed / cancelled / no-show slot has no operational effect and
+   *  would rewrite history. */
+  protected readonly canReassign = computed(() => {
+    const a = this._appointment();
+    if (!a) return false;
+    return this.auth.hasPermission('appointments.reassign') && a.status === 'scheduled';
+  });
+
+  /** Reschedule is allowed on `scheduled` (change slot), `no_show`, and
+   *  `cancelled` (rebook). Not on `completed` — the appointment already
+   *  happened. */
+  protected readonly canReschedule = computed(() => {
+    const a = this._appointment();
+    if (!a) return false;
+    return this.canWrite() && a.status !== 'completed';
+  });
 
   /** Status-machine gate for "Mark completed" — only valid from `scheduled`. */
   protected readonly canMarkCompleted = computed(() => {

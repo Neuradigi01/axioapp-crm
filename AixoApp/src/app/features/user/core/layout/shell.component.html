@@ -1,23 +1,9 @@
 <div class="flex h-screen overflow-hidden bg-app text-default">
-  @if (mobileMenuOpen()) {
-    <div
-      class="fixed inset-0 z-40 bg-black/50 md:hidden"
-      (click)="closeMobileMenu()"
-      aria-hidden="true"
-    ></div>
-  }
-
-  <app-sidebar
-    [expanded]="sidebarOpen()"
-    [mobileOpen]="mobileMenuOpen()"
-    (toggle)="toggleSidebar()"
-    (close)="closeMobileMenu()"
-    class="contents"
-  />
+  <app-sidebar [expanded]="sidebarOpen()" (toggle)="toggleSidebar()" class="contents" />
 
   <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
     <crm-trial-banner />
-    <app-header (toggleSidebar)="toggleMobileMenu()" (openPalette)="openPalette()" />
+    <app-header (openPalette)="openPalette()" />
     <main class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <!-- Inner scroll region. Ordinary pages scroll here as normal
            (their content grows past the viewport). App-shell pages like
@@ -25,8 +11,11 @@
            flex-col` so they fill this box exactly and hand off scrolling
            to their internal panes (list / thread). Keeping the outer
            chain `overflow-hidden` and a single scroll container here
-           gives both patterns a stable height to compute against. -->
-      <div class="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+           gives both patterns a stable height to compute against.
+
+           `pb-[64px] md:pb-0` reserves space on mobile for the fixed
+           bottom nav so content isn't hidden behind it. -->
+      <div class="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto pb-[64px] md:pb-0">
         <router-outlet />
       </div>
       <app-footer />
@@ -34,6 +23,7 @@
   </div>
 </div>
 
+<app-bottom-nav />
 <app-quick-add-fab />
 <app-toast-host />
 <app-command-palette #palette />

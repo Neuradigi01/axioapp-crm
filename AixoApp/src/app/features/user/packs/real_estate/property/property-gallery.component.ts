@@ -2,10 +2,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  effect,
   inject,
   input,
   output,
   signal,
+  untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -62,9 +64,16 @@ export class PropertyGalleryComponent {
   }
 
   constructor() {
-    // Hydrate from parent's `initialImages` on first render, and
-    // sync back whenever the parent replaces the list.
-    queueMicrotask(() => this.images.set([...this.initialImages()]));
+    // Hydrate from the parent's `initialImages` on first render AND
+    // whenever the parent replaces the list (e.g. property re-fetched
+    // after a save). `untracked` keeps the set inside the effect from
+    // triggering another cycle. Previously used a one-shot
+    // `queueMicrotask` — that missed later input changes and left the
+    // gallery stale after an external refresh.
+    effect(() => {
+      const next = this.initialImages();
+      untracked(() => this.images.set([...next]));
+    });
   }
 
   protected onFilesPicked(event: Event): void {

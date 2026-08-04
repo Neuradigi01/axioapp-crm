@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   inject,
   signal,
@@ -119,20 +120,32 @@ export class PropertyFormPageComponent {
     property_type: this.fb.nonNullable.control<PropertyTypeKey | ''>('', [Validators.required]),
     category: this.fb.nonNullable.control<PropertyCategoryKey | ''>('', [Validators.required]),
     description: this.fb.nonNullable.control(''),
-    price: this.fb.control<number | null>(null),
-    currency: this.fb.nonNullable.control('INR', [Validators.maxLength(3)]),
+    price: this.fb.control<number | null>(null, [Validators.min(0)]),
+    currency: this.fb.nonNullable.control('INR', [
+      Validators.required,
+      Validators.pattern(/^[A-Z]{3}$/),
+    ]),
     address_line: this.fb.nonNullable.control('', [Validators.maxLength(500)]),
     city: this.fb.nonNullable.control('', [Validators.maxLength(100)]),
     state: this.fb.nonNullable.control('', [Validators.maxLength(100)]),
     country: this.fb.nonNullable.control('', [Validators.maxLength(100)]),
-    pincode: this.fb.nonNullable.control('', [Validators.maxLength(20)]),
-    bedrooms: this.fb.control<number | null>(null),
-    bathrooms: this.fb.control<number | null>(null),
-    area_value: this.fb.control<number | null>(null),
+    // Postal codes vary globally (5–10 alphanumerics). Enforces "digits/letters
+    // only, 3–10 chars" so free-text garbage is caught early.
+    pincode: this.fb.nonNullable.control('', [
+      Validators.maxLength(20),
+      Validators.pattern(/^[A-Za-z0-9 -]{3,10}$/),
+    ]),
+    bedrooms: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(50)]),
+    bathrooms: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(50)]),
+    area_value: this.fb.control<number | null>(null, [Validators.min(0)]),
     area_unit: this.fb.nonNullable.control(''),
     amenities: this.fb.nonNullable.control<string[]>([]),
     contact_person: this.fb.nonNullable.control('', [Validators.maxLength(200)]),
-    contact_phone: this.fb.nonNullable.control('', [Validators.maxLength(40)]),
+    // Same E.164 rule the rest of the app uses (see custom-validators.ts).
+    contact_phone: this.fb.nonNullable.control('', [
+      Validators.maxLength(16),
+      Validators.pattern(/^\+?[0-9]{8,15}$/),
+    ]),
     contact_email: this.fb.nonNullable.control('', [Validators.email, Validators.maxLength(200)]),
   });
 
@@ -188,6 +201,31 @@ export class PropertyFormPageComponent {
           this.loading.set(false);
         },
       });
+  }
+
+  /** Warn the user before they close the browser tab / hit refresh
+   *  with unsaved changes. Only fires when the form is `dirty` and
+   *  we're not already mid-submit. Angular router navigation isn't
+   *  covered here — for that see `cancelEdit()` which prompts on
+   *  the Cancel button click. */
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.form.dirty && !this.saving()) {
+      event.preventDefault();
+      // Legacy Chromium: setting returnValue triggers the native prompt.
+      event.returnValue = '';
+    }
+  }
+
+  /** Router-navigation cancel — if the form is dirty, ask before
+   *  discarding. Called from the Cancel button in the footer instead
+   *  of a plain `routerLink` so the confirm can intercept. */
+  protected cancelEdit(): void {
+    if (this.form.dirty && !this.saving()) {
+      const ok = window.confirm('Discard unsaved changes and leave this page?');
+      if (!ok) return;
+    }
+    this.router.navigate(['/user/properties']);
   }
 
   /** Toolbar row-menu handlers. */
@@ -315,6 +353,25 @@ export class PropertyFormPageComponent {
     if (c.errors?.['email']) return 'Enter a valid email.';
     if (c.errors?.['maxlength']) {
       return `Too long (max ${c.errors['maxlength'].requiredLength}).`;
+    }
+    if (c.errors?.['min']) {
+      return `Must be ${c.errors['min'].min} or more.`;
+    }
+    if (c.errors?.['max']) {
+      return `Must be ${c.errors['max'].max} or less.`;
+    }
+    if (c.errors?.['pattern']) {
+      // Give a helpful message per field rather than the raw regex.
+      if (control === 'contact_phone') {
+        return 'Enter 8–15 digits, optionally starting with +.';
+      }
+      if (control === 'pincode') {
+        return 'Enter a valid postal code (3–10 letters/digits).';
+      }
+      if (control === 'currency') {
+        return 'Enter a 3-letter currency code (e.g. INR, USD).';
+      }
+      return 'Invalid format.';
     }
     return 'Invalid value.';
   }
