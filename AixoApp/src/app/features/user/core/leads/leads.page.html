@@ -401,14 +401,18 @@
     >
       <ng-template let-item>
         @let contact = contactFor(item.contact_id);
-        <!-- `div` (not `button`) with `role="button"` — nesting a real
-             `<button>` inside `cdkDrag` swallows the mousedown/pointerdown
-             CDK needs to start (and finish) a drag, so kanban moves never
-             fire `onItemMoved`. -->
+        <!-- `div` (not `button`) — nesting a `<button>` inside `cdkDrag`
+             swallows the pointerdown CDK needs. Click is gated by
+             `handleCardClick`: pointerdown records position, click only
+             fires openEdit when pointer barely moved (real click), not
+             when it moved (drag). Prevents the drop-mouseup → click →
+             route-navigation-away race that destroyed the optimistic
+             state update and cancelled the pending move-stage HTTP. -->
         <div
           role="button"
           tabindex="0"
-          (click)="openEdit(item)"
+          (pointerdown)="onCardPointerDown($event)"
+          (click)="handleCardClick(item, $event)"
           (keydown.enter)="openEdit(item)"
           (keydown.space)="openEdit(item); $event.preventDefault()"
           draggable="false"

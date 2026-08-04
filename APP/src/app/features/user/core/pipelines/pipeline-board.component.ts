@@ -143,21 +143,37 @@ export class PipelineBoardComponent {
   }
 
   protected onDrop(event: CdkDragDrop<PipelineItem[]>, toStage: string): void {
-    if (event.previousContainer === event.container) {
+    // Compare stage KEYS (not CDK container instances). CDK's container
+    // identity can be fragile under signal-driven re-renders — the ids
+    // we set via `[id]="dropListIdFor(stage.key)"` are the reliable
+    // source of truth for "which column did this come from".
+    const fromStage = this.stageKeyFromDropListId(event.previousContainer.id);
+    const movedItem = event.item.data as PipelineItem | undefined;
+
+    // Debug: temporary. Comment out once persistence is confirmed working.
+    // eslint-disable-next-line no-console
+    console.log('[pipeline-board] drop', {
+      fromStage,
+      toStage,
+      itemId: movedItem?.id,
+      previousContainerId: event.previousContainer.id,
+      containerId: event.container.id,
+      sameContainerRef: event.previousContainer === event.container,
+    });
+
+    if (fromStage === toStage) {
       // Reorder within the same column — purely visual, no server call.
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
     } else {
-      // `event.item.data` is bound via `[cdkDragData]="item"` and is
-      // the exact item the user dragged — the reliable identity source.
       // Emit BEFORE mutating the arrays so a stale array read can never
       // suppress the API call.
-      const movedItem = event.item.data as PipelineItem;
-      const fromStage = this.stageKeyFromDropListId(event.previousContainer.id);
-      this.itemMoved.emit({
-        itemId: String(movedItem.id),
-        fromStage,
-        toStage,
-      });
+      if (movedItem) {
+        this.itemMoved.emit({
+          itemId: String(movedItem.id),
+          fromStage,
+          toStage,
+        });
+      }
       transferArrayItem(
         event.previousContainer.data,
         event.container.data,

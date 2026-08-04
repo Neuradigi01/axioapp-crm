@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  Injectable,
   computed,
   effect,
   inject,
@@ -114,6 +115,7 @@ const DEFAULT_LEAD_COLUMNS: ColumnDef[] = [
 /** Pagination sizes the footer dropdown offers. 200 is the server cap. */
 const PAGE_SIZES = [25, 50, 100, 200] as const;
 
+@Injectable()
 class LeadsListState extends ListPageState<Lead> {}
 
 @Component({
@@ -1032,6 +1034,9 @@ export class LeadsPageComponent {
   }
 
   protected onItemMoved(event: ItemMovedEvent): void {
+    // Debug: temporary. Comment out once persistence is confirmed working.
+    // eslint-disable-next-line no-console
+    console.log('[leads.page] onItemMoved reached', event);
     // F2 — intercept move-to-Won up-front so the Won-capture modal
     // can prompt for close details before the API call fires. Same
     // shape as the Lost interception but proactive (backend doesn't
@@ -1212,6 +1217,28 @@ export class LeadsPageComponent {
     // attribution). The Edit modal still lives on the detail page
     // itself for in-place field edits.
     this.router.navigate(['/user/leads', lead.id]);
+  }
+
+  /** Pointer coords captured on pointerdown of a pipeline card. Used by
+   *  `handleCardClick` to distinguish a real click (didn't move) from
+   *  the mouseup that ends a CDK drag (moved noticeably). Prevents
+   *  navigation from firing after a drop, which would destroy the
+   *  page and cancel the in-flight `moveStage` HTTP call. */
+  private cardPointerDownX = 0;
+  private cardPointerDownY = 0;
+
+  protected onCardPointerDown(event: PointerEvent): void {
+    this.cardPointerDownX = event.clientX;
+    this.cardPointerDownY = event.clientY;
+  }
+
+  protected handleCardClick(lead: Lead, event: MouseEvent): void {
+    const dx = Math.abs(event.clientX - this.cardPointerDownX);
+    const dy = Math.abs(event.clientY - this.cardPointerDownY);
+    // 5px matches CDK's default drag-start threshold. Anything more is
+    // treated as a drag (no navigation); ≤ 5px is a click.
+    if (dx > 5 || dy > 5) return;
+    this.openEdit(lead);
   }
 
   protected closeModal(): void {
