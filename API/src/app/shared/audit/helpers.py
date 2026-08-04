@@ -30,7 +30,7 @@ async def log_entity_change(
     *,
     action: str,
     entity_type: str,
-    entity_id: uuid.UUID,
+    entity_id: uuid.UUID | None = None,
     before: dict[str, Any] | None = None,
     after: dict[str, Any] | None = None,
 ) -> None:
@@ -39,6 +39,15 @@ async def log_entity_change(
     ``action`` is the full dotted event name (e.g. ``"contacts.created"``).
     Tenant / user / IP / UA context is resolved automatically from the
     active :class:`RequestContext` inside the audit service.
+
+    ``entity_id`` is optional so bulk-operation events (e.g.
+    ``catalog.bulk_imported``, ``leads.bulk_delete``) that touch many
+    rows in one call — and therefore have no single row to point at —
+    can log an audit trail with just counts in ``after``. The DB
+    column and the underlying ``audit.log`` service both accept
+    ``NULL``; this signature had it as required, which raised a
+    ``TypeError`` at call time and surfaced to operators as the
+    generic "An unknown error occurred!" banner.
     """
     await audit.log(
         action,
