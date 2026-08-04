@@ -107,10 +107,14 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
     setReq('location', map['location']);
   }
 
-  /** Pre-fill the date side of `scheduled_at`. Time defaults to 10:00. */
+  /** Pre-fill `scheduled_at`. For a future day → 10:00 (typical
+   *  workday start). For today → the current system time rounded up
+   *  to the nearest 5-minute slot, so the default matches "now" as
+   *  closely as possible while staying safely ahead of the
+   *  `dateNotPast` validator's grace window. */
   @Input() set defaultDate(value: Date | null) {
     if (value && !this.scheduledAtControl.value) {
-      this.scheduledAtControl.setValue(this.toDatetimeLocalString(value, 10));
+      this.scheduledAtControl.setValue(this.buildDefaultScheduledAt(value));
     }
   }
 
@@ -334,10 +338,37 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
   /** Convert a Date → "YYYY-MM-DDTHH:mm" for <input type="datetime-local">. */
   private toDatetimeLocalString(d: Date, hour: number): string {
     const local = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hour, 0, 0, 0);
+    return this.formatDatetimeLocal(local);
+  }
+
+  /** Format a Date to the "YYYY-MM-DDTHH:mm" shape a datetime-local
+   *  input expects. Preserves the Date's actual hour/minute. */
+  private formatDatetimeLocal(d: Date): string {
     const pad = (n: number) => String(n).padStart(2, '0');
     return (
-      `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}` +
-      `T${pad(local.getHours())}:${pad(local.getMinutes())}`
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+      `T${pad(d.getHours())}:${pad(d.getMinutes())}`
     );
+  }
+
+  private buildDefaultScheduledAt(date: Date): string {
+    const now = new Date();
+    const isToday =
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth() &&
+      date.getDate() === now.getDate();
+    if (!isToday) {
+      // Future day → keep 10:00 as the sensible workday default.
+      return this.toDatetimeLocalString(date, 10);
+    }
+    // Today → round the current minute up to the next 5-minute mark
+    // so the default reads as close to "now" as possible while still
+    // being strictly ahead of the real system clock (avoids the
+    // `dateNotPast` validator tripping on submit due to seconds
+    // elapsing between open and click).
+    const rounded = new Date(now);
+    const nextSlot = Math.ceil((now.getMinutes() + (now.getSeconds() > 0 ? 1 : 0)) / 5) * 5;
+    rounded.setMinutes(nextSlot, 0, 0);
+    return this.formatDatetimeLocal(rounded);
   }
 }

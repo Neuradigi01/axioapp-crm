@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  Injectable,
   computed,
   effect,
   inject,
@@ -68,6 +69,7 @@ const FILTER_CHIPS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
   { id: 'cancelled', label: 'Cancelled' },
 ];
 
+@Injectable()
 class AppointmentsListState extends ListPageState<Appointment> {}
 
 @Component({
