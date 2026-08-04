@@ -14,6 +14,7 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { RouterLink } from '@angular/router';
 
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { InrPipe } from '../shared/pipes/inr.pipe';
 import {
   CatalogApiService,
@@ -43,6 +44,7 @@ import { deriveApiOrigin } from '@core/services/url.util';
     RouterLink,
     AddItemModalComponent,
     ViewItemModalComponent,
+    MobileSelectComponent,
   ],
   templateUrl: './catalog.page.html',
 })
@@ -108,6 +110,17 @@ export class CatalogPageComponent {
       updated_at: '',
     }));
   });
+
+  /** `crm-mobile-select` shape for the Category filter — sentinel
+   *  "All categories" first, then one entry per category (name is
+   *  both value and label, with an optional leading emoji when set). */
+  readonly categorySelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'All categories' },
+    ...this.categoryOptions().map((c) => ({
+      value: c.name,
+      label: c.icon_emoji ? `${c.icon_emoji} ${c.name}` : c.name,
+    })),
+  ]);
 
   // --- KPI cards ---
 

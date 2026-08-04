@@ -21,6 +21,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import { FieldDef } from '../shared/dynamic-form/types';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { commonValidators, withRequiredIf } from '../shared/validators';
 import {
@@ -56,7 +57,7 @@ interface OrgUser {
   selector: 'app-book-appointment-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, MobileSelectComponent],
   templateUrl: './book-appointment-modal.component.html',
 })
 export class BookAppointmentModalComponent extends BaseFormModalComponent {
@@ -145,6 +146,22 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
    * ngOnInit via `GET /api/v1/users`; inactive users filtered out
    * client-side. Empty until the request lands. */
   protected readonly users = signal<OrgUser[]>([]);
+
+  /** `crm-mobile-select` shape for the Assignee picker. When `users()`
+   *  hasn't loaded yet, fall back to just the current user so the form
+   *  stays submittable. */
+  protected readonly assigneeSelectOptions = computed<{ value: string; label: string }[]>(() => {
+    const list = this.users();
+    if (list.length === 0) {
+      const m = this.me();
+      return m ? [{ value: m.id, label: `${m.full_name} (you)` }] : [];
+    }
+    const meId = this.me()?.id;
+    return list.map((u) => ({
+      value: u.id,
+      label: u.id === meId ? `${u.full_name} (you)` : u.full_name,
+    }));
+  });
 
   private readonly contactQuery$ = new Subject<string>();
 

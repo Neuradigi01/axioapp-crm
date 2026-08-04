@@ -20,6 +20,7 @@ import { BaseFormModalComponent } from '../shared/components/base-form-modal.com
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { commonValidators, withRequiredIf } from '../shared/validators';
 
@@ -71,7 +72,7 @@ const FOLLOWUP_VALUES: readonly string[] = FOLLOWUP_OPTIONS.map((o) => o.value);
   selector: 'app-task-form-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule, DynamicFormComponent],
+  imports: [CommonModule, ReactiveFormsModule, DynamicFormComponent, MobileSelectComponent],
   templateUrl: './task-form-modal.component.html',
 })
 export class TaskFormModalComponent extends BaseFormModalComponent {
@@ -135,6 +136,24 @@ export class TaskFormModalComponent extends BaseFormModalComponent {
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly followupOptions = FOLLOWUP_OPTIONS;
+
+  /** Static option lists shaped for `crm-mobile-select`. */
+  protected readonly prioritySelectOptions: ReadonlyArray<{ value: string; label: string }> = [
+    { value: 'low', label: 'Low' },
+    { value: 'med', label: 'Medium' },
+    { value: 'high', label: 'High' },
+  ];
+
+  /** Assignees are passed in via @Input; compute the picker shape from
+   *  them so parent doesn't have to know the mobile-select shape. */
+  protected get assigneeSelectOptions(): { value: string; label: string }[] {
+    return this.assignees.map((a) => ({ value: a.id, label: a.full_name || a.email }));
+  }
+
+  /** Follow-up options are already `{value, label}` — reuse directly. */
+  protected get followupSelectOptions(): { value: string; label: string }[] {
+    return this.followupOptions.map((o) => ({ value: String(o.value ?? ''), label: o.label }));
+  }
 
   protected readonly form = this.fb.nonNullable.group({
     title: ['', [commonValidators.required, commonValidators.maxLength(255)]],

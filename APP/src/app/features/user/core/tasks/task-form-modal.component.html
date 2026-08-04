@@ -80,14 +80,11 @@
           <span class="mb-1 block text-xs font-medium text-muted">
             {{ stdField('priority')?.label ?? 'Priority' }} <span class="text-red-500">*</span>
           </span>
-          <select
-            formControlName="priority"
-            class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
-          >
-            <option value="low">Low</option>
-            <option value="med">Medium</option>
-            <option value="high">High</option>
-          </select>
+          <crm-mobile-select
+            [options]="prioritySelectOptions"
+            [value]="form.controls.priority.value"
+            (valueChange)="form.controls.priority.setValue($any($event))"
+          />
           @if (stdField('priority')?.help_text; as help) {
             <span class="mt-1 block text-xs text-muted">{{ help }}</span>
           }
@@ -103,14 +100,11 @@
             <span class="text-red-500">*</span>
           }
         </span>
-        <select
-          formControlName="assigned_to_id"
-          class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
-        >
-          @for (a of assignees; track a.id) {
-            <option [value]="a.id">{{ a.full_name || a.email }}</option>
-          }
-        </select>
+        <crm-mobile-select
+          [options]="assigneeSelectOptions"
+          [value]="form.controls.assigned_to_id.value ?? ''"
+          (valueChange)="form.controls.assigned_to_id.setValue($event)"
+        />
         @if (stdField('assigned_to_id')?.help_text; as help) {
           <span class="mt-1 block text-xs text-muted">{{ help }}</span>
         }
@@ -127,14 +121,11 @@
         Follow-up type
         <span class="ml-1 text-faint">(optional)</span>
       </span>
-      <select
-        formControlName="followup_type"
-        class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
-      >
-        @for (o of followupOptions; track o.value) {
-          <option [value]="o.value">{{ o.label }}</option>
-        }
-      </select>
+      <crm-mobile-select
+        [options]="followupSelectOptions"
+        [value]="form.controls.followup_type.value ?? ''"
+        (valueChange)="form.controls.followup_type.setValue($any($event) || null)"
+      />
     </label>
 
     <!-- T5 — Related contact picker. Optional. On save, sets
