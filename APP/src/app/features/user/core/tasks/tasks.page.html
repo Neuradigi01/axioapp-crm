@@ -48,19 +48,17 @@
       <!-- T7 — Assignee dropdown hidden when Mine is active (filtering
            "Mine" by owner=Someone Else silently yields zero rows).
            Also only exposed to callers with users.read since the API
-           they filter through requires it. -->
+           they filter through requires it. crm-mobile-select renders
+           in-DOM (dark theme, readable options, no OS-picker overflow
+           on mobile emulation). -->
       @if (showAssigneeDropdown()) {
-        <select
-          [formControl]="assigneeControl"
-          class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-xs text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          aria-label="Filter by assignee"
-        >
-          <option value="">All owners</option>
-          <option value="me">Me</option>
-          @for (u of users(); track u.id) {
-            <option [value]="u.id">{{ u.full_name }}</option>
-          }
-        </select>
+        <div class="min-w-[9rem]">
+          <crm-mobile-select
+            [options]="assigneeSelectOptions()"
+            [value]="assigneeControl.value"
+            (valueChange)="assigneeControl.setValue($event)"
+          />
+        </div>
       }
     </div>
     <div class="flex items-center gap-2">

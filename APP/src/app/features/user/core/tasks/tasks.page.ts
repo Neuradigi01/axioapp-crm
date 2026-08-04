@@ -22,6 +22,7 @@ import {
   UrlFilterStateConfig,
   UrlFilterStateDirective,
 } from '../shared/directives/url-filter-state.directive';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import {
   ReassignConfirm,
@@ -79,6 +80,7 @@ interface ChipDef {
     ReassignModalComponent,
     UrlFilterStateDirective,
     RelativeTimePipe,
+    MobileSelectComponent,
   ],
   providers: [TasksListState],
   templateUrl: './tasks.page.html',
@@ -148,6 +150,13 @@ export class TasksPageComponent {
   /** Directory of org users for the dropdown. Cached by `UsersDirectoryService`,
    * so this is cheap to read across the page. */
   readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
+
+  /** `crm-mobile-select` shape for the Owner filter. */
+  readonly assigneeSelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'All owners' },
+    { value: 'me', label: 'Me' },
+    ...this.users().map((u) => ({ value: u.id, label: u.full_name })),
+  ]);
 
   // --- URL state (Step 2) ------------------------------------------------
 
