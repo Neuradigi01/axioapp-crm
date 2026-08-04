@@ -26,6 +26,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -436,6 +437,12 @@ async def set_item_image(
 
     before = _snapshot(item)
     item.image_url = ref.url
+    # Force `updated_at` to tick even when the URL string is unchanged
+    # (JPEG→JPEG replaces the file at the same path, so `ref.url` is
+    # identical and SQLAlchemy would otherwise skip the UPDATE). The
+    # frontend uses `updated_at` as an image cache-buster (`?v={ts}`);
+    # without this bump the browser serves the stale cached bytes.
+    item.updated_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(item)
 
