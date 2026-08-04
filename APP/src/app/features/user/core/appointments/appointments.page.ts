@@ -199,6 +199,11 @@ export class AppointmentsPageComponent {
   readonly cancelAppt = signal<Appointment | null>(null);
   readonly cancelSubmitting = signal(false);
 
+  /** Appointment pending hard-delete confirmation. Populated from the
+   *  popover Delete action; rendered as `<app-confirm-dialog>`. */
+  readonly deleteAppt = signal<Appointment | null>(null);
+  readonly deleteSubmitting = signal(false);
+
   // --- URL state ---------------------------------------------------------
 
   readonly urlState: UrlFilterStateConfig = {
@@ -546,6 +551,53 @@ export class AppointmentsPageComponent {
     if (!a) return;
     this.closePopover();
     this.cancelAppt.set(a);
+  }
+
+  /** Open the styled confirm dialog for a hard-delete. Only offered
+   *  from the popover for TERMINAL states (cancelled / completed /
+   *  no_show); the popover gates the button via `canDelete`. Uses
+   *  `<app-confirm-dialog>` (see template) instead of a native
+   *  `window.confirm` so the messaging matches the rest of the UI. */
+  protected onPopoverDelete(): void {
+    const a = this.popoverAppointment();
+    if (!a) return;
+    this.closePopover();
+    this.deleteAppt.set(a);
+  }
+
+  /** Human-readable "{title} · {date}" line shown as the body of the
+   *  delete-confirm dialog. */
+  protected deleteApptLabel(): string {
+    const a = this.deleteAppt();
+    if (!a) return '';
+    return `${a.title} · ${new Date(a.scheduled_at).toLocaleString()}`;
+  }
+
+  protected closeDeleteConfirm(): void {
+    this.deleteAppt.set(null);
+    this.deleteSubmitting.set(false);
+  }
+
+  protected onDeleteConfirmed(): void {
+    const a = this.deleteAppt();
+    if (!a) return;
+    this.deleteSubmitting.set(true);
+    this.api
+      .delete(a.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          // Drop the row from the local list so the calendar / list
+          // view reflects the delete without a full refetch.
+          this.state.items.update((rows) => rows.filter((r) => r.id !== a.id));
+          this.closeDeleteConfirm();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.deleteSubmitting.set(false);
+          this.state.loadError.set(extractApiError(err) ?? 'Could not delete appointment.');
+          this.deleteAppt.set(null);
+        },
+      });
   }
 
   // --- Single-row reassign ----------------------------------------------

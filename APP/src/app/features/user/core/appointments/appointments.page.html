@@ -448,6 +448,22 @@
   />
 }
 
+<!-- Hard-delete confirm (terminal-state appointments only) -->
+@if (deleteAppt(); as appt) {
+  <app-confirm-dialog
+    [title]="'Permanently delete this appointment?'"
+    [body]="
+      deleteApptLabel() +
+      ' — This cannot be undone. The row is removed from the database and disappears from all reports and views.'
+    "
+    [confirmLabel]="'Delete permanently'"
+    [danger]="true"
+    [submitting]="deleteSubmitting()"
+    (confirm)="onDeleteConfirmed()"
+    (cancel)="closeDeleteConfirm()"
+  />
+}
+
 <!-- Popover (calendar event-click or list row actions) -->
 @if (popoverAppointment(); as appt) {
   <app-appointment-popover
@@ -457,6 +473,7 @@
     (markCompleted)="onPopoverMarkCompleted()"
     (markNoShow)="onPopoverMarkNoShow()"
     (cancelAppt)="onPopoverCancel()"
+    (deleteAppt)="onPopoverDelete()"
     (dismiss)="closePopover()"
   />
 }

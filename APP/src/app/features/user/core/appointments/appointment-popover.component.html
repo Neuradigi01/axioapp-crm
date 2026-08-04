@@ -98,6 +98,16 @@
           Cancel
         </button>
       }
+      @if (canDelete()) {
+        <button
+          type="button"
+          (click)="deleteAppt.emit()"
+          class="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-red-500 hover:bg-red-500/10"
+        >
+          <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
+          Delete permanently
+        </button>
+      }
     </div>
     <footer class="mt-2 border-t border-subtle pt-2 text-right">
       <button
