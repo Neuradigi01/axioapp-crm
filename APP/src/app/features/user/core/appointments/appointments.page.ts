@@ -31,6 +31,7 @@ import {
   UrlFilterStateDirective,
 } from '../shared/directives/url-filter-state.directive';
 import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { OwnerColor, ownerColor } from '../shared/owner-color.util';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import {
@@ -92,6 +93,7 @@ class AppointmentsListState extends ListPageState<Appointment> {}
     MailLinkDirective,
     UrlFilterStateDirective,
     RelativeTimePipe,
+    MobileSelectComponent,
   ],
   providers: [AppointmentsListState],
   templateUrl: './appointments.page.html',
@@ -142,6 +144,28 @@ export class AppointmentsPageComponent {
     for (const u of this.users()) map.set(u.id, u.full_name);
     return map;
   });
+
+  /** `crm-mobile-select` shape for the Owner filter (sentinel "All
+   *  owners" + "Me" + one entry per active org user). Kept as a
+   *  computed so the mobile-select re-renders when users load in. */
+  readonly assigneeSelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'All owners' },
+    { value: 'me', label: 'Me' },
+    ...this.users().map((u) => ({ value: u.id, label: u.full_name })),
+  ]);
+
+  /** `crm-mobile-select` shape for the Sort dropdown. Static list — 6
+   *  presets that mirror what other CRMs offer. Value is
+   *  `${sortKey}:${sortOrder}` so a single change handler can split
+   *  and drive both signals. */
+  readonly sortSelectOptions: ReadonlyArray<{ value: string; label: string }> = [
+    { value: 'scheduled_at:asc', label: 'Upcoming first' },
+    { value: 'scheduled_at:desc', label: 'Latest first' },
+    { value: 'last_activity_at:desc', label: 'Recent activity' },
+    { value: 'last_activity_at:asc', label: 'Stale (oldest activity)' },
+    { value: 'created_at:desc', label: 'Newest created' },
+    { value: 'created_at:asc', label: 'Oldest created' },
+  ];
 
   readonly canChangeScope = computed(() => {
     const role = this.auth.currentRoleName().toLowerCase();

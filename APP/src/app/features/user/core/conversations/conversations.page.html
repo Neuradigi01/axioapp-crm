@@ -12,19 +12,16 @@
         Conversations
       </h1>
       <div class="flex items-center gap-2">
-        <!-- Status filter moved out of the list panel into the header so
-             the list keeps full height for messages. Small compact
-             select — Open/Snoozed/Closed cases stay a click away. -->
-        <select
-          [value]="statusFilter()"
-          (change)="onStatusFilterChange($event)"
-          class="rounded-lg border border-subtle bg-surface px-2 py-1 text-xs text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          aria-label="Status filter"
-        >
-          @for (o of statusOptions; track o.value) {
-            <option [value]="o.value">{{ o.label }}</option>
-          }
-        </select>
+        <!-- Status filter — crm-mobile-select instead of native <select>
+             so the picker renders in-DOM (dark theme, readable text on
+             every OS, no full-screen OS-picker overflow on mobile). -->
+        <div class="min-w-[8rem]">
+          <crm-mobile-select
+            [options]="statusOptions"
+            [value]="statusFilter()"
+            (valueChange)="onStatusFilterChange($event)"
+          />
+        </div>
         <button
           type="button"
           (click)="reloadList()"

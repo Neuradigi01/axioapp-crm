@@ -72,9 +72,7 @@
     }
 
     @if (canChangeScope()) {
-      <div
-        class="hidden overflow-hidden rounded-full border-subtle bg-surface ring-1 md:inline-flex"
-      >
+      <div class="inline-flex overflow-hidden rounded-full border-subtle bg-surface ring-1">
         @for (
           sc of [
             { v: 'mine', label: 'Mine' },
@@ -98,33 +96,29 @@
       </div>
     }
 
+    <!-- Sort dropdown (list view only). Native <select> was hidden on
+         mobile — swap to crm-mobile-select so the picker renders
+         in-DOM (matches dark theme, no OS-picker overflow) AND
+         visible on every viewport size. -->
     @if (view() === 'list') {
-      <select
-        [value]="sortKey() + ':' + sortOrder()"
-        (change)="setSort($any($event.target).value)"
-        class="hidden rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-muted focus:ring-1 focus:ring-accent focus:outline-none md:inline-block"
-        aria-label="Sort"
-      >
-        <option value="scheduled_at:asc">Upcoming first</option>
-        <option value="scheduled_at:desc">Latest first</option>
-        <option value="last_activity_at:desc">Recent activity</option>
-        <option value="last_activity_at:asc">Stale (oldest activity)</option>
-        <option value="created_at:desc">Newest created</option>
-        <option value="created_at:asc">Oldest created</option>
-      </select>
+      <div class="min-w-[9rem]">
+        <crm-mobile-select
+          [options]="sortSelectOptions"
+          [value]="sortKey() + ':' + sortOrder()"
+          (valueChange)="setSort($event)"
+        />
+      </div>
     }
 
-    <select
-      [formControl]="assigneeControl"
-      class="hidden rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-muted focus:ring-1 focus:ring-accent focus:outline-none md:inline-block"
-      aria-label="Owner"
-    >
-      <option value="">All owners</option>
-      <option value="me">Me</option>
-      @for (u of users(); track u.id) {
-        <option [value]="u.id">{{ u.full_name }}</option>
-      }
-    </select>
+    <!-- Owner filter — same story: swap to mobile-select + reveal on
+         mobile so users on phones can actually filter by owner. -->
+    <div class="min-w-[9rem]">
+      <crm-mobile-select
+        [options]="assigneeSelectOptions()"
+        [value]="assigneeControl.value"
+        (valueChange)="assigneeControl.setValue($event)"
+      />
+    </div>
   </section>
 
   <!-- Body -->

@@ -77,69 +77,35 @@
       />
     </div>
 
-    <label
-      class="relative inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[9px] border border-subtle bg-app pr-8 pl-3 text-[13px] transition hover:border-muted"
-    >
-      <lucide-icon name="filter" class="h-3.5 w-3.5 shrink-0 text-faint" />
-      <span class="sr-only">Source</span>
-      <select
-        id="contacts_source"
-        [formControl]="sourceControl"
-        class="cursor-pointer appearance-none border-none bg-transparent text-default focus:outline-none"
-      >
-        <option value="">Source</option>
-        @for (s of sourceOptions(); track s) {
-          <option [value]="s">{{ s }}</option>
-        }
-      </select>
-      <lucide-icon
-        name="chevron-down"
-        class="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-faint"
+    <!-- Source filter — crm-mobile-select instead of native <select>
+         so the picker renders in-DOM. Native <select> options render
+         with the OS's default white/light theme, which reads as
+         low-contrast washed-out text against the dark app UI. -->
+    <div class="min-w-[9rem]">
+      <crm-mobile-select
+        [options]="sourceSelectOptions()"
+        [value]="sourceControl.value"
+        (valueChange)="sourceControl.setValue($event)"
       />
-    </label>
+    </div>
 
-    <label
-      class="relative flex h-10 min-w-0 flex-1 basis-[calc(50%-0.25rem)] cursor-pointer items-center gap-1.5 rounded-[9px] border border-subtle bg-app pr-8 pl-3 text-[13px] transition hover:border-muted sm:inline-flex sm:flex-none sm:basis-auto"
-    >
-      <lucide-icon name="tag" class="h-3.5 w-3.5 shrink-0 text-faint" />
-      <span class="sr-only">Tag</span>
-      <select
-        id="contacts_tag"
-        [formControl]="tagControl"
-        class="min-w-0 flex-1 cursor-pointer appearance-none border-none bg-transparent text-default focus:outline-none"
-      >
-        <option value="">Tags</option>
-        @for (t of tagOptions(); track t) {
-          <option [value]="t">{{ t }}</option>
-        }
-      </select>
-      <lucide-icon
-        name="chevron-down"
-        class="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-faint"
+    <!-- Tags filter — same story as Source above. -->
+    <div class="min-w-[9rem]">
+      <crm-mobile-select
+        [options]="tagSelectOptions()"
+        [value]="tagControl.value"
+        (valueChange)="tagControl.setValue($event)"
       />
-    </label>
+    </div>
 
-    <label
-      class="relative flex h-10 min-w-0 flex-1 basis-[calc(50%-0.25rem)] cursor-pointer items-center gap-1.5 rounded-[9px] border border-subtle bg-app pr-8 pl-3 text-[13px] transition hover:border-muted sm:inline-flex sm:flex-none sm:basis-auto"
-    >
-      <lucide-icon name="user" class="h-3.5 w-3.5 shrink-0 text-faint" />
-      <span class="sr-only">Owner</span>
-      <select
-        id="contacts_assignee"
-        [formControl]="assigneeControl"
-        class="min-w-0 flex-1 cursor-pointer appearance-none border-none bg-transparent text-default focus:outline-none"
-      >
-        <option value="">Owner</option>
-        <option value="me">Me</option>
-        @for (u of users(); track u.id) {
-          <option [value]="u.id">{{ u.full_name }}</option>
-        }
-      </select>
-      <lucide-icon
-        name="chevron-down"
-        class="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-faint"
+    <!-- Owner filter — same crm-mobile-select pattern. -->
+    <div class="min-w-[10rem] flex-1 basis-[calc(50%-0.25rem)] sm:flex-none sm:basis-auto">
+      <crm-mobile-select
+        [options]="assigneeSelectOptions()"
+        [value]="assigneeControl.value"
+        (valueChange)="assigneeControl.setValue($event)"
       />
-    </label>
+    </div>
   </div>
 
   <!-- Body -->
