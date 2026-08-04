@@ -76,35 +76,32 @@
           />
         </div>
 
-        <select
-          [value]="channelFilter()"
-          (change)="onChannelChange($any($event.target).value)"
-          class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
-        >
-          @for (opt of CHANNEL_OPTIONS; track opt.value) {
-            <option [value]="opt.value">{{ opt.label }}</option>
-          }
-        </select>
+        <!-- Channel / Category / Status filters — crm-mobile-select
+             for in-DOM picker (dark theme, readable options, no
+             OS-picker overflow on mobile emulation). -->
+        <div class="min-w-[9rem]">
+          <crm-mobile-select
+            [options]="CHANNEL_OPTIONS"
+            [value]="channelFilter()"
+            (valueChange)="onChannelChange($event)"
+          />
+        </div>
 
-        <select
-          [value]="categoryFilter()"
-          (change)="onCategoryChange($any($event.target).value)"
-          class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
-        >
-          @for (opt of CATEGORY_OPTIONS; track opt.value) {
-            <option [value]="opt.value">{{ opt.label }}</option>
-          }
-        </select>
+        <div class="min-w-[10rem]">
+          <crm-mobile-select
+            [options]="CATEGORY_OPTIONS"
+            [value]="categoryFilter()"
+            (valueChange)="onCategoryChange($event)"
+          />
+        </div>
 
-        <select
-          [value]="statusFilter()"
-          (change)="onStatusChange($any($event.target).value)"
-          class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
-        >
-          @for (opt of STATUS_OPTIONS; track opt.value) {
-            <option [value]="opt.value">{{ opt.label }}</option>
-          }
-        </select>
+        <div class="min-w-[9rem]">
+          <crm-mobile-select
+            [options]="STATUS_OPTIONS"
+            [value]="statusFilter()"
+            (valueChange)="onStatusChange($event)"
+          />
+        </div>
 
         @if (hasFilters()) {
           <button

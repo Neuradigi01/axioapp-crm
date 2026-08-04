@@ -17,6 +17,7 @@ import { forkJoin } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../auth/auth.service';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 
 import { FolderCreateModalComponent } from './folders/folder-create.modal.component';
 import { FoldersSidebarComponent } from './folders/folders-sidebar.component';
@@ -90,6 +91,7 @@ const CHANNEL_OPTIONS: Array<{ value: string; label: string }> = [
     FoldersSidebarComponent,
     FolderCreateModalComponent,
     RunHistoryDrawerComponent,
+    MobileSelectComponent,
   ],
   templateUrl: './workflows.page.html',
 })

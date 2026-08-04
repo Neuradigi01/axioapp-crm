@@ -49,36 +49,32 @@
         />
       </div>
 
-      <select
-        [value]="eventFilter()"
-        (change)="onEventChange($any($event.target).value)"
-        class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
-      >
-        <option value="">All events</option>
-        @for (entry of eventCatalog(); track entry.event_type) {
-          <option [value]="entry.event_type">{{ entry.label }}</option>
-        }
-      </select>
+      <!-- Event / Channel / Enabled filters — crm-mobile-select for
+           in-DOM picker (dark theme, readable options, no OS-picker
+           overflow on mobile emulation). -->
+      <div class="min-w-[11rem]">
+        <crm-mobile-select
+          [options]="eventSelectOptions()"
+          [value]="eventFilter()"
+          (valueChange)="onEventChange($event)"
+        />
+      </div>
 
-      <select
-        [value]="channelFilter()"
-        (change)="onChannelChange($any($event.target).value)"
-        class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
-      >
-        @for (opt of CHANNEL_OPTIONS; track opt.value) {
-          <option [value]="opt.value">{{ opt.label }}</option>
-        }
-      </select>
+      <div class="min-w-[9rem]">
+        <crm-mobile-select
+          [options]="CHANNEL_OPTIONS"
+          [value]="channelFilter()"
+          (valueChange)="onChannelChange($event)"
+        />
+      </div>
 
-      <select
-        [value]="enabledFilter()"
-        (change)="onEnabledChange($any($event.target).value)"
-        class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
-      >
-        @for (opt of ENABLED_OPTIONS; track opt.value) {
-          <option [value]="opt.value">{{ opt.label }}</option>
-        }
-      </select>
+      <div class="min-w-[9rem]">
+        <crm-mobile-select
+          [options]="ENABLED_OPTIONS"
+          [value]="enabledFilter()"
+          (valueChange)="onEnabledChange($event)"
+        />
+      </div>
 
       @if (eventFilter() || channelFilter() || enabledFilter() || searchQuery()) {
         <button

@@ -16,6 +16,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../auth/auth.service';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 
 import { ChannelChipComponent } from '../templates/channel-chip.component';
 import { EventTypeChipComponent } from './event-type-chip.component';
@@ -71,6 +72,7 @@ const ENABLED_OPTIONS: Array<{ value: '' | 'true' | 'false'; label: string }> = 
     LucideAngularModule,
     ChannelChipComponent,
     EventTypeChipComponent,
+    MobileSelectComponent,
   ],
   templateUrl: './automations.page.html',
 })
@@ -92,6 +94,13 @@ export class AutomationsPageComponent {
 
   // Event-type discovery (Step-3 endpoint).
   protected readonly eventCatalog = signal<EventCatalogEntry[]>([]);
+
+  /** `crm-mobile-select` shape for the Event filter — sentinel "All
+   *  events" first, then one entry per catalog event_type. */
+  protected readonly eventSelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'All events' },
+    ...this.eventCatalog().map((e) => ({ value: e.event_type, label: e.label })),
+  ]);
 
   // Filters.
   protected readonly eventFilter = signal<string>('');
