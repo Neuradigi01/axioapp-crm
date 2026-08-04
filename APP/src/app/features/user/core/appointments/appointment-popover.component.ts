@@ -72,13 +72,16 @@ export class AppointmentPopoverComponent {
     return this.auth.hasPermission('appointments.reassign') && a.status === 'scheduled';
   });
 
-  /** Reschedule is allowed on `scheduled` (change slot), `no_show`, and
-   *  `cancelled` (rebook). Not on `completed` — the appointment already
-   *  happened. */
+  /** Reschedule is allowed on `scheduled` (change slot) and `no_show`
+   *  (they didn't show up — book them again for a new time). Not on
+   *  `completed` (already happened) or `cancelled` (a cancelled
+   *  appointment shouldn't be re-woken from a status menu; if the
+   *  operator changed their mind, the right flow is to book a new
+   *  appointment). */
   protected readonly canReschedule = computed(() => {
     const a = this._appointment();
     if (!a) return false;
-    return this.canWrite() && a.status !== 'completed';
+    return this.canWrite() && (a.status === 'scheduled' || a.status === 'no_show');
   });
 
   /** Status-machine gate for "Mark completed" — only valid from `scheduled`. */
@@ -100,5 +103,18 @@ export class AppointmentPopoverComponent {
     const a = this._appointment();
     if (!a) return false;
     return this.canWrite() && ALLOWED_FROM_STATUS[a.status].includes('cancelled');
+  });
+
+  /** True when at least one action button is renderable — drives the
+   *  "This appointment is cancelled…" hint that replaces an empty
+   *  button grid so the popover doesn't look broken. */
+  protected readonly hasAnyAction = computed(() => {
+    return (
+      this.canReassign() ||
+      this.canReschedule() ||
+      this.canMarkCompleted() ||
+      this.canMarkNoShow() ||
+      this.canCancel()
+    );
   });
 }

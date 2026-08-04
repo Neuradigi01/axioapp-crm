@@ -37,6 +37,17 @@
       </div>
     </header>
     <div class="mt-2 grid grid-cols-1 gap-1">
+      @if (!hasAnyAction()) {
+        <p class="rounded-md bg-surface-2 px-2 py-2 text-[11px] text-muted">
+          @if (a.status === 'cancelled') {
+            This appointment was cancelled. Book a new one from the calendar if needed.
+          } @else if (a.status === 'completed') {
+            This appointment is complete. No further actions available.
+          } @else {
+            No actions available.
+          }
+        </p>
+      }
       @if (canReassign()) {
         <button
           type="button"
