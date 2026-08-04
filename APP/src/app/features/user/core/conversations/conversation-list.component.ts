@@ -77,14 +77,19 @@ interface ChannelPillOption {
   hue: 'emerald' | 'fuchsia' | 'blue' | 'zinc' | 'violet' | 'sky' | 'accent';
 }
 
+// v1 ships with WhatsApp + Email only. Messenger / Instagram / SMS /
+// Web adapters exist in the backend but aren't wired for live ingest,
+// so surfacing their chips would just show empty result sets and
+// mislead users. Un-comment each entry as its ingest pipeline goes
+// live (order here also drives the on-screen chip order).
 const CHANNEL_PILL_OPTIONS: ChannelPillOption[] = [
   { value: '', label: 'All messengers', hue: 'accent' },
   { value: 'whatsapp', label: 'WhatsApp', hue: 'emerald' },
-  { value: 'facebook', label: 'Messenger', hue: 'blue' },
-  { value: 'instagram', label: 'Instagram', hue: 'fuchsia' },
   { value: 'email', label: 'Email', hue: 'violet' },
-  { value: 'sms', label: 'SMS', hue: 'zinc' },
-  { value: 'web', label: 'Web', hue: 'sky' },
+  // { value: 'facebook', label: 'Messenger', hue: 'blue' },
+  // { value: 'instagram', label: 'Instagram', hue: 'fuchsia' },
+  // { value: 'sms', label: 'SMS', hue: 'zinc' },
+  // { value: 'web', label: 'Web', hue: 'sky' },
 ];
 
 /** Per-hue Tailwind class strings for the channel filter pill. Kept as

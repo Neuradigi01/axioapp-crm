@@ -171,19 +171,51 @@ async def send_email_reply(
             detail="Email conversation has no linked contact — cannot reply.",
         )
 
-    # Default account: first live mailbox connected by the sending user.
+    # Default account: first sendable mailbox connected by the sending
+    # user. `sync_state=live` reflects INBOUND backfill completeness —
+    # outbound send only needs valid OAuth tokens, which are present in
+    # `pending` (just connected, backfill pending) and `backfilling`
+    # (backfill in progress) too. Requiring `live` here made freshly-
+    # connected accounts unable to reply until the Celery backfill
+    # worker finished, which is a workflow bug (and breaks entirely
+    # when Celery isn't running in dev). Excluded states:
+    #   - error         → tokens rejected by the provider; user must
+    #                     reconnect before we can send anything.
+    #   - disconnected  → user clicked Disconnect; tokens are nulled.
     if account_id is None:
         accounts = await email_service.list_accounts(session, user_id=user_id)
-        live = [a for a in accounts if a.sync_state == EmailAccountSyncState.live]
-        if not live:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
+        sendable = [
+            a
+            for a in accounts
+            if a.sync_state
+            not in (
+                EmailAccountSyncState.error,
+                EmailAccountSyncState.disconnected,
+            )
+        ]
+        if not sendable:
+            # Distinguish "no account at all" from "account exists but
+            # tokens are broken" — the fix path is different for each.
+            if not accounts:
+                detail = (
                     "You have no connected email account. "
                     "Connect one in Settings → Email Accounts to reply from the inbox."
-                ),
+                )
+            else:
+                detail = (
+                    "Your connected email account can't send right now "
+                    "(tokens rejected or account disconnected). "
+                    "Reconnect it in Settings → Email Accounts."
+                )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=detail,
             )
-        account_id = live[0].id
+        # Prefer a `live` account when the user has several — the
+        # freshest inbox surface — otherwise fall back to whatever
+        # sendable account we have.
+        live = [a for a in sendable if a.sync_state == EmailAccountSyncState.live]
+        account_id = (live[0] if live else sendable[0]).id
 
     # Auto-thread on the newest inbound message so Gmail / Outlook
     # collapse the reply into the customer's original thread.
