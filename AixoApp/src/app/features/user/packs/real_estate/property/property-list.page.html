@@ -84,22 +84,34 @@
         </a>
       </div>
     } @else {
-      <table class="min-w-full divide-y divide-subtle text-sm">
+      <table class="w-full table-fixed divide-y divide-subtle text-sm md:table-auto md:min-w-full">
         <thead class="bg-surface-2">
-          <tr class="text-left text-xs font-medium uppercase tracking-wider text-muted">
-            <th class="w-14 px-4 py-3"></th>
-            <th class="px-3 py-3">Title</th>
-            <th class="px-3 py-3">Status</th>
-            <th class="px-3 py-3">Price</th>
-            <th class="px-3 py-3">Location</th>
-            <th class="px-3 py-3">Updated</th>
-            <th class="w-14 px-3 py-3"></th>
+          <tr
+            class="text-left text-[9px] font-medium tracking-wider text-muted uppercase sm:text-[10px] md:text-xs"
+          >
+            <th class="hidden w-14 px-4 py-3 md:table-cell"></th>
+            <th class="w-[48%] overflow-hidden px-2 py-2 sm:w-[40%] md:w-auto md:px-3 md:py-3">
+              Title
+            </th>
+            <th class="w-[26%] overflow-hidden px-1.5 py-2 sm:w-[18%] md:w-auto md:px-3 md:py-3">
+              Status
+            </th>
+            <th class="w-[26%] overflow-hidden px-1.5 py-2 sm:w-[20%] md:w-auto md:px-3 md:py-3">
+              Price
+            </th>
+            <th
+              class="hidden overflow-hidden px-1.5 py-2 sm:table-cell sm:w-[14%] md:w-auto md:px-3 md:py-3"
+            >
+              Location
+            </th>
+            <th class="hidden px-3 py-3 md:table-cell">Updated</th>
+            <th class="hidden w-14 px-3 py-3 md:table-cell"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-subtle bg-surface">
           @for (p of items(); track p.id) {
             <tr (click)="openProperty(p)" class="cursor-pointer hover:bg-surface-2">
-              <td class="px-4 py-3">
+              <td class="hidden px-4 py-3 md:table-cell">
                 @if (p.featured_image_url) {
                   <img
                     [src]="imgSrc(p)"
@@ -114,31 +126,70 @@
                   </div>
                 }
               </td>
-              <td class="px-3 py-3">
-                <div class="font-medium text-default">{{ p.title }}</div>
-                <div class="text-xs text-faint">{{ p.slug }}</div>
+              <td class="overflow-hidden px-2 py-2 align-top md:px-3 md:py-3">
+                <div class="flex items-start gap-2 md:items-center md:gap-3">
+                  <!-- Small thumbnail visible on mobile since we hide the wide one -->
+                  @if (p.featured_image_url) {
+                    <img
+                      [src]="imgSrc(p)"
+                      [alt]="p.title"
+                      class="h-8 w-8 shrink-0 rounded-md object-cover ring-1 border-subtle md:hidden"
+                    />
+                  } @else {
+                    <div
+                      class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-faint ring-1 border-subtle md:hidden"
+                    >
+                      <lucide-icon name="image-off" class="h-3.5 w-3.5"></lucide-icon>
+                    </div>
+                  }
+                  <div class="min-w-0 flex-1">
+                    <div
+                      class="text-[12px] leading-tight font-medium text-default [overflow-wrap:anywhere] md:truncate md:text-sm md:leading-normal"
+                    >
+                      {{ p.title }}
+                    </div>
+                    <div class="mt-0.5 truncate text-[10px] text-faint md:text-xs">
+                      {{ p.slug }}
+                    </div>
+                    @if (p.city) {
+                      <div class="mt-0.5 truncate text-[10px] text-muted sm:hidden">
+                        {{ p.city }}
+                        @if (p.state) {
+                          , {{ p.state }}
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
               </td>
-              <td class="px-3 py-3">
+              <td class="overflow-hidden px-1.5 py-2 align-top md:px-3 md:py-3">
                 <span
                   [class]="statusBadgeClass(p.status)"
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1"
+                  class="inline-flex max-w-full items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap ring-1 md:px-2 md:text-xs"
                 >
                   {{ p.status }}
                 </span>
               </td>
-              <td class="px-3 py-3 text-default">
+              <td
+                class="overflow-hidden px-1.5 py-2 align-top text-[11px] whitespace-nowrap text-default md:px-3 md:py-3 md:text-sm"
+              >
                 {{ formatPrice(p.price, p.currency) }}
               </td>
-              <td class="px-3 py-3 text-muted">
+              <td
+                class="hidden overflow-hidden px-1.5 py-2 align-top text-muted sm:table-cell md:px-3 md:py-3"
+              >
                 {{ p.city || '—' }}
                 @if (p.state) {
                   <span class="text-faint">, {{ p.state }}</span>
                 }
               </td>
-              <td class="px-3 py-3 text-muted">
+              <td class="hidden px-3 py-3 text-muted md:table-cell">
                 {{ p.updated_at | date: 'mediumDate' }}
               </td>
-              <td class="px-3 py-3 text-right" (click)="$event.stopPropagation()">
+              <td
+                class="hidden px-3 py-3 text-right md:table-cell"
+                (click)="$event.stopPropagation()"
+              >
                 <app-property-row-menu
                   [property]="p"
                   (refresh)="reload()"

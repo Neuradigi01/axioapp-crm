@@ -1,4 +1,8 @@
 import { CommonModule } from '@angular/common';
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../shared/forms/mobile-select.component';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -99,6 +103,7 @@ function waNameValidator(control: AbstractControl): { waName: true } | null {
     TemplateReviewModalComponent,
     TestSendModalComponent,
     VersionsDrawerComponent,
+    MobileSelectComponent,
   ],
   templateUrl: './template-editor.page.html',
 })
@@ -121,6 +126,23 @@ export class TemplateEditorPageComponent {
       validators: [Validators.required],
     }),
   });
+
+  /** Options list for the mobile channel picker — kept in sync with the
+   *  native `<option>`s in the desktop select. */
+  protected readonly channelOptions: ReadonlyArray<MobileSelectOption> = [
+    { value: 'email', label: 'Email' },
+    { value: 'whatsapp', label: 'WhatsApp' },
+    { value: 'sms', label: 'SMS' },
+    { value: 'facebook', label: 'Facebook Messenger' },
+    { value: 'instagram', label: 'Instagram Direct' },
+    { value: 'push', label: 'Push notification' },
+  ];
+
+  /** Write the mobile-select's picked value back into the form control
+   *  so downstream validation + sub-form builders behave identically. */
+  protected onChannelPicked(value: string): void {
+    this.headerForm.controls.channel.setValue(value as ChannelOption);
+  }
 
   // --- channel sub-forms (lazy-built on channel choice) ---------------
 

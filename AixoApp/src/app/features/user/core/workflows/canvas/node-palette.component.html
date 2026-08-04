@@ -29,7 +29,8 @@
               <div
                 draggable="true"
                 (dragstart)="onDragStart($event, item)"
-                [title]="item.description"
+                (click)="onTap(item)"
+                [title]="item.description + ' — drag onto the canvas, or tap to add at centre'"
                 class="group flex items-start gap-2 px-2.5 py-2 rounded border border-subtle hover:border-subtle hover:bg-surface-2 cursor-grab active:cursor-grabbing"
               >
                 <lucide-icon

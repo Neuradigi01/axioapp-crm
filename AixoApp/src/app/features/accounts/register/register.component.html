@@ -116,6 +116,10 @@
         <input
           id="mobile_no"
           type="tel"
+          inputmode="tel"
+          pattern="\+?[0-9]{8,15}"
+          maxlength="16"
+          placeholder="e.g. +919876543210"
           formControlName="mobile_no"
           autocomplete="tel"
           class="w-full min-w-0 flex-1 rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"

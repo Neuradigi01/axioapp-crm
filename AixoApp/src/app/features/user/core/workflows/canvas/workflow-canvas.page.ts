@@ -745,14 +745,23 @@ export class WorkflowCanvasPageComponent {
   // --- Drop from palette ----------------------------------------------
 
   onDragOver(event: DragEvent): void {
-    if (event.dataTransfer?.types.includes('text/workflow-node-type')) {
-      event.preventDefault();
+    // Always accept the drop — some browsers (Firefox, older Chromium
+    // profiles) don't expose custom MIME types on `dataTransfer.types`
+    // during dragover, only during drop. Gating preventDefault on the
+    // presence check made those browsers silently reject the drop
+    // and leave the palette dragging nothing onto the canvas.
+    event.preventDefault();
+    if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'copy';
     }
   }
 
   onDrop(event: DragEvent): void {
     event.preventDefault();
+    // Filter here instead of dragover — `getData` on drop is reliable
+    // across browsers. If the payload isn't a workflow node type, bail
+    // silently so unrelated drops (e.g. text from another app) don't
+    // create garbage nodes.
     const type = event.dataTransfer?.getData('text/workflow-node-type');
     if (!type) return;
     const pos = this.toCanvasCoords(event);
@@ -761,6 +770,30 @@ export class WorkflowCanvasPageComponent {
       x: pos.x - NODE_WIDTH / 2,
       y: pos.y - NODE_HEIGHT / 2,
     });
+  }
+
+  /** Tap-to-add fallback: touch devices can't fire HTML5 drag events,
+   *  so mobile users tap a palette item and we place the node at the
+   *  current viewport centre in canvas coords. Also closes the mobile
+   *  palette overlay so the freshly-added node is visible. */
+  onPaletteTap(type: string): void {
+    if (!type) return;
+    const svg = this.canvasRoot?.nativeElement;
+    const rect = svg?.getBoundingClientRect();
+    let centreClient = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    if (rect) {
+      centreClient = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    }
+    // Translate the centre client-pt into canvas coords through the
+    // same helper the drop handler uses (respects pan + zoom).
+    const pseudoEvent = { clientX: centreClient.x, clientY: centreClient.y } as DragEvent;
+    const pos = this.toCanvasCoords(pseudoEvent);
+    this.state.addNode(type, {
+      x: pos.x - NODE_WIDTH / 2,
+      y: pos.y - NODE_HEIGHT / 2,
+    });
+    // Close the mobile palette overlay so the new node isn't covered.
+    this.mobilePaletteOpen.set(false);
   }
 
   // --- Camera helpers + keyboard --------------------------------------

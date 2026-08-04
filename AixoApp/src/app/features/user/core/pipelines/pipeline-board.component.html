@@ -88,11 +88,20 @@
           class="flex-1 min-h-[24rem] space-y-2 p-2"
         >
           @for (item of bucket(stage.key); track item.id) {
+            <!-- IMPORTANT: use `transition-colors` (NOT `transition`) on
+                 the cdkDrag element. Tailwind's `transition` shortcut
+                 emits `transition-property: ..., transform, ...` with
+                 only ONE `transition-duration` value, which crashes
+                 CDK's drop animation (parseCssTimeUnitsToMs on
+                 undefined → TypeError → drop event never dispatched
+                 → API call never fires). `transition-colors` excludes
+                 `transform` so CDK's `getTransformTransitionDurationInMs`
+                 returns 0 cleanly. -->
             <div
               cdkDrag
               [cdkDragData]="item"
               [cdkDragStartDelay]="dragStartDelay"
-              class="touch-manipulation cursor-grab rounded-md bg-surface p-2 shadow-sm ring-1 border-subtle transition hover:border-subtle active:cursor-grabbing"
+              class="touch-manipulation cursor-grab rounded-md bg-surface p-2 shadow-sm ring-1 border-subtle transition-colors hover:border-subtle active:cursor-grabbing"
             >
               @if (itemTemplate(); as tpl) {
                 <ng-container

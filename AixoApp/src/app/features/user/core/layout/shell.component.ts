@@ -6,6 +6,7 @@ import { QuickAddFabComponent } from '../shared/quick-add-fab/quick-add-fab.comp
 import { CommandPaletteComponent } from '../shared/command-palette/command-palette.component';
 import { TrialBannerComponent } from '../billing/components/trial-banner/trial-banner.component';
 import { UpgradeModalComponent } from '../billing/components/upgrade-modal/upgrade-modal.component';
+import { BottomNavComponent } from './bottom-nav.component';
 import { FooterComponent } from './footer.component';
 import { SidebarComponent } from './sidebar.component';
 import { HeaderComponent } from './header.component';
@@ -20,6 +21,7 @@ const SIDEBAR_STORAGE_KEY = 'furniturecrm:sidebar-open';
     SidebarComponent,
     HeaderComponent,
     FooterComponent,
+    BottomNavComponent,
     ToastHostComponent,
     QuickAddFabComponent,
     CommandPaletteComponent,
@@ -32,8 +34,6 @@ const SIDEBAR_STORAGE_KEY = 'furniturecrm:sidebar-open';
 export class ShellComponent {
   /** Desktop expand/collapse state (persisted). */
   protected readonly sidebarOpen = signal(this.loadInitialSidebarState());
-  /** Mobile off-canvas drawer state (always starts closed, not persisted). */
-  protected readonly mobileMenuOpen = signal(false);
   /** Handle on the command palette so the header search-pill click can
    *  toggle it. Cmd+K also toggles it via the component's own document
    *  keydown listener. */
@@ -43,14 +43,6 @@ export class ShellComponent {
     const next = !this.sidebarOpen();
     this.sidebarOpen.set(next);
     localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
-  }
-
-  toggleMobileMenu(): void {
-    this.mobileMenuOpen.update((v) => !v);
-  }
-
-  closeMobileMenu(): void {
-    this.mobileMenuOpen.set(false);
   }
 
   openPalette(): void {

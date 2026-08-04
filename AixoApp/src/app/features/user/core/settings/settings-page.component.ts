@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
 
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
@@ -124,6 +125,7 @@ const TABS: ReadonlyArray<TabDef> = [
     CustomFieldsPageComponent,
     StandardFieldsTabComponent,
     EmbedIntegrationsTabComponent,
+    LucideAngularModule,
   ],
   templateUrl: './settings-page.component.html',
 })
@@ -143,6 +145,25 @@ export class SettingsPageComponent {
       tabs: visible.filter((t) => t.group === g),
     })).filter((g) => g.tabs.length > 0);
   });
+
+  /** Label of the currently-active tab — shown in the mobile picker
+   *  button so the user always sees which section they're on. */
+  readonly activeLabel = computed(() => {
+    const id = this.active();
+    return this.tabs().find((t) => t.id === id)?.label ?? '';
+  });
+
+  /** Mobile picker open/closed state. */
+  readonly mobilePickerOpen = signal(false);
+
+  toggleMobilePicker(): void {
+    this.mobilePickerOpen.update((v) => !v);
+  }
+
+  pickMobile(id: SettingsTab): void {
+    this.active.set(id);
+    this.mobilePickerOpen.set(false);
+  }
 
   // Initial tab resolution priority (Step 7):
   //   1. route.data.tab (set by /user/settings/integrations alias)

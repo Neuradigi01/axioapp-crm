@@ -1,16 +1,6 @@
 <header
   class="sticky top-0 z-10 flex h-[56px] shrink-0 items-center gap-3 border-b border-subtle bg-surface px-4"
 >
-  <!-- Mobile: open sidebar drawer -->
-  <button
-    type="button"
-    class="rounded-lg p-1.5 text-muted transition hover:bg-surface-2 hover:text-default md:hidden"
-    (click)="toggleSidebar.emit()"
-    aria-label="Open menu"
-  >
-    <lucide-icon name="menu" class="h-4 w-4" />
-  </button>
-
   <!-- Left: Cmd+K search trigger pill (AIXO layout — left, 34px, 340px max) -->
   <button
     type="button"
@@ -25,6 +15,16 @@
     >
       ⌘K
     </kbd>
+  </button>
+
+  <!-- Mobile: compact search icon (opens the same command palette) -->
+  <button
+    type="button"
+    class="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[9px] border border-subtle bg-app text-muted transition hover:bg-surface-2 hover:text-default md:hidden"
+    (click)="openPalette.emit()"
+    aria-label="Open command palette"
+  >
+    <lucide-icon name="search" class="h-4 w-4" />
   </button>
 
   <!-- Right cluster (AIXO layout — 34px controls, radius 9px) -->

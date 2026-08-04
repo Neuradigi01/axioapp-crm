@@ -218,12 +218,12 @@
           }
         </div>
       } @else {
-        <div class="overflow-x-auto rounded-xl border border-subtle bg-surface">
-          <table class="w-full min-w-[760px] table-fixed text-sm">
-            <thead class="bg-surface-2 text-xs text-muted">
+        <div class="overflow-hidden rounded-xl border border-subtle bg-surface md:overflow-x-auto">
+          <table class="w-full table-fixed text-sm md:min-w-[760px] md:table-fixed">
+            <thead class="bg-surface-2 text-[9px] text-muted sm:text-[10px] md:text-xs">
               <tr>
                 @if (canActivate()) {
-                  <th class="w-9 px-2 py-2">
+                  <th class="hidden w-9 px-2 py-2 md:table-cell">
                     <input
                       type="checkbox"
                       [checked]="isAllSelected"
@@ -232,19 +232,35 @@
                     />
                   </th>
                 }
-                <th class="px-3 py-2 text-left font-medium">Name</th>
-                <th class="w-24 px-3 py-2 text-left font-medium">Status</th>
-                <th class="w-24 px-3 py-2 text-left font-medium">Category</th>
-                <th class="w-24 px-3 py-2 text-left font-medium">Channel</th>
-                <th class="w-28 px-3 py-2 text-left font-medium">Updated</th>
-                <th class="w-10 px-2 py-2"></th>
+                <th
+                  class="w-[46%] overflow-hidden px-2 py-2 text-left font-medium sm:w-[38%] md:w-auto md:px-3"
+                >
+                  Name
+                </th>
+                <th
+                  class="w-[28%] overflow-hidden px-1.5 py-2 text-left font-medium sm:w-[20%] md:w-24 md:px-3"
+                >
+                  Status
+                </th>
+                <th
+                  class="w-[26%] overflow-hidden px-1.5 py-2 text-left font-medium sm:w-[20%] md:w-24 md:px-3"
+                >
+                  Category
+                </th>
+                <th
+                  class="hidden overflow-hidden px-1.5 py-2 text-left font-medium sm:table-cell sm:w-[16%] md:w-24 md:px-3"
+                >
+                  Channel
+                </th>
+                <th class="hidden w-28 px-3 py-2 text-left font-medium md:table-cell">Updated</th>
+                <th class="hidden w-10 px-2 py-2 md:table-cell"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-subtle">
               @for (row of items(); track trackById($index, row)) {
                 <tr class="hover:bg-surface-2">
                   @if (canActivate()) {
-                    <td class="px-2 py-3">
+                    <td class="hidden px-2 py-3 md:table-cell">
                       <input
                         type="checkbox"
                         [checked]="isSelected(row.id)"
@@ -254,10 +270,10 @@
                       />
                     </td>
                   }
-                  <td class="px-3 py-3">
+                  <td class="overflow-hidden px-2 py-2 align-top md:px-3 md:py-3">
                     <a
                       [routerLink]="['/user/workflows', row.id]"
-                      class="block truncate font-medium text-default hover:text-default"
+                      class="block text-[12px] leading-tight font-medium text-default [overflow-wrap:anywhere] hover:text-default md:truncate md:text-sm md:leading-normal"
                       [title]="row.name"
                     >
                       {{ row.name }}
@@ -310,20 +326,22 @@
                       }
                     </div>
                   </td>
-                  <td class="px-3 py-3">
+                  <td class="overflow-hidden px-1.5 py-2 align-top md:px-3 md:py-3">
                     <app-workflow-status-badge [status]="row.status" />
                   </td>
-                  <td class="px-3 py-3">
+                  <td class="overflow-hidden px-1.5 py-2 align-top md:px-3 md:py-3">
                     <span
-                      class="inline-flex items-center rounded-md bg-surface-2 px-1.5 py-0.5 text-xs text-default ring-1 ring-inset border-subtle"
+                      class="inline-flex max-w-full items-center rounded-md bg-surface-2 px-1 py-0.5 text-[10px] whitespace-nowrap text-default ring-1 ring-inset border-subtle md:px-1.5 md:text-xs"
                     >
                       {{ row.category }}
                     </span>
                   </td>
-                  <td class="px-3 py-3 text-xs text-muted">
+                  <td
+                    class="hidden overflow-hidden px-1.5 py-2 align-top text-xs text-muted sm:table-cell md:px-3 md:py-3"
+                  >
                     @if (channelOf(row); as ch) {
                       <span
-                        class="inline-flex items-center rounded-md bg-surface-2 px-1.5 py-0.5 text-xs text-default ring-1 ring-inset border-subtle"
+                        class="inline-flex max-w-full items-center rounded-md bg-surface-2 px-1 py-0.5 text-[10px] whitespace-nowrap text-default ring-1 ring-inset border-subtle md:px-1.5 md:text-xs"
                       >
                         {{ ch }}
                       </span>
@@ -331,10 +349,10 @@
                       <span class="text-faint">—</span>
                     }
                   </td>
-                  <td class="px-3 py-3 text-xs text-muted">
+                  <td class="hidden px-3 py-3 text-xs text-muted md:table-cell">
                     {{ row.updated_at | date: 'mediumDate' }}
                   </td>
-                  <td class="px-2 py-3 text-right">
+                  <td class="hidden px-2 py-3 text-right md:table-cell">
                     <div class="relative inline-block">
                       <button
                         type="button"

@@ -113,9 +113,13 @@
                   <label class="block text-sm">
                     <span class="mb-1 block text-xs font-medium text-muted">Phone</span>
                     <input
-                      type="text"
+                      type="tel"
+                      inputmode="tel"
+                      pattern="\+?[0-9]{8,15}"
+                      maxlength="16"
+                      placeholder="e.g. +919876543210"
                       formControlName="phone"
-                      autocomplete="off"
+                      autocomplete="tel"
                       class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
                     />
                   </label>

@@ -107,10 +107,12 @@
                 id="cf_phone"
                 type="tel"
                 inputmode="tel"
+                pattern="\+?[0-9]{8,15}"
+                maxlength="16"
                 formControlName="phone"
                 autocomplete="tel"
                 class="input"
-                [attr.placeholder]="stdField('phone')?.placeholder ?? '+91 9000000001'"
+                [attr.placeholder]="stdField('phone')?.placeholder ?? 'e.g. +919876543210'"
               />
               @if (standard.controls.phone.touched && standard.controls.phone.invalid) {
                 <p class="field-error">
