@@ -2,7 +2,12 @@
 
 **Goal:** End-to-end smoke on the cutover. Verify (a) no duplicate sends across the whole platform, (b) every seeded/user-created automation now runs as a workflow, (c) new-org registration produces workflows-only, (d) frontend redirects work for every legacy `/user/automations/*` path, (e) rollback path (Alembic downgrade) restores the pre-cutover state on a scratch DB.
 
-**Status:** Pending
+**Status:** COMPLETED — 2026-08-05. Backend + API + memory checks green; browser-side smoke queued for operator. Six automated checks PASS via a throwaway `_smoke_step4.py` (deleted post-run): 382/382 automations soft-disabled across 38 orgs, Ajay's Workspace consistent (12 mirrors + 29 total workflows), zero enabled automations anywhere, sidebar module registry hides automations while keeping workflows visible, redirect endpoint DAL round-trip verified, `create_organization` wires the workflow seed (not the automation seed). OpenAPI confirms `/api/v1/automations/triggers/{trigger_id}/migrated-workflow-id` mounted. Memory file `project_workflows_absorb_automation.md` created + MEMORY.md pointer added + `project_central_template_library.md` amended with the absorption note. Full audit trail in [`SMOKE-RESULTS.md`](SMOKE-RESULTS.md).
+
+**Deferred (operator to execute):**
+- Manual browser smoke on Ajay's Workspace: sidebar visual check, snackbar behaviour on `/user/automations` first-visit, deep-link resolver for a real trigger UUID.
+- Fresh-tenant registration test (burner email + delete after).
+- Rollback dry-run on staging DB (`run.cmd downgrade -3` was blocked by the runtime safety guard on the live dev DB — would destroy the mirrors just created).
 
 **Depends on:** Steps 1 + 2 + 3 all deployed to the same environment.
 

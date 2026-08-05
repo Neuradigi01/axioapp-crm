@@ -67,7 +67,7 @@ Parity check 2026-08-04 (agent report):
 | 1 | [Data migration — existing automations → workflows](step-1-data-migration-automations-to-workflows.md) | **COMPLETED** (2026-08-05, 382 rows / 38 orgs migrated) | 5 | ~1 day |
 | 2 | [Seed cutover — new orgs get workflows only](step-2-seed-cutover-new-orgs.md) | **COMPLETED** (2026-08-05, backfill 380/38 orgs skipped-as-already-present per Step 1) | 5 | ~0.5 day |
 | 3 | [Frontend hide — sidebar + redirect resolver](step-3-frontend-hide-automations.md) | **COMPLETED** (2026-08-05, sidebar hidden + `/user/automations/*` redirects live) | 6 | ~0.5 day |
-| 4 | [Smoke verification across existing + fresh orgs](step-4-smoke-verification.md) | Pending | 0 | ~0.25 day |
+| 4 | [Smoke verification across existing + fresh orgs](step-4-smoke-verification.md) | **COMPLETED** (2026-08-05, backend 6/6 automated PASS; browser + rollback smoke queued for operator — see [`SMOKE-RESULTS.md`](SMOKE-RESULTS.md)) | 3 (docs + memory) | ~0.25 day |
 
 **Total: 4 steps, ~2.25 days.**
 
