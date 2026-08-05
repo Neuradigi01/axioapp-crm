@@ -145,6 +145,18 @@ class AutomationTrigger(Base, TenantScoped):
     recipient_resolver_config: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=sql_text("'{}'::jsonb")
     )
+    # workflows-absorb-automation Step 1 — when the migration mirrors this
+    # trigger into a single-step workflow, the new workflow's id lands here.
+    # The source row is soft-disabled (``enabled = false``) in the same txn so
+    # the two engines never fire the same event. Redirects (``/user/automations/:id
+    # → /user/workflows/<this>``) and the reversible downgrade both read it.
+    # ``ON DELETE SET NULL`` — a deleted mirror unlinks but does not cascade
+    # back to the source automation row.
+    migrated_to_workflow_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_workflows.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

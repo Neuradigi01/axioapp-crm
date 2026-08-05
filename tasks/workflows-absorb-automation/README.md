@@ -64,7 +64,7 @@ Parity check 2026-08-04 (agent report):
 
 | # | Title | Status | Files | Effort |
 |---|---|---|---|---|
-| 1 | [Data migration — existing automations → workflows](step-1-data-migration-automations-to-workflows.md) | Pending | 5 | ~1 day |
+| 1 | [Data migration — existing automations → workflows](step-1-data-migration-automations-to-workflows.md) | **COMPLETED** (2026-08-05, 382 rows / 38 orgs migrated) | 5 | ~1 day |
 | 2 | [Seed cutover — new orgs get workflows only](step-2-seed-cutover-new-orgs.md) | Pending | 6 | ~0.5 day |
 | 3 | [Frontend hide — sidebar + redirect resolver](step-3-frontend-hide-automations.md) | Pending | 5 | ~0.5 day |
 | 4 | [Smoke verification across existing + fresh orgs](step-4-smoke-verification.md) | Pending | 0 | ~0.25 day |

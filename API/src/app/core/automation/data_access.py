@@ -148,6 +148,46 @@ def add_trigger(session: AsyncSession, trigger: AutomationTrigger) -> Automation
     return trigger
 
 
+async def find_by_migrated_workflow_id(
+    session: AsyncSession,
+    *,
+    workflow_id: uuid.UUID,
+) -> AutomationTrigger | None:
+    """Reverse-lookup: given a workflow id, return the source
+    automation trigger whose ``migrated_to_workflow_id`` points at it.
+
+    Reads the FK column added by migration
+    ``0175_automation_migrated_fk``. Used by the redirect resolver
+    (Step 3 of workflows-absorb-automation) — but also useful for
+    diagnostic + rollback tooling. Returns ``None`` when the workflow
+    isn't a mirror of any automation (native workflow, or the FK was
+    cleared)."""
+    result = await session.execute(
+        select(AutomationTrigger).where(
+            AutomationTrigger.migrated_to_workflow_id == workflow_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+def set_migrated_to(
+    session: AsyncSession,
+    *,
+    automation: AutomationTrigger,
+    workflow_id: uuid.UUID,
+) -> AutomationTrigger:
+    """Stage the ``enabled = false`` + ``migrated_to_workflow_id``
+    flip on the source automation.
+
+    Mutation-in-place — the session already tracks the row. Service
+    commits. Kept in the DAL (rather than the service) so the same
+    helper can be called from ad-hoc scripts / rollback tools without
+    dragging in service-layer imports."""
+    automation.enabled = False
+    automation.migrated_to_workflow_id = workflow_id
+    return automation
+
+
 # --- tbl_automation_runs ------------------------------------------------
 
 

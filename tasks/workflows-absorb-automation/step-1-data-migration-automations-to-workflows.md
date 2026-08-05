@@ -1,8 +1,10 @@
 # Step 1 — Data migration: existing automations → workflows
 
-**Goal:** For every org, migrate every row in `tbl_automations` into a matching single-step workflow (`tbl_workflows` + one `tbl_workflow_nodes` action). Preserve trigger, action, channel, template, delay, recipient resolver, and conditions. Soft-disable the source automation so the two engines never fire the same event. Add a bidirectional FK column (`tbl_automations.migrated_to_workflow_id`) so redirects and rollbacks can look up the mapping.
+**Goal:** For every org, migrate every row in `tbl_automation_triggers` into a matching single-step workflow (`tbl_workflows` row + `graph` JSONB embedding a trigger node → optional `flow.wait` → `send.<channel>` node). Preserve trigger event type, channel, template, delay, recipient resolver, and conditions. Soft-disable the source automation so the two engines never fire the same event. Add a bidirectional FK column (`tbl_automation_triggers.migrated_to_workflow_id`) so redirects and rollbacks can look up the mapping.
 
-**Status:** Pending
+**Status:** COMPLETED — Migration 0175 (schema) + 0176 (data) applied to live dev DB on 2026-08-05. **382 automation triggers across 38 orgs** migrated to single-step workflow mirrors; 0 automations remain enabled; 0 rows skipped for unsupported channel. Ajay's Workspace verified: 12 mirror workflows created (10 preset + 2 custom: "Congrats email when lead → won", "Leads Assigned/Reassigned"), all `status='active'`, ex-automations disabled with FK set. Downgrade dry-run deferred to Step 4 smoke checklist per runtime safety guard (would destroy the mirrors just created).
+
+**Correction from original plan (found during discovery):** actual source table is `tbl_automation_triggers` (not `tbl_automations`); actual event column is `event_type` (not `event_key`); workflows have NO separate `tbl_workflow_nodes` / `tbl_workflow_triggers` tables — nodes AND triggers live inside `tbl_workflows.graph` JSONB (`{nodes, edges}` shape). Workflow lifecycle uses the `workflow_status` enum (`draft/active/paused/archived`), not an `is_active` boolean. Wait nodes are typed `flow.wait` (with `max_wait_seconds` in config per the graph validator) — not `flow_control.wait`. Send action node types match the workflow action registry directly: `send.{email,whatsapp,sms,facebook,instagram,push}`. No new `source` column on `tbl_workflows`; the `category = 'Migrated Automation'` marker (existing column) plays that role.
 
 **Depends on:** `core/automation/` (live), `core/workflows/` (live, Step 20 shipped)
 
