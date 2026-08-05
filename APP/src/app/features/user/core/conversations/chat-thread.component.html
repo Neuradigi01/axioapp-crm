@@ -1,7 +1,11 @@
 <div class="flex min-h-0 flex-1 flex-col">
   <!-- Header — compact (py-2) so more vertical space goes to the
-       message thread on typical laptop viewports. -->
-  <div class="flex items-center justify-between border-b border-subtle bg-surface px-4 py-2">
+       message thread on typical laptop viewports. On mobile the
+       header stacks (contact info top, action row below with
+       flex-wrap) so nothing gets clipped off the right edge. -->
+  <div
+    class="flex flex-col gap-2 border-b border-subtle bg-surface px-3 py-2 md:flex-row md:items-center md:justify-between md:px-4"
+  >
     <div class="min-w-0">
       <p class="truncate text-sm font-semibold text-default">
         {{ conversation.external_id }}
@@ -14,7 +18,7 @@
         }
       </p>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-1.5 md:gap-2">
       @let ownerHeader = staffColorFor(conversation.assigned_to_id);
       @if (canReassign()) {
         <button
