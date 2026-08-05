@@ -1,17 +1,34 @@
-"""Idempotent trigger seeders installed at org-creation time.
+"""Idempotent trigger seeders — RETAINED, NO LONGER WIRED at org creation.
 
-Step 5 of ``tasks/automation-engine/`` seeds a default "User
-Welcome" trigger that fires on :data:`user.signed_up` and sends
+**workflows-absorb-automation Step 2 (2026-08-05) unwired these seeders**
+from ``core.tenants.service.create_organization``. New orgs now install
+single-step **workflow** equivalents via
+:func:`core.workflows.seeds.install_preset_workflows`. This module + its
+functions are deliberately kept in place per the manager directive
+("do not delete or remove its code") — a future track may re-wire them
+if the automation module is revived, or a rollback runbook may need to
+call them from a data-repair script.
+
+Pre-cutover behaviour (kept as reference):
+
+Step 5 of ``tasks/automation-engine/`` seeded a default "User
+Welcome" trigger that fired on :data:`user.signed_up` and sent
 the matching email template (see :mod:`core.templates.seeds`).
-Step 6 will add a "Lead Confirmation" trigger that fires on
-:data:`lead.created` from every source.
+Step 6 added a "Lead Confirmation" trigger that fired on
+:data:`lead.created` from every source. Steps 10-12 added the
+appointment / invoice / birthday / stale-lead triggers.
 
-Seeds are inserted as **enabled** so the manager's "welcome mail
-on signup" promise is live the moment Step 5 lands. Operators can
-disable or edit them via the regular Settings → Automations
-surface (Steps 7-9 wire the UI; the API is already live from
-Step 3). Idempotent on ``(org_id, lower(name))`` — re-runs never
-duplicate.
+Seeds were inserted as **enabled** so the manager's "welcome mail
+on signup" promise was live the moment Step 5 landed. Operators
+disabled or edited them via the Settings → Automations surface.
+Idempotent on ``(org_id, lower(name))`` — re-runs never
+duplicated.
+
+**Do not call ``install_default_org_seeds`` from new code paths.** The
+workflow-absorb dispatcher-guard (deferred to a future track) does not
+yet gate the automation matcher on ``migrated_to_workflow_id IS NULL``,
+so any freshly-seeded ``enabled=true`` automation would fire in
+parallel with its workflow mirror and cause duplicate sends.
 """
 
 from __future__ import annotations

@@ -66,14 +66,18 @@ async def create_organization(
         await session.rollback()
         raise
 
-    # tasks/automation-engine Step 5 — install default automation
-    # seeds inside the same transaction. A signup that later rolls
-    # back also rolls back the seeded template + trigger. Idempotent
-    # — re-runs (from the backfill migration's pre-existing-org
-    # sweep) never duplicate.
-    from src.app.core.automation.seeds import install_default_org_seeds
+    # tasks/workflows-absorb-automation Step 2 — install the ten preset
+    # single-step workflows (User Welcome / Lead Confirmation /
+    # Appointment Reminders / Invoice notifications / Birthday / Lead
+    # Stale). Replaces the pre-cutover call to
+    # ``core.automation.seeds.install_default_org_seeds`` — new orgs no
+    # longer install any automation triggers, only their workflow
+    # equivalents. Same transaction so a rolled-back signup also rolls
+    # back the seeded template + workflow rows. Idempotent — re-runs
+    # from the backfill migration never duplicate.
+    from src.app.core.workflows.seeds import install_preset_workflows
 
-    await install_default_org_seeds(session, org_id=org.id)
+    await install_preset_workflows(session, org_id=org.id, user_id=None)
 
     # tasks/workflows Step 20 — install the 15 default core workflows
     # for the new org. Drafts by default — operator activates per

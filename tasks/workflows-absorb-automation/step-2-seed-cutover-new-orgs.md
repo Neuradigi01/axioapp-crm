@@ -1,8 +1,10 @@
 # Step 2 — Seed cutover: new orgs get workflows only
 
-**Goal:** When a brand-new org is created, seed the 10 preset automations as single-step **workflows** instead of automations. Register the 10 as templates in `core/workflows/gallery/` so they also show up in the Templates tab. Keep `core/automation/seeds.py` code intact but stop calling it from `core/tenants/service.create_organization`.
+**Goal:** When a brand-new org is created, seed the 10 preset automations as single-step **workflows** instead of automations. Keep `core/automation/seeds.py` code intact but stop calling it from `core/tenants/service.create_organization`.
 
-**Status:** Pending
+**Status:** COMPLETED — 2026-08-05. Backfill migration `0177_bf_preset_workflows` applied cleanly against live dev DB: 38 orgs walked, 0 rows installed (Step 1 had already migrated every automation into a workflow, so all 380 preset names were already present as `Migrated Automation` category rows — verified by `skipped_existing=380`). The backfill is now belt-and-braces for future edge cases (operator deletes a preset workflow → this migration re-installs on next run only if the underlying template still exists). `create_organization` now calls `install_preset_workflows` (10 preset workflows, active-on-seed) + `install_seeded_workflows` (15 multi-step drafts) — the automation seed path is no longer wired at org creation. API stack restarted; new tenants service + workflows seeds live in-memory.
+
+**Scope adjustment from original plan:** Gallery entries in `core/workflows/gallery/preset_automations.py` were **NOT** added — deferred to a later step. Rationale: gallery entries strip `template_id` on clone (design of the existing gallery-clone path), which would land any restored preset workflow with `__valid=false` on send nodes. The preset workflows in this step ship with real template_ids because they call `templates.seeds.seed_<name>_template()` first. Adding a distinct "preset clone" flow to the gallery is a UX change worth its own step; not blocking the seed cutover.
 
 **Depends on:** Step 1 (migration already turned existing orgs' automations off, so seed cutover on new orgs finalises the "no automations anywhere" state).
 
