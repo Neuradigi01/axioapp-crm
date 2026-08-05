@@ -17,7 +17,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.workflows.models import (
@@ -26,6 +26,7 @@ from src.app.core.workflows.models import (
     WorkflowFolder,
     WorkflowRun,
     WorkflowRunStatus,
+    WorkflowSchedule,
     WorkflowStatus,
     WorkflowStepRun,
     WorkflowVersion,
@@ -714,9 +715,7 @@ async def aggregate_runs_in_window(
         "errored": int(row.errored or 0),
         "running": int(row.running or 0),
         "avg_completion_seconds": (
-            float(row.avg_completion_seconds)
-            if row.avg_completion_seconds is not None
-            else None
+            float(row.avg_completion_seconds) if row.avg_completion_seconds is not None else None
         ),
     }
 
@@ -976,6 +975,205 @@ async def get_run_with_workflow(
     return row[0], row[1]
 
 
+# --- workflow-scheduling — schedule CRUD --------------------------------
+#
+# `tasks/workflow-scheduling` Step 1. Pure DAL: no transactions, no
+# audit, no side-effects. Service layer (Step 2) owns the txn +
+# validation + event emission. Sweep (Step 2) uses
+# `select_due_schedules_for_update_skip_locked` inside a service-owned
+# txn to lock rows for dispatch.
+
+
+async def insert_schedule(
+    session: AsyncSession,
+    *,
+    schedule: WorkflowSchedule,
+) -> WorkflowSchedule:
+    """Stage an insert on the session. Caller commits."""
+    session.add(schedule)
+    return schedule
+
+
+async def get_schedule_by_id_and_org(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    schedule_id: uuid.UUID,
+) -> WorkflowSchedule | None:
+    """Single-row read by PK + org. ``None`` on miss or cross-tenant
+    — service layer maps to 404 (never 403; no info leak)."""
+    result = await session.execute(
+        select(WorkflowSchedule).where(
+            WorkflowSchedule.id == schedule_id,
+            WorkflowSchedule.org_id == org_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def list_schedules_for_workflow(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+) -> list[WorkflowSchedule]:
+    """All schedules attached to a workflow — Builder attach panel
+    (Step 4) reads via this. Ordered by ``created_at ASC`` so the
+    operator's first-added shows first."""
+    result = await session.execute(
+        select(WorkflowSchedule)
+        .where(
+            WorkflowSchedule.org_id == org_id,
+            WorkflowSchedule.workflow_id == workflow_id,
+        )
+        .order_by(WorkflowSchedule.created_at.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def list_active_schedules_for_org(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> list[WorkflowSchedule]:
+    """Every active schedule for an org — powers the per-org cap
+    enforcement + the "you have 4 active schedules" org-summary hint."""
+    result = await session.execute(
+        select(WorkflowSchedule).where(
+            WorkflowSchedule.org_id == org_id,
+            WorkflowSchedule.active == True,  # noqa: E712 — SQLAlchemy filter
+        )
+    )
+    return list(result.scalars().all())
+
+
+async def count_active_schedules_for_org(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> int:
+    """Cheap counter for the 500-schedule cap check. Service layer
+    wraps the ``SELECT COUNT + INSERT`` in a row-lock on the org
+    row (via ``FOR UPDATE``) so the cap can't be raced past 500."""
+    result = await session.execute(
+        select(func.count(WorkflowSchedule.id)).where(
+            WorkflowSchedule.org_id == org_id,
+            WorkflowSchedule.active == True,  # noqa: E712
+        )
+    )
+    return int(result.scalar_one())
+
+
+async def update_schedule_fields(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    schedule_id: uuid.UUID,
+    fields: dict,
+) -> int:
+    """Partial UPDATE of a schedule row by PK + org. Returns the
+    row-count Postgres reports (1 on hit, 0 on cross-tenant / not
+    found). ``updated_at`` is server-set here so the ETag advances
+    on every write; service layer must not pass ``updated_at`` in
+    ``fields`` (kept out via the ``ScheduleUpdate`` schema)."""
+    if not fields:
+        return 0
+    stmt = (
+        update(WorkflowSchedule)
+        .where(
+            WorkflowSchedule.id == schedule_id,
+            WorkflowSchedule.org_id == org_id,
+        )
+        .values(**fields, updated_at=func.now())
+    )
+    result = await session.execute(stmt)
+    return result.rowcount or 0
+
+
+async def delete_schedule(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    schedule_id: uuid.UUID,
+) -> int:
+    """Hard delete by PK + org. Returns rowcount (1 on hit, 0
+    otherwise)."""
+    result = await session.execute(
+        delete(WorkflowSchedule).where(
+            WorkflowSchedule.id == schedule_id,
+            WorkflowSchedule.org_id == org_id,
+        )
+    )
+    return result.rowcount or 0
+
+
+async def select_due_schedules_for_update_skip_locked(
+    session: AsyncSession,
+    *,
+    now: datetime,
+    limit: int = 100,
+) -> list[WorkflowSchedule]:
+    """Sweep hot path. Picks up to ``limit`` schedules whose
+    ``next_run_at <= now`` and ``active = true``, joined against
+    ``tbl_workflows.status = 'active'``. ``FOR UPDATE SKIP LOCKED``
+    guarantees at most one worker dispatches each row per tick.
+
+    This is a **cross-org scan** — the sweep worker runs as a
+    service role (no request context / RLS org GUC). The service
+    layer's dispatch loop MUST set ``SET LOCAL app.current_org_id
+    = <schedule.org_id>`` before calling ``engine.start_run`` for
+    per-row tenancy. Explicit ``org_id`` FK join on ``tbl_workflows``
+    is belt-and-braces (RLS bypass or context leak still lands each
+    fire in the right org).
+
+    Ordering by ``next_run_at`` so the most-overdue rows fire first
+    — mitigates thrash under backlog."""
+    stmt = (
+        select(WorkflowSchedule)
+        .join(Workflow, Workflow.id == WorkflowSchedule.workflow_id)
+        .where(
+            WorkflowSchedule.active == True,  # noqa: E712
+            WorkflowSchedule.next_run_at != None,  # noqa: E711
+            WorkflowSchedule.next_run_at <= now,
+            Workflow.status == WorkflowStatus.active,
+            Workflow.org_id == WorkflowSchedule.org_id,  # belt-and-braces
+        )
+        .order_by(WorkflowSchedule.next_run_at.asc())
+        .limit(limit)
+        .with_for_update(skip_locked=True, of=WorkflowSchedule)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def select_orphaned_pending_runs(
+    session: AsyncSession,
+    *,
+    older_than: datetime,
+    limit: int = 100,
+) -> list[WorkflowRun]:
+    """Orphan-run reaper (Step 6). Picks up ``pending`` runs whose
+    ``started_at < older_than`` — typically ``now - 1 hour``. These
+    are the runs left behind when a Celery worker died between
+    ``engine.start_run`` commit and the first hop's dispatch. The
+    reaper marks them ``errored`` with a distinctive
+    ``error_reason='orphaned_pending'``.
+
+    Also cross-org — same tenancy discipline as
+    :func:`select_due_schedules_for_update_skip_locked`."""
+    stmt = (
+        select(WorkflowRun)
+        .where(
+            WorkflowRun.status == WorkflowRunStatus.pending,
+            WorkflowRun.started_at < older_than,
+        )
+        .order_by(WorkflowRun.started_at.asc())
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
 __all__ = [
     "add_folder",
     "add_version",
@@ -985,11 +1183,13 @@ __all__ = [
     "aggregate_runs_in_window",
     "aggregate_send_metrics",
     "aggregate_skip_reasons",
+    "count_active_schedules_for_org",
     "count_recent_marketing_sends",
     "count_versions",
     "count_workflows_in_folder",
     "delete_event_wait",
     "delete_folder",
+    "delete_schedule",
     "find_existing_run",
     "find_waits_for_event",
     "get_folder",
@@ -997,21 +1197,28 @@ __all__ = [
     "get_run_for_processing",
     "get_run_unscoped",
     "get_run_with_workflow",
+    "get_schedule_by_id_and_org",
     "get_version",
     "get_workflow",
     "get_workflow_by_name",
     "insert_event_wait",
     "insert_run",
+    "insert_schedule",
     "insert_step_run",
+    "list_active_schedules_for_org",
     "list_active_workflows_for_event",
     "list_expired_waits",
     "list_folders",
     "list_runs",
     "list_runs_due_for_resume",
+    "list_schedules_for_workflow",
     "list_step_runs",
     "list_versions",
     "list_waits_for_run",
     "list_workflows",
     "next_step_index",
     "refresh_cached_counters",
+    "select_due_schedules_for_update_skip_locked",
+    "select_orphaned_pending_runs",
+    "update_schedule_fields",
 ]

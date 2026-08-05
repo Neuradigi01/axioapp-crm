@@ -19,13 +19,15 @@ from typing import Any
 from sqlalchemy import (
     Boolean,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
     Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+)
+from sqlalchemy import (
+    Enum as SAEnum,
 )
 from sqlalchemy import text as sql_text
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM, JSONB, UUID
@@ -157,6 +159,132 @@ class ABWinnerMetric(str, enum.Enum):
 workflow_re_enrollment_rule_enum = ENUM(
     WorkflowReEnrollmentRule,
     name="workflow_re_enrollment_rule",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+class ScheduleKind(str, enum.Enum):
+    """Recurrence shape for a :class:`WorkflowSchedule`.
+
+    ``once``     — fires exactly once at a stored datetime.
+    ``daily``    — fires every day at HH:MM (per-schedule tz).
+    ``weekly``   — fires on selected days-of-week at HH:MM.
+    ``monthly``  — fires monthly on day-of-month (day 31 clamps to
+                   month-end) OR nth-weekday.
+    ``interval`` — every N minutes / hours / days. Minimum 5 min.
+    ``cron``     — 5-field cron. Advanced. Minimum inter-fire
+                   distance 5 min enforced (computed, not string-
+                   matched — so ``*/1`` is caught).
+    """
+
+    once = "once"
+    daily = "daily"
+    weekly = "weekly"
+    monthly = "monthly"
+    interval = "interval"
+    cron = "cron"
+
+
+schedule_kind_enum = ENUM(
+    ScheduleKind,
+    name="workflow_schedule_kind",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+class OnMissedPolicy(str, enum.Enum):
+    """What to do when the beat sweep is late and one or more fires
+    were missed.
+
+    ``skip``         — forward-compute from now; no catch-up. Default.
+    ``run_once``     — fire exactly once on recovery, then forward
+                       compute. Matches systemd ``Persistent=true``.
+    ``backfill_all`` — enqueue one fire per missed slot, honoring the
+                       per-org fires-per-hour rate limit.
+    """
+
+    skip = "skip"
+    run_once = "run_once"
+    backfill_all = "backfill_all"
+
+
+on_missed_policy_enum = ENUM(
+    OnMissedPolicy,
+    name="workflow_schedule_on_missed",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+class ConcurrencyPolicy(str, enum.Enum):
+    """What to do when a fire lands while a previous run for the
+    same schedule is still executing. Matches k8s CronJob semantics.
+
+    ``allow``   — enrol anyway; parallel runs allowed.
+    ``forbid``  — skip fire + advance ``next_run_at``. Default —
+                  prevents the classic time-triggered double-send.
+    ``replace`` — cancel the in-flight run, then start a new one.
+    """
+
+    allow = "allow"
+    forbid = "forbid"
+    replace = "replace"
+
+
+concurrency_policy_enum = ENUM(
+    ConcurrencyPolicy,
+    name="workflow_schedule_concurrency",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+class DeactivationReason(str, enum.Enum):
+    """Why a schedule was auto- or manually-deactivated. NULL while
+    ``active = true``.
+
+    Natural exhaustion (``ended`` / ``max_runs`` / ``end_at``) is
+    expected + does NOT trigger owner-notification email. Every
+    other reason emails the workflow owner (sabotage detection)."""
+
+    manual = "manual"
+    ended = "ended"
+    max_runs = "max_runs"
+    end_at = "end_at"
+    consecutive_empty = "consecutive_empty"
+    recurrence_timeout = "recurrence_timeout"
+    recurrence_invalid = "recurrence_invalid"
+    contact_deleted = "contact_deleted"
+    admin_edit_past_end_at = "admin_edit_past_end_at"
+
+
+deactivation_reason_enum = ENUM(
+    DeactivationReason,
+    name="workflow_schedule_deactivation_reason",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+class TriggerKind(str, enum.Enum):
+    """Origin of a :class:`WorkflowRun` enrolment. Populated on
+    every run so audit / reporting can answer "who caused this?".
+
+    ``event``    — trigger-handler dispatch from the event bus.
+    ``schedule`` — sweep-driven fire from :class:`WorkflowSchedule`.
+    ``manual``   — operator-invoked (e.g. "Run now" button).
+    """
+
+    event = "event"
+    schedule = "schedule"
+    manual = "manual"
+
+
+trigger_kind_enum = ENUM(
+    TriggerKind,
+    name="workflow_run_trigger_kind",
     values_callable=lambda obj: [m.value for m in obj],
     create_type=False,
 )
@@ -449,6 +577,30 @@ class WorkflowRun(Base, TenantScoped):
     )
     next_step_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # workflow-scheduling Step 1 — audit dimension answering
+    # "what caused this run?" Event dispatch, schedule fire, or
+    # operator "Run now" click. Backfilled to 'event' for pre-
+    # scheduling rows in migration 0182.
+    trigger_kind: Mapped[TriggerKind] = mapped_column(
+        trigger_kind_enum,
+        nullable=False,
+        server_default=sql_text("'event'"),
+    )
+    # Points at the causing row: a ``tbl_workflow_schedules.id`` for
+    # ``schedule`` kind, an event ``event_id`` (opaque, may be a UUID
+    # or text — the existing ``trigger_event_id`` column stays as the
+    # dedup key) for ``event``, NULL for ``manual``. Kept as UUID
+    # even though event ids can be text because every producer today
+    # emits a UUID; a mixed column would defeat FK-alignment plans.
+    trigger_source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    # Set only for ``manual`` — the operator who clicked Run.
+    # Soft reference (no FK) matching the rest of the workflows
+    # module's user-id columns (``Workflow.created_by_user_id``,
+    # ``WorkflowVersion.created_by_user_id``, etc). Existing pattern
+    # avoids user-table churn cascading into workflow history.
+    triggered_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
 
 
 class WorkflowStepRun(Base, TenantScoped):
@@ -540,8 +692,133 @@ class WorkflowEventWait(Base, TenantScoped):
     )
 
 
+class WorkflowSchedule(Base, TenantScoped):
+    """Time-based fire attached to a workflow (``tasks/workflow-
+    scheduling`` Step 1). N:1 to :class:`Workflow` — a workflow can
+    carry many schedules (e.g. "daily 9am" + "weekly Mon 5pm").
+    Schedule fires INDEPENDENTLY of the workflow's event trigger:
+    both fire mechanisms enrol runs concurrently, dedup at the
+    trigger-event-id level.
+
+    Sweep uses the partial index ``ix_schedules_next_run_due`` for
+    O(due-rows) picking. ``FOR UPDATE SKIP LOCKED`` guards against
+    double-fire under worker overlap. Per-row savepoint in the
+    dispatch loop isolates poison rows (malformed ``config_json``,
+    croniter raise) so one bad row cannot crash-loop the batch.
+
+    ``contact_id`` is nullable — NULL means "fire without a contact
+    dimension" (e.g. daily internal notify-admin workflow). A future
+    date-anchored-trigger track (see README Open items §3) fires
+    per-contact via non-null ``contact_id``; the column is here from
+    day one so that follow-up doesn't need a table split.
+    """
+
+    __tablename__ = "tbl_workflow_schedules"
+    __table_args__ = (
+        # Sweep hot path — pick due-and-active schedules cheaply.
+        # Partial predicate ``WHERE active = true`` keeps the index
+        # bounded (inactive rows dominate at steady state).
+        Index(
+            "ix_schedules_next_run_due",
+            "next_run_at",
+            postgresql_where=sql_text("active = true"),
+        ),
+        # List-schedules-for-workflow hot path (Builder attach
+        # panel Step 4 + list-page count subquery Step 5).
+        Index(
+            "ix_schedules_org_workflow",
+            "org_id",
+            "workflow_id",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    workflow_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_workflows.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    schedule_kind: Mapped[ScheduleKind] = mapped_column(schedule_kind_enum, nullable=False)
+    # Kind-specific: e.g. ``{"time": "09:00"}`` for daily,
+    # ``{"days": ["mon", "wed"], "time": "09:00"}`` for weekly,
+    # ``{"cron": "0 9 * * 1"}`` for cron. Validated at service layer;
+    # sweep re-parses on every load (see Step 2).
+    config_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sql_text("'{}'::jsonb"),
+    )
+    # IANA tz string. Default is applied by service layer at create
+    # time (uses ``org.timezone`` with fallback to ``'UTC'``). Kept
+    # NOT NULL so the sweep never has to branch on missing tz.
+    timezone: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        server_default=sql_text("'UTC'"),
+    )
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    runs_completed: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=sql_text("0")
+    )
+    max_runs: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sql_text("true"))
+    deactivation_reason: Mapped[DeactivationReason | None] = mapped_column(
+        deactivation_reason_enum, nullable=True
+    )
+    on_missed: Mapped[OnMissedPolicy] = mapped_column(
+        on_missed_policy_enum,
+        nullable=False,
+        server_default=sql_text("'skip'"),
+    )
+    concurrency_policy: Mapped[ConcurrencyPolicy] = mapped_column(
+        concurrency_policy_enum,
+        nullable=False,
+        server_default=sql_text("'forbid'"),
+    )
+    # Counter used by the sweep + send-action to auto-deactivate a
+    # schedule that always resolves to nothing (misconfig or DoS).
+    # Reset to 0 on schedule config edit (Step 2 service).
+    consecutive_empty_fires: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=sql_text("0")
+    )
+    # Soft reference (no FK) — matches the rest of the workflows
+    # module's user-id columns.
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+    # ETag source for the ``If-Match`` optimistic lock on PATCH
+    # /api/v1/schedules/{id}. Service layer updates this explicitly
+    # on every write; the DB default is only for the initial insert.
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+
+
 __all__ = [
     "ABWinnerMetric",
+    "ConcurrencyPolicy",
+    "DeactivationReason",
+    "OnMissedPolicy",
+    "ScheduleKind",
+    "TriggerKind",
     "Workflow",
     "WorkflowEventWait",
     "WorkflowFolder",
@@ -549,10 +826,16 @@ __all__ = [
     "WorkflowRun",
     "WorkflowRunOutcome",
     "WorkflowRunStatus",
+    "WorkflowSchedule",
     "WorkflowStatus",
     "WorkflowStepRun",
     "WorkflowStepRunStatus",
     "WorkflowVersion",
+    "concurrency_policy_enum",
+    "deactivation_reason_enum",
+    "on_missed_policy_enum",
+    "schedule_kind_enum",
+    "trigger_kind_enum",
     "workflow_re_enrollment_rule_enum",
     "workflow_run_outcome_enum",
     "workflow_run_status_enum",

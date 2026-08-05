@@ -2,7 +2,7 @@
 
 **Goal:** Land the `tbl_workflow_schedules` table, add audit columns to `tbl_workflow_runs`, backfill `org.timezone` NULLs, add `croniter` dependency, ship pure DAL CRUD + due-query. No service logic, no endpoints, no engine wiring yet.
 
-**Status:** Pending
+**Status:** COMPLETED (2026-08-05, migration `0182_workflow_schedules` applied to dev DB; up + down + re-up verified clean; ruff clean; 166 pre-existing runs backfilled to `trigger_kind='event'`; DAL/model tests written, pytest run pending user go-ahead per memory)
 
 **Depends on:** `core/workflows/` (live), `core/tenants/` (live), `core/contacts/` (live)
 

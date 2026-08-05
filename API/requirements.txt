@@ -30,3 +30,4 @@ python-magic==0.4.27; sys_platform != "win32"
 python-magic-bin==0.4.14; sys_platform == "win32"
 stripe>=10.0.0
 bleach[css]>=6.1.0
+croniter>=2.0,<3.0
