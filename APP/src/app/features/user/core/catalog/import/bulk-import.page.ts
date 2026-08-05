@@ -52,6 +52,39 @@ const EXPECTED_COLUMNS = [
 
 type ExpectedColumn = (typeof EXPECTED_COLUMNS)[number];
 
+/** Aliases for auto-mapping incoming CSV headers to the canonical
+ *  catalog columns. Comparison is case-insensitive and non-alphanumeric
+ *  chars are stripped so `Product Name`, `product_name`, `Product-Name`
+ *  all normalise to `productname`. Order doesn't matter — the first hit
+ *  wins per raw header. */
+const COLUMN_ALIASES: Record<ExpectedColumn, string[]> = {
+  sku: ['sku', 'productcode', 'itemcode', 'code', 'productid', 'itemid'],
+  name: ['name', 'productname', 'itemname', 'title', 'product', 'item'],
+  description: ['description', 'desc', 'details', 'notes', 'productdescription'],
+  category: ['category', 'type', 'group', 'productcategory', 'productgroup'],
+  price: [
+    'price',
+    'sellingprice',
+    'retailprice',
+    'mrp',
+    'listprice',
+    'sale',
+    'saleprice',
+    'amount',
+  ],
+  cost_price: ['costprice', 'cost', 'buyingprice', 'purchaseprice', 'wholesaleprice', 'basecost'],
+  currency: ['currency', 'curr', 'currencycode'],
+  is_active: ['isactive', 'active', 'enabled', 'status', 'published'],
+  tags: ['tags', 'labels', 'keywords', 'tag'],
+};
+
+/** Normalises a raw CSV header for alias lookup — lowercases and
+ *  strips whitespace, hyphens, underscores, dots, and parens so
+ *  `"Cost Price (₹)"` matches `costprice`. */
+function normaliseHeader(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 const ERROR_VISIBLE_LIMIT = 50;
 
 interface ParseIssue {
@@ -301,22 +334,42 @@ function parseCsvContent(text: string): ParseOutcome {
     return { rows: [], issues: [], missingRequired: [], headerRow: [] };
   }
 
-  const header = rows[0].map((c) => c.trim().toLowerCase());
+  // Auto-map each raw CSV header to its canonical column by checking
+  // the alias list. `columnIndex` is `{expected: rawIndex}` — undefined
+  // for expected columns not found in the CSV.
+  const rawHeader = rows[0].map((c) => c.trim());
+  const columnIndex: Partial<Record<ExpectedColumn, number>> = {};
+  for (let i = 0; i < rawHeader.length; i += 1) {
+    const norm = normaliseHeader(rawHeader[i]);
+    if (!norm) continue;
+    for (const expected of EXPECTED_COLUMNS) {
+      if (columnIndex[expected] !== undefined) continue;
+      if (COLUMN_ALIASES[expected].includes(norm)) {
+        columnIndex[expected] = i;
+        break;
+      }
+    }
+  }
+  // Header row returned to the UI is the resolved canonical names in
+  // raw-column order so error messages still reference what the user
+  // literally typed.
+  const header = rawHeader.map((c) => c.toLowerCase());
+
   const required: ExpectedColumn[] = ['sku', 'name', 'price'];
-  const missing = required.filter((r) => !header.includes(r));
+  const missing = required.filter((r) => columnIndex[r] === undefined);
   if (missing.length > 0) {
     return { rows: [], issues: [], missingRequired: missing, headerRow: header };
   }
 
-  const skuIdx = header.indexOf('sku');
-  const nameIdx = header.indexOf('name');
-  const descIdx = header.indexOf('description');
-  const catIdx = header.indexOf('category');
-  const priceIdx = header.indexOf('price');
-  const costIdx = header.indexOf('cost_price');
-  const currIdx = header.indexOf('currency');
-  const activeIdx = header.indexOf('is_active');
-  const tagsIdx = header.indexOf('tags');
+  const skuIdx = columnIndex.sku!;
+  const nameIdx = columnIndex.name!;
+  const descIdx = columnIndex.description ?? -1;
+  const catIdx = columnIndex.category ?? -1;
+  const priceIdx = columnIndex.price!;
+  const costIdx = columnIndex.cost_price ?? -1;
+  const currIdx = columnIndex.currency ?? -1;
+  const activeIdx = columnIndex.is_active ?? -1;
+  const tagsIdx = columnIndex.tags ?? -1;
 
   const out: CatalogBulkImportRow[] = [];
   const issues: ParseIssue[] = [];
