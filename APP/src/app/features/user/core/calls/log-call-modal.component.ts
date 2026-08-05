@@ -16,6 +16,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 
 import { commonValidators } from '../shared/validators';
+import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import { Call, CallOutcome, CallsApiService } from './calls-api.service';
 
 /**
@@ -43,7 +44,7 @@ const recordingUploadValidator = commonValidators.fileUpload({
   selector: 'app-log-call-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, LucideAngularModule],
+  imports: [ReactiveFormsModule, LucideAngularModule, MobileSelectComponent],
   templateUrl: './log-call-modal.component.html',
 })
 export class LogCallModalComponent {
@@ -106,6 +107,30 @@ export class LogCallModalComponent {
     outcome_id: this.fb.control<string | null>(null),
     notes: this.fb.control<string | null>(null, [commonValidators.maxLength(4000)]),
   });
+
+  /** Direction options for the mobile picker. */
+  protected readonly directionOptions: ReadonlyArray<MobileSelectOption> = [
+    { value: 'out', label: 'Outgoing' },
+    { value: 'in', label: 'Incoming' },
+  ];
+
+  /** Outcome options list — includes the `null` "— Not set —"
+   *  placeholder as an empty-string entry the mobile picker can handle
+   *  (converted back to `null` in `onOutcomePicked`). */
+  protected outcomeOptions(): ReadonlyArray<MobileSelectOption> {
+    const opts: MobileSelectOption[] = [{ value: '', label: '— Not set —' }];
+    for (const o of this._outcomes) opts.push({ value: o.id, label: o.label });
+    return opts;
+  }
+
+  /** Value-only variants for `<crm-mobile-select>`. */
+  protected onDirectionPicked(value: string): void {
+    this.form.controls.direction.setValue(value as 'in' | 'out');
+  }
+
+  protected onOutcomePicked(value: string): void {
+    this.form.controls.outcome_id.setValue(value || null);
+  }
 
   protected save(): void {
     if (!this.form.valid) {
