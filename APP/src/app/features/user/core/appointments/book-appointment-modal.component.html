@@ -165,14 +165,12 @@
                 {{ stdField('scheduled_at')?.label ?? 'Scheduled at' }}
                 <span class="text-red-600">*</span>
               </label>
-              <input
-                id="ba_at"
-                type="datetime-local"
-                formControlName="scheduled_at"
-                min="1900-01-01T00:00"
-                max="9999-12-31T23:59"
-                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-              />
+              <div class="mt-1">
+                <crm-mobile-datetime
+                  formControlName="scheduled_at"
+                  placeholder="Pick date & time"
+                />
+              </div>
               @if (form.controls.scheduled_at.touched && form.controls.scheduled_at.invalid) {
                 <p class="mt-1 text-xs text-red-600">Pick a date and time.</p>
               }

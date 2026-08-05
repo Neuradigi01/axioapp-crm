@@ -5,11 +5,13 @@ import {
   HostListener,
   computed,
   effect,
+  forwardRef,
   inject,
   input,
   output,
   signal,
 } from '@angular/core';
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
 /**
@@ -27,38 +29,85 @@ import { LucideAngularModule } from 'lucide-angular';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => MobileDateTimeComponent),
+      multi: true,
+    },
+  ],
   templateUrl: './mobile-datetime.component.html',
 })
-export class MobileDateTimeComponent {
-  readonly value = input<string>('');
+export class MobileDateTimeComponent implements ControlValueAccessor {
+  /** `[value]` binding for non-form-driven callers. */
+  readonly valueInput = input<string>('', { alias: 'value' });
   readonly placeholder = input<string>('Pick a date & time');
-  /** Optional `min` boundary — same `YYYY-MM-DDTHH:mm` shape as `value`.
-   *  Days before this get disabled in the calendar grid. */
+  /** Optional `min` boundary — matches `value` shape. Days before this
+   *  get disabled in the calendar grid. */
   readonly min = input<string>('');
   /** Optional `max` boundary — same shape. */
   readonly max = input<string>('');
+  /** `'datetime'` (default) — calendar + time inputs, emits
+   *  `YYYY-MM-DDTHH:mm`. `'date'` — calendar only, emits `YYYY-MM-DD`. */
+  readonly mode = input<'datetime' | 'date'>('datetime');
   readonly valueChange = output<string>();
 
   private readonly host = inject(ElementRef<HTMLElement>);
 
   protected readonly open = signal(false);
+  readonly disabled = signal(false);
+
+  /** Single source of truth — written by either `[value]` (via effect)
+   *  or `writeValue()` (from Angular Forms). */
+  private readonly writtenValue = signal<string | null>(null);
+  protected readonly currentValue = computed<string>(() => {
+    const w = this.writtenValue();
+    return w !== null ? w : this.valueInput();
+  });
+
+  private onChangeFn: (v: string) => void = () => undefined;
+  private onTouchedFn: () => void = () => undefined;
 
   /** The month currently shown in the calendar grid (independent of
    *  the selected value so a user can browse without picking). */
   protected readonly viewMonth = signal(new Date());
 
   constructor() {
-    // When the value input changes to a real date, park the calendar
+    // Mirror [value] input into writtenValue so both binding paths agree.
+    effect(() => {
+      const v = this.valueInput();
+      if (v !== this.writtenValue()) this.writtenValue.set(v);
+    });
+
+    // When the current value maps to a real date, park the calendar
     // on that month so opening the picker again shows the right page.
     effect(() => {
-      const parsed = this.parseValue(this.value());
+      const parsed = this.parseValue(this.currentValue());
       if (parsed) this.viewMonth.set(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
     });
   }
 
+  // --- ControlValueAccessor ------------------------------------------
+  writeValue(value: string | null | undefined): void {
+    this.writtenValue.set(value ?? '');
+  }
+
+  registerOnChange(fn: (v: string) => void): void {
+    this.onChangeFn = fn;
+  }
+
+  registerOnTouched(fn: () => void): void {
+    this.onTouchedFn = fn;
+  }
+
+  setDisabledState(isDisabled: boolean): void {
+    this.disabled.set(isDisabled);
+  }
+  // -------------------------------------------------------------------
+
   /** Human label for the trigger — "05 Aug 2026, 14:30" or placeholder. */
   protected readonly triggerLabel = computed<string>(() => {
-    const parsed = this.parseValue(this.value());
+    const parsed = this.parseValue(this.currentValue());
     if (!parsed) return this.placeholder();
     return this.formatDisplay(parsed);
   });
@@ -94,18 +143,18 @@ export class MobileDateTimeComponent {
   /** Currently-selected time components (hours 0-23, minutes 0-59).
    *  Falls back to `12:00` if no value is set — matching the OS pickers. */
   protected readonly selectedHour = computed<number>(() => {
-    const p = this.parseValue(this.value());
+    const p = this.parseValue(this.currentValue());
     return p ? p.getHours() : 12;
   });
 
   protected readonly selectedMinute = computed<number>(() => {
-    const p = this.parseValue(this.value());
+    const p = this.parseValue(this.currentValue());
     return p ? p.getMinutes() : 0;
   });
 
   /** Selected day (midnight-local Date) — for highlighting the grid. */
   protected readonly selectedDay = computed<Date | null>(() => {
-    const p = this.parseValue(this.value());
+    const p = this.parseValue(this.currentValue());
     if (!p) return null;
     return new Date(p.getFullYear(), p.getMonth(), p.getDate());
   });
@@ -113,11 +162,13 @@ export class MobileDateTimeComponent {
   protected readonly today = new Date();
 
   protected toggle(): void {
+    if (this.disabled()) return;
     this.open.update((v) => !v);
   }
 
   protected close(): void {
     this.open.set(false);
+    this.onTouchedFn();
   }
 
   protected prevMonth(): void {
@@ -132,18 +183,23 @@ export class MobileDateTimeComponent {
 
   protected pickDay(day: Date): void {
     // Keep the existing hour/minute; if there's no value yet, start
-    // at the current wall-clock time.
-    const parsed = this.parseValue(this.value());
-    const h = parsed ? parsed.getHours() : this.today.getHours();
-    const m = parsed ? parsed.getMinutes() : this.today.getMinutes();
+    // at the current wall-clock time. Date-only mode zeros the time
+    // to keep the emitted string tidy.
+    const parsed = this.parseValue(this.currentValue());
+    const dateMode = this.mode() === 'date';
+    const h = dateMode ? 0 : parsed ? parsed.getHours() : this.today.getHours();
+    const m = dateMode ? 0 : parsed ? parsed.getMinutes() : this.today.getMinutes();
     const next = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m);
     this.emit(next);
+    // In date-only mode there's nothing else to configure — close so
+    // the user doesn't have to reach for the backdrop.
+    if (dateMode) this.close();
   }
 
   protected pickToday(): void {
     const n = new Date();
     // Preserve the currently-selected time if there is one.
-    const parsed = this.parseValue(this.value());
+    const parsed = this.parseValue(this.currentValue());
     if (parsed) {
       n.setHours(parsed.getHours(), parsed.getMinutes(), 0, 0);
     } else {
@@ -154,7 +210,9 @@ export class MobileDateTimeComponent {
   }
 
   protected clear(): void {
+    this.writtenValue.set('');
     this.valueChange.emit('');
+    this.onChangeFn('');
     this.close();
   }
 
@@ -172,13 +230,16 @@ export class MobileDateTimeComponent {
   }
 
   private applyTime(h: number, m: number): void {
-    const parsed = this.parseValue(this.value()) ?? new Date();
+    const parsed = this.parseValue(this.currentValue()) ?? new Date();
     const next = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), h, m);
     this.emit(next);
   }
 
   private emit(d: Date): void {
-    this.valueChange.emit(this.formatIso(d));
+    const iso = this.formatIso(d);
+    this.writtenValue.set(iso);
+    this.valueChange.emit(iso);
+    this.onChangeFn(iso);
   }
 
   /** Convenience predicates the template uses to style cells. */
@@ -227,19 +288,23 @@ export class MobileDateTimeComponent {
     return Number.isNaN(dt.getTime()) ? null : dt;
   }
 
-  /** ISO shape without timezone: `YYYY-MM-DDTHH:mm`. */
+  /** ISO shape without timezone. `date` mode emits `YYYY-MM-DD`
+   *  (matches `<input type="date">`); `datetime` mode emits
+   *  `YYYY-MM-DDTHH:mm` (matches `datetime-local`). */
   private formatIso(d: Date): string {
     const p = (n: number): string => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(
-      d.getMinutes(),
-    )}`;
+    const datePart = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    if (this.mode() === 'date') return datePart;
+    return `${datePart}T${p(d.getHours())}:${p(d.getMinutes())}`;
   }
 
-  /** Trigger label — `05 Aug 2026, 14:30`. */
+  /** Trigger label — `05 Aug 2026, 14:30` or `05 Aug 2026`. */
   private formatDisplay(d: Date): string {
     const p = (n: number): string => String(n).padStart(2, '0');
     const month = d.toLocaleString('en', { month: 'short' });
-    return `${p(d.getDate())} ${month} ${d.getFullYear()}, ${p(d.getHours())}:${p(d.getMinutes())}`;
+    const datePart = `${p(d.getDate())} ${month} ${d.getFullYear()}`;
+    if (this.mode() === 'date') return datePart;
+    return `${datePart}, ${p(d.getHours())}:${p(d.getMinutes())}`;
   }
 
   @HostListener('keydown.escape')

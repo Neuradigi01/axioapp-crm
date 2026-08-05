@@ -20,6 +20,7 @@ import { BaseFormModalComponent } from '../shared/components/base-form-modal.com
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { commonValidators, withRequiredIf } from '../shared/validators';
@@ -72,7 +73,13 @@ const FOLLOWUP_VALUES: readonly string[] = FOLLOWUP_OPTIONS.map((o) => o.value);
   selector: 'app-task-form-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule, DynamicFormComponent, MobileSelectComponent],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    DynamicFormComponent,
+    MobileSelectComponent,
+    MobileDateTimeComponent,
+  ],
   templateUrl: './task-form-modal.component.html',
 })
 export class TaskFormModalComponent extends BaseFormModalComponent {

@@ -4,11 +4,14 @@ import {
   ElementRef,
   HostListener,
   computed,
+  effect,
+  forwardRef,
   inject,
   input,
   output,
   signal,
 } from '@angular/core';
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
 /**
@@ -46,13 +49,21 @@ export interface MobileSelectOption {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => MobileSelectComponent),
+      multi: true,
+    },
+  ],
   template: `
     <div class="relative">
       <button
         type="button"
-        class="flex w-full items-center justify-between rounded border border-subtle bg-surface px-2 py-1.5 text-left text-xs text-default hover:bg-surface-2"
+        class="flex w-full items-center justify-between rounded border border-subtle bg-surface px-2 py-1.5 text-left text-xs text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
         [attr.aria-expanded]="open()"
         [attr.aria-haspopup]="'listbox'"
+        [disabled]="disabled()"
         (click)="toggle()"
       >
         <span class="truncate">{{ activeLabel() }}</span>
@@ -78,12 +89,12 @@ export interface MobileSelectOption {
             <button
               type="button"
               role="option"
-              [attr.aria-selected]="opt.value === value()"
+              [attr.aria-selected]="opt.value === currentValue()"
               class="flex w-full items-center rounded px-2 py-1.5 text-left text-xs transition"
-              [class.bg-accent-soft]="opt.value === value()"
-              [class.text-accent]="opt.value === value()"
-              [class.text-default]="opt.value !== value()"
-              [class.hover:bg-surface-2]="opt.value !== value()"
+              [class.bg-accent-soft]="opt.value === currentValue()"
+              [class.text-accent]="opt.value === currentValue()"
+              [class.text-default]="opt.value !== currentValue()"
+              [class.hover:bg-surface-2]="opt.value !== currentValue()"
               (click)="pick(opt.value)"
             >
               {{ opt.label }}
@@ -94,31 +105,78 @@ export interface MobileSelectOption {
     </div>
   `,
 })
-export class MobileSelectComponent {
+export class MobileSelectComponent implements ControlValueAccessor {
   readonly options = input.required<ReadonlyArray<MobileSelectOption>>();
-  readonly value = input<string>('');
+  /** `[value]` binding — used by callers who don't want a FormControl. */
+  readonly valueInput = input<string>('', { alias: 'value' });
   readonly placeholder = input<string>('Select…');
   readonly valueChange = output<string>();
+  /** Also disable-able via a FormControl (`control.disable()`). */
+  readonly disabled = signal(false);
 
   protected readonly open = signal(false);
   private readonly host = inject(ElementRef<HTMLElement>);
 
+  /** Single source of truth for the currently-selected value. Written
+   *  by either the `[value]` input (via `effect`) or Angular Forms
+   *  (via `writeValue`). Reads `writtenValue` first so a form control
+   *  can override an initial input value. */
+  private readonly writtenValue = signal<string | null>(null);
+  protected readonly currentValue = computed<string>(() => {
+    const w = this.writtenValue();
+    return w !== null ? w : this.valueInput();
+  });
+
+  private onChangeFn: (v: string) => void = () => undefined;
+  private onTouchedFn: () => void = () => undefined;
+
+  constructor() {
+    // Mirror any external `[value]` change into `writtenValue` so
+    // template + form path both agree.
+    effect(() => {
+      const v = this.valueInput();
+      if (v !== this.writtenValue()) this.writtenValue.set(v);
+    });
+  }
+
+  // --- ControlValueAccessor ------------------------------------------
+  writeValue(value: string | null | undefined): void {
+    this.writtenValue.set(value ?? '');
+  }
+
+  registerOnChange(fn: (v: string) => void): void {
+    this.onChangeFn = fn;
+  }
+
+  registerOnTouched(fn: () => void): void {
+    this.onTouchedFn = fn;
+  }
+
+  setDisabledState(isDisabled: boolean): void {
+    this.disabled.set(isDisabled);
+  }
+  // -------------------------------------------------------------------
+
   protected readonly activeLabel = computed<string>(() => {
-    const v = this.value();
+    const v = this.currentValue();
     const hit = this.options().find((o) => o.value === v);
     return hit?.label ?? this.placeholder();
   });
 
   protected toggle(): void {
+    if (this.disabled()) return;
     this.open.update((v) => !v);
   }
 
   protected close(): void {
     this.open.set(false);
+    this.onTouchedFn();
   }
 
   protected pick(v: string): void {
+    this.writtenValue.set(v);
     this.valueChange.emit(v);
+    this.onChangeFn(v);
     this.close();
   }
 

@@ -17,6 +17,7 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { Pipeline, PipelinesApiService } from '../pipelines/pipelines-api.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
@@ -43,7 +44,12 @@ import { extractApiError } from '@core/services/api-error.util';
   selector: 'app-lead-form-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, DynamicFormComponent, MobileSelectComponent],
+  imports: [
+    ReactiveFormsModule,
+    DynamicFormComponent,
+    MobileSelectComponent,
+    MobileDateTimeComponent,
+  ],
   templateUrl: './lead-form-modal.component.html',
 })
 export class LeadFormModalComponent extends BaseFormModalComponent {

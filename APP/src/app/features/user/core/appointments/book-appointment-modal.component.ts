@@ -21,6 +21,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import { FieldDef } from '../shared/dynamic-form/types';
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { commonValidators, withRequiredIf } from '../shared/validators';
@@ -57,7 +58,7 @@ interface OrgUser {
   selector: 'app-book-appointment-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, MobileSelectComponent],
+  imports: [ReactiveFormsModule, MobileSelectComponent, MobileDateTimeComponent],
   templateUrl: './book-appointment-modal.component.html',
 })
 export class BookAppointmentModalComponent extends BaseFormModalComponent {

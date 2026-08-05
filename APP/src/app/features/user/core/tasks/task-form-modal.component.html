@@ -63,13 +63,7 @@
               <span class="text-red-500">*</span>
             }
           </span>
-          <input
-            type="datetime-local"
-            formControlName="due_at"
-            min="1900-01-01T00:00"
-            max="9999-12-31T23:59"
-            class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
-          />
+          <crm-mobile-datetime formControlName="due_at" placeholder="Pick date & time" />
           @if (stdField('due_at')?.help_text; as help) {
             <span class="mt-1 block text-xs text-muted">{{ help }}</span>
           }
