@@ -20,13 +20,13 @@
           />
         </label>
         <label class="block text-sm">
-          <span class="block text-xs font-medium text-muted">Started</span>
-          <input
-            type="datetime-local"
-            formControlName="started_at"
-            min="1900-01-01T00:00"
-            max="9999-12-31T23:59"
-            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          <span class="mb-1 block text-xs font-medium text-muted">Started</span>
+          <crm-mobile-datetime
+            [value]="form.controls.started_at.value"
+            [min]="minStartedAt"
+            [max]="maxStartedAt"
+            placeholder="Pick date & time"
+            (valueChange)="onStartedAtPicked($event)"
           />
         </label>
       </div>
