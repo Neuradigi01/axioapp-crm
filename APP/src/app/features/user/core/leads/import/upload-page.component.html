@@ -79,16 +79,11 @@
     <label for="import-platform" class="mb-1 block text-xs font-medium text-default">
       Source platform
     </label>
-    <select
-      id="import-platform"
+    <crm-mobile-select
+      [options]="platforms"
       [value]="sourcePlatform()"
-      (change)="onPlatformChange($event)"
-      class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-    >
-      @for (p of platforms; track p.value) {
-        <option [value]="p.value">{{ p.label }}</option>
-      }
-    </select>
+      (valueChange)="onPlatformValue($event)"
+    />
     <p class="mt-1 text-[14px] text-muted">
       Picks the default column mapping for the next step. You can override every column.
     </p>

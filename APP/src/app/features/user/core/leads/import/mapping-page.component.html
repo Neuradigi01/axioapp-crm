@@ -83,34 +83,14 @@
                 {{ sampleValue(col) ?? '—' }}
               </td>
               <td class="px-4 py-3 align-top">
-                <select
-                  [value]="mapping()[col] ?? ''"
-                  (change)="onMappingChange(col, $event)"
-                  class="block w-full max-w-md rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-                >
-                  <option value="">— Ignore —</option>
-                  @if (targetGroups().contact.length > 0) {
-                    <optgroup label="Standard contact">
-                      @for (t of targetGroups().contact; track t.key) {
-                        <option [value]="t.key">{{ t.label }}{{ t.required ? ' *' : '' }}</option>
-                      }
-                    </optgroup>
-                  }
-                  @if (targetGroups().lead.length > 0) {
-                    <optgroup label="Standard lead">
-                      @for (t of targetGroups().lead; track t.key) {
-                        <option [value]="t.key">{{ t.label }}{{ t.required ? ' *' : '' }}</option>
-                      }
-                    </optgroup>
-                  }
-                  @if (targetGroups().custom.length > 0) {
-                    <optgroup label="Custom fields">
-                      @for (t of targetGroups().custom; track t.key) {
-                        <option [value]="t.key">{{ t.label }}{{ t.required ? ' *' : '' }}</option>
-                      }
-                    </optgroup>
-                  }
-                </select>
+                <div class="max-w-md">
+                  <crm-mobile-select
+                    [options]="targetOptions()"
+                    [value]="mapping()[col] ?? ''"
+                    placeholder="— Ignore —"
+                    (valueChange)="onMappingValue(col, $event)"
+                  />
+                </div>
               </td>
               <td class="px-4 py-3 text-center">
                 @switch (statusFor(col)) {

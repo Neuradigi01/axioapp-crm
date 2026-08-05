@@ -13,6 +13,7 @@ import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { MobileSelectComponent } from '../../shared/forms/mobile-select.component';
 import {
   ImportsApiService,
   LeadImport,
@@ -54,7 +55,7 @@ interface KebabOpen {
   selector: 'app-import-history-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideAngularModule],
+  imports: [RouterLink, LucideAngularModule, MobileSelectComponent],
   templateUrl: './history-page.component.html',
 })
 export class HistoryPageComponent {
@@ -148,6 +149,17 @@ export class HistoryPageComponent {
 
   protected onPlatformChange(event: Event): void {
     this.platformFilter.set((event.target as HTMLSelectElement).value as PlatformFilter);
+    this.page.set(1);
+  }
+
+  /** Value-only variants for `<crm-mobile-select>`. */
+  protected onStatusValue(value: string): void {
+    this.statusFilter.set(value as StatusFilter);
+    this.page.set(1);
+  }
+
+  protected onPlatformValue(value: string): void {
+    this.platformFilter.set(value as PlatformFilter);
     this.page.set(1);
   }
 

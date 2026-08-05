@@ -34,6 +34,11 @@ import { LucideAngularModule } from 'lucide-angular';
 export interface MobileSelectOption {
   readonly value: string;
   readonly label: string;
+  /** Optional group heading. Consecutive options that share the same
+   *  `group` string render under a single sticky-style header — mirrors
+   *  the native `<optgroup>` behaviour. Options without a `group` render
+   *  ungrouped (also legal). */
+  readonly group?: string;
 }
 
 @Component({
@@ -62,7 +67,14 @@ export interface MobileSelectOption {
           class="absolute top-full right-0 left-0 z-40 mt-1 max-h-[60vh] overflow-y-auto rounded-md border border-subtle bg-surface p-1 shadow-lg"
           role="listbox"
         >
-          @for (opt of options(); track opt.value) {
+          @for (opt of options(); track opt.value; let i = $index) {
+            @if (opt.group && opt.group !== options()[i - 1]?.group) {
+              <div
+                class="px-2 pt-2 pb-1 text-[10px] font-semibold tracking-[.06em] text-faint uppercase"
+              >
+                {{ opt.group }}
+              </div>
+            }
             <button
               type="button"
               role="option"
