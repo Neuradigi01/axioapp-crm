@@ -203,7 +203,13 @@ class _PresetSpec:
     # action node type — see ``core/workflows/actions/send.py``.
     channel: str
     node_type: str
-    recipient_resolver: str
+    # ``config.recipient`` value the send node lands with. Either a
+    # bare string (stock resolver by name — ``"contact.email"`` /
+    # ``"contact.phone"``) or a dict for parameterised resolvers
+    # (e.g. ``{"kind": "custom", "path": "user.email"}`` for
+    # signup events where the recipient lives at the trigger
+    # payload path rather than on a persisted user row).
+    recipient: str | dict[str, Any]
     conditions: dict[str, Any] = field(default_factory=dict)
     delay_seconds: int = 0
     # Attribute name in ``core.templates.seeds`` — resolved at call time
@@ -218,7 +224,14 @@ _PRESET_SPECS: list[_PresetSpec] = [
         event_type="user.signed_up",
         channel="email",
         node_type="send.email",
-        recipient_resolver="user.email",
+        # Workflow's ``user.email`` resolver looks up a user by ID
+        # (from ``node.config.recipient.user_id`` or falls back to
+        # ``workflow.created_by_user_id``) — neither is populated for
+        # a signup event, so the resolver would return None + skip.
+        # Use ``custom`` with the payload path instead — mirrors what
+        # the automation module's ``user.email`` resolver did (read
+        # ``payload.user.email``).
+        recipient={"kind": "custom", "path": "user.email"},
         template_seeder="seed_user_welcome_template",
     ),
     _PresetSpec(
@@ -226,8 +239,13 @@ _PRESET_SPECS: list[_PresetSpec] = [
         event_type="lead.created",
         channel="email",
         node_type="send.email",
-        recipient_resolver="contact.email",
-        conditions={"field": "source", "op": "ne", "value": "bulk_import"},
+        recipient="contact.email",
+        # workflow condition AST uses ``path`` (not ``field``) + ``neq``
+        # (not ``ne``) — see ``core/events/conditions.py``. The old
+        # automation seed shape is auto-translated by migration
+        # ``0178_fix_wf_condition_shape`` for existing orgs; new
+        # orgs get the correct shape here directly.
+        conditions={"path": "source", "op": "neq", "value": "bulk_import"},
         template_seeder="seed_lead_confirmation_template",
     ),
     _PresetSpec(
@@ -235,7 +253,7 @@ _PRESET_SPECS: list[_PresetSpec] = [
         event_type="appointment.booked",
         channel="whatsapp",
         node_type="send.whatsapp",
-        recipient_resolver="contact.phone",
+        recipient="contact.phone",
         template_seeder="seed_appointment_booked_template",
     ),
     _PresetSpec(
@@ -243,7 +261,7 @@ _PRESET_SPECS: list[_PresetSpec] = [
         event_type="appointment.reminder_24h",
         channel="whatsapp",
         node_type="send.whatsapp",
-        recipient_resolver="contact.phone",
+        recipient="contact.phone",
         template_seeder="seed_appointment_reminder_24h_template",
     ),
     _PresetSpec(
@@ -251,7 +269,7 @@ _PRESET_SPECS: list[_PresetSpec] = [
         event_type="appointment.reminder_1h",
         channel="whatsapp",
         node_type="send.whatsapp",
-        recipient_resolver="contact.phone",
+        recipient="contact.phone",
         template_seeder="seed_appointment_reminder_1h_template",
     ),
     _PresetSpec(
@@ -259,7 +277,7 @@ _PRESET_SPECS: list[_PresetSpec] = [
         event_type="invoice.sent",
         channel="email",
         node_type="send.email",
-        recipient_resolver="contact.email",
+        recipient="contact.email",
         template_seeder="seed_invoice_sent_template",
     ),
     _PresetSpec(
@@ -267,7 +285,7 @@ _PRESET_SPECS: list[_PresetSpec] = [
         event_type="invoice.paid",
         channel="email",
         node_type="send.email",
-        recipient_resolver="contact.email",
+        recipient="contact.email",
         template_seeder="seed_invoice_paid_template",
     ),
     _PresetSpec(
@@ -275,7 +293,7 @@ _PRESET_SPECS: list[_PresetSpec] = [
         event_type="invoice.overdue_7d",
         channel="email",
         node_type="send.email",
-        recipient_resolver="contact.email",
+        recipient="contact.email",
         template_seeder="seed_invoice_overdue_template",
     ),
     _PresetSpec(
@@ -283,7 +301,7 @@ _PRESET_SPECS: list[_PresetSpec] = [
         event_type="contact.birthday",
         channel="whatsapp",
         node_type="send.whatsapp",
-        recipient_resolver="contact.phone",
+        recipient="contact.phone",
         template_seeder="seed_contact_birthday_template",
     ),
     _PresetSpec(
@@ -291,7 +309,7 @@ _PRESET_SPECS: list[_PresetSpec] = [
         event_type="lead.stale_30d",
         channel="email",
         node_type="send.email",
-        recipient_resolver="contact.email",
+        recipient="contact.email",
         template_seeder="seed_lead_stale_30d_template",
     ),
 ]
@@ -360,8 +378,12 @@ def _build_preset_graph(spec: _PresetSpec, *, template_id: str) -> dict[str, Any
             "config": {
                 "label": "Send",
                 "template_id": template_id,
-                "recipient_resolver": spec.recipient_resolver,
-                "recipient_resolver_config": {},
+                # Workflow send actions read ``config.recipient`` (not
+                # ``config.recipient_resolver`` — that was the automation
+                # module's key). Migration ``0179_fix_wf_send_recipient``
+                # translates the shape on existing rows; this seed writes
+                # the right key from the start for new orgs.
+                "recipient": spec.recipient,
             },
         }
     )

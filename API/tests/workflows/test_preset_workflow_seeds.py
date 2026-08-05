@@ -57,7 +57,10 @@ def test_build_preset_graph_no_delay_produces_two_node_dag():
     trigger, send = graph["nodes"]
     assert trigger["config"]["event_type"] == "user.signed_up"
     assert send["config"]["template_id"] == template_id
-    assert send["config"]["recipient_resolver"] == "user.email"
+    # User Welcome uses the ``custom`` resolver against the payload path
+    # (workflow's stock ``user.email`` resolver needs a user_id, which a
+    # signup-event payload doesn't carry).
+    assert send["config"]["recipient"] == {"kind": "custom", "path": "user.email"}
 
 
 def test_build_preset_graph_positive_delay_inserts_wait_node():
@@ -73,7 +76,7 @@ def test_build_preset_graph_positive_delay_inserts_wait_node():
         event_type="lead.created",
         channel="email",
         node_type="send.email",
-        recipient_resolver="contact.email",
+        recipient="contact.email",
         delay_seconds=3600,
         template_seeder="seed_user_welcome_template",  # unused in this test
     )
@@ -228,7 +231,7 @@ async def test_appointment_reminder_24h_uses_whatsapp_channel_and_phone_resolver
 
     send_node = next(n for n in wf.graph["nodes"] if n["type"].startswith("send."))
     assert send_node["type"] == "send.whatsapp"
-    assert send_node["config"]["recipient_resolver"] == "contact.phone"
+    assert send_node["config"]["recipient"] == "contact.phone"
     assert wf.enabled_event_types == ["appointment.reminder_24h"]
 
 
