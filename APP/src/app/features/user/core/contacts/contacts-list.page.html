@@ -433,6 +433,7 @@
     [confirmLabel]="'Delete'"
     [danger]="true"
     [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
     (confirm)="onBulkDelete()"
     (cancel)="closeBulkModal()"
   />

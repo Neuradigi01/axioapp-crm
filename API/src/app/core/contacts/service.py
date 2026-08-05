@@ -18,6 +18,7 @@ inside each write path.
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime
@@ -39,6 +40,36 @@ from src.app.shared.db.pagination import paginate
 from src.app.shared.db.queries import ensure_found
 
 _CONTACT_ENTITY = "contact"
+
+# Maps the referring table in a FK-RESTRICT violation on tbl_contacts
+# to a user-facing dependency label. Only the three RESTRICT tables
+# below can trigger this — every other FK to tbl_contacts is
+# CASCADE or SET NULL and never blocks a delete.
+_CONTACT_FK_BLOCKERS = {
+    "tbl_leads": "lead",
+    "tbl_appointments": "appointment",
+    "tbl_walk_ins": "walk-in",
+}
+_FK_TABLE_RE = re.compile(r'on table "(tbl_\w+)"')
+
+
+def _contact_delete_conflict_detail(exc: IntegrityError, *, plural: bool) -> str:
+    """Turn a FK-RESTRICT `IntegrityError` on tbl_contacts into a
+    specific message naming the blocking dependency (lead /
+    appointment / walk-in) so the user knows what to remove first."""
+    match = _FK_TABLE_RE.search(str(exc.orig) if exc.orig else str(exc))
+    label = _CONTACT_FK_BLOCKERS.get(match.group(1)) if match else None
+    subject = "one or more contacts have" if plural else "this contact has"
+    if label:
+        return (
+            f"Cannot delete — {subject} at least one linked {label}. "
+            f"Delete the {label}{'s' if plural else ''} first, "
+            f"or use Anonymise to wipe PII while keeping history."
+        )
+    return (
+        f"Cannot delete — {subject} linked leads, appointments, or walk-ins. "
+        "Delete those first, or use Anonymise to wipe PII while keeping history."
+    )
 
 # Server-side whitelist for `?sort=`. Anything outside this set is
 # rejected at the router via FastAPI's Literal Query validation, but
@@ -304,12 +335,7 @@ async def delete_contact(session: AsyncSession, *, contact_id: uuid.UUID) -> Non
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "cannot delete contact — leads, walk-ins, appointments, "
-                "or invoices reference this contact. Delete or reassign "
-                "the dependent rows first, or use Anonymise to wipe PII "
-                "while preserving history."
-            ),
+            detail=_contact_delete_conflict_detail(exc, plural=False),
         ) from exc
 
     await log_entity_change(
@@ -820,20 +846,18 @@ async def bulk_delete_contacts(
 
     Wraps FK RESTRICT `IntegrityError` (see `delete_contact` for the
     list of dependent tables) into a clean 409 — otherwise a
-    single-row conflict would raw-500 the whole batch.
+    single-row conflict would raw-500 the whole batch. The FK check
+    fires at statement execution (not deferred), so the try/except
+    must wrap the DAL call, not `commit()`.
     """
-    deleted = await data_access.delete_contacts_in_org(session, ids=ids, org_id=org_id)
     try:
+        deleted = await data_access.delete_contacts_in_org(session, ids=ids, org_id=org_id)
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "cannot delete one or more contacts — leads, walk-ins, "
-                "appointments, or invoices reference them. Delete or "
-                "reassign the dependent rows first, or use Anonymise."
-            ),
+            detail=_contact_delete_conflict_detail(exc, plural=True),
         ) from exc
     return deleted
 

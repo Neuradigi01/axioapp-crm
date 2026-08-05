@@ -32,6 +32,7 @@ export class ConfirmDialogComponent {
   @Input() cancelLabel = 'Cancel';
   @Input() danger = false;
   @Input() submitting = false;
+  @Input() error: string | null = null;
 
   @Output() readonly confirm = new EventEmitter<void>();
   @Output() readonly cancel = new EventEmitter<void>();

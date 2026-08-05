@@ -210,21 +210,11 @@
                   </span>
                 </td>
                 <td class="px-3 py-2 align-top">
-                  <select
+                  <crm-mobile-select
+                    [options]="fieldTargets()"
                     [value]="mapping()[col]"
-                    (change)="onMappingChange(col, $event)"
-                    class="block w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-default focus:outline-none focus:ring-1"
-                    [class.border-red-300]="duplicateTargets().has(mapping()[col])"
-                    [class.focus:border-red-500]="duplicateTargets().has(mapping()[col])"
-                    [class.focus:ring-red-500]="duplicateTargets().has(mapping()[col])"
-                    [class.border-subtle]="!duplicateTargets().has(mapping()[col])"
-                    [class.focus:border-muted]="!duplicateTargets().has(mapping()[col])"
-                    [class.focus:ring-accent]="!duplicateTargets().has(mapping()[col])"
-                  >
-                    @for (t of fieldTargets(); track t.value) {
-                      <option [value]="t.value">{{ t.label }}</option>
-                    }
-                  </select>
+                    (valueChange)="onMappingValue(col, $event)"
+                  />
                   @if (duplicateTargets().has(mapping()[col])) {
                     <p class="mt-1 text-xs text-red-600">
                       Mapped by another column too — pick a different field.
@@ -249,26 +239,16 @@
             <p class="mt-1 truncate text-xs text-muted" [title]="meta.sample_rows[0]?.[col] ?? '—'">
               e.g. {{ meta.sample_rows[0]?.[col] ?? '—' }}
             </p>
-            <label class="mt-3 block">
+            <div class="mt-3">
               <span class="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
                 Map to
               </span>
-              <select
+              <crm-mobile-select
+                [options]="fieldTargets()"
                 [value]="mapping()[col]"
-                (change)="onMappingChange(col, $event)"
-                class="block w-full rounded-md border bg-surface px-3 py-2 text-sm text-default focus:outline-none focus:ring-1"
-                [class.border-red-300]="duplicateTargets().has(mapping()[col])"
-                [class.focus:border-red-500]="duplicateTargets().has(mapping()[col])"
-                [class.focus:ring-red-500]="duplicateTargets().has(mapping()[col])"
-                [class.border-subtle]="!duplicateTargets().has(mapping()[col])"
-                [class.focus:border-muted]="!duplicateTargets().has(mapping()[col])"
-                [class.focus:ring-accent]="!duplicateTargets().has(mapping()[col])"
-              >
-                @for (t of fieldTargets(); track t.value) {
-                  <option [value]="t.value">{{ t.label }}</option>
-                }
-              </select>
-            </label>
+                (valueChange)="onMappingValue(col, $event)"
+              />
+            </div>
             @if (duplicateTargets().has(mapping()[col])) {
               <p class="mt-1.5 text-xs text-red-600">
                 Mapped by another column too — pick a different field.
