@@ -78,6 +78,25 @@ class TriggerRead(BaseModel):
     updated_at: datetime
 
 
+class MigratedWorkflowIdResponse(BaseModel):
+    """Wire shape for ``GET /api/v1/automations/triggers/{id}/migrated-workflow-id``.
+
+    Step-3 of ``tasks/workflows-absorb-automation/`` — the Angular
+    redirect resolver reads this to know where to bounce a legacy
+    ``/user/automations/{id}`` bookmark. ``workflow_id`` is the id of
+    the single-step workflow the Step-1 migration created for this
+    trigger; ``None`` when the trigger predates the migration or was
+    created after (i.e. not part of the cutover). Never raises 404 —
+    the endpoint returns ``{workflow_id: null}`` for missing triggers
+    too, so the resolver can uniformly fall back to the workflows
+    list.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_id: uuid.UUID | None = None
+
+
 class RunRead(BaseModel):
     """Wire shape for the run-history endpoint (Step 9 UI consumes it)."""
 

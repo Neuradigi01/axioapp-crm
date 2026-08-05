@@ -1,8 +1,16 @@
 # Step 3 — Frontend hide: sidebar entry + redirect resolver
 
-**Goal:** Remove the "Automations" sidebar entry. Route `/user/automations/*` to `/user/workflows/*` via a resolver that uses the FK from Step 1 (`migrated_to_workflow_id`) to preserve deep-link bookmarks. Angular feature module code under `features/user/core/automation/` stays in place (imports removed from the route tree only).
+**Goal:** Remove the "Automations" sidebar entry. Route `/user/automations/*` to `/user/workflows/*` via a resolver that uses the FK from Step 1 (`migrated_to_workflow_id`) to preserve deep-link bookmarks. Angular feature module code under `features/user/core/automations/` stays in place (imports removed from the route tree only).
 
-**Status:** Pending
+**Status:** COMPLETED — 2026-08-05. Backend + frontend changes shipped:
+- Sidebar hide via `core/automation/module.py` (`menu_position=None`) — the module stays in the registry so its permission keys keep registering on startup, but `ModuleRegistry.list_for_user` filters `None` out of the `/api/v1/modules` response the sidebar consumes.
+- Redirect endpoint live at `GET /api/v1/automations/triggers/{trigger_id}/migrated-workflow-id` (verified in OpenAPI post-restart); returns `{workflow_id: null}` on missing/unmigrated so the Angular resolver never has to branch on 404.
+- Four `/user/automations/*` route entries in `user.routes.ts` swapped: two static `redirectTo` (`/user/automations` → `/user/workflows`, `/user/automations/new` → `/user/workflows/new`), one component-based redirect at `/user/automations/:id` (loads `RedirectAutomationComponent` which reads the FK and navigates), one static `redirectTo` for `/user/automations/:id/runs`.
+- `RedirectAutomationComponent` shows a one-time snackbar ("Automations are now part of Workflows...") gated by `localStorage['automation-redirect-seen']` — subsequent visits redirect silently.
+- Automation feature module code under `APP/src/app/features/user/core/automations/` **untouched** per manager directive.
+- API stack restarted post-change; OpenAPI confirms new endpoint mounted; module list API no longer serves the automations descriptor.
+
+**Deviation from original plan:** Used a **component** (`RedirectAutomationComponent`) instead of a `ResolveFn` — Angular routes need something to render, and a functional resolver returning a `UrlTree` requires either a dummy component or a `canActivate` variant. Component pattern is what every other route in `user.routes.ts` uses, so this keeps the file consistent. Toast + fallback logic lives in the component's `ngOnInit`. Karma test file deferred — the project doesn't currently run Karma in CI; behaviour will be verified through the Step-4 smoke checklist against Ajay's Workspace.
 
 **Depends on:** Steps 1 + 2 (backend migrated + new seeds in place). Frontend hide before backend migration would strand users on empty redirects.
 

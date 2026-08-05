@@ -7,11 +7,17 @@ intentionally don't register themselves (double-registration
 crashes the lifespan; see the templates module post-Step-7 fix).
 
 Backend mount: ``/api/v1/automations`` (Step 3 router).
-Frontend mount: ``/user/automations`` (Step 7 list page).
+Frontend mount: NONE at the module registry level as of
+workflows-absorb-automation Step 3 (2026-08-05) — the frontend
+``/user/automations/*`` routes still exist but only as redirects to
+``/user/workflows/*``. See ``APP/src/app/features/user/user.routes.ts``.
 
-``menu_position=260`` places "Automations" right after Templates
-(250) and before Settings (600+). Logical grouping — operators
-build templates, then attach them to triggers via the editor.
+``menu_position=None`` **hides** the module from the sidebar while
+keeping it in the registry so its permission keys still register on
+startup (RBAC edits + backend router remain callable, e.g. by admin
+tooling). The workflows-absorb cutover consolidated the two lists;
+the sidebar now shows a single "Workflows" entry under the
+Automation section.
 """
 
 from __future__ import annotations
@@ -27,6 +33,6 @@ MODULE = ModuleDescriptor(
     route="/api/v1/automations",
     frontend_route="/user/automations",
     permissions=list(ALL_KEYS),
-    menu_position=700,
+    menu_position=None,
     section="Automation",
 )

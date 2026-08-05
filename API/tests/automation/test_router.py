@@ -356,6 +356,140 @@ async def test_delete_returns_204_then_404(layered_client, seeded_admin):
     assert second.status_code == 404
 
 
+# --- workflows-absorb-automation Step 3: redirect resolver -----------
+
+
+async def test_migrated_workflow_id_endpoint_returns_null_when_not_migrated(
+    layered_client, seeded_admin
+):
+    """A freshly-created trigger has no mirror workflow — endpoint
+    returns ``{workflow_id: null}`` so the Angular resolver falls back
+    to the workflows list cleanly instead of crashing."""
+    await _grant_keys(
+        seeded_admin["role"].id,
+        "automations.read",
+        "automations.write",
+        "templates.read",
+        "templates.write",
+    )
+    token = await _login(
+        layered_client,
+        org_slug=seeded_admin["org"].slug,
+        email=seeded_admin["user"].email,
+        password=seeded_admin["password"],
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    template_id = await _seed_email_template(layered_client, headers)
+    create = await layered_client.post(
+        "/api/v1/automations/triggers",
+        json={
+            "name": "Fresh trigger",
+            "event_type": "user.signed_up",
+            "channel": "email",
+            "template_id": template_id,
+        },
+        headers=headers,
+    )
+    trigger_id = create.json()["id"]
+
+    resp = await layered_client.get(
+        f"/api/v1/automations/triggers/{trigger_id}/migrated-workflow-id",
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"workflow_id": None}
+
+
+async def test_migrated_workflow_id_endpoint_returns_workflow_id_when_fk_set(
+    layered_client, seeded_admin
+):
+    """When the Step-1 migration's FK is populated, the endpoint
+    returns the workflow_id so the resolver can navigate the user to
+    the exact workflow that replaced their automation."""
+    from tests.conftest import TestSession
+
+    await _grant_keys(
+        seeded_admin["role"].id,
+        "automations.read",
+        "automations.write",
+        "templates.read",
+        "templates.write",
+    )
+    token = await _login(
+        layered_client,
+        org_slug=seeded_admin["org"].slug,
+        email=seeded_admin["user"].email,
+        password=seeded_admin["password"],
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    template_id = await _seed_email_template(layered_client, headers)
+    create = await layered_client.post(
+        "/api/v1/automations/triggers",
+        json={
+            "name": "Migrated trigger",
+            "event_type": "user.signed_up",
+            "channel": "email",
+            "template_id": template_id,
+        },
+        headers=headers,
+    )
+    trigger_id = create.json()["id"]
+
+    # Simulate Step-1 migration: create a mirror workflow + link its
+    # id back onto the automation trigger via raw SQL. Bypasses the
+    # runtime seeder because we're only exercising the redirect
+    # endpoint contract.
+    fake_workflow_id = str(uuid.uuid4())
+    from sqlalchemy import text as _sql_text
+
+    async with TestSession() as _session:
+        await _session.execute(
+            _sql_text(
+                """
+                INSERT INTO tbl_workflows
+                    (id, org_id, name, category, status, current_version,
+                     re_enrollment_rule, is_marketing, is_system_default,
+                     graph, cost_per_run_cents, enabled_event_types,
+                     ab_test_min_runs_per_variant, ab_test_winner_metric,
+                     cached_running_count, cached_completed_today_count,
+                     created_at, updated_at)
+                VALUES
+                    (CAST(:wf AS UUID), CAST(:org AS UUID), :name,
+                     'Migrated Automation',
+                     CAST('active' AS workflow_status), 1,
+                     CAST('once' AS workflow_re_enrollment_rule),
+                     false, false,
+                     '{"nodes": [], "edges": []}'::jsonb, 0,
+                     CAST('{}' AS TEXT[]),
+                     50, CAST('goal_conversion' AS ab_winner_metric),
+                     0, 0,
+                     now(), now())
+                """
+            ),
+            {
+                "wf": fake_workflow_id,
+                "org": str(seeded_admin["org"].id),
+                "name": f"Mirror-{uuid.uuid4().hex[:6]}",
+            },
+        )
+        await _session.execute(
+            _sql_text(
+                "UPDATE tbl_automation_triggers "
+                "SET migrated_to_workflow_id = CAST(:wf AS UUID) "
+                "WHERE id = CAST(:tid AS UUID)"
+            ),
+            {"wf": fake_workflow_id, "tid": trigger_id},
+        )
+        await _session.commit()
+
+    resp = await layered_client.get(
+        f"/api/v1/automations/triggers/{trigger_id}/migrated-workflow-id",
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"workflow_id": fake_workflow_id}
+
+
 # --- runs ------------------------------------------------------------
 
 

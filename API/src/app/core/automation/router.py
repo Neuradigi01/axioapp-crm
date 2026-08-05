@@ -53,6 +53,7 @@ from src.app.core.automation.permissions import (
 from src.app.core.automation.schemas import (
     EnumOptionOut,
     FieldValuesRequest,
+    MigratedWorkflowIdResponse,
     PreviewMatchesRequest,
     PreviewMatchesResponse,
     RunRead,
@@ -212,6 +213,28 @@ async def create_trigger_endpoint(
     except AutomationError as exc:
         raise _automation_http_map(exc) from exc
     return TriggerRead.model_validate(trigger)
+
+
+@router.get(
+    "/triggers/{trigger_id}/migrated-workflow-id",
+    response_model=MigratedWorkflowIdResponse,
+)
+async def get_migrated_workflow_id_endpoint(
+    trigger_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_READ)),
+) -> MigratedWorkflowIdResponse:
+    """workflows-absorb-automation Step 3 — resolver endpoint used by
+    the Angular ``RedirectAutomationComponent`` to bounce legacy
+    ``/user/automations/{trigger_id}`` bookmarks to
+    ``/user/workflows/{workflow_id}``. Returns ``{workflow_id: null}``
+    when the trigger is missing or predates the cutover — the caller
+    then falls back to the workflows list. Never 404s so the resolver
+    stays branchless."""
+    workflow_id = await automation_service.get_migrated_workflow_id(
+        db, org_id=user.org_id, trigger_id=trigger_id
+    )
+    return MigratedWorkflowIdResponse(workflow_id=workflow_id)
 
 
 @router.get("/triggers/{trigger_id}", response_model=TriggerRead)

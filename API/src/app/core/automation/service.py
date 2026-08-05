@@ -103,6 +103,30 @@ async def list_triggers(
     )
 
 
+async def get_migrated_workflow_id(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    trigger_id: uuid.UUID,
+) -> uuid.UUID | None:
+    """Look up the workflow id that the Step-1 migration created for
+    this trigger, if any.
+
+    Consumed by the Angular ``RedirectAutomationComponent`` (Step 3 of
+    ``tasks/workflows-absorb-automation/``) so bookmarks of the form
+    ``/user/automations/<trigger-id>`` can bounce to the equivalent
+    ``/user/workflows/<workflow-id>``. Never raises — a missing trigger
+    or an unmigrated trigger both return ``None`` so the resolver falls
+    back to the workflows list uniformly. Returns cross-tenant-safe:
+    the DAL scopes the read to ``org_id`` even though the trigger PK
+    is globally unique.
+    """
+    trigger = await data_access.get_trigger(session, org_id=org_id, trigger_id=trigger_id)
+    if trigger is None:
+        return None
+    return trigger.migrated_to_workflow_id
+
+
 # --- writes ----------------------------------------------------------
 
 
