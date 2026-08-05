@@ -363,6 +363,65 @@ async def _poll_fallback_async() -> dict[str, Any]:
     return {"enqueued": len(rows)}
 
 
+@shared_task(name="src.app.core.email.tasks.sweep_stuck_pending")
+def sweep_stuck_pending() -> dict[str, Any]:
+    """Every 60s — recover email accounts stuck in ``sync_state='pending'``
+    past the freshness window.
+
+    Why this exists: ``sync_daemon.enqueue_backfill`` is a fire-and-
+    forget wrapper — if Redis / the Celery broker was blipping during
+    the OAuth callback, the ``backfill_account.delay()`` swallows the
+    connection error + the row stays ``pending`` forever, so
+    ``resolve_org_sender`` never picks the account up + workflow email
+    sends silently skip with ``org_sender_not_configured``. Ajay's
+    Workspace hit this on 2026-08-04 (see
+    ``memory/project_workflows_absorb_automation.md``); we hand-flipped
+    his ``sync_state`` to unblock, but every future OAuth completion
+    would have the same silent-fail exposure.
+
+    Sweep logic: find every non-disconnected account still ``pending``
+    older than 5 minutes (long enough that the connect-flow's initial
+    enqueue would have completed on a healthy broker) and re-enqueue
+    backfill. The backfill task is idempotent — a duplicate on an
+    already-transitioning row is a no-op. Cap at 200/tick to bound
+    wall-clock; a healthy environment should never accumulate more
+    than a handful in a minute.
+    """
+    return asyncio.run(_sweep_stuck_pending_async())
+
+
+async def _sweep_stuck_pending_async() -> dict[str, Any]:
+    from sqlalchemy import text
+
+    from src.app.core.email.sync_daemon import enqueue_backfill
+    from src.app.shared.db import async_session
+
+    cutoff = datetime.now(UTC) - _POLL_FRESHNESS_WINDOW
+    async with async_session() as session:
+        rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT id
+                      FROM tbl_email_accounts
+                     WHERE sync_state = 'pending'
+                       AND disconnected_at IS NULL
+                       AND (connected_at IS NULL OR connected_at < :cutoff)
+                     LIMIT 200
+                    """
+                ),
+                {"cutoff": cutoff},
+            )
+        ).all()
+
+    for (aid,) in rows:
+        enqueue_backfill(aid)
+
+    if rows:
+        log.info("email.sweep_stuck_pending re-enqueued=%d", len(rows))
+    return {"enqueued": len(rows)}
+
+
 @shared_task(name="src.app.core.email.tasks.scan_renewals")
 def scan_renewals() -> dict[str, Any]:
     """Every 30 min — enqueue renewal for accounts whose
@@ -515,5 +574,6 @@ __all__ = [
     "renew_account_watch",
     "reset_daily_sent_counters",
     "scan_renewals",
+    "sweep_stuck_pending",
     "sync_account_incremental",
 ]

@@ -84,6 +84,20 @@ beat_schedule = {
         "task": "src.app.core.email.tasks.poll_fallback",
         "schedule": 60.0,
     },
+    # workflows-absorb-automation follow-up (2026-08-05) — sweep for
+    # email_accounts stuck in sync_state='pending' > 5 minutes after
+    # connect. Recovers accounts whose initial `enqueue_backfill` fired
+    # into a temporarily-blipped broker (fire-and-forget swallows the
+    # ConnectionError). Without this sweep the account sits at
+    # `pending` forever + workflow email sends skip with
+    # `org_sender_not_configured` + the operator has to click
+    # Reconnect (or admin has to hand-flip the DB row). Runs every 60s
+    # to match `email-poll-fallback`; cheap query (indexed on
+    # sync_state + partial where clause on pending).
+    "email-sweep-stuck-pending": {
+        "task": "src.app.core.email.tasks.sweep_stuck_pending",
+        "schedule": 60.0,
+    },
     # App-updates Email Step 4 — every 30 min, enqueue watch /
     # subscription renewals for accounts that haven't synced in
     # 2 days (Microsoft) / 5 days (Gmail). Cheap idempotent calls;
@@ -174,9 +188,9 @@ beat_schedule = {
     # tasks/workflows Step 18 — hourly sweep that picks A/B-test
     # winners after the holdback elapses. Inconclusive results
     # auto-extend the holdback by 50% (capped at 30 days total).
-    'workflows-evaluate-ab': {
-        'task': 'src.app.core.workflows.tasks.evaluate_ab_winners',
-        'schedule': crontab(minute=0),
+    "workflows-evaluate-ab": {
+        "task": "src.app.core.workflows.tasks.evaluate_ab_winners",
+        "schedule": crontab(minute=0),
     },
     # tasks/workflows Step 19 — refresh per-workflow
     # ``cached_running_count`` + ``cached_completed_today_count``

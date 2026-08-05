@@ -5,133 +5,136 @@
   "sidebar" to avoid churning imports across the codebase; visually
   it's a top strip.
 
-  Chip styles borrow from the AIXO reference: subtle border, active
-  pill uses `bg-accent-soft` + `text-accent`. Horizontal overflow
-  scrolls freely on mobile so an org with dozens of folders doesn't
-  break the layout.
+  Layout: the scrollable chip rail (folder list) is separate from the
+  pinned action rail on the right. Without this split the "New folder"
+  button lived inside the same overflow-x-auto container as the chips
+  and scrolled off-screen on mobile — users didn't know they had to
+  swipe left to reach it. Chip styles borrow from the AIXO reference:
+  subtle border, active pill uses `bg-accent-soft` + `text-accent`.
 -->
-<div
-  class="flex items-center gap-2 overflow-x-auto border-b border-subtle bg-surface px-4 py-2.5 md:px-6"
->
-  <span
-    class="mr-1 hidden shrink-0 text-[11px] font-semibold uppercase tracking-wider text-muted sm:inline"
-  >
-    Folder
-  </span>
+<div class="flex items-center gap-2 border-b border-subtle bg-surface px-4 py-2.5 md:px-6">
+  <div class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+    <span
+      class="mr-1 hidden shrink-0 text-[11px] font-semibold uppercase tracking-wider text-muted sm:inline"
+    >
+      Folder
+    </span>
 
-  <button
-    type="button"
-    (click)="selectAll()"
-    class="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition"
-    [class.bg-accent-soft]="selectedFolderId() === null"
-    [class.text-accent]="selectedFolderId() === null"
-    [class.border-transparent]="selectedFolderId() === null"
-    [class.border-subtle]="selectedFolderId() !== null"
-    [class.text-default]="selectedFolderId() !== null"
-    [class.hover:bg-surface-2]="selectedFolderId() !== null"
-  >
-    <lucide-icon name="list" size="12" />
-    All workflows
-  </button>
+    <button
+      type="button"
+      (click)="selectAll()"
+      class="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition"
+      [class.bg-accent-soft]="selectedFolderId() === null"
+      [class.text-accent]="selectedFolderId() === null"
+      [class.border-transparent]="selectedFolderId() === null"
+      [class.border-subtle]="selectedFolderId() !== null"
+      [class.text-default]="selectedFolderId() !== null"
+      [class.hover:bg-surface-2]="selectedFolderId() !== null"
+    >
+      <lucide-icon name="list" size="12" />
+      All workflows
+    </button>
 
-  <div
-    class="contents"
-    cdkDropList
-    cdkDropListOrientation="horizontal"
-    (cdkDropListDropped)="onDrop($event)"
-  >
-    @for (folder of topLevel(); track trackById($index, folder)) {
-      <div class="contents" cdkDrag>
-        <div
-          class="group inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition"
-          [class.bg-accent-soft]="selectedFolderId() === folder.id"
-          [class.text-accent]="selectedFolderId() === folder.id"
-          [class.border-transparent]="selectedFolderId() === folder.id"
-          [class.border-subtle]="selectedFolderId() !== folder.id"
-          [class.text-default]="selectedFolderId() !== folder.id"
-          [class.hover:bg-surface-2]="selectedFolderId() !== folder.id"
-        >
-          <lucide-icon name="folder" size="12" class="shrink-0" />
-
-          @if (editingId() === folder.id) {
-            <input
-              #renameInput
-              [value]="editingValue()"
-              (input)="onRenameInput($any($event.target).value)"
-              (blur)="commitRename(folder)"
-              (keydown.enter)="commitRename(folder)"
-              (keydown.escape)="cancelRename()"
-              class="w-28 rounded border border-subtle bg-surface px-1 py-0 text-xs focus:border-muted focus:outline-none"
-              autofocus
-            />
-          } @else {
-            <button
-              type="button"
-              (click)="select(folder.id)"
-              (dblclick)="beginRename(folder, $event)"
-              class="whitespace-nowrap"
-              [title]="folder.name + ' — double-click to rename'"
-            >
-              {{ folder.name }}
-            </button>
-            @if (canWrite()) {
-              <button
-                type="button"
-                (click)="onDelete(folder, $event)"
-                class="invisible -mr-1 rounded p-0.5 text-faint hover:text-red-500 group-hover:visible"
-                title="Delete folder"
-              >
-                <lucide-icon name="x" size="10" />
-              </button>
-            }
-          }
-        </div>
-
-        @for (child of childrenOf(folder.id); track trackById($index, child)) {
+    <div
+      class="contents"
+      cdkDropList
+      cdkDropListOrientation="horizontal"
+      (cdkDropListDropped)="onDrop($event)"
+    >
+      @for (folder of topLevel(); track trackById($index, folder)) {
+        <div class="contents" cdkDrag>
           <div
             class="group inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition"
-            [class.bg-accent-soft]="selectedFolderId() === child.id"
-            [class.text-accent]="selectedFolderId() === child.id"
-            [class.border-transparent]="selectedFolderId() === child.id"
-            [class.border-subtle]="selectedFolderId() !== child.id"
-            [class.text-default]="selectedFolderId() !== child.id"
-            [class.hover:bg-surface-2]="selectedFolderId() !== child.id"
+            [class.bg-accent-soft]="selectedFolderId() === folder.id"
+            [class.text-accent]="selectedFolderId() === folder.id"
+            [class.border-transparent]="selectedFolderId() === folder.id"
+            [class.border-subtle]="selectedFolderId() !== folder.id"
+            [class.text-default]="selectedFolderId() !== folder.id"
+            [class.hover:bg-surface-2]="selectedFolderId() !== folder.id"
           >
-            <lucide-icon name="folder" size="12" class="text-faint" />
-            <button
-              type="button"
-              (click)="select(child.id)"
-              (dblclick)="beginRename(child, $event)"
-              class="whitespace-nowrap"
-              [title]="child.name + ' — double-click to rename'"
-            >
-              {{ child.name }}
-            </button>
-            @if (canWrite()) {
+            <lucide-icon name="folder" size="12" class="shrink-0" />
+
+            @if (editingId() === folder.id) {
+              <input
+                #renameInput
+                [value]="editingValue()"
+                (input)="onRenameInput($any($event.target).value)"
+                (blur)="commitRename(folder)"
+                (keydown.enter)="commitRename(folder)"
+                (keydown.escape)="cancelRename()"
+                class="w-28 rounded border border-subtle bg-surface px-1 py-0 text-xs focus:border-muted focus:outline-none"
+                autofocus
+              />
+            } @else {
               <button
                 type="button"
-                (click)="onDelete(child, $event)"
-                class="invisible -mr-1 rounded p-0.5 text-faint hover:text-red-500 group-hover:visible"
-                title="Delete folder"
+                (click)="select(folder.id)"
+                (dblclick)="beginRename(folder, $event)"
+                class="whitespace-nowrap"
+                [title]="folder.name + ' — double-click to rename'"
               >
-                <lucide-icon name="x" size="10" />
+                {{ folder.name }}
               </button>
+              @if (canWrite()) {
+                <button
+                  type="button"
+                  (click)="onDelete(folder, $event)"
+                  class="invisible -mr-1 rounded p-0.5 text-faint hover:text-red-500 group-hover:visible"
+                  title="Delete folder"
+                >
+                  <lucide-icon name="x" size="10" />
+                </button>
+              }
             }
           </div>
-        }
-      </div>
-    }
+
+          @for (child of childrenOf(folder.id); track trackById($index, child)) {
+            <div
+              class="group inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition"
+              [class.bg-accent-soft]="selectedFolderId() === child.id"
+              [class.text-accent]="selectedFolderId() === child.id"
+              [class.border-transparent]="selectedFolderId() === child.id"
+              [class.border-subtle]="selectedFolderId() !== child.id"
+              [class.text-default]="selectedFolderId() !== child.id"
+              [class.hover:bg-surface-2]="selectedFolderId() !== child.id"
+            >
+              <lucide-icon name="folder" size="12" class="text-faint" />
+              <button
+                type="button"
+                (click)="select(child.id)"
+                (dblclick)="beginRename(child, $event)"
+                class="whitespace-nowrap"
+                [title]="child.name + ' — double-click to rename'"
+              >
+                {{ child.name }}
+              </button>
+              @if (canWrite()) {
+                <button
+                  type="button"
+                  (click)="onDelete(child, $event)"
+                  class="invisible -mr-1 rounded p-0.5 text-faint hover:text-red-500 group-hover:visible"
+                  title="Delete folder"
+                >
+                  <lucide-icon name="x" size="10" />
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
   </div>
 
   @if (canWrite()) {
     <button
       type="button"
       (click)="onNewFolder()"
-      class="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-subtle px-3 py-1 text-xs font-medium text-muted transition hover:border-muted hover:bg-surface-2 hover:text-default"
+      class="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-subtle px-2.5 py-1 text-xs font-medium text-muted transition hover:border-muted hover:bg-surface-2 hover:text-default"
       title="New folder"
+      aria-label="New folder"
     >
       <lucide-icon name="folder-plus" size="12" />
-      New folder
+      <span class="hidden sm:inline">New folder</span>
     </button>
   }
 
