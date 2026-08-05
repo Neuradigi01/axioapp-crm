@@ -40,7 +40,7 @@ import { LucideAngularModule } from 'lucide-angular';
 })
 export class MobileDateTimeComponent implements ControlValueAccessor {
   /** `[value]` binding for non-form-driven callers. */
-  readonly valueInput = input<string>('', { alias: 'value' });
+  readonly value = input<string>('');
   readonly placeholder = input<string>('Pick a date & time');
   /** Optional `min` boundary — matches `value` shape. Days before this
    *  get disabled in the calendar grid. */
@@ -62,7 +62,7 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
   private readonly writtenValue = signal<string | null>(null);
   protected readonly currentValue = computed<string>(() => {
     const w = this.writtenValue();
-    return w !== null ? w : this.valueInput();
+    return w !== null ? w : this.value();
   });
 
   private onChangeFn: (v: string) => void = () => undefined;
@@ -75,7 +75,7 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
   constructor() {
     // Mirror [value] input into writtenValue so both binding paths agree.
     effect(() => {
-      const v = this.valueInput();
+      const v = this.value();
       if (v !== this.writtenValue()) this.writtenValue.set(v);
     });
 

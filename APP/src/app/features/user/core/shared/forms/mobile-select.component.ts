@@ -108,7 +108,7 @@ export interface MobileSelectOption {
 export class MobileSelectComponent implements ControlValueAccessor {
   readonly options = input.required<ReadonlyArray<MobileSelectOption>>();
   /** `[value]` binding — used by callers who don't want a FormControl. */
-  readonly valueInput = input<string>('', { alias: 'value' });
+  readonly value = input<string>('');
   readonly placeholder = input<string>('Select…');
   readonly valueChange = output<string>();
   /** Also disable-able via a FormControl (`control.disable()`). */
@@ -124,7 +124,7 @@ export class MobileSelectComponent implements ControlValueAccessor {
   private readonly writtenValue = signal<string | null>(null);
   protected readonly currentValue = computed<string>(() => {
     const w = this.writtenValue();
-    return w !== null ? w : this.valueInput();
+    return w !== null ? w : this.value();
   });
 
   private onChangeFn: (v: string) => void = () => undefined;
@@ -134,7 +134,7 @@ export class MobileSelectComponent implements ControlValueAccessor {
     // Mirror any external `[value]` change into `writtenValue` so
     // template + form path both agree.
     effect(() => {
-      const v = this.valueInput();
+      const v = this.value();
       if (v !== this.writtenValue()) this.writtenValue.set(v);
     });
   }
