@@ -6,6 +6,7 @@ import { CallPhoneBookTabComponent } from './tabs/phone-book.component';
 import { CallTranscriptsTabComponent } from './tabs/transcripts.component';
 import { CallBookAppointmentTabComponent } from './tabs/book-appointment.component';
 import { CallAnalyticsTabComponent } from './tabs/analytics.component';
+import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 
 export type CallTabId = 'logs' | 'phone-book' | 'transcripts' | 'book-appointment' | 'analytics';
 
@@ -21,6 +22,7 @@ export type CallTabId = 'logs' | 'phone-book' | 'transcripts' | 'book-appointmen
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideAngularModule,
+    MobileSelectComponent,
     CallLogsTabComponent,
     CallPhoneBookTabComponent,
     CallTranscriptsTabComponent,
@@ -46,8 +48,20 @@ export class CallCenterPageComponent {
     { id: 'analytics', label: 'Analytics' },
   ];
 
+  /** Same tab list shaped for the mobile `<crm-mobile-select>` picker. */
+  protected readonly tabOptions: ReadonlyArray<MobileSelectOption> = this.tabs.map((t) => ({
+    value: t.id,
+    label: t.label,
+  }));
+
   protected setTab(t: CallTabId): void {
     this.activeTab.set(t);
+  }
+
+  /** Bridge from the mobile-select `valueChange` (string) to the typed
+   *  `CallTabId`. Cast is safe: options are built directly from `tabs`. */
+  protected setTabFromValue(v: string): void {
+    this.activeTab.set(v as CallTabId);
   }
 
   /** Page-header "Log call" click. Always jumps to the Logs tab first
