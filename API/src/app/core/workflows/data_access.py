@@ -1290,6 +1290,84 @@ async def count_recent_workflow_runs_for_org(
     return int(result.scalar_one())
 
 
+async def list_schedules_for_contact(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    contact_id: uuid.UUID,
+) -> list[WorkflowSchedule]:
+    """Every schedule directly pointing at a contact. Step 6 uses this
+    on contact hard-delete to enumerate schedules the operator's owner
+    needs to be told about before the FK's SET NULL fires."""
+    result = await session.execute(
+        select(WorkflowSchedule).where(
+            WorkflowSchedule.org_id == org_id,
+            WorkflowSchedule.contact_id == contact_id,
+        )
+    )
+    return list(result.scalars().all())
+
+
+async def bump_consecutive_empty_fires(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    schedule_id: uuid.UUID,
+) -> int:
+    """Atomically increment ``consecutive_empty_fires`` and return the
+    post-increment value so the caller can check the deactivation
+    threshold without a second read."""
+    stmt = (
+        update(WorkflowSchedule)
+        .where(
+            WorkflowSchedule.id == schedule_id,
+            WorkflowSchedule.org_id == org_id,
+        )
+        .values(consecutive_empty_fires=WorkflowSchedule.consecutive_empty_fires + 1)
+        .returning(WorkflowSchedule.consecutive_empty_fires)
+    )
+    result = await session.execute(stmt)
+    row = result.first()
+    return int(row[0]) if row else 0
+
+
+async def reset_consecutive_empty_fires(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    schedule_id: uuid.UUID,
+) -> None:
+    """Zero the counter — called from the send action after a
+    successful (non-empty) send. Signals that this schedule is
+    doing something useful."""
+    await session.execute(
+        update(WorkflowSchedule)
+        .where(
+            WorkflowSchedule.id == schedule_id,
+            WorkflowSchedule.org_id == org_id,
+        )
+        .values(consecutive_empty_fires=0)
+    )
+
+
+async def list_orphan_schedules(
+    session: AsyncSession,
+    *,
+    limit: int = 100,
+) -> list[WorkflowSchedule]:
+    """Weekly-sweeper query: schedules whose parent workflow is
+    missing. FK CASCADE should prevent this from ever existing —
+    historical bugs (raw SQL delete bypassing the FK, dev-fixture
+    restore mid-migration) mean we keep the safety net."""
+    stmt = (
+        select(WorkflowSchedule)
+        .where(~select(Workflow.id).where(Workflow.id == WorkflowSchedule.workflow_id).exists())
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
 async def select_orphaned_pending_runs(
     session: AsyncSession,
     *,
@@ -1350,13 +1428,17 @@ __all__ = [
     "insert_run",
     "insert_schedule",
     "insert_step_run",
+    "bump_consecutive_empty_fires",
     "list_active_schedules_for_org",
     "list_active_workflows_for_event",
     "list_expired_waits",
     "list_folders",
+    "list_orphan_schedules",
     "list_runs",
     "list_runs_due_for_resume",
+    "list_schedules_for_contact",
     "list_schedules_for_workflow",
+    "reset_consecutive_empty_fires",
     "list_step_runs",
     "list_versions",
     "list_waits_for_run",

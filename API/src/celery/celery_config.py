@@ -233,4 +233,12 @@ beat_schedule = {
         "task": "src.app.core.tenants.tasks.sweep_orphan_pending_orgs",
         "schedule": crontab(hour=3, minute=45),
     },
+    # tasks/workflow-scheduling Step 6 — weekly cleanup for schedule
+    # rows whose parent workflow is missing. FK CASCADE should
+    # prevent it; this is the safety net for historical drift. Sunday
+    # 03:00 UTC = quietest window across the tz mix.
+    "workflows-sweep-orphan-schedules-weekly": {
+        "task": "src.app.core.workflows.tasks.sweep_orphan_schedules_weekly",
+        "schedule": crontab(hour=3, minute=0, day_of_week="sun"),
+    },
 }

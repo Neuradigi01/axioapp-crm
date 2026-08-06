@@ -71,6 +71,7 @@ def _contact_delete_conflict_detail(exc: IntegrityError, *, plural: bool) -> str
         "Delete those first, or use Anonymise to wipe PII while keeping history."
     )
 
+
 # Server-side whitelist for `?sort=`. Anything outside this set is
 # rejected at the router via FastAPI's Literal Query validation, but
 # we keep the dict here so the service can resolve the key → column
@@ -324,10 +325,43 @@ async def delete_contact(session: AsyncSession, *, contact_id: uuid.UUID) -> Non
     ``ON DELETE RESTRICT``) into a clean 409 with a hint to use
     Anonymise or delete the dependent rows first. Previous behaviour
     let the raw ``IntegrityError`` bubble up as a 500.
+
+    tasks/workflow-scheduling Step 6 — before the contact row drops,
+    every ``tbl_workflow_schedules`` row pointing at this contact is
+    deactivated with ``deactivation_reason='contact_deleted'`` +
+    audit + owner-notification. The schedule's FK is ``SET NULL``,
+    so without this pre-cascade the FK would silently orphan the
+    schedule (contact_id → NULL) and it would keep firing against
+    ``recipient_not_found``, wasting the fire budget until
+    consecutive-empty deactivation catches it 20 fires later.
     """
     contact = ensure_found(await data_access.get_contact(session, contact_id), entity="contact")
     before = _snapshot(contact)
     contact_uuid = contact.id
+    contact_org_id = contact.org_id
+
+    # Pre-cascade: deactivate schedules pointing at this contact BEFORE
+    # the row drops so the FK SET NULL doesn't leave firing orphans.
+    # ``cascade_schedules_on_contact_delete`` commits its own txn —
+    # scheduling as the source of truth persists even if the contact
+    # delete later fails (better failure mode than the reverse).
+    try:
+        from src.app.core.workflows import service as workflows_service
+
+        await workflows_service.cascade_schedules_on_contact_delete(
+            session, org_id=contact_org_id, contact_id=contact_uuid
+        )
+    except Exception:
+        # Never block the contact delete on a schedule cascade
+        # failure — the FK SET NULL still cleans up the FK; the
+        # audit + email are best-effort.
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "contacts.delete_contact schedule_cascade_failed contact=%s",
+            contact_uuid,
+        )
+
     await data_access.delete_contact_row(session, contact)
     try:
         await session.commit()

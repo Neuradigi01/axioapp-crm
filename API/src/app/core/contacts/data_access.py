@@ -235,9 +235,10 @@ async def bulk_append_tag(
         sa_update(Contact)
         .where(Contact.id.in_(ids), Contact.org_id == org_id)
         .where(~Contact.tags.contains([tag]))
-        .where(func.array_length(Contact.tags, 1).is_(None) | (
-            func.array_length(Contact.tags, 1) < max_tags
-        ))
+        .where(
+            func.array_length(Contact.tags, 1).is_(None)
+            | (func.array_length(Contact.tags, 1) < max_tags)
+        )
         .values(tags=func.array_append(Contact.tags, tag))
     )
     return int(result.rowcount or 0)
@@ -452,6 +453,12 @@ async def reassign_contact_references(
         # blocked; they were just being dropped on the floor instead
         # of following the merge.
         ("tbl_workflow_event_waits", "workflow_event_waits"),
+        # tasks/workflow-scheduling Step 6 — schedule.contact_id FK
+        # is `SET NULL` on cascade too. Without this repoint a
+        # scheduled workflow attached to the merged-away contact
+        # loses its target instead of following the merged-into
+        # primary. Every mature CRM does this.
+        ("tbl_workflow_schedules", "workflow_schedules"),
         ("tbl_fp_custom_orders", "fp_custom_orders"),
     )
     moved_lead_ids: list[uuid.UUID] = []

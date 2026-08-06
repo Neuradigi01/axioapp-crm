@@ -1718,6 +1718,263 @@ async def resume_schedule_service(
     return refreshed  # type: ignore[return-value]
 
 
+async def cascade_schedules_on_contact_delete(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    contact_id: uuid.UUID,
+) -> int:
+    """Called from ``contacts.service.delete_contact`` BEFORE the
+    contact row is dropped. Deactivates every schedule directly
+    targeting the deleted contact — the FK's ``ON DELETE SET NULL``
+    would silently orphan them otherwise (schedule fires with
+    ``contact_id = None`` → send actions skip with
+    ``recipient_not_found``, wasting the fire budget).
+
+    Writes one ``workflows.schedule_deactivated`` audit event per
+    row + notifies the workflow owner via the notifications service.
+    Returns the row count deactivated (caller may include it in the
+    contact-delete audit summary).
+
+    NOOP when the contact has no schedules — no audit, no
+    notifications."""
+    schedules = await _da.list_schedules_for_contact(session, org_id=org_id, contact_id=contact_id)
+    if not schedules:
+        return 0
+    for schedule in schedules:
+        if not schedule.active:
+            continue
+        await _da.update_schedule_fields(
+            session,
+            org_id=org_id,
+            schedule_id=schedule.id,
+            fields={
+                "active": False,
+                "deactivation_reason": DeactivationReason.contact_deleted,
+                "next_run_at": None,
+            },
+        )
+    # Commit here so the schedule rows are durably deactivated even
+    # if the caller's later delete-contact commit fails — orphan-
+    # schedule-with-live-contact is a better failure mode than
+    # deleted-contact-with-still-firing-schedule.
+    await session.commit()
+
+    for schedule in schedules:
+        await log_entity_change(
+            action="workflows.schedule_deactivated",
+            entity_type="workflow_schedule",
+            entity_id=schedule.id,
+            after={
+                "reason": DeactivationReason.contact_deleted.value,
+                "workflow_id": str(schedule.workflow_id),
+                "contact_id": str(contact_id),
+            },
+        )
+        await _notify_schedule_owner_deactivated(
+            schedule,
+            reason=DeactivationReason.contact_deleted,
+        )
+    return len(schedules)
+
+
+async def deactivate_schedule_for_empty_fires(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    schedule_id: uuid.UUID,
+) -> None:
+    """Called from the schedule dispatch loop when
+    ``consecutive_empty_fires`` reaches the deactivation threshold
+    (README locked decision: 20). Writes the audit + emails the
+    workflow owner so a silently-broken schedule doesn't stay
+    silently broken."""
+    schedule = await _da.get_schedule_by_id_and_org(session, org_id=org_id, schedule_id=schedule_id)
+    if schedule is None or not schedule.active:
+        return
+    await _da.update_schedule_fields(
+        session,
+        org_id=org_id,
+        schedule_id=schedule_id,
+        fields={
+            "active": False,
+            "deactivation_reason": DeactivationReason.consecutive_empty,
+            "next_run_at": None,
+        },
+    )
+    await session.commit()
+    await log_entity_change(
+        action="workflows.schedule_deactivated",
+        entity_type="workflow_schedule",
+        entity_id=schedule_id,
+        after={
+            "reason": DeactivationReason.consecutive_empty.value,
+            "consecutive_empty_fires": schedule.consecutive_empty_fires,
+        },
+    )
+    await _notify_schedule_owner_deactivated(
+        schedule,
+        reason=DeactivationReason.consecutive_empty,
+    )
+
+
+async def increment_consecutive_empty_fires_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    schedule_id: uuid.UUID,
+) -> int:
+    """Called from the send-action handler when a scheduled run
+    resolves to ``recipient_not_found`` — the closest signal to
+    "this schedule fired but reached no one". Returns the post-
+    increment value so the caller can decide whether to trigger
+    deactivation on this same fire."""
+    return await _da.bump_consecutive_empty_fires(session, org_id=org_id, schedule_id=schedule_id)
+
+
+async def reset_consecutive_empty_fires_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    schedule_id: uuid.UUID,
+) -> None:
+    """Called from the send-action handler on a successful send —
+    the schedule is doing something useful, reset the counter."""
+    await _da.reset_consecutive_empty_fires(session, org_id=org_id, schedule_id=schedule_id)
+
+
+async def reap_orphaned_pending_runs(
+    *,
+    older_than_minutes: int = 60,
+    limit: int = 100,
+) -> dict[str, int]:
+    """Beat helper — mark ``pending`` runs whose ``started_at`` is
+    older than ``older_than_minutes`` as ``errored`` with
+    ``error='orphaned_pending'``. These are runs the engine
+    committed but the celery worker died before dispatching, so no
+    subsequent hop is coming — leaving them ``pending`` forever
+    pollutes the analytics + prevents contact re-enrolment.
+
+    Called from ``sweep_waits`` after the schedule dispatch phase.
+    Rate-limited to ``limit`` reaps per tick so a large backlog
+    unwinds gradually.
+    """
+    from sqlalchemy import update as _sql_update
+
+    from src.app.shared.db import async_session
+
+    reaped = 0
+    async with async_session() as sess:
+        threshold = datetime.now(UTC) - timedelta(minutes=older_than_minutes)
+        orphans = await _da.select_orphaned_pending_runs(sess, older_than=threshold, limit=limit)
+        if not orphans:
+            return {"reaped": 0}
+        ids = [r.id for r in orphans]
+        # Batch UPDATE — one round-trip regardless of orphan count.
+        from src.app.core.workflows.models import WorkflowRun
+
+        await sess.execute(
+            _sql_update(WorkflowRun)
+            .where(WorkflowRun.id.in_(ids))
+            .values(
+                status=WorkflowRunStatus.errored,
+                error="orphaned_pending",
+                completed_at=datetime.now(UTC),
+            )
+        )
+        await sess.commit()
+        reaped = len(ids)
+        for r in orphans:
+            logger.warning(
+                "workflows.reap_orphan run=%s org=%s workflow=%s",
+                r.id,
+                r.org_id,
+                r.workflow_id,
+            )
+    return {"reaped": reaped}
+
+
+async def sweep_orphan_schedules() -> dict[str, int]:
+    """Weekly beat helper — schedule rows whose parent workflow row
+    is missing. FK CASCADE should prevent this from ever existing;
+    this is a safety net for historical bugs (dev fixtures restored
+    mid-migration, raw SQL delete bypassing FK). Logs findings +
+    writes one audit event per orphan; does NOT auto-delete — the
+    operator makes that call.
+    """
+    from src.app.shared.db import async_session
+
+    async with async_session() as sess:
+        orphans = await _da.list_orphan_schedules(sess, limit=500)
+    if orphans:
+        logger.warning("workflows.sweep_orphan_schedules found %d orphan(s)", len(orphans))
+        for s in orphans:
+            await log_entity_change(
+                action="workflows.schedule_orphaned",
+                entity_type="workflow_schedule",
+                entity_id=s.id,
+                after={
+                    "workflow_id": str(s.workflow_id),
+                    "org_id": str(s.org_id),
+                    "note": (
+                        "schedule row exists but parent workflow is missing; "
+                        "FK CASCADE should have dropped it — historical drift"
+                    ),
+                },
+            )
+    return {"found": len(orphans)}
+
+
+async def _notify_schedule_owner_deactivated(
+    schedule: WorkflowSchedule,
+    *,
+    reason: DeactivationReason,
+) -> None:
+    """Best-effort — email + in-app notification to the schedule's
+    creator (or the workflow's owner if creator is null). NEVER
+    raises — a notifications outage must not prevent the schedule
+    deactivation from committing.
+
+    Natural exhaustion (``ended`` / ``max_runs`` / ``end_at``) is
+    expected — no notification. Every other reason emails so the
+    operator sees the silent-off state."""
+    natural_exhaustion = {
+        DeactivationReason.ended,
+        DeactivationReason.max_runs,
+        DeactivationReason.end_at,
+    }
+    if reason in natural_exhaustion:
+        return
+    if schedule.created_by_user_id is None:
+        return
+    try:
+        from src.app.core.notifications import service as notifications_service
+
+        await notifications_service.notify(
+            org_id=schedule.org_id,
+            user_id=schedule.created_by_user_id,
+            type="workflow.schedule_deactivated",
+            title=f"Schedule paused: {schedule.name}",
+            body=(
+                f"Your workflow schedule '{schedule.name}' has been "
+                f"deactivated ({reason.value}). Reopen the workflow to "
+                "review + reactivate."
+            ),
+            payload={
+                "workflow_id": str(schedule.workflow_id),
+                "schedule_id": str(schedule.id),
+                "schedule_name": schedule.name,
+                "reason": reason.value,
+                "url": f"/user/workflows/{schedule.workflow_id}",
+            },
+        )
+    except Exception:  # pragma: no cover — best-effort
+        logger.exception(
+            "workflows._notify_schedule_owner_deactivated failed schedule=%s",
+            schedule.id,
+        )
+
+
 async def get_schedule_service(
     session: AsyncSession,
     *,
@@ -2305,16 +2562,22 @@ __all__ = [
     "ScheduleNotFound",
     "ScheduleValidationError",
     "archive_workflow",
+    "cascade_schedules_on_contact_delete",
     "change_status",
     "compute_next_run_at",
     "create_folder",
     "create_schedule_service",
     "create_workflow",
+    "deactivate_schedule_for_empty_fires",
     "delete_folder",
     "delete_schedule_service",
     "get_schedule_service",
+    "increment_consecutive_empty_fires_service",
     "list_schedules_for_workflow_service",
     "preview_next_fires_service",
+    "reap_orphaned_pending_runs",
+    "reset_consecutive_empty_fires_service",
+    "sweep_orphan_schedules",
     "export_workflow",
     "get_ab_stats",
     "get_workflow",

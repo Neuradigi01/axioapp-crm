@@ -2,7 +2,7 @@
 
 **Goal:** End-to-end validation of every locked decision from the README against a real org. All manual, browser-driven, using the org the manager watches (Ajay's Workspace, per memory).
 
-**Status:** Pending
+**Status:** COMPLETED (2026-08-06, 20 rows PASS · 0 FAIL · 7 SKIP against Ajay's Workspace; see [SMOKE-RESULTS.md](SMOKE-RESULTS.md). SKIPs are pytest-covered or need a live celery-beat outage the operator triggers manually.)
 
 **Depends on:** Steps 1–6 (full stack deployed)
 

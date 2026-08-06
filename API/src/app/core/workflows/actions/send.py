@@ -141,6 +141,73 @@ async def _gate_or_skip(
     return None
 
 
+async def _maybe_bump_schedule_empty_fires(session, *, run, reason: str) -> None:
+    """workflow-scheduling Step 6 — when a scheduled run resolves to
+    ``recipient_not_found`` (the closest signal to "audience empty"
+    the send layer surfaces), bump the schedule's
+    ``consecutive_empty_fires`` counter. When 20 fires in a row hit
+    that path, the service deactivates the schedule + emails the
+    workflow owner.
+
+    Best-effort — never raises into the send handler. Only fires
+    when ``run.trigger_kind == 'schedule'`` (event / manual runs
+    don't participate in the counter).
+    """
+    from src.app.core.workflows.models import TriggerKind
+    from src.app.core.workflows.service import (
+        CONSECUTIVE_EMPTY_DEACTIVATION_THRESHOLD,
+        deactivate_schedule_for_empty_fires,
+        increment_consecutive_empty_fires_service,
+    )
+
+    if reason != "recipient_not_found":
+        return
+    trigger_kind = getattr(run, "trigger_kind", None)
+    schedule_id = getattr(run, "trigger_source_id", None)
+    if trigger_kind != TriggerKind.schedule or schedule_id is None:
+        return
+    try:
+        new_count = await increment_consecutive_empty_fires_service(
+            session, org_id=run.org_id, schedule_id=schedule_id
+        )
+        await session.commit()
+        if new_count >= CONSECUTIVE_EMPTY_DEACTIVATION_THRESHOLD:
+            await deactivate_schedule_for_empty_fires(
+                session, org_id=run.org_id, schedule_id=schedule_id
+            )
+    except Exception:
+        logger.exception(
+            "workflows.send empty_fire_bump_failed run=%s schedule=%s",
+            getattr(run, "id", None),
+            schedule_id,
+        )
+
+
+async def _maybe_reset_schedule_empty_fires(session, *, run) -> None:
+    """workflow-scheduling Step 6 — after a successful send from a
+    scheduled run, reset the empty-fires counter. Signals the
+    schedule is doing something useful; the deactivation threshold
+    only trips on CONSECUTIVE empty fires."""
+    from src.app.core.workflows.models import TriggerKind
+    from src.app.core.workflows.service import reset_consecutive_empty_fires_service
+
+    trigger_kind = getattr(run, "trigger_kind", None)
+    schedule_id = getattr(run, "trigger_source_id", None)
+    if trigger_kind != TriggerKind.schedule or schedule_id is None:
+        return
+    try:
+        await reset_consecutive_empty_fires_service(
+            session, org_id=run.org_id, schedule_id=schedule_id
+        )
+        await session.commit()
+    except Exception:
+        logger.exception(
+            "workflows.send empty_fire_reset_failed run=%s schedule=%s",
+            getattr(run, "id", None),
+            schedule_id,
+        )
+
+
 async def _resolve_recipient_or_skip(
     session, *, run, node: dict[str, Any], context: dict[str, Any]
 ):
@@ -169,7 +236,17 @@ async def _resolve_recipient_or_skip(
         return None, f"unknown_resolver:{exc.name}"
 
     if not recipient:
+        # workflow-scheduling Step 6 — record the empty fire against
+        # the parent schedule (if this run was schedule-triggered).
+        # Fires deactivation at the CONSECUTIVE_EMPTY_DEACTIVATION_
+        # THRESHOLD (README-locked at 20).
+        await _maybe_bump_schedule_empty_fires(session, run=run, reason="recipient_not_found")
         return None, "recipient_not_found"
+    # Successful recipient resolution — reset the empty-fires
+    # counter so a schedule doing useful work isn't deactivated by
+    # historical empty fires. Best-effort; a failure here doesn't
+    # block the send.
+    await _maybe_reset_schedule_empty_fires(session, run=run)
     return recipient, None
 
 

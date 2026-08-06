@@ -2,7 +2,7 @@
 
 **Goal:** Close the lifecycle loops the reviewers flagged: contacts merging/deleting, sweep crashing mid-commit, schedules silently resolving to nothing, orphan rows from historical bugs. All are safety nets that fire without operator action.
 
-**Status:** Pending
+**Status:** COMPLETED (2026-08-06, contact-merge repoint via extended `_FK_TARGETS`; contact-delete cascade + audit + owner notify; orphan-run reaper wired into `sweep_waits` (100/tick); weekly `sweep_orphan_schedules_weekly` beat entry at Sun 03:00 UTC; consecutive-empty counter with 20-fire deactivation threshold in send.py's recipient-resolve path; 5-case end-to-end smoke on Ajay's org PASS incl. 11 real pre-existing orphaned runs reaped in-place; 7 pytest cases; ruff clean)
 
 **Depends on:** Step 5 (full stack operable so lifecycle can be exercised end-to-end)
 

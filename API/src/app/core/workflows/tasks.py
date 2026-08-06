@@ -117,13 +117,47 @@ async def _sweep_waits_async() -> dict[str, int]:
         logger.exception("workflows.sweep_waits schedule_sweep_failed")
         sched_stats = {"found": 0, "fired": 0, "skipped": 0, "errored": 0}
 
+    # 3. Orphan-run reaper (workflow-scheduling Step 6). Marks
+    # ``pending`` runs older than 1h as ``errored`` — the safety
+    # net for the sweep-crash-mid-commit case (README Cases §35).
+    # Rate-limited to 100 reaps per tick so a large backlog unwinds
+    # gradually. Isolated try/except so a reaper failure doesn't
+    # squash the schedule-sweep stats.
+    try:
+        reap_stats = await workflows_service.reap_orphaned_pending_runs(limit=100)
+    except Exception:
+        logger.exception("workflows.sweep_waits reaper_failed")
+        reap_stats = {"reaped": 0}
+
     return {
         **waits_stats,
         "schedules_found": sched_stats.get("found", 0),
         "schedules_fired": sched_stats.get("fired", 0),
         "schedules_skipped": sched_stats.get("skipped", 0),
         "schedules_errored": sched_stats.get("errored", 0),
+        "orphans_reaped": reap_stats.get("reaped", 0),
     }
+
+
+@_shared_task(
+    name="src.app.core.workflows.tasks.sweep_orphan_schedules_weekly",
+)
+def sweep_orphan_schedules_weekly() -> dict[str, int]:
+    """Weekly beat-scheduled cleanup (workflow-scheduling Step 6).
+
+    Finds schedule rows whose parent workflow row is missing — FK
+    CASCADE should prevent this but historical bugs (raw SQL delete
+    bypassing FK, dev-fixture restore mid-migration) leave orphans.
+    Logs findings + writes an audit row per orphan. Does NOT auto-
+    delete — the operator makes that call after reviewing the audit
+    log."""
+    return asyncio.run(_sweep_orphan_schedules_async())
+
+
+async def _sweep_orphan_schedules_async() -> dict[str, int]:
+    from src.app.core.workflows import service as workflows_service
+
+    return await workflows_service.sweep_orphan_schedules()
 
 
 @_shared_task(
