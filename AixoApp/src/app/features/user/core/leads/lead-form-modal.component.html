@@ -135,16 +135,18 @@
                   <span class="text-red-600">*</span>
                 }
               </label>
-              @if (pipeline(); as p) {
-                <select
-                  id="lf_stage"
-                  formControlName="pipeline_stage"
-                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-                >
-                  @for (s of p.stages; track s.key) {
-                    <option [value]="s.key">{{ s.name }}</option>
-                  }
-                </select>
+              @if (pipeline()) {
+                <!-- crm-mobile-select instead of native <select> so the
+                     picker renders in-DOM (dark theme, readable options,
+                     no OS-picker overflow that pushed the menu past the
+                     modal edge on mobile emulation). -->
+                <div class="mt-1">
+                  <crm-mobile-select
+                    [options]="stageSelectOptions()"
+                    [value]="standard.controls.pipeline_stage.value"
+                    (valueChange)="standard.controls.pipeline_stage.setValue($event)"
+                  />
+                </div>
               } @else {
                 <p class="mt-1 text-xs text-faint">Loading stages…</p>
               }
@@ -203,15 +205,13 @@
                   <span class="text-red-600">*</span>
                 }
               </label>
-              <input
-                id="lf_close"
-                type="date"
-                formControlName="expected_close_date"
-                min="1900-01-01"
-                max="9999-12-31"
-                [attr.placeholder]="stdField('expected_close_date')?.placeholder"
-                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-              />
+              <div class="mt-1">
+                <crm-mobile-datetime
+                  mode="date"
+                  formControlName="expected_close_date"
+                  placeholder="Pick a date"
+                />
+              </div>
               @if (
                 standard.controls.expected_close_date.touched &&
                 standard.controls.expected_close_date.invalid

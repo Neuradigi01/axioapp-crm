@@ -1,25 +1,33 @@
 <div class="p-4 md:p-6 space-y-4">
-  <header class="flex items-center justify-between">
-    <div>
-      <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+  <!--
+    Header stacks vertically on mobile: title/description first (full
+    width so the copy doesn't get squeezed to two words per line by the
+    button rail), then the actions on their own row. From sm+ it goes
+    back to the desktop layout with actions pinned to the right.
+  -->
+  <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="min-w-0">
+      <h1
+        class="font-display text-[22px] font-bold leading-tight tracking-[-0.02em] text-default md:text-[26px]"
+      >
         Contact groups
       </h1>
-      <p class="mt-1 text-[14px] text-muted">
+      <p class="mt-1 text-[13px] leading-snug text-muted md:text-[14px]">
         Saved audiences for campaign targeting. Dynamic groups re-resolve on every send; static
         groups stay frozen at creation.
       </p>
     </div>
-    <div class="flex gap-2">
+    <div class="flex flex-wrap items-center gap-2 sm:shrink-0">
       <a
         routerLink="/user/contacts"
-        class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+        class="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 sm:flex-none"
       >
         <lucide-icon name="arrow-left" class="h-4 w-4" />
         Back to contacts
       </a>
       <a
         routerLink="/user/contacts/groups/new"
-        class="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
+        class="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95 sm:flex-none"
       >
         <lucide-icon name="plus" class="h-4 w-4" />
         New group

@@ -15,6 +15,10 @@ import { catchError } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
 import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../shared/forms/mobile-select.component';
+import {
   ImportPreset,
   ImportsApiService,
   LeadImport,
@@ -53,7 +57,7 @@ const REQUIRED_TARGETS = ['contact.full_name'] as const;
   selector: 'app-import-mapping-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideAngularModule],
+  imports: [RouterLink, LucideAngularModule, MobileSelectComponent],
   templateUrl: './mapping-page.component.html',
 })
 export class MappingPageComponent {
@@ -96,6 +100,36 @@ export class MappingPageComponent {
       lead: ts.filter((t) => t.key.startsWith('lead.')),
       custom: ts.filter((t) => t.custom),
     };
+  });
+
+  /** Flattened options list for `<crm-mobile-select>` — same shape as
+   *  the native <optgroup> layout, just represented via the `group`
+   *  field on each option so a single flat list is enough. */
+  protected readonly targetOptions = computed<ReadonlyArray<MobileSelectOption>>(() => {
+    const g = this.targetGroups();
+    const out: MobileSelectOption[] = [{ value: '', label: '— Ignore —' }];
+    for (const t of g.contact) {
+      out.push({
+        value: t.key,
+        label: t.label + (t.required ? ' *' : ''),
+        group: 'Standard contact',
+      });
+    }
+    for (const t of g.lead) {
+      out.push({
+        value: t.key,
+        label: t.label + (t.required ? ' *' : ''),
+        group: 'Standard lead',
+      });
+    }
+    for (const t of g.custom) {
+      out.push({
+        value: t.key,
+        label: t.label + (t.required ? ' *' : ''),
+        group: 'Custom fields',
+      });
+    }
+    return out;
   });
 
   /** Set of target keys mapped to at least one column. */
@@ -283,6 +317,13 @@ export class MappingPageComponent {
     const select = event.target as HTMLSelectElement;
     const value = select.value || null;
     this.mapping.update((m) => ({ ...m, [csvColumn]: value }));
+  }
+
+  /** Value-only variant for `<crm-mobile-select>`. Empty string means
+   *  the operator picked "— Ignore —" — mirror the native `<select>`
+   *  behaviour of storing that as `null`. */
+  protected onMappingValue(csvColumn: string, value: string): void {
+    this.mapping.update((m) => ({ ...m, [csvColumn]: value || null }));
   }
 
   protected sampleValue(csvColumn: string): string | null {

@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 
+import { MobileDateTimeComponent } from '../forms/mobile-datetime.component';
+import { MobileSelectComponent, MobileSelectOption } from '../forms/mobile-select.component';
 import { FieldDef } from './types';
 
 /**
@@ -18,7 +20,7 @@ import { FieldDef } from './types';
   selector: 'app-field-renderer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, MobileSelectComponent, MobileDateTimeComponent],
   templateUrl: './field-renderer.component.html',
 })
 export class FieldRendererComponent {
@@ -28,6 +30,24 @@ export class FieldRendererComponent {
   readonly choices = computed<string[]>(() => this.def().options?.choices ?? []);
   readonly inputId = computed(() => `field-${this.def().field_key}`);
   readonly errorId = computed(() => `${this.inputId()}-err`);
+
+  /** `{value, label}` list for `<crm-mobile-select>`; includes the
+   *  empty-string "— Select —" placeholder as the first entry. */
+  readonly selectOptions = computed<ReadonlyArray<MobileSelectOption>>(() => [
+    { value: '', label: '— Select —' },
+    ...this.choices().map((c) => ({ value: c, label: c })),
+  ]);
+
+  /** Handler shared by `<crm-mobile-select>` and `<crm-mobile-datetime>`
+   *  — writes to the FormControl and marks it dirty + touched so
+   *  validation feedback fires immediately (mirrors the behaviour of
+   *  the native inputs the pickers replaced). */
+  protected writeValue(value: string): void {
+    const c = this.control();
+    c.setValue(value);
+    c.markAsDirty();
+    c.markAsTouched();
+  }
 
   readonly showError = computed(() => {
     const c = this.control();

@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  output,
+  signal,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -46,11 +54,27 @@ export class HeaderComponent implements OnInit {
   /** Live unread count for the bell badge. */
   protected readonly unreadCount = this.notifications.unreadCount;
 
+  /** Current tenant — drives the mobile workspace label. Desktop shows
+   *  the same info in the sidebar's workspace-switcher card. */
+  protected readonly org = this.auth.currentOrg;
+
+  /** First letter of the workspace name — accent-tinted mobile avatar. */
+  protected readonly wsInitial = computed(() => (this.org()?.name ?? 'C').charAt(0).toUpperCase());
+
   /** Current theme choice (light/dark/system) — bound to the segmented toggle. */
   protected readonly themeChoice = this.themeService.choice;
 
   protected pickTheme(c: ThemeChoice): void {
     this.themeService.set(c);
+  }
+
+  /** Mobile theme cycle: Light → Dark → System → Light. Mirrors the
+   *  three options on the desktop segmented control so mobile users
+   *  don't lose access to the "match OS" mode. */
+  protected cycleTheme(): void {
+    const next: ThemeChoice =
+      this.themeChoice() === 'light' ? 'dark' : this.themeChoice() === 'dark' ? 'system' : 'light';
+    this.themeService.set(next);
   }
 
   ngOnInit(): void {

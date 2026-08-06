@@ -27,6 +27,7 @@ import {
   UrlFilterStateDirective,
 } from '../shared/directives/url-filter-state.directive';
 import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { InrPipe } from '../shared/pipes/inr.pipe';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import {
@@ -100,6 +101,7 @@ class WalkInsListState extends ListPageState<WalkIn> {}
     PhoneLinkDirective,
     WhatsappLinkDirective,
     UrlFilterStateDirective,
+    MobileSelectComponent,
   ],
   providers: [WalkInsListState],
   templateUrl: './walk-ins.page.html',
@@ -163,6 +165,25 @@ export class WalkInsPageComponent {
     for (const u of this.users()) map.set(u.id, u.full_name);
     return map;
   });
+
+  /** `crm-mobile-select` shape for the Sort dropdown. Value =
+   *  `${sortKey}:${sortOrder}`; `setSort` splits and drives both
+   *  signals. Static list — 6 presets matching other list pages. */
+  readonly sortSelectOptions: ReadonlyArray<{ value: string; label: string }> = [
+    { value: 'time_in:desc', label: 'Newest visit' },
+    { value: 'time_in:asc', label: 'Oldest visit' },
+    { value: 'last_activity_at:desc', label: 'Recent activity' },
+    { value: 'last_activity_at:asc', label: 'Stale (oldest activity)' },
+    { value: 'created_at:desc', label: 'Newest created' },
+    { value: 'created_at:asc', label: 'Oldest created' },
+  ];
+
+  /** `crm-mobile-select` shape for the Owner filter. */
+  readonly assigneeSelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'All owners' },
+    { value: 'me', label: 'Me' },
+    ...this.users().map((u) => ({ value: u.id, label: u.full_name })),
+  ]);
 
   /** Gates the "Owner" filter dropdown. Only users with ``users.read``
    * see org-wide walk-ins (backend list endpoint clamps everyone else

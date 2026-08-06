@@ -48,25 +48,25 @@
         />
       </div>
 
-      <select
-        [value]="channelFilter()"
-        (change)="onChannelChange($any($event.target).value)"
-        class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
-      >
-        @for (opt of CHANNEL_OPTIONS; track opt.value) {
-          <option [value]="opt.value">{{ opt.label }}</option>
-        }
-      </select>
+      <!-- Channel + Status filters — crm-mobile-select instead of
+           native <select> so the picker renders in-DOM (dark theme,
+           readable at every viewport size, no OS-picker overflow on
+           mobile emulation). -->
+      <div class="min-w-[10rem]">
+        <crm-mobile-select
+          [options]="CHANNEL_OPTIONS"
+          [value]="channelFilter()"
+          (valueChange)="onChannelChange($event)"
+        />
+      </div>
 
-      <select
-        [value]="statusFilter()"
-        (change)="onStatusChange($any($event.target).value)"
-        class="rounded-lg border border-subtle bg-surface py-1.5 px-2 text-sm text-default"
-      >
-        @for (opt of STATUS_OPTIONS; track opt.value) {
-          <option [value]="opt.value">{{ opt.label }}</option>
-        }
-      </select>
+      <div class="min-w-[9rem]">
+        <crm-mobile-select
+          [options]="STATUS_OPTIONS"
+          [value]="statusFilter()"
+          (valueChange)="onStatusChange($event)"
+        />
+      </div>
 
       @if (channelFilter() || statusFilter() || debouncedSearch()) {
         <button

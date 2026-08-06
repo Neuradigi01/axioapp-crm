@@ -12,6 +12,7 @@ import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { MobileSelectComponent } from '../../shared/forms/mobile-select.component';
 import { ImportsApiService, SourcePlatform } from './imports-api.service';
 
 /**
@@ -52,7 +53,7 @@ const PLATFORMS: PlatformOption[] = [
   selector: 'app-import-upload-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideAngularModule],
+  imports: [RouterLink, LucideAngularModule, MobileSelectComponent],
   templateUrl: './upload-page.component.html',
 })
 export class UploadPageComponent {
@@ -82,6 +83,11 @@ export class UploadPageComponent {
   protected onPlatformChange(event: Event): void {
     const value = (event.target as HTMLSelectElement).value as SourcePlatform;
     this.sourcePlatform.set(value);
+  }
+
+  /** Value-only variant for `<crm-mobile-select>`. */
+  protected onPlatformValue(value: string): void {
+    this.sourcePlatform.set(value as SourcePlatform);
   }
 
   protected onNameInput(event: Event): void {

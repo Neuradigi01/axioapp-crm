@@ -75,27 +75,19 @@
         />
       </div>
     </div>
-    <div>
-      <label for="cat_category" class="sr-only">Category</label>
+    <div class="min-w-[11rem]">
+      <label class="sr-only">Category</label>
       <!-- C2 — dropdown fed by the server categories list. Free-text
            fallback (derived from loaded items) kicks in when the
            categories fetch hasn't landed yet or the org is still on
-           the pre-0163 shape. -->
-      <select
-        id="cat_category"
-        [formControl]="categoryControl"
-        class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-      >
-        <option value="">All categories</option>
-        @for (c of categoryOptions(); track c.id) {
-          <option [value]="c.name">
-            @if (c.icon_emoji) {
-              {{ c.icon_emoji }}
-            }
-            {{ c.name }}
-          </option>
-        }
-      </select>
+           the pre-0163 shape. crm-mobile-select renders in-DOM
+           (dark theme, readable options, no OS-picker overflow on
+           mobile emulation). -->
+      <crm-mobile-select
+        [options]="categorySelectOptions()"
+        [value]="categoryControl.value"
+        (valueChange)="categoryControl.setValue($event)"
+      />
     </div>
   </div>
 

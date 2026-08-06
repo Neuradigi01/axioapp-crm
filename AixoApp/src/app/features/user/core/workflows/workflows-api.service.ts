@@ -77,6 +77,11 @@ export interface WorkflowRead {
   is_system_default?: boolean;
   created_at: string;
   updated_at: string;
+  // tasks/workflow-scheduling Step 5 — populated by the list endpoint
+  // via the schedule-summary aggregate join. Optional so single-workflow
+  // GET (which doesn't compute the aggregate) can omit them.
+  active_schedule_count?: number;
+  next_scheduled_at?: string | null;
 }
 
 /** Per-row summary the list page renders. Identical shape to
@@ -94,6 +99,9 @@ export interface WorkflowListQuery {
   category?: string;
   folder_id?: string;
   q?: string;
+  /** Filter to workflows with (true) or without (false) an active
+   *  schedule. Omitted = no filter. */
+  has_schedule?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -382,6 +390,84 @@ export interface WorkflowRunDetailResponse {
   steps: WorkflowRunDetailStep[];
 }
 
+// --- tasks/workflow-scheduling Step 4: Schedules ----------------------
+
+export type ScheduleKind = 'once' | 'daily' | 'weekly' | 'monthly' | 'interval' | 'cron';
+export type OnMissedPolicy = 'skip' | 'run_once' | 'backfill_all';
+export type ConcurrencyPolicy = 'allow' | 'forbid' | 'replace';
+export type DeactivationReason =
+  | 'manual'
+  | 'ended'
+  | 'max_runs'
+  | 'end_at'
+  | 'consecutive_empty'
+  | 'recurrence_timeout'
+  | 'recurrence_invalid'
+  | 'contact_deleted'
+  | 'admin_edit_past_end_at';
+
+export interface Schedule {
+  id: string;
+  org_id: string;
+  workflow_id: string;
+  contact_id: string | null;
+  name: string;
+  schedule_kind: ScheduleKind;
+  config_json: Record<string, unknown>;
+  timezone: string;
+  starts_at: string;
+  end_at: string | null;
+  next_run_at: string | null;
+  last_run_at: string | null;
+  runs_completed: number;
+  max_runs: number | null;
+  active: boolean;
+  deactivation_reason: DeactivationReason | null;
+  on_missed: OnMissedPolicy;
+  concurrency_policy: ConcurrencyPolicy;
+  consecutive_empty_fires: number;
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScheduleCreatePayload {
+  name: string;
+  schedule_kind: ScheduleKind;
+  config_json: Record<string, unknown>;
+  timezone?: string | null;
+  starts_at: string;
+  end_at?: string | null;
+  max_runs?: number | null;
+  contact_id?: string | null;
+  on_missed?: OnMissedPolicy;
+  concurrency_policy?: ConcurrencyPolicy;
+}
+
+export interface ScheduleUpdatePayload {
+  name?: string;
+  schedule_kind?: ScheduleKind;
+  config_json?: Record<string, unknown>;
+  timezone?: string;
+  starts_at?: string;
+  end_at?: string | null;
+  max_runs?: number | null;
+  contact_id?: string | null;
+  on_missed?: OnMissedPolicy;
+  concurrency_policy?: ConcurrencyPolicy;
+}
+
+export interface SchedulePreviewPayload {
+  schedule_kind: ScheduleKind;
+  config_json: Record<string, unknown>;
+  timezone: string;
+  starts_at: string;
+}
+
+export interface SchedulePreviewResponse {
+  fires: string[];
+}
+
 // --- Step 18: A/B testing ---------------------------------------------
 
 export type ABWinnerMetric = 'goal_conversion' | 'reply_rate' | 'open_rate' | 'custom';
@@ -415,6 +501,10 @@ export interface ABStatsResponse {
 export class WorkflowsApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/workflows`;
+  // tasks/workflow-scheduling Step 4 — schedule endpoints hang off a
+  // sibling `/api/v1/schedules/*` prefix (per Step 3 wiring). The
+  // nested list/create routes live under /workflows/{id}/schedules.
+  private readonly schedulesBase = `${environment.apiBaseUrl}/schedules`;
 
   // --- Workflow CRUD ------------------------------------------------
 
@@ -424,6 +514,7 @@ export class WorkflowsApiService {
       category: query.category,
       folder_id: query.folder_id,
       q: query.q,
+      has_schedule: query.has_schedule,
       limit: query.limit,
       offset: query.offset,
     });
@@ -596,5 +687,152 @@ export class WorkflowsApiService {
 
   listRunSteps(runId: string): Observable<WorkflowStepRunRead[]> {
     return this.http.get<WorkflowStepRunRead[]>(`${this.base}/runs/${runId}/steps`);
+  }
+
+  // --- tasks/workflow-scheduling Step 4: Schedules -----------------
+
+  listSchedulesForWorkflow(workflowId: string): Observable<Schedule[]> {
+    return this.http.get<Schedule[]>(`${this.base}/${workflowId}/schedules`);
+  }
+
+  createSchedule(workflowId: string, payload: ScheduleCreatePayload): Observable<Schedule> {
+    return this.http.post<Schedule>(`${this.base}/${workflowId}/schedules`, payload);
+  }
+
+  getSchedule(scheduleId: string): Observable<Schedule> {
+    return this.http.get<Schedule>(`${this.schedulesBase}/${scheduleId}`);
+  }
+
+  /**
+   * PATCH a schedule. ``etag`` is the ``updated_at`` returned on the
+   * last GET / mutation — sent verbatim as ``If-Match``. Server 428
+   * on missing, 409 on stale. Callers should catch 409 and re-fetch.
+   */
+  updateSchedule(
+    scheduleId: string,
+    etag: string,
+    payload: ScheduleUpdatePayload,
+  ): Observable<Schedule> {
+    return this.http.patch<Schedule>(`${this.schedulesBase}/${scheduleId}`, payload, {
+      headers: { 'If-Match': etag },
+    });
+  }
+
+  deleteSchedule(scheduleId: string): Observable<void> {
+    return this.http.delete<void>(`${this.schedulesBase}/${scheduleId}`);
+  }
+
+  pauseSchedule(scheduleId: string): Observable<Schedule> {
+    return this.http.post<Schedule>(`${this.schedulesBase}/${scheduleId}/pause`, {});
+  }
+
+  resumeSchedule(scheduleId: string): Observable<Schedule> {
+    return this.http.post<Schedule>(`${this.schedulesBase}/${scheduleId}/resume`, {});
+  }
+
+  previewSchedule(payload: SchedulePreviewPayload): Observable<SchedulePreviewResponse> {
+    return this.http.post<SchedulePreviewResponse>(`${this.schedulesBase}/preview`, payload);
+  }
+
+  /**
+   * Pause every ACTIVE schedule attached to a workflow. Sequential
+   * (one POST per schedule) so per-schedule audit rows land — not a
+   * bulk DB update. Returns a summary tuple; failures are counted
+   * but don't halt the run. Emits the summary once when the loop
+   * completes.
+   */
+  pauseAllSchedulesForWorkflow(
+    workflowId: string,
+  ): Observable<{ paused: number; skipped: number; errored: number }> {
+    return new Observable((observer) => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const schedules = await new Promise<Schedule[]>((resolve, reject) => {
+            this.listSchedulesForWorkflow(workflowId).subscribe({
+              next: resolve,
+              error: reject,
+            });
+          });
+          let paused = 0;
+          let skipped = 0;
+          let errored = 0;
+          for (const s of schedules) {
+            if (cancelled) return;
+            if (!s.active) {
+              skipped += 1;
+              continue;
+            }
+            try {
+              await new Promise<Schedule>((resolve, reject) => {
+                this.pauseSchedule(s.id).subscribe({ next: resolve, error: reject });
+              });
+              paused += 1;
+            } catch {
+              errored += 1;
+            }
+          }
+          observer.next({ paused, skipped, errored });
+          observer.complete();
+        } catch (err) {
+          observer.error(err);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    });
+  }
+
+  /** Symmetric counterpart of :func:`pauseAllSchedulesForWorkflow`.
+   *  Only touches rows that are currently paused (skips ended /
+   *  naturally-exhausted rows because the service-layer resume path
+   *  would 422 them). */
+  resumeAllSchedulesForWorkflow(
+    workflowId: string,
+  ): Observable<{ resumed: number; skipped: number; errored: number }> {
+    return new Observable((observer) => {
+      let cancelled = false;
+      const terminal = new Set(['ended', 'max_runs', 'end_at']);
+      (async () => {
+        try {
+          const schedules = await new Promise<Schedule[]>((resolve, reject) => {
+            this.listSchedulesForWorkflow(workflowId).subscribe({
+              next: resolve,
+              error: reject,
+            });
+          });
+          let resumed = 0;
+          let skipped = 0;
+          let errored = 0;
+          for (const s of schedules) {
+            if (cancelled) return;
+            if (s.active) {
+              skipped += 1;
+              continue;
+            }
+            if (s.deactivation_reason && terminal.has(s.deactivation_reason)) {
+              skipped += 1;
+              continue;
+            }
+            try {
+              await new Promise<Schedule>((resolve, reject) => {
+                this.resumeSchedule(s.id).subscribe({ next: resolve, error: reject });
+              });
+              resumed += 1;
+            } catch {
+              errored += 1;
+            }
+          }
+          observer.next({ resumed, skipped, errored });
+          observer.complete();
+        } catch (err) {
+          observer.error(err);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    });
   }
 }

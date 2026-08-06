@@ -27,6 +27,7 @@ import { NodePaletteComponent } from './node-palette.component';
 import { NODE_HEIGHT, NODE_WIDTH, WorkflowNodeComponent } from './node.component';
 import { getNodeType } from './node-type-registry';
 import { SaveChangeNoteModalComponent } from './save-change-note.modal.component';
+import { SchedulesDrawerComponent } from './schedules-drawer.component';
 import { VersionHistoryDrawerComponent } from './version-history-drawer.component';
 import {
   WorkflowExportBody,
@@ -88,6 +89,7 @@ const AUTOSAVE_INTERVAL_MS = 30_000;
     NodeEditorComponent,
     NodePaletteComponent,
     SaveChangeNoteModalComponent,
+    SchedulesDrawerComponent,
     VersionHistoryDrawerComponent,
     WorkflowNodeComponent,
     WorkflowEdgeComponent,
@@ -129,6 +131,20 @@ export class WorkflowCanvasPageComponent {
   closeMobileOverlays(): void {
     this.mobilePaletteOpen.set(false);
     this.mobileInspectorOpen.set(false);
+  }
+
+  // tasks/workflow-scheduling Step 4 — schedules drawer, opened by
+  // the header calendar-clock button. Mutually exclusive with the
+  // version drawer (both share the same right-side inspector slot).
+  readonly showSchedulesDrawer = signal(false);
+  toggleSchedulesDrawer(): void {
+    this.showSchedulesDrawer.update((v) => !v);
+    if (this.showSchedulesDrawer()) {
+      this.showVersionDrawer.set(false);
+    }
+  }
+  closeSchedulesDrawer(): void {
+    this.showSchedulesDrawer.set(false);
   }
 
   // Step 17 — version history + import/export.
@@ -297,6 +313,11 @@ export class WorkflowCanvasPageComponent {
 
   toggleVersionDrawer(): void {
     this.showVersionDrawer.update((open) => !open);
+    if (this.showVersionDrawer()) {
+      // Mutual exclusion with the schedules drawer — both share the
+      // same inspector slot.
+      this.showSchedulesDrawer.set(false);
+    }
   }
 
   closeVersionDrawer(): void {

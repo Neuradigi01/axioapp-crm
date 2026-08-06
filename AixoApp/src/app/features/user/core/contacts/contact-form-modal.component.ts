@@ -19,6 +19,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { commonValidators, withRequiredIf } from '../shared/validators';
@@ -45,7 +46,13 @@ import {
   selector: 'app-contact-form-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, DynamicFormComponent, LucideAngularModule, RouterLink],
+  imports: [
+    ReactiveFormsModule,
+    DynamicFormComponent,
+    LucideAngularModule,
+    RouterLink,
+    MobileSelectComponent,
+  ],
   templateUrl: './contact-form-modal.component.html',
 })
 export class ContactFormModalComponent extends BaseFormModalComponent {
@@ -62,6 +69,13 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
 
   /** User list for the Owner dropdown. */
   protected readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
+
+  /** `crm-mobile-select` shape for the Owner picker (sentinel
+   *  "Unassigned" + one entry per active org user). */
+  protected readonly ownerSelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'Unassigned' },
+    ...this.users().map((u) => ({ value: u.id, label: u.full_name })),
+  ]);
 
   /** Live duplicate-match banner. Populated by debounced phone/email
    * watchers; the user can still save through it (legitimate cases:

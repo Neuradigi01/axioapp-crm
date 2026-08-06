@@ -63,6 +63,14 @@
           <code class="rounded bg-surface-2 px-1 py-0.5 text-[11px]">price</code> are required. Tags
           can be comma / semi-colon / pipe-separated.
         </p>
+        <p class="mt-2 text-[12px] text-emerald-500">
+          <lucide-icon name="sparkles" class="inline h-3 w-3 -translate-y-[1px]" />
+          Auto-mapping: common variants like
+          <code class="rounded bg-surface-2 px-1 text-[10px]">Product Name</code>,
+          <code class="rounded bg-surface-2 px-1 text-[10px]">MRP</code>,
+          <code class="rounded bg-surface-2 px-1 text-[10px]">Cost Price</code> are recognised
+          automatically — you don't have to rename headers first.
+        </p>
       </div>
 
       <label
@@ -272,6 +280,39 @@
             class="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400 ring-1 border-red-500/20"
           >
             {{ err }}
+          </div>
+        }
+
+        <!-- Pre-commit clarifier so the operator knows exactly what
+             happens when they click Commit — matches the contacts /
+             leads import wizards' explicit language. -->
+        @if (res.inserted === 0) {
+          <div
+            class="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"
+          >
+            <lucide-icon
+              name="alert-triangle"
+              class="mr-1 inline h-3.5 w-3.5 -translate-y-[1px]"
+              aria-hidden="true"
+            />
+            No rows can be imported. Fix the errors in your CSV and re-upload, or download the error
+            report above to see what needs correcting.
+          </div>
+        } @else if (res.errors.length > 0) {
+          <div
+            class="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-500 ring-1 border-amber-500/20"
+          >
+            <lucide-icon
+              name="alert-triangle"
+              class="mr-1 inline h-3.5 w-3.5 -translate-y-[1px]"
+              aria-hidden="true"
+            />
+            {{ res.errors.length }} row{{ res.errors.length === 1 ? '' : 's' }} won't be imported
+            (see error table above). The other {{ res.inserted }} row{{
+              res.inserted === 1 ? '' : 's'
+            }}
+            will proceed on commit. Download the errors CSV to fix and re-upload the remaining rows
+            separately.
           </div>
         }
 

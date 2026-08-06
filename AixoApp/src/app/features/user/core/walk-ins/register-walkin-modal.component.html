@@ -265,14 +265,15 @@
               Expected return date
               <span class="ml-1 text-faint">(optional)</span>
             </label>
-            <input
-              id="rw_return"
-              type="date"
-              formControlName="expected_return_date"
-              [min]="expectedReturnMin"
-              [max]="expectedReturnMax"
-              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-            />
+            <div class="mt-1">
+              <crm-mobile-datetime
+                mode="date"
+                formControlName="expected_return_date"
+                [min]="expectedReturnMin"
+                [max]="expectedReturnMax"
+                placeholder="Pick a date"
+              />
+            </div>
             @if (
               form.controls.expected_return_date.touched &&
               form.controls.expected_return_date.invalid
@@ -299,14 +300,14 @@
               Queue arrival time
               <span class="ml-1 text-faint">(optional — for wait-time analytics)</span>
             </label>
-            <input
-              id="rw_wait"
-              type="datetime-local"
-              formControlName="wait_started_at"
-              [min]="waitStartedMin"
-              [max]="waitStartedMax"
-              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-            />
+            <div class="mt-1">
+              <crm-mobile-datetime
+                formControlName="wait_started_at"
+                [min]="waitStartedMin"
+                [max]="waitStartedMax"
+                placeholder="Pick date & time"
+              />
+            </div>
             @if (form.controls.wait_started_at.touched && form.controls.wait_started_at.invalid) {
               <p class="mt-1 text-xs text-red-600">
                 @if (form.controls.wait_started_at.errors?.['invalidDateTime']; as msg) {

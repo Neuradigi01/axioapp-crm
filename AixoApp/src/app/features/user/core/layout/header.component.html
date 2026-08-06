@@ -17,10 +17,24 @@
     </kbd>
   </button>
 
+  <!-- Mobile: workspace label (initial + name) on the left. Sidebar's
+       workspace card shows the same info on desktop. -->
+  <div class="flex min-w-0 items-center gap-2 md:hidden">
+    <span
+      class="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-[8px] bg-accent-soft font-display text-[13px] font-semibold text-accent"
+      aria-hidden="true"
+    >
+      {{ wsInitial() }}
+    </span>
+    <span class="truncate text-[14px] font-semibold text-default">
+      {{ org()?.name ?? 'Core CRM' }}
+    </span>
+  </div>
+
   <!-- Mobile: compact search icon (opens the same command palette) -->
   <button
     type="button"
-    class="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[9px] border border-subtle bg-app text-muted transition hover:bg-surface-2 hover:text-default md:hidden"
+    class="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px] border border-subtle bg-app text-muted transition hover:bg-surface-2 hover:text-default md:hidden"
     (click)="openPalette.emit()"
     aria-label="Open command palette"
   >
@@ -89,6 +103,26 @@
         <lucide-icon name="monitor" class="h-3.5 w-3.5" />
       </button>
     </div>
+
+    <!-- Mobile theme cycle (Light → Dark → System → Light) -->
+    <button
+      type="button"
+      class="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[9px] border border-subtle bg-app text-muted transition hover:bg-surface-2 hover:text-default sm:hidden"
+      (click)="cycleTheme()"
+      [attr.aria-label]="'Theme: ' + themeChoice() + ' (tap to change)'"
+    >
+      @switch (themeChoice()) {
+        @case ('light') {
+          <lucide-icon name="sun" class="h-4 w-4" />
+        }
+        @case ('dark') {
+          <lucide-icon name="moon" class="h-4 w-4" />
+        }
+        @default {
+          <lucide-icon name="monitor" class="h-4 w-4" />
+        }
+      }
+    </button>
 
     <!-- My tasks (34px bordered icon button to match AIXO controls) -->
     <div class="relative">

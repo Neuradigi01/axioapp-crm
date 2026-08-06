@@ -426,44 +426,44 @@ export const userRoutes: Routes = [
           ),
       },
       {
-        // tasks/automation-engine Step 7 — single-event trigger
-        // list. Read-gated; "New automation" + inline
-        // enable/disable affordances inside the page hide for
-        // read-only Employees via the runtime permission check.
+        // tasks/workflows-absorb-automation Step 3 — the Automations
+        // module was absorbed into Workflows on 2026-08-05. The
+        // sidebar entry is hidden (module.py: menu_position=None) and
+        // every legacy /user/automations/* URL redirects into the
+        // Workflows page. The old feature components under
+        // ./core/automations/ are RETAINED, per the manager directive
+        // "do not delete or remove its code", but no route in this
+        // table loads them anymore. Step-1's data migration wrote
+        // `tbl_automation_triggers.migrated_to_workflow_id` for every
+        // pre-cutover trigger; the RedirectAutomationComponent reads
+        // that FK to preserve deep-link bookmarks.
         path: 'automations',
-        canActivate: [permissionGuard('automations.read')],
-        loadComponent: () =>
-          import('./core/automations/automations.page').then((m) => m.AutomationsPageComponent),
+        redirectTo: '/user/workflows',
+        pathMatch: 'full',
       },
       {
-        // tasks/automation-engine Step 8 — trigger editor for
-        // create (/new) + edit (/:id). Save / Save & Test inside
-        // are gated on `automations.write`; Employees see a
-        // read-only editor.
         path: 'automations/new',
-        canActivate: [permissionGuard('automations.read')],
-        loadComponent: () =>
-          import('./core/automations/editor/automation-editor.page').then(
-            (m) => m.AutomationEditorPageComponent,
-          ),
+        redirectTo: '/user/workflows/new',
+        pathMatch: 'full',
       },
       {
+        // Deep-link resolver — reads the FK via the endpoint added
+        // in Step 3 and navigates to the matching workflow's canvas,
+        // or falls back to the workflows list.
         path: 'automations/:id',
-        canActivate: [permissionGuard('automations.read')],
         loadComponent: () =>
-          import('./core/automations/editor/automation-editor.page').then(
-            (m) => m.AutomationEditorPageComponent,
+          import('./core/workflows/redirect-automation.component').then(
+            (m) => m.RedirectAutomationComponent,
           ),
       },
       {
-        // tasks/automation-engine Step 9 — per-trigger run-history
-        // page. Retry button gated on automations.write inside the
-        // component; list read gated tighter on
-        // automations.runs.read server-side.
+        // Legacy run-history URLs — no per-run ID mapping to workflow
+        // runs (the two engines wrote to separate audit tables). Bounce
+        // to the workflows list so operators can find the workflow
+        // manually.
         path: 'automations/:id/runs',
-        canActivate: [permissionGuard('automations.runs.read')],
-        loadComponent: () =>
-          import('./core/automations/runs/run-history.page').then((m) => m.RunHistoryPageComponent),
+        redirectTo: '/user/workflows',
+        pathMatch: 'full',
       },
       {
         // tasks/template-library Step 7 — channel-aware editor.

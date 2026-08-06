@@ -14,6 +14,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import { MobileSelectComponent } from '../../shared/forms/mobile-select.component';
 import {
   ContactFieldTarget,
   ContactImportCommitOut,
@@ -68,7 +69,7 @@ const ERROR_VISIBLE_LIMIT = 50;
   selector: 'app-contact-import-wizard-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideAngularModule, BulkImportOptInStepComponent],
+  imports: [RouterLink, LucideAngularModule, BulkImportOptInStepComponent, MobileSelectComponent],
   templateUrl: './import-wizard.page.html',
 })
 export class ContactImportWizardPageComponent implements OnInit {
@@ -343,6 +344,12 @@ export class ContactImportWizardPageComponent implements OnInit {
   protected onMappingChange(column: string, event: Event): void {
     const value = (event.target as HTMLSelectElement).value as ContactFieldTarget;
     this.mapping.update((m) => ({ ...m, [column]: value }));
+  }
+
+  /** Overload for `<crm-mobile-select>` which emits the string value
+   *  directly (no wrapping Event object). */
+  protected onMappingValue(column: string, value: string): void {
+    this.mapping.update((m) => ({ ...m, [column]: value as ContactFieldTarget }));
   }
 
   protected onCreateGroupChange(event: Event): void {

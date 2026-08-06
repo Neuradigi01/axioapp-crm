@@ -79,28 +79,19 @@
     }
 
     @case ('date') {
-      <input
-        [id]="inputId()"
-        type="date"
-        class="input"
-        [formControl]="control()"
-        min="1900-01-01"
-        max="9999-12-31"
-        [attr.aria-invalid]="showError() ? 'true' : null"
-        [attr.aria-describedby]="showError() ? errorId() : null"
+      <crm-mobile-datetime
+        mode="date"
+        [value]="control().value ?? ''"
+        placeholder="Pick a date"
+        (valueChange)="writeValue($event)"
       />
     }
 
     @case ('datetime') {
-      <input
-        [id]="inputId()"
-        type="datetime-local"
-        class="input"
-        [formControl]="control()"
-        min="1900-01-01T00:00"
-        max="9999-12-31T23:59"
-        [attr.aria-invalid]="showError() ? 'true' : null"
-        [attr.aria-describedby]="showError() ? errorId() : null"
+      <crm-mobile-datetime
+        [value]="control().value ?? ''"
+        placeholder="Pick date & time"
+        (valueChange)="writeValue($event)"
       />
     }
 
@@ -119,18 +110,12 @@
     }
 
     @case ('select') {
-      <select
-        [id]="inputId()"
-        class="select"
-        [formControl]="control()"
-        [attr.aria-invalid]="showError() ? 'true' : null"
-        [attr.aria-describedby]="showError() ? errorId() : null"
-      >
-        <option value="">— Select —</option>
-        @for (choice of choices(); track choice) {
-          <option [value]="choice">{{ choice }}</option>
-        }
-      </select>
+      <crm-mobile-select
+        [options]="selectOptions()"
+        [value]="control().value ?? ''"
+        placeholder="— Select —"
+        (valueChange)="writeValue($event)"
+      />
     }
 
     @case ('multiselect') {
