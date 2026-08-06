@@ -24,9 +24,10 @@
 
     <input
       type="text"
-      class="flex-1 max-w-md text-sm md:text-base font-medium bg-transparent text-default focus:outline-none focus:border-b focus:border-subtle px-1 min-w-0"
+      class="min-w-[160px] flex-1 max-w-md text-sm md:text-base font-medium bg-transparent text-default focus:outline-none focus:border-b focus:border-subtle px-1 truncate"
       [ngModel]="state.name()"
       (ngModelChange)="state.setName($event)"
+      [title]="state.name() || 'Untitled workflow'"
       placeholder="Untitled workflow"
     />
 
@@ -209,14 +210,42 @@
 
   <!-- Main 3-column layout -->
   <div class="flex-1 flex min-h-0">
-    <!-- Left palette. On desktop: always visible in-flow at 300px.
-         On mobile: fixed slide-over from the left, toggled by the header
+    <!-- Left palette. On desktop: always visible in-flow at 300px
+         (or a 40px rail when collapsed via the chevron button). On
+         mobile: fixed slide-over from the left, toggled by the header
          "layout-grid" button. -->
     <aside
-      class="fixed inset-y-0 left-0 z-40 w-[280px] max-w-[85vw] shrink-0 transform border-r border-subtle bg-surface transition-transform duration-200 ease-out md:relative md:z-auto md:w-[300px] md:translate-x-0 md:border-r-0"
+      class="fixed inset-y-0 left-0 z-40 w-[280px] max-w-[85vw] shrink-0 transform border-r border-subtle bg-surface transition-[transform,width] duration-200 ease-out md:relative md:z-auto md:translate-x-0 md:border-r-0"
       [class.-translate-x-full]="!mobilePaletteOpen()"
+      [class.md:w-[300px]]="!paletteCollapsed()"
+      [class.md:w-[40px]]="paletteCollapsed()"
     >
-      <app-node-palette (nodeAdded)="onPaletteTap($event)" />
+      @if (paletteCollapsed()) {
+        <!-- Desktop collapsed rail — click to expand. Mobile ignores
+             the collapsed state because slide-over handles it. -->
+        <button
+          type="button"
+          class="hidden md:flex h-full w-full items-start justify-center pt-3 text-muted hover:text-default hover:bg-surface-2"
+          (click)="togglePaletteCollapsed()"
+          title="Expand node palette"
+          aria-label="Expand node palette"
+        >
+          <lucide-icon name="chevron-right" class="h-4 w-4" />
+        </button>
+      } @else {
+        <div class="relative h-full">
+          <button
+            type="button"
+            class="hidden md:flex absolute top-2 right-2 z-10 h-6 w-6 items-center justify-center rounded text-faint hover:text-default hover:bg-surface-2"
+            (click)="togglePaletteCollapsed()"
+            title="Collapse palette"
+            aria-label="Collapse palette"
+          >
+            <lucide-icon name="chevron-left" class="h-3.5 w-3.5" />
+          </button>
+          <app-node-palette (nodeAdded)="onPaletteTap($event)" />
+        </div>
+      }
     </aside>
 
     <!-- Backdrop when any mobile overlay is open -->
@@ -359,66 +388,98 @@
          fixed-width right column. A future step will surface a floating
          "open inspector" toggle for mobile users. -->
     <aside
-      class="fixed inset-y-0 right-0 z-40 flex w-[380px] max-w-[85vw] shrink-0 transform flex-col border-l border-subtle bg-surface transition-transform duration-200 ease-out md:relative md:z-auto md:w-[440px] md:translate-x-0"
+      class="fixed inset-y-0 right-0 z-40 flex w-[380px] max-w-[85vw] shrink-0 transform flex-col border-l border-subtle bg-surface transition-[transform,width] duration-200 ease-out md:relative md:z-auto md:translate-x-0"
       [class.translate-x-full]="!mobileInspectorOpen()"
+      [class.md:w-[440px]]="!inspectorCollapsed()"
+      [class.md:w-[40px]]="inspectorCollapsed()"
     >
-      @if (showSchedulesDrawer() && state.workflowId(); as wfId) {
-        <app-schedules-drawer [workflowId]="wfId" (close)="closeSchedulesDrawer()" />
-      } @else if (showVersionDrawer() && state.workflowId(); as wfId) {
-        <app-version-history-drawer
-          [workflowId]="wfId"
-          [viewingVersion]="viewingVersion()"
-          (close)="closeVersionDrawer()"
-          (viewVersion)="viewHistoricalVersion($event)"
-          (backToCurrent)="backToCurrentFromVersion()"
-          (restoreVersion)="rollbackToVersion($event)"
-        />
-      } @else if (selectedNode(); as node) {
-        <app-node-editor [node]="node" (close)="state.selectNode(null)" />
+      @if (inspectorCollapsed()) {
+        <button
+          type="button"
+          class="hidden md:flex h-full w-full items-start justify-center pt-3 text-muted hover:text-default hover:bg-surface-2"
+          (click)="toggleInspectorCollapsed()"
+          title="Expand inspector"
+          aria-label="Expand inspector"
+        >
+          <lucide-icon name="chevron-left" class="h-4 w-4" />
+        </button>
       } @else {
-        <header class="px-4 py-3 border-b border-subtle flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-default">
-            @if (testFireTrace()) {
-              Test fire trace
-            } @else {
-              Inspector
-            }
-          </h3>
-        </header>
-        <div class="flex-1 overflow-y-auto px-4 py-4 text-sm text-default">
-          @if (testFireTrace(); as trace) {
-            <div class="space-y-2">
-              <p class="text-[11px] text-muted">Synthetic trace — no real sends were performed.</p>
-              @for (hop of trace.steps; track $index) {
-                <div class="border border-subtle rounded p-2 text-xs flex items-center gap-2">
-                  <span class="font-mono text-[10px] text-muted w-5">{{ $index + 1 }}.</span>
-                  <div class="flex-1 min-w-0">
-                    <div class="font-medium text-default truncate">
-                      {{ hop.node_type }}
-                    </div>
-                    @if (hop.skip_reason) {
-                      <div class="text-red-500 text-[10px]">skipped: {{ hop.skip_reason }}</div>
-                    } @else {
-                      <div class="text-emerald-400 text-[10px]">
-                        would execute
-                        @if (hop.edge_label) {
-                          — next: {{ hop.edge_label }}
-                        }
-                      </div>
-                    }
-                  </div>
-                </div>
+        <button
+          type="button"
+          class="hidden md:flex absolute top-2 left-2 z-10 h-6 w-6 items-center justify-center rounded text-faint hover:text-default hover:bg-surface-2"
+          (click)="toggleInspectorCollapsed()"
+          title="Collapse inspector"
+          aria-label="Collapse inspector"
+        >
+          <lucide-icon name="chevron-right" class="h-3.5 w-3.5" />
+        </button>
+      }
+      @if (!inspectorCollapsed()) {
+        @if (showSchedulesDrawer() && state.workflowId(); as wfId) {
+          <app-schedules-drawer
+            [workflowId]="wfId"
+            [refreshToken]="schedulesRefreshToken()"
+            (close)="closeSchedulesDrawer()"
+            (openConfig)="onScheduleConfigOpen($event)"
+          />
+        } @else if (showVersionDrawer() && state.workflowId(); as wfId) {
+          <app-version-history-drawer
+            [workflowId]="wfId"
+            [viewingVersion]="viewingVersion()"
+            (close)="closeVersionDrawer()"
+            (viewVersion)="viewHistoricalVersion($event)"
+            (backToCurrent)="backToCurrentFromVersion()"
+            (restoreVersion)="rollbackToVersion($event)"
+          />
+        } @else if (selectedNode(); as node) {
+          <app-node-editor [node]="node" (close)="state.selectNode(null)" />
+        } @else {
+          <header class="px-4 py-3 border-b border-subtle flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-default">
+              @if (testFireTrace()) {
+                Test fire trace
+              } @else {
+                Inspector
               }
-              <div class="text-[11px] text-muted pt-2">
-                Outcome: <strong>{{ trace.outcome }}</strong>
+            </h3>
+          </header>
+          <div class="flex-1 overflow-y-auto px-4 py-4 text-sm text-default">
+            @if (testFireTrace(); as trace) {
+              <div class="space-y-2">
+                <p class="text-[11px] text-muted">
+                  Synthetic trace — no real sends were performed.
+                </p>
+                @for (hop of trace.steps; track $index) {
+                  <div class="border border-subtle rounded p-2 text-xs flex items-center gap-2">
+                    <span class="font-mono text-[10px] text-muted w-5">{{ $index + 1 }}.</span>
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium text-default truncate">
+                        {{ hop.node_type }}
+                      </div>
+                      @if (hop.skip_reason) {
+                        <div class="text-red-500 text-[10px]">skipped: {{ hop.skip_reason }}</div>
+                      } @else {
+                        <div class="text-emerald-400 text-[10px]">
+                          would execute
+                          @if (hop.edge_label) {
+                            — next: {{ hop.edge_label }}
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+                <div class="text-[11px] text-muted pt-2">
+                  Outcome: <strong>{{ trace.outcome }}</strong>
+                </div>
               </div>
-            </div>
-          } @else {
-            <p class="mt-1 text-[14px] text-muted">
-              Select a node to configure it, or click <em>Test fire</em> to dry-run the workflow.
-            </p>
-          }
-        </div>
+            } @else {
+              <p class="mt-1 text-[14px] text-muted">
+                Select a node to configure it, or click <em>Test fire</em> to dry-run the workflow.
+              </p>
+            }
+          </div>
+        }
       }
     </aside>
   </div>
@@ -441,6 +502,20 @@
     (cancel)="cancelChangeNote()"
     (confirm)="confirmChangeNote($event)"
   />
+
+  <!-- tasks/workflow-scheduling Step 4 — schedule config modal.
+       Mounted here (not inside the schedules drawer) because the
+       aside uses `transform` which traps `position: fixed` inside
+       its 440px bounds — the modal would render cropped otherwise. -->
+  @if (state.workflowId(); as wfId) {
+    <app-schedule-config-modal
+      [open]="scheduleModalOpen()"
+      [workflowId]="wfId"
+      [editing]="scheduleModalEditing()"
+      (close)="onScheduleConfigClose()"
+      (saved)="onScheduleConfigSaved($event)"
+    />
+  }
 
   <!-- Step 17 — import JSON modal -->
   @if (showImportModal()) {

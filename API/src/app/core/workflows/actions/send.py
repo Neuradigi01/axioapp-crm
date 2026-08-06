@@ -53,6 +53,15 @@ from src.app.core.workflows.recipients import (
 logger = logging.getLogger(__name__)
 
 
+# Legacy UI values shipped before the frontend recipient dropdown was
+# aligned with the resolver registry. Rewrites keep old workflow JSON
+# resolving without a data migration; new writes use the canonical keys.
+_LEGACY_RECIPIENT_ALIASES: dict[str, str] = {
+    "workflow.owner.email": "user.email",
+    "lead.owner.email": "lead.owner",
+}
+
+
 # --- Internal helpers ---------------------------------------------------
 
 
@@ -224,6 +233,11 @@ async def _resolve_recipient_or_skip(
         kind = None
     if not isinstance(kind, str) or not kind:
         return None, "recipient_kind_missing"
+
+    # Legacy UI values (shipped before the frontend was aligned with the
+    # resolver registry keys). Rewrite in-place so old workflow JSON
+    # still resolves; new UI writes the canonical keys directly.
+    kind = _LEGACY_RECIPIENT_ALIASES.get(kind, kind)
 
     try:
         recipient = await resolve_recipient(kind, session, run=run, node=node, context=context)

@@ -113,12 +113,3 @@
     }
   </div>
 </div>
-
-<app-schedule-config-modal
-  [open]="modalOpen()"
-  [workflowId]="workflowId()"
-  [editing]="editingSchedule()"
-  [defaultTimezone]="defaultTimezone()"
-  (close)="closeModal()"
-  (saved)="onSaved($event)"
-/>

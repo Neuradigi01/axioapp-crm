@@ -198,16 +198,28 @@
 
         <!-- Timezone + Start / End -->
         <div class="grid grid-cols-2 gap-3">
-          <label class="block col-span-2">
+          <label class="col-span-2 block">
             <span class="mb-1 block text-[11px] font-medium text-muted">Timezone</span>
-            <select
+            <!-- Native searchable combobox — `<datalist>` gives browsers
+                 built-in type-ahead filtering across the 400+ IANA
+                 zones. Type "kolkata" / "kol" / "asia/kol" and the
+                 browser narrows the list. No JS needed. -->
+            <input
+              type="text"
               formControlName="timezone"
+              list="crm-schedule-timezones"
+              autocomplete="off"
+              placeholder="Type to search — e.g. Asia/Kolkata"
               class="w-full rounded border border-subtle bg-surface px-2 py-1.5 text-sm text-default"
-            >
+            />
+            <datalist id="crm-schedule-timezones">
               @for (tz of timezoneOptions(); track tz) {
-                <option [value]="tz">{{ tz }}</option>
+                <option [value]="tz"></option>
               }
-            </select>
+            </datalist>
+            <span class="mt-1 block text-[10px] text-faint">
+              Any IANA timezone. Type to filter.
+            </span>
           </label>
           <label class="block">
             <span class="mb-1 block text-[11px] font-medium text-muted">Starts at</span>

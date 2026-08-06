@@ -1105,11 +1105,20 @@ async def assemble_funnel(
         )
     ).all()
 
-    # Per-stage lead counts + budget totals within the range. Grouped
-    # by the stage's stable key (the column leads actually store) so
-    # the two-dict lookup below is a direct hit. Budget nulls fold to
-    # 0 via `coalesce` so the sum column is always a real number the
-    # dashboard's Deal Pipeline strip can render as currency.
+    # Per-stage lead counts + budget totals — a live snapshot of the
+    # CURRENT pipeline state, NOT range-filtered. The dashboard's Deal
+    # Pipeline strip is a "what's sitting in each stage right now"
+    # widget (matches HubSpot / Salesforce / Pipedrive convention). A
+    # `created_at >= start` filter here hid leads created before the
+    # range even when they were actively sitting in a stage today —
+    # the widget then read "0 New / 1 Contacted" while the leads page
+    # actually showed dozens of active leads. Range still applies to
+    # `won_count` / `lost_count` below (those are period outcomes) and
+    # `total_leads_in_range` (that label explicitly says so). Grouped by
+    # the stage's stable key (the column leads actually store) so the
+    # two-dict lookup below is a direct hit. Budget nulls fold to 0 via
+    # `coalesce` so the sum column is always a real number the strip
+    # can render as currency.
     lead_stmt = (
         select(
             Lead.pipeline_stage,
@@ -1118,7 +1127,6 @@ async def assemble_funnel(
         )
         .where(
             Lead.org_id == org_id,
-            Lead.created_at >= start,
             Lead.status == LeadStatus.active,
         )
         .group_by(Lead.pipeline_stage)

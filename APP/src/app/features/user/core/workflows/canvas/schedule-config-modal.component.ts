@@ -67,9 +67,16 @@ const SCHEDULE_KIND_OPTIONS: ReadonlyArray<{ value: ScheduleKind; label: string 
 ];
 
 function localIsoNowPlus(minutes: number): string {
+  // <input type="datetime-local"> is naive-local time (no tz). Build
+  // in local time so the display matches the operator's wall clock —
+  // `.toISOString()` would emit UTC and pre-shift the value by the
+  // browser's tz offset.
   const d = new Date(Date.now() + minutes * 60 * 1000);
-  // <input type="datetime-local"> wants YYYY-MM-DDTHH:MM (no seconds, no tz).
-  return d.toISOString().slice(0, 16);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
 }
 
 function toIsoUtc(dateTimeLocal: string): string {

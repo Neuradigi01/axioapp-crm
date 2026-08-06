@@ -17,8 +17,6 @@ import { extractApiError } from '@core/services/api-error.util';
 
 import { Schedule, WorkflowsApiService } from '../workflows-api.service';
 
-import { ScheduleConfigModalComponent } from './schedule-config-modal.component';
-
 /**
  * Right-side drawer for the workflow canvas — lists schedules
  * attached to the current workflow. Add button opens the config
@@ -31,7 +29,7 @@ import { ScheduleConfigModalComponent } from './schedule-config-modal.component'
 @Component({
   selector: 'app-schedules-drawer',
   standalone: true,
-  imports: [CommonModule, DatePipe, LucideAngularModule, ScheduleConfigModalComponent],
+  imports: [CommonModule, DatePipe, LucideAngularModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './schedules-drawer.component.html',
 })
@@ -41,21 +39,30 @@ export class SchedulesDrawerComponent {
 
   readonly workflowId = input.required<string>();
   readonly defaultTimezone = input<string>('UTC');
+  /** Ticks up when the parent finishes a save; drawer re-fetches. */
+  readonly refreshToken = input<number>(0);
 
   readonly close = output<void>();
+  /** Emit when the operator wants to create or edit a schedule.
+   *  Parent (workflow-canvas.page) mounts the modal at the top level
+   *  so `position: fixed` inside it is viewport-relative (the aside
+   *  container uses `transform`, which would otherwise trap fixed
+   *  positioning to the drawer's 440px width). */
+  readonly openConfig = output<Schedule | null>();
 
   readonly schedules = signal<Schedule[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly deletingId = signal<string | null>(null);
 
-  readonly modalOpen = signal(false);
-  readonly editingSchedule = signal<Schedule | null>(null);
-
   constructor() {
     effect(() => {
       const id = this.workflowId();
       if (!id) return;
+      // Re-fetch on workflow change AND when the parent bumps
+      // ``refreshToken`` (after a save closes the modal).
+      const _ = this.refreshToken();
+      void _;
       this.fetch();
     });
   }
@@ -79,30 +86,11 @@ export class SchedulesDrawerComponent {
   }
 
   openAdd(): void {
-    this.editingSchedule.set(null);
-    this.modalOpen.set(true);
+    this.openConfig.emit(null);
   }
 
   openEdit(s: Schedule): void {
-    this.editingSchedule.set(s);
-    this.modalOpen.set(true);
-  }
-
-  closeModal(): void {
-    this.modalOpen.set(false);
-    this.editingSchedule.set(null);
-  }
-
-  onSaved(saved: Schedule): void {
-    // Merge into the list — replace when editing, prepend when
-    // creating. Then close the modal.
-    const existing = this.schedules().find((s) => s.id === saved.id);
-    if (existing) {
-      this.schedules.set(this.schedules().map((s) => (s.id === saved.id ? saved : s)));
-    } else {
-      this.schedules.set([...this.schedules(), saved]);
-    }
-    this.closeModal();
+    this.openConfig.emit(s);
   }
 
   onDelete(s: Schedule): void {

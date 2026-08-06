@@ -1143,7 +1143,12 @@ def _validate_config_and_bounds(
     surfaces verbatim as the 422 ``detail``."""
     _validate_timezone(tz_name)
 
-    if starts_at < now:
+    # Accept `starts_at` up to 5 minutes in the past so the natural
+    # form-fill / network latency between "operator clicks now-ish"
+    # and the server receiving the POST doesn't 422 (README Cases
+    # §7). Anything older than 5 min is a genuine mistake (or a
+    # form that sat open all day).
+    if starts_at < now - timedelta(minutes=5):
         raise ScheduleValidationError("start time is in the past")
     if end_at is not None and end_at < starts_at:
         raise ScheduleValidationError("end time must be after start time")
