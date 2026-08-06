@@ -126,6 +126,12 @@ SEQUENCE_COMPLETED = "sequence.completed"
 TIME_DAILY_TICK = "time.daily_tick"
 
 
+# --- Workflow lifecycle --------------------------------------------------
+# (``tasks/workflow-scheduling`` Step 2 — dual-dispatch observability.)
+
+WORKFLOW_SCHEDULE_FIRED = "workflow.schedule_fired"
+
+
 # --- Canonical ordered list + helper -------------------------------------
 
 
@@ -196,6 +202,8 @@ ALL_EVENTS: tuple[str, ...] = (
     SEQUENCE_COMPLETED,
     # Time-based
     TIME_DAILY_TICK,
+    # Workflow lifecycle
+    WORKFLOW_SCHEDULE_FIRED,
 )
 
 
@@ -262,6 +270,11 @@ EVENT_DESCRIPTIONS: dict[str, str] = {
     CAMPAIGN_COMPLETED: "A campaign run completes (all chunks dispatched).",
     SEQUENCE_COMPLETED: "An email sequence enrolment reaches the final step.",
     TIME_DAILY_TICK: "Org-local midnight tick — daily-cadence workflows hook here.",
+    WORKFLOW_SCHEDULE_FIRED: (
+        "A workflow schedule fired — observability hook for audit / reporting. "
+        "The workflow run itself is dispatched directly by the sweep; this event "
+        "is broadcast so cross-cutting subscribers can react."
+    ),
 }
 
 
@@ -336,6 +349,7 @@ __all__ = [
     "WALK_IN_REGISTERED",
     "WHATSAPP_MESSAGE_RECEIVED",
     "WHATSAPP_TEMPLATE_REPLIED",
+    "WORKFLOW_SCHEDULE_FIRED",
     "is_known_event",
     "list_descriptions",
 ]

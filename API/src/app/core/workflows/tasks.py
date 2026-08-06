@@ -83,18 +83,47 @@ async def _process_step_async(run_id: str) -> dict[str, Any]:
     name="src.app.core.workflows.tasks.sweep_waits",
 )
 def sweep_waits() -> dict[str, int]:
-    """Beat-scheduled (60s cadence). Pulls pending runs whose
-    ``next_step_at <= now()`` and re-dispatches
-    :func:`process_step` for each. The dispatcher's ``FOR UPDATE
-    SKIP LOCKED`` row lock handles the case where the sweep fires
-    while a worker is already processing the same run."""
+    """Beat-scheduled (60s cadence). Two responsibilities in one tick:
+
+    1. Wait-node resume: pulls pending runs whose ``next_step_at
+       <= now()`` and re-dispatches :func:`process_step` for each.
+       The dispatcher's ``FOR UPDATE SKIP LOCKED`` row lock handles
+       the case where the sweep fires while a worker is already
+       processing the same run.
+    2. Schedule fires: pulls due rows from ``tbl_workflow_schedules``
+       and dispatches each via ``service.sweep_due_schedules`` inside
+       its own savepoint. Extended in ``tasks/workflow-scheduling``
+       Step 2 — sharing this task keeps the beat entry count at one
+       and the operational lock discipline unified.
+    """
     return asyncio.run(_sweep_waits_async())
 
 
 async def _sweep_waits_async() -> dict[str, int]:
     from src.app.core.workflows import engine
+    from src.app.core.workflows import service as workflows_service
 
-    return await engine.resume_after_wait()
+    # 1. Wait-node resume — unchanged from pre-Step-2 behaviour.
+    waits_stats = await engine.resume_after_wait()
+
+    # 2. Schedule fires. Isolated from wait-resume: an exception here
+    # is logged but not re-raised so the tick still counts the wait
+    # resumes it did. sweep_due_schedules already savepoints per row
+    # internally; a top-level raise would only happen on session /
+    # DB failure, which the beat retry handles.
+    try:
+        sched_stats = await workflows_service.sweep_due_schedules()
+    except Exception:
+        logger.exception("workflows.sweep_waits schedule_sweep_failed")
+        sched_stats = {"found": 0, "fired": 0, "skipped": 0, "errored": 0}
+
+    return {
+        **waits_stats,
+        "schedules_found": sched_stats.get("found", 0),
+        "schedules_fired": sched_stats.get("fired", 0),
+        "schedules_skipped": sched_stats.get("skipped", 0),
+        "schedules_errored": sched_stats.get("errored", 0),
+    }
 
 
 @_shared_task(
@@ -190,9 +219,7 @@ async def _evaluate_ab_winners_async() -> dict[str, Any]:
         pairs = await ab_testing.list_pairs_due_for_decision(session)
         for wf in pairs:
             try:
-                outcome = await ab_testing.evaluate_pair_for_decision(
-                    session, workflow=wf
-                )
+                outcome = await ab_testing.evaluate_pair_for_decision(session, workflow=wf)
                 await session.commit()
                 if outcome.get("status") == "decided":
                     decisions += 1
@@ -200,9 +227,7 @@ async def _evaluate_ab_winners_async() -> dict[str, Any]:
                 elif outcome.get("status") == "extended":
                     extensions += 1
             except Exception:
-                logger.exception(
-                    "workflows.evaluate_ab_winners failed workflow=%s", wf.id
-                )
+                logger.exception("workflows.evaluate_ab_winners failed workflow=%s", wf.id)
                 errors += 1
                 try:
                     await session.rollback()
@@ -278,9 +303,7 @@ async def _refresh_cached_counters_async() -> dict[str, Any]:
     from src.app.core.workflows import data_access as _wf_da
     from src.app.shared.db import async_session
 
-    today_midnight_utc = datetime.now(UTC).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    today_midnight_utc = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     async with async_session() as session:
         try:
             updated = await _wf_da.refresh_cached_counters(

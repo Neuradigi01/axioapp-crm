@@ -28,25 +28,39 @@ exception path. Until Step 12 lands the hook is a no-op.
 
 from __future__ import annotations
 
+import logging
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Literal
+from datetime import UTC, datetime, timedelta
+from typing import Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 
+from croniter import CroniterBadCronError, CroniterBadDateError, croniter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.workflows import data_access as _da
+from src.app.core.workflows._croniter_timeout import (
+    RecurrenceTimeout,
+    run_with_timeout,
+)
 from src.app.core.workflows.exceptions import (
     DuplicateWorkflowName,
     FolderHasWorkflows,
+    InvalidGraph,
     WorkflowLocked,
     WorkflowNotFound,
 )
-from src.app.shared.audit import log_entity_change
 from src.app.core.workflows.graph import validate_graph_with_db
 from src.app.core.workflows.models import (
+    ConcurrencyPolicy,
+    DeactivationReason,
+    OnMissedPolicy,
+    ScheduleKind,
+    TriggerKind,
     Workflow,
     WorkflowFolder,
     WorkflowReEnrollmentRule,
+    WorkflowRunStatus,
+    WorkflowSchedule,
     WorkflowStatus,
     WorkflowVersion,
 )
@@ -56,6 +70,9 @@ from src.app.core.workflows.schemas import (
     WorkflowGraph,
     WorkflowUpdate,
 )
+from src.app.shared.audit import log_entity_change
+
+logger = logging.getLogger(__name__)
 
 # Status transitions the service allows. Any transition not in
 # this set raises a :class:`ValueError` — the router maps to 409.
@@ -220,9 +237,7 @@ async def update_workflow(
     # the SPA can render. RLS keeps ``get_folder`` scoped to the
     # caller's tenant, so a cross-org uuid returns None.
     if "folder_id" in changes and changes["folder_id"] is not None:
-        target_folder = await _da.get_folder(
-            session, org_id=org_id, folder_id=changes["folder_id"]
-        )
+        target_folder = await _da.get_folder(session, org_id=org_id, folder_id=changes["folder_id"])
         if target_folder is None:
             raise WorkflowNotFound(f"folder {changes['folder_id']} not found")
 
@@ -402,9 +417,7 @@ async def archive_workflow(
     Operator can pause + edit them but not remove. Re-installing
     requires the seeder, which is operator-only via the backfill
     migration."""
-    workflow = await get_workflow(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
+    workflow = await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
     if workflow.is_system_default:
         raise WorkflowLocked(
             "cannot archive a system-default workflow — pause it "
@@ -777,55 +790,37 @@ async def pair_for_ab(
     from src.app.core.workflows.models import ABWinnerMetric
 
     if workflow_id == sibling_id:
-        raise InvalidGraph(
-            "A/B pair refused: workflow can't pair with itself"
-        )
+        raise InvalidGraph("A/B pair refused: workflow can't pair with itself")
 
-    primary = await get_workflow(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
-    sibling = await get_workflow(
-        session, org_id=org_id, workflow_id=sibling_id
-    )
+    primary = await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
+    sibling = await get_workflow(session, org_id=org_id, workflow_id=sibling_id)
 
     if primary.status != WorkflowStatus.draft:
         raise InvalidGraph(
-            f"A/B pair refused: primary workflow is "
-            f"'{primary.status.value}', expected 'draft'"
+            f"A/B pair refused: primary workflow is '{primary.status.value}', expected 'draft'"
         )
     if sibling.status != WorkflowStatus.draft:
         raise InvalidGraph(
-            f"A/B pair refused: sibling workflow is "
-            f"'{sibling.status.value}', expected 'draft'"
+            f"A/B pair refused: sibling workflow is '{sibling.status.value}', expected 'draft'"
         )
-    if (
-        primary.ab_paired_workflow_id is not None
-        or sibling.ab_paired_workflow_id is not None
-    ):
-        raise InvalidGraph(
-            "A/B pair refused: one of the workflows is already paired"
-        )
+    if primary.ab_paired_workflow_id is not None or sibling.ab_paired_workflow_id is not None:
+        raise InvalidGraph("A/B pair refused: one of the workflows is already paired")
 
     primary_events = set(primary.enabled_event_types or [])
     sibling_events = set(sibling.enabled_event_types or [])
     if not primary_events or primary_events != sibling_events:
         raise InvalidGraph(
-            "A/B pair refused: both workflows must share the same "
-            "trigger event_type(s)"
+            "A/B pair refused: both workflows must share the same trigger event_type(s)"
         )
     if primary.goal_node_id is None or sibling.goal_node_id is None:
-        raise InvalidGraph(
-            "A/B pair refused: both workflows must define a goal node"
-        )
+        raise InvalidGraph("A/B pair refused: both workflows must define a goal node")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     holdback_until = now + timedelta(seconds=holdback_seconds)
     chosen_metric = ABWinnerMetric(metric)
 
     for wf in (primary, sibling):
-        wf.ab_paired_workflow_id = (
-            sibling.id if wf.id == primary.id else primary.id
-        )
+        wf.ab_paired_workflow_id = sibling.id if wf.id == primary.id else primary.id
         wf.ab_test_started_at = now
         wf.ab_test_holdback_until = holdback_until
         wf.ab_test_winner_metric = chosen_metric
@@ -855,17 +850,11 @@ async def unpair_ab(
     pointers + holdback metadata are cleared. In-flight runs
     continue to completion.
     """
-    primary = await get_workflow(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
+    primary = await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
     sibling_id = primary.ab_paired_workflow_id
     if sibling_id is None:
-        raise InvalidGraph(
-            "A/B unpair refused: workflow isn't part of an A/B test"
-        )
-    sibling = await _da.get_workflow(
-        session, org_id=org_id, workflow_id=sibling_id
-    )
+        raise InvalidGraph("A/B unpair refused: workflow isn't part of an A/B test")
+    sibling = await _da.get_workflow(session, org_id=org_id, workflow_id=sibling_id)
 
     for wf in (primary, sibling):
         if wf is None:
@@ -896,26 +885,16 @@ async def get_ab_stats(
     """
     from src.app.core.workflows import ab_testing
 
-    primary = await get_workflow(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
+    primary = await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
     sibling_id = primary.ab_paired_workflow_id
     if sibling_id is None:
-        raise InvalidGraph(
-            "A/B stats refused: workflow isn't part of an A/B test"
-        )
-    sibling = await _da.get_workflow(
-        session, org_id=org_id, workflow_id=sibling_id
-    )
+        raise InvalidGraph("A/B stats refused: workflow isn't part of an A/B test")
+    sibling = await _da.get_workflow(session, org_id=org_id, workflow_id=sibling_id)
     if sibling is None:
-        raise InvalidGraph(
-            "A/B stats: sibling workflow is missing — was it deleted?"
-        )
+        raise InvalidGraph("A/B stats: sibling workflow is missing — was it deleted?")
 
     a_workflow, b_workflow = (
-        (primary, sibling)
-        if str(primary.id) < str(sibling.id)
-        else (sibling, primary)
+        (primary, sibling) if str(primary.id) < str(sibling.id) else (sibling, primary)
     )
     min_runs = max(
         primary.ab_test_min_runs_per_variant or 50,
@@ -962,9 +941,7 @@ async def get_workflow_analytics(
     + delegates to :mod:`core.workflows.analytics`."""
     from src.app.core.workflows import analytics as _analytics
 
-    workflow = await get_workflow(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
+    workflow = await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
     return await _analytics.compute_workflow_metrics(
         session,
         org_id=org_id,
@@ -984,9 +961,7 @@ async def get_workflow_daily_rate(
     """Daily sparkline series."""
     from src.app.core.workflows import analytics as _analytics
 
-    workflow = await get_workflow(
-        session, org_id=org_id, workflow_id=workflow_id
-    )
+    workflow = await get_workflow(session, org_id=org_id, workflow_id=workflow_id)
     return await _analytics.compute_daily_rate(
         session,
         org_id=org_id,
@@ -1010,32 +985,21 @@ async def get_run_detail(
         WorkflowStepRunRead,
     )
 
-    pair = await _da.get_run_with_workflow(
-        session, org_id=org_id, run_id=run_id
-    )
+    pair = await _da.get_run_with_workflow(session, org_id=org_id, run_id=run_id)
     if pair is None:
         raise WorkflowNotFound(f"run {run_id} not found")
     run, workflow = pair
-    step_runs = await _da.list_step_runs(
-        session, org_id=org_id, run_id=run_id
-    )
+    step_runs = await _da.list_step_runs(session, org_id=org_id, run_id=run_id)
     nodes_by_id = workflow.graph_nodes_by_id
     enriched_steps = []
     for step in step_runs:
         node = nodes_by_id.get(step.node_id) or {}
         config = node.get("config") or {}
-        label = (
-            config.get("label")
-            or config.get("name")
-            or config.get("title")
-            or step.node_id
-        )
+        label = config.get("label") or config.get("name") or config.get("title") or step.node_id
         # Validate via the Pydantic schema so enum values coerce to
         # their string forms + the FastAPI encoder sees a plain dict
         # (not the SQLAlchemy ORM object).
-        step_dict = WorkflowStepRunRead.model_validate(step).model_dump(
-            mode="json"
-        )
+        step_dict = WorkflowStepRunRead.model_validate(step).model_dump(mode="json")
         step_dict["node_label"] = label
         step_dict["node_type"] = node.get("type") or "unknown"
         enriched_steps.append(step_dict)
@@ -1059,12 +1023,1170 @@ def _next_unique_name(base: str, existing: set[str]) -> str:
         n += 1
 
 
+# ---------------------------------------------------------------------------
+# Workflow scheduling — ``tasks/workflow-scheduling`` Step 2
+# ---------------------------------------------------------------------------
+#
+# The scheduling surface splits into three concerns, all owned by this file:
+#
+#   1. **CRUD** — create / update / pause / resume / delete schedule rows.
+#      Endpoints in Step 3 call these; each writes an audit row.
+#   2. **Recurrence math** — ``compute_next_run_at`` converts a schedule's
+#      ``schedule_kind`` + ``config_json`` + ``timezone`` into the next UTC
+#      firing datetime. Pure function; safe to call from anywhere.
+#   3. **Sweep dispatch** — ``sweep_due_schedules`` walks the DAL's due-
+#      query in bounded batches, and ``_dispatch_due_schedule`` fires one
+#      schedule inside a per-row savepoint (RLS context set, concurrency
+#      + rate checks, event publish, ``engine.start_run`` call, advance
+#      ``next_run_at``, deactivation on terminal conditions).
+#
+# The sweep is called from ``tasks.sweep_waits`` — same 60s beat, no new
+# beat entry (README locked decision).
+
+# --- caps (README locked decisions) --------------------------------------
+
+MAX_ACTIVE_SCHEDULES_PER_ORG = 500
+MAX_FIRES_PER_HOUR_PER_ORG = 1000
+MIN_INTER_FIRE_MINUTES = 5
+MAX_SCHEDULE_HORIZON_YEARS = 5
+CONSECUTIVE_EMPTY_DEACTIVATION_THRESHOLD = 20
+SWEEP_BATCH_SIZE = 100
+
+
+class ScheduleValidationError(Exception):
+    """Service-layer input validation refused a schedule create/update.
+
+    Router maps to 422 with ``reason`` as the detail. Distinct from
+    :class:`InvalidGraph` so the router can format schedule vs graph
+    errors differently."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+class ScheduleNotFound(Exception):
+    """Schedule row missing (or cross-tenant). Router maps to 404 —
+    never 403 (no info leak)."""
+
+
+class ScheduleCapExceeded(Exception):
+    """Per-org active-schedule cap reached. Router maps to 422 with a
+    friendly "reached the N-schedule limit" message."""
+
+    def __init__(self, cap: int) -> None:
+        super().__init__(f"organization has reached the {cap}-schedule limit")
+        self.cap = cap
+
+
+# --- validation ----------------------------------------------------------
+
+
+def _validate_timezone(tz_name: str) -> None:
+    """Whitelist the tz string against ``zoneinfo.available_timezones()``
+    so a typo (or a supply-chain-poisoned import) can't plant an
+    unresolvable tz. Also protects the sweep — a bad tz raise on load
+    would deactivate the schedule (see ``_dispatch_due_schedule``)."""
+    if tz_name not in available_timezones():
+        raise ScheduleValidationError(
+            f"timezone must be a valid IANA identifier (got: {tz_name!r})"
+        )
+    # Second-line guard — catch imports whose whitelist is stale
+    # relative to zoneinfo's actual data.
+    try:
+        ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError as exc:
+        raise ScheduleValidationError(f"timezone {tz_name!r} not resolvable") from exc
+
+
+def _validate_config_and_bounds(
+    *,
+    schedule_kind: ScheduleKind,
+    config: dict[str, Any],
+    starts_at: datetime,
+    end_at: datetime | None,
+    max_runs: int | None,
+    tz_name: str,
+    now: datetime,
+) -> None:
+    """Reject any schedule that violates a locked decision. Called
+    from create + update. Every raise carries a message the router
+    surfaces verbatim as the 422 ``detail``."""
+    _validate_timezone(tz_name)
+
+    if starts_at < now:
+        raise ScheduleValidationError("start time is in the past")
+    if end_at is not None and end_at < starts_at:
+        raise ScheduleValidationError("end time must be after start time")
+    if max_runs is not None and max_runs < 1:
+        raise ScheduleValidationError("max_runs must be >= 1 when set")
+
+    kind_validators = {
+        ScheduleKind.once: _validate_once_config,
+        ScheduleKind.daily: _validate_daily_config,
+        ScheduleKind.weekly: _validate_weekly_config,
+        ScheduleKind.monthly: _validate_monthly_config,
+        ScheduleKind.interval: _validate_interval_config,
+        ScheduleKind.cron: _validate_cron_config,
+    }
+    kind_validators[schedule_kind](config, tz_name=tz_name, now=now)
+
+
+def _parse_hhmm(value: object, *, field: str) -> tuple[int, int]:
+    if not isinstance(value, str):
+        raise ScheduleValidationError(f"{field} must be a string like '09:00'")
+    try:
+        hh_str, mm_str = value.split(":", 1)
+        hh, mm = int(hh_str), int(mm_str)
+    except (ValueError, AttributeError) as exc:
+        raise ScheduleValidationError(
+            f"{field} must be 'HH:MM' 24-hour format (got {value!r})"
+        ) from exc
+    if not (0 <= hh <= 23 and 0 <= mm <= 59):
+        raise ScheduleValidationError(f"{field} out of range (got {value!r})")
+    return hh, mm
+
+
+def _validate_once_config(config: dict[str, Any], *, tz_name: str, now: datetime) -> None:
+    at_iso = config.get("at")
+    if not isinstance(at_iso, str):
+        raise ScheduleValidationError("once schedules require config.at (ISO datetime)")
+    try:
+        at_dt = datetime.fromisoformat(at_iso)
+    except ValueError as exc:
+        raise ScheduleValidationError(
+            f"config.at must be an ISO datetime (got {at_iso!r})"
+        ) from exc
+    if at_dt.tzinfo is None:
+        # Naive → assume schedule's tz.
+        at_dt = at_dt.replace(tzinfo=ZoneInfo(tz_name))
+    if at_dt < now:
+        raise ScheduleValidationError("once schedule's fire time is in the past")
+
+
+def _validate_daily_config(config: dict[str, Any], *, tz_name: str, now: datetime) -> None:
+    _parse_hhmm(config.get("time"), field="config.time")
+
+
+_WEEKDAY_NAMES = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
+
+
+def _validate_weekly_config(config: dict[str, Any], *, tz_name: str, now: datetime) -> None:
+    days = config.get("days")
+    if not isinstance(days, list) or not days:
+        raise ScheduleValidationError(
+            "weekly schedules require config.days (non-empty list, e.g. ['mon','wed'])"
+        )
+    for d in days:
+        if not isinstance(d, str) or d.lower() not in _WEEKDAY_NAMES:
+            raise ScheduleValidationError(
+                f"weekly config.days must contain 3-letter day codes "
+                f"(mon/tue/wed/thu/fri/sat/sun); got {d!r}"
+            )
+    _parse_hhmm(config.get("time"), field="config.time")
+
+
+def _validate_monthly_config(config: dict[str, Any], *, tz_name: str, now: datetime) -> None:
+    day = config.get("day_of_month")
+    if not isinstance(day, int) or not (1 <= day <= 31):
+        raise ScheduleValidationError(
+            "monthly config.day_of_month must be an int in 1..31 "
+            "(31 clamps to the last day of shorter months)"
+        )
+    _parse_hhmm(config.get("time"), field="config.time")
+
+
+_INTERVAL_UNITS = {"minutes", "hours", "days"}
+
+
+def _validate_interval_config(config: dict[str, Any], *, tz_name: str, now: datetime) -> None:
+    unit = config.get("unit")
+    every = config.get("every")
+    if unit not in _INTERVAL_UNITS:
+        raise ScheduleValidationError(
+            f"interval config.unit must be one of {sorted(_INTERVAL_UNITS)}"
+        )
+    if not isinstance(every, int) or every < 1:
+        raise ScheduleValidationError("interval config.every must be a positive integer")
+    # Enforce the min-inter-fire floor (README locked decision).
+    minutes = every * {"minutes": 1, "hours": 60, "days": 60 * 24}[unit]
+    if minutes < MIN_INTER_FIRE_MINUTES:
+        raise ScheduleValidationError(f"minimum interval is {MIN_INTER_FIRE_MINUTES} minutes")
+
+
+def _validate_cron_config(config: dict[str, Any], *, tz_name: str, now: datetime) -> None:
+    expr = config.get("expression")
+    if not isinstance(expr, str) or not expr.strip():
+        raise ScheduleValidationError(
+            "cron schedules require config.expression (5-field cron string)"
+        )
+    # 5-field only — reject 6+ (with seconds or year).
+    if len(expr.split()) != 5:
+        raise ScheduleValidationError(
+            "5-field cron only (minute hour day month weekday); "
+            "seconds field and 6-field cron with year not supported"
+        )
+    tz = ZoneInfo(tz_name)
+    now_local = now.astimezone(tz)
+    try:
+        it = croniter(expr, now_local)
+        first = it.get_next(datetime)
+        second = it.get_next(datetime)
+    except (CroniterBadCronError, CroniterBadDateError, ValueError) as exc:
+        raise ScheduleValidationError(f"invalid cron expression: {exc}") from exc
+
+    inter_fire = (second - first).total_seconds() / 60.0
+    if inter_fire < MIN_INTER_FIRE_MINUTES:
+        raise ScheduleValidationError(
+            f"minimum inter-fire interval is {MIN_INTER_FIRE_MINUTES} minutes "
+            f"(computed {inter_fire:.1f}m for this expression)"
+        )
+
+    horizon = now + timedelta(days=365 * MAX_SCHEDULE_HORIZON_YEARS)
+    if first.astimezone(UTC) > horizon:
+        raise ScheduleValidationError(
+            f"schedule would not fire for over {MAX_SCHEDULE_HORIZON_YEARS} years"
+        )
+
+
+# --- recurrence math -----------------------------------------------------
+
+
+def compute_next_run_at(
+    schedule: WorkflowSchedule,
+    *,
+    now: datetime,
+) -> datetime:
+    """Compute the next UTC firing datetime for ``schedule``, given
+    ``now`` (UTC). Wrapped in a 500ms hard timeout via
+    :func:`_croniter_timeout.run_with_timeout` so a pathological cron
+    can't stall the sweep.
+
+    Raises:
+        * :class:`RecurrenceTimeout` — compute exceeded 500ms.
+        * :class:`ScheduleValidationError` — config is invalid
+          (sweep catches, deactivates row with
+          ``deactivation_reason='recurrence_invalid'``).
+
+    For ``once`` schedules, returns the configured fire time if it's
+    still in the future, else raises :class:`ScheduleValidationError`
+    (once-schedules are meant to fire exactly once and terminate).
+    """
+    return run_with_timeout(_compute_next_run_at_inner, schedule, now, timeout_ms=500)
+
+
+def _compute_next_run_at_inner(
+    schedule: WorkflowSchedule,
+    now: datetime,
+) -> datetime:
+    tz = ZoneInfo(schedule.timezone)
+    config = schedule.config_json or {}
+    base_utc = max(now, schedule.starts_at.astimezone(UTC))
+    base_local = base_utc.astimezone(tz)
+
+    kind = schedule.schedule_kind
+
+    if kind == ScheduleKind.once:
+        at_iso = config.get("at")
+        if not isinstance(at_iso, str):
+            raise ScheduleValidationError("once schedule missing config.at")
+        at_dt = datetime.fromisoformat(at_iso)
+        if at_dt.tzinfo is None:
+            at_dt = at_dt.replace(tzinfo=tz)
+        return at_dt.astimezone(UTC)
+
+    if kind == ScheduleKind.daily:
+        hh, mm = _parse_hhmm(config.get("time"), field="config.time")
+        candidate = base_local.replace(hour=hh, minute=mm, second=0, microsecond=0)
+        if candidate <= base_local:
+            candidate = candidate + timedelta(days=1)
+        return candidate.astimezone(UTC)
+
+    if kind == ScheduleKind.weekly:
+        days = [d.lower() for d in config.get("days") or []]
+        wanted = {
+            name: i for i, name in enumerate(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])
+        }
+        wanted_idx = sorted({wanted[d] for d in days if d in wanted})
+        if not wanted_idx:
+            raise ScheduleValidationError("weekly schedule has no valid days")
+        hh, mm = _parse_hhmm(config.get("time"), field="config.time")
+        # Walk forward day-by-day up to 14 days looking for the next
+        # matching (weekday, HH:MM) that is strictly after base_local.
+        for delta_days in range(0, 15):
+            cand = (base_local + timedelta(days=delta_days)).replace(
+                hour=hh, minute=mm, second=0, microsecond=0
+            )
+            if cand.weekday() in wanted_idx and cand > base_local:
+                return cand.astimezone(UTC)
+        # Fallback — should never hit given 14-day window covers a
+        # full weekly cycle twice.
+        raise ScheduleValidationError("weekly schedule could not resolve next fire")
+
+    if kind == ScheduleKind.monthly:
+        day = int(config.get("day_of_month") or 1)
+        hh, mm = _parse_hhmm(config.get("time"), field="config.time")
+        # Try current month first; if the clamped date is <= now,
+        # jump to next month.
+        year = base_local.year
+        month = base_local.month
+        for _ in range(2):
+            clamped_day = _clamp_day_of_month(year, month, day)
+            cand = base_local.replace(
+                year=year,
+                month=month,
+                day=clamped_day,
+                hour=hh,
+                minute=mm,
+                second=0,
+                microsecond=0,
+            )
+            if cand > base_local:
+                return cand.astimezone(UTC)
+            month += 1
+            if month > 12:
+                month = 1
+                year += 1
+        raise ScheduleValidationError("monthly schedule could not resolve next fire")
+
+    if kind == ScheduleKind.interval:
+        unit = config.get("unit")
+        every = int(config.get("every") or 0)
+        seconds = every * {"minutes": 60, "hours": 3600, "days": 86400}.get(unit, 0)
+        if seconds < MIN_INTER_FIRE_MINUTES * 60:
+            raise ScheduleValidationError(f"interval too short (min {MIN_INTER_FIRE_MINUTES}m)")
+        # If last_run_at is set, compute from there; otherwise from
+        # base_utc. Forward-project past ``now`` so a long outage
+        # doesn't leave us N intervals behind.
+        anchor = schedule.last_run_at or base_utc
+        anchor_utc = anchor.astimezone(UTC) if anchor.tzinfo else anchor.replace(tzinfo=UTC)
+        candidate = anchor_utc + timedelta(seconds=seconds)
+        if candidate <= now:
+            # Forward-jump to first future slot.
+            missed = (now - candidate).total_seconds() // seconds + 1
+            candidate = candidate + timedelta(seconds=seconds * missed)
+        return candidate
+
+    if kind == ScheduleKind.cron:
+        expr = config.get("expression")
+        if not isinstance(expr, str):
+            raise ScheduleValidationError("cron schedule missing config.expression")
+        try:
+            # croniter takes a tz-aware start_time and returns tz-aware
+            # datetimes if given tz-aware input. We iterate until the
+            # next fire is strictly > now (defensive; get_next already
+            # does this but base_local may equal a fire boundary).
+            it = croniter(expr, base_local)
+            while True:
+                nxt = it.get_next(datetime)
+                if nxt.astimezone(UTC) > now:
+                    return nxt.astimezone(UTC)
+        except (CroniterBadCronError, CroniterBadDateError, ValueError) as exc:
+            raise ScheduleValidationError(f"cron expression invalid on re-parse: {exc}") from exc
+
+    raise ScheduleValidationError(f"unknown schedule_kind: {kind}")
+
+
+def _clamp_day_of_month(year: int, month: int, day: int) -> int:
+    """Clamp a day-of-month to the last valid day of the given month
+    (day=31 → 28/29/30/31 depending on month + leap year)."""
+    import calendar
+
+    last = calendar.monthrange(year, month)[1]
+    return min(day, last)
+
+
+# --- CRUD services -------------------------------------------------------
+
+
+async def _resolve_default_timezone(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> str:
+    """Look up the org's ``timezone`` for use as the schedule default.
+    Falls back to ``'UTC'`` when the org row is absent (shouldn't
+    happen — RLS + FK ensure the row exists — but the fallback keeps
+    the sweep from raising on data drift)."""
+    from sqlalchemy import select as _select
+
+    from src.app.core.tenants.models import Organization
+
+    result = await session.execute(_select(Organization.timezone).where(Organization.id == org_id))
+    tz = result.scalar_one_or_none()
+    return tz or "UTC"
+
+
+async def create_schedule_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+    workflow_id: uuid.UUID,
+    name: str,
+    schedule_kind: ScheduleKind,
+    config_json: dict[str, Any],
+    starts_at: datetime,
+    end_at: datetime | None,
+    max_runs: int | None,
+    timezone_name: str | None,
+    contact_id: uuid.UUID | None,
+    on_missed: OnMissedPolicy,
+    concurrency_policy: ConcurrencyPolicy,
+    now: datetime | None = None,
+) -> WorkflowSchedule:
+    """Create a schedule attached to a workflow. Cross-org guard:
+    workflow must belong to ``org_id`` — else :class:`WorkflowNotFound`
+    (router maps to 404 with no info leak).
+
+    Enforces the per-org active-schedule cap in the same transaction
+    as the insert so two racing requests can't slip past 500.
+
+    Writes ``workflow.schedule_created`` audit event on success."""
+    now = now or datetime.now(UTC)
+
+    # Cross-org guard — reuse the existing DAL loader.
+    workflow = await _da.get_workflow(session, org_id=org_id, workflow_id=workflow_id)
+    if workflow is None:
+        raise WorkflowNotFound(f"workflow {workflow_id} not found in org {org_id}")
+
+    tz_name = timezone_name or await _resolve_default_timezone(session, org_id=org_id)
+
+    _validate_config_and_bounds(
+        schedule_kind=schedule_kind,
+        config=config_json,
+        starts_at=starts_at,
+        end_at=end_at,
+        max_runs=max_runs,
+        tz_name=tz_name,
+        now=now,
+    )
+
+    # Cap check inside the same txn as insert prevents race past 500.
+    active_count = await _da.count_active_schedules_for_org(session, org_id=org_id)
+    if active_count >= MAX_ACTIVE_SCHEDULES_PER_ORG:
+        raise ScheduleCapExceeded(MAX_ACTIVE_SCHEDULES_PER_ORG)
+
+    schedule = WorkflowSchedule(
+        org_id=org_id,
+        workflow_id=workflow_id,
+        contact_id=contact_id,
+        name=name,
+        schedule_kind=schedule_kind,
+        config_json=config_json,
+        timezone=tz_name,
+        starts_at=starts_at,
+        end_at=end_at,
+        max_runs=max_runs,
+        active=True,
+        on_missed=on_missed,
+        concurrency_policy=concurrency_policy,
+        created_by_user_id=user_id,
+    )
+    # Compute the first fire before insert so the sweep picks it up
+    # on the next tick.
+    schedule.next_run_at = compute_next_run_at(schedule, now=now)
+
+    await _da.insert_schedule(session, schedule=schedule)
+    await session.commit()
+    await session.refresh(schedule)
+
+    await log_entity_change(
+        action="workflows.schedule_created",
+        entity_type="workflow_schedule",
+        entity_id=schedule.id,
+        after={
+            "workflow_id": str(workflow_id),
+            "name": name,
+            "schedule_kind": schedule_kind.value,
+            "next_run_at": schedule.next_run_at.isoformat() if schedule.next_run_at else None,
+        },
+    )
+    return schedule
+
+
+async def update_schedule_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+    schedule_id: uuid.UUID,
+    fields: dict[str, Any],
+    if_match_updated_at: datetime,
+    now: datetime | None = None,
+) -> WorkflowSchedule:
+    """Partial update. ``if_match_updated_at`` is the ETag the caller
+    pulled off the last GET; a mismatch → :class:`WorkflowLocked`
+    (router maps to 409). Recomputes ``next_run_at`` when any
+    recurrence-affecting field changes; resets
+    ``consecutive_empty_fires`` (operator-supervision signal)."""
+    now = now or datetime.now(UTC)
+
+    schedule = await _da.get_schedule_by_id_and_org(session, org_id=org_id, schedule_id=schedule_id)
+    if schedule is None:
+        raise ScheduleNotFound(f"schedule {schedule_id} not found in org {org_id}")
+
+    # Optimistic-lock check — reject stale writers.
+    if _isoformat_no_micros(schedule.updated_at) != _isoformat_no_micros(if_match_updated_at):
+        raise WorkflowLocked("schedule was modified concurrently; re-fetch and retry")
+
+    # Build the new proposed state so re-validation can see the
+    # merged payload.
+    merged_kind: ScheduleKind = fields.get("schedule_kind", schedule.schedule_kind)
+    merged_config: dict[str, Any] = fields.get("config_json", schedule.config_json or {})
+    merged_starts: datetime = fields.get("starts_at", schedule.starts_at)
+    merged_end: datetime | None = fields.get("end_at", schedule.end_at)
+    merged_max: int | None = fields.get("max_runs", schedule.max_runs)
+    merged_tz: str = fields.get("timezone", schedule.timezone)
+
+    _validate_config_and_bounds(
+        schedule_kind=merged_kind,
+        config=merged_config,
+        starts_at=merged_starts,
+        end_at=merged_end,
+        max_runs=merged_max,
+        tz_name=merged_tz,
+        now=now,
+    )
+
+    # Reset the empty-fires counter — the operator touched the config,
+    # so any prior "always empty" signal is stale.
+    fields.setdefault("consecutive_empty_fires", 0)
+
+    # Recompute next_run_at if any recurrence-affecting field changed.
+    recurrence_dirty = bool(
+        {"schedule_kind", "config_json", "starts_at", "timezone"} & fields.keys()
+    )
+    if recurrence_dirty:
+        # Build a hydrated in-memory schedule for the compute call
+        # (the row on session may not yet reflect the new fields).
+        preview = WorkflowSchedule(
+            org_id=schedule.org_id,
+            workflow_id=schedule.workflow_id,
+            name=schedule.name,
+            schedule_kind=merged_kind,
+            config_json=merged_config,
+            timezone=merged_tz,
+            starts_at=merged_starts,
+        )
+        try:
+            fields["next_run_at"] = compute_next_run_at(preview, now=now)
+        except (ScheduleValidationError, RecurrenceTimeout) as exc:
+            raise ScheduleValidationError(str(exc)) from exc
+
+    rowcount = await _da.update_schedule_fields(
+        session, org_id=org_id, schedule_id=schedule_id, fields=fields
+    )
+    await session.commit()
+    if rowcount == 0:
+        # Extremely unlikely — row was deleted between load and update.
+        raise ScheduleNotFound(f"schedule {schedule_id} vanished mid-update")
+
+    refreshed = await _da.get_schedule_by_id_and_org(
+        session, org_id=org_id, schedule_id=schedule_id
+    )
+    await log_entity_change(
+        action="workflows.schedule_updated",
+        entity_type="workflow_schedule",
+        entity_id=schedule_id,
+        before={"updated_at": _isoformat_no_micros(if_match_updated_at)},
+        after={k: _to_json_safe(v) for k, v in fields.items()},
+    )
+    return refreshed  # type: ignore[return-value]
+
+
+async def pause_schedule_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+    schedule_id: uuid.UUID,
+) -> WorkflowSchedule:
+    """Pause = set ``active=false`` with ``deactivation_reason='manual'``.
+    ``next_run_at`` is frozen; resume recomputes forward from now."""
+    schedule = await _da.get_schedule_by_id_and_org(session, org_id=org_id, schedule_id=schedule_id)
+    if schedule is None:
+        raise ScheduleNotFound(f"schedule {schedule_id} not found in org {org_id}")
+    if not schedule.active:
+        return schedule  # already paused / ended — idempotent
+    await _da.update_schedule_fields(
+        session,
+        org_id=org_id,
+        schedule_id=schedule_id,
+        fields={
+            "active": False,
+            "deactivation_reason": DeactivationReason.manual,
+        },
+    )
+    await session.commit()
+    refreshed = await _da.get_schedule_by_id_and_org(
+        session, org_id=org_id, schedule_id=schedule_id
+    )
+    await log_entity_change(
+        action="workflows.schedule_paused",
+        entity_type="workflow_schedule",
+        entity_id=schedule_id,
+    )
+    return refreshed  # type: ignore[return-value]
+
+
+async def resume_schedule_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+    schedule_id: uuid.UUID,
+    now: datetime | None = None,
+) -> WorkflowSchedule:
+    """Resume = clear ``active=false`` + recompute ``next_run_at``
+    from now. Refuses if the row was deactivated by natural
+    exhaustion (max_runs / end_at / ended) — those need a fresh
+    schedule, not a resume."""
+    now = now or datetime.now(UTC)
+    schedule = await _da.get_schedule_by_id_and_org(session, org_id=org_id, schedule_id=schedule_id)
+    if schedule is None:
+        raise ScheduleNotFound(f"schedule {schedule_id} not found in org {org_id}")
+    if schedule.active:
+        return schedule  # already active — idempotent
+
+    terminal_reasons = {
+        DeactivationReason.max_runs,
+        DeactivationReason.end_at,
+        DeactivationReason.ended,
+    }
+    if schedule.deactivation_reason in terminal_reasons:
+        raise ScheduleValidationError(
+            "schedule ended naturally; create a new schedule instead of resuming"
+        )
+
+    # Recompute next fire from now.
+    try:
+        next_at = compute_next_run_at(schedule, now=now)
+    except (ScheduleValidationError, RecurrenceTimeout) as exc:
+        raise ScheduleValidationError(f"cannot resume: {exc}") from exc
+
+    await _da.update_schedule_fields(
+        session,
+        org_id=org_id,
+        schedule_id=schedule_id,
+        fields={
+            "active": True,
+            "deactivation_reason": None,
+            "next_run_at": next_at,
+            "consecutive_empty_fires": 0,
+        },
+    )
+    await session.commit()
+    refreshed = await _da.get_schedule_by_id_and_org(
+        session, org_id=org_id, schedule_id=schedule_id
+    )
+    await log_entity_change(
+        action="workflows.schedule_resumed",
+        entity_type="workflow_schedule",
+        entity_id=schedule_id,
+        after={"next_run_at": next_at.isoformat()},
+    )
+    return refreshed  # type: ignore[return-value]
+
+
+async def delete_schedule_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+    schedule_id: uuid.UUID,
+) -> None:
+    """Hard delete. Router uses this from DELETE endpoint."""
+    schedule = await _da.get_schedule_by_id_and_org(session, org_id=org_id, schedule_id=schedule_id)
+    if schedule is None:
+        raise ScheduleNotFound(f"schedule {schedule_id} not found in org {org_id}")
+
+    await _da.delete_schedule(session, org_id=org_id, schedule_id=schedule_id)
+    await session.commit()
+    await log_entity_change(
+        action="workflows.schedule_deleted",
+        entity_type="workflow_schedule",
+        entity_id=schedule_id,
+        before={
+            "workflow_id": str(schedule.workflow_id),
+            "name": schedule.name,
+            "schedule_kind": schedule.schedule_kind.value,
+        },
+    )
+
+
+# --- sweep dispatch ------------------------------------------------------
+
+
+async def sweep_due_schedules(now: datetime | None = None) -> dict[str, int]:
+    """Beat entry point (called from ``tasks.sweep_waits``). Two-phase:
+
+      1. **Claim** — one session, ``SELECT ... FOR UPDATE SKIP LOCKED``
+         to atomically pick due schedules and snapshot the fields the
+         dispatch needs; commit + release the row locks.
+      2. **Dispatch** — one fresh session per claimed schedule. The
+         fresh session isolates ``engine.start_run``'s internal commit
+         (which would otherwise invalidate a shared session's
+         savepoint) and gives each dispatch clean transactional
+         boundaries — a poison row can't roll back siblings.
+
+    The two-phase pattern trades the SKIP-LOCKED lock's per-fire hold
+    duration (now sub-millisecond, since we release before dispatch)
+    for the ability to use the engine's existing commit semantics
+    unchanged. Race window: two overlapping sweeps could double-fire
+    a schedule; the ``trigger_event_id`` dedup + send_guard's
+    per-recipient idempotency absorb this in practice.
+    """
+    from src.app.shared.db import async_session
+
+    now = now or datetime.now(UTC)
+    fired = 0
+    skipped = 0
+    errored = 0
+
+    # Phase 1 — claim.
+    async with async_session() as claim_sess:
+        due_rows = await _da.select_due_schedules_for_update_skip_locked(
+            claim_sess, now=now, limit=SWEEP_BATCH_SIZE
+        )
+        snapshots = [_ScheduleSnapshot.from_row(s) for s in due_rows]
+        await claim_sess.commit()
+
+    # Phase 2 — dispatch each in its own session.
+    for snap in snapshots:
+        try:
+            outcome = await _dispatch_one(snap, now=now)
+            if outcome == "fired":
+                fired += 1
+            else:
+                skipped += 1
+        except (ScheduleValidationError, RecurrenceTimeout) as exc:
+            errored += 1
+            await _deactivate_after_recurrence_error(snap.id, snap.org_id, exc)
+        except Exception:  # pragma: no cover — defensive
+            logger.exception(
+                "workflows.sweep_due_schedules dispatch_failed schedule=%s",
+                snap.id,
+            )
+            errored += 1
+
+    return {
+        "found": len(snapshots),
+        "fired": fired,
+        "skipped": skipped,
+        "errored": errored,
+    }
+
+
+class _ScheduleSnapshot:
+    """Plain-data snapshot of the fields the dispatch needs, captured
+    inside the claim transaction so the dispatch loop doesn't have to
+    hold the SKIP-LOCKED row-lock while it fires. Not a dataclass —
+    slots-only for a tiny memory footprint per sweep tick."""
+
+    __slots__ = (
+        "id",
+        "org_id",
+        "workflow_id",
+        "contact_id",
+        "schedule_kind",
+        "config_json",
+        "timezone",
+        "starts_at",
+        "end_at",
+        "max_runs",
+        "runs_completed",
+        "last_run_at",
+        "next_run_at",
+        "on_missed",
+        "concurrency_policy",
+    )
+
+    def __init__(self, **kw: Any) -> None:
+        for k in self.__slots__:
+            setattr(self, k, kw.get(k))
+
+    @classmethod
+    def from_row(cls, row: WorkflowSchedule) -> _ScheduleSnapshot:
+        return cls(
+            id=row.id,
+            org_id=row.org_id,
+            workflow_id=row.workflow_id,
+            contact_id=row.contact_id,
+            schedule_kind=row.schedule_kind,
+            config_json=dict(row.config_json or {}),
+            timezone=row.timezone,
+            starts_at=row.starts_at,
+            end_at=row.end_at,
+            max_runs=row.max_runs,
+            runs_completed=row.runs_completed,
+            last_run_at=row.last_run_at,
+            next_run_at=row.next_run_at,
+            on_missed=row.on_missed,
+            concurrency_policy=row.concurrency_policy,
+        )
+
+    def to_ephemeral_schedule(self) -> WorkflowSchedule:
+        """Materialize a detached ``WorkflowSchedule`` instance for
+        ``compute_next_run_at`` (which reads schedule_kind + config +
+        timezone + last_run_at). Not attached to any session — pure
+        data holder."""
+        wf = WorkflowSchedule(
+            org_id=self.org_id,
+            workflow_id=self.workflow_id,
+            name="_snapshot",
+            schedule_kind=self.schedule_kind,
+            config_json=self.config_json,
+            timezone=self.timezone,
+            starts_at=self.starts_at,
+            on_missed=self.on_missed,
+            concurrency_policy=self.concurrency_policy,
+        )
+        wf.last_run_at = self.last_run_at
+        wf.next_run_at = self.next_run_at
+        wf.runs_completed = self.runs_completed or 0
+        return wf
+
+
+async def _dispatch_one(
+    snap: _ScheduleSnapshot,
+    *,
+    now: datetime,
+) -> Literal["fired", "skipped"]:
+    """Fresh-session dispatch for one claimed schedule.
+
+    The fresh session isolates ``engine.start_run``'s internal commit
+    from the claim session. Each dispatch is its own transaction —
+    poison rows can't roll back siblings; the engine's committing
+    behaviour stays unchanged."""
+    from src.app.shared.db import async_session
+
+    async with async_session() as sess:
+        return await _dispatch_due_schedule(sess, snap=snap, now=now)
+
+
+async def _deactivate_after_recurrence_error(
+    schedule_id: uuid.UUID,
+    org_id: uuid.UUID,
+    exc: Exception,
+) -> None:
+    """Best-effort deactivation outside the failing dispatch session.
+    Opens its own transaction so a poison row's deactivation lands
+    even when the dispatch txn rolled back."""
+    from src.app.shared.db import async_session
+
+    async with async_session() as sess:
+        await _mark_schedule_deactivated_by_recurrence_error(
+            sess, schedule_id=schedule_id, org_id=org_id, exc=exc
+        )
+
+
+async def _dispatch_due_schedule(
+    session: AsyncSession,
+    *,
+    snap: _ScheduleSnapshot,
+    now: datetime,
+) -> Literal["fired", "skipped"]:
+    """Fresh-session single-schedule dispatch.
+
+    Sequence:
+      1. Set the RLS org context so ``engine.start_run`` writes under
+         the right tenant.
+      2. Load the workflow (org-scoped) — 404 as a hard skip.
+      3. ``concurrency_policy`` check: ``forbid`` skips if a prior
+         run is still running.
+      4. Per-org fire-budget check.
+      5. Missed-fire count → audit event.
+      6. Publish ``workflow.schedule_fired`` event (observability).
+      7. Call ``engine.start_run`` with a server-generated UUID as
+         ``trigger_event_id`` (never exposed to clients).
+      8. Stamp run with schedule provenance.
+      9. Advance ``next_run_at``, increment ``runs_completed``,
+         evaluate terminal conditions.
+
+    Note: ``engine.start_run`` internally commits the session. Steps
+    8 + 9 run in a fresh implicit transaction after that commit;
+    that's fine — the run row is already durable, and stamping /
+    advancing are independent writes.
+    """
+    from sqlalchemy import update as _sql_update
+
+    from src.app.core.events import bus as events_bus
+    from src.app.core.events.event_catalog import WORKFLOW_SCHEDULE_FIRED
+    from src.app.core.workflows import engine as workflows_engine
+    from src.app.core.workflows.models import WorkflowRun
+
+    # 1. RLS org context per dispatch (sweep runs cross-org).
+    await _da.set_current_org_context(session, org_id=snap.org_id)
+
+    # 2. Load workflow. Cross-org / archived should already be filtered
+    # by the sweep query, but defensive.
+    workflow = await _da.get_workflow(session, org_id=snap.org_id, workflow_id=snap.workflow_id)
+    if workflow is None or workflow.status != WorkflowStatus.active:
+        await _advance_schedule(session, snap=snap, now=now, outcome="skipped")
+        await session.commit()
+        return "skipped"
+
+    # 3. Concurrency policy.
+    if snap.concurrency_policy == ConcurrencyPolicy.forbid:
+        prior = await _da.find_existing_run(
+            session,
+            workflow_id=snap.workflow_id,
+            contact_id=snap.contact_id,
+        )
+        if prior is not None and prior.status == WorkflowRunStatus.running:
+            logger.info(
+                "workflows.sweep concurrency_forbid_skip schedule=%s prior_run=%s",
+                snap.id,
+                prior.id,
+            )
+            await _advance_schedule(session, snap=snap, now=now, outcome="skipped")
+            await session.commit()
+            return "skipped"
+    elif snap.concurrency_policy == ConcurrencyPolicy.replace:
+        prior = await _da.find_existing_run(
+            session,
+            workflow_id=snap.workflow_id,
+            contact_id=snap.contact_id,
+        )
+        if prior is not None and prior.status == WorkflowRunStatus.running:
+            prior.status = WorkflowRunStatus.canceled
+            await session.flush()
+
+    # 4. Per-org fire-budget.
+    hour_start = now - timedelta(hours=1)
+    recent = await _da.count_recent_workflow_runs_for_org(
+        session, org_id=snap.org_id, since=hour_start
+    )
+    if recent >= MAX_FIRES_PER_HOUR_PER_ORG:
+        logger.warning(
+            "workflows.sweep rate_limited org=%s schedule=%s recent=%d cap=%d",
+            snap.org_id,
+            snap.id,
+            recent,
+            MAX_FIRES_PER_HOUR_PER_ORG,
+        )
+        # Do NOT advance next_run_at — try again next tick.
+        return "skipped"
+
+    # 5. Missed-fire audit (only meaningful when we're late).
+    if snap.next_run_at and snap.next_run_at < now - timedelta(minutes=1):
+        missed = _count_missed_fires_snap(snap, now=now)
+        if missed >= 1:
+            logger.info(
+                "workflows.sweep missed_fires schedule=%s count=%d policy=%s",
+                snap.id,
+                missed,
+                snap.on_missed.value,
+            )
+            await log_entity_change(
+                action="workflows.schedule_missed_fire",
+                entity_type="workflow_schedule",
+                entity_id=snap.id,
+                after={"missed_count": missed, "policy": snap.on_missed.value},
+            )
+
+    # 6 + 7. Emit observability event + fire the run.
+    trigger_event_id = str(uuid.uuid4())
+    try:
+        await events_bus.publish(
+            WORKFLOW_SCHEDULE_FIRED,
+            {
+                "workflow_id": str(snap.workflow_id),
+                "schedule_id": str(snap.id),
+                "schedule_run_uuid": trigger_event_id,
+                "contact_id": str(snap.contact_id) if snap.contact_id else None,
+            },
+            org_id=snap.org_id,
+            event_id=trigger_event_id,
+        )
+    except Exception:
+        logger.exception("workflows.sweep event_publish_failed schedule=%s", snap.id)
+        # Publish failure is non-fatal — the run still fires.
+
+    run = await workflows_engine.start_run(
+        session,
+        workflow=workflow,
+        contact_id=snap.contact_id,
+        trigger_event_id=trigger_event_id,
+        trigger_payload={
+            "schedule_id": str(snap.id),
+            "schedule_kind": snap.schedule_kind.value,
+            "schedule_run_uuid": trigger_event_id,
+        },
+    )
+    # 8. Stamp the run with schedule provenance. engine.start_run
+    # committed, so this is a fresh transaction — SET LOCAL is
+    # re-issued because Postgres scopes it to the current
+    # transaction.
+    await _da.set_current_org_context(session, org_id=snap.org_id)
+    await session.execute(
+        _sql_update(WorkflowRun)
+        .where(WorkflowRun.id == run.id)
+        .values(
+            trigger_kind=TriggerKind.schedule,
+            trigger_source_id=snap.id,
+        )
+    )
+
+    # 9. Advance state.
+    await _advance_schedule(session, snap=snap, now=now, outcome="fired")
+    await session.commit()
+    return "fired"
+
+
+async def _advance_schedule(
+    session: AsyncSession,
+    *,
+    snap: _ScheduleSnapshot,
+    now: datetime,
+    outcome: Literal["fired", "skipped"],
+) -> None:
+    """Advance ``next_run_at`` / ``runs_completed`` / ``last_run_at``
+    and evaluate terminal conditions. When terminal, deactivates
+    the schedule with the right reason. Does NOT commit — caller
+    owns the transaction boundary."""
+    fields: dict[str, Any] = {}
+    if outcome == "fired":
+        snap.last_run_at = now
+        snap.runs_completed = (snap.runs_completed or 0) + 1
+        fields["last_run_at"] = now
+        fields["runs_completed"] = snap.runs_completed
+
+    # Terminal conditions before recomputing next_run_at.
+    terminated_reason: DeactivationReason | None = None
+    if snap.max_runs is not None and snap.runs_completed >= snap.max_runs:
+        terminated_reason = DeactivationReason.max_runs
+    elif snap.end_at is not None and now >= snap.end_at:
+        terminated_reason = DeactivationReason.end_at
+    elif snap.schedule_kind == ScheduleKind.once and outcome == "fired":
+        terminated_reason = DeactivationReason.ended
+
+    if terminated_reason is not None:
+        fields["active"] = False
+        fields["deactivation_reason"] = terminated_reason
+        fields["next_run_at"] = None
+    else:
+        # Recompute from the freshly-updated snapshot state.
+        preview = snap.to_ephemeral_schedule()
+        fields["next_run_at"] = compute_next_run_at(preview, now=now)
+
+    await _da.update_schedule_fields(
+        session,
+        org_id=snap.org_id,
+        schedule_id=snap.id,
+        fields=fields,
+    )
+
+
+async def _mark_schedule_deactivated_by_recurrence_error(
+    session: AsyncSession,
+    *,
+    schedule_id: uuid.UUID,
+    org_id: uuid.UUID,
+    exc: Exception,
+) -> None:
+    """Called by the sweep when a schedule's recurrence math raised
+    or timed out. Deactivates the row + writes a distinctive audit
+    event so operators see the misconfigured row."""
+    reason = (
+        DeactivationReason.recurrence_timeout
+        if isinstance(exc, RecurrenceTimeout)
+        else DeactivationReason.recurrence_invalid
+    )
+    await _da.update_schedule_fields(
+        session,
+        org_id=org_id,
+        schedule_id=schedule_id,
+        fields={
+            "active": False,
+            "deactivation_reason": reason,
+            "next_run_at": None,
+        },
+    )
+    await session.commit()
+    logger.warning(
+        "workflows.sweep schedule_deactivated_by_error schedule=%s reason=%s exc=%s",
+        schedule_id,
+        reason.value,
+        exc,
+    )
+    await log_entity_change(
+        action="workflows.schedule_auto_deactivated",
+        entity_type="workflow_schedule",
+        entity_id=schedule_id,
+        after={"reason": reason.value, "error": str(exc)},
+    )
+
+
+def _count_missed_fires_snap(snap: _ScheduleSnapshot | WorkflowSchedule, *, now: datetime) -> int:
+    """How many additional fires would have landed between the
+    scheduled ``next_run_at`` and ``now``? Best-effort — for cron
+    we don't walk the expression (could be pathological), just count
+    based on the schedule kind's natural cadence.
+
+    Accepts either a :class:`_ScheduleSnapshot` (sweep call site) or
+    a full :class:`WorkflowSchedule` (test call site). Both expose
+    the same attribute names."""
+    if snap.next_run_at is None or snap.next_run_at >= now:
+        return 0
+    delta = now - snap.next_run_at
+    kind = snap.schedule_kind
+    if kind == ScheduleKind.interval:
+        config = snap.config_json or {}
+        unit = config.get("unit")
+        every = int(config.get("every") or 1)
+        seconds = every * {"minutes": 60, "hours": 3600, "days": 86400}.get(unit, 60)
+        return int(delta.total_seconds() // seconds)
+    if kind == ScheduleKind.daily:
+        return int(delta.total_seconds() // 86400)
+    if kind == ScheduleKind.weekly:
+        return int(delta.total_seconds() // (86400 * 7))
+    if kind == ScheduleKind.monthly:
+        return int(delta.total_seconds() // (86400 * 30))
+    # once + cron — treat as "at least one missed" without further math.
+    return 1
+
+
+# --- small helpers -------------------------------------------------------
+
+
+def _isoformat_no_micros(dt: datetime) -> str:
+    """ETag string — second-precision ISO so client + server always
+    round-trip identically (microseconds get chopped when marshalled
+    through some header shapes)."""
+    return dt.replace(microsecond=0).isoformat()
+
+
+def _to_json_safe(value: Any) -> Any:
+    """Coerce enums / datetimes into JSON-friendly primitives for
+    audit ``after`` snapshots."""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if hasattr(value, "value"):
+        return value.value
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    return value
+
+
 __all__ = [
+    "CONSECUTIVE_EMPTY_DEACTIVATION_THRESHOLD",
+    "MAX_ACTIVE_SCHEDULES_PER_ORG",
+    "MAX_FIRES_PER_HOUR_PER_ORG",
+    "MAX_SCHEDULE_HORIZON_YEARS",
+    "MIN_INTER_FIRE_MINUTES",
+    "ScheduleCapExceeded",
+    "ScheduleNotFound",
+    "ScheduleValidationError",
     "archive_workflow",
     "change_status",
+    "compute_next_run_at",
     "create_folder",
+    "create_schedule_service",
     "create_workflow",
     "delete_folder",
+    "delete_schedule_service",
     "export_workflow",
     "get_ab_stats",
     "get_workflow",
@@ -1075,8 +2197,12 @@ __all__ = [
     "list_workflows",
     "pair_for_ab",
     "patch_folder",
+    "pause_schedule_service",
+    "resume_schedule_service",
     "rollback_workflow",
+    "sweep_due_schedules",
     "unpair_ab",
     "update_enabled_event_types_from_graph",
+    "update_schedule_service",
     "update_workflow",
 ]

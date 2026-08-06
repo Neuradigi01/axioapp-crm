@@ -91,8 +91,31 @@ class ActionNotImplemented(WorkflowError):
         self.reason = reason
 
 
+class ActionRequiresContactError(WorkflowError):
+    """Raised when a workflow run's ``contact_id`` is ``None`` but
+    the action handler requires a contact to operate.
+
+    Scheduled workflows (``tasks/workflow-scheduling`` Step 2) can
+    fire with ``contact_id=None`` when the schedule row itself
+    doesn't target a specific contact. Most action handlers today
+    tolerate this via a graceful skip (return ``skip_reason='no_contact_id'``)
+    — this exception is the *loud* alternative reserved for a future
+    step's per-node ``require_contact: True`` opt-in when the operator
+    wants the run to *fail* rather than silently skip.
+
+    Engine catches → marks the step_run ``errored`` with
+    ``error='ActionRequiresContactError: <action_type>'``; downstream
+    steps do not execute; the schedule's ``next_run_at`` still advances
+    (an errored run doesn't block subsequent fires)."""
+
+    def __init__(self, action_type: str) -> None:
+        super().__init__(f"action '{action_type}' requires a contact but run.contact_id is None")
+        self.action_type = action_type
+
+
 __all__ = [
     "ActionNotImplemented",
+    "ActionRequiresContactError",
     "ActivationBlocked",
     "DuplicateWorkflowName",
     "FolderHasWorkflows",

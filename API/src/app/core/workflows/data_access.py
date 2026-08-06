@@ -18,6 +18,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.workflows.models import (
@@ -1146,6 +1147,45 @@ async def select_due_schedules_for_update_skip_locked(
     return list(result.scalars().all())
 
 
+async def set_current_org_context(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> None:
+    """Set the ``app.current_org_id`` GUC on the current transaction
+    so RLS policies see the tenant. Used by the schedule sweep before
+    each per-schedule dispatch so ``engine.start_run`` writes land under
+    the schedule's org even though the sweep worker itself runs as a
+    service role with no request context.
+
+    NOOP outside a transaction — Postgres requires ``SET LOCAL`` to
+    live inside a transaction, so callers must be inside one. Caller
+    is the service-layer dispatch loop (per-row savepoint)."""
+    await session.execute(
+        sql_text("SELECT set_config('app.current_org_id', :org_id, true)"),
+        {"org_id": str(org_id)},
+    )
+
+
+async def count_recent_workflow_runs_for_org(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    since: datetime,
+) -> int:
+    """How many workflow runs were started for this org since
+    ``since``? Powers the schedule sweep's per-org fires-per-hour
+    rate-limit check (README locked decision:
+    ``max_fires_per_hour_per_org = 1000``)."""
+    result = await session.execute(
+        select(func.count(WorkflowRun.id)).where(
+            WorkflowRun.org_id == org_id,
+            WorkflowRun.started_at >= since,
+        )
+    )
+    return int(result.scalar_one())
+
+
 async def select_orphaned_pending_runs(
     session: AsyncSession,
     *,
@@ -1185,6 +1225,7 @@ __all__ = [
     "aggregate_skip_reasons",
     "count_active_schedules_for_org",
     "count_recent_marketing_sends",
+    "count_recent_workflow_runs_for_org",
     "count_versions",
     "count_workflows_in_folder",
     "delete_event_wait",
@@ -1220,5 +1261,6 @@ __all__ = [
     "refresh_cached_counters",
     "select_due_schedules_for_update_skip_locked",
     "select_orphaned_pending_runs",
+    "set_current_org_context",
     "update_schedule_fields",
 ]

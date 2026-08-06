@@ -2,7 +2,7 @@
 
 **Goal:** Land the recurrence math (via `croniter` + `zoneinfo`), extend the existing `sweep_waits` beat task to also pick due schedule rows, wire dual-dispatch (publish `workflow.schedule_fired` event + call `engine.start_run`), and audit every action handler for `contact_id=None` safety. After Step 2, hand-crafted schedule rows fire on time.
 
-**Status:** Pending
+**Status:** COMPLETED (2026-08-05, sweep + dispatch verified end-to-end against Ajay's org — real schedule fired, run row landed with `trigger_kind='schedule'` + matching `trigger_source_id`, once-schedule terminated with `deactivation_reason='ended'`; recurrence math validated for all 6 kinds + DST edge cases; ruff clean; pytest deferred pending user go-ahead per memory)
 
 **Depends on:** Step 1 (model + DAL + croniter dep)
 
