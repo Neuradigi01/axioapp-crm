@@ -94,6 +94,16 @@
       type="button"
       class="px-2 py-1.5 text-xs rounded text-muted hover:bg-surface-2"
       [disabled]="!state.workflowId()"
+      (click)="toggleSchedulesDrawer()"
+      title="Schedules — attach time-based fires to this workflow"
+      [class.text-accent]="showSchedulesDrawer()"
+    >
+      <lucide-icon name="calendar-clock" class="w-4 h-4"></lucide-icon>
+    </button>
+    <button
+      type="button"
+      class="px-2 py-1.5 text-xs rounded text-muted hover:bg-surface-2"
+      [disabled]="!state.workflowId()"
       (click)="toggleVersionDrawer()"
       title="Version history"
     >
@@ -352,7 +362,9 @@
       class="fixed inset-y-0 right-0 z-40 flex w-[380px] max-w-[85vw] shrink-0 transform flex-col border-l border-subtle bg-surface transition-transform duration-200 ease-out md:relative md:z-auto md:w-[440px] md:translate-x-0"
       [class.translate-x-full]="!mobileInspectorOpen()"
     >
-      @if (showVersionDrawer() && state.workflowId(); as wfId) {
+      @if (showSchedulesDrawer() && state.workflowId(); as wfId) {
+        <app-schedules-drawer [workflowId]="wfId" (close)="closeSchedulesDrawer()" />
+      } @else if (showVersionDrawer() && state.workflowId(); as wfId) {
         <app-version-history-drawer
           [workflowId]="wfId"
           [viewingVersion]="viewingVersion()"

@@ -21,6 +21,8 @@ import { extractApiError } from '@core/services/api-error.util';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import { FieldDef } from '../shared/dynamic-form/types';
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { commonValidators, withRequiredIf } from '../shared/validators';
 import {
@@ -56,7 +58,7 @@ interface OrgUser {
   selector: 'app-book-appointment-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, MobileSelectComponent, MobileDateTimeComponent],
   templateUrl: './book-appointment-modal.component.html',
 })
 export class BookAppointmentModalComponent extends BaseFormModalComponent {
@@ -107,10 +109,14 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
     setReq('location', map['location']);
   }
 
-  /** Pre-fill the date side of `scheduled_at`. Time defaults to 10:00. */
+  /** Pre-fill `scheduled_at`. For a future day → 10:00 (typical
+   *  workday start). For today → the current system time rounded up
+   *  to the nearest 5-minute slot, so the default matches "now" as
+   *  closely as possible while staying safely ahead of the
+   *  `dateNotPast` validator's grace window. */
   @Input() set defaultDate(value: Date | null) {
     if (value && !this.scheduledAtControl.value) {
-      this.scheduledAtControl.setValue(this.toDatetimeLocalString(value, 10));
+      this.scheduledAtControl.setValue(this.buildDefaultScheduledAt(value));
     }
   }
 
@@ -141,6 +147,22 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
    * ngOnInit via `GET /api/v1/users`; inactive users filtered out
    * client-side. Empty until the request lands. */
   protected readonly users = signal<OrgUser[]>([]);
+
+  /** `crm-mobile-select` shape for the Assignee picker. When `users()`
+   *  hasn't loaded yet, fall back to just the current user so the form
+   *  stays submittable. */
+  protected readonly assigneeSelectOptions = computed<{ value: string; label: string }[]>(() => {
+    const list = this.users();
+    if (list.length === 0) {
+      const m = this.me();
+      return m ? [{ value: m.id, label: `${m.full_name} (you)` }] : [];
+    }
+    const meId = this.me()?.id;
+    return list.map((u) => ({
+      value: u.id,
+      label: u.id === meId ? `${u.full_name} (you)` : u.full_name,
+    }));
+  });
 
   private readonly contactQuery$ = new Subject<string>();
 
@@ -334,10 +356,37 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
   /** Convert a Date → "YYYY-MM-DDTHH:mm" for <input type="datetime-local">. */
   private toDatetimeLocalString(d: Date, hour: number): string {
     const local = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hour, 0, 0, 0);
+    return this.formatDatetimeLocal(local);
+  }
+
+  /** Format a Date to the "YYYY-MM-DDTHH:mm" shape a datetime-local
+   *  input expects. Preserves the Date's actual hour/minute. */
+  private formatDatetimeLocal(d: Date): string {
     const pad = (n: number) => String(n).padStart(2, '0');
     return (
-      `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}` +
-      `T${pad(local.getHours())}:${pad(local.getMinutes())}`
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+      `T${pad(d.getHours())}:${pad(d.getMinutes())}`
     );
+  }
+
+  private buildDefaultScheduledAt(date: Date): string {
+    const now = new Date();
+    const isToday =
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth() &&
+      date.getDate() === now.getDate();
+    if (!isToday) {
+      // Future day → keep 10:00 as the sensible workday default.
+      return this.toDatetimeLocalString(date, 10);
+    }
+    // Today → round the current minute up to the next 5-minute mark
+    // so the default reads as close to "now" as possible while still
+    // being strictly ahead of the real system clock (avoids the
+    // `dateNotPast` validator tripping on submit due to seconds
+    // elapsing between open and click).
+    const rounded = new Date(now);
+    const nextSlot = Math.ceil((now.getMinutes() + (now.getSeconds() > 0 ? 1 : 0)) / 5) * 5;
+    rounded.setMinutes(nextSlot, 0, 0);
+    return this.formatDatetimeLocal(rounded);
   }
 }

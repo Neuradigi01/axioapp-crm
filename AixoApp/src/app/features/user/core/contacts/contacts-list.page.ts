@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  Injectable,
   computed,
   inject,
   signal,
@@ -35,6 +36,7 @@ import {
   UrlFilterStateDirective,
 } from '../shared/directives/url-filter-state.directive';
 import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import {
   ReassignConfirm,
@@ -45,6 +47,7 @@ import { UsersDirectoryService } from '../shared/services/users-directory.servic
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
 
+@Injectable()
 class ContactsListState extends ListPageState<ContactListItem> {}
 
 @Component({
@@ -66,6 +69,7 @@ class ContactsListState extends ListPageState<ContactListItem> {}
     MailLinkDirective,
     UrlFilterStateDirective,
     OptInChipComponent,
+    MobileSelectComponent,
   ],
   providers: [ContactsListState],
   templateUrl: './contacts-list.page.html',
@@ -119,14 +123,34 @@ export class ContactsListPageComponent {
     initialValue: '',
   });
 
-  /** Distinct source/tag chips for filter dropdowns — derived from the loaded page. */
-  readonly sourceOptions = computed(() => {
-    const set = new Set<string>();
+  /** Distinct source options for the filter dropdown. Contacts store
+   *  `source` as free-form text — some rows use raw enum keys
+   *  ("google_ads"), others use pretty labels ("Google Ads"), and
+   *  casing varies ("facebook" vs "Facebook Ads"). Collapse to one
+   *  canonical entry per lowercase key so the dropdown doesn't show
+   *  the same source twice. `value` is the original raw string of the
+   *  first occurrence (what the backend filter matches on); `label`
+   *  is the display-only prettified version. */
+  readonly sourceOptions = computed<{ value: string; label: string }[]>(() => {
+    const byKey = new Map<string, { value: string; label: string }>();
     for (const item of this.state.items()) {
-      if (item.source) set.add(item.source);
+      if (!item.source) continue;
+      const key = item.source.trim().toLowerCase();
+      if (!key || byKey.has(key)) continue;
+      byKey.set(key, { value: item.source, label: this.prettifySource(item.source) });
     }
-    return [...set].sort();
+    return [...byKey.values()].sort((a, b) => a.label.localeCompare(b.label));
   });
+
+  /** Prettify a raw source token ("google_ads" → "Google Ads"). Same
+   *  logic as leads.page.ts; kept local so contacts doesn't take a
+   *  dependency on the leads module. */
+  private prettifySource(raw: string): string {
+    const trimmed = raw.trim();
+    if (!trimmed) return trimmed;
+    if (/\s/.test(trimmed) && trimmed !== trimmed.toLowerCase()) return trimmed;
+    return trimmed.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
 
   readonly tagOptions = computed(() => {
     const set = new Set<string>();
@@ -135,6 +159,27 @@ export class ContactsListPageComponent {
     }
     return [...set].sort();
   });
+
+  /** `crm-mobile-select` shape for the Source filter (sentinel "Source"
+   *  first, then dedup'd + prettified entries from `sourceOptions`). */
+  readonly sourceSelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'Source' },
+    ...this.sourceOptions(),
+  ]);
+
+  /** `crm-mobile-select` shape for the Tags filter. */
+  readonly tagSelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'Tags' },
+    ...this.tagOptions().map((t) => ({ value: t, label: t })),
+  ]);
+
+  /** `crm-mobile-select` shape for the Owner filter (sentinel "Owner"
+   *  + "Me" + one entry per active org user). */
+  readonly assigneeSelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'Owner' },
+    { value: 'me', label: 'Me' },
+    ...this.users().map((u) => ({ value: u.id, label: u.full_name })),
+  ]);
 
   // --- Multi-select + bulk actions -------------------------------------------
 

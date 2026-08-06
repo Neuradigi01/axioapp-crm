@@ -37,6 +37,17 @@
       </div>
     </header>
     <div class="mt-2 grid grid-cols-1 gap-1">
+      @if (!hasAnyAction()) {
+        <p class="rounded-md bg-surface-2 px-2 py-2 text-[11px] text-muted">
+          @if (a.status === 'cancelled') {
+            This appointment was cancelled. Book a new one from the calendar if needed.
+          } @else if (a.status === 'completed') {
+            This appointment is complete. No further actions available.
+          } @else {
+            No actions available.
+          }
+        </p>
+      }
       @if (canReassign()) {
         <button
           type="button"
@@ -85,6 +96,16 @@
         >
           <lucide-icon name="x-circle" class="h-3.5 w-3.5" />
           Cancel
+        </button>
+      }
+      @if (canDelete()) {
+        <button
+          type="button"
+          (click)="deleteAppt.emit()"
+          class="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-red-500 hover:bg-red-500/10"
+        >
+          <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
+          Delete permanently
         </button>
       }
     </div>

@@ -148,6 +148,11 @@ export class ComposeBarComponent {
   @Output() readonly openInteractive = new EventEmitter<void>();
   @Output() readonly toggleAi = new EventEmitter<boolean>();
   @Output() readonly clearReply = new EventEmitter<void>();
+  /** Emitted when the operator clicks the "Pick template" CTA that
+   *  appears next to the disabled Send button after the WhatsApp
+   *  24-hour session expires. Parent handles the actual navigation /
+   *  picker open — same handler as the session-window banner uses. */
+  @Output() readonly pickTemplate = new EventEmitter<void>();
 
   /** Step 27b — explicit send-from selection. Null when the org
    *  is single-number (picker hidden). The parent persists the

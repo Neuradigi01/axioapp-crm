@@ -15,6 +15,7 @@ import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import { ContactsApiService } from '../contacts/contacts-api.service';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 
 import {
   Conversation,
@@ -68,6 +69,7 @@ import { extractApiError } from '@core/services/api-error.util';
     InteractiveBuilderComponent,
     ReassignModalComponent,
     LucideAngularModule,
+    MobileSelectComponent,
   ],
   templateUrl: './conversations.page.html',
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -214,13 +216,15 @@ export class ConversationsPageComponent {
     this.reloadList();
   }
 
-  /** Page-header status filter — patches the list query and reloads. */
-  protected onStatusFilterChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value as ConversationStatus | '';
-    this.statusFilter.set(value);
+  /** Page-header status filter — patches the list query and reloads.
+   *  Accepts the picked value directly (from `crm-mobile-select`'s
+   *  `valueChange`) so no synthetic Event parsing is needed. */
+  protected onStatusFilterChange(value: string): void {
+    const cast = value as ConversationStatus | '';
+    this.statusFilter.set(cast);
     this.filters.update((prev) => {
       const { status: _omit, ...rest } = prev;
-      return value ? { ...rest, status: value } : rest;
+      return cast ? { ...rest, status: cast } : rest;
     });
     this.reloadList();
   }

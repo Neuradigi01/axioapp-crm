@@ -17,6 +17,7 @@ import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.se
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { commonValidators } from '../shared/validators';
 import { extractApiError } from '@core/services/api-error.util';
@@ -39,7 +40,7 @@ import { QuickRegisterResponse, WalkInsApiService } from './walk-ins-api.service
   selector: 'app-register-walkin-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, DynamicFormComponent],
+  imports: [ReactiveFormsModule, DynamicFormComponent, MobileDateTimeComponent],
   templateUrl: './register-walkin-modal.component.html',
 })
 export class RegisterWalkinModalComponent extends BaseFormModalComponent {

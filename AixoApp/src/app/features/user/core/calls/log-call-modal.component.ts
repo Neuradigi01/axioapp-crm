@@ -16,6 +16,8 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 
 import { commonValidators } from '../shared/validators';
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
+import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import { Call, CallOutcome, CallsApiService } from './calls-api.service';
 
 /**
@@ -43,7 +45,12 @@ const recordingUploadValidator = commonValidators.fileUpload({
   selector: 'app-log-call-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, LucideAngularModule],
+  imports: [
+    ReactiveFormsModule,
+    LucideAngularModule,
+    MobileSelectComponent,
+    MobileDateTimeComponent,
+  ],
   templateUrl: './log-call-modal.component.html',
 })
 export class LogCallModalComponent {
@@ -106,6 +113,61 @@ export class LogCallModalComponent {
     outcome_id: this.fb.control<string | null>(null),
     notes: this.fb.control<string | null>(null, [commonValidators.maxLength(4000)]),
   });
+
+  /** Direction options for the mobile picker. */
+  protected readonly directionOptions: ReadonlyArray<MobileSelectOption> = [
+    { value: 'out', label: 'Outgoing' },
+    { value: 'in', label: 'Incoming' },
+  ];
+
+  /** Outcome options list — includes the `null` "— Not set —"
+   *  placeholder as an empty-string entry the mobile picker can handle
+   *  (converted back to `null` in `onOutcomePicked`). */
+  protected outcomeOptions(): ReadonlyArray<MobileSelectOption> {
+    const opts: MobileSelectOption[] = [{ value: '', label: '— Not set —' }];
+    for (const o of this._outcomes) opts.push({ value: o.id, label: o.label });
+    return opts;
+  }
+
+  /** Value-only variants for `<crm-mobile-select>`. */
+  protected onDirectionPicked(value: string): void {
+    this.form.controls.direction.setValue(value as 'in' | 'out');
+  }
+
+  protected onOutcomePicked(value: string): void {
+    this.form.controls.outcome_id.setValue(value || null);
+  }
+
+  /** Handler for `<crm-mobile-datetime>` — value is `YYYY-MM-DDTHH:mm`
+   *  (same shape as the native input) so the form control's downstream
+   *  `new Date(v.started_at).toISOString()` conversion still works. */
+  protected onStartedAtPicked(value: string): void {
+    this.form.controls.started_at.setValue(value);
+  }
+
+  /** ISO-local string for "30 days ago at 00:00" — the earliest slot
+   *  the picker should offer as a `min` boundary. Matches the
+   *  `dateWithinPastDays(CALL_BACKFILL_DAYS)` validator so the picker
+   *  can't offer a value the validator will reject. */
+  protected readonly minStartedAt = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - CALL_BACKFILL_DAYS);
+    d.setHours(0, 0, 0, 0);
+    const p = (n: number): string => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(
+      d.getMinutes(),
+    )}`;
+  })();
+
+  /** ISO-local string for "now" — the latest slot the picker should
+   *  offer. Recomputed lazily via a getter so it's fresh each open. */
+  protected get maxStartedAt(): string {
+    const d = new Date();
+    const p = (n: number): string => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(
+      d.getMinutes(),
+    )}`;
+  }
 
   protected save(): void {
     if (!this.form.valid) {

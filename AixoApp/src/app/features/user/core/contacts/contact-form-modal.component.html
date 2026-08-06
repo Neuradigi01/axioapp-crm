@@ -211,13 +211,14 @@
           }
 
           <div class="field">
-            <label class="field-label" for="cf_owner">Owner</label>
-            <select id="cf_owner" formControlName="assigned_to_id" class="select">
-              <option value="">Unassigned</option>
-              @for (u of users(); track u.id) {
-                <option [value]="u.id">{{ u.full_name }}</option>
-              }
-            </select>
+            <label class="field-label">Owner</label>
+            <!-- crm-mobile-select — in-DOM picker (dark theme, no
+                 OS-picker overflow on mobile emulation). -->
+            <crm-mobile-select
+              [options]="ownerSelectOptions()"
+              [value]="standard.controls.assigned_to_id.value ?? ''"
+              (valueChange)="standard.controls.assigned_to_id.setValue($event)"
+            />
             <p class="field-hint">Sales rep responsible for this contact.</p>
           </div>
         </div>

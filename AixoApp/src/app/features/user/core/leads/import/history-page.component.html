@@ -29,31 +29,21 @@
       <label for="status-filter" class="mb-1 block text-xs font-medium text-default">
         Status
       </label>
-      <select
-        id="status-filter"
+      <crm-mobile-select
+        [options]="statusOptions"
         [value]="statusFilter()"
-        (change)="onStatusChange($event)"
-        class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-      >
-        @for (opt of statusOptions; track opt.value) {
-          <option [value]="opt.value">{{ opt.label }}</option>
-        }
-      </select>
+        (valueChange)="onStatusValue($event)"
+      />
     </div>
     <div>
       <label for="platform-filter" class="mb-1 block text-xs font-medium text-default">
         Source platform
       </label>
-      <select
-        id="platform-filter"
+      <crm-mobile-select
+        [options]="platformOptions"
         [value]="platformFilter()"
-        (change)="onPlatformChange($event)"
-        class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-      >
-        @for (opt of platformOptions; track opt.value) {
-          <option [value]="opt.value">{{ opt.label }}</option>
-        }
-      </select>
+        (valueChange)="onPlatformValue($event)"
+      />
     </div>
   </div>
 

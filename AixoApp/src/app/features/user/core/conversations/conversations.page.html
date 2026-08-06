@@ -1,34 +1,31 @@
 <div class="flex min-h-0 flex-1 flex-col">
-  <header class="border-b border-subtle bg-surface px-4 py-3 md:px-6">
-    <div class="flex items-center justify-between">
-      <div>
-        <h1
-          class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default"
-        >
-          Conversations
-        </h1>
-        <p class="mt-1 text-[14px] text-muted">
-          Unified inbox across WhatsApp, Instagram, web chat &amp; SMS
-        </p>
-      </div>
+  <!-- Page header — slim by default so the chat + list get as much
+       vertical space as possible on typical laptop screens. Title is
+       compact (18px), subtitle moved into the empty-state message
+       (`Pick a conversation...`) so it's not visible chrome when a
+       thread is open. -->
+  <header class="border-b border-subtle bg-surface px-4 py-2 md:px-6">
+    <div class="flex items-center justify-between gap-2">
+      <h1
+        class="font-display text-[18px] font-semibold leading-tight tracking-[-0.01em] text-default"
+      >
+        Conversations
+      </h1>
       <div class="flex items-center gap-2">
-        <!-- Status filter moved out of the list panel into the header so
-             the list keeps full height for messages. Small compact
-             select — Open/Snoozed/Closed cases stay a click away. -->
-        <select
-          [value]="statusFilter()"
-          (change)="onStatusFilterChange($event)"
-          class="rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          aria-label="Status filter"
-        >
-          @for (o of statusOptions; track o.value) {
-            <option [value]="o.value">{{ o.label }}</option>
-          }
-        </select>
+        <!-- Status filter — crm-mobile-select instead of native <select>
+             so the picker renders in-DOM (dark theme, readable text on
+             every OS, no full-screen OS-picker overflow on mobile). -->
+        <div class="min-w-[8rem]">
+          <crm-mobile-select
+            [options]="statusOptions"
+            [value]="statusFilter()"
+            (valueChange)="onStatusFilterChange($event)"
+          />
+        </div>
         <button
           type="button"
           (click)="reloadList()"
-          class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+          class="rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
         >
           Refresh
         </button>
@@ -36,7 +33,7 @@
     </div>
     @if (loadError(); as err) {
       <div
-        class="mt-2 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+        class="mt-2 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-400"
       >
         {{ err }}
       </div>
@@ -126,6 +123,7 @@
           (openInteractive)="openInteractive()"
           (toggleAi)="onToggleAi($event)"
           (clearReply)="onClearReply()"
+          (pickTemplate)="onPickTemplate()"
         />
         <app-interactive-builder
           [open]="interactiveOpen()"
@@ -133,8 +131,11 @@
           (submit)="onSendInteractive($event)"
         />
       } @else {
-        <div class="flex flex-1 items-center justify-center px-4 text-center text-sm text-muted">
-          Pick a conversation from the list to start replying.
+        <div
+          class="flex flex-1 flex-col items-center justify-center gap-1 px-4 text-center text-muted"
+        >
+          <p class="text-sm">Pick a conversation from the list to start replying.</p>
+          <p class="text-xs text-faint">Unified inbox across WhatsApp &amp; Email</p>
         </div>
       }
     </section>

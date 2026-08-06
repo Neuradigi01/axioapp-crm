@@ -42,6 +42,7 @@ import {
   ReassignConfirm,
   ReassignModalComponent,
 } from '../shared/reassign-modal/reassign-modal.component';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { AdvancedFilterModalComponent } from './advanced-filter-modal.component';
@@ -140,6 +141,7 @@ class LeadsListState extends ListPageState<Lead> {}
     WhatsappLinkDirective,
     ColumnCustomizationMenuComponent,
     AdvancedFilterModalComponent,
+    MobileSelectComponent,
   ],
   providers: [LeadsListState],
   templateUrl: './leads.page.html',
@@ -323,13 +325,52 @@ export class LeadsPageComponent {
 
   readonly contactsById = signal<Record<string, ContactSummary>>({});
 
-  readonly sourceOptions = computed(() => {
-    const set = new Set<string>();
+  /** Source dropdown options. Contacts store `source` as free-form
+   *  text — some rows have raw enum keys ("google_ads"), others have
+   *  human labels ("Google Ads"), and casing varies ("facebook" vs
+   *  "Facebook Ads"). We collapse everything to a single canonical
+   *  label per lowercase key so the dropdown doesn't render the
+   *  same source twice under different spellings. `value` is the
+   *  ORIGINAL (raw) source string of the first occurrence — that's
+   *  what the backend filter matches on. `label` is a display-only
+   *  prettified version for the option text. */
+  readonly sourceOptions = computed<{ value: string; label: string }[]>(() => {
+    const byKey = new Map<string, { value: string; label: string }>();
     for (const c of Object.values(this.contactsById())) {
-      if (c.source) set.add(c.source);
+      if (!c.source) continue;
+      const key = c.source.trim().toLowerCase();
+      if (!key || byKey.has(key)) continue;
+      byKey.set(key, { value: c.source, label: this.prettifySource(c.source) });
     }
-    return [...set].sort();
+    return [...byKey.values()].sort((a, b) => a.label.localeCompare(b.label));
   });
+
+  /** Turn a raw source token like "google_ads" or "walk_in" into a
+   *  human-readable label ("Google Ads", "Walk-in"). If the input
+   *  already has spaces or mixed case (already a label), leave it
+   *  alone. Ad-network suffixes are title-cased consistently. */
+  private prettifySource(raw: string): string {
+    const trimmed = raw.trim();
+    if (!trimmed) return trimmed;
+    // Preserve existing multi-word labels (e.g. "Cold Call").
+    if (/\s/.test(trimmed) && trimmed !== trimmed.toLowerCase()) return trimmed;
+    return trimmed.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  /** `crm-mobile-select` shape for the source filter — same data as
+   *  `sourceOptions()` plus the sentinel "All sources" first entry. */
+  readonly sourceSelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'All sources' },
+    ...this.sourceOptions(),
+  ]);
+
+  /** `crm-mobile-select` shape for the assignee filter — sentinel
+   *  "All owners" + "Me" + one entry per active org user. */
+  readonly assigneeSelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'All owners' },
+    { value: 'me', label: 'Me' },
+    ...this.users().map((u) => ({ value: u.id, label: u.full_name })),
+  ]);
 
   /** Header subtitle counts: `loadedCount` is what's on screen now,
    * `totalCount` is server-reported for the active filter. */
