@@ -2,7 +2,7 @@
 
 **Goal:** Surface schedules in the main workflows list page: new "Next Run" column, "Scheduled" filter chip, per-row schedule count badge. Add pause/resume/delete actions inline (either as icon buttons or a menu). No new page; extends the existing list.
 
-**Status:** Pending
+**Status:** COMPLETED (2026-08-06, Next Run column + Scheduled 3-state filter chip + per-row Pause-all/Resume-all menu actions live on `/user/workflows`; backend `has_schedule` filter + `active_schedule_count`/`next_scheduled_at` fields via aggregate subqueries; 6-case HTTP smoke against Ajay's org PASS incl. N+1 check (2 SELECTs for 50-row list); 6 pytest cases written; ruff + prettier + TS + ng build all clean)
 
 **Depends on:** Step 4 (schedule attach panel exists so users can create schedules to see here)
 

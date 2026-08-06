@@ -208,6 +208,12 @@ class WorkflowRead(ORMModel):
     is_system_default: bool = False
     created_at: datetime
     updated_at: datetime
+    # ``tasks/workflow-scheduling`` Step 5 — populated by the list
+    # endpoint via a schedule-summary aggregate join. NULL / 0 for
+    # the single-workflow GET (kept optional so single-row callers
+    # don't have to compute the summary they won't render).
+    active_schedule_count: int = 0
+    next_scheduled_at: datetime | None = None
 
     @field_validator("status", "re_enrollment_rule", mode="before")
     @classmethod

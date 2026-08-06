@@ -262,7 +262,7 @@ Every step ships tests proving the claim. Named here so coverage is planned, not
 | 2 | [Backend service + extend `sweep_waits` + dual-dispatch + null-contact action audit](step-2-backend-service-and-sweep.md) | **COMPLETED** (2026-08-05, sweep fires real schedules end-to-end; recurrence + DST + poison-row isolation verified) | 10 | ~1 day |
 | 3 | [Backend API endpoints + validation + caps + cross-org check + If-Match + pause/resume](step-3-backend-api-endpoints.md) | **COMPLETED** (2026-08-06, 8 endpoints live; 16-case HTTP smoke against Ajay's org PASS) | 5 | ~0.75 day |
 | 4 | [Frontend — Schedule attach panel on workflow detail + config form + cron preview](step-4-frontend-attach-panel.md) | **COMPLETED** (2026-08-06, schedules drawer + config modal + debounced cron preview live) | 8 | ~1 day |
-| 5 | [Frontend — schedule list surfacing on workflows page + pause/resume/delete](step-5-frontend-list-surfacing.md) | Pending | 4 | ~0.5 day |
+| 5 | [Frontend — schedule list surfacing on workflows page + pause/resume/delete](step-5-frontend-list-surfacing.md) | **COMPLETED** (2026-08-06, Scheduled chip + Next Run column + Pause-all/Resume-all row actions; N+1 guard 2 SELECTs for 50-row list) | 8 | ~0.5 day |
 | 6 | [Data lifecycle — contact-merge cascade + orphan-run reaper + consecutive-empty deactivation](step-6-data-lifecycle.md) | Pending | 5 | ~0.75 day |
 | 7 | [Smoke verification on Ajay's Workspace (6 presets + DST + missed-run + contact-merge)](step-7-smoke-verification.md) | Pending | 2 (docs) | ~0.5 day |
 

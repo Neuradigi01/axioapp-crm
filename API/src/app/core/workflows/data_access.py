@@ -124,6 +124,110 @@ async def list_workflows(
     return list(rows), int(total)
 
 
+async def list_workflows_with_schedule_summary(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    status: WorkflowStatus | None = None,
+    category: str | None = None,
+    folder_id: uuid.UUID | None = None,
+    q: str | None = None,
+    has_schedule: bool | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[tuple[Workflow, int, datetime | None]], int]:
+    """List page (``tasks/workflow-scheduling`` Step 5) variant of
+    :func:`list_workflows`. Joins a per-workflow aggregate over
+    ``tbl_workflow_schedules`` so each row carries
+    ``(active_schedule_count, min_next_run_at)`` in ONE query — no
+    N+1. ``has_schedule=True`` narrows to workflows with ≥1 active
+    schedule.
+
+    Returns ``(rows, total)`` where each row is a 3-tuple. Original
+    :func:`list_workflows` (2-tuple return) stays untouched so
+    non-list-page callers don't have to change."""
+    # Correlated aggregate — one row per workflow, NULL when the
+    # workflow has no active schedule. LATERAL not required — a
+    # scalar subquery per column keeps the query planner happy and
+    # returns the same shape with lower join cost.
+    count_expr = (
+        select(func.count(WorkflowSchedule.id))
+        .where(
+            WorkflowSchedule.workflow_id == Workflow.id,
+            WorkflowSchedule.active == True,  # noqa: E712
+        )
+        .correlate(Workflow)
+        .scalar_subquery()
+    )
+    min_next_run_expr = (
+        select(func.min(WorkflowSchedule.next_run_at))
+        .where(
+            WorkflowSchedule.workflow_id == Workflow.id,
+            WorkflowSchedule.active == True,  # noqa: E712
+        )
+        .correlate(Workflow)
+        .scalar_subquery()
+    )
+
+    base = select(
+        Workflow,
+        count_expr.label("active_schedule_count"),
+        min_next_run_expr.label("min_next_run_at"),
+    ).where(Workflow.org_id == org_id)
+
+    if status is not None:
+        base = base.where(Workflow.status == status)
+    if category is not None:
+        base = base.where(Workflow.category == category)
+    if folder_id is not None:
+        base = base.where(Workflow.folder_id == folder_id)
+    if q is not None and q.strip():
+        like = f"%{q.strip().lower()}%"
+        base = base.where(
+            or_(
+                func.lower(Workflow.name).like(like),
+                func.lower(func.coalesce(Workflow.description, "")).like(like),
+            )
+        )
+    if has_schedule is True:
+        base = base.where(count_expr > 0)
+    elif has_schedule is False:
+        base = base.where(count_expr == 0)
+
+    # Count subquery — same predicate set, but strip the aggregate
+    # columns so the count is one row per workflow.
+    count_base = select(Workflow.id).where(Workflow.org_id == org_id)
+    if status is not None:
+        count_base = count_base.where(Workflow.status == status)
+    if category is not None:
+        count_base = count_base.where(Workflow.category == category)
+    if folder_id is not None:
+        count_base = count_base.where(Workflow.folder_id == folder_id)
+    if q is not None and q.strip():
+        like = f"%{q.strip().lower()}%"
+        count_base = count_base.where(
+            or_(
+                func.lower(Workflow.name).like(like),
+                func.lower(func.coalesce(Workflow.description, "")).like(like),
+            )
+        )
+    if has_schedule is True:
+        count_base = count_base.where(count_expr > 0)
+    elif has_schedule is False:
+        count_base = count_base.where(count_expr == 0)
+    total = (
+        await session.execute(select(func.count()).select_from(count_base.subquery()))
+    ).scalar_one()
+
+    result = await session.execute(
+        base.order_by(Workflow.updated_at.desc()).offset(offset).limit(limit)
+    )
+    rows: list[tuple[Workflow, int, datetime | None]] = [
+        (wf, int(cnt or 0), nxt) for wf, cnt, nxt in result.all()
+    ]
+    return rows, int(total)
+
+
 async def count_workflows_in_folder(
     session: AsyncSession,
     *,
@@ -1257,6 +1361,7 @@ __all__ = [
     "list_versions",
     "list_waits_for_run",
     "list_workflows",
+    "list_workflows_with_schedule_summary",
     "next_step_index",
     "refresh_cached_counters",
     "select_due_schedules_for_update_skip_locked",

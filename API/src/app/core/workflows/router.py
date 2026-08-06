@@ -390,6 +390,14 @@ async def list_workflows_endpoint(
     category: str | None = Query(default=None),
     folder_id: uuid.UUID | None = Query(default=None),
     q: str | None = Query(default=None),
+    has_schedule: bool | None = Query(
+        default=None,
+        description=(
+            "Filter by whether the workflow has ≥1 active schedule. "
+            "Powers the list page's 'Scheduled' chip (workflow-scheduling "
+            "Step 5)."
+        ),
+    ),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -406,20 +414,25 @@ async def list_workflows_endpoint(
                 detail=f"invalid status filter '{status_filter}'",
             ) from exc
 
-    rows, total = await workflows_service.list_workflows(
+    rows, total = await workflows_service.list_workflows_with_schedule_summary(
         db,
         org_id=org_id,
         status=status_enum,
         category=category,
         folder_id=folder_id,
         q=q,
+        has_schedule=has_schedule,
         limit=limit,
         offset=offset,
     )
-    return WorkflowListOut(
-        items=[WorkflowRead.model_validate(r) for r in rows],
-        total=total,
-    )
+    # Each row is (Workflow, active_schedule_count, min_next_run_at).
+    # Populate the two new schedule fields on the response model.
+    items: list[WorkflowRead] = []
+    for wf, count, nxt in rows:
+        item = WorkflowRead.model_validate(wf)
+        item = item.model_copy(update={"active_schedule_count": count, "next_scheduled_at": nxt})
+        items.append(item)
+    return WorkflowListOut(items=items, total=total)
 
 
 @router.post(

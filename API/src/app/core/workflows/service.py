@@ -205,6 +205,35 @@ async def list_workflows(
     )
 
 
+async def list_workflows_with_schedule_summary(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    status: WorkflowStatus | None = None,
+    category: str | None = None,
+    folder_id: uuid.UUID | None = None,
+    q: str | None = None,
+    has_schedule: bool | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[tuple[Workflow, int, datetime | None]], int]:
+    """List variant used by the list page (workflow-scheduling
+    Step 5). Passthrough to the DAL — pagination, filters, and the
+    schedule-summary aggregate all live in SQL to avoid N+1 across
+    hundreds of workflows."""
+    return await _da.list_workflows_with_schedule_summary(
+        session,
+        org_id=org_id,
+        status=status,
+        category=category,
+        folder_id=folder_id,
+        q=q,
+        has_schedule=has_schedule,
+        limit=limit,
+        offset=offset,
+    )
+
+
 async def update_workflow(
     session: AsyncSession,
     *,
@@ -2294,6 +2323,7 @@ __all__ = [
     "list_folders",
     "list_workflow_versions",
     "list_workflows",
+    "list_workflows_with_schedule_summary",
     "pair_for_ab",
     "patch_folder",
     "pause_schedule_service",

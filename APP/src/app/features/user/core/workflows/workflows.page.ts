@@ -123,6 +123,10 @@ export class WorkflowsPageComponent {
   protected readonly channelFilter = signal<string>('');
   protected readonly searchQuery = signal<string>('');
   protected readonly debouncedSearch = signal<string>('');
+  // tasks/workflow-scheduling Step 5 — three-state chip: null=any,
+  // true=only workflows with an active schedule,
+  // false=only workflows without one.
+  protected readonly scheduledFilter = signal<boolean | null>(null);
 
   // Bulk selection.
   protected readonly selectedIds = signal<Set<string>>(new Set());
@@ -179,6 +183,7 @@ export class WorkflowsPageComponent {
       !!this.categoryFilter() ||
       !!this.channelFilter() ||
       !!this.debouncedSearch() ||
+      this.scheduledFilter() !== null ||
       this.selectedFolderId() !== null,
   );
 
@@ -203,12 +208,14 @@ export class WorkflowsPageComponent {
       const channel = this.channelFilter();
       const folder = this.selectedFolderId();
       const q = this.debouncedSearch();
+      const scheduled = this.scheduledFilter();
       const page = this.pageIndex();
       void status;
       void category;
       void channel;
       void folder;
       void q;
+      void scheduled;
       void page;
       this.reload();
     });
@@ -248,7 +255,24 @@ export class WorkflowsPageComponent {
     this.searchQuery.set('');
     this.debouncedSearch.set('');
     this.selectedFolderId.set(null);
+    this.scheduledFilter.set(null);
     this.pageIndex.set(0);
+  }
+
+  /** Toggle the 3-state Scheduled chip: any → scheduled only →
+   *  unscheduled only → any. */
+  protected toggleScheduledFilter(): void {
+    const cur = this.scheduledFilter();
+    const next = cur === null ? true : cur === true ? false : null;
+    this.scheduledFilter.set(next);
+    this.pageIndex.set(0);
+  }
+
+  /** Human label for the current Scheduled chip state. */
+  protected scheduledChipLabel(): string {
+    const s = this.scheduledFilter();
+    if (s === null) return 'Any';
+    return s ? 'Scheduled only' : 'Unscheduled only';
   }
 
   protected onFolderSelected(id: string | null): void {
@@ -595,6 +619,7 @@ export class WorkflowsPageComponent {
         category: this.categoryFilter() || undefined,
         folder_id: this.selectedFolderId() || undefined,
         q: this.debouncedSearch() || undefined,
+        has_schedule: this.scheduledFilter() ?? undefined,
         limit: PAGE_SIZE,
         offset,
       })
@@ -625,4 +650,65 @@ export class WorkflowsPageComponent {
   }
 
   protected trackById = (_: number, row: WorkflowRead) => row.id;
+
+  // --- tasks/workflow-scheduling Step 5 — per-workflow bulk actions --
+
+  /** Toast-ish transient status line shown after a bulk pause/resume
+   *  completes. Cleared after 4 seconds. NOT a global snack — matches
+   *  the in-page `loadError` pattern used elsewhere in this file. */
+  protected readonly bulkScheduleMessage = signal<string | null>(null);
+  private bulkMessageTimer: ReturnType<typeof setTimeout> | null = null;
+
+  protected pauseAllSchedules(row: WorkflowRead, event?: Event): void {
+    event?.stopPropagation();
+    this.openMenuId.set(null);
+    if (!row.active_schedule_count) return;
+    this.api
+      .pauseAllSchedulesForWorkflow(row.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (summary) => {
+          this.showBulkMessage(
+            `${summary.paused} paused${
+              summary.skipped ? `, ${summary.skipped} already paused` : ''
+            }${summary.errored ? `, ${summary.errored} errored` : ''}.`,
+          );
+          // Refresh the row so the next-run column empties out.
+          this.reload();
+        },
+        error: () => {
+          this.showBulkMessage('Could not pause schedules.');
+        },
+      });
+  }
+
+  protected resumeAllSchedules(row: WorkflowRead, event?: Event): void {
+    event?.stopPropagation();
+    this.openMenuId.set(null);
+    this.api
+      .resumeAllSchedulesForWorkflow(row.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (summary) => {
+          this.showBulkMessage(
+            `${summary.resumed} resumed${
+              summary.skipped ? `, ${summary.skipped} skipped` : ''
+            }${summary.errored ? `, ${summary.errored} errored` : ''}.`,
+          );
+          this.reload();
+        },
+        error: () => {
+          this.showBulkMessage('Could not resume schedules.');
+        },
+      });
+  }
+
+  private showBulkMessage(text: string): void {
+    this.bulkScheduleMessage.set(text);
+    if (this.bulkMessageTimer !== null) clearTimeout(this.bulkMessageTimer);
+    this.bulkMessageTimer = setTimeout(() => {
+      this.bulkScheduleMessage.set(null);
+      this.bulkMessageTimer = null;
+    }, 4000);
+  }
 }

@@ -118,6 +118,24 @@
         />
       </div>
 
+      <!-- tasks/workflow-scheduling Step 5 — Scheduled chip.
+           3-state: any → scheduled only → unscheduled only → any. -->
+      <button
+        type="button"
+        (click)="toggleScheduledFilter()"
+        class="inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs hover:bg-surface-2"
+        [class.border-accent]="scheduledFilter() !== null"
+        [class.text-accent]="scheduledFilter() !== null"
+        [class.bg-accent-soft]="scheduledFilter() !== null"
+        [class.border-subtle]="scheduledFilter() === null"
+        [class.text-default]="scheduledFilter() === null"
+        [class.bg-surface]="scheduledFilter() === null"
+        title="Filter by schedule attachment"
+      >
+        <lucide-icon name="calendar-clock" size="12" />
+        {{ scheduledChipLabel() }}
+      </button>
+
       @if (hasFilters()) {
         <button
           type="button"
@@ -133,6 +151,14 @@
         {{ total() }} workflow{{ total() === 1 ? '' : 's' }}
       </span>
     </div>
+
+    @if (bulkScheduleMessage(); as msg) {
+      <div
+        class="mt-2 rounded-md border border-subtle bg-surface-2 px-3 py-1.5 text-xs text-default"
+      >
+        {{ msg }}
+      </div>
+    }
 
     @if (selectedIds().size > 0 && canActivate()) {
       <div
@@ -267,6 +293,9 @@
                 <th class="hidden w-[112px] px-3 py-2.5 text-left font-semibold lg:table-cell">
                   Channel
                 </th>
+                <th class="hidden w-[152px] px-3 py-2.5 text-left font-semibold lg:table-cell">
+                  Next run
+                </th>
                 <th class="hidden w-[112px] px-3 py-2.5 text-left font-semibold lg:table-cell">
                   Updated
                 </th>
@@ -372,6 +401,29 @@
                     }
                   </td>
                   <td class="hidden px-3 py-3 align-middle text-xs text-muted lg:table-cell">
+                    @if (row.next_scheduled_at) {
+                      <span
+                        class="font-mono text-[11px] text-default"
+                        [title]="
+                          (row.active_schedule_count || 0) +
+                          ' active schedule' +
+                          ((row.active_schedule_count || 0) === 1 ? '' : 's')
+                        "
+                      >
+                        {{ row.next_scheduled_at | date: 'MMM d, HH:mm' }}
+                      </span>
+                      @if ((row.active_schedule_count || 0) > 1) {
+                        <span
+                          class="ml-1 inline-flex items-center rounded bg-surface-2 px-1 py-0 text-[10px] text-muted ring-1 ring-inset ring-subtle"
+                        >
+                          +{{ (row.active_schedule_count || 0) - 1 }}
+                        </span>
+                      }
+                    } @else {
+                      <span class="text-faint">—</span>
+                    }
+                  </td>
+                  <td class="hidden px-3 py-3 align-middle text-xs text-muted lg:table-cell">
                     {{ row.updated_at | date: 'mediumDate' }}
                   </td>
                   <td class="px-2 py-3 text-right align-middle">
@@ -425,6 +477,26 @@
                             >
                               <lucide-icon name="archive" size="13" />
                               Archive
+                            </button>
+                          }
+                          @if (canWrite() && (row.active_schedule_count || 0) > 0) {
+                            <button
+                              type="button"
+                              (click)="pauseAllSchedules(row, $event)"
+                              class="flex w-full items-center gap-2 border-t border-subtle px-3 py-1.5 text-left text-default hover:bg-surface-2"
+                            >
+                              <lucide-icon name="pause-circle" size="13" />
+                              Pause all schedules
+                            </button>
+                          }
+                          @if (canWrite()) {
+                            <button
+                              type="button"
+                              (click)="resumeAllSchedules(row, $event)"
+                              class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-default hover:bg-surface-2"
+                            >
+                              <lucide-icon name="play" size="13" />
+                              Resume all schedules
                             </button>
                           }
                         </div>
