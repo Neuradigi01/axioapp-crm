@@ -1,0 +1,33 @@
+<div class="rounded border border-subtle bg-surface-2 p-3">
+  <div class="flex items-center justify-between">
+    <h4 class="text-[11px] font-semibold uppercase tracking-wide text-muted">Next 5 fires</h4>
+    @if (loading()) {
+      <span class="text-[10px] text-muted italic">computing…</span>
+    }
+  </div>
+
+  @if (!ready()) {
+    <p class="mt-2 text-[11px] italic text-faint">
+      Fill in kind, timezone, and start time to preview.
+    </p>
+  } @else if (error()) {
+    <p
+      class="mt-2 rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-[11px] text-red-500"
+    >
+      {{ error() }}
+    </p>
+  } @else if (fires().length === 0 && !loading()) {
+    <p class="mt-2 text-[11px] italic text-faint">
+      No fires computed — check the recurrence config.
+    </p>
+  } @else {
+    <ol class="mt-2 space-y-1">
+      @for (fire of fires(); track $index) {
+        <li class="flex items-center gap-2 font-mono text-[11px] text-default">
+          <span class="w-4 text-right text-faint">{{ $index + 1 }}.</span>
+          <span>{{ fire | date: "yyyy-MM-dd HH:mm 'UTC'" : 'UTC' }}</span>
+        </li>
+      }
+    </ol>
+  }
+</div>

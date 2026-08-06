@@ -1,8 +1,8 @@
 # Step 4 — Frontend — Schedule attach panel on workflow detail + config form + cron preview
 
-**Goal:** In the workflow detail page, add a "Schedules" panel showing existing schedules for that workflow with an "Add schedule" button. The add/edit form exposes the 6 preset kinds + advanced cron, timezone picker (defaults to org tz), start/end, `on_missed` + `concurrency_policy` selects, and a "next 5 fires" live preview. Client-side debounced calls to `POST /schedules/preview`.
+**Goal:** In the workflow detail page, add a "Schedules" panel showing existing schedules for that workflow with an "Add schedule" button. The add/edit form exposes the 6 preset kinds + advanced cron, timezone picker (defaults to org tz), start/end, `on_missed` + `con  currency_policy` selects, and a "next 5 fires" live preview. Client-side debounced calls to `POST /schedules/preview`.
 
-**Status:** Pending
+**Status:** COMPLETED (2026-08-06, schedules drawer + config modal + debounced cron preview live on `/user/workflows/:id` canvas; 6-kind recurrence form + tz picker + `on_missed`/`concurrency_policy` selects; If-Match round-trip; TS + ESLint + prettier + ng build all clean; Karma tests deferred as optional per plan)
 
 **Depends on:** Step 3 (API)
 

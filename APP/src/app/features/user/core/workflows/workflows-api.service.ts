@@ -382,6 +382,84 @@ export interface WorkflowRunDetailResponse {
   steps: WorkflowRunDetailStep[];
 }
 
+// --- tasks/workflow-scheduling Step 4: Schedules ----------------------
+
+export type ScheduleKind = 'once' | 'daily' | 'weekly' | 'monthly' | 'interval' | 'cron';
+export type OnMissedPolicy = 'skip' | 'run_once' | 'backfill_all';
+export type ConcurrencyPolicy = 'allow' | 'forbid' | 'replace';
+export type DeactivationReason =
+  | 'manual'
+  | 'ended'
+  | 'max_runs'
+  | 'end_at'
+  | 'consecutive_empty'
+  | 'recurrence_timeout'
+  | 'recurrence_invalid'
+  | 'contact_deleted'
+  | 'admin_edit_past_end_at';
+
+export interface Schedule {
+  id: string;
+  org_id: string;
+  workflow_id: string;
+  contact_id: string | null;
+  name: string;
+  schedule_kind: ScheduleKind;
+  config_json: Record<string, unknown>;
+  timezone: string;
+  starts_at: string;
+  end_at: string | null;
+  next_run_at: string | null;
+  last_run_at: string | null;
+  runs_completed: number;
+  max_runs: number | null;
+  active: boolean;
+  deactivation_reason: DeactivationReason | null;
+  on_missed: OnMissedPolicy;
+  concurrency_policy: ConcurrencyPolicy;
+  consecutive_empty_fires: number;
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScheduleCreatePayload {
+  name: string;
+  schedule_kind: ScheduleKind;
+  config_json: Record<string, unknown>;
+  timezone?: string | null;
+  starts_at: string;
+  end_at?: string | null;
+  max_runs?: number | null;
+  contact_id?: string | null;
+  on_missed?: OnMissedPolicy;
+  concurrency_policy?: ConcurrencyPolicy;
+}
+
+export interface ScheduleUpdatePayload {
+  name?: string;
+  schedule_kind?: ScheduleKind;
+  config_json?: Record<string, unknown>;
+  timezone?: string;
+  starts_at?: string;
+  end_at?: string | null;
+  max_runs?: number | null;
+  contact_id?: string | null;
+  on_missed?: OnMissedPolicy;
+  concurrency_policy?: ConcurrencyPolicy;
+}
+
+export interface SchedulePreviewPayload {
+  schedule_kind: ScheduleKind;
+  config_json: Record<string, unknown>;
+  timezone: string;
+  starts_at: string;
+}
+
+export interface SchedulePreviewResponse {
+  fires: string[];
+}
+
 // --- Step 18: A/B testing ---------------------------------------------
 
 export type ABWinnerMetric = 'goal_conversion' | 'reply_rate' | 'open_rate' | 'custom';
@@ -415,6 +493,10 @@ export interface ABStatsResponse {
 export class WorkflowsApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/workflows`;
+  // tasks/workflow-scheduling Step 4 — schedule endpoints hang off a
+  // sibling `/api/v1/schedules/*` prefix (per Step 3 wiring). The
+  // nested list/create routes live under /workflows/{id}/schedules.
+  private readonly schedulesBase = `${environment.apiBaseUrl}/schedules`;
 
   // --- Workflow CRUD ------------------------------------------------
 
@@ -596,5 +678,50 @@ export class WorkflowsApiService {
 
   listRunSteps(runId: string): Observable<WorkflowStepRunRead[]> {
     return this.http.get<WorkflowStepRunRead[]>(`${this.base}/runs/${runId}/steps`);
+  }
+
+  // --- tasks/workflow-scheduling Step 4: Schedules -----------------
+
+  listSchedulesForWorkflow(workflowId: string): Observable<Schedule[]> {
+    return this.http.get<Schedule[]>(`${this.base}/${workflowId}/schedules`);
+  }
+
+  createSchedule(workflowId: string, payload: ScheduleCreatePayload): Observable<Schedule> {
+    return this.http.post<Schedule>(`${this.base}/${workflowId}/schedules`, payload);
+  }
+
+  getSchedule(scheduleId: string): Observable<Schedule> {
+    return this.http.get<Schedule>(`${this.schedulesBase}/${scheduleId}`);
+  }
+
+  /**
+   * PATCH a schedule. ``etag`` is the ``updated_at`` returned on the
+   * last GET / mutation — sent verbatim as ``If-Match``. Server 428
+   * on missing, 409 on stale. Callers should catch 409 and re-fetch.
+   */
+  updateSchedule(
+    scheduleId: string,
+    etag: string,
+    payload: ScheduleUpdatePayload,
+  ): Observable<Schedule> {
+    return this.http.patch<Schedule>(`${this.schedulesBase}/${scheduleId}`, payload, {
+      headers: { 'If-Match': etag },
+    });
+  }
+
+  deleteSchedule(scheduleId: string): Observable<void> {
+    return this.http.delete<void>(`${this.schedulesBase}/${scheduleId}`);
+  }
+
+  pauseSchedule(scheduleId: string): Observable<Schedule> {
+    return this.http.post<Schedule>(`${this.schedulesBase}/${scheduleId}/pause`, {});
+  }
+
+  resumeSchedule(scheduleId: string): Observable<Schedule> {
+    return this.http.post<Schedule>(`${this.schedulesBase}/${scheduleId}/resume`, {});
+  }
+
+  previewSchedule(payload: SchedulePreviewPayload): Observable<SchedulePreviewResponse> {
+    return this.http.post<SchedulePreviewResponse>(`${this.schedulesBase}/preview`, payload);
   }
 }
