@@ -2,7 +2,7 @@
 
 **Goal:** Ship the HTTP surface for schedule CRUD with mass-assignment shielding, cross-org isolation, cron/interval validation (≥5-min floor), timezone whitelist, per-org caps (500 active, 1000 fires/hr), `If-Match` optimistic lock, and dedicated pause/resume endpoints (`active` NOT toggleable via PATCH).
 
-**Status:** Pending
+**Status:** COMPLETED (2026-08-06, 8 endpoints live under `/api/v1/workflows/{id}/schedules` + `/api/v1/schedules/*`; 16-case HTTP smoke against Ajay's org PASS — POST/GET/PATCH/DELETE/pause/resume/preview + cross-org 404 + past-starts_at 422 + mass-assign 422 + If-Match 428/409/200; ruff clean; pytest deferred pending user go-ahead)
 
 **Depends on:** Step 2 (service layer)
 

@@ -25,7 +25,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,7 +44,13 @@ from src.app.core.workflows.exceptions import (
     WorkflowLocked,
     WorkflowNotFound,
 )
-from src.app.core.workflows.models import WorkflowRunStatus, WorkflowStatus
+from src.app.core.workflows.models import (
+    ConcurrencyPolicy,
+    OnMissedPolicy,
+    ScheduleKind,
+    WorkflowRunStatus,
+    WorkflowStatus,
+)
 from src.app.core.workflows.permissions import (
     PERM_ACTIVATE,
     PERM_CLONE,
@@ -57,6 +63,11 @@ from src.app.core.workflows.schemas import (
     ABStatsResponse,
     PairABRequest,
     RollbackRequest,
+    ScheduleCreate,
+    SchedulePreviewRequest,
+    SchedulePreviewResponse,
+    ScheduleResponse,
+    ScheduleUpdate,
     WorkflowAnalyticsResponse,
     WorkflowCreate,
     WorkflowDailyRateResponse,
@@ -72,6 +83,11 @@ from src.app.core.workflows.schemas import (
     WorkflowVersionDetailRead,
     WorkflowVersionListResponse,
     WorkflowVersionSummaryRead,
+)
+from src.app.core.workflows.service import (
+    ScheduleCapExceeded,
+    ScheduleNotFound,
+    ScheduleValidationError,
 )
 from src.app.shared.context import get_context
 from src.app.shared.db import get_db
@@ -126,6 +142,42 @@ def _workflow_http_map(exc: WorkflowError) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         detail=str(exc),
+    )
+
+
+def _schedule_http_map(exc: Exception) -> HTTPException:
+    """Translate schedule-domain exceptions to FastAPI HTTPExceptions.
+
+    Kept separate from ``_workflow_http_map`` because the schedule
+    types (``ScheduleNotFound``, ``ScheduleValidationError``,
+    ``ScheduleCapExceeded``) inherit from :class:`Exception`, not
+    :class:`WorkflowError`, so the existing map's ``isinstance``
+    chain would miss them. Cross-org access → 404 with a generic
+    message so an attacker can't distinguish "wrong org" from
+    "doesn't exist" (Attacker C2 mitigation)."""
+    if isinstance(exc, ScheduleNotFound):
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="schedule not found",
+        )
+    if isinstance(exc, ScheduleValidationError):
+        return HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "invalid_schedule", "reason": exc.reason},
+        )
+    if isinstance(exc, ScheduleCapExceeded):
+        return HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "schedule_cap_exceeded",
+                "reason": str(exc),
+                "cap": exc.cap,
+            },
+        )
+    # Should never reach here — caller narrows via isinstance first.
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="unexpected schedule error",
     )
 
 
@@ -1048,9 +1100,7 @@ async def get_workflow_ab_stats_endpoint(
             detail="no org context",
         )
     try:
-        body = await workflows_service.get_ab_stats(
-            db, org_id=org_id, workflow_id=workflow_id
-        )
+        body = await workflows_service.get_ab_stats(db, org_id=org_id, workflow_id=workflow_id)
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
     return ABStatsResponse.model_validate(body)
@@ -1132,9 +1182,7 @@ async def get_run_detail_endpoint(
     graph label + type)."""
     org_id = _require_org_id()
     try:
-        return await workflows_service.get_run_detail(
-            db, org_id=org_id, run_id=run_id
-        )
+        return await workflows_service.get_run_detail(db, org_id=org_id, run_id=run_id)
     except WorkflowError as exc:
         raise _workflow_http_map(exc) from exc
 
@@ -1192,4 +1240,280 @@ async def get_workflow_daily_rate_endpoint(
     return WorkflowDailyRateResponse(items=items)
 
 
-__all__ = ["router"]
+# --- Schedule endpoints (workflow-scheduling Step 3) ---------------------
+#
+# Eight routes covering CRUD + pause/resume + preview.
+#
+#   POST   /workflows/{workflow_id}/schedules   → create
+#   GET    /workflows/{workflow_id}/schedules   → list for a workflow
+#   GET    /schedules/{schedule_id}             → single fetch
+#   PATCH  /schedules/{schedule_id}             → update (If-Match required)
+#   DELETE /schedules/{schedule_id}             → delete
+#   POST   /schedules/{schedule_id}/pause       → pause
+#   POST   /schedules/{schedule_id}/resume      → resume
+#   POST   /schedules/preview                   → next 5 fires (Builder)
+#
+# The last five hang off ``schedules_router`` (mounted under
+# ``/api/v1/schedules``) — kept separate so router discovery doesn't
+# rewrite the prefix mid-file.
+
+schedules_router = APIRouter(prefix="/schedules", tags=["Workflow Schedules"])
+
+
+def _schedule_etag(updated_at: datetime) -> str:
+    """Format the ``updated_at`` datetime as the ETag string. Kept
+    in sync with ``service._isoformat_no_micros`` so PATCH round-trips
+    the value verbatim — UTC-normalized, second-precision, no tz
+    suffix. Router mirrors the service format so a client can echo
+    the header back into ``If-Match`` without any transformation."""
+    from datetime import UTC as _UTC
+
+    dt = updated_at.astimezone(_UTC) if updated_at.tzinfo else updated_at
+    return dt.replace(microsecond=0, tzinfo=None).isoformat()
+
+
+def _extract_user_id() -> uuid.UUID | None:
+    """Pull user_id off the request context — the workflows router
+    doesn't currently thread it through, so this reads directly. Used
+    for the audit trail on schedule mutations."""
+    ctx = get_context()
+    return ctx.user_id
+
+
+@router.post(
+    "/{workflow_id}/schedules",
+    response_model=ScheduleResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_schedule_endpoint(
+    workflow_id: uuid.UUID,
+    payload: ScheduleCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_WRITE)),
+) -> ScheduleResponse:
+    """Create a schedule attached to a workflow. Cross-org guard:
+    workflow must belong to the caller's org (404 on mismatch — no
+    info leak)."""
+    org_id = _require_org_id()
+    user_id = _extract_user_id()
+    try:
+        schedule = await workflows_service.create_schedule_service(
+            db,
+            org_id=org_id,
+            user_id=user_id,
+            workflow_id=workflow_id,
+            name=payload.name,
+            schedule_kind=ScheduleKind(payload.schedule_kind),
+            config_json=payload.config_json,
+            starts_at=payload.starts_at,
+            end_at=payload.end_at,
+            max_runs=payload.max_runs,
+            timezone_name=payload.timezone,
+            contact_id=payload.contact_id,
+            on_missed=OnMissedPolicy(payload.on_missed),
+            concurrency_policy=ConcurrencyPolicy(payload.concurrency_policy),
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    except (ScheduleValidationError, ScheduleCapExceeded, ScheduleNotFound) as exc:
+        raise _schedule_http_map(exc) from exc
+    return ScheduleResponse.model_validate(schedule)
+
+
+@router.get(
+    "/{workflow_id}/schedules",
+    response_model=list[ScheduleResponse],
+)
+async def list_schedules_for_workflow_endpoint(
+    workflow_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_READ)),
+) -> list[ScheduleResponse]:
+    """All schedules attached to this workflow. 404 (not empty list)
+    when the workflow itself is cross-org / missing."""
+    org_id = _require_org_id()
+    try:
+        schedules = await workflows_service.list_schedules_for_workflow_service(
+            db, org_id=org_id, workflow_id=workflow_id
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    return [ScheduleResponse.model_validate(s) for s in schedules]
+
+
+@schedules_router.get(
+    "/{schedule_id}",
+    response_model=ScheduleResponse,
+)
+async def get_schedule_endpoint(
+    schedule_id: uuid.UUID,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_READ)),
+) -> ScheduleResponse:
+    """Single fetch. Response carries an ``ETag`` header sourced from
+    ``updated_at`` so the client's next PATCH can echo it via
+    ``If-Match``."""
+    org_id = _require_org_id()
+    try:
+        schedule = await workflows_service.get_schedule_service(
+            db, org_id=org_id, schedule_id=schedule_id
+        )
+    except ScheduleNotFound as exc:
+        raise _schedule_http_map(exc) from exc
+    response.headers["ETag"] = _schedule_etag(schedule.updated_at)
+    return ScheduleResponse.model_validate(schedule)
+
+
+@schedules_router.patch(
+    "/{schedule_id}",
+    response_model=ScheduleResponse,
+)
+async def patch_schedule_endpoint(
+    schedule_id: uuid.UUID,
+    payload: ScheduleUpdate,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    if_match: str | None = Header(default=None, alias="If-Match"),
+    _: User = Depends(require_permissions(PERM_WRITE)),
+) -> ScheduleResponse:
+    """Partial update. ``If-Match`` header REQUIRED — carries the
+    ``updated_at`` ISO the client pulled off the previous GET. Stale
+    match → 409. Recomputes ``next_run_at`` when any recurrence-
+    affecting field changes."""
+    if not if_match:
+        raise HTTPException(
+            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+            detail="If-Match header required",
+        )
+    try:
+        if_match_dt = datetime.fromisoformat(if_match)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="If-Match must be an ISO datetime",
+        ) from exc
+
+    org_id = _require_org_id()
+    user_id = _extract_user_id()
+    fields: dict[str, object] = payload.model_dump(exclude_unset=True)
+    # Coerce enum strings to enum members so the DAL update stores
+    # canonical values.
+    if "schedule_kind" in fields and fields["schedule_kind"] is not None:
+        fields["schedule_kind"] = ScheduleKind(fields["schedule_kind"])
+    if "on_missed" in fields and fields["on_missed"] is not None:
+        fields["on_missed"] = OnMissedPolicy(fields["on_missed"])
+    if "concurrency_policy" in fields and fields["concurrency_policy"] is not None:
+        fields["concurrency_policy"] = ConcurrencyPolicy(fields["concurrency_policy"])
+
+    try:
+        schedule = await workflows_service.update_schedule_service(
+            db,
+            org_id=org_id,
+            user_id=user_id,
+            schedule_id=schedule_id,
+            fields=fields,
+            if_match_updated_at=if_match_dt,
+        )
+    except WorkflowError as exc:
+        raise _workflow_http_map(exc) from exc
+    except (ScheduleNotFound, ScheduleValidationError) as exc:
+        raise _schedule_http_map(exc) from exc
+    response.headers["ETag"] = _schedule_etag(schedule.updated_at)
+    return ScheduleResponse.model_validate(schedule)
+
+
+@schedules_router.delete(
+    "/{schedule_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_schedule_endpoint(
+    schedule_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_WRITE)),
+) -> Response:
+    org_id = _require_org_id()
+    user_id = _extract_user_id()
+    try:
+        await workflows_service.delete_schedule_service(
+            db,
+            org_id=org_id,
+            user_id=user_id,
+            schedule_id=schedule_id,
+        )
+    except ScheduleNotFound as exc:
+        raise _schedule_http_map(exc) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@schedules_router.post(
+    "/{schedule_id}/pause",
+    response_model=ScheduleResponse,
+)
+async def pause_schedule_endpoint(
+    schedule_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_WRITE)),
+) -> ScheduleResponse:
+    """Dedicated pause endpoint. ``active`` is intentionally NOT in
+    ``ScheduleUpdate`` so operators go through this route (audit-
+    friendly + friendly for a dedicated UI button)."""
+    org_id = _require_org_id()
+    user_id = _extract_user_id()
+    try:
+        schedule = await workflows_service.pause_schedule_service(
+            db, org_id=org_id, user_id=user_id, schedule_id=schedule_id
+        )
+    except ScheduleNotFound as exc:
+        raise _schedule_http_map(exc) from exc
+    return ScheduleResponse.model_validate(schedule)
+
+
+@schedules_router.post(
+    "/{schedule_id}/resume",
+    response_model=ScheduleResponse,
+)
+async def resume_schedule_endpoint(
+    schedule_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_WRITE)),
+) -> ScheduleResponse:
+    """Dedicated resume endpoint. Refuses if the row deactivated by
+    natural exhaustion (``max_runs`` / ``end_at`` / ``ended``) — the
+    operator needs to create a fresh schedule in that case."""
+    org_id = _require_org_id()
+    user_id = _extract_user_id()
+    try:
+        schedule = await workflows_service.resume_schedule_service(
+            db, org_id=org_id, user_id=user_id, schedule_id=schedule_id
+        )
+    except (ScheduleNotFound, ScheduleValidationError) as exc:
+        raise _schedule_http_map(exc) from exc
+    return ScheduleResponse.model_validate(schedule)
+
+
+@schedules_router.post(
+    "/preview",
+    response_model=SchedulePreviewResponse,
+)
+async def preview_schedule_endpoint(
+    payload: SchedulePreviewRequest,
+    _: User = Depends(require_permissions(PERM_READ)),
+) -> SchedulePreviewResponse:
+    """Compute the next 5 fires for a candidate schedule config.
+    Read-only + does not persist. Client-side debounce is expected
+    (Builder's cron preview) — no server-side rate-limit dependency
+    installed yet; the existing per-user global rate limit applies."""
+    try:
+        fires = workflows_service.preview_next_fires_service(
+            schedule_kind=ScheduleKind(payload.schedule_kind),
+            config_json=payload.config_json,
+            timezone_name=payload.timezone,
+            starts_at=payload.starts_at,
+        )
+    except ScheduleValidationError as exc:
+        raise _schedule_http_map(exc) from exc
+    return SchedulePreviewResponse(fires=fires)
+
+
+__all__ = ["router", "schedules_router"]

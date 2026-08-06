@@ -130,9 +130,7 @@ class WorkflowGraph(BaseModel):
 
 _WorkflowStatusLiteral = Literal["draft", "active", "paused", "archived"]
 _ReEnrollmentLiteral = Literal["once", "daily", "never"]
-_ABWinnerMetricLiteral = Literal[
-    "goal_conversion", "reply_rate", "open_rate", "custom"
-]
+_ABWinnerMetricLiteral = Literal["goal_conversion", "reply_rate", "open_rate", "custom"]
 
 
 class WorkflowCreate(BaseModel):
@@ -527,6 +525,128 @@ class WorkflowDiagnosticsResponse(BaseModel):
     entries: list[WorkflowDiagnosticsEntry]
 
 
+# --- Schedule schemas (workflow-scheduling Step 3) -----------------------
+#
+# Three request shapes + one response, plus a preview surface.
+#
+# Mass-assignment shield: every Create/Update carries
+# ``ConfigDict(extra="forbid")`` so server-owned fields
+# (``runs_completed``, ``next_run_at``, ``last_run_at``,
+# ``consecutive_empty_fires``, ``deactivation_reason``,
+# ``org_id``, ``created_by_user_id``, ``created_at``,
+# ``updated_at``) get a 422 the moment a client tries to set them.
+# ``active`` is intentionally NOT declared on ``ScheduleUpdate`` so
+# operators go through ``POST /pause`` or ``POST /resume`` (dedicated
+# audit-friendly endpoints) rather than flipping it via PATCH.
+#
+# ``config_json`` is a free-form dict at the schema layer — the
+# service-layer ``_validate_config_and_bounds`` runs kind-specific
+# validation (cron / interval / weekly / etc.) and raises
+# ``ScheduleValidationError`` on rejection. The router maps that to
+# 422 with a friendly reason.
+
+
+_SCHEDULE_KIND_LITERAL = Literal["once", "daily", "weekly", "monthly", "interval", "cron"]
+_ON_MISSED_LITERAL = Literal["skip", "run_once", "backfill_all"]
+_CONCURRENCY_LITERAL = Literal["allow", "forbid", "replace"]
+
+
+class ScheduleCreate(BaseModel):
+    """POST /workflows/{workflow_id}/schedules body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(..., min_length=1, max_length=200)
+    schedule_kind: _SCHEDULE_KIND_LITERAL
+    config_json: dict[str, Any] = Field(default_factory=dict)
+    timezone: str | None = Field(
+        default=None,
+        max_length=64,
+        description=(
+            "IANA tz string. When omitted, defaults to the org's timezone (or UTC if that's unset)."
+        ),
+    )
+    starts_at: datetime
+    end_at: datetime | None = None
+    max_runs: int | None = Field(default=None, ge=1)
+    contact_id: uuid.UUID | None = None
+    on_missed: _ON_MISSED_LITERAL = "skip"
+    concurrency_policy: _CONCURRENCY_LITERAL = "forbid"
+
+
+class ScheduleUpdate(BaseModel):
+    """PATCH /schedules/{id} body — every field optional. NOTE:
+    ``active`` is deliberately absent; toggle via ``/pause`` and
+    ``/resume``. Server-owned fields are absent so ``extra="forbid"``
+    rejects them at 422."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    schedule_kind: _SCHEDULE_KIND_LITERAL | None = None
+    config_json: dict[str, Any] | None = None
+    timezone: str | None = Field(default=None, max_length=64)
+    starts_at: datetime | None = None
+    end_at: datetime | None = None
+    max_runs: int | None = Field(default=None, ge=1)
+    contact_id: uuid.UUID | None = None
+    on_missed: _ON_MISSED_LITERAL | None = None
+    concurrency_policy: _CONCURRENCY_LITERAL | None = None
+
+
+class ScheduleResponse(BaseModel):
+    """GET response — full schedule state including server-owned fields.
+    ``updated_at`` is the ETag source for the ``If-Match`` optimistic
+    lock on subsequent PATCH."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    org_id: uuid.UUID
+    workflow_id: uuid.UUID
+    contact_id: uuid.UUID | None
+    name: str
+    schedule_kind: str
+    config_json: dict[str, Any]
+    timezone: str
+    starts_at: datetime
+    end_at: datetime | None
+    next_run_at: datetime | None
+    last_run_at: datetime | None
+    runs_completed: int
+    max_runs: int | None
+    active: bool
+    deactivation_reason: str | None
+    on_missed: str
+    concurrency_policy: str
+    consecutive_empty_fires: int
+    created_by_user_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SchedulePreviewRequest(BaseModel):
+    """POST /schedules/preview body — Builder-only surface. Computes
+    the next 5 fires without persisting anything. Reuses the same
+    validation the create path uses so the preview 422 matches the
+    save 422."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schedule_kind: _SCHEDULE_KIND_LITERAL
+    config_json: dict[str, Any] = Field(default_factory=dict)
+    timezone: str = Field(..., max_length=64)
+    starts_at: datetime
+
+
+class SchedulePreviewResponse(BaseModel):
+    """Preview response — next 5 fire datetimes in UTC. Empty list
+    is a legal outcome (e.g., an interval schedule whose start_at is
+    minutes away from ending)."""
+
+    fires: list[datetime]
+
+
 __all__ = [
     "ABStatsResponse",
     "EventWaitRead",
@@ -535,6 +655,11 @@ __all__ = [
     "NodePosition",
     "PairABRequest",
     "RollbackRequest",
+    "ScheduleCreate",
+    "SchedulePreviewRequest",
+    "SchedulePreviewResponse",
+    "ScheduleResponse",
+    "ScheduleUpdate",
     "WorkflowAnalyticsResponse",
     "WorkflowAnalyticsTotals",
     "WorkflowAnalyticsWindow",

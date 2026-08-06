@@ -1689,6 +1689,97 @@ async def resume_schedule_service(
     return refreshed  # type: ignore[return-value]
 
 
+async def get_schedule_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    schedule_id: uuid.UUID,
+) -> WorkflowSchedule:
+    """Single-row read — raises :class:`ScheduleNotFound` on miss so
+    the router 404s cleanly (no info leak on cross-org)."""
+    schedule = await _da.get_schedule_by_id_and_org(session, org_id=org_id, schedule_id=schedule_id)
+    if schedule is None:
+        raise ScheduleNotFound(f"schedule {schedule_id} not found in org {org_id}")
+    return schedule
+
+
+async def list_schedules_for_workflow_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+) -> list[WorkflowSchedule]:
+    """All schedules attached to a workflow, oldest-first. Cross-org
+    guard: workflow must belong to ``org_id`` — else
+    :class:`WorkflowNotFound` (router → 404)."""
+    workflow = await _da.get_workflow(session, org_id=org_id, workflow_id=workflow_id)
+    if workflow is None:
+        raise WorkflowNotFound(f"workflow {workflow_id} not found in org {org_id}")
+    return await _da.list_schedules_for_workflow(session, org_id=org_id, workflow_id=workflow_id)
+
+
+def preview_next_fires_service(
+    *,
+    schedule_kind: ScheduleKind,
+    config_json: dict[str, Any],
+    timezone_name: str,
+    starts_at: datetime,
+    count: int = 5,
+    now: datetime | None = None,
+) -> list[datetime]:
+    """Pure function — compute the next N fires for a candidate
+    schedule config without persisting anything. Builder calls this
+    on keystroke (debounced client-side) to render the "next 5 fires"
+    preview.
+
+    Runs the same validator + recurrence math the create path uses so
+    the preview 422 matches the save 422. Not marked ``async`` because
+    it never touches I/O; router awaits it via a no-op ``asyncio.run``
+    is unnecessary — call directly."""
+    now = now or datetime.now(UTC)
+    # Preview endpoints usually accept "starts_at now" as a
+    # convenience — the operator hasn't committed to a start date
+    # yet. Skip the "past starts_at" rejection for the preview path;
+    # everything else must validate.
+    effective_starts_at = max(starts_at, now)
+    _validate_config_and_bounds(
+        schedule_kind=schedule_kind,
+        config=config_json,
+        starts_at=effective_starts_at,
+        end_at=None,
+        max_runs=None,
+        tz_name=timezone_name,
+        now=now,
+    )
+
+    # Build a synthetic in-memory schedule for iterative compute.
+    ephemeral = WorkflowSchedule(
+        name="_preview",
+        schedule_kind=schedule_kind,
+        config_json=config_json,
+        timezone=timezone_name,
+        starts_at=effective_starts_at,
+        on_missed=OnMissedPolicy.skip,
+        concurrency_policy=ConcurrencyPolicy.forbid,
+    )
+    fires: list[datetime] = []
+    cursor = now
+    for _ in range(count):
+        try:
+            nxt = compute_next_run_at(ephemeral, now=cursor)
+        except (ScheduleValidationError, RecurrenceTimeout):
+            break
+        if not fires or nxt > fires[-1]:
+            fires.append(nxt)
+            # Feed forward: use the fire time as the anchor for the
+            # next compute so we get 5 distinct future datetimes.
+            cursor = nxt
+            ephemeral.last_run_at = nxt
+        else:
+            break
+    return fires
+
+
 async def delete_schedule_service(
     session: AsyncSession,
     *,
@@ -2152,10 +2243,15 @@ def _count_missed_fires_snap(snap: _ScheduleSnapshot | WorkflowSchedule, *, now:
 
 
 def _isoformat_no_micros(dt: datetime) -> str:
-    """ETag string — second-precision ISO so client + server always
-    round-trip identically (microseconds get chopped when marshalled
-    through some header shapes)."""
-    return dt.replace(microsecond=0).isoformat()
+    """ETag string — second-precision UTC ISO so client + server
+    always round-trip identically. Normalizes tz to UTC and STRIPS
+    the tz suffix so a client that sends the ISO without ``+00:00``
+    (common when browsers proxy the header verbatim through a
+    ``split('.')[0]``-style shortcut) still matches. Any tz-aware
+    input is first converted to UTC; naive inputs are assumed UTC."""
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(UTC)
+    return dt.replace(microsecond=0, tzinfo=None).isoformat()
 
 
 def _to_json_safe(value: Any) -> Any:
@@ -2187,6 +2283,9 @@ __all__ = [
     "create_workflow",
     "delete_folder",
     "delete_schedule_service",
+    "get_schedule_service",
+    "list_schedules_for_workflow_service",
+    "preview_next_fires_service",
     "export_workflow",
     "get_ab_stats",
     "get_workflow",
