@@ -59,7 +59,7 @@ const STATUS_OPTIONS: Array<{
   { value: '', label: 'All statuses' },
   { value: 'draft', label: 'Draft' },
   { value: 'in_review', label: 'In review' },
-  { value: 'approved', label: 'Approved' },
+  { value: 'approved', label: 'Ready to publish' },
   { value: 'published', label: 'Published' },
   { value: 'archived', label: 'Archived' },
 ];
