@@ -44,20 +44,13 @@ from src.app.core.campaigns.schemas import (
     CampaignCreate,
     CampaignUpdate,
 )
-from src.app.core.contacts import service as contacts_service
-from src.app.core.contacts.models import Contact
-from src.app.core.conversations.adapters import ChannelMessageRef
-from src.app.core.tenants.models import Organization
 from src.app.core.campaigns.utils import (
     render_body,
     render_subject,
 )
-from src.app.core.email import data_access as email_da
-from src.app.core.email.models import EmailAccount, EmailAccountSyncState
-from src.app.core.templates.sanitizer import (
-    derive_plain_text,
-    sanitize_email_html,
-)
+from src.app.core.contacts import service as contacts_service
+from src.app.core.contacts.models import Contact
+from src.app.core.conversations.adapters import ChannelMessageRef
 from src.app.core.conversations.adapters.whatsapp import (
     WhatsAppNotConnected,
     WhatsAppRateLimited,
@@ -75,7 +68,14 @@ from src.app.core.conversations.registry import (
 from src.app.core.conversations.registry import (
     resolve as resolve_channel,
 )
+from src.app.core.email import data_access as email_da
+from src.app.core.email.models import EmailAccount, EmailAccountSyncState
 from src.app.core.integrations.whatsapp.models import WhatsAppTemplate
+from src.app.core.templates.sanitizer import (
+    derive_plain_text,
+    sanitize_email_html,
+)
+from src.app.core.tenants.models import Organization
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.db.queries import ensure_found, get_or_404
 
@@ -164,9 +164,7 @@ async def _check_email_sender_readiness(
     if campaign.email_account_id is None:
         return []
 
-    account = await email_da.get_account_by_id(
-        session, account_id=campaign.email_account_id
-    )
+    account = await email_da.get_account_by_id(session, account_id=campaign.email_account_id)
     if account is None:
         # Step 03's _resolve_email_sender already rejected this case at
         # create time. If it survived until enqueue it means the mailbox
@@ -179,19 +177,14 @@ async def _check_email_sender_readiness(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "Selected mailbox is not connected — reconnect it in "
-                "Email Sender Setup and retry."
+                "Selected mailbox is not connected — reconnect it in Email Sender Setup and retry."
             ),
         )
 
     org_settings = (
-        await session.execute(
-            select(OrgSettings).where(OrgSettings.org_id == campaign.org_id)
-        )
+        await session.execute(select(OrgSettings).where(OrgSettings.org_id == campaign.org_id))
     ).scalar_one_or_none()
-    strict = bool(
-        org_settings is not None and org_settings.require_full_domain_verification
-    )
+    strict = bool(org_settings is not None and org_settings.require_full_domain_verification)
 
     sender_domain = await get_domain_for_email(
         session, org_id=campaign.org_id, email_address=account.email_address
@@ -254,13 +247,9 @@ async def _suppress_bounced_contacts(
         return contact_ids, 0
 
     contacts_rows = (
-        await session.execute(
-            select(Contact.id, Contact.email).where(Contact.id.in_(contact_ids))
-        )
+        await session.execute(select(Contact.id, Contact.email).where(Contact.id.in_(contact_ids)))
     ).all()
-    email_by_contact = {
-        row[0]: (row[1] or "").lower() for row in contacts_rows if row[1]
-    }
+    email_by_contact = {row[0]: (row[1] or "").lower() for row in contacts_rows if row[1]}
 
     bounced_emails = {
         row[0].lower()
@@ -330,9 +319,7 @@ async def check_readiness(
 
     # Audience resolution — same call ``enqueue`` uses, so the count
     # the wizard shows matches what the start endpoint acts on.
-    contact_ids = await resolve_audience(
-        session, audience_filter=campaign.audience_filter
-    )
+    contact_ids = await resolve_audience(session, audience_filter=campaign.audience_filter)
     audience_size = len(contact_ids)
 
     excluded_opted_out = 0
@@ -354,9 +341,7 @@ async def check_readiness(
     if is_email:
         # --- Store Profile postal address (CAN-SPAM) ---------------
         org_settings = (
-            await session.execute(
-                select(OrgSettings).where(OrgSettings.org_id == campaign.org_id)
-            )
+            await session.execute(select(OrgSettings).where(OrgSettings.org_id == campaign.org_id))
         ).scalar_one_or_none()
         if not tracking_footer.has_required_address(org_settings):
             blockers.append(
@@ -376,9 +361,7 @@ async def check_readiness(
         # returns warnings for soft degradations. Wrap the raise into a
         # structured blocker instead so the endpoint stays 200.
         try:
-            email_warnings = await _check_email_sender_readiness(
-                session, campaign=campaign
-            )
+            email_warnings = await _check_email_sender_readiness(session, campaign=campaign)
             for note in email_warnings:
                 warnings.append({"code": "email_sender_degraded", "message": note})
         except HTTPException as exc:  # already 400 with a friendly detail
@@ -417,9 +400,7 @@ async def check_readiness(
                     email_opt_out = opt_out
                     email_opt_in_status = opt_status
 
-                decision = evaluate_email_contact(
-                    _StubContact(), allow_implicit=True
-                )
+                decision = evaluate_email_contact(_StubContact(), allow_implicit=True)
                 if decision.verdict == "block":
                     excluded_opted_out += 1
                 else:
@@ -809,9 +790,7 @@ async def enqueue(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str,
         # readiness endpoint is the structured surface).
         await _check_email_sender_readiness(session, campaign=campaign)
         org_settings = (
-            await session.execute(
-                _select(OrgSettings).where(OrgSettings.org_id == campaign.org_id)
-            )
+            await session.execute(_select(OrgSettings).where(OrgSettings.org_id == campaign.org_id))
         ).scalar_one_or_none()
         if not tracking_footer.has_required_address(org_settings):
             raise HTTPException(
@@ -1097,12 +1076,28 @@ async def dispatch_chunk(
     # in :func:`_resolve_named_wa_variables` — every contact in the
     # chunk shares the same org so we skip a re-fetch per row.
     org: Organization | None = None
+    # Once-per-chunk named-body fallback. The WA cache row's ``body``
+    # column is Meta's positional copy — we lose named variable info
+    # after the first Meta sync. Fetch the central-library row's
+    # ``body_text`` (still named) so ``_resolve_named_wa_variables``
+    # can recover the ordered param names when ``body_components``
+    # is missing/empty on older synced rows.
+    named_body_from_central: str | None = None
     if campaign.channel == ConversationChannel.whatsapp and template_row is not None:
         org = (
-            await session.execute(
-                select(Organization).where(Organization.id == campaign.org_id)
-            )
+            await session.execute(select(Organization).where(Organization.id == campaign.org_id))
         ).scalar_one_or_none()
+        central_id = getattr(template_row, "message_template_id", None)
+        if central_id is not None:
+            from src.app.core.templates.models import MessageTemplate
+
+            central_row = (
+                await session.execute(
+                    select(MessageTemplate.body_text).where(MessageTemplate.id == central_id)
+                )
+            ).scalar_one_or_none()
+            if isinstance(central_row, str) and central_row.strip():
+                named_body_from_central = central_row
 
     # Step 22 — DPDP opt-in pre-flight check. Marketing campaigns on
     # opted-out contacts must never ship; the dashboard's failure
@@ -1341,9 +1336,7 @@ async def dispatch_chunk(
                     body_html=rendered_html,
                 )
             except _HTTPExc as exc:
-                logger.info(
-                    "campaign email send rejected", extra={"contact_id": str(cid)}
-                )
+                logger.info("campaign email send rejected", extra={"contact_id": str(cid)})
                 await _mark_message(
                     session,
                     campaign_id=campaign_id,
@@ -1353,9 +1346,7 @@ async def dispatch_chunk(
                 )
                 continue
             except Exception as exc:  # provider-side transient failure
-                logger.exception(
-                    "campaign email send failed", extra={"contact_id": str(cid)}
-                )
+                logger.exception("campaign email send failed", extra={"contact_id": str(cid)})
                 await _mark_message(
                     session,
                     campaign_id=campaign_id,
@@ -1373,8 +1364,7 @@ async def dispatch_chunk(
                 campaign_id=campaign_id,
                 contact_id=cid,
                 new_status=CampaignMessageStatus.sent,
-                channel_message_id=result.provider_message_id
-                or str(result.message.id),
+                channel_message_id=result.provider_message_id or str(result.message.id),
                 sent_at=result.message.sent_at or datetime.now(UTC),
             )
             continue
@@ -1418,7 +1408,7 @@ async def dispatch_chunk(
                     # campaign row wins over the auto value for the
                     # same positional slot.
                     named_variables = _resolve_named_wa_variables(
-                        template_row, contact, org
+                        template_row, contact, org, named_body_from_central
                     )
                     operator_variables = _resolve_template_variables(campaign, contact)
                     variables = {**named_variables, **operator_variables}
@@ -1644,10 +1634,39 @@ def _get_contact_field(contact: Contact, field_name: str) -> str:
     return ""
 
 
+def _extract_named_body_from_components(
+    template_row: WhatsAppTemplate,
+) -> str | None:
+    """Pull the ORIGINAL named-variable BODY text out of
+    ``template_row.body_components``.
+
+    Rationale: ``template_row.body`` gets overwritten by the sync-from-
+    Meta job with Meta's positional copy (``{{1}}``, ``{{2}}``), so
+    running ``convert_to_positional`` on it recovers nothing. The
+    ``body_components`` column, populated at submit-time, still carries
+    the pre-conversion named text (``{{contact.first_name}}``).
+
+    Returns None when ``body_components`` is missing/empty or has no
+    BODY entry — caller falls back to the central-library row.
+    """
+    comps = template_row.body_components
+    if not isinstance(comps, list):
+        return None
+    for comp in comps:
+        if not isinstance(comp, dict):
+            continue
+        if str(comp.get("type") or "").upper() == "BODY":
+            text = comp.get("text")
+            if isinstance(text, str) and text.strip():
+                return text
+    return None
+
+
 def _resolve_named_wa_variables(
     template_row: WhatsAppTemplate,
     contact: Contact,
     org: Organization | None,
+    named_body_override: str | None = None,
 ) -> dict[int, str]:
     """Derive Meta positional params (``{1: ..., 2: ...}``) from the
     CRM template's named variables (``{{contact.first_name}}``,
@@ -1655,19 +1674,28 @@ def _resolve_named_wa_variables(
 
     Meta only accepts positional placeholders in the actual template
     body, so ``convert_all_components`` rewrites the CRM body at
-    Meta-submit time. At send-time we run the same conversion against
-    ``template_row.body`` to recover the ordered param names and
-    resolve each one — the positional index therefore always agrees
-    with what Meta approved.
+    Meta-submit time. At send-time we re-run the same conversion —
+    but against the ORIGINAL named body (from ``body_components`` or
+    the central-library row), never ``template_row.body`` which the
+    Meta sync overwrites with the positional copy.
 
-    Returns an empty dict when the body has no named vars (pure
-    positional or vars-free template).
+    Source resolution order:
+      1. ``named_body_override`` if the caller supplied one (usually
+         the central-library ``body_text`` fetched once per chunk).
+      2. The BODY entry inside ``template_row.body_components``.
+
+    Returns an empty dict when neither source yields a body with
+    named vars (pure positional or vars-free template).
     """
     from src.app.core.integrations.whatsapp.meta_variables import (
         convert_to_positional,
     )
 
-    _, param_names = convert_to_positional(template_row.body or "")
+    named_body = named_body_override or _extract_named_body_from_components(template_row)
+    if not named_body:
+        return {}
+
+    _, param_names = convert_to_positional(named_body)
     if not param_names:
         return {}
 
@@ -1684,9 +1712,7 @@ def _resolve_named_wa_variables(
     return resolved
 
 
-def _build_wa_variable_context(
-    contact: Contact, org: Organization | None
-) -> dict[str, Any]:
+def _build_wa_variable_context(contact: Contact, org: Organization | None) -> dict[str, Any]:
     """Build the nested dict the WA variable resolver reads. Mirrors
     :func:`core.templates.render.build_context` but derives
     ``contact.first_name`` / ``last_name`` from ``full_name`` (the
@@ -1916,15 +1942,19 @@ async def apply_email_status(
     # an already-failed row still stamp bounced_at + bounce_type so the
     # UI can show why (e.g. the send succeeded then bounced back).
     is_bounce = email_status == "bounced"
-    if row.status == CampaignMessageStatus.failed and not is_bounce and email_status != "unsubscribed":
+    if (
+        row.status == CampaignMessageStatus.failed
+        and not is_bounce
+        and email_status != "unsubscribed"
+    ):
         return False
 
     new_status, ts_column = mapping
     changed = False
 
-    if new_status is not None and _EMAIL_STATUS_ORDER.get(
-        new_status, 0
-    ) > _EMAIL_STATUS_ORDER.get(row.status, 0):
+    if new_status is not None and _EMAIL_STATUS_ORDER.get(new_status, 0) > _EMAIL_STATUS_ORDER.get(
+        row.status, 0
+    ):
         row.status = new_status
         changed = True
 
@@ -1937,9 +1967,7 @@ async def apply_email_status(
             row.bounce_type = bounce_type
             changed = True
         if row.error is None:
-            row.error = (
-                error or f"email bounced ({bounce_type or 'hard'})"
-            )[:512]
+            row.error = (error or f"email bounced ({bounce_type or 'hard'})")[:512]
             changed = True
 
     if changed:
