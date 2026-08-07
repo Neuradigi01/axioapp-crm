@@ -99,7 +99,13 @@ export class ConversationsPageComponent {
 
   protected readonly items = signal<Conversation[]>([]);
   protected readonly loading = signal(false);
+  /** Errors from the list / thread load paths. Rendered by the header
+   *  banner. Cleared on next reload. */
   protected readonly loadError = signal<string | null>(null);
+  /** Errors from send / patch / react actions. Rendered by the same
+   *  banner but labelled per-action so a "Could not update reaction"
+   *  toast doesn't read like a list-load failure. */
+  protected readonly sendError = signal<string | null>(null);
 
   protected readonly selectedId = signal<string | null>(null);
   protected readonly detail = signal<ConversationDetail | null>(null);
@@ -163,6 +169,17 @@ export class ConversationsPageComponent {
    * the same head element. */
   private lastSeenNotificationId: string | null = null;
 
+  /** Coalesce bursty WS notifications (10 inbound msgs in one second)
+   *  into a single list-reload + at-most-one thread-refresh per window.
+   *  Without this every notification fires a full `GET /conversations`
+   *  plus a `hydrateContacts` forkJoin. */
+  private static readonly RELOAD_DEBOUNCE_MS = 300;
+  private pendingListReloadTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingDetailReload: {
+    id: string;
+    timer: ReturnType<typeof setTimeout>;
+  } | null = null;
+
   constructor() {
     // Seed the filter from the persisted assignee BEFORE the first
     // list call so the request goes out with the right `?assigned_to=…`.
@@ -181,6 +198,19 @@ export class ConversationsPageComponent {
       this.lastSeenNotificationId = head.id;
       if (head.type !== 'conversation.message') return;
       this.onIncomingNotification(head.payload);
+    });
+
+    // Clear any coalescing timers so we don't run a reload after the
+    // component has been torn down (would leak subscriptions).
+    this.destroyRef.onDestroy(() => {
+      if (this.pendingListReloadTimer !== null) {
+        clearTimeout(this.pendingListReloadTimer);
+        this.pendingListReloadTimer = null;
+      }
+      if (this.pendingDetailReload !== null) {
+        clearTimeout(this.pendingDetailReload.timer);
+        this.pendingDetailReload = null;
+      }
     });
   }
 
@@ -377,28 +407,12 @@ export class ConversationsPageComponent {
 
     sendCall.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (real) => {
-        this.detail.update((d) =>
-          d
-            ? {
-                ...d,
-                messages: d.messages.map((m) => (m.id === optimistic.id ? real : m)),
-              }
-            : d,
-        );
+        this.swapOptimisticMessage(id, optimistic.id, real);
         this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
       },
       error: (err: HttpErrorResponse) => {
-        // Roll the optimistic row back; show the error inline on the
-        // thread so the user notices.
-        this.detail.update((d) =>
-          d
-            ? {
-                ...d,
-                messages: d.messages.filter((m) => m.id !== optimistic.id),
-              }
-            : d,
-        );
-        this.loadError.set(extractApiError(err) ?? 'Could not send message.');
+        this.removeOptimisticMessage(id, optimistic.id);
+        this.sendError.set(extractApiError(err) ?? 'Could not send message.');
       },
     });
   }
@@ -436,26 +450,12 @@ export class ConversationsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (real) => {
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.map((m) => (m.id === optimistic.id ? real : m)),
-                }
-              : d,
-          );
+          this.swapOptimisticMessage(id, optimistic.id, real);
           this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
         },
         error: (err: HttpErrorResponse) => {
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.filter((m) => m.id !== optimistic.id),
-                }
-              : d,
-          );
-          this.loadError.set(extractApiError(err) ?? 'Could not post the note.');
+          this.removeOptimisticMessage(id, optimistic.id);
+          this.sendError.set(extractApiError(err) ?? 'Could not post the note.');
         },
       });
   }
@@ -478,17 +478,13 @@ export class ConversationsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.map((m) => (m.id === updated.id ? updated : m)),
-                }
-              : d,
-          );
+          this.mutateDetailForConversation(conversationId, (d) => ({
+            ...d,
+            messages: d.messages.map((m) => (m.id === updated.id ? updated : m)),
+          }));
         },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(extractApiError(err) ?? 'Could not update reaction.');
+          this.sendError.set(extractApiError(err) ?? 'Could not update reaction.');
         },
       });
   }
@@ -543,26 +539,12 @@ export class ConversationsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (real) => {
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.map((m) => (m.id === optimistic.id ? real : m)),
-                }
-              : d,
-          );
+          this.swapOptimisticMessage(id, optimistic.id, real);
           this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
         },
         error: (err: HttpErrorResponse) => {
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.filter((m) => m.id !== optimistic.id),
-                }
-              : d,
-          );
-          this.loadError.set(extractApiError(err) ?? 'Could not send interactive message.');
+          this.removeOptimisticMessage(id, optimistic.id);
+          this.sendError.set(extractApiError(err) ?? 'Could not send interactive message.');
         },
       });
   }
@@ -621,27 +603,12 @@ export class ConversationsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (msg) => {
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.map((x) => (x.id === optimistic.id ? msg : x)),
-                }
-              : d,
-          );
+          this.swapOptimisticMessage(id, optimistic.id, msg);
+          this.bumpListLastMessage(id, msg.sent_at ?? msg.created_at);
         },
         error: (err: HttpErrorResponse) => {
-          // Roll back the optimistic placeholder + surface the
-          // backend error in the standard loadError banner.
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.filter((x) => x.id !== optimistic.id),
-                }
-              : d,
-          );
-          this.loadError.set(extractApiError(err) ?? 'Could not share location.');
+          this.removeOptimisticMessage(id, optimistic.id);
+          this.sendError.set(extractApiError(err) ?? 'Could not share location.');
         },
       });
   }
@@ -695,26 +662,12 @@ export class ConversationsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (real) => {
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.map((m) => (m.id === optimistic.id ? real : m)),
-                }
-              : d,
-          );
+          this.swapOptimisticMessage(id, optimistic.id, real);
           this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
         },
         error: (err: HttpErrorResponse) => {
-          this.detail.update((d) =>
-            d
-              ? {
-                  ...d,
-                  messages: d.messages.filter((m) => m.id !== optimistic.id),
-                }
-              : d,
-          );
-          this.loadError.set(extractApiError(err) ?? 'Could not send media.');
+          this.removeOptimisticMessage(id, optimistic.id);
+          this.sendError.set(extractApiError(err) ?? 'Could not send media.');
         },
       });
   }
@@ -769,7 +722,7 @@ export class ConversationsPageComponent {
           this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
         },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(extractApiError(err) ?? 'Could not update AI handling.');
+          this.sendError.set(extractApiError(err) ?? 'Could not update AI handling.');
         },
       });
   }
@@ -792,14 +745,19 @@ export class ConversationsPageComponent {
           this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
         },
         error: (err: HttpErrorResponse) => {
-          this.loadError.set(extractApiError(err) ?? 'Could not update conversation status.');
+          this.sendError.set(extractApiError(err) ?? 'Could not update conversation status.');
         },
       });
+  }
+
+  protected dismissSendError(): void {
+    this.sendError.set(null);
   }
 
   protected reloadList(): void {
     this.loading.set(true);
     this.loadError.set(null);
+    this.sendError.set(null);
     this.api
       .list({ ...this.filters(), size: 100 })
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -881,12 +839,79 @@ export class ConversationsPageComponent {
       typeof payload?.['conversation_id'] === 'string'
         ? (payload['conversation_id'] as string)
         : null;
-    // Refresh the list so order + unread counts reflect the new state.
-    this.reloadList();
-    // Reload the thread only if the conversation in question is open.
-    if (incomingId && incomingId === this.selectedId()) {
-      this.loadDetail(incomingId);
+
+    // Coalesce list-reload calls: a burst of N inbound messages fires
+    // one reload after the debounce window rather than N sequential
+    // `GET /conversations?size=100` + hydrateContacts fan-outs.
+    if (this.pendingListReloadTimer === null) {
+      this.pendingListReloadTimer = setTimeout(() => {
+        this.pendingListReloadTimer = null;
+        this.reloadList();
+      }, ConversationsPageComponent.RELOAD_DEBOUNCE_MS);
     }
+
+    // Same treatment for the thread refresh — only fire when the
+    // incoming notification is for the currently-open conversation, and
+    // coalesce successive events for the same id.
+    if (incomingId && incomingId === this.selectedId()) {
+      if (this.pendingDetailReload !== null) {
+        clearTimeout(this.pendingDetailReload.timer);
+      }
+      const id = incomingId;
+      const timer = setTimeout(() => {
+        this.pendingDetailReload = null;
+        // Guard against a thread switch during the debounce window.
+        if (this.selectedId() === id) this.loadDetail(id);
+      }, ConversationsPageComponent.RELOAD_DEBOUNCE_MS);
+      this.pendingDetailReload = { id, timer };
+    }
+  }
+
+  /** Splice an optimistic bubble into the current thread ONLY when the
+   *  user hasn't switched conversations since the send was fired. Every
+   *  optimistic-send + rollback path routes through this helper so the
+   *  guard is applied uniformly. */
+  private mutateDetailForConversation(
+    conversationId: string,
+    mutator: (d: ConversationDetail) => ConversationDetail,
+  ): void {
+    this.detail.update((d) => {
+      if (!d) return d;
+      if (d.conversation.id !== conversationId) return d;
+      return mutator(d);
+    });
+  }
+
+  /** Replace an optimistic (`tmp-…`) row with the server row. Skips the
+   *  swap when the server row already appears in the thread (WS refresh
+   *  race) so we never render the same message twice. */
+  private swapOptimisticMessage(
+    conversationId: string,
+    optimisticId: string,
+    real: ConversationMessage,
+  ): void {
+    this.mutateDetailForConversation(conversationId, (d) => {
+      const alreadyPresent = d.messages.some((m) => m.id === real.id);
+      const nextMessages = d.messages.reduce<ConversationMessage[]>((acc, m) => {
+        if (m.id === optimisticId) {
+          // If the real row landed via WS first, drop the placeholder.
+          if (alreadyPresent) return acc;
+          acc.push(real);
+          return acc;
+        }
+        acc.push(m);
+        return acc;
+      }, []);
+      return { ...d, messages: nextMessages };
+    });
+  }
+
+  /** Drop an optimistic row on send failure. */
+  private removeOptimisticMessage(conversationId: string, optimisticId: string): void {
+    this.mutateDetailForConversation(conversationId, (d) => ({
+      ...d,
+      messages: d.messages.filter((m) => m.id !== optimisticId),
+    }));
   }
 
   private bumpListLastMessage(id: string, isoTs: string): void {
@@ -894,8 +919,15 @@ export class ConversationsPageComponent {
       rows
         .map((r) => (r.id === id ? { ...r, last_message_at: isoTs } : r))
         .sort((a, b) => {
-          const av = a.last_message_at ?? '';
-          const bv = b.last_message_at ?? '';
+          // Match the server's `ORDER BY last_message_at DESC NULLS LAST`.
+          // Sorting on empty-string fallback made null rows leak to the
+          // top of the list; explicit null sentinels keep client + server
+          // rendering the same order.
+          const av = a.last_message_at;
+          const bv = b.last_message_at;
+          if (av === bv) return 0;
+          if (!av) return 1;
+          if (!bv) return -1;
           return bv.localeCompare(av);
         }),
     );

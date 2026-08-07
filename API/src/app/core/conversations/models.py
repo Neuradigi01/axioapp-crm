@@ -182,6 +182,17 @@ class Message(Base, TenantScoped):
             "conversation_id",
             "created_at",
         ),
+        # WhatsApp Cloud API retries webhook deliveries for up to 7 days
+        # on any non-2xx response. Partial unique index dedups inbound
+        # rows per conversation; outbound rows have wamid NULL until Meta
+        # ack, so the predicate scopes uniqueness to persisted wamids only.
+        Index(
+            "uq_messages_conv_wamid",
+            "conversation_id",
+            "channel_message_id",
+            unique=True,
+            postgresql_where=sql_text("channel_message_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

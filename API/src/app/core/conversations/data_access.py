@@ -224,6 +224,24 @@ async def get_message_by_channel_message_id(
     ).scalar_one_or_none()
 
 
+async def get_last_inbound_message(
+    session: AsyncSession, conversation_id: uuid.UUID
+) -> Message | None:
+    """Newest ``direction='in'`` message on this conversation, or
+    ``None`` if the thread has no inbounds. Used by the email-reply
+    path to auto-thread the outgoing MIME on the customer's freshest
+    message. Single-row lookup on the
+    ``(conversation_id, created_at)`` index."""
+    stmt = (
+        select(Message)
+        .where(Message.conversation_id == conversation_id)
+        .where(Message.direction == MessageDirection.in_)
+        .order_by(Message.created_at.desc(), Message.id.desc())
+        .limit(1)
+    )
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
 async def count_outbound_messages_for_conversation(
     session: AsyncSession, conversation_id: uuid.UUID
 ) -> int:
@@ -434,6 +452,7 @@ __all__ = [
     "delete_tag_row",
     "find_conversation_for_channel_external",
     "get_conversation_by_id",
+    "get_last_inbound_message",
     "get_message_by_channel_message_id",
     "get_message_by_id",
     "get_tag_assignment",

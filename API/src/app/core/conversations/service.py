@@ -126,7 +126,17 @@ async def list_messages(
     """Thin passthrough — service exists so the router can add
     business rules later (visibility, redaction) without touching the
     DAL contract. ``limit=None`` returns the whole thread (used by the
-    export paths); pass ``limit`` for the paginated thread view."""
+    export paths); pass ``limit`` for the paginated thread view.
+
+    When ``before_id`` is supplied it must resolve to a real row on
+    this conversation; otherwise a stale cursor would silently return
+    the newest N messages (index look-past behaviour). Raise 404 instead.
+    """
+    if before_id is not None:
+        ensure_found(
+            await _da.get_message_by_id(session, before_id),
+            entity="message",
+        )
     return await _da.list_messages_for_conversation(
         session, conversation_id, limit=limit, before_id=before_id
     )
@@ -218,14 +228,9 @@ async def send_email_reply(
         account_id = (live[0] if live else sendable[0]).id
 
     # Auto-thread on the newest inbound message so Gmail / Outlook
-    # collapse the reply into the customer's original thread.
-    thread_messages = await _da.list_messages_for_conversation(
-        session, conversation_id, limit=50
-    )
-    last_inbound = next(
-        (m for m in reversed(thread_messages) if m.direction == MessageDirection.in_),
-        None,
-    )
+    # collapse the reply into the customer's original thread. Single
+    # indexed row instead of pulling the last 50 and scanning.
+    last_inbound = await _da.get_last_inbound_message(session, conversation_id)
 
     # Subject: fall back to a neutral "Re:" — Gmail / Outlook thread on
     # the `In-Reply-To` / `References` MIME headers we set below, so
@@ -478,6 +483,20 @@ async def receive_webhook(
         )
         await session.commit()
         return None
+
+    # WhatsApp Cloud API retries webhooks for up to 7 days on non-2xx.
+    # Short-circuit if we've already persisted this wamid on this
+    # conversation — the DB has a partial unique index guarding it,
+    # but skipping the insert avoids an IntegrityError round-trip and
+    # keeps the response idempotent (returns the existing row).
+    if parsed.channel_message_id:
+        existing = await _da.get_message_by_channel_message_id(
+            session,
+            channel_message_id=parsed.channel_message_id,
+            conversation_id=conv.id,
+        )
+        if existing is not None:
+            return existing
 
     # Step 7: resolve the quoted-reply target back to our UUID by
     # looking up the wamid on `Message.channel_message_id`. If we don't
