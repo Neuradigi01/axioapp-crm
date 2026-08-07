@@ -21,6 +21,7 @@ import {
   CatalogCategoriesApiService,
   CatalogCategory,
   CatalogItem,
+  buildCatalogImageHref,
 } from './catalog-api.service';
 import { AddItemModalComponent } from './add-item-modal.component';
 import { ViewItemModalComponent } from './view-item-modal.component';
@@ -236,7 +237,7 @@ export class CatalogPageComponent {
   protected imageHref(item: CatalogItem): string | null {
     if (!item.image_url) return null;
     if (this.brokenImages().has(item.id)) return null;
-    return `${this.apiOrigin}${item.image_url}`;
+    return buildCatalogImageHref(this.apiOrigin, item.image_url, item);
   }
 
   /** Tracks which product ids have already emitted an ``<img error>``

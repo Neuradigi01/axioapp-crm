@@ -191,12 +191,34 @@ export class TemplateEditorPageComponent {
     }
     // Internal review lock — junior roles stay locked as before, but
     // holders of ``templates.publish`` (Owner + Admin) can edit through
-    // in_review / approved / published states directly. That matches
-    // the workflow bypass we already applied for the Approve / Publish
-    // transitions — no more "duplicate to fork" friction for solo
-    // operators.
+    // in_review / approved / published states directly.
     if (!LOCKED_STATUSES.has(t.internal_status)) return false;
     return !this.canPublish();
+  });
+
+  /** Why the template is locked, so the header banner can show
+   *  guidance the operator can actually act on:
+   *
+   *  * ``meta_approved`` — WhatsApp has approved the template body.
+   *    It's part of Meta's stored template — editing locally would
+   *    diverge from what Meta actually sends. Only escape: archive
+   *    this row and author a new template with the changes you want.
+   *  * ``meta_pending`` — awaiting Meta review. Locked so the body
+   *    we submitted stays the same until Meta responds. Refresh
+   *    status to speed the check.
+   *  * ``internal_review`` — the CRM's own review workflow is
+   *    holding the template. A reviewer with the review permission
+   *    can approve, reject, or request changes to unlock.
+   *  * ``null`` — not locked.
+   */
+  protected readonly lockKind = computed<
+    'meta_approved' | 'meta_pending' | 'internal_review' | null
+  >(() => {
+    const t = this.template();
+    if (t === null || !this.locked()) return null;
+    if (t.external_status === 'approved') return 'meta_approved';
+    if (t.external_status === 'pending') return 'meta_pending';
+    return 'internal_review';
   });
 
   /** ``true`` when channel = whatsapp and the current name value fails

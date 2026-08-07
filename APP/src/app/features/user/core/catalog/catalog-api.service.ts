@@ -39,6 +39,20 @@ export interface CatalogListResponse {
   size: number;
 }
 
+/** Anchor a server-relative `/files/...` URL to the API origin and
+ *  append `?v={updated_at}` so the browser re-fetches after an image
+ *  swap. The backend deliberately re-uses the same storage path per
+ *  item and bumps `updated_at`; without this suffix, the cached
+ *  bytes render and the operator sees the stale image on cards. */
+export function buildCatalogImageHref(
+  apiOrigin: string,
+  url: string,
+  item: Pick<CatalogItem, 'id' | 'updated_at'>,
+): string {
+  const stamp = item.updated_at ?? item.id;
+  return `${apiOrigin}${url}?v=${encodeURIComponent(stamp)}`;
+}
+
 export interface CatalogItemCreate {
   sku: string;
   name: string;

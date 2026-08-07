@@ -184,15 +184,44 @@
       </div>
     </div>
 
-    @if (locked()) {
+    @if (lockKind() === 'meta_approved') {
       <div
         class="mt-3 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400"
       >
-        <strong>Locked for review.</strong>
+        <strong>Approved by WhatsApp — cannot be edited.</strong>
+        WhatsApp locks the exact body it approved, so this template can no longer be changed. To
+        make changes, click
+        <strong>Archive</strong>
+        above, then create a new template with the updated content and submit it for approval.
+        <div class="mt-1 text-xs text-amber-400/80">
+          Tip: give the new template a versioned name like
+          <code class="font-mono">{{ template()?.name }}_v2</code>
+          so old campaigns still point at this one until you're ready to switch them over.
+        </div>
+      </div>
+    } @else if (lockKind() === 'meta_pending') {
+      <div
+        class="mt-3 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400"
+      >
+        <strong>Awaiting WhatsApp review.</strong>
+        You can't edit while Meta is reviewing — changing the body now would break the pending
+        submission. Click
+        <strong>Refresh status</strong>
+        to re-check Meta (usually 5–30 minutes for Utility templates, up to 24 h for Marketing). If
+        Meta rejects, you'll get options to fix and resubmit.
+      </div>
+    } @else if (lockKind() === 'internal_review') {
+      <div
+        class="mt-3 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400"
+      >
+        <strong>Locked for internal review.</strong>
         This template is in
         <code class="font-mono">{{ template()?.internal_status }}</code>
-        — to edit, a reviewer must move it back to draft via Reject / Request changes (Step 8
-        modal). Use Duplicate to fork an editable copy.
+        and can't be edited until a reviewer approves or rejects it. If you have the
+        <em>templates.review</em>
+        permission you'll see a
+        <strong>Review</strong>
+        button above; otherwise ask your Admin or Owner to review it.
       </div>
     }
     @if (template()?.external_status === 'rejected') {
