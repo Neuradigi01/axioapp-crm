@@ -211,6 +211,10 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
       }),
     ]);
     fixture.detectChanges();
+    // The template picker lives on step 2 of the wizard; flip forward
+    // so the picker rows render into the DOM before we assert on them.
+    (fixture.componentInstance as unknown as { step: { set: (v: 1 | 2 | 3) => void } }).step.set(2);
+    fixture.detectChanges();
 
     const text: string = fixture.nativeElement.textContent ?? '';
     expect(text).toContain('welcome_offer');
@@ -242,7 +246,10 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
     fixture.detectChanges();
     const cmp = fixture.componentInstance as unknown as {
       selectedTemplateId: () => string | null;
+      step: { set: (v: 1 | 2 | 3) => void };
     };
+    cmp.step.set(2);
+    fixture.detectChanges();
 
     const buttons = fixture.nativeElement.querySelectorAll(
       'button[role="option"]',
@@ -288,8 +295,10 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
     );
     const cmp = fixture.componentInstance as unknown as {
       form: { controls: { channel: { setValue: (v: string) => void } } };
+      step: { set: (v: 1 | 2 | 3) => void };
     };
     cmp.form.controls.channel.setValue('email');
+    cmp.step.set(2);
     fixture.detectChanges();
 
     // No badge is rendered for non-WA channels — the badge label from
@@ -332,8 +341,10 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
       form: { controls: { channel: { setValue: (v: string) => void } } };
       selectedTemplateId: { set: (v: string | null) => void };
       templateVariableNumbers: () => number[];
+      step: { set: (v: 1 | 2 | 3) => void };
     };
     cmp.form.controls.channel.setValue('email');
+    cmp.step.set(2);
     fixture.detectChanges();
     cmp.selectedTemplateId.set('tpl-email-1');
     fixture.detectChanges();
@@ -350,9 +361,14 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
     const fixture = makeFixture([], [makeEmailAccount()]);
     const cmp = fixture.componentInstance as unknown as {
       form: { controls: { channel: { setValue: (v: string) => void } } };
+      step: { set: (v: 1 | 2 | 3) => void };
     };
 
-    // WhatsApp default — the Email fieldset stays hidden.
+    // Sender identity lives on step 2. Flip forward before the assertions.
+    cmp.step.set(2);
+    fixture.detectChanges();
+
+    // WhatsApp default — the Email fieldset stays hidden even on step 2.
     let text: string = fixture.nativeElement.textContent ?? '';
     expect(text).not.toContain('Email sender identity');
 
@@ -377,8 +393,10 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
     const fixture = makeFixture([], []);
     const cmp = fixture.componentInstance as unknown as {
       form: { controls: { channel: { setValue: (v: string) => void } } };
+      step: { set: (v: 1 | 2 | 3) => void };
     };
     cmp.form.controls.channel.setValue('email');
+    cmp.step.set(2);
     fixture.detectChanges();
 
     const text: string = fixture.nativeElement.textContent ?? '';
@@ -466,7 +484,6 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
           sender_name: { setValue: (v: string | null) => void; value: string | null };
           subject: { setValue: (v: string | null) => void; value: string | null };
           preheader: { setValue: (v: string | null) => void; value: string | null };
-          body_html: { setValue: (v: string) => void; value: string };
         };
       };
     };
@@ -475,7 +492,6 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
     cmp.form.controls.sender_name.setValue('Your Shop');
     cmp.form.controls.subject.setValue('July deals');
     cmp.form.controls.preheader.setValue('This month picks');
-    cmp.form.controls.body_html.setValue('<p>Hi</p>');
 
     cmp.form.controls.channel.setValue('whatsapp');
     fixture.detectChanges();
@@ -484,85 +500,50 @@ describe('CreateCampaignModalComponent — Step 15 picker swap', () => {
     expect(cmp.form.controls.sender_name.value).toBeNull();
     expect(cmp.form.controls.subject.value).toBeNull();
     expect(cmp.form.controls.preheader.value).toBeNull();
-    expect(cmp.form.controls.body_html.value).toBe('');
   });
 
-  // --- Campaigns v1 Step 04 — inline HTML composer + payload routing ---
+  // --- Stepper (templates-only rewrite) ---
 
-  it('renders the HTML composer only when Email is picked and no template is selected', () => {
-    const fixture = makeFixture([], [makeEmailAccount()]);
+  it('starts on step 1 and blocks nextStep until name + audience are set', () => {
+    const fixture = makeFixture();
     const cmp = fixture.componentInstance as unknown as {
-      form: { controls: { channel: { setValue: (v: string) => void } } };
-      selectedTemplateId: { set: (v: string | null) => void };
+      step: () => 1 | 2 | 3;
+      nextStep: () => void;
+      form: { controls: { name: { setValue: (v: string) => void } } };
     };
-    // WhatsApp default — no composer.
-    expect(fixture.nativeElement.querySelector('app-html-composer')).toBeNull();
+    expect(cmp.step()).toBe(1);
 
-    cmp.form.controls.channel.setValue('email');
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('app-html-composer')).not.toBeNull();
+    // Empty name blocks advancement; Everyone-mode is the default so
+    // audience is already valid.
+    cmp.nextStep();
+    expect(cmp.step()).toBe(1);
 
-    // Selecting a template hides the composer — the template's HTML
-    // becomes the source of truth.
-    cmp.selectedTemplateId.set('tpl-1');
+    cmp.form.controls.name.setValue('July newsletter');
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('app-html-composer')).toBeNull();
+    cmp.nextStep();
+    expect(cmp.step()).toBe(2);
   });
 
-  it('routes the payload through body_html when the operator authored inline HTML', () => {
-    const fixture = makeFixture([], [makeEmailAccount()]);
+  it('save() posts template_id and never includes free-text template or inline body_html', () => {
+    const fixture = makeFixture([makeTemplate({ id: 'wa-approved', external_status: 'approved' })]);
+    fixture.detectChanges();
     const cmp = fixture.componentInstance as unknown as {
-      form: {
-        controls: {
-          channel: { setValue: (v: string) => void };
-          name: { setValue: (v: string) => void };
-          email_account_id: { setValue: (v: string | null) => void };
-          sender_name: { setValue: (v: string | null) => void };
-          subject: { setValue: (v: string | null) => void };
-          body_html: { setValue: (v: string) => void };
-          template: { setValue: (v: string) => void };
-        };
-      };
+      form: { controls: { name: { setValue: (v: string) => void } } };
+      selectedTemplateId: { set: (v: string | null) => void };
+      variables: { set: (v: Record<string, { kind: 'static'; value: string }>) => void };
       save: () => void;
     };
-    campaignsSpy.create.and.returnValue(
-      of({
-        id: 'c1',
-        org_id: 'org-1',
-        name: 'July newsletter',
-        channel: 'email',
-        audience_filter: {},
-        template: null,
-        template_id: null,
-        template_variables: null,
-        schedule_at: null,
-        email_account_id: 'acc-1',
-        sender_name: 'Your Shop',
-        reply_to: null,
-        subject: 'July deals',
-        preheader: null,
-        body_html: '<p>Hi</p>',
-        status: 'draft',
-        created_by_id: null,
-        created_at: '2026-07-16T00:00:00Z',
-      } as never),
-    );
-    cmp.form.controls.channel.setValue('email');
-    cmp.form.controls.name.setValue('July newsletter');
-    cmp.form.controls.email_account_id.setValue('acc-1');
-    cmp.form.controls.sender_name.setValue('Your Shop');
-    cmp.form.controls.subject.setValue('July deals');
-    cmp.form.controls.body_html.setValue('<p>Hi {{first_name}}</p>');
-    // The free-text `template` also has a value — the composer's
-    // HTML wins per the exactly-one-source guard on the backend.
-    cmp.form.controls.template.setValue('Fallback plain text');
-    fixture.detectChanges();
+    campaignsSpy.create.and.returnValue(of({ id: 'c1' } as never));
 
+    cmp.form.controls.name.setValue('Welcome blast');
+    cmp.selectedTemplateId.set('wa-approved');
+    cmp.variables.set({ '1': { kind: 'static', value: 'Ajay' } });
     cmp.save();
+
     expect(campaignsSpy.create).toHaveBeenCalled();
     const payload = campaignsSpy.create.calls.mostRecent().args[0];
-    expect(payload.body_html).toBe('<p>Hi {{first_name}}</p>');
+    expect(payload.template_id).toBe('wa-approved');
     expect(payload.template).toBeNull();
-    expect(payload.template_id).toBeNull();
+    expect(payload.body_html).toBeNull();
   });
 });
