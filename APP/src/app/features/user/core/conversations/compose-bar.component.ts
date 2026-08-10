@@ -16,6 +16,7 @@ import { EmailTemplateRenderResponse } from '../services/email-templates-api.ser
 import { EmailTemplatePickerComponent } from '../shared/email/template-picker.component';
 import { SendFromPickerComponent } from '../whatsapp/shared/send-from-picker.component';
 import { ConversationMessage } from './conversations-api.service';
+import { WhatsAppTemplatePickerComponent } from './whatsapp-template-picker.component';
 import { StaffListItem } from '../staff/staff-api.service';
 
 export type ComposerAttachmentType = 'image' | 'video' | 'audio' | 'document';
@@ -102,6 +103,7 @@ function classifyFile(file: File): ComposerAttachmentType | null {
     LucideAngularModule,
     EmailTemplatePickerComponent,
     SendFromPickerComponent,
+    WhatsAppTemplatePickerComponent,
   ],
   templateUrl: './compose-bar.component.html',
 })
@@ -130,8 +132,9 @@ export class ComposeBarComponent {
 
   /** Step 15: WhatsApp 24-hour session window has expired. When true,
    *  the textarea is disabled in Reply mode (note mode is unaffected
-   *  — internal notes don't reach the customer). The banner above
-   *  the thread carries the "Pick template" CTA. */
+   *  — internal notes don't reach the customer). The bottom yellow
+   *  banner surfaces the inline template picker as the recovery
+   *  action. */
   @Input() outOfSession = false;
 
   /** Step 27b — WhatsApp phone the customer reached us on (read
@@ -141,6 +144,11 @@ export class ComposeBarComponent {
    *  override when intentionally switching numbers. */
   @Input() receivedViaPhoneId: string | null = null;
 
+  /** Conversation id — passed through to the inline WhatsApp
+   *  template picker so it knows which conversation to POST to when
+   *  the operator picks + sends a template. */
+  @Input() conversationId: string | null = null;
+
   @Output() readonly send = new EventEmitter<string>();
   @Output() readonly sendMedia = new EventEmitter<ComposerMediaPayload>();
   @Output() readonly sendNote = new EventEmitter<ComposerNotePayload>();
@@ -148,11 +156,13 @@ export class ComposeBarComponent {
   @Output() readonly openInteractive = new EventEmitter<void>();
   @Output() readonly toggleAi = new EventEmitter<boolean>();
   @Output() readonly clearReply = new EventEmitter<void>();
-  /** Emitted when the operator clicks the "Pick template" CTA that
-   *  appears next to the disabled Send button after the WhatsApp
-   *  24-hour session expires. Parent handles the actual navigation /
-   *  picker open — same handler as the session-window banner uses. */
-  @Output() readonly pickTemplate = new EventEmitter<void>();
+  /** Emitted when the inline WhatsApp template picker successfully
+   *  sends a template — parent optimistic-appends the message into
+   *  the thread + refreshes the list row's last_message_at. */
+  @Output() readonly templateSent = new EventEmitter<ConversationMessage>();
+  /** Emitted when the inline picker fails (network / Meta refusal).
+   *  Parent surfaces the reason via its existing send-error banner. */
+  @Output() readonly templateSendError = new EventEmitter<string>();
 
   /** Step 27b — explicit send-from selection. Null when the org
    *  is single-number (picker hidden). Lives on this component

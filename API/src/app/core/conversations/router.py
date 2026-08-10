@@ -69,6 +69,7 @@ from src.app.core.conversations.schemas import (
     MessageSendPayload,
     NoteCreate,
     ReactionRequest,
+    SendTemplatePayload,
     TagCreate,
     TagOut,
     TagUpdate,
@@ -84,6 +85,7 @@ from src.app.core.conversations.service import (
     receive_webhook,
     send_email_reply,
     send_outbound,
+    send_template_message,
     start_conversation,
 )
 from src.app.core.conversations.tags_service import (
@@ -375,6 +377,81 @@ async def send_message_endpoint(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return MessageOut.model_validate(msg)
+
+
+@router.post(
+    "/{conversation_id}/messages/template",
+    response_model=MessageOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def send_template_message_endpoint(
+    conversation_id: uuid.UUID,
+    payload: SendTemplatePayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> MessageOut:
+    """Send an approved WhatsApp template message inside an existing
+    conversation. Powers the inbox composer's inline template picker
+    when the 24-hour session window has expired — Meta only accepts
+    approved templates outside the window.
+
+    Error translation (all messages user-facing — surfaced verbatim
+    on the SPA's error banner):
+
+    * ``ValueError`` → 400 with the raised message. Covers wrong
+      channel, blocklist hit, template not approved, variable count
+      / key mismatch.
+    * ``WhatsAppNotConnected`` → 409 — org has no active WhatsApp
+      integration; prompt to reconnect in Settings → Integrations.
+    * ``WhatsAppRateLimited`` → 429 with ``Retry-After`` set from
+      Meta so the SPA can back off cleanly.
+    * ``WhatsAppSendError`` → 502 — Meta refused the send (bad
+      template state, phone unreachable, invalid variable value).
+      Message carries Meta's raw reason for debugging.
+    """
+    from src.app.core.conversations.adapters.whatsapp import (
+        WhatsAppRateLimited,
+        WhatsAppSendError,
+    )
+
+    try:
+        msg = await send_template_message(
+            db,
+            conversation_id=conversation_id,
+            user_id=user.legacy_uuid,
+            template_id=payload.template_id,
+            variables=payload.variables,
+            send_from_phone_id=payload.send_from_phone_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except WhatsAppNotConnected as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "WhatsApp is not connected for this organisation. "
+                "Reconnect it in Settings → Integrations, then try again."
+            ),
+        ) from exc
+    except WhatsAppRateLimited as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"WhatsApp rate limit hit — try again in "
+                f"{exc.retry_after_seconds}s. Meta throttles bursts to "
+                "protect the sender's number."
+            ),
+            headers={"Retry-After": str(exc.retry_after_seconds)},
+        ) from exc
+    except WhatsAppSendError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Meta refused this template send. "
+                f"Details: {str(exc)[:400]}"
+            ),
+        ) from exc
     return MessageOut.model_validate(msg)
 
 

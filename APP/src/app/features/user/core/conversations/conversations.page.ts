@@ -303,20 +303,32 @@ export class ConversationsPageComponent {
    *  its 24-hour session window. Drives the composer's text-input
    *  disabled state. Non-WhatsApp conversations + missing state
    *  (still loading) are treated as "in session" so the composer
-   *  doesn't lock down spuriously. */
+   *  doesn't lock down spuriously. Extra channel guard so a stale
+   *  ``detail()`` (left over during a WhatsApp → Email switch) never
+   *  leaks the WhatsApp expired-window state onto an email thread. */
   protected readonly isOutOfSession = computed(() => {
+    const conv = this.selectedConversation();
+    if (!conv || conv.channel !== 'whatsapp') return false;
     const state = this.detail()?.whatsapp_session_state;
     if (!state) return false;
     return !state.in_session;
   });
 
-  /** Step 15 — banner's [Pick template] CTA. Routes to the templates
-   *  page where the operator can pick + submit a template. In a
-   *  future step this could open an inline template-send picker. */
-  protected onPickTemplate(): void {
-    // Lazy import: keep the page bundle lean by routing imperatively
-    // instead of declaring RouterLink in this page (already a big file).
-    window.location.href = '/user/whatsapp/templates';
+  /** Compose-bar's inline WhatsApp template picker just sent a
+   *  template. Optimistic-append the message + bump the list row so
+   *  the thread reflects the send without waiting for a poll. */
+  protected onTemplateSent(msg: ConversationMessage): void {
+    this.detail.update((d) =>
+      d && d.conversation.id === msg.conversation_id ? { ...d, messages: [...d.messages, msg] } : d,
+    );
+    this.bumpListLastMessage(msg.conversation_id, msg.sent_at ?? msg.created_at);
+  }
+
+  /** Inline picker surfaced an error (network / Meta refusal / etc).
+   *  Route through the same send-error banner every other write path
+   *  uses so the operator sees the reason above the thread. */
+  protected onTemplateError(message: string): void {
+    this.sendError.set(message);
   }
 
   // --- Tags (Step 14) ------------------------------------------------
@@ -441,7 +453,14 @@ export class ConversationsPageComponent {
       },
       error: (err: HttpErrorResponse) => {
         this.removeOptimisticMessage(id, optimistic.id);
-        this.sendError.set(extractApiError(err) ?? 'Could not send message.');
+        // Channel-specific fallback copy so an email failure doesn't
+        // read as a WhatsApp one. Backend detail (extractApiError)
+        // takes precedence when present.
+        const fallback =
+          conv?.channel === 'email'
+            ? 'Could not send this email. Check your connected mailbox and try again.'
+            : 'Could not send this message. Try again in a moment.';
+        this.sendError.set(extractApiError(err) ?? fallback);
       },
     });
   }

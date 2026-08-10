@@ -289,6 +289,26 @@ class EmailReplyPayload(BaseModel):
     account_id: uuid.UUID | None = None
 
 
+class SendTemplatePayload(BaseModel):
+    """Body of ``POST /api/v1/conversations/{id}/messages/template``.
+
+    Sends an approved WhatsApp template through the conversation's
+    active adapter. Used by the inbox composer's inline template
+    picker when the 24-hour session has expired — Meta's rule is that
+    templates are the only sendable message type outside the window.
+
+    ``variables`` maps ``{{n}}`` placeholder index (1-based) to a
+    plaintext value. Keys are strings on the wire (JSON object keys
+    are always strings); the service parses them back to ints before
+    handing to the adapter."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    template_id: uuid.UUID
+    variables: dict[str, str] = Field(default_factory=dict)
+    send_from_phone_id: str | None = Field(default=None, max_length=64)
+
+
 class ReactionRequest(BaseModel):
     """Body of ``POST /conversations/{id}/messages/{message_id}/reactions``.
 

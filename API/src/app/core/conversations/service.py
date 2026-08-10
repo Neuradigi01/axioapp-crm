@@ -382,6 +382,145 @@ async def send_outbound(
     return msg
 
 
+async def send_template_message(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    user_id: uuid.UUID,
+    template_id: uuid.UUID,
+    variables: dict[str, str],
+    send_from_phone_id: str | None = None,
+) -> Message:
+    """Send an approved WhatsApp template through an existing
+    conversation. Used by the inbox composer's inline template picker
+    when the 24-hour session window has expired (Meta's rule: only
+    approved templates outside the window).
+
+    Guards:
+      * conversation must be WhatsApp — 400 otherwise
+      * template must belong to this org and be APPROVED — 404 / 400
+      * ``variables`` count must equal the template's ``variable_count``
+    """
+    from src.app.core.integrations.whatsapp import data_access as _wa_da
+    from src.app.core.integrations.whatsapp.block_list import is_blocked
+
+    conv = await get_conversation(session, conversation_id)
+    if conv.channel != ConversationChannel.whatsapp:
+        raise ValueError("Template sends are only supported on WhatsApp conversations.")
+
+    block_hit = await is_blocked(session, org_id=conv.org_id, phone=conv.external_id)
+    if block_hit is not None:
+        raise ValueError(
+            f"This number is on the block list "
+            f"(reason: {block_hit.reason}). Unblock it from "
+            f"Settings → WhatsApp → Block List to send again."
+        )
+
+    template = await _wa_da.get_by_id(session, template_id)
+    if template is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="template not found")
+    if (template.status or "").upper() != "APPROVED":
+        raise ValueError("Only APPROVED templates can be sent — this template is not approved yet.")
+
+    # Convert string-keyed variables (JSON) to int-keyed dict the
+    # adapter consumes. Validate the caller supplied one value per
+    # `{{n}}` placeholder before hitting Meta — mismatches would
+    # fail at Meta's end with an opaque 400.
+    parsed_variables: dict[int, str] = {}
+    for key, val in variables.items():
+        try:
+            parsed_variables[int(key)] = val
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"variables key {key!r} must be a numeric string") from exc
+    if len(parsed_variables) != template.variable_count:
+        raise ValueError(
+            f"Template expects {template.variable_count} variable(s) "
+            f"but got {len(parsed_variables)}."
+        )
+
+    resolved_phone_id = send_from_phone_id or getattr(conv, "received_via_phone_id", None)
+    adapter = await resolve_whatsapp_adapter(session, phone_id=resolved_phone_id)
+
+    is_first_outbound = (
+        await _da.count_outbound_messages_for_conversation(session, conversation_id) == 0
+    )
+
+    ref = await adapter.send_template(
+        org_id=conv.org_id,
+        external_id=conv.external_id,
+        template_name=template.name,
+        language=template.language,
+        variables=parsed_variables,
+        header_type=template.header_type,
+        header_text=template.header_text,
+    )
+    now = datetime.now(UTC)
+    sent_at = ref.sent_at or now
+
+    # Render a plaintext preview of the template so the inbox row +
+    # bubble text isn't blank — substitute `{{n}}` with the resolved
+    # value the operator typed. Full body components stay in the
+    # `payload` JSONB for debugging.
+    preview = template.body or f"[template: {template.name}]"
+    for idx, val in parsed_variables.items():
+        preview = preview.replace("{{" + str(idx) + "}}", val)
+
+    msg = Message(
+        org_id=conv.org_id,
+        conversation_id=conv.id,
+        direction=MessageDirection.out,
+        sender_user_id=user_id,
+        text=preview,
+        attachments=[],
+        interactive_payload=None,
+        reply_to_message_id=None,
+        channel_message_id=ref.channel_message_id,
+        payload={
+            "adapter_ref": ref.channel_message_id,
+            "template": {
+                "id": str(template.id),
+                "name": template.name,
+                "language": template.language,
+                "variables": {str(k): v for k, v in parsed_variables.items()},
+            },
+        },
+        sent_at=sent_at,
+    )
+    _da.insert_message(session, msg)
+    conv.last_message_at = sent_at
+    await session.commit()
+    await session.refresh(msg)
+    await session.refresh(conv)
+
+    await audit.log(
+        "conversations.template_sent",
+        entity_type="conversation",
+        entity_id=conv.id,
+        after={
+            "channel": conv.channel.value,
+            "external_id": conv.external_id,
+            "message_id": str(msg.id),
+            "template_id": str(template.id),
+            "template_name": template.name,
+        },
+    )
+    if is_first_outbound and conv.contact_id is not None:
+        await activities_log(
+            entity_type="contact",
+            entity_id=conv.contact_id,
+            type=ActivityType.whatsapp,
+            payload={
+                "channel": conv.channel.value,
+                "preview": preview[:120],
+                "conversation_id": str(conv.id),
+                "template_name": template.name,
+            },
+            user_id=user_id,
+            org_id=conv.org_id,
+        )
+    return msg
+
+
 async def receive_webhook(
     session: AsyncSession,
     *,
