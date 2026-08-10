@@ -309,6 +309,18 @@ class ConversationPatch(BaseModel):
     ai_handling: bool | None = None
 
 
+class ConversationCreate(BaseModel):
+    """Operator-initiated fresh thread. The service resolves the
+    contact's phone (WhatsApp/SMS) or email (Email) as the external_id
+    and reuses the existing find-or-create path — starting a thread
+    for a contact that already has one just returns the existing row."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    channel: ConversationChannel
+    contact_id: uuid.UUID
+
+
 class ConversationOut(ORMModel):
     id: uuid.UUID
     org_id: uuid.UUID

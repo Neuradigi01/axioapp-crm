@@ -823,6 +823,91 @@ async def _apply_inbound_reaction(
     )
 
 
+async def start_conversation(
+    session: AsyncSession,
+    *,
+    channel: ConversationChannel,
+    contact_id: uuid.UUID,
+) -> Conversation:
+    """Operator-initiated new thread — the *New conversation* button
+    in the inbox lands here. Resolves the contact's phone (WA/SMS)
+    or email (Email) as ``external_id`` and delegates to the same
+    row-shape webhooks would create for an inbound.
+
+    Idempotent by design: if a conversation on this channel already
+    exists for the resolved identifier, we return it instead of
+    inserting a duplicate — the operator ends up in the same thread
+    whether they clicked *New* or *Continue*."""
+
+    contact = await contacts_service.get_contact(session, contact_id)
+    if contact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="contact not found",
+        )
+
+    if channel in _PHONE_CHANNELS:
+        identifier = (contact.phone or "").strip()
+        if not identifier:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "This contact has no phone number. Add one on the contact "
+                    "before starting a WhatsApp or SMS conversation."
+                ),
+            )
+    elif channel == ConversationChannel.email:
+        identifier = (contact.email or "").strip()
+        if not identifier:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "This contact has no email address. Add one on the contact "
+                    "before starting an email conversation."
+                ),
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Manual new conversations aren't supported on the "
+                f"{channel.value} channel yet."
+            ),
+        )
+
+    existing = await _da.find_conversation_for_channel_external(
+        session, channel=channel, external_id=identifier
+    )
+    if existing is not None:
+        # Backfill contact_id only if the existing row was unlinked —
+        # never overwrite a link a webhook or a different operator set.
+        if existing.contact_id is None:
+            existing.contact_id = contact_id
+            await session.commit()
+            await session.refresh(existing)
+        return existing
+
+    conv = Conversation(
+        org_id=contact.org_id,
+        channel=channel,
+        external_id=identifier,
+        contact_id=contact_id,
+        status=ConversationStatus.open,
+        ai_handling=False,
+    )
+    _da.insert_conversation(session, conv)
+    await session.commit()
+    await session.refresh(conv)
+    await audit.log(
+        "conversations.started",
+        entity_type="conversation",
+        entity_id=conv.id,
+        before=None,
+        after=_snapshot(conv),
+    )
+    return conv
+
+
 async def patch_conversation(
     session: AsyncSession,
     *,
@@ -1040,4 +1125,5 @@ __all__ = [
     "react_to_message",
     "receive_webhook",
     "send_outbound",
+    "start_conversation",
 ]

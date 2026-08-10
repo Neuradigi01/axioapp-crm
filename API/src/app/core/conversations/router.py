@@ -59,6 +59,7 @@ from src.app.core.conversations.schemas import (
     AssignTagRequest,
     AttachmentType,
     ConversationAttributionOut,
+    ConversationCreate,
     ConversationDetail,
     ConversationListResponse,
     ConversationOut,
@@ -83,6 +84,7 @@ from src.app.core.conversations.service import (
     receive_webhook,
     send_email_reply,
     send_outbound,
+    start_conversation,
 )
 from src.app.core.conversations.tags_service import (
     assign_tag,
@@ -140,6 +142,25 @@ async def list_endpoint(
         out.tags = tags_by_conv.get(r.id, [])
         items.append(out)
     return ConversationListResponse(items=items, total=total, page=page, size=size)
+
+
+@router.post("", response_model=ConversationOut, status_code=status.HTTP_201_CREATED)
+async def create_endpoint(
+    payload: ConversationCreate,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.write")),
+) -> ConversationOut:
+    """Start a new outbound conversation from the inbox's *New*
+    button. The service resolves the picked contact's phone / email
+    based on channel and reuses the existing find-or-create path so
+    the operator lands in the existing thread if one is already open."""
+
+    conv = await start_conversation(
+        db,
+        channel=payload.channel,
+        contact_id=payload.contact_id,
+    )
+    return ConversationOut.model_validate(conv)
 
 
 # --- Tags (whatsapp-platform-upgrade Step 14) -----------------------------

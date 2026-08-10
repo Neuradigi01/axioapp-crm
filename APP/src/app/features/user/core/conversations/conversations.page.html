@@ -29,6 +29,15 @@
         >
           Refresh
         </button>
+        <button
+          type="button"
+          (click)="openNewConversation()"
+          class="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-xs font-medium text-white hover:brightness-95"
+        >
+          <lucide-icon name="plus" class="h-3.5 w-3.5" />
+          <span class="hidden sm:inline">New conversation</span>
+          <span class="sm:hidden">New</span>
+        </button>
       </div>
     </div>
     @if (loadError(); as err) {
@@ -64,6 +73,13 @@
       [error]="reassignError()"
       (confirm)="onReassignConfirm($event)"
       (cancel)="closeReassign()"
+    />
+  }
+
+  @if (newConversationOpen()) {
+    <app-new-conversation-modal
+      (started)="onConversationStarted($event)"
+      (cancel)="closeNewConversation()"
     />
   }
 

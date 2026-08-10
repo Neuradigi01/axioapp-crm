@@ -35,6 +35,7 @@ import {
 } from './compose-bar.component';
 import { ConversationListComponent } from './conversation-list.component';
 import { InteractiveBuilderComponent, InteractivePayload } from './interactive-builder.component';
+import { NewConversationModalComponent } from './new-conversation-modal.component';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
 import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
 import {
@@ -67,6 +68,7 @@ import { extractApiError } from '@core/services/api-error.util';
     ChatThreadComponent,
     ComposeBarComponent,
     InteractiveBuilderComponent,
+    NewConversationModalComponent,
     ReassignModalComponent,
     LucideAngularModule,
     MobileSelectComponent,
@@ -147,6 +149,33 @@ export class ConversationsPageComponent {
   protected readonly reassignOpen = signal(false);
   protected readonly reassignSubmitting = signal(false);
   protected readonly reassignError = signal<string | null>(null);
+
+  /** When `true`, the new-conversation modal is mounted. The header
+   *  `+ New` button opens it; the modal emits `started` (route to the
+   *  fresh thread) or `cancel` (dismiss). */
+  protected readonly newConversationOpen = signal(false);
+
+  protected openNewConversation(): void {
+    this.newConversationOpen.set(true);
+  }
+
+  protected closeNewConversation(): void {
+    this.newConversationOpen.set(false);
+  }
+
+  /** Modal picked a contact and the server returned the conversation
+   *  (either freshly created or the existing one if a thread was
+   *  already open). Drop it into the list optimistically so the row
+   *  appears without waiting for the next `reloadList()`, then open it. */
+  protected onConversationStarted(conv: Conversation): void {
+    this.newConversationOpen.set(false);
+    this.items.update((rows) => {
+      const withoutDup = rows.filter((r) => r.id !== conv.id);
+      return [conv, ...withoutDup];
+    });
+    this.hydrateContacts([conv]);
+    this.onSelect(conv.id);
+  }
 
   /** When `true`, the interactive-message builder modal is mounted.
    *  Lives outside the compose bar so dragging the dialog around
