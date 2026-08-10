@@ -32,4 +32,21 @@ def insert_org_settings(session: AsyncSession, row: OrgSettings) -> None:
     session.add(row)
 
 
-__all__ = ["get_org_settings_for_org", "insert_org_settings"]
+async def list_all_org_settings(session: AsyncSession) -> list[OrgSettings]:
+    """Return every ``OrgSettings`` row across all tenants.
+
+    Used by the cross-tenant appointment-reminder sweep (celery beat)
+    which needs each org's configured reminder offsets in one pass.
+    The scanner opens its session WITHOUT setting a request context,
+    so the ``do_orm_execute`` tenant filter is a no-op here — same
+    pattern ``appointments.find_due_for_reminder`` uses.
+    """
+    result = await session.execute(select(OrgSettings))
+    return list(result.scalars().all())
+
+
+__all__ = [
+    "get_org_settings_for_org",
+    "insert_org_settings",
+    "list_all_org_settings",
+]

@@ -213,4 +213,115 @@
   <div class="mt-6">
     <app-compliance-settings />
   </div>
+
+  <!-- tasks/appointment-reminders — configurable pre-notify offsets.
+       Inlined (not extracted to a child component) so this section
+       is guaranteed to render in the same compilation unit as the
+       compliance card above it. -->
+  <div class="mt-6">
+    <section class="rounded-xl border border-subtle bg-surface p-4">
+      <header class="mb-4">
+        <h3 class="text-sm font-semibold text-default">Appointment reminders</h3>
+        <p class="mt-1 text-xs text-muted">
+          Choose how long before a scheduled appointment the assigned staff member should be
+          reminded. Every selected offset fires a bell notification and any wired-up workflow
+          trigger.
+        </p>
+      </header>
+
+      @if (reminderLoading()) {
+        <div class="text-sm text-muted">Loading…</div>
+      } @else {
+        <div class="space-y-4">
+          <div>
+            <span class="mb-2 block text-xs font-medium text-muted">Presets</span>
+            <div class="flex flex-wrap gap-2">
+              @for (preset of reminderPresets; track preset.minutes) {
+                <button
+                  type="button"
+                  (click)="toggleReminderPreset(preset.minutes)"
+                  [class.bg-accent]="isReminderSelected(preset.minutes)"
+                  [class.text-white]="isReminderSelected(preset.minutes)"
+                  [class.border-transparent]="isReminderSelected(preset.minutes)"
+                  class="rounded-full border border-subtle bg-surface-2 px-3 py-1 text-xs font-medium text-default transition hover:brightness-110"
+                >
+                  {{ preset.label }}
+                </button>
+              }
+            </div>
+          </div>
+
+          <div>
+            <span class="mb-2 block text-xs font-medium text-muted">Custom (minutes)</span>
+            <div class="flex flex-wrap items-start gap-2">
+              <input
+                #customReminderInput
+                type="number"
+                min="5"
+                max="43200"
+                step="1"
+                placeholder="e.g. 90"
+                class="w-32 rounded-lg border border-subtle bg-surface px-2 py-1 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              <button
+                type="button"
+                (click)="addCustomReminder(customReminderInput)"
+                class="rounded-md border border-subtle bg-surface-2 px-3 py-1 text-xs font-medium text-default hover:brightness-110"
+              >
+                Add
+              </button>
+              @if (reminderCustomError(); as ce) {
+                <span class="self-center text-xs text-red-500">{{ ce }}</span>
+              }
+            </div>
+          </div>
+
+          <div>
+            <span class="mb-2 block text-xs font-medium text-muted">Active reminders</span>
+            @if (reminderOffsets().length === 0) {
+              <div
+                class="rounded-md border border-dashed border-subtle bg-surface-2 px-3 py-2 text-xs text-muted"
+              >
+                No reminders selected — no bell notifications will fire for appointments.
+              </div>
+            } @else {
+              <ul class="flex flex-wrap gap-2">
+                @for (m of reminderOffsets(); track m) {
+                  <li
+                    class="inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-2 px-3 py-1 text-xs font-medium text-default"
+                  >
+                    {{ reminderLabel(m) }}
+                    <button
+                      type="button"
+                      (click)="removeReminder(m)"
+                      class="rounded-full text-muted hover:text-red-500"
+                      aria-label="Remove"
+                    >
+                      &times;
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+
+          <div class="flex items-center justify-end gap-2">
+            @if (reminderError(); as err) {
+              <span class="text-xs text-red-500">{{ err }}</span>
+            } @else if (reminderSaved()) {
+              <span class="text-xs text-emerald-400">Saved.</span>
+            }
+            <button
+              type="button"
+              (click)="saveReminders()"
+              [disabled]="reminderSaving()"
+              class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
+            >
+              {{ reminderSaving() ? 'Saving…' : 'Save' }}
+            </button>
+          </div>
+        </div>
+      }
+    </section>
+  </div>
 </div>

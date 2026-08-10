@@ -1,15 +1,26 @@
 """Celery tasks for the appointments module.
 
 One beat-scheduled task today — :func:`scan_for_reminders` — sweeps
-``tbl_appointments`` every 15 minutes and publishes
-``appointment.reminder_24h`` / ``appointment.reminder_1h`` domain
-events for rows that fall inside the matching ``[now+window-30m,
-now+window+30m)`` half-hour bracket. The
-``(trigger_id, event_id)`` uniqueness index on
+``tbl_appointments`` every 15 minutes and publishes reminder events
+for rows that fall inside the matching ``[now+offset-30m,
+now+offset+30m)`` half-hour bracket around each configured offset.
+
+Reminder offsets are per-org — see
+``tbl_org_settings.appointment_reminder_offsets_minutes``. The default
+list ``[1440, 60]`` keeps every existing org firing at 24h + 1h before
+scheduled_at, matching the pre-configurable behaviour.
+
+Every fire publishes a generic ``appointment.reminder_due`` event
+carrying ``minutes_before`` in the payload — new automation triggers
+and the in-app notification handler subscribe to this. For backward
+compatibility, offsets 1440 / 60 ALSO publish the legacy
+``appointment.reminder_24h`` / ``appointment.reminder_1h`` events so
+the two seed-time automation triggers that listen on those exact
+names keep firing untouched.
+
+The ``(trigger_id, event_id)`` uniqueness index on
 ``tbl_automation_runs`` absorbs the overlap between sweep ticks —
-even if the beat fires the scan twice during the 24h window, the
-second publish lands on the same deterministic ``event_id`` and the
-dispatcher's idempotency check drops it.
+event IDs are ``appointment_reminder_due:{appt.id}:{minutes_before}``.
 
 Convention: ``@shared_task`` wrappers call
 ``asyncio.run(_async_helper(...))`` per ``src/celery/worker.py``'s
@@ -32,6 +43,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -68,86 +80,121 @@ except ImportError:  # pragma: no cover — celery absent in dev shells
 logger = logging.getLogger(__name__)
 
 
-# Half-window each side of the canonical 24h / 1h offset. The beat
-# scheduler ticks every 15 minutes, so a 30-minute half-window covers
-# every appointment exactly once across two ticks even when the
-# scheduler skews; the dispatcher's ``(trigger_id, event_id)``
-# uniqueness absorbs the double-publish in the overlap.
+# Half-window each side of every configured offset. The beat scheduler
+# ticks every 15 minutes, so a 30-minute half-window covers every
+# appointment exactly once across two ticks even when the scheduler
+# skews; the dispatcher's ``(trigger_id, event_id)`` uniqueness
+# absorbs the double-publish in the overlap.
 _HALF_WINDOW = timedelta(minutes=30)
-# Reminder offsets — kept as module-level constants so tests can
-# poke them without monkey-patching the body.
-_REMINDER_24H_OFFSET = timedelta(hours=24)
-_REMINDER_1H_OFFSET = timedelta(hours=1)
+# Fallback if the settings row cannot be loaded (e.g. brand-new org
+# that has never touched Settings and the get_or_create hasn't run
+# yet). Matches the JSONB column's server default.
+_DEFAULT_OFFSETS_MINUTES = (1440, 60)
 
 
 @_shared_task(
     name="src.app.core.appointments.tasks.scan_for_reminders",
 )
 def scan_for_reminders() -> dict[str, Any]:
-    """Beat-scheduled sweep — fires the two reminder events for any
-    appointment whose ``scheduled_at`` falls inside the 24h or 1h
-    bracket. Returns a small summary dict ``{found_24h, found_1h,
-    published}`` for the worker logs."""
+    """Beat-scheduled sweep — fires configured reminder events for any
+    appointment whose ``scheduled_at`` falls inside any of the per-org
+    offset brackets. Returns a small summary dict for the worker logs.
+    """
     return asyncio.run(_scan_for_reminders_async())
 
 
 async def _scan_for_reminders_async() -> dict[str, Any]:
     from src.app.core.appointments import data_access as _da
+    from src.app.core.settings import data_access as _settings_da
     from src.app.shared.db import async_session
 
     now = datetime.now(UTC)
 
-    # 24h bracket centred on ``now + 24h``.
-    win24_start = now + _REMINDER_24H_OFFSET - _HALF_WINDOW
-    win24_end = now + _REMINDER_24H_OFFSET + _HALF_WINDOW
-    # 1h bracket centred on ``now + 1h``.
-    win1_start = now + _REMINDER_1H_OFFSET - _HALF_WINDOW
-    win1_end = now + _REMINDER_1H_OFFSET + _HALF_WINDOW
+    # Load every org's reminder-offset list in one query; small table
+    # (one row per org). Orgs without a row fall back to the default
+    # 24h + 1h so behaviour matches the JSONB server default before
+    # ``get_or_create`` ever runs.
+    async with async_session() as session:
+        org_offsets = await _load_org_offsets(session, _settings_da)
 
-    published_24h = 0
-    published_1h = 0
+    # Compute the union of every configured offset across all orgs.
+    # For each unique offset we run ONE cross-tenant windowed query,
+    # then filter per-appointment by "is this offset actually enabled
+    # for THIS org". Two unique offsets is the steady-state (most orgs
+    # keep the [1440, 60] default) so this stays at ~2 SELECTs.
+    all_offsets: set[int] = set()
+    for offsets in org_offsets.values():
+        all_offsets.update(offsets)
+    if not all_offsets:
+        all_offsets.update(_DEFAULT_OFFSETS_MINUTES)
+
+    total_found = 0
+    total_published = 0
 
     async with async_session() as session:
-        due_24h = await _da.find_due_for_reminder(
-            session, window_start=win24_start, window_end=win24_end
-        )
-        due_1h = await _da.find_due_for_reminder(
-            session, window_start=win1_start, window_end=win1_end
-        )
-
-        for appt in due_24h:
-            ok = await _publish_reminder(
-                session,
-                appt=appt,
-                event_type="appointment.reminder_24h",
-                event_id_prefix="appointment_reminder_24h",
+        for minutes_before in sorted(all_offsets, reverse=True):
+            window_start = now + timedelta(minutes=minutes_before) - _HALF_WINDOW
+            window_end = now + timedelta(minutes=minutes_before) + _HALF_WINDOW
+            due = await _da.find_due_for_reminder(
+                session, window_start=window_start, window_end=window_end
             )
-            if ok:
-                published_24h += 1
-
-        for appt in due_1h:
-            ok = await _publish_reminder(
-                session,
-                appt=appt,
-                event_type="appointment.reminder_1h",
-                event_id_prefix="appointment_reminder_1h",
-            )
-            if ok:
-                published_1h += 1
+            total_found += len(due)
+            for appt in due:
+                org_offset_list = org_offsets.get(appt.org_id, _DEFAULT_OFFSETS_MINUTES)
+                if minutes_before not in org_offset_list:
+                    continue
+                ok = await _publish_reminder(
+                    session,
+                    appt=appt,
+                    minutes_before=minutes_before,
+                )
+                if ok:
+                    total_published += 1
 
     logger.info(
-        "appointments.scan_for_reminders ticks done found_24h=%d "
-        "found_1h=%d published_24h=%d published_1h=%d",
-        len(due_24h),
-        len(due_1h),
-        published_24h,
-        published_1h,
+        "appointments.scan_for_reminders tick done found=%d published=%d offsets=%s",
+        total_found,
+        total_published,
+        sorted(all_offsets, reverse=True),
     )
     return {
-        "found_24h": len(due_24h),
-        "found_1h": len(due_1h),
-        "published_24h": published_24h,
-        "published_1h": published_1h,
+        "found": total_found,
+        "published": total_published,
+        "offsets": sorted(all_offsets, reverse=True),
+    }
+
+
+async def _load_org_offsets(session, settings_da) -> dict[uuid.UUID, tuple[int, ...]]:
+    """Return ``{org_id: (offsets...)}`` for every org with a settings
+    row. Orgs missing a row (never touched Settings) fall through to
+    the module default at call sites.
+    """
+    try:
+        rows = await settings_da.list_all_org_settings(session)
+    except AttributeError:
+        # Older DAL revisions without the bulk helper — fall back to
+        # a direct SELECT to avoid failing the whole sweep.
+        from sqlalchemy import select as _select
+
+        from src.app.core.settings.models import OrgSettings
+
+        rows = list(
+            (
+                await session.execute(
+                    _select(
+                        OrgSettings.org_id,
+                        OrgSettings.appointment_reminder_offsets_minutes,
+                    )
+                )
+            ).all()
+        )
+        return {
+            org_id: tuple(int(x) for x in (offsets or _DEFAULT_OFFSETS_MINUTES))
+            for org_id, offsets in rows
+        }
+    return {
+        row.org_id: tuple(int(x) for x in (row.appointment_reminder_offsets_minutes or ()))
+        for row in rows
     }
 
 
@@ -155,21 +202,28 @@ async def _publish_reminder(
     session,
     *,
     appt,
-    event_type: str,
-    event_id_prefix: str,
+    minutes_before: int,
 ) -> bool:
-    """Build the reminder envelope + publish via the bus.
+    """Build the reminder envelope + publish via the bus, then create
+    the in-app notification for the assignee.
 
     Hydrates contact + organisation for the renderer; sets a request
     context for the dispatcher subscriber so its session opens with
     ``org_id`` scoped correctly. Returns True when the publish call
-    completed (regardless of subscriber outcome — those are absorbed
-    by the bus + logged)."""
+    completed.
+
+    Publishes ``appointment.reminder_due`` for all offsets. For the
+    two legacy offsets (1440, 60) also publishes the historical
+    ``appointment.reminder_24h`` / ``appointment.reminder_1h`` events
+    so the seeded automation triggers wired to those exact names keep
+    firing without a data migration.
+    """
     try:
         from sqlalchemy import select as _select
 
         from src.app.core.contacts.models import Contact
         from src.app.core.events.bus import publish as events_publish
+        from src.app.core.notifications import service as notifications_service
         from src.app.core.tenants.models import Organization
         from src.app.shared.context import (
             RequestContext,
@@ -189,6 +243,7 @@ async def _publish_reminder(
             "contact_id": str(appt.contact_id),
             "scheduled_at": appt.scheduled_at.isoformat(),
             "location": appt.location,
+            "minutes_before": minutes_before,
             "appointment": {
                 "id": str(appt.id),
                 "title": appt.title,
@@ -213,28 +268,90 @@ async def _publish_reminder(
             }
 
         # The bus's subscribers — primarily the automation
-        # dispatcher — open their own sessions; but they read
+        # dispatcher — open their own sessions but read
         # ``get_context().org_id`` to scope their writes. Set the
         # context for the publish duration so the dispatcher's
         # trigger lookup + run insert lands in the right tenant.
         token = set_context(RequestContext(org_id=appt.org_id, user_id=None))
         try:
             await events_publish(
-                event_type,
+                "appointment.reminder_due",
                 payload,
                 org_id=appt.org_id,
-                event_id=f"{event_id_prefix}:{appt.id}",
+                event_id=f"appointment_reminder_due:{appt.id}:{minutes_before}",
             )
+            # Back-compat named events for the seeded automation
+            # triggers that were wired to the old event names.
+            if minutes_before == 1440:
+                await events_publish(
+                    "appointment.reminder_24h",
+                    payload,
+                    org_id=appt.org_id,
+                    event_id=f"appointment_reminder_24h:{appt.id}",
+                )
+            elif minutes_before == 60:
+                await events_publish(
+                    "appointment.reminder_1h",
+                    payload,
+                    org_id=appt.org_id,
+                    event_id=f"appointment_reminder_1h:{appt.id}",
+                )
         finally:
             reset_context(token)
+
+        # In-app notification for the assignee. `notify()` is
+        # non-raising and opens its own session, so a socket / DB
+        # hiccup here never breaks the publish loop above.
+        if appt.assigned_to_id is not None:
+            await notifications_service.notify(
+                org_id=appt.org_id,
+                user_id=appt.assigned_to_id,
+                type="appointment.reminder_due",
+                title=_reminder_title(appt, minutes_before),
+                body=_reminder_body(appt, contact),
+                payload={
+                    "appointment_id": str(appt.id),
+                    "contact_id": str(appt.contact_id) if appt.contact_id else None,
+                    "contact_name": (contact.full_name if contact is not None else None),
+                    "scheduled_at": appt.scheduled_at.isoformat(),
+                    "minutes_before": minutes_before,
+                    "location": appt.location,
+                },
+            )
         return True
     except Exception:
         logger.exception(
-            "appointments.scan_for_reminders publish_failed appt=%s event=%s",
+            "appointments.scan_for_reminders publish_failed appt=%s offset=%s",
             getattr(appt, "id", None),
-            event_type,
+            minutes_before,
         )
         return False
+
+
+def _reminder_title(appt, minutes_before: int) -> str:
+    lead = _humanize_lead(minutes_before)
+    return f"Reminder: {appt.title} in {lead}"
+
+
+def _reminder_body(appt, contact) -> str:
+    parts: list[str] = []
+    when_human = appt.scheduled_at.strftime("%a %b %d, %I:%M %p")
+    parts.append(when_human)
+    if contact is not None and contact.full_name:
+        parts.append(f"with {contact.full_name}")
+    if appt.location:
+        parts.append(f"at {appt.location}")
+    return " ".join(parts)
+
+
+def _humanize_lead(minutes_before: int) -> str:
+    if minutes_before % 1440 == 0:
+        days = minutes_before // 1440
+        return f"{days} day" if days == 1 else f"{days} days"
+    if minutes_before % 60 == 0:
+        hours = minutes_before // 60
+        return f"{hours}h"
+    return f"{minutes_before}m"
 
 
 __all__ = ["scan_for_reminders"]

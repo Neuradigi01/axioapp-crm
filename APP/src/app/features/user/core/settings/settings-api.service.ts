@@ -37,6 +37,8 @@ export interface OrgSettings {
   transactional_bypass_quiet_hours?: boolean;
   transactional_bypass_frequency_cap?: boolean;
   unsubscribe_link_required_in_marketing_email?: boolean;
+  // tasks/appointment-reminders — configurable pre-notify offsets.
+  appointment_reminder_offsets_minutes?: number[];
   created_at: string;
   updated_at: string;
 }
@@ -72,6 +74,8 @@ export type OrgSettingsPatch = Partial<{
   transactional_bypass_quiet_hours: boolean;
   transactional_bypass_frequency_cap: boolean;
   unsubscribe_link_required_in_marketing_email: boolean;
+  // tasks/appointment-reminders — configurable pre-notify offsets.
+  appointment_reminder_offsets_minutes: number[];
 }>;
 
 @Injectable({ providedIn: 'root' })

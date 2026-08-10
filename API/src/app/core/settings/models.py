@@ -156,6 +156,17 @@ class OrgSettings(Base, TenantScoped):
         Boolean, nullable=False, server_default=sql_text("true")
     )
 
+    # --- appointment reminders (tasks/appointment-reminders) ---
+    # JSONB list of positive integers — "minutes before scheduled_at"
+    # that should fire a reminder. Default ``[1440, 60]`` = 24h + 1h,
+    # matching the pre-migration hardcoded behaviour. Editing is
+    # gated on ``settings.write`` (Owner + Admin).
+    appointment_reminder_offsets_minutes: Mapped[list[int]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sql_text("'[1440, 60]'::jsonb"),
+    )
+
     # --- workflow routing state (tasks/workflows Step 9) ---
     # Per-pool round-robin pointer state. Keyed by ``pool_spec``
     # string (e.g. ``"role:Sales"``) → ``{"last_picked_user_id":
