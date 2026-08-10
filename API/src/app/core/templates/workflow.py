@@ -43,6 +43,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
+from src.app.core.notifications import service as notifications_service
+from src.app.core.permissions import data_access as _perms_da
 from src.app.core.settings.models import OrgSettings
 from src.app.core.templates.exceptions import (
     InvalidWorkflowTransition,
@@ -158,11 +160,18 @@ async def submit_for_review(
     user_id: uuid.UUID | None,
     note: str | None = None,
 ) -> MessageTemplate:
-    """``draft → in_review``."""
+    """``draft → in_review`` + fan-out notifications to reviewers.
+
+    Every active user in the org who holds ``templates.review`` gets
+    an in-app notification pointing at the template editor so they
+    can approve or reject without hunting through the list.
+    Notification failures are swallowed by ``notify()`` — the
+    workflow transition is authoritative and must not roll back on
+    a WS / email hiccup."""
     template = await get_template(session, org_id=org_id, template_id=template_id)
     if template.internal_status != TemplateInternalStatus.draft:
         raise InvalidWorkflowTransition(current=template.internal_status.value, action="submit")
-    return await _apply_transition(
+    updated = await _apply_transition(
         session,
         template=template,
         new_status=TemplateInternalStatus.in_review,
@@ -170,6 +179,65 @@ async def submit_for_review(
         actor_user_id=user_id,
         note=note,
     )
+    await _notify_reviewers_on_submit(session, template=updated, submitter_user_id=user_id)
+    return updated
+
+
+async def _notify_reviewers_on_submit(
+    session: AsyncSession,
+    *,
+    template: MessageTemplate,
+    submitter_user_id: uuid.UUID | None,
+) -> None:
+    """Best-effort fan-out. Every user with ``templates.review`` in the
+    template's org gets one in-app notification. The submitter is
+    skipped — no point pinging yourself. Errors are logged + swallowed
+    so a broken notification service can never block a submission."""
+    try:
+        reviewer_ids = await _perms_da.list_user_ids_with_permission(
+            session, org_id=template.org_id, permission_key="templates.review"
+        )
+    except Exception:
+        logger.exception("templates.submit_for_review: reviewer lookup failed")
+        return
+
+    submitter_name = "A teammate"
+    if submitter_user_id is not None:
+        try:
+            from src.app.core.users import data_access as _users_da
+
+            submitter = await _users_da.get_user_by_uuid(session, submitter_user_id)
+            if submitter is not None:
+                submitter_name = submitter.full_name or submitter.email or "A teammate"
+        except Exception:
+            logger.exception("templates.submit_for_review: submitter lookup failed")
+
+    title = f"{submitter_name} sent a template for your approval"
+    body = f"Template '{template.name}' ({template.channel.value}) needs review."
+    payload = {
+        "template_id": str(template.id),
+        "template_name": template.name,
+        "channel": template.channel.value,
+        "submitted_by_user_id": str(submitter_user_id) if submitter_user_id else None,
+        "submitted_by_name": submitter_name,
+        "deeplink": f"/user/templates/{template.id}",
+    }
+    for reviewer_id in reviewer_ids:
+        if submitter_user_id is not None and reviewer_id == submitter_user_id:
+            continue
+        try:
+            await notifications_service.notify(
+                org_id=template.org_id,
+                user_id=reviewer_id,
+                type="template.submitted_for_review",
+                title=title,
+                body=body,
+                payload=payload,
+            )
+        except Exception:
+            logger.exception(
+                "templates.submit_for_review: notify failed for %s", reviewer_id
+            )
 
 
 async def approve(
@@ -181,11 +249,22 @@ async def approve(
     note: str | None = None,
     caller_can_publish: bool = False,
 ) -> MessageTemplate:
-    """``in_review → approved``. Reviewer ≠ author unless the org
-    setting ``template_review_self_approve_allowed`` is ``True`` OR the
-    caller holds ``templates.publish`` (Owner / Admin tier). Junior
-    reviewers without publish rights still enforce separation-of-duties
-    against their own drafts."""
+    """``in_review → published`` (auto-publish on approve).
+
+    Previously this transitioned to ``approved`` as an intermediate
+    "ready to publish" state, then a second click walked
+    ``approved → published``. That two-step dance was pure friction
+    for the org — reviewers with review rights invariably held
+    publish rights too, so they always clicked Publish immediately
+    after Approve. The manager collapsed the flow: approving IS
+    publishing. The ``approved`` state stays legal in the DB for any
+    historical rows that landed there, but the state machine no
+    longer produces new ones.
+
+    Reviewer ≠ author still enforced unless the org setting
+    ``template_review_self_approve_allowed`` is ``True`` OR the
+    caller holds ``templates.publish`` (Owner / Admin tier).
+    """
     template = await get_template(session, org_id=org_id, template_id=template_id)
     if template.internal_status != TemplateInternalStatus.in_review:
         raise InvalidWorkflowTransition(current=template.internal_status.value, action="approve")
@@ -199,10 +278,19 @@ async def approve(
     ):
         raise SelfApproveBlocked()
 
+    # External-status pre-check mirrors ``publish()`` — a WhatsApp
+    # template with a pending / rejected Meta status shouldn't skip to
+    # ``published`` internally either.
+    if template.external_status not in (
+        TemplateExternalStatus.n_a,
+        TemplateExternalStatus.approved,
+    ):
+        raise PublishBlockedByExternal(external_status=template.external_status.value)
+
     return await _apply_transition(
         session,
         template=template,
-        new_status=TemplateInternalStatus.approved,
+        new_status=TemplateInternalStatus.published,
         action=TemplateReviewAction.approve,
         actor_user_id=reviewer_user_id,
         note=note,

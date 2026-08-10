@@ -241,6 +241,20 @@ class TemplateRead(ORMModel):
     current_version: int
     created_by_user_id: uuid.UUID | None
     updated_by_user_id: uuid.UUID | None
+    # Owner / Admin (or any role granted ``templates.activate``) can
+    # flip this off to keep the row in the library for audit while
+    # blocking every send path from picking it up. Defaults true so
+    # every template is usable out of the box; existing rows are
+    # backfilled true by the migration.
+    is_active: bool = True
+    # Latest approval / publish / rejection actor + timestamp. Populated
+    # by the list + detail endpoints via a LATERAL join onto the review
+    # audit trail so the SPA can render "Approved by X on Y" inline
+    # without a per-row followup fetch. Null when the template has no
+    # review history yet (fresh draft that was never submitted).
+    last_reviewed_by_user_id: uuid.UUID | None = None
+    last_reviewed_action: str | None = None
+    last_reviewed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

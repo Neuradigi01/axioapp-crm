@@ -26,6 +26,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
+import { StaffApiService, StaffListItem } from '../../staff/staff-api.service';
 
 import { ChannelChipComponent } from '../channel-chip.component';
 import { TemplateReviewModalComponent } from '../review/template-review.modal';
@@ -110,9 +111,20 @@ function waNameValidator(control: AbstractControl): { waName: true } | null {
 export class TemplateEditorPageComponent {
   private readonly api = inject(TemplatesApiService);
   private readonly auth = inject(FurnitureAuthService);
+  private readonly staffApi = inject(StaffApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** Attribution track — staff lookup for the "Created by X · Approved
+   *  by Y" metadata bar above the form. Loaded once at page mount;
+   *  missing ids fall back to `—` so the bar never breaks the layout. */
+  protected readonly staffById = signal<Map<string, StaffListItem>>(new Map());
+
+  protected staffName(userId: string | null): string {
+    if (!userId) return '—';
+    return this.staffById().get(userId)?.full_name ?? '—';
+  }
 
   // --- header form ----------------------------------------------------
 
@@ -160,6 +172,13 @@ export class TemplateEditorPageComponent {
   protected readonly toast = signal<string | null>(null);
   protected readonly saving = signal<boolean>(false);
 
+  /** True when the operator has typed something since the last
+   *  successful save (or the last template load). Drives the Save
+   *  Draft button's disabled state so accidental double-saves + saves
+   *  with nothing changed can't happen. Reset in `finishSave` and at
+   *  the tail of `loadTemplate`. */
+  protected readonly dirty = signal<boolean>(false);
+
   /** Reactive mirror of the channel form control. Form controls aren't
    *  signals on their own, so a plain ``computed`` reading
    *  ``headerForm.controls.channel.value`` never re-evaluates when the
@@ -170,6 +189,15 @@ export class TemplateEditorPageComponent {
    *  graph updates on selection. */
   private readonly channelValueSignal = toSignal(this.headerForm.controls.channel.valueChanges, {
     initialValue: this.headerForm.controls.channel.value,
+  });
+
+  /** Reactive mirror of the name control. Same reasoning as
+   *  ``channelValueSignal`` — the WhatsApp snake_case validation hint
+   *  reads this so the red inline error clears the moment the user
+   *  types a valid character (previously the red text lingered
+   *  because a plain ``computed`` didn't retrigger on form typing). */
+  private readonly nameValueSignal = toSignal(this.headerForm.controls.name.valueChanges, {
+    initialValue: this.headerForm.controls.name.value,
   });
 
   protected readonly channel = computed<TemplateChannel | null>(() => {
@@ -204,19 +232,35 @@ export class TemplateEditorPageComponent {
    *  * ``meta_pending`` — awaiting Meta review. Locked so the body
    *    we submitted stays the same until Meta responds. Refresh
    *    status to speed the check.
-   *  * ``internal_review`` — the CRM's own review workflow is
-   *    holding the template. A reviewer with the review permission
-   *    can approve, reject, or request changes to unlock.
+   *  * ``internal_pending`` — internal_status = ``in_review``.
+   *    A CRM reviewer with the review permission needs to approve
+   *    or reject before edits reopen.
+   *  * ``internal_approved`` — internal_status = ``approved``.
+   *    Review passed; template is queued for publish (or awaiting
+   *    external submission for WhatsApp). Publisher unlocks by
+   *    clicking Publish.
+   *  * ``internal_published`` — internal_status = ``published``.
+   *    Live template — campaigns / automations may already reference
+   *    it. Editing in place would silently change what customers
+   *    receive; the guidance is "archive + author a versioned copy."
    *  * ``null`` — not locked.
    */
   protected readonly lockKind = computed<
-    'meta_approved' | 'meta_pending' | 'internal_review' | null
+    | 'meta_approved'
+    | 'meta_pending'
+    | 'internal_pending'
+    | 'internal_approved'
+    | 'internal_published'
+    | null
   >(() => {
     const t = this.template();
     if (t === null || !this.locked()) return null;
     if (t.external_status === 'approved') return 'meta_approved';
     if (t.external_status === 'pending') return 'meta_pending';
-    return 'internal_review';
+    if (t.internal_status === 'in_review') return 'internal_pending';
+    if (t.internal_status === 'approved') return 'internal_approved';
+    if (t.internal_status === 'published') return 'internal_published';
+    return null;
   });
 
   /** ``true`` when channel = whatsapp and the current name value fails
@@ -224,7 +268,7 @@ export class TemplateEditorPageComponent {
    *  snake_case" button in the header row. */
   protected readonly waNameInvalid = computed<boolean>(() => {
     if (this.channel() !== 'whatsapp') return false;
-    const v = this.headerForm.controls.name.value ?? '';
+    const v = this.nameValueSignal() ?? '';
     if (!v) return false;
     return !WA_NAME_RE.test(v);
   });
@@ -246,15 +290,43 @@ export class TemplateEditorPageComponent {
   protected readonly canWrite = computed(() => this.auth.hasPermission('templates.write'));
   protected readonly canReview = computed(() => this.auth.hasPermission('templates.review'));
   protected readonly canPublish = computed(() => this.auth.hasPermission('templates.publish'));
+  /** Active/inactive toggle visibility. Owner + Admin by default;
+   *  grant `templates.activate` on any custom role to hand them the
+   *  toggle without unlocking author / publish. */
+  protected readonly canActivate = computed(() => this.auth.hasPermission('templates.activate'));
   protected readonly canSubmitExternal = computed(() =>
     this.auth.hasPermission('templates.submit_external'),
   );
 
   // --- header-button visibility (Step 8 + Step 9) ---------------------
 
-  protected readonly showSubmitButton = computed(() => {
+  /** Owner / Admin (or any custom role with `templates.publish`) on a
+   *  draft: skip the pointless three-click review round-trip and
+   *  publish the draft in one shot. Backend `publish()` already
+   *  supports `draft → published` when the caller can publish. */
+  protected readonly showPublishDirectButton = computed(() => {
     const t = this.template();
-    return t !== null && t.internal_status === 'draft' && this.canWrite() && !this.locked();
+    return (
+      t !== null &&
+      t.internal_status === 'draft' &&
+      this.canWrite() &&
+      this.canPublish() &&
+      !this.locked()
+    );
+  });
+  /** Employees / roles WITHOUT publish rights on a draft: send the
+   *  template to the Admin/Owner queue for approval. Distinct from
+   *  the WhatsApp-side "Submit to WhatsApp for approval" button which
+   *  fires much later, after publish, on the WhatsApp channel only. */
+  protected readonly showSubmitForApprovalButton = computed(() => {
+    const t = this.template();
+    return (
+      t !== null &&
+      t.internal_status === 'draft' &&
+      this.canWrite() &&
+      !this.canPublish() &&
+      !this.locked()
+    );
   });
   protected readonly showReviewButton = computed(() => {
     const t = this.template();
@@ -344,6 +416,28 @@ export class TemplateEditorPageComponent {
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
+    // Header-form edits (name + channel) flip the dirty flag so the
+    // Save Draft button re-enables. Sub-form edits go through
+    // scheduleAutoSave(), which also flips dirty.
+    this.headerForm.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.dirty.set(true));
+
+    // Attribution track — hydrate staff list once so the metadata bar
+    // can resolve created_by / last_reviewed_by ids to display names.
+    // Failure is non-fatal; the bar just shows `—`.
+    this.staffApi
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          const map = new Map<string, StaffListItem>();
+          for (const r of rows) map.set(r.id, r);
+          this.staffById.set(map);
+        },
+        error: () => undefined,
+      });
+
     // React to channel selection — build the matching sub-form if it
     // doesn't exist yet, clear the unused one.
     effect(() => {
@@ -611,6 +705,11 @@ export class TemplateEditorPageComponent {
           if (row.channel === 'whatsapp' && row.external_status === 'rejected') {
             this.loadExternalStatus(row.id);
           }
+          // Hydration is done — the patchValue / setValue calls above
+          // fired valueChanges which flipped dirty to true. Reset it
+          // so the Save Draft button starts disabled after load; user
+          // input will re-enable it.
+          this.dirty.set(false);
         },
         error: (err: HttpErrorResponse) => {
           this.loadError.set(extractApiError(err) ?? 'Could not load template.');
@@ -857,6 +956,10 @@ export class TemplateEditorPageComponent {
     this.saving.set(false);
     this.template.set(row);
     this.toast.set(`Saved · v${row.current_version}`);
+    // Reset the dirty flag AFTER `template.set(row)` — the effects
+    // that rebuild sub-form state on template change fire valueChanges
+    // during hydration, which would otherwise flip dirty right back on.
+    this.dirty.set(false);
     if (isNew) {
       void this.router.navigate(['/user/templates', row.id], {
         replaceUrl: true,
@@ -865,6 +968,12 @@ export class TemplateEditorPageComponent {
   }
 
   private scheduleAutoSave(): void {
+    // Any value-change flip marks the editor dirty — this hook is
+    // wired from every sub-form's valueChanges subscription so it
+    // covers WA / Email / SMS / FB / IG / Push edits uniformly.
+    // Header-form edits go through a dedicated subscription in the
+    // constructor.
+    this.dirty.set(true);
     if (!this.template() || this.locked() || !this.canWrite()) return;
     if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
     this.autoSaveTimer = setTimeout(() => {
@@ -886,7 +995,7 @@ export class TemplateEditorPageComponent {
       .submit(t.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (row) => this.applyTransition(row, 'Submitted for review'),
+        next: (row) => this.applyTransition(row, 'Sent to your Admin / Owner for approval.'),
         error: (err: HttpErrorResponse) => this.applyTransitionError(err),
       });
   }
@@ -895,11 +1004,16 @@ export class TemplateEditorPageComponent {
     const t = this.template();
     if (!t || this.transitioning()) return;
     this.transitioning.set('publish');
+    // The backend `publish()` accepts both `approved → published` and
+    // `draft → published` (when the caller holds `templates.publish`),
+    // so Owner / Admin clicking the shortcut Publish button on a
+    // still-draft template lands here just the same as clicking
+    // Publish on an approved-by-someone-else template.
     this.api
       .publish(t.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (row) => this.applyTransition(row, 'Published'),
+        next: (row) => this.applyTransition(row, 'Published — template is now live.'),
         error: (err: HttpErrorResponse) => this.applyTransitionError(err),
       });
   }
@@ -947,6 +1061,26 @@ export class TemplateEditorPageComponent {
         },
         error: (err: HttpErrorResponse) => this.applyTransitionError(err),
       });
+  }
+
+  /** Activation toggle handler. `active=false` blocks every send picker
+   *  from choosing this template; `active=true` restores it. Idempotent
+   *  server-side — a no-op call still returns the row cleanly. */
+  protected toggleActive(active: boolean): void {
+    const t = this.template();
+    if (!t || this.transitioning()) return;
+    this.transitioning.set(active ? 'activate' : 'deactivate');
+    const call$ = active ? this.api.activate(t.id) : this.api.deactivate(t.id);
+    call$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (row) =>
+        this.applyTransition(
+          row,
+          active
+            ? 'Template active — pickers can use it again.'
+            : 'Template inactive — hidden from every send picker.',
+        ),
+      error: (err: HttpErrorResponse) => this.applyTransitionError(err),
+    });
   }
 
   /** Step 14 — clear a Meta rejection so the operator can edit + resubmit. */
@@ -1018,7 +1152,18 @@ export class TemplateEditorPageComponent {
     this.reviewModalOpen.set(false);
   }
   protected onReviewSucceeded(row: TemplateRead): void {
-    this.applyTransition(row, `Marked ${row.internal_status}`);
+    // Approve now auto-publishes (backend `workflow.approve()` jumps
+    // ``in_review → published`` in one shot). Reject sends back to draft.
+    // Toast copy per outcome so the reviewer understands what just landed.
+    let msg: string;
+    if (row.internal_status === 'published') {
+      msg = 'Approved and published — template is now live.';
+    } else if (row.internal_status === 'draft') {
+      msg = 'Sent back to draft — author can edit and resubmit.';
+    } else {
+      msg = `Marked ${row.internal_status}`;
+    }
+    this.applyTransition(row, msg);
   }
 
   protected openTestSendModal(): void {

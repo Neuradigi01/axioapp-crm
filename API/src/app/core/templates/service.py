@@ -118,6 +118,7 @@ async def list_templates(
     channel: ConversationChannel | None = None,
     internal_status: TemplateInternalStatus | None = None,
     external_status: TemplateExternalStatus | None = None,
+    is_active: bool | None = None,
     q: str | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -133,6 +134,7 @@ async def list_templates(
         channel=channel,
         internal_status=internal_status,
         external_status=external_status,
+        is_active=is_active,
         q=q,
         limit=limit,
         offset=offset,
@@ -674,6 +676,39 @@ async def archive_template(
     return template
 
 
+async def set_active(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    template_id: uuid.UUID,
+    active: bool,
+    user_id: uuid.UUID | None,
+) -> MessageTemplate:
+    """Flip ``is_active`` on / off. Idempotent — the current row's flag
+    already matching ``active`` short-circuits without an audit row or
+    ``updated_at`` bump.
+
+    Distinct from ``archive`` — an inactive template stays in whatever
+    internal_status it was (published rows stay ``published``, drafts
+    stay drafts). It just gets filtered out of every send path.
+    """
+    template = await get_template(session, org_id=org_id, template_id=template_id)
+    if bool(template.is_active) == bool(active):
+        return template
+    template.is_active = bool(active)
+    template.updated_by_user_id = user_id
+    template.updated_at = func.now()
+    await session.commit()
+    await session.refresh(template)
+    logger.info(
+        "templates.set_active org=%s id=%s active=%s",
+        org_id,
+        template.id,
+        active,
+    )
+    return template
+
+
 __all__: list[str] = [
     "archive_template",
     "create_template",
@@ -681,5 +716,6 @@ __all__: list[str] = [
     "get_version",
     "list_templates",
     "list_versions",
+    "set_active",
     "update_template",
 ]

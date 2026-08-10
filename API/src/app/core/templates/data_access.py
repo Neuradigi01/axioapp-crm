@@ -20,6 +20,7 @@ forget to set ``RequestContext.org_id`` (Celery tasks, scripts).
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +29,7 @@ from src.app.core.conversations.models import ConversationChannel
 from src.app.core.integrations.whatsapp.models import WhatsAppTemplate
 from src.app.core.templates.models import (
     MessageTemplate,
+    MessageTemplateReview,
     MessageTemplateVersion,
     TemplateExternalStatus,
     TemplateInternalStatus,
@@ -108,16 +110,20 @@ async def list_templates(
     channel: ConversationChannel | None = None,
     internal_status: TemplateInternalStatus | None = None,
     external_status: TemplateExternalStatus | None = None,
+    is_active: bool | None = None,
     q: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[tuple[MessageTemplate, str | None]], int]:
     """Filterable + paginated list. ``q`` matches against ``name`` or
-    ``body_text`` (case-insensitive). Returns ``(rows, total)`` where
-    each row is ``(MessageTemplate, external_rejection_reason)`` — the
-    reason is a LEFT OUTER JOIN onto the WhatsApp extension so
-    Meta-rejected rows carry their reason without an N+1 fetch. Non-WA
-    rows always come back with reason=None."""
+    ``body_text`` (case-insensitive). ``is_active`` filters on the
+    activation toggle — pickers pass ``True`` so operators never see
+    an inactive template; the library page passes ``None`` so admins
+    can review everything. Returns ``(rows, total)`` where each row
+    is ``(MessageTemplate, external_rejection_reason)`` — the reason
+    is a LEFT OUTER JOIN onto the WhatsApp extension so Meta-rejected
+    rows carry their reason without an N+1 fetch. Non-WA rows always
+    come back with reason=None."""
     base = select(MessageTemplate).where(MessageTemplate.org_id == org_id)
 
     if channel is not None:
@@ -126,6 +132,8 @@ async def list_templates(
         base = base.where(MessageTemplate.internal_status == internal_status)
     if external_status is not None:
         base = base.where(MessageTemplate.external_status == external_status)
+    if is_active is not None:
+        base = base.where(MessageTemplate.is_active.is_(is_active))
     if q:
         pattern = f"%{q.lower()}%"
         base = base.where(
@@ -154,6 +162,8 @@ async def list_templates(
         listing = listing.where(MessageTemplate.internal_status == internal_status)
     if external_status is not None:
         listing = listing.where(MessageTemplate.external_status == external_status)
+    if is_active is not None:
+        listing = listing.where(MessageTemplate.is_active.is_(is_active))
     if q:
         pattern = f"%{q.lower()}%"
         listing = listing.where(
@@ -170,6 +180,56 @@ async def list_templates(
         (row[0], row[1]) for row in result.all()
     ]
     return rows, int(total)
+
+
+async def latest_reviews_for_templates(
+    session: AsyncSession,
+    template_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, tuple[uuid.UUID | None, str, datetime]]:
+    """Return ``{template_id: (reviewer_user_id, action, created_at)}``
+    for every template in ``template_ids`` that has at least one review
+    row. Latest = most recent ``created_at``.
+
+    Powers the list / detail endpoints' ``last_reviewed_*`` fields so
+    the SPA can render "Approved by X on Y" without an N+1 fetch per
+    row. Templates with no review history are simply absent from the
+    returned dict — the caller sets the three fields to ``None`` in
+    that case."""
+    if not template_ids:
+        return {}
+    # Window-function pick: rank rows per template_id by created_at DESC,
+    # take rank=1. Single scan of the audit table with an index-supported
+    # partition instead of N per-template ORDER BY LIMIT 1 subqueries.
+    ranked = (
+        select(
+            MessageTemplateReview.template_id,
+            MessageTemplateReview.reviewer_user_id,
+            MessageTemplateReview.action,
+            MessageTemplateReview.created_at,
+            func.row_number()
+            .over(
+                partition_by=MessageTemplateReview.template_id,
+                order_by=MessageTemplateReview.created_at.desc(),
+            )
+            .label("rn"),
+        )
+        .where(MessageTemplateReview.template_id.in_(template_ids))
+        .subquery()
+    )
+    result = await session.execute(
+        select(
+            ranked.c.template_id,
+            ranked.c.reviewer_user_id,
+            ranked.c.action,
+            ranked.c.created_at,
+        ).where(ranked.c.rn == 1)
+    )
+    out: dict[uuid.UUID, tuple[uuid.UUID | None, str, datetime]] = {}
+    for tpl_id, reviewer_id, action, created_at in result.all():
+        # ``action`` comes back as the enum instance — .value for the
+        # string wire representation the schema expects.
+        out[tpl_id] = (reviewer_id, action.value, created_at)
+    return out
 
 
 # --- tbl_message_template_versions --------------------------------------

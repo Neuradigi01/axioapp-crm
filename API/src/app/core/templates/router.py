@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.permissions.service import list_permissions_for_role
+from src.app.core.templates import data_access as templates_da
 from src.app.core.templates import external_submission as templates_external
 from src.app.core.templates import service as templates_service
 from src.app.core.templates import sync as templates_sync
@@ -59,6 +60,7 @@ from src.app.core.templates.models import (
     TemplateInternalStatus,
 )
 from src.app.core.templates.permissions import (
+    PERM_ACTIVATE,
     PERM_PUBLISH,
     PERM_READ,
     PERM_REVIEW,
@@ -151,6 +153,14 @@ async def list_endpoint(
     channel: ConversationChannel | None = Query(default=None),
     internal_status: TemplateInternalStatus | None = Query(default=None),
     external_status: TemplateExternalStatus | None = Query(default=None),
+    is_active: bool | None = Query(
+        default=None,
+        description=(
+            "Filter by activation toggle. Pickers pass true so operators "
+            "never see inactive templates; the library page omits the "
+            "param to show everything for admin review."
+        ),
+    ),
     q: str | None = Query(default=None, max_length=255),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -163,6 +173,7 @@ async def list_endpoint(
         channel=channel,
         internal_status=internal_status,
         external_status=external_status,
+        is_active=is_active,
         q=q,
         limit=limit,
         offset=offset,
@@ -170,10 +181,21 @@ async def list_endpoint(
     # Campaigns v1 Step 02 — each row is (MessageTemplate, rejection_reason);
     # attach the reason to the response schema so the frontend picker +
     # library list can show it inline on hover.
+    # Attribution track — batch-hydrate the "last reviewed by / when /
+    # action" trio so the list page can render "Approved by X on Y"
+    # inline without a per-row followup fetch.
+    template_ids = [tpl.id for tpl, _ in rows]
+    latest_reviews = await templates_da.latest_reviews_for_templates(db, template_ids)
     items: list[TemplateRead] = []
     for template, rejection_reason in rows:
         payload = TemplateRead.model_validate(template)
         payload.external_rejection_reason = rejection_reason
+        review = latest_reviews.get(template.id)
+        if review is not None:
+            reviewer_id, action, reviewed_at = review
+            payload.last_reviewed_by_user_id = reviewer_id
+            payload.last_reviewed_action = action
+            payload.last_reviewed_at = reviewed_at
         items.append(payload)
     return TemplateListResponse(
         items=items,
@@ -236,7 +258,17 @@ async def get_endpoint(
     # Attach WA-specific fields for WhatsApp templates so the editor's
     # header / footer / buttons UI re-populates on load.
     await templates_service._load_wa_extension(db, template=template)
-    return TemplateRead.model_validate(template)
+    payload_out = TemplateRead.model_validate(template)
+    # Attribution track — same last-reviewed hydration as the list
+    # endpoint so the editor's metadata bar shows "Approved by X on Y".
+    latest = await templates_da.latest_reviews_for_templates(db, [template.id])
+    review = latest.get(template.id)
+    if review is not None:
+        reviewer_id, action, reviewed_at = review
+        payload_out.last_reviewed_by_user_id = reviewer_id
+        payload_out.last_reviewed_action = action
+        payload_out.last_reviewed_at = reviewed_at
+    return payload_out
 
 
 @router.patch("/{template_id}", response_model=TemplateRead)
@@ -301,6 +333,55 @@ async def archive_endpoint(
             detail="template not found",
         ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{template_id}/activate", response_model=TemplateRead)
+async def activate_endpoint(
+    template_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_ACTIVATE)),
+) -> TemplateRead:
+    """Flip the template ``is_active=true``. Idempotent. Owner / Admin
+    or any custom role granted ``templates.activate``."""
+    try:
+        template = await templates_service.set_active(
+            db,
+            org_id=user.org_id,
+            template_id=template_id,
+            active=True,
+            user_id=user.legacy_uuid,
+        )
+    except TemplateNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="template not found",
+        ) from exc
+    return TemplateRead.model_validate(template)
+
+
+@router.post("/{template_id}/deactivate", response_model=TemplateRead)
+async def deactivate_endpoint(
+    template_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_ACTIVATE)),
+) -> TemplateRead:
+    """Flip the template ``is_active=false``. Every send picker
+    (campaigns / workflows / automations / composer) filters this row
+    out; the row stays in the library for audit. Idempotent."""
+    try:
+        template = await templates_service.set_active(
+            db,
+            org_id=user.org_id,
+            template_id=template_id,
+            active=False,
+            user_id=user.legacy_uuid,
+        )
+    except TemplateNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="template not found",
+        ) from exc
+    return TemplateRead.model_validate(template)
 
 
 @router.get(

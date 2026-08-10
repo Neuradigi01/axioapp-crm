@@ -30,6 +30,12 @@ PERM_WRITE = "templates.write"
 PERM_REVIEW = "templates.review"
 PERM_PUBLISH = "templates.publish"
 PERM_SUBMIT_EXTERNAL = "templates.submit_external"
+#: Flip a published template active / inactive. Inactive rows are
+#: hidden from every send picker (campaigns, workflows, automations,
+#: conversations composer) and rejected server-side if they slip
+#: through. Owner + Admin by default; grant to any custom role to
+#: give them the toggle without unlocking author / publish rights.
+PERM_ACTIVATE = "templates.activate"
 
 
 #: Every permission key this module declares. Imported by
@@ -41,11 +47,13 @@ ALL_KEYS: tuple[str, ...] = (
     PERM_REVIEW,
     PERM_PUBLISH,
     PERM_SUBMIT_EXTERNAL,
+    PERM_ACTIVATE,
 )
 
 
 __all__ = [
     "ALL_KEYS",
+    "PERM_ACTIVATE",
     "PERM_PUBLISH",
     "PERM_READ",
     "PERM_REVIEW",

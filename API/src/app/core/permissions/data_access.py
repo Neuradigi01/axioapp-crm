@@ -256,6 +256,34 @@ async def count_active_members_for_role(session: AsyncSession, role_id: uuid.UUI
     return int(result.scalar_one() or 0)
 
 
+async def list_user_ids_with_permission(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    permission_key: str,
+) -> list[uuid.UUID]:
+    """All active user ids in ``org_id`` whose role grants ``permission_key``.
+
+    Powers cross-module fan-out notifications (e.g. "a template was
+    submitted for review — notify everyone who can approve it").
+    Returns an empty list when nobody holds the key — the notifier
+    should handle that gracefully (usually a no-op)."""
+    stmt = (
+        select(OrganizationMember.user_id)
+        .join(Role, Role.id == OrganizationMember.role_id)
+        .join(RolePermission, RolePermission.role_id == Role.id)
+        .join(Permission, Permission.id == RolePermission.permission_id)
+        .where(
+            OrganizationMember.org_id == org_id,
+            OrganizationMember.is_active.is_(True),
+            Permission.key == permission_key,
+        )
+        .distinct()
+    )
+    result = await session.execute(stmt)
+    return [row for row in result.scalars().all()]
+
+
 __all__ = [
     "bulk_insert_role_permissions",
     "bulk_upsert_permission_keys",
@@ -267,6 +295,7 @@ __all__ = [
     "get_role_by_id",
     "insert_role",
     "list_all_permissions",
+    "list_user_ids_with_permission",
     "list_permission_keys_with_ids",
     "list_permissions_by_keys",
     "list_role_permissions_query",

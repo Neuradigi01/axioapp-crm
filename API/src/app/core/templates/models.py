@@ -229,6 +229,15 @@ class MessageTemplate(Base, TenantScoped):
     )
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    # Owner / Admin (or any role with ``templates.activate``) can flip
+    # a template inactive to keep the row in the library but block every
+    # send path from using it. Campaigns, workflows, automations, and
+    # the conversations composer all filter this out server-side + hide
+    # inactive rows in their pickers. Default true so existing rows +
+    # every newly-created template are usable out of the box.
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("true")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

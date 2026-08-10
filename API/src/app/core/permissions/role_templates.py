@@ -147,6 +147,9 @@ _CORE_ADMIN_KEYS: list[str] = [
     "templates.review",
     "templates.publish",
     "templates.submit_external",
+    # Flip a template active / inactive to keep it in the library but
+    # block every send path from using it. Admin + Owner default.
+    "templates.activate",
     # tasks/automation-engine Step 3 — single-event trigger engine.
     # Admin authors triggers (write) + inspects run history (runs.read).
     # Read keeps the sidebar entry visible for read-only Employees.

@@ -86,6 +86,17 @@ export interface TemplateRead {
   current_version: number;
   created_by_user_id: string | null;
   updated_by_user_id: string | null;
+  /** Owner / Admin (or any role with `templates.activate`) can flip
+   *  this to false to keep the row in the library but block every
+   *  send picker from using it. Defaults true on every new template. */
+  is_active: boolean;
+  /** Attribution track — most recent review-trail row picked up by the
+   *  list + detail endpoints so the SPA can render "Approved by X on Y"
+   *  inline without a per-row fetch. `null` when the template has no
+   *  review history yet (fresh draft that was never submitted). */
+  last_reviewed_by_user_id: string | null;
+  last_reviewed_action: string | null;
+  last_reviewed_at: string | null;
   created_at: string;
   updated_at: string;
   /** Populated by the backend for WhatsApp templates that have a
@@ -174,6 +185,10 @@ export interface TemplateListQuery {
   channel?: TemplateChannel;
   internal_status?: TemplateInternalStatus;
   external_status?: TemplateExternalStatus;
+  /** Activation toggle filter. Pickers pass `true` so operators never
+   *  see inactive templates; the library page omits the field to
+   *  show everything for admin review. */
+  is_active?: boolean;
   q?: string;
   limit?: number;
   offset?: number;
@@ -244,6 +259,7 @@ export class TemplatesApiService {
       channel: query.channel,
       internal_status: query.internal_status,
       external_status: query.external_status,
+      is_active: query.is_active,
       q: query.q,
       limit: query.limit,
       offset: query.offset,
@@ -265,6 +281,17 @@ export class TemplatesApiService {
 
   archive(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);
+  }
+
+  /** Flip a template active. Owner/Admin (or any role with
+   *  `templates.activate`) — 403 otherwise. Idempotent. */
+  activate(id: string): Observable<TemplateRead> {
+    return this.http.post<TemplateRead>(`${this.base}/${id}/activate`, {});
+  }
+
+  /** Flip a template inactive so every send picker filters it out. */
+  deactivate(id: string): Observable<TemplateRead> {
+    return this.http.post<TemplateRead>(`${this.base}/${id}/deactivate`, {});
   }
 
   versions(id: string): Observable<TemplateVersionRead[]> {
