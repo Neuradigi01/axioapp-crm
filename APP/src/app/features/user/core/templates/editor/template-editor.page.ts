@@ -133,8 +133,6 @@ export class TemplateEditorPageComponent {
     { value: 'email', label: 'Email' },
     { value: 'whatsapp', label: 'WhatsApp' },
     { value: 'sms', label: 'SMS' },
-    { value: 'facebook', label: 'Facebook Messenger' },
-    { value: 'instagram', label: 'Instagram Direct' },
     { value: 'push', label: 'Push notification' },
   ];
 

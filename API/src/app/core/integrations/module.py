@@ -1,13 +1,18 @@
 """Integrations module descriptor.
 
-Sidebar entry at `menu_position=900` (just before Settings at 999).
-Registers the `settings.integrations.manage` permission with the core
-RBAC registry at startup. The OAuth flows (Step 2 + 4) and webhook
-receivers (Step 3 + 5) all gate on this single key — Owner-only by
-default; Admin role template inherits it; Employee templates do not.
+Sidebar entry at `menu_position=840`. The page itself is
+`always_visible` because it hosts the per-user Google Calendar
+connect card — every role (Owner, Admin, Employee, any custom role)
+can reach the page to wire their own calendar. The org-level cards
+(Google Ads, Meta Ads, WhatsApp, Email) render conditionally inside
+the page based on `settings.integrations.manage` /
+`email.accounts.manage`; users without those permissions just see
+the Calendar card and a "more integrations are managed by your
+Owner or Admin" note.
 
-The name dropped the "Ad" qualifier — WhatsApp + email integrations
-also live under this surface, so the broader label fits.
+The declared permission keys still register with the RBAC registry
+at startup so they exist for role seeding + can be granted to
+custom roles.
 """
 
 from src.app.core.module_registry import ModuleDescriptor
@@ -20,6 +25,7 @@ MODULE = ModuleDescriptor(
     route="/api/v1/integrations",
     frontend_route="/user/integrations",
     menu_position=840,
+    always_visible=True,
     permissions=[
         "settings.integrations.manage",
         # whatsapp-platform-upgrade Step 8 — template management.
