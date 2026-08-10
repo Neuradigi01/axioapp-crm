@@ -26,6 +26,7 @@ import {
   CatalogCategoriesApiService,
   CatalogCategory,
   CatalogItem,
+  buildCatalogImageHref,
 } from './catalog-api.service';
 import { deriveApiOrigin } from '@core/services/url.util';
 
@@ -193,31 +194,18 @@ export class AddItemModalComponent {
 
   private readonly apiOrigin = deriveApiOrigin();
 
-  /** What the preview shows: freshly picked file > existing image_url > nothing.
-   *  Existing URLs from the backend are server-relative (`/files/...`)
-   *  and must be re-anchored to the API origin during dev (Angular dev
-   *  server runs on a different port). A cache-buster query string is
-   *  appended so a fresh upload re-fetches instead of showing the stale
-   *  browser-cached PNG (backend keeps the same path per item id). */
+  /** What the preview shows: freshly picked file > existing image_url > nothing. */
   protected readonly displayImage = computed<string | null>(() => {
     const preview = this.previewUrl();
     if (preview) return preview;
     const item = this._item();
     if (!item?.image_url) return null;
-    return `${this.apiOrigin}${item.image_url}${this.cacheBuster(item)}`;
+    return buildCatalogImageHref(this.apiOrigin, item.image_url, item);
   });
 
-  /** Absolute URL for a gallery entry (same anchoring as displayImage). */
   protected galleryHref(url: string): string {
     const item = this._item();
-    return `${this.apiOrigin}${url}${item ? this.cacheBuster(item) : ''}`;
-  }
-
-  /** `?v={updated_at-or-id}` — busts the browser image cache when the
-   *  file at the same URL is replaced. */
-  private cacheBuster(item: CatalogItem): string {
-    const stamp = item.updated_at ?? item.id;
-    return `?v=${encodeURIComponent(String(stamp))}`;
+    return item ? buildCatalogImageHref(this.apiOrigin, url, item) : `${this.apiOrigin}${url}`;
   }
 
   readonly isEdit = computed(() => this._item() !== null);

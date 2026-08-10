@@ -39,13 +39,6 @@ export class HeaderComponent implements OnInit {
    *  the `CommandPaletteComponent` instance and toggles it in response. */
   readonly openPalette = output<void>();
 
-  /** Fires the AIXO-style "+ New" primary CTA in the top-right of the
-   *  header. Navigates to the leads page with the new-lead modal open,
-   *  matching the floating quick-add FAB. */
-  onNew(): void {
-    this.router.navigate(['/user/leads'], { queryParams: { new: 1 } });
-  }
-
   protected readonly user = signal<MeResponse | null>(null);
   protected readonly userMenuOpen = signal(false);
   protected readonly tasksOpen = signal(false);

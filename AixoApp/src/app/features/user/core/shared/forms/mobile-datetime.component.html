@@ -13,9 +13,13 @@
   </button>
 
   @if (open()) {
-    <div class="fixed inset-0 z-30" (click)="close()" aria-hidden="true"></div>
+    <div class="fixed inset-0 z-40" (click)="close()" aria-hidden="true"></div>
     <div
-      class="absolute top-full right-0 left-0 z-40 mt-1 rounded-lg border border-subtle bg-surface p-3 shadow-lg"
+      #panel
+      class="fixed z-50 max-h-[90vh] overflow-y-auto rounded-lg border border-subtle bg-surface p-3 shadow-lg"
+      [style.top]="panelStyle()?.top"
+      [style.left]="panelStyle()?.left"
+      [style.width]="panelStyle()?.width"
       role="dialog"
       aria-modal="false"
     >

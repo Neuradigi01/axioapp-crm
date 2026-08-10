@@ -43,17 +43,6 @@
 
   <!-- Right cluster (AIXO layout — 34px controls, radius 9px) -->
   <div class="ml-auto flex items-center gap-2">
-    <!-- Primary "+ New" CTA (matches AIXO) -->
-    <button
-      type="button"
-      (click)="onNew()"
-      class="inline-flex h-[34px] items-center gap-1.5 rounded-[9px] bg-accent px-3.5 text-[13px] font-semibold text-white transition hover:brightness-110"
-      aria-label="Create new"
-    >
-      <lucide-icon name="plus" class="h-4 w-4" />
-      <span class="hidden sm:inline">New</span>
-    </button>
-
     <!-- Theme toggle (3-way segmented, 34px tall to match AIXO controls) -->
     <div
       class="hidden h-[34px] items-center rounded-[9px] border border-subtle bg-app px-1 sm:inline-flex"

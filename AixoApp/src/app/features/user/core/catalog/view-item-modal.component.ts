@@ -10,7 +10,7 @@ import {
 import { DatePipe } from '@angular/common';
 
 import { InrPipe } from '../shared/pipes/inr.pipe';
-import { CatalogItem } from './catalog-api.service';
+import { CatalogItem, buildCatalogImageHref } from './catalog-api.service';
 import { deriveApiOrigin } from '@core/services/url.util';
 
 /**
@@ -41,14 +41,16 @@ export class ViewItemModalComponent {
   protected readonly current = computed<CatalogItem | null>(() => this._item());
 
   protected readonly imageHref = computed<string | null>(() => {
-    const stored = this._item()?.image_url;
-    return stored ? `${this.apiOrigin}${stored}` : null;
+    const item = this._item();
+    if (!item?.image_url) return null;
+    return buildCatalogImageHref(this.apiOrigin, item.image_url, item);
   });
 
   /** C5 — Gallery URLs anchored to the API origin. */
   protected readonly galleryHrefs = computed<string[]>(() => {
-    const urls = this._item()?.image_urls ?? [];
-    return urls.map((u) => `${this.apiOrigin}${u}`);
+    const item = this._item();
+    if (!item) return [];
+    return item.image_urls.map((u) => buildCatalogImageHref(this.apiOrigin, u, item));
   });
 
   protected readonly customEntries = computed<Array<[string, unknown]>>(() => {

@@ -179,10 +179,18 @@ export class ChatThreadComponent implements AfterViewChecked {
 
   protected formatTime(iso: string | null): string {
     if (!iso) return '';
-    return new Date(iso).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const d = new Date(iso);
+    const now = new Date();
+    const sameDay =
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate();
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (sameDay) return time;
+    // Older than today: prepend the short date so an operator can
+    // distinguish "14:32 today" from "14:32 last Tuesday" at a glance.
+    const date = d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+    return `${date} · ${time}`;
   }
 
   protected isPending(m: ConversationMessage): boolean {

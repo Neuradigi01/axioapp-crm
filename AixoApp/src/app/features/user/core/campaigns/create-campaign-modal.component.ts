@@ -48,7 +48,6 @@ import {
   TemplatesApiService,
 } from '../templates/templates-api.service';
 import { TemplateStatusBadgeComponent } from '../templates/template-status-badge.component';
-import { HtmlComposerComponent } from '../templates/editor/html-composer.component';
 
 /**
  * Step 15 — local picker row. Both the WhatsApp and non-WhatsApp
@@ -114,23 +113,15 @@ const _TEMPLATE_CHANNELS: ReadonlySet<ConversationChannel> = new Set<Conversatio
 /**
  * Create-campaign modal.
  *
- * Two template authoring modes drive the body input:
+ * Templates-only: the operator picks a published template from the
+ * central library. WhatsApp positional `{{n}}` placeholders each get
+ * a static/contact-field binding; other channels resolve named
+ * `{{contact.first_name}}` variables per-recipient at dispatch time.
  *
- *  - **Free text** (non-WA channels, or WA-text-fallback): textarea
- *    with `{{full_name}}` Mustache placeholder for the legacy
- *    contact-name interpolation.
- *  - **WA template picker** (Step 3.5.5 — channel='whatsapp'):
- *    dropdown of approved templates loaded from
- *    `GET /api/v1/integrations/whatsapp/templates?status=APPROVED`.
- *    Selecting a template shows a body preview + one input per
- *    `{{n}}` placeholder; each input has a "Static text" / "Contact
- *    field" toggle so the operator can either pin a literal value
- *    or bind to a contact attribute (full_name / phone / email).
- *    Step 3.5.6 dispatch resolves the field bindings per contact.
- *
- * Schema-level validation (backend `CampaignCreate`) enforces
- * "exactly one of template or template_id" — this modal serializes
- * the right shape based on the selected mode.
+ * The modal is split into three sequential steps so the form isn't
+ * one long scroll: **Basics** (name, channel, audience), **Content**
+ * (email sender identity + template picker + bindings), and **Send**
+ * (schedule, WA send-from, A/B toggle).
  */
 @Component({
   selector: 'app-create-campaign-modal',
@@ -143,7 +134,6 @@ const _TEMPLATE_CHANNELS: ReadonlySet<ConversationChannel> = new Set<Conversatio
     SendFromPickerComponent,
     AbTestSectionComponent,
     TemplateStatusBadgeComponent,
-    HtmlComposerComponent,
   ],
   templateUrl: './create-campaign-modal.component.html',
 })
@@ -387,12 +377,89 @@ export class CreateCampaignModalComponent {
     return [...found].sort((a, b) => a - b);
   });
 
-  // --- form ---------------------------------------------------------
+  // --- stepper ------------------------------------------------------
 
-  protected readonly varFullName = '{{full_name}}';
-  protected readonly varPhone = '{{phone}}';
-  protected readonly templatePlaceholder =
-    'Hi {{full_name}} — our Diwali sale is live! 20% off everything this week.';
+  /** Labels shown in the horizontal step indicator at the top of the
+   *  modal. Kept as a template constant so the template can `@for` and
+   *  the ordinal (1/2/3) drives both display and routing. */
+  protected readonly steps: ReadonlyArray<{ n: 1 | 2 | 3; label: string }> = [
+    { n: 1, label: 'Basics' },
+    { n: 2, label: 'Content' },
+    { n: 3, label: 'Send' },
+  ];
+
+  /** Which of the three panels is visible. Advancement is gated by
+   *  ``step1Complete`` / ``step2Complete`` so operators can't skip
+   *  past required fields. Back-navigation is always allowed. */
+  protected readonly step = signal<1 | 2 | 3>(1);
+
+  /** True when the current step is reachable — used by the stepper
+   *  header buttons to enable/disable the crumb click target. */
+  protected stepReachable(target: 1 | 2 | 3): boolean {
+    if (target <= this.step()) return true;
+    if (target === 2) return this.step1Complete();
+    return this.step1Complete() && this.step2Complete();
+  }
+
+  /** Signal-visible mirror of the fields step 1 requires. The form
+   *  controls themselves aren't signals; without this bridge the
+   *  ``canAdvance`` computed wouldn't invalidate on keystrokes. */
+  protected readonly nameValue = signal<string>('');
+
+  /** Step 1 (Basics) is complete when the campaign has a name AND the
+   *  audience selection is coherent — "Everyone" is always valid, a
+   *  saved group must be picked, a custom filter must include at
+   *  least one condition or handpicked contact. */
+  protected readonly step1Complete = computed<boolean>(() => {
+    if (!this.nameValue().trim()) return false;
+    const mode = this.audienceMode();
+    if (mode === 'everyone') return true;
+    if (mode === 'group') return this.selectedGroupId() !== null;
+    // filter mode
+    if (this.selectedContactMap().size > 0) return true;
+    const v = this.form.getRawValue();
+    return Boolean(v.audience_q?.trim() || v.audience_source?.trim() || v.audience_tag?.trim());
+  });
+
+  /** Step 2 (Content) requires a picked template plus every WA
+   *  ``{{n}}`` variable filled in. Email also requires mailbox +
+   *  sender name + subject (mirrors ``emailBranchIncomplete``). */
+  protected readonly step2Complete = computed<boolean>(() => {
+    if (this.selectedTemplateId() === null) return false;
+    const bindings = this.variables();
+    for (const n of this.templateVariableNumbers()) {
+      const b = bindings[String(n)];
+      if (!b || !b.value.trim()) return false;
+    }
+    if (this.isEmailChannel() && this.emailBranchIncomplete()) return false;
+    return true;
+  });
+
+  protected goToStep(target: 1 | 2 | 3): void {
+    // Free backwards nav. Forwards nav gated by step completeness so
+    // the operator can't leap over a required field via a header click.
+    if (target < this.step()) {
+      this.step.set(target);
+      return;
+    }
+    if (target === 2 && !this.step1Complete()) return;
+    if (target === 3 && (!this.step1Complete() || !this.step2Complete())) return;
+    this.step.set(target);
+  }
+
+  protected nextStep(): void {
+    const s = this.step();
+    if (s === 1 && this.step1Complete()) this.step.set(2);
+    else if (s === 2 && this.step2Complete()) this.step.set(3);
+  }
+
+  protected prevStep(): void {
+    const s = this.step();
+    if (s === 2) this.step.set(1);
+    else if (s === 3) this.step.set(2);
+  }
+
+  // --- form ---------------------------------------------------------
 
   /** Campaigns v1 scope locked to WhatsApp + Email (memory
    *  ``project_campaigns_scope.md``). Legacy campaigns on other
@@ -418,13 +485,6 @@ export class CreateCampaignModalComponent {
     audience_q: this.fb.control<string | null>(null),
     audience_source: this.fb.control<string | null>(null),
     audience_tag: this.fb.control<string | null>(null),
-    // Free-text body — required ONLY when no template is selected for
-    // a WA campaign, OR for any non-WA channel. The submit handler
-    // does the conditional check rather than dynamic Validators.
-    template: this.fb.control<string>('', {
-      nonNullable: true,
-      validators: [Validators.maxLength(4096)],
-    }),
     schedule_at: this.fb.control<string | null>(null),
     // Step 27b — multi-number Send-From selector. Null = use org
     // default. The dropdown self-hides when the org has < 2
@@ -450,11 +510,6 @@ export class CreateCampaignModalComponent {
     reply_to: this.fb.control<string | null>(null, [Validators.email, Validators.maxLength(320)]),
     subject: this.fb.control<string | null>(null, [Validators.maxLength(998)]),
     preheader: this.fb.control<string | null>(null, [Validators.maxLength(200)]),
-    // Campaigns v1 Step 04 — inline HTML body for Email campaigns that
-    // don't reference a template. Mutually exclusive with `template`
-    // and the picker; the save handler picks one source of truth
-    // before calling the API.
-    body_html: this.fb.control<string>('', [Validators.maxLength(200000)]),
   });
 
   constructor() {
@@ -524,12 +579,15 @@ export class CreateCampaignModalComponent {
             reply_to: null,
             subject: null,
             preheader: null,
-            // Campaigns v1 Step 04 — HTML body is Email-only; drop any
-            // stale HTML when the operator flips away.
-            body_html: '',
           });
         }
       });
+
+    // Bridge the Name control into a signal so ``step1Complete`` re-
+    // evaluates on every keystroke (form controls aren't signals).
+    this.form.controls.name.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((v) => this.nameValue.set(v ?? ''));
 
     // Initial load — default channel is whatsapp.
     this._loadTemplates(this.form.controls.channel.value);
@@ -623,14 +681,6 @@ export class CreateCampaignModalComponent {
     const current = ctrl.value ?? '';
     ctrl.setValue(current + token);
     ctrl.markAsDirty();
-  }
-
-  /** Bridge for the <app-html-composer>'s (valueChange) — the composer
-   *  is a plain input/output component (no ControlValueAccessor) so the
-   *  modal owns the form-control writes. */
-  protected onEmailBodyHtmlChange(html: string): void {
-    this.form.controls.body_html.setValue(html);
-    this.form.controls.body_html.markAsDirty();
   }
 
   /** Signal mirror of the three Email-branch form fields so the
@@ -993,34 +1043,21 @@ export class CreateCampaignModalComponent {
     // 'everyone' mode leaves `audience` as {} — backend treats as
     // "all org contacts" (already the existing default behaviour).
 
-    // Step 15 — decide template vs template_id mode. Any channel with
-    // a selected template_id sends through the central library; the
-    // free-text fallback fires only when no template is picked.
-    const useTemplatePicker = this.selectedTemplateId() !== null;
-    // Campaigns v1 Step 04 — inline HTML body is Email-only and
-    // mutually exclusive with the picker + free-text textarea. If the
-    // operator authored HTML, that's the source of truth; we clear the
-    // plain `template` value in the payload below so the backend's
-    // exactly-one-source guard is satisfied.
-    const emailInlineHtml = v.channel === 'email' ? (v.body_html?.trim() ?? '') : '';
-    const useInlineHtml = emailInlineHtml.length > 0;
-
-    if (useTemplatePicker) {
-      // WA's positional `{{n}}` placeholders require operator-supplied
-      // bindings before the dispatcher can render per-contact. Named
-      // variables on other channels resolve automatically from the
-      // contact row — no bindings to validate.
-      const bindings = this.variables();
-      for (const n of this.templateVariableNumbers()) {
-        const b = bindings[String(n)];
-        if (!b || !b.value.trim()) {
-          this.submitError.set(`Fill in a value for variable {{${n}}}.`);
-          return;
-        }
-      }
-    } else if (!useInlineHtml && !v.template.trim()) {
-      this.submitError.set('Provide a message body or pick a template.');
+    // Templates-only: campaigns always send through the central
+    // library, never free-text or inline HTML. Guard here even though
+    // the Next button on step 2 already blocks progression without a
+    // template, so a rogue Save keystroke can't slip past.
+    if (this.selectedTemplateId() === null) {
+      this.submitError.set('Pick a template on step 2 before saving.');
       return;
+    }
+    const bindings = this.variables();
+    for (const n of this.templateVariableNumbers()) {
+      const b = bindings[String(n)];
+      if (!b || !b.value.trim()) {
+        this.submitError.set(`Fill in a value for variable {{${n}}}.`);
+        return;
+      }
     }
 
     // Campaigns v1 Step 03 — Email required-field guard. Backend
@@ -1044,12 +1081,9 @@ export class CreateCampaignModalComponent {
         name: v.name,
         channel: v.channel,
         audience_filter: audience,
-        // Backend's exactly-one-source guard requires exactly one of
-        // template / template_id / body_html — pick per the resolved
-        // mode above.
-        template: useTemplatePicker || useInlineHtml ? null : v.template,
-        template_id: useTemplatePicker ? this.selectedTemplateId() : null,
-        template_variables: useTemplatePicker ? this.variables() : null,
+        template: null,
+        template_id: this.selectedTemplateId(),
+        template_variables: this.variables(),
         schedule_at: v.schedule_at ? new Date(v.schedule_at).toISOString() : null,
         // Step 27b — null on single-number orgs (picker hidden);
         // when set, the dispatcher pins the campaign to this
@@ -1071,11 +1105,7 @@ export class CreateCampaignModalComponent {
         reply_to: v.channel === 'email' ? (v.reply_to ?? null) : null,
         subject: v.channel === 'email' ? (v.subject ?? null) : null,
         preheader: v.channel === 'email' ? (v.preheader ?? null) : null,
-        // Campaigns v1 Step 04 — inline HTML body. Only sent when the
-        // operator authored HTML for an Email campaign; every other
-        // combination stays null so the exactly-one-source guard is
-        // satisfied.
-        body_html: useInlineHtml ? emailInlineHtml : null,
+        body_html: null,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
