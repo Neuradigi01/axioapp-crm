@@ -449,12 +449,12 @@ export const EMAIL_RECIPIENTS: readonly RecipientOption[] = [
     description: 'Send to the contact tied to this run.',
   },
   {
-    value: 'lead.owner.email',
+    value: 'lead.owner',
     label: "Lead owner's email",
     description: 'Send to the rep assigned to the lead.',
   },
   {
-    value: 'workflow.owner.email',
+    value: 'user.email',
     label: "Workflow owner's email",
     description: 'Send to the user who created the workflow.',
   },

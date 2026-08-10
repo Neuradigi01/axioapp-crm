@@ -185,6 +185,17 @@ export class ConversationsApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/conversations`;
 
+  /** Start (or resume) a conversation from the inbox's *New* button.
+   *  Resolves the picked contact's phone / email server-side per the
+   *  chosen channel; 422 when the contact lacks the required identifier
+   *  so the caller can render "add a phone/email first" inline. */
+  create(channel: ConversationChannel, contactId: string): Observable<Conversation> {
+    return this.http.post<Conversation>(this.base, {
+      channel,
+      contact_id: contactId,
+    });
+  }
+
   list(query: ConversationListQuery = {}): Observable<ConversationListResponse> {
     const params = buildHttpParams({
       channel: query.channel,

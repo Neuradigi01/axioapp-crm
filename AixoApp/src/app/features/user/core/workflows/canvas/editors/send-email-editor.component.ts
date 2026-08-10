@@ -14,6 +14,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import { MobileSelectComponent } from '../../../shared/forms/mobile-select.component';
 import { TemplateRead, TemplatesApiService } from '../../../templates/templates-api.service';
 import { CanvasNode } from '../canvas-state.service';
 import { EMAIL_RECIPIENTS, SEND_CATEGORIES } from './editor-contract';
@@ -22,7 +23,7 @@ import { readSendState, sendIsValid } from './send-editor-shared';
 @Component({
   selector: 'app-send-email-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './send-email-editor.component.html',
 })
@@ -49,6 +50,30 @@ export class SendEmailEditorComponent {
   /** All published Email templates for the org — the picker options. */
   readonly templates = signal<TemplateRead[] | null>(null);
   readonly loadError = signal<string | null>(null);
+
+  /** Mapped for `crm-mobile-select` — a placeholder pinned first. */
+  readonly templateOptions = computed(() => {
+    const tpls = this.templates();
+    const base = [{ value: '', label: '— pick a template —' }];
+    if (!tpls) return base;
+    return [
+      ...base,
+      ...tpls.map((t) => ({
+        value: t.id,
+        label: t.subject ? `${t.name} — ${t.subject}` : t.name,
+      })),
+    ];
+  });
+
+  readonly recipientOptionsForSelect = computed(() => [
+    { value: '', label: '— pick a recipient —' },
+    ...this.recipientOptions.map((r) => ({ value: r.value, label: r.label })),
+  ]);
+
+  readonly categoryOptionsForSelect = this.categoryOptions.map((c) => ({
+    value: c.value,
+    label: c.label,
+  }));
 
   constructor() {
     effect(() => this.validityChange.emit(sendIsValid(this.state())));

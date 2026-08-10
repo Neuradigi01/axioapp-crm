@@ -10,6 +10,7 @@ import {
   input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
@@ -57,6 +58,12 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
   protected readonly open = signal(false);
   readonly disabled = signal(false);
 
+  /** `position: fixed` coords for the calendar panel. Recomputed each
+   *  time the panel opens (or the viewport resizes/scrolls) so the
+   *  panel escapes any parent `overflow-hidden` / clipped modal card
+   *  and always fits inside the viewport. `null` → not open yet. */
+  protected readonly panelStyle = signal<{ top: string; left: string; width: string } | null>(null);
+
   /** Single source of truth — written by either `[value]` (via effect)
    *  or `writeValue()` (from Angular Forms). */
   private readonly writtenValue = signal<string | null>(null);
@@ -84,6 +91,15 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
     effect(() => {
       const parsed = this.parseValue(this.currentValue());
       if (parsed) this.viewMonth.set(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
+    });
+
+    // Refine the panel position once the actual panel is in the DOM
+    // (its measured height is more reliable than the estimate).
+    effect(() => {
+      if (this.open() && this.panelRef()) {
+        // Run in a microtask so layout settles before we read offsetHeight.
+        queueMicrotask(() => this.refinePosition());
+      }
     });
   }
 
@@ -161,14 +177,85 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
 
   protected readonly today = new Date();
 
+  /** Panel element ref, populated once `@if (open())` renders it. */
+  protected readonly panelRef = viewChild<ElementRef<HTMLElement>>('panel');
+
   protected toggle(): void {
     if (this.disabled()) return;
-    this.open.update((v) => !v);
+    const nextOpen = !this.open();
+    if (nextOpen) {
+      // Seed a sensible position from the trigger's rect so first
+      // paint isn't at (0,0). Actual size measurement runs after the
+      // panel renders (see `afterNextRender` in the constructor).
+      this.positionPanel();
+    }
+    this.open.set(nextOpen);
   }
 
   protected close(): void {
     this.open.set(false);
+    this.panelStyle.set(null);
     this.onTouchedFn();
+  }
+
+  /** Compute a fixed-position for the panel that:
+   *  - sits below the trigger when there's room, above otherwise
+   *  - never extends outside the viewport horizontally
+   *  - never taller than 90vh (internal scroll takes over past that).
+   *  Panel is `position: fixed` so it escapes any parent `overflow-hidden`
+   *  (modal cards, table cells, sidebars, etc.) and can never be clipped.
+   *  `estimatedHeight` is used on first paint (before the panel is in
+   *  the DOM). Once the panel renders, `refinePosition()` re-measures
+   *  and re-anchors with the true height. */
+  private positionPanel(estimatedHeight = 380): void {
+    const trigger = this.host.nativeElement.querySelector(
+      'button[type="button"]',
+    ) as HTMLElement | null;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const PANEL_W = Math.min(320, vw - 16);
+    const h = Math.min(estimatedHeight, vh - 16);
+    const spaceBelow = vh - rect.bottom;
+    const spaceAbove = rect.top;
+    let top: number;
+    if (spaceBelow >= h + 8 || spaceBelow >= spaceAbove) {
+      top = rect.bottom + 4;
+    } else {
+      top = rect.top - h - 4;
+    }
+    // Clamp so the panel is fully on-screen vertically.
+    top = Math.max(8, Math.min(top, vh - h - 8));
+    // Align to trigger's left edge, but clamp so it stays on-screen.
+    const left = Math.max(8, Math.min(rect.left, vw - PANEL_W - 8));
+    this.panelStyle.set({
+      top: `${Math.round(top)}px`,
+      left: `${Math.round(left)}px`,
+      width: `${Math.round(PANEL_W)}px`,
+    });
+  }
+
+  /** Re-anchor with the true measured height once the panel is in the
+   *  DOM. Prevents "estimate was wrong → panel clips off screen"
+   *  glitches, especially in date-only mode where the panel is shorter
+   *  than the datetime mode. */
+  private refinePosition(): void {
+    const el = this.panelRef()?.nativeElement;
+    if (!el) return;
+    this.positionPanel(el.offsetHeight);
+  }
+
+  /** Recompute the panel position on window resize / scroll while it's
+   *  open — keeps it glued to the trigger through page-scroll or
+   *  orientation change. */
+  @HostListener('window:resize')
+  onResize(): void {
+    if (this.open()) this.positionPanel();
+  }
+  @HostListener('window:scroll')
+  onWindowScroll(): void {
+    if (this.open()) this.positionPanel();
   }
 
   protected prevMonth(): void {

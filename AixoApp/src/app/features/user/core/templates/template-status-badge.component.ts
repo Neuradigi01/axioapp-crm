@@ -18,6 +18,13 @@ interface BadgeDescriptor {
   classes: string;
 }
 
+// The internal ``approved`` state deliberately uses "Ready to publish"
+// instead of the on-wire "Approved" so it never collides with the
+// external EXTERNAL[approved] badge — which also renders green and also
+// used to say "Approved". Two green "Approved" badges side-by-side (one
+// meaning "your team's reviewer OK'd it, awaiting Publish click", the
+// other meaning "Meta/DLT OK'd it, safe to send") consistently misled
+// operators into thinking a WA-pending template was ready.
 const INTERNAL: Record<TemplateInternalStatus, BadgeDescriptor> = {
   draft: { label: 'Draft', classes: 'bg-surface-2 text-default border-subtle' },
   in_review: {
@@ -25,7 +32,7 @@ const INTERNAL: Record<TemplateInternalStatus, BadgeDescriptor> = {
     classes: 'bg-amber-50 text-amber-700 ring-amber-200',
   },
   approved: {
-    label: 'Approved',
+    label: 'Ready to publish',
     classes: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   },
   published: {

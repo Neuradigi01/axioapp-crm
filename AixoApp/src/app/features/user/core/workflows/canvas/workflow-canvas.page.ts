@@ -27,9 +27,11 @@ import { NodePaletteComponent } from './node-palette.component';
 import { NODE_HEIGHT, NODE_WIDTH, WorkflowNodeComponent } from './node.component';
 import { getNodeType } from './node-type-registry';
 import { SaveChangeNoteModalComponent } from './save-change-note.modal.component';
+import { ScheduleConfigModalComponent } from './schedule-config-modal.component';
 import { SchedulesDrawerComponent } from './schedules-drawer.component';
 import { VersionHistoryDrawerComponent } from './version-history-drawer.component';
 import {
+  Schedule,
   WorkflowExportBody,
   WorkflowGraph,
   WorkflowRead,
@@ -89,6 +91,7 @@ const AUTOSAVE_INTERVAL_MS = 30_000;
     NodeEditorComponent,
     NodePaletteComponent,
     SaveChangeNoteModalComponent,
+    ScheduleConfigModalComponent,
     SchedulesDrawerComponent,
     VersionHistoryDrawerComponent,
     WorkflowNodeComponent,
@@ -133,10 +136,60 @@ export class WorkflowCanvasPageComponent {
     this.mobileInspectorOpen.set(false);
   }
 
+  // Desktop-only sidebar collapse toggles. Node palette + right
+  // inspector each eat ~300-440px of screen; collapsing either gives
+  // the canvas back the space. Mobile ignores these (mobile uses the
+  // slide-over toggles instead). Persist to localStorage so the
+  // operator's preference sticks across canvas visits.
+  readonly paletteCollapsed = signal(this._readCollapsePref('palette'));
+  readonly inspectorCollapsed = signal(this._readCollapsePref('inspector'));
+  togglePaletteCollapsed(): void {
+    this.paletteCollapsed.update((v) => !v);
+    this._writeCollapsePref('palette', this.paletteCollapsed());
+  }
+  toggleInspectorCollapsed(): void {
+    this.inspectorCollapsed.update((v) => !v);
+    this._writeCollapsePref('inspector', this.inspectorCollapsed());
+  }
+  private _readCollapsePref(key: 'palette' | 'inspector'): boolean {
+    try {
+      return localStorage.getItem(`wf-canvas-${key}-collapsed`) === '1';
+    } catch {
+      return false;
+    }
+  }
+  private _writeCollapsePref(key: 'palette' | 'inspector', value: boolean): void {
+    try {
+      localStorage.setItem(`wf-canvas-${key}-collapsed`, value ? '1' : '0');
+    } catch {
+      // Storage disabled (Safari private mode) — silently ignore.
+    }
+  }
+
   // tasks/workflow-scheduling Step 4 — schedules drawer, opened by
   // the header calendar-clock button. Mutually exclusive with the
   // version drawer (both share the same right-side inspector slot).
   readonly showSchedulesDrawer = signal(false);
+
+  // Schedule config modal — hoisted to top-level so `position: fixed`
+  // is viewport-relative. The right-side aside uses `transform` for
+  // its slide-over, which would otherwise trap the modal inside
+  // the aside's 440px bounds.
+  readonly scheduleModalOpen = signal(false);
+  readonly scheduleModalEditing = signal<Schedule | null>(null);
+  readonly schedulesRefreshToken = signal(0);
+  onScheduleConfigOpen(editing: Schedule | null): void {
+    this.scheduleModalEditing.set(editing);
+    this.scheduleModalOpen.set(true);
+  }
+  onScheduleConfigClose(): void {
+    this.scheduleModalOpen.set(false);
+    this.scheduleModalEditing.set(null);
+  }
+  onScheduleConfigSaved(_saved: Schedule): void {
+    this.onScheduleConfigClose();
+    this.schedulesRefreshToken.update((n) => n + 1);
+  }
   toggleSchedulesDrawer(): void {
     this.showSchedulesDrawer.update((v) => !v);
     if (this.showSchedulesDrawer()) {

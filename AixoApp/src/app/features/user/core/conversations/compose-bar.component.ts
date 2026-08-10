@@ -155,9 +155,9 @@ export class ComposeBarComponent {
   @Output() readonly pickTemplate = new EventEmitter<void>();
 
   /** Step 27b — explicit send-from selection. Null when the org
-   *  is single-number (picker hidden). The parent persists the
-   *  selection per-conversation so switching threads doesn't
-   *  silently reset the choice. */
+   *  is single-number (picker hidden). Lives on this component
+   *  instance, so the choice resets when the compose-bar is
+   *  re-created (i.e. when a different conversation is opened). */
   protected readonly sendFromPhoneId = signal<string | null>(null);
 
   // --- Step 28: outbound location share -------------------------------
@@ -249,7 +249,7 @@ export class ComposeBarComponent {
     return this.sendFromPhoneId();
   }
 
-  @ViewChild('fileInput') private readonly fileInput!: ElementRef<HTMLInputElement>;
+  @ViewChild('fileInput') private readonly fileInput?: ElementRef<HTMLInputElement>;
 
   protected readonly text = signal<string>('');
   protected readonly templateError = signal<string | null>(null);
