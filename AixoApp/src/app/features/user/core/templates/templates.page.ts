@@ -17,6 +17,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
+import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
 
 import { ChannelChipComponent } from './channel-chip.component';
 import { TemplateStatusBadgeComponent } from './template-status-badge.component';
@@ -83,11 +84,25 @@ const STATUS_OPTIONS: Array<{
 export class TemplatesPageComponent {
   private readonly api = inject(TemplatesApiService);
   private readonly auth = inject(FurnitureAuthService);
+  private readonly staffApi = inject(StaffApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly CHANNEL_OPTIONS = CHANNEL_OPTIONS;
   protected readonly STATUS_OPTIONS = STATUS_OPTIONS;
   protected readonly PAGE_SIZE = PAGE_SIZE;
+
+  /** Attribution track — staff hydration for the "Created by" / "Approved
+   *  by" columns. Loaded once at page mount; hits are cheap because the
+   *  set is org-wide staff (small). Missing ids fall back to a `—` cell. */
+  protected readonly staffById = signal<Map<string, StaffListItem>>(new Map());
+
+  /** Attribution track — resolve a user id to a display name for the
+   *  list cell. Returns `—` when the id is null or the staff row isn't
+   *  in the hydration map (deactivated / cross-org — very rare). */
+  protected staffName(userId: string | null): string {
+    if (!userId) return '—';
+    return this.staffById().get(userId)?.full_name ?? '—';
+  }
 
   // List + paging state.
   protected readonly items = signal<TemplateRead[]>([]);
@@ -104,6 +119,11 @@ export class TemplatesPageComponent {
   protected readonly debouncedSearch = signal<string>('');
 
   protected readonly canWrite = computed(() => this.auth.hasPermission('templates.write'));
+  /** Attribution track — reviewers see a "Needs approval" chip on rows
+   *  in `in_review`. Non-reviewers can still see the underlying status
+   *  badge; the chip is just an actionable nudge for people who can
+   *  actually act on it. */
+  protected readonly canReview = computed(() => this.auth.hasPermission('templates.review'));
 
   protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / PAGE_SIZE)));
   protected readonly hasPrev = computed(() => this.pageIndex() > 0);
@@ -126,6 +146,22 @@ export class TemplatesPageComponent {
       void page;
       this.reload();
     });
+    // Attribution track — one-shot staff load at page mount for the
+    // "Created by" / "Approved by" cells. Failure is non-fatal; those
+    // cells just show `—` and the rest of the page keeps working.
+    this.staffApi
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          const map = new Map<string, StaffListItem>();
+          for (const r of rows) map.set(r.id, r);
+          this.staffById.set(map);
+        },
+        error: () => {
+          // Silent — cells degrade gracefully.
+        },
+      });
   }
 
   // --- filters / search -----------------------------------------------

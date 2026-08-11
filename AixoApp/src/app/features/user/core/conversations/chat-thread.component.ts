@@ -22,7 +22,6 @@ import {
   MessageReaction,
 } from './conversations-api.service';
 import { ReactionPickerComponent } from './reaction-picker.component';
-import { SessionWindowBannerComponent } from './session-window-banner.component';
 import { TagChipComponent } from './tag-chip.component';
 import { TagManagerComponent } from './tag-manager.component';
 import { AttributionChipComponent } from './header/attribution-chip.component';
@@ -50,7 +49,6 @@ import { FurnitureAuthService } from '../auth/auth.service';
   imports: [
     LucideAngularModule,
     ReactionPickerComponent,
-    SessionWindowBannerComponent,
     TagChipComponent,
     TagManagerComponent,
     ConversationBlockNumberActionComponent,
@@ -100,11 +98,6 @@ export class ChatThreadComponent implements AfterViewChecked {
    *  changes (assign / unassign / create). The page updates the
    *  conversation row in its `items` list + the detail. */
   @Output() readonly tagsChanged = new EventEmitter<ConversationTagRef[]>();
-
-  /** Step 15 — out-of-session "Pick template" CTA was clicked on the
-   *  banner. Parent decides where to route (templates page today;
-   *  future Step 16 might wire to in-thread template send). */
-  @Output() readonly pickTemplate = new EventEmitter<void>();
 
   /** J.16 fix — the user picked a new status from the header status
    *  menu (open / snoozed / closed). Parent owns the PATCH; header

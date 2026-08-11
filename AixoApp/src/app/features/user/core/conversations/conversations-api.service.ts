@@ -250,6 +250,30 @@ export class ConversationsApiService {
     return this.http.post<ConversationMessage>(`${this.base}/${id}/messages`, body);
   }
 
+  /** Send an approved WhatsApp template through an existing
+   *  conversation. Powers the inbox composer's inline template picker
+   *  when the 24-hour session window has expired — Meta only accepts
+   *  approved templates outside the window.
+   *
+   *  ``variables`` maps `{{n}}` placeholder index (1-based, as a
+   *  string) to the resolved value. Empty when the template has no
+   *  variables. */
+  sendTemplate(
+    id: string,
+    payload: {
+      templateId: string;
+      variables?: Record<string, string>;
+      sendFromPhoneId?: string | null;
+    },
+  ): Observable<ConversationMessage> {
+    const body: Record<string, unknown> = {
+      template_id: payload.templateId,
+      variables: payload.variables ?? {},
+    };
+    if (payload.sendFromPhoneId) body['send_from_phone_id'] = payload.sendFromPhoneId;
+    return this.http.post<ConversationMessage>(`${this.base}/${id}/messages/template`, body);
+  }
+
   /** Reply to an email conversation from the unified inbox. Routes to
    *  the typed email endpoint (the generic `/messages` guard rejects
    *  email because it needs subject + sender-account). Body-only send

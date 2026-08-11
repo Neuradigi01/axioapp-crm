@@ -305,10 +305,8 @@
   </div>
   @if (!isNoteMode() && outOfSession) {
     <!-- WhatsApp 24-hour rule reminder inline with the composer. The
-         session-window-banner above the messages is the primary CTA;
-         this line is a duplicate near the disabled Send so the
-         operator doesn't have to scroll to find the "Pick template"
-         action after typing. -->
+         inline template picker on the right lets the operator send an
+         approved template without leaving the thread. -->
     <div
       class="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-500 ring-1 border-amber-500/20"
     >
@@ -322,13 +320,14 @@
         WhatsApp 24-hour reply window expired. Send an approved template or wait for the customer to
         message you.
       </p>
-      <button
-        type="button"
-        (click)="pickTemplate.emit()"
-        class="shrink-0 rounded-md border border-amber-500/40 bg-surface px-2.5 py-1 text-[11px] font-semibold text-amber-500 hover:bg-amber-500/10"
-      >
-        Pick template
-      </button>
+      @if (conversationId) {
+        <app-whatsapp-template-picker
+          [conversationId]="conversationId"
+          [sendFromPhoneId]="sendFromPhoneId()"
+          (sent)="templateSent.emit($event)"
+          (errored)="templateSendError.emit($event)"
+        />
+      }
     </div>
   } @else {
     <p class="mt-2 text-[10px] text-faint">

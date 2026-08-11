@@ -135,13 +135,13 @@
           (replyTo)="onReplyTo($event)"
           (react)="onReact($event)"
           (tagsChanged)="onTagsChanged($event)"
-          (pickTemplate)="onPickTemplate()"
           (statusChange)="onStatusChange($event)"
         />
         <app-compose-bar
           #composeBar
           [aiHandling]="conv.ai_handling"
           [channel]="conv.channel"
+          [conversationId]="conv.id"
           [contactId]="conv.contact_id"
           [replyingTo]="replyingTo()"
           [staff]="staffList()"
@@ -154,7 +154,8 @@
           (openInteractive)="openInteractive()"
           (toggleAi)="onToggleAi($event)"
           (clearReply)="onClearReply()"
-          (pickTemplate)="onPickTemplate()"
+          (templateSent)="onTemplateSent($event)"
+          (templateSendError)="onTemplateError($event)"
         />
         <app-interactive-builder
           [open]="interactiveOpen()"
