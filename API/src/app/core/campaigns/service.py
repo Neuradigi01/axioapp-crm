@@ -575,6 +575,24 @@ async def create_campaign(
         entity_id=campaign.id,
         after=_snapshot(campaign),
     )
+
+    # Auto-arm scheduled campaigns: when the operator sets a future
+    # `schedule_at` at create time, skip the manual Start click and run
+    # the enqueue pre-flight (readiness checks, audience resolution,
+    # chunk pre-queue) inline. The campaign lands in `scheduled` state
+    # with queued rows so the `dispatch_scheduled_campaigns` beat picks
+    # it up at `schedule_at` without further input. If pre-flight
+    # raises (missing store address, template channel mismatch, etc.),
+    # roll back the just-created row so the operator can fix + retry
+    # without a phantom draft in the list.
+    if campaign.schedule_at is not None and campaign.schedule_at > datetime.now(UTC):
+        try:
+            await enqueue(session, campaign_id=campaign.id)
+            await session.refresh(campaign)
+        except HTTPException:
+            await campaigns_da.delete_campaign_row(session, campaign)
+            await session.commit()
+            raise
     return campaign
 
 
@@ -2057,6 +2075,33 @@ async def retry_message(
     await dispatch_chunk(session, campaign_id=campaign_id, contact_ids=[msg.contact_id])
     await session.refresh(msg)
     return msg
+
+
+async def dashboard_stats(session: AsyncSession) -> dict[str, Any]:
+    """Org-wide campaign KPIs for the current calendar month.
+
+    Aggregates every `CampaignMessage` whose `sent_at` falls in the
+    caller's this-month window and returns raw counts plus the two
+    rates the dashboard cards render. Rates are `None` (rendered as
+    "—" client-side) when the denominator is zero so we never show
+    a fake `0%` before any campaign has run.
+    """
+    now = datetime.now(UTC)
+    start_of_month = datetime(now.year, now.month, 1, tzinfo=UTC)
+    counts = await campaigns_da.dashboard_stats_since(session, since=start_of_month)
+    sent = counts["sent"]
+    delivered = counts["delivered"]
+    read = counts["read"]
+    delivery_rate = (delivered / sent) if sent else None
+    read_rate = (read / delivered) if delivered else None
+    return {
+        "since": start_of_month,
+        "sent": sent,
+        "delivered": delivered,
+        "read": read,
+        "delivery_rate": delivery_rate,
+        "read_rate": read_rate,
+    }
 
 
 async def stats(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str, Any]:

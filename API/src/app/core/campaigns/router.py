@@ -7,6 +7,7 @@
   DELETE /api/v1/campaigns/{id}
   POST   /api/v1/campaigns/{id}/start
   GET    /api/v1/campaigns/{id}/stats
+  GET    /api/v1/campaigns/dashboard-stats
 
 Reads need `campaigns.read`; mutations need `campaigns.write`; starting
 a campaign needs the separate `campaigns.send` permission so an admin
@@ -24,6 +25,7 @@ from src.app.core.auth.dependencies import require_permissions
 from src.app.core.campaigns.models import CampaignMessageStatus
 from src.app.core.campaigns.schemas import (
     CampaignCreate,
+    CampaignDashboardStatsOut,
     CampaignListResponse,
     CampaignMessageOut,
     CampaignOut,
@@ -35,6 +37,7 @@ from src.app.core.campaigns.schemas import (
 from src.app.core.campaigns.service import (
     check_readiness,
     create_campaign,
+    dashboard_stats,
     delete_campaign,
     enqueue,
     get_campaign,
@@ -48,6 +51,17 @@ from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
 router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
+
+
+@router.get("/dashboard-stats", response_model=CampaignDashboardStatsOut)
+async def dashboard_stats_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("campaigns.read")),
+) -> CampaignDashboardStatsOut:
+    """Org-wide KPIs powering the four cards at the top of the
+    Campaigns page — aggregated across every this-month message row."""
+    data = await dashboard_stats(db)
+    return CampaignDashboardStatsOut(**data)
 
 
 @router.get("", response_model=CampaignListResponse)

@@ -11,7 +11,12 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
-import { Campaign, CampaignStatus, CampaignsApiService } from './campaigns-api.service';
+import {
+  Campaign,
+  CampaignDashboardStats,
+  CampaignStatus,
+  CampaignsApiService,
+} from './campaigns-api.service';
 import { CreateCampaignModalComponent } from './create-campaign-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -104,6 +109,10 @@ export class CampaignsPageComponent {
   protected readonly items = signal<Campaign[]>([]);
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
+  /** Aggregated this-month KPIs powering the top cards. `null` until
+   *  the first fetch resolves; failure keeps it `null` so the cards
+   *  render "—" without swallowing the list load. */
+  protected readonly dashboardStats = signal<CampaignDashboardStats | null>(null);
   protected readonly modalOpen = signal(false);
   protected readonly busyId = signal<string | null>(null);
 
@@ -156,23 +165,21 @@ export class CampaignsPageComponent {
     });
   });
 
-  /** Preview stats row — 4 cards with delta strings. Per-campaign
-   *  stats aren't in the list payload; real "sent this month" +
-   *  rates land when the batch analytics endpoint ships (deferred
-   *  from Campaigns v1). We show what we have (client-side status
-   *  counts) with an honest "—" for the aggregates we can't compute
-   *  yet, so the visual matches the preview without lying. */
+  /** Preview stats row — 3 cards. `thisMonth` is the count of
+   *  messages actually SENT this month (from the aggregated dashboard
+   *  endpoint), not campaigns created — the label used to mislead
+   *  before the endpoint shipped. `deliveryRate` / `readRate` are
+   *  formatted percentages or "—" when the denominator is zero. */
   protected readonly stats = computed(() => {
     const rows = this.items();
     const byStatus = (s: CampaignStatus) => rows.filter((r) => r.status === s).length;
-    const now = new Date();
-    const thisMonth = rows.filter((r) => {
-      if (!r.created_at) return false;
-      const dt = new Date(r.created_at);
-      return dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear();
-    }).length;
+    const ds = this.dashboardStats();
+    const pct = (r: number | null | undefined): string =>
+      r === null || r === undefined ? '—' : `${Math.round(r * 100)}%`;
     return {
-      thisMonth,
+      thisMonth: ds?.sent ?? 0,
+      deliveryRate: pct(ds?.delivery_rate),
+      readRate: pct(ds?.read_rate),
       running: byStatus('running'),
       scheduled: byStatus('scheduled'),
       sent: byStatus('done'),
@@ -216,6 +223,16 @@ export class CampaignsPageComponent {
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load campaigns.');
         },
+      });
+    // Dashboard KPIs load independently — a failed aggregation must
+    // not block the list, and vice versa. The cards fall back to "—"
+    // when the fetch fails.
+    this.api
+      .dashboardStats()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (s) => this.dashboardStats.set(s),
+        error: () => this.dashboardStats.set(null),
       });
   }
 

@@ -44,32 +44,27 @@
 
   <!-- ================= Stat cards ================= -->
   @let s = stats();
-  <div class="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:grid-cols-4">
+  <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
     <div class="rounded-xl border border-subtle bg-surface px-5 py-4">
       <div class="text-[11px] font-semibold uppercase tracking-wider text-muted">
         Sent this month
       </div>
       <div class="mt-1 text-[26px] font-bold leading-tight text-default">{{ s.thisMonth }}</div>
-      <div class="mt-1 text-[11px] text-faint">campaigns created this month</div>
+      <div class="mt-1 text-[11px] text-faint">messages sent this month</div>
     </div>
     <div class="rounded-xl border border-subtle bg-surface px-5 py-4">
       <div class="text-[11px] font-semibold uppercase tracking-wider text-muted">Delivery rate</div>
-      <div class="mt-1 text-[26px] font-bold leading-tight text-default">—</div>
-      <div class="mt-1 text-[11px] text-faint">Analytics endpoint coming soon</div>
+      <div class="mt-1 text-[26px] font-bold leading-tight text-default">
+        {{ s.deliveryRate }}
+      </div>
+      <div class="mt-1 text-[11px] text-faint">delivered / sent</div>
     </div>
     <div class="rounded-xl border border-subtle bg-surface px-5 py-4">
       <div class="text-[11px] font-semibold uppercase tracking-wider text-muted">
         Read / open rate
       </div>
-      <div class="mt-1 text-[26px] font-bold leading-tight text-default">—</div>
-      <div class="mt-1 text-[11px] text-faint">Analytics endpoint coming soon</div>
-    </div>
-    <div class="rounded-xl border border-subtle bg-surface px-5 py-4">
-      <div class="text-[11px] font-semibold uppercase tracking-wider text-muted">
-        Est. cost this month
-      </div>
-      <div class="mt-1 text-[26px] font-bold leading-tight text-default">—</div>
-      <div class="mt-1 text-[11px] text-faint">Wallet balance coming soon</div>
+      <div class="mt-1 text-[26px] font-bold leading-tight text-default">{{ s.readRate }}</div>
+      <div class="mt-1 text-[11px] text-faint">read (WA) or opened (email) / delivered</div>
     </div>
   </div>
 

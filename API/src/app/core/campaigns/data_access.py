@@ -14,6 +14,7 @@ resolves it via the Step-9 reciprocal link.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import and_, func, or_, select
@@ -313,6 +314,50 @@ async def email_tracking_counts(
     }
 
 
+async def dashboard_stats_since(
+    session: AsyncSession, *, since: datetime
+) -> dict[str, int]:
+    """Aggregate `CampaignMessage` counts across all campaigns whose
+    messages were sent on or after `since`.
+
+    Rolls up three top-level metrics for the Campaigns dashboard:
+      - ``sent``      — rows with ``sent_at >= since``
+      - ``delivered`` — subset of the above whose ``delivered_at`` is set
+      - ``read``      — subset whose ``read_at`` (WhatsApp) or
+                        ``opened_at`` (Email) is set
+
+    The join to ``tbl_campaigns`` lets Postgres' RLS on the parent
+    table scope the aggregate to the caller's org — CampaignMessage
+    has no ``org_id`` of its own.
+    """
+    row = (
+        await session.execute(
+            select(
+                func.count().filter(CampaignMessage.sent_at.is_not(None)).label("sent"),
+                func.count()
+                .filter(CampaignMessage.delivered_at.is_not(None))
+                .label("delivered"),
+                func.count()
+                .filter(
+                    or_(
+                        CampaignMessage.read_at.is_not(None),
+                        CampaignMessage.opened_at.is_not(None),
+                    )
+                )
+                .label("read"),
+            )
+            .select_from(CampaignMessage)
+            .join(Campaign, Campaign.id == CampaignMessage.campaign_id)
+            .where(CampaignMessage.sent_at >= since)
+        )
+    ).one()
+    return {
+        "sent": int(row.sent or 0),
+        "delivered": int(row.delivered or 0),
+        "read": int(row.read or 0),
+    }
+
+
 # --- conversation + inbox message rows ----------------------------------
 #
 # Campaigns reach into `conversations` to append outbound messages so
@@ -369,4 +414,5 @@ __all__ = [
     "list_messages_page",
     "stats_by_status",
     "email_tracking_counts",
+    "dashboard_stats_since",
 ]

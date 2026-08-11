@@ -285,6 +285,20 @@ class CampaignStartResponse(BaseModel):
     scheduled_at: datetime | None
 
 
+class CampaignDashboardStatsOut(BaseModel):
+    """Org-wide campaign KPIs for the current calendar month, powering
+    the KPI cards at the top of the Campaigns page. ``delivery_rate``
+    and ``read_rate`` are `None` when their denominator is zero so the
+    frontend renders "—" instead of a misleading 0%."""
+
+    since: datetime
+    sent: int
+    delivered: int
+    read: int
+    delivery_rate: float | None
+    read_rate: float | None
+
+
 class CampaignReadinessItem(BaseModel):
     """One blocker or warning surfaced by the readiness pre-flight."""
 
