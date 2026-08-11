@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   HostListener,
   computed,
@@ -10,6 +11,8 @@ import {
   input,
   output,
   signal,
+  untracked,
+  viewChild,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
@@ -73,9 +76,13 @@ export interface MobileSelectOption {
         />
       </button>
       @if (open()) {
-        <div class="fixed inset-0 z-30" (click)="close()" aria-hidden="true"></div>
+        <div #backdrop class="fixed inset-0 z-[1000]" (click)="close()" aria-hidden="true"></div>
         <div
-          class="absolute top-full right-0 left-0 z-40 mt-1 max-h-[60vh] overflow-y-auto rounded-md border border-subtle bg-surface p-1 shadow-lg"
+          #panel
+          class="fixed z-[1001] max-h-[60vh] overflow-y-auto rounded-md border border-subtle bg-surface p-1 shadow-lg"
+          [style.top]="panelStyle()?.top"
+          [style.left]="panelStyle()?.left"
+          [style.width]="panelStyle()?.width"
           role="listbox"
         >
           @for (opt of options(); track opt.value; let i = $index) {
@@ -116,6 +123,12 @@ export class MobileSelectComponent implements ControlValueAccessor {
 
   protected readonly open = signal(false);
   private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly destroyRef = inject(DestroyRef);
+
+  /** `position: fixed` coords for the dropdown panel. Recomputed each
+   *  time the panel opens (or the viewport resizes/scrolls) so it
+   *  stays glued to the trigger while being body-portaled. */
+  protected readonly panelStyle = signal<{ top: string; left: string; width: string } | null>(null);
 
   /** Single source of truth for the currently-selected value. Written
    *  by either the `[value]` input (via `effect`) or Angular Forms
@@ -130,12 +143,58 @@ export class MobileSelectComponent implements ControlValueAccessor {
   private onChangeFn: (v: string) => void = () => undefined;
   private onTouchedFn: () => void = () => undefined;
 
+  protected readonly panelRef = viewChild<ElementRef<HTMLElement>>('panel');
+  protected readonly backdropRef = viewChild<ElementRef<HTMLElement>>('backdrop');
+
+  /** Original parent of the panel/backdrop before we portal them to
+   *  `document.body`. We put them back before the `@if` teardown so
+   *  Angular's renderer can remove the nodes from a parent it knows
+   *  about. */
+  private originalParent: HTMLElement | null = null;
+
   constructor() {
     // Mirror any external `[value]` change into `writtenValue` so
-    // template + form path both agree.
+    // template + form path both agree. `writtenValue` is read via
+    // `untracked` so the effect only fires when the input actually
+    // changes — otherwise a user pick (which sets writtenValue) would
+    // re-trigger the effect and clobber it back to the input value.
     effect(() => {
       const v = this.value();
-      if (v !== this.writtenValue()) this.writtenValue.set(v);
+      if (v !== untracked(() => this.writtenValue())) this.writtenValue.set(v);
+    });
+
+    // Refine the panel position once the actual panel is in the DOM.
+    effect(() => {
+      if (this.open() && this.panelRef()) {
+        queueMicrotask(() => this.refinePosition());
+      }
+    });
+
+    // Portal the panel + backdrop to `document.body`. `position: fixed`
+    // is broken by any ancestor with `transform` / `filter` /
+    // `perspective` — Tailwind's `-translate-x-1/2 -translate-y-1/2`
+    // modal-centering pattern triggers this. Portalling to body means
+    // the backdrop truly covers the viewport (so outside-clicks close
+    // the dropdown instead of falling through to the modal's own
+    // backdrop and closing the whole modal), and the panel positions
+    // correctly regardless of the caller's DOM.
+    effect(() => {
+      if (!this.open()) return;
+      const panel = this.panelRef()?.nativeElement;
+      const backdrop = this.backdropRef()?.nativeElement;
+      if (!panel || !backdrop) return;
+      if (panel.parentElement !== document.body) {
+        this.originalParent = panel.parentElement;
+        document.body.appendChild(backdrop);
+        document.body.appendChild(panel);
+      }
+    });
+
+    // Safety net: if the component is destroyed while the panel is
+    // still portaled, yank the orphaned nodes from body.
+    this.destroyRef.onDestroy(() => {
+      this.panelRef()?.nativeElement?.remove();
+      this.backdropRef()?.nativeElement?.remove();
     });
   }
 
@@ -165,11 +224,29 @@ export class MobileSelectComponent implements ControlValueAccessor {
 
   protected toggle(): void {
     if (this.disabled()) return;
-    this.open.update((v) => !v);
+    const nextOpen = !this.open();
+    if (nextOpen) {
+      // Seed a position from the trigger's rect so the first paint
+      // isn't at (0,0); the effect above refines it after the panel
+      // measures its true height.
+      this.positionPanel();
+    }
+    this.open.set(nextOpen);
   }
 
   protected close(): void {
+    // Move the portaled nodes back to their original parent BEFORE
+    // Angular tears down the `@if (open())` view — otherwise the
+    // renderer's `removeChild(originalParent, node)` throws because
+    // the node's real parent is now `document.body`.
+    const panel = this.panelRef()?.nativeElement;
+    const backdrop = this.backdropRef()?.nativeElement;
+    if (panel && backdrop && this.originalParent && panel.parentElement === document.body) {
+      this.originalParent.appendChild(backdrop);
+      this.originalParent.appendChild(panel);
+    }
     this.open.set(false);
+    this.panelStyle.set(null);
     this.onTouchedFn();
   }
 
@@ -180,19 +257,74 @@ export class MobileSelectComponent implements ControlValueAccessor {
     this.close();
   }
 
+  /** Compute a fixed-position for the panel that sits below the
+   *  trigger when there's room, above otherwise, and never spills
+   *  past the viewport horizontally. */
+  private positionPanel(estimatedHeight = 240): void {
+    const trigger = this.host.nativeElement.querySelector(
+      'button[type="button"]',
+    ) as HTMLElement | null;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const PANEL_W = Math.max(160, Math.min(rect.width, vw - 16));
+    const h = Math.min(estimatedHeight, vh - 16);
+    const spaceBelow = vh - rect.bottom;
+    const spaceAbove = rect.top;
+    let top: number;
+    if (spaceBelow >= h + 8 || spaceBelow >= spaceAbove) {
+      top = rect.bottom + 4;
+    } else {
+      top = rect.top - h - 4;
+    }
+    top = Math.max(8, Math.min(top, vh - h - 8));
+    const left = Math.max(8, Math.min(rect.left, vw - PANEL_W - 8));
+    this.panelStyle.set({
+      top: `${Math.round(top)}px`,
+      left: `${Math.round(left)}px`,
+      width: `${Math.round(PANEL_W)}px`,
+    });
+  }
+
+  /** Re-anchor with the true measured height once the panel is in the
+   *  DOM — the estimate can be wildly off for long option lists. */
+  private refinePosition(): void {
+    const el = this.panelRef()?.nativeElement;
+    if (!el) return;
+    this.positionPanel(el.offsetHeight);
+  }
+
+  @HostListener('window:resize')
+  onResize(): void {
+    if (this.open()) this.positionPanel();
+  }
+
+  @HostListener('window:scroll')
+  onWindowScroll(): void {
+    if (this.open()) this.positionPanel();
+  }
+
   /** Close on Escape when focus is inside the component. */
   @HostListener('keydown.escape')
   onEsc(): void {
     if (this.open()) this.close();
   }
 
-  /** Close on outside click when we're open (backdrop already covers
-   *  the general case; this is the belt-and-braces for click paths
-   *  that skip the backdrop, e.g. inside another portal). */
+  /** Close on outside click when we're open. Panel + backdrop are
+   *  portaled to `document.body`, so `host.contains(panel)` is false —
+   *  check panel/backdrop explicitly so clicks on options don't close
+   *  before `pick()` fires. */
   @HostListener('document:mousedown', ['$event.target'])
   onDocumentClick(target: EventTarget | null): void {
     if (!this.open()) return;
+    if (!(target instanceof Node)) return;
     const el = this.host.nativeElement;
-    if (target instanceof Node && !el.contains(target)) this.close();
+    const panel = this.panelRef()?.nativeElement;
+    const backdrop = this.backdropRef()?.nativeElement;
+    if (el.contains(target)) return;
+    if (panel && panel.contains(target)) return;
+    if (backdrop && backdrop.contains(target)) return;
+    this.close();
   }
 }
