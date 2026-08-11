@@ -1076,7 +1076,7 @@ export class LeadsPageComponent {
 
   protected onItemMoved(event: ItemMovedEvent): void {
     // Debug: temporary. Comment out once persistence is confirmed working.
-    // eslint-disable-next-line no-console
+
     console.log('[leads.page] onItemMoved reached', event);
     // F2 — intercept move-to-Won up-front so the Won-capture modal
     // can prompt for close details before the API call fires. Same

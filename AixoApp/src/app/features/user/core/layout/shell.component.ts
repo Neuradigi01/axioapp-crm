@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, signal, viewChild } from '@angular/
 import { RouterOutlet } from '@angular/router';
 
 import { ToastHostComponent } from '../notifications/toast-host.component';
-import { QuickAddFabComponent } from '../shared/quick-add-fab/quick-add-fab.component';
 import { CommandPaletteComponent } from '../shared/command-palette/command-palette.component';
 import { TrialBannerComponent } from '../billing/components/trial-banner/trial-banner.component';
 import { UpgradeModalComponent } from '../billing/components/upgrade-modal/upgrade-modal.component';
@@ -23,7 +22,6 @@ const SIDEBAR_STORAGE_KEY = 'furniturecrm:sidebar-open';
     FooterComponent,
     BottomNavComponent,
     ToastHostComponent,
-    QuickAddFabComponent,
     CommandPaletteComponent,
     TrialBannerComponent,
     UpgradeModalComponent,

@@ -36,6 +36,7 @@ import {
 import { ConversationListComponent } from './conversation-list.component';
 import { InteractiveBuilderComponent, InteractivePayload } from './interactive-builder.component';
 import { NewConversationModalComponent } from './new-conversation-modal.component';
+import { WhatsAppTemplatePickerComponent } from './whatsapp-template-picker.component';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
 import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
 import {
@@ -72,6 +73,7 @@ import { extractApiError } from '@core/services/api-error.util';
     ReassignModalComponent,
     LucideAngularModule,
     MobileSelectComponent,
+    WhatsAppTemplatePickerComponent,
   ],
   templateUrl: './conversations.page.html',
   host: { class: 'flex min-h-0 flex-1 flex-col' },
