@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   HostListener,
   computed,
@@ -10,6 +11,7 @@ import {
   input,
   output,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
@@ -54,6 +56,7 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
   readonly valueChange = output<string>();
 
   private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly open = signal(false);
   readonly disabled = signal(false);
@@ -80,10 +83,15 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
   protected readonly viewMonth = signal(new Date());
 
   constructor() {
-    // Mirror [value] input into writtenValue so both binding paths agree.
+    // Mirror the `[value]` input into writtenValue so both binding paths
+    // agree. `writtenValue` is read via `untracked` so this effect fires
+    // only when `[value]` actually changes — otherwise the user's
+    // `pickDay()` (which sets writtenValue) would re-trigger the effect
+    // and get clobbered back to the input's default (empty), breaking
+    // `formControlName` callers where `[value]` is never bound.
     effect(() => {
       const v = this.value();
-      if (v !== this.writtenValue()) this.writtenValue.set(v);
+      if (v !== untracked(() => this.writtenValue())) this.writtenValue.set(v);
     });
 
     // When the current value maps to a real date, park the calendar
@@ -100,6 +108,34 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
         // Run in a microtask so layout settles before we read offsetHeight.
         queueMicrotask(() => this.refinePosition());
       }
+    });
+
+    // Portal the panel + backdrop to `document.body` once they render.
+    // `position: fixed` normally anchors to the viewport — but if ANY
+    // ancestor uses `transform`, `filter`, `perspective`, or
+    // `will-change`, that ancestor becomes the containing block and
+    // the panel positions relative to the ancestor instead. Tailwind's
+    // `-translate-x-1/2 -translate-y-1/2` centering pattern (used by
+    // the task modal and other callers) triggers this. Portalling to
+    // body sidesteps the trap for every caller.
+    effect(() => {
+      if (!this.open()) return;
+      const panel = this.panelRef()?.nativeElement;
+      const backdrop = this.backdropRef()?.nativeElement;
+      if (!panel || !backdrop) return;
+      if (panel.parentElement !== document.body) {
+        this.originalParent = panel.parentElement;
+        document.body.appendChild(backdrop);
+        document.body.appendChild(panel);
+      }
+    });
+
+    // Safety net: if the component is destroyed while the panel is
+    // still portaled (parent view teardown, route change), yank the
+    // orphaned nodes from body so we don't leak DOM.
+    this.destroyRef.onDestroy(() => {
+      this.panelRef()?.nativeElement?.remove();
+      this.backdropRef()?.nativeElement?.remove();
     });
   }
 
@@ -179,6 +215,15 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
 
   /** Panel element ref, populated once `@if (open())` renders it. */
   protected readonly panelRef = viewChild<ElementRef<HTMLElement>>('panel');
+  /** Backdrop element ref — needs to move to `document.body` alongside
+   *  the panel so both escape any transformed ancestor container. */
+  protected readonly backdropRef = viewChild<ElementRef<HTMLElement>>('backdrop');
+
+  /** Original parent of the panel/backdrop before we portal them to
+   *  `document.body`. We put them back before the `@if` teardown so
+   *  Angular's renderer can remove the nodes from a parent it knows
+   *  about. */
+  private originalParent: HTMLElement | null = null;
 
   protected toggle(): void {
     if (this.disabled()) return;
@@ -193,6 +238,16 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
   }
 
   protected close(): void {
+    // Move the portaled nodes back to their original parent BEFORE
+    // Angular tears down the `@if (open())` view — otherwise the
+    // renderer's `removeChild(originalParent, node)` throws because
+    // the node's real parent is now `document.body`.
+    const panel = this.panelRef()?.nativeElement;
+    const backdrop = this.backdropRef()?.nativeElement;
+    if (panel && backdrop && this.originalParent && panel.parentElement === document.body) {
+      this.originalParent.appendChild(backdrop);
+      this.originalParent.appendChild(panel);
+    }
     this.open.set(false);
     this.panelStyle.set(null);
     this.onTouchedFn();
@@ -402,7 +457,16 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
   @HostListener('document:mousedown', ['$event.target'])
   onDocumentClick(target: EventTarget | null): void {
     if (!this.open()) return;
+    if (!(target instanceof Node)) return;
     const el = this.host.nativeElement;
-    if (target instanceof Node && !el.contains(target)) this.close();
+    // Panel + backdrop are portaled to `document.body`, so
+    // `host.contains(panel)` is false. Check panel/backdrop explicitly
+    // so clicks on days / month nav / time inputs don't close.
+    const panel = this.panelRef()?.nativeElement;
+    const backdrop = this.backdropRef()?.nativeElement;
+    if (el.contains(target)) return;
+    if (panel && panel.contains(target)) return;
+    if (backdrop && backdrop.contains(target)) return;
+    this.close();
   }
 }
