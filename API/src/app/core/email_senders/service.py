@@ -170,8 +170,7 @@ async def create_smtp_sender(
 
     subject = "Verify your CRM sender identity"
     body = (
-        f"Your verification code is {code}. "
-        "Enter it in the CRM to activate this sender identity."
+        f"Your verification code is {code}. Enter it in the CRM to activate this sender identity."
     )
 
     try:
@@ -280,8 +279,7 @@ async def resend_code(
 
     subject = "Verify your CRM sender identity"
     body = (
-        f"Your verification code is {code}. "
-        "Enter it in the CRM to activate this sender identity."
+        f"Your verification code is {code}. Enter it in the CRM to activate this sender identity."
     )
     try:
         await _send_via_smtp(
@@ -341,9 +339,7 @@ async def delete_sender(
     sender_id: uuid.UUID,
 ) -> None:
     """Remove one SMTP sender. 404 on miss, idempotent on repeat."""
-    deleted = await data_access.delete_by_id(
-        session, org_id=org_id, sender_id=sender_id
-    )
+    deleted = await data_access.delete_by_id(session, org_id=org_id, sender_id=sender_id)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -384,6 +380,14 @@ async def list_unified_senders(
     for r in oauth_rows:
         provider = r.provider.value if hasattr(r.provider, "value") else str(r.provider)
         if provider not in ("gmail", "microsoft"):
+            continue
+        # Hide disconnected rows from the sender list — the row is
+        # retained in the DB so connect/disconnect history survives a
+        # reconnect, but the operator has already told us they no
+        # longer want to send from this identity. Surfacing it as
+        # "Syncing…" (the pre-live fallback) misleads them into
+        # thinking a re-sync is in flight when it isn't.
+        if r.sync_state == EmailAccountSyncState.disconnected:
             continue
         merged.append(
             UnifiedSenderOut(

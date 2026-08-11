@@ -46,6 +46,7 @@ from typing import Any
 
 from celery import shared_task
 from src.app.core.email.models import (
+    EmailAccount,
     EmailAccountProvider,
     EmailAccountSyncState,
 )
@@ -86,18 +87,30 @@ async def _backfill_account_async(account_id: uuid.UUID) -> dict[str, Any]:
     )
     from src.app.shared.db import async_session
 
-    async with async_session() as session:
-        account = await email_service.get_account_unscoped(session, account_id=account_id)
-        if account is None:
-            return {"skipped": "not_found", "account_id": str(account_id)}
-        if account.sync_state == EmailAccountSyncState.disconnected:
-            return {
-                "skipped": "disconnected",
-                "account_id": str(account_id),
-            }
+    # Cross-tenant bootstrap read to learn org_id → sync_state.
+    # `get_account_unscoped` returns a *transient* EmailAccount hand-
+    # built from raw SQL rows (see data_access.get_account_by_id_unscoped)
+    # — it is NOT attached to the session, so mutations on it never
+    # flush and `session.refresh()` raises InvalidRequestError. We use
+    # it only to learn (org_id, user_id, sync_state), then re-load
+    # via ORM under the tenant context to get a persistent instance.
+    async with async_session() as bootstrap:
+        transient = await email_service.get_account_unscoped(bootstrap, account_id=account_id)
+    if transient is None:
+        return {"skipped": "not_found", "account_id": str(account_id)}
+    if transient.sync_state == EmailAccountSyncState.disconnected:
+        return {
+            "skipped": "disconnected",
+            "account_id": str(account_id),
+        }
 
-        ctx_token = set_context(RequestContext(org_id=account.org_id, user_id=account.user_id))
-        try:
+    ctx_token = set_context(RequestContext(org_id=transient.org_id, user_id=transient.user_id))
+    try:
+        async with async_session() as session:
+            account = await session.get(EmailAccount, account_id)
+            if account is None:
+                return {"skipped": "not_found", "account_id": str(account_id)}
+
             account.sync_state = EmailAccountSyncState.backfilling
             account.last_sync_error = None
             await session.commit()
@@ -139,8 +152,8 @@ async def _backfill_account_async(account_id: uuid.UUID) -> dict[str, Any]:
                 "scanned": result.scanned_count,
                 "truncated": result.truncated,
             }
-        finally:
-            reset_context(ctx_token)
+    finally:
+        reset_context(ctx_token)
 
 
 @shared_task(name="src.app.core.email.tasks.sync_account_incremental")
@@ -176,26 +189,35 @@ async def _sync_account_incremental_async(
                 "account_id": str(account_id),
             }
 
-        async with async_session() as session:
-            account = await email_service.get_account_unscoped(session, account_id=account_id)
-            if account is None:
-                return {"skipped": "not_found"}
-            if account.sync_state != EmailAccountSyncState.live:
-                return {
-                    "skipped": f"state={account.sync_state.value}",
-                    "account_id": str(account_id),
-                }
-            if not account.sync_cursor:
-                # No cursor — caller should have run backfill first.
-                # Self-heal by triggering one inline.
-                log.warning(
-                    "sync_account_incremental: no cursor for account=%s — running backfill instead",
-                    account_id,
-                )
-                return await _backfill_account_async(account_id)
+        # Cross-tenant bootstrap read — the returned instance is
+        # transient (raw SQL, not session-attached). We only use it to
+        # learn org_id and gate on sync_state; the real work runs on a
+        # fresh persistent instance loaded under the tenant context so
+        # commit()s actually flush.
+        async with async_session() as bootstrap:
+            transient = await email_service.get_account_unscoped(bootstrap, account_id=account_id)
+        if transient is None:
+            return {"skipped": "not_found"}
+        if transient.sync_state != EmailAccountSyncState.live:
+            return {
+                "skipped": f"state={transient.sync_state.value}",
+                "account_id": str(account_id),
+            }
+        if not transient.sync_cursor:
+            # No cursor — caller should have run backfill first.
+            # Self-heal by triggering one inline.
+            log.warning(
+                "sync_account_incremental: no cursor for account=%s — running backfill instead",
+                account_id,
+            )
+            return await _backfill_account_async(account_id)
 
-            ctx_token = set_context(RequestContext(org_id=account.org_id, user_id=account.user_id))
-            try:
+        ctx_token = set_context(RequestContext(org_id=transient.org_id, user_id=transient.user_id))
+        try:
+            async with async_session() as session:
+                account = await session.get(EmailAccount, account_id)
+                if account is None:
+                    return {"skipped": "not_found", "account_id": str(account_id)}
                 try:
                     result = await _provider_incremental(account, session)
                 except Exception as exc:
@@ -244,8 +266,8 @@ async def _sync_account_incremental_async(
                     "matched": len(result.matched),
                     "scanned": result.scanned_count,
                 }
-            finally:
-                reset_context(ctx_token)
+        finally:
+            reset_context(ctx_token)
 
 
 @shared_task(name="src.app.core.email.tasks.renew_account_watch")
@@ -265,15 +287,24 @@ async def _renew_account_watch_async(
     )
     from src.app.shared.db import async_session
 
-    async with async_session() as session:
-        account = await email_service.get_account_unscoped(session, account_id=account_id)
-        if account is None:
-            return {"skipped": "not_found"}
-        if account.sync_state != EmailAccountSyncState.live:
-            return {"skipped": f"state={account.sync_state.value}"}
+    # Cross-tenant bootstrap read — the returned instance is transient
+    # (raw SQL, not session-attached). We only use it to learn org_id
+    # and gate on sync_state; the real work runs on a fresh persistent
+    # instance loaded under the tenant context so commit()s actually flush.
+    async with async_session() as bootstrap:
+        transient = await email_service.get_account_unscoped(bootstrap, account_id=account_id)
+    if transient is None:
+        return {"skipped": "not_found"}
+    if transient.sync_state != EmailAccountSyncState.live:
+        return {"skipped": f"state={transient.sync_state.value}"}
 
-        ctx_token = set_context(RequestContext(org_id=account.org_id, user_id=account.user_id))
-        try:
+    ctx_token = set_context(RequestContext(org_id=transient.org_id, user_id=transient.user_id))
+    try:
+        async with async_session() as session:
+            account = await session.get(EmailAccount, account_id)
+            if account is None:
+                return {"skipped": "not_found", "account_id": str(account_id)}
+
             if account.provider == EmailAccountProvider.gmail:
                 # Gmail re-issues `users.watch` to extend the
                 # subscription. Sets a fresh historyId — we capture
@@ -316,8 +347,8 @@ async def _renew_account_watch_async(
                     "new_expiration": new_exp,
                 }
             return {"skipped": f"unknown_provider={account.provider}"}
-        finally:
-            reset_context(ctx_token)
+    finally:
+        reset_context(ctx_token)
 
 
 # ---------------------------------------------------------------------------
