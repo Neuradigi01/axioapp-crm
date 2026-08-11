@@ -1000,10 +1000,18 @@ async def dispatch_chunk(
     # the WA extension carries the Meta-specific fields we need for
     # ``adapter.send_template`` (name / language / header). Lookup
     # via the Step-9 reciprocal link ``message_template_id``.
+    #
+    # Only WhatsApp campaigns need this extension row — email
+    # campaigns resolve their template body via
+    # ``templates_service.find_template`` in the email-specific block
+    # below (line ~1118). Firing the WA-extension check for a non-WA
+    # channel misreports every recipient as "Template no longer
+    # exists locally — re-sync from Settings → Integrations →
+    # WhatsApp." even when the email template is present.
     template_row: WhatsAppTemplate | None = None
     template_a_row: WhatsAppTemplate | None = None
     template_b_row: WhatsAppTemplate | None = None
-    if campaign.is_ab_test:
+    if campaign.channel == ConversationChannel.whatsapp and campaign.is_ab_test:
         ids = [
             tid
             for tid in (
@@ -1036,7 +1044,7 @@ async def dispatch_chunk(
             template_row = template_a_row
         elif campaign.winning_variant == "B":
             template_row = template_b_row
-    elif campaign.template_id is not None:
+    elif campaign.channel == ConversationChannel.whatsapp and campaign.template_id is not None:
         # Step 11 — lookup the WA extension via the central row's id
         # (the campaign's `template_id` now points at the central
         # library, not the WA extension).
