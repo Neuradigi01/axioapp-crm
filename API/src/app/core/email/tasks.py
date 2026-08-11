@@ -71,7 +71,16 @@ _RENEWAL_LEAD_TIME = timedelta(hours=24)
 # ---------------------------------------------------------------------------
 
 
-@shared_task(name="src.app.core.email.tasks.backfill_account")
+@shared_task(
+    name="src.app.core.email.tasks.backfill_account",
+    # Override the global 240s soft / 300s hard limits (celery_config.py).
+    # A first-connect 30-day backfill on a busy mailbox fetches metadata
+    # for every message one-at-a-time (~400ms/msg); real inboxes routinely
+    # need 10+ minutes. Hitting the global soft limit killed the task
+    # mid-scan and left the row stuck at sync_state='backfilling'.
+    soft_time_limit=1500,
+    time_limit=1800,
+)
 def backfill_account(account_id: str) -> dict[str, Any]:
     """Initial backfill. Triggered by OAuth-callback handlers."""
     return asyncio.run(_backfill_account_async(uuid.UUID(account_id)))
@@ -152,6 +161,24 @@ async def _backfill_account_async(account_id: uuid.UUID) -> dict[str, Any]:
                 "scanned": result.scanned_count,
                 "truncated": result.truncated,
             }
+    except BaseException:
+        # Celery's ``SoftTimeLimitExceeded`` and worker SIGKILL from the
+        # hard time limit both bypass our inner ``except Exception`` (the
+        # signal is raised outside the async frame). Without cleanup the
+        # row is left at ``sync_state='backfilling'`` — the sweeper only
+        # rescues ``pending`` rows, so the account stays permanently
+        # stuck and workflow email sends skip it. Flip to ``error`` so
+        # the operator sees why + a re-connect can start fresh.
+        try:
+            async with async_session() as recover:
+                stuck = await recover.get(EmailAccount, account_id)
+                if stuck is not None and stuck.sync_state == EmailAccountSyncState.backfilling:
+                    stuck.sync_state = EmailAccountSyncState.error
+                    stuck.last_sync_error = "backfill aborted (time limit or worker kill)"
+                    await recover.commit()
+        except Exception:
+            log.exception("backfill_account cleanup failed account=%s", account_id)
+        raise
     finally:
         reset_context(ctx_token)
 
