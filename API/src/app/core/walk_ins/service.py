@@ -551,6 +551,14 @@ async def convert_walk_in_to_lead(
     )
 
     walk_in.linked_lead_id = lead.id
+    # Flip status → converted so the walk-ins KPI query (data_access
+    # ``rollup_query``) counts this in "Converted today" and the 30-day
+    # conversion-rate calc. Skips the ``status_workflow`` state-machine
+    # check on purpose — the conversion action is itself the terminal
+    # promotion, so ``browsing → converted`` / ``interested → converted``
+    # / ``follow_up → converted`` are all valid here even though the
+    # state map only allows the last two for manual edits.
+    walk_in.status = WalkInStatus.converted
     # W6 — stamp the reverse-link on the fresh Lead so a lead-detail
     # page can render "originated from walk-in on X" and win-attribution
     # analytics can walk backwards from a closed deal.
