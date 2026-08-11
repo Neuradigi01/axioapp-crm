@@ -151,7 +151,7 @@ export class PipelineBoardComponent {
     const movedItem = event.item.data as PipelineItem | undefined;
 
     // Debug: temporary. Comment out once persistence is confirmed working.
-    // eslint-disable-next-line no-console
+
     console.log('[pipeline-board] drop', {
       fromStage,
       toStage,

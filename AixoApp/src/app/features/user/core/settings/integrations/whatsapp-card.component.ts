@@ -3,11 +3,13 @@
  *
  * Differs structurally from GoogleCardComponent and MetaCardComponent
  * because WhatsApp Cloud API is NOT OAuth — there's no consent
- * redirect. The operator pastes 5 long-lived values (phone_id,
- * waba_id, access_token, app_secret, verify_token) into an inline
- * form and the backend validates them against `graph.facebook.com`
- * before persisting (Step 3.5.1). One click, one network round-trip,
- * either success or a Meta error message inline.
+ * redirect. The operator pastes 4 long-lived values (phone_id,
+ * waba_id, access_token, verify_token) into an inline form and the
+ * backend validates them against `graph.facebook.com` before
+ * persisting (Step 3.5.1). App Secret is sourced from the platform
+ * env (`WHATSAPP_APP_SECRET`) — one shared Meta App across tenants,
+ * so no per-org paste. One click, one network round-trip, either
+ * success or a Meta error message inline.
  *
  * State machine:
  *
@@ -86,7 +88,6 @@ interface WhatsAppConnectForm {
   phone_id: FormControl<string>;
   waba_id: FormControl<string>;
   access_token: FormControl<string>;
-  app_secret: FormControl<string>;
   verify_token: FormControl<string>;
   api_version: FormControl<string>;
   rate_limit_per_sec: FormControl<number>;
@@ -190,7 +191,6 @@ export class WhatsAppCardComponent implements OnInit {
     phone_id: this.fb.nonNullable.control('', Validators.required),
     waba_id: this.fb.nonNullable.control('', Validators.required),
     access_token: this.fb.nonNullable.control('', Validators.required),
-    app_secret: this.fb.nonNullable.control('', Validators.required),
     verify_token: this.fb.nonNullable.control('', Validators.required),
     api_version: this.fb.nonNullable.control('v18.0', Validators.required),
     rate_limit_per_sec: this.fb.nonNullable.control(50, [
@@ -267,7 +267,7 @@ export class WhatsAppCardComponent implements OnInit {
     this.inlineError.set(null);
     // Wipe secrets — leave phone_id / waba_id / api_version so a
     // re-open doesn't lose the prefilled identifiers.
-    this.form.patchValue({ access_token: '', app_secret: '' });
+    this.form.patchValue({ access_token: '' });
   }
 
   toggleAdvanced(): void {
@@ -370,7 +370,7 @@ export class WhatsAppCardComponent implements OnInit {
         next: () => {
           this.connecting.set(false);
           this.formExpanded.set(false);
-          this.form.patchValue({ access_token: '', app_secret: '' });
+          this.form.patchValue({ access_token: '' });
           this.changed.emit();
         },
         error: (err: HttpErrorResponse) => {

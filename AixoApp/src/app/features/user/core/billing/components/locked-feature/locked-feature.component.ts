@@ -63,7 +63,7 @@ export class LockedFeatureComponent {
     if (featureKey !== null) {
       const fromRegistry = this.access.requiredPlanFor(featureKey);
       if (fromRegistry !== null) return fromRegistry;
-      // eslint-disable-next-line no-console
+
       console.warn(
         `crm-locked-feature: unknown feature key %o — falling back to "standard".`,
         featureKey,

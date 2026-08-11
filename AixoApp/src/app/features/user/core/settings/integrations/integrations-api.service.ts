@@ -183,14 +183,17 @@ export interface WhatsAppStatus {
 }
 
 /** HTTP body for `POST /api/v1/integrations/whatsapp/connect`.
- *  All 5 base fields are required; `api_version` defaults to `v18.0`
- *  on the backend if omitted. Mirrors backend `WhatsAppConnectIn`. */
+ *  `phone_id`, `waba_id`, `access_token`, `verify_token` are required.
+ *  `app_secret` is optional — omit to reuse the platform-level
+ *  `WHATSAPP_APP_SECRET` env var on the server (the common case for
+ *  a single-Meta-App SaaS). `api_version` defaults to `v18.0` on the
+ *  backend if omitted. Mirrors backend `WhatsAppConnectIn`. */
 export interface WhatsAppConnectPayload {
   phone_id: string;
   waba_id: string;
   access_token: string;
-  app_secret: string;
   verify_token: string;
+  app_secret?: string;
   api_version?: string;
   /** Step 3.5.15 — per-org outbound rate cap (msg/sec). 1..1000. */
   rate_limit_per_sec?: number;

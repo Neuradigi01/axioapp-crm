@@ -24,7 +24,6 @@ import {
   WorkflowsApiService,
 } from '../workflows-api.service';
 
-
 const HOLDBACK_PRESETS: Array<{ days: number; label: string; seconds: number }> = [
   { days: 1, label: '1 day', seconds: 86_400 },
   { days: 3, label: '3 days', seconds: 86_400 * 3 },
@@ -40,7 +39,6 @@ const METRICS: Array<{ value: ABWinnerMetric; label: string }> = [
   { value: 'custom', label: 'Custom (manual decision)' },
 ];
 
-
 /**
  * Step 18 — pair-A/B modal. Operator picks a draft sibling workflow
  * (filtered to drafts whose trigger event_type set matches the
@@ -50,7 +48,6 @@ const METRICS: Array<{ value: ABWinnerMetric; label: string }> = [
  * the primary's `enabled_event_types`. The backend re-validates and
  * returns 422 with a structured reason on edge cases.
  */
-
 
 @Component({
   selector: 'app-ab-pair-modal',

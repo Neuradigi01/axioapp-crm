@@ -7,6 +7,7 @@ import {
   computed,
   inject,
   signal,
+  OnChanges,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -82,7 +83,7 @@ const FOLLOWUP_VALUES: readonly string[] = FOLLOWUP_OPTIONS.map((o) => o.value);
   ],
   templateUrl: './task-form-modal.component.html',
 })
-export class TaskFormModalComponent extends BaseFormModalComponent {
+export class TaskFormModalComponent extends BaseFormModalComponent implements OnChanges {
   protected readonly entityType = 'task';
 
   private readonly api = inject(TasksApiService);

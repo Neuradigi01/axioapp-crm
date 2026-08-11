@@ -18,7 +18,9 @@
            contact. `link` opens a picker so the rep can point the new
            lead at a different existing contact. -->
       <div>
-        <p class="text-xs font-medium text-default">Which contact should the lead use?</p>
+        <p class="text-xs font-medium text-default">
+          Which contact should the lead use? <span class="text-red-500">*</span>
+        </p>
         <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <button
             type="button"
@@ -33,7 +35,8 @@
             <span class="block font-medium">This walk-in's contact</span>
             <span
               class="mt-0.5 block text-[11px]"
-              [class.text-faint]="linkMode() === 'auto'"
+              [class.text-white]="linkMode() === 'auto'"
+              [class.opacity-90]="linkMode() === 'auto'"
               [class.text-muted]="linkMode() !== 'auto'"
             >
               Default. Use the contact quick-register created / matched.
@@ -52,10 +55,11 @@
             <span class="block font-medium">Pick an existing contact</span>
             <span
               class="mt-0.5 block text-[11px]"
-              [class.text-faint]="linkMode() === 'link'"
+              [class.text-white]="linkMode() === 'link'"
+              [class.opacity-90]="linkMode() === 'link'"
               [class.text-muted]="linkMode() !== 'link'"
             >
-              For repeat visitors or family members of an existing customer.
+              Opens a contact search below — for repeat visitors or family members.
             </span>
           </button>
         </div>
@@ -63,7 +67,7 @@
         @if (linkMode() === 'link') {
           @if (!selectedContact()) {
             <label class="mt-3 block text-xs font-medium text-default" for="walkin_convert_search">
-              Search contacts
+              Search contacts <span class="text-red-500">*</span>
             </label>
             <input
               id="walkin_convert_search"
@@ -73,6 +77,9 @@
               autocomplete="off"
               class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            <p class="mt-1 text-[11px] text-muted">
+              Type a name, phone, or email — then pick a result to link this lead.
+            </p>
             @if (contactResults().length > 0) {
               <ul
                 class="mt-2 max-h-56 divide-y divide-subtle overflow-auto rounded-md border border-subtle"

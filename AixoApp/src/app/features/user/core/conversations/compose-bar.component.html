@@ -303,48 +303,20 @@
       </button>
     </div>
   </div>
-  @if (!isNoteMode() && outOfSession) {
-    <!-- WhatsApp 24-hour rule reminder inline with the composer. The
-         inline template picker on the right lets the operator send an
-         approved template without leaving the thread. -->
-    <div
-      class="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-500 ring-1 border-amber-500/20"
-    >
-      <p class="flex-1 min-w-0">
-        <lucide-icon
-          name="alert-triangle"
-          size="11"
-          class="mr-1 inline align-middle"
-          aria-hidden="true"
-        ></lucide-icon>
-        WhatsApp 24-hour reply window expired. Send an approved template or wait for the customer to
-        message you.
-      </p>
-      @if (conversationId) {
-        <app-whatsapp-template-picker
-          [conversationId]="conversationId"
-          [sendFromPhoneId]="sendFromPhoneId()"
-          (sent)="templateSent.emit($event)"
-          (errored)="templateSendError.emit($event)"
-        />
-      }
-    </div>
-  } @else {
-    <p class="mt-2 text-[10px] text-faint">
-      @if (canAttachMedia()) {
-        Enter to send · Shift+Enter for newline · drag a file or click
-        <lucide-icon
-          name="paperclip"
-          size="10"
-          class="inline align-middle"
-          aria-hidden="true"
-        ></lucide-icon>
-        to attach
-      } @else {
-        Enter to send · Shift+Enter for a new line
-      }
-    </p>
-  }
+  <p class="mt-2 text-[10px] text-faint">
+    @if (canAttachMedia()) {
+      Enter to send · Shift+Enter for newline · drag a file or click
+      <lucide-icon
+        name="paperclip"
+        size="10"
+        class="inline align-middle"
+        aria-hidden="true"
+      ></lucide-icon>
+      to attach
+    } @else {
+      Enter to send · Shift+Enter for a new line
+    }
+  </p>
 </div>
 
 <!-- Step 28 — outbound location dialog. Lat/lng + optional label/address.

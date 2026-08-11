@@ -125,6 +125,34 @@
           <lucide-icon name="chevron-left" class="h-3.5 w-3.5" />
           Back to conversations
         </button>
+        <!-- WhatsApp 24-hour session banner. Sits above the thread so
+             the operator sees "session expired + how to unblock" the
+             moment they open a stale conversation, instead of hunting
+             for it under the message list. -->
+        @if (isOutOfSession()) {
+          <div
+            class="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-500"
+          >
+            <p class="flex min-w-0 flex-1 items-center gap-1.5">
+              <lucide-icon
+                name="alert-triangle"
+                size="12"
+                class="shrink-0"
+                aria-hidden="true"
+              ></lucide-icon>
+              <span>
+                WhatsApp 24-hour reply window expired. Send an approved template or wait for the
+                customer to message you.
+              </span>
+            </p>
+            <app-whatsapp-template-picker
+              [conversationId]="conv.id"
+              [sendFromPhoneId]="composeBar?.currentSendFromPhoneId() ?? null"
+              (sent)="onTemplateSent($event)"
+              (errored)="onTemplateError($event)"
+            />
+          </div>
+        }
         <app-chat-thread
           [conversation]="conv"
           [detail]="detail()"
@@ -141,7 +169,6 @@
           #composeBar
           [aiHandling]="conv.ai_handling"
           [channel]="conv.channel"
-          [conversationId]="conv.id"
           [contactId]="conv.contact_id"
           [replyingTo]="replyingTo()"
           [staff]="staffList()"
@@ -154,8 +181,6 @@
           (openInteractive)="openInteractive()"
           (toggleAi)="onToggleAi($event)"
           (clearReply)="onClearReply()"
-          (templateSent)="onTemplateSent($event)"
-          (templateSendError)="onTemplateError($event)"
         />
         <app-interactive-builder
           [open]="interactiveOpen()"
