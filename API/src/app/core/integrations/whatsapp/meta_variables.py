@@ -207,8 +207,77 @@ def convert_all_components(
     return out, mapping
 
 
+def extract_named_body(components: list[dict[str, Any]] | None) -> str | None:
+    """Return the BODY component's text from a Meta ``components`` list.
+
+    The CRM stores the operator-authored (named-variable) body in
+    ``body_components`` at Meta-submit time and the positional-converted
+    copy in the top-level ``body`` column. Send-time variable
+    resolution has to re-derive positional params from the ORIGINAL
+    named body — this helper pulls that string out.
+    """
+    if not isinstance(components, list):
+        return None
+    for comp in components:
+        if not isinstance(comp, dict):
+            continue
+        if str(comp.get("type") or "").upper() == "BODY":
+            text = comp.get("text")
+            if isinstance(text, str) and text.strip():
+                return text
+    return None
+
+
+def _resolve_dotted_path(context: dict[str, Any], path: str) -> Any:
+    """Walk a dot-scoped path (``contact.first_name``) through a nested
+    dict. Returns ``None`` for any missing segment."""
+    cur: Any = context
+    for segment in path.split("."):
+        if not isinstance(cur, dict) or segment not in cur:
+            return None
+        cur = cur[segment]
+    return cur
+
+
+def resolve_named_body_to_positional_params(
+    named_body: str | None,
+    contact_data: dict[str, Any] | None,
+    org_data: dict[str, Any] | None,
+    *,
+    fallback: str = "Customer",
+) -> dict[int, str]:
+    """Convert a CRM named body into Meta positional params.
+
+    Given the operator-authored body (with ``{{contact.full_name}}``
+    style variables), a flat contact dict, and a flat org dict, return
+    ``{1: "Ajay", 2: "..."}`` — one entry per positional slot in the
+    order the variables first appear.
+
+    Blank resolutions fall back to ``fallback`` because Meta rejects
+    empty positional params outright.
+    Returns ``{}`` when the body has no named variables.
+    """
+    if not named_body:
+        return {}
+    _, param_names = convert_to_positional(named_body)
+    if not param_names:
+        return {}
+    context: dict[str, Any] = {
+        "contact": contact_data or {},
+        "org": org_data or {},
+    }
+    resolved: dict[int, str] = {}
+    for idx, name in enumerate(param_names, start=1):
+        value = _resolve_dotted_path(context, name)
+        text = "" if value is None else str(value)
+        resolved[idx] = text if text.strip() else fallback
+    return resolved
+
+
 __all__ = [
     "convert_all_components",
     "convert_to_positional",
+    "extract_named_body",
+    "resolve_named_body_to_positional_params",
     "sample_examples",
 ]

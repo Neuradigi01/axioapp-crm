@@ -374,7 +374,6 @@ export class AdvancedFilterModalComponent {
       return;
     }
     if (dsl.any?.length) {
-      // eslint-disable-next-line no-console
       console.warn(
         '[advanced-filter] OR clauses are not editable in v1; they will be replaced on Apply.',
       );

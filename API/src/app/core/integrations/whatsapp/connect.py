@@ -35,6 +35,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import WHATSAPP_APP_SECRET
 from src.app.core import audit
 from src.app.core.integrations.crypto import decrypt, encrypt
 from src.app.core.integrations.models import (
@@ -243,6 +244,14 @@ async def connect_account(
     we still persist `status=error` + `last_error` so the Settings UI
     can surface the message; the sidecar is NOT created in that path
     (no point caching phone_id from credentials we never accepted)."""
+    if not payload.app_secret and not WHATSAPP_APP_SECRET:
+        # Neither a per-org paste nor a platform env value is available —
+        # fail fast rather than persist an un-verifiable webhook config.
+        raise MetaValidationError(
+            "App Secret is not configured on this server. "
+            "Set WHATSAPP_APP_SECRET in the API env, or paste a per-org "
+            "App Secret in the connect form."
+        )
     try:
         meta_payload = await _validate_with_meta(
             phone_id=payload.phone_id,
@@ -361,9 +370,12 @@ async def _upsert_config_row(
     display_phone_number: str,
     verified_name: str | None,
 ) -> WhatsAppAccountConfig:
-    """Insert-or-update the WA sidecar row. Encrypts the app secret."""
+    """Insert-or-update the WA sidecar row. Encrypts the app secret
+    when the operator pasted one; otherwise leaves the column NULL and
+    relies on the platform-level `WHATSAPP_APP_SECRET` env var (the
+    webhook signature verifier prefers env over the per-org row)."""
     existing = await _get_config_row(session, integration_id=integration_id)
-    app_secret_enc = encrypt(payload.app_secret)
+    app_secret_enc = encrypt(payload.app_secret) if payload.app_secret else None
     if existing is None:
         row = WhatsAppAccountConfig(
             org_id=org_id,

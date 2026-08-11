@@ -17,11 +17,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  ABStatsResponse,
-  WorkflowsApiService,
-} from '../workflows-api.service';
-
+import { ABStatsResponse, WorkflowsApiService } from '../workflows-api.service';
 
 /**
  * Live A/B-test banner. Polls `/workflows/{id}/ab-stats` once a
@@ -30,20 +26,12 @@ import {
  * call. The "Compare" button routes to the full comparison page.
  */
 
-
 const REFRESH_INTERVAL_MS = 60_000;
-
 
 @Component({
   selector: 'app-ab-stats-banner',
   standalone: true,
-  imports: [
-    CommonModule,
-    DatePipe,
-    PercentPipe,
-    RouterLink,
-    LucideAngularModule,
-  ],
+  imports: [CommonModule, DatePipe, PercentPipe, RouterLink, LucideAngularModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './ab-stats-banner.component.html',
 })
@@ -59,9 +47,7 @@ export class ABStatsBannerComponent {
 
   readonly unpair = output<void>();
 
-  readonly winnerCalled = computed(
-    () => this.stats()?.decided_at != null,
-  );
+  readonly winnerCalled = computed(() => this.stats()?.decided_at != null);
 
   readonly aPercent = computed(() => this.stats()?.a_rate ?? 0);
   readonly bPercent = computed(() => this.stats()?.b_rate ?? 0);

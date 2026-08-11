@@ -16,12 +16,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  ABStatsResponse,
-  WorkflowRead,
-  WorkflowsApiService,
-} from '../workflows-api.service';
-
+import { ABStatsResponse, WorkflowRead, WorkflowsApiService } from '../workflows-api.service';
 
 /**
  * Step 18 — full-page side-by-side A/B comparison. Renders both
@@ -35,20 +30,12 @@ import {
  * paired.
  */
 
-
 const REFRESH_INTERVAL_MS = 60_000;
-
 
 @Component({
   selector: 'app-ab-comparison-page',
   standalone: true,
-  imports: [
-    CommonModule,
-    DatePipe,
-    PercentPipe,
-    RouterLink,
-    LucideAngularModule,
-  ],
+  imports: [CommonModule, DatePipe, PercentPipe, RouterLink, LucideAngularModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './ab-comparison.page.html',
 })

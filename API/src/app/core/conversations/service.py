@@ -403,6 +403,11 @@ async def send_template_message(
     """
     from src.app.core.integrations.whatsapp import data_access as _wa_da
     from src.app.core.integrations.whatsapp.block_list import is_blocked
+    from src.app.core.integrations.whatsapp.meta_variables import (
+        extract_named_body,
+        resolve_named_body_to_positional_params,
+    )
+    from src.app.core.tenants import data_access as _tenants_da
 
     conv = await get_conversation(session, conversation_id)
     if conv.channel != ConversationChannel.whatsapp:
@@ -422,19 +427,66 @@ async def send_template_message(
     if (template.status or "").upper() != "APPROVED":
         raise ValueError("Only APPROVED templates can be sent — this template is not approved yet.")
 
-    # Convert string-keyed variables (JSON) to int-keyed dict the
-    # adapter consumes. Validate the caller supplied one value per
-    # `{{n}}` placeholder before hitting Meta — mismatches would
-    # fail at Meta's end with an opaque 400.
-    parsed_variables: dict[int, str] = {}
+    # Auto-resolve any CRM named variables (`{{contact.full_name}}`,
+    # `{{org.name}}`, ...) in the template's original body against
+    # the conversation's contact + org. Meta only sees positional
+    # placeholders (its body is the converted copy), so a
+    # named-variable template arrives here with `variable_count=0`
+    # but Meta still expects one param per slot at send-time.
+    # Without this resolution the send hits Meta with 0 params and
+    # gets a #132000 "number of localizable_params does not match"
+    # 400 — the same fix `campaigns/service.py` applies for shots.
+    named_body = extract_named_body(template.body_components)
+    contact_data: dict[str, Any] | None = None
+    org_data: dict[str, Any] | None = None
+    if named_body:
+        contact = (
+            await contacts_service.get_contact(session, conv.contact_id)
+            if conv.contact_id
+            else None
+        )
+        if contact is not None:
+            full_name = contact.full_name or ""
+            parts = full_name.split(None, 1) if full_name else []
+            contact_data = {
+                "id": str(contact.id),
+                "first_name": parts[0] if parts else "",
+                "last_name": parts[1] if len(parts) > 1 else "",
+                "full_name": full_name,
+                "email": contact.email or "",
+                "phone": contact.phone or "",
+                "source": getattr(contact, "source", None) or "",
+                "custom_data": dict(getattr(contact, "custom_data", None) or {}),
+            }
+        org = await _tenants_da.get_organization_by_id(session, conv.org_id)
+        if org is not None:
+            org_data = {
+                "name": org.name or "",
+                "support_email": getattr(org, "support_email", "") or "",
+            }
+    auto_variables = resolve_named_body_to_positional_params(
+        named_body, contact_data, org_data
+    )
+
+    # Convert string-keyed operator variables (from the inline picker's
+    # `{{n}}` inputs) to int-keyed. Operator entries override any
+    # auto-resolved value for the same slot — the picker is the
+    # explicit path, auto-resolution is the fallback for named-only
+    # templates where the picker renders no inputs.
+    parsed_variables: dict[int, str] = dict(auto_variables)
     for key, val in variables.items():
         try:
             parsed_variables[int(key)] = val
         except (TypeError, ValueError) as exc:
             raise ValueError(f"variables key {key!r} must be a numeric string") from exc
-    if len(parsed_variables) != template.variable_count:
+
+    # Sanity-check against Meta's expectation. `variable_count` is the
+    # positional-only count on `template.body`; for a named-var
+    # template that's 0, so trust the higher of the two.
+    expected = max(int(template.variable_count or 0), len(auto_variables))
+    if len(parsed_variables) < expected:
         raise ValueError(
-            f"Template expects {template.variable_count} variable(s) "
+            f"Template expects {expected} variable(s) "
             f"but got {len(parsed_variables)}."
         )
 

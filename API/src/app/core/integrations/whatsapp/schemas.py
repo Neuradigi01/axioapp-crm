@@ -36,7 +36,10 @@ class WhatsAppConnectIn(BaseModel):
     phone_id: str = Field(min_length=1, max_length=64)
     waba_id: str = Field(min_length=1, max_length=64)
     access_token: str = Field(min_length=1)
-    app_secret: str = Field(min_length=1, max_length=255)
+    # Optional — omit to reuse the platform-level `WHATSAPP_APP_SECRET`
+    # env var. Only paste a per-org value when this org's WABA lives
+    # under a different Meta App than the platform default.
+    app_secret: str | None = Field(default=None, max_length=255)
     verify_token: str = Field(min_length=1, max_length=255)
     api_version: str = Field(default="v18.0", max_length=16)
     # Step 3.5.15 — per-org rate cap (msg/sec). Free-tier ~50, verified
