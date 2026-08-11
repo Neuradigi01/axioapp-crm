@@ -48,6 +48,8 @@ import {
   TemplatesApiService,
 } from '../templates/templates-api.service';
 import { TemplateStatusBadgeComponent } from '../templates/template-status-badge.component';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 
 /**
  * Step 15 — local picker row. Both the WhatsApp and non-WhatsApp
@@ -134,6 +136,8 @@ const _TEMPLATE_CHANNELS: ReadonlySet<ConversationChannel> = new Set<Conversatio
     SendFromPickerComponent,
     AbTestSectionComponent,
     TemplateStatusBadgeComponent,
+    MobileSelectComponent,
+    MobileDateTimeComponent,
   ],
   templateUrl: './create-campaign-modal.component.html',
 })
