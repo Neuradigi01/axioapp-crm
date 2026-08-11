@@ -62,37 +62,29 @@
             Test send
           </button>
         }
-        @if (showSubmitButton()) {
+        @if (showSubmitForApprovalButton()) {
           <button
             type="button"
             (click)="submitForReview()"
             [disabled]="transitioning() !== null"
             class="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
+            title="Goes to your Admin / Owner for internal approval. This is not the same as WhatsApp approval."
           >
             @if (transitioning() === 'submit') {
               <lucide-icon name="loader-2" size="12" class="animate-spin" />
             } @else {
               <lucide-icon name="eye" size="12" />
             }
-            Submit for review
+            Send for approval
           </button>
         }
-        @if (showReviewButton()) {
-          <button
-            type="button"
-            (click)="openReviewModal()"
-            class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/10"
-          >
-            <lucide-icon name="check" size="12" />
-            Review
-          </button>
-        }
-        @if (showPublishButton()) {
+        @if (showPublishDirectButton()) {
           <button
             type="button"
             (click)="publishTemplate()"
             [disabled]="transitioning() !== null"
             class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            title="Skips internal review — your role has publish rights, so this template goes live immediately."
           >
             @if (transitioning() === 'publish') {
               <lucide-icon name="loader-2" size="12" class="animate-spin" />
@@ -102,20 +94,51 @@
             Publish
           </button>
         }
+        @if (showReviewButton()) {
+          <button
+            type="button"
+            (click)="openReviewModal()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/10"
+            title="Approve or reject the draft submitted for review."
+          >
+            <lucide-icon name="check" size="12" />
+            Review draft
+          </button>
+        }
+        <!-- "Publish to library" button removed — approving auto-publishes
+             in one shot now. The button only shows up for legacy templates
+             that landed in the ``approved`` state before the workflow was
+             collapsed, so they still have a path to go live. -->
+        @if (showPublishButton()) {
+          <button
+            type="button"
+            (click)="publishTemplate()"
+            [disabled]="transitioning() !== null"
+            class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            title="Legacy: publish an already-approved template. New approvals auto-publish."
+          >
+            @if (transitioning() === 'publish') {
+              <lucide-icon name="loader-2" size="12" class="animate-spin" />
+            } @else {
+              <lucide-icon name="upload-cloud" size="12" />
+            }
+            Publish to library
+          </button>
+        }
         @if (showSubmitExternalButton()) {
           <button
             type="button"
             (click)="submitToMeta()"
             [disabled]="transitioning() !== null"
             class="inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-500/10 px-3 py-1.5 text-sm font-medium text-violet-800 hover:bg-violet-500/10 disabled:opacity-50"
-            title="Submit this template to Meta for WhatsApp Business approval"
+            title="Ships the template to WhatsApp (Meta) for approval before it can be sent to customers."
           >
             @if (transitioning() === 'submit_external') {
               <lucide-icon name="loader-2" size="12" class="animate-spin" />
             } @else {
               <lucide-icon name="send" size="12" />
             }
-            Submit to Meta
+            Submit to WhatsApp for approval
           </button>
         }
         @if (showRefreshExternalButton()) {
@@ -124,7 +147,7 @@
             (click)="refreshExternalStatus()"
             [disabled]="transitioning() !== null"
             class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
-            title="Re-check Meta for the live status — same call the hourly sweep makes"
+            title="Re-check WhatsApp for the live status — same call the hourly sweep makes."
           >
             @if (transitioning() === 'sync_external') {
               <lucide-icon name="loader-2" size="12" class="animate-spin" />
@@ -140,15 +163,50 @@
             (click)="resubmitTemplate()"
             [disabled]="transitioning() !== null"
             class="inline-flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-            title="Move back to draft so you can edit + re-submit to Meta"
+            title="Moves back to draft so you can edit the body and re-submit to WhatsApp."
           >
             @if (transitioning() === 'resubmit') {
               <lucide-icon name="loader-2" size="12" class="animate-spin" />
             } @else {
               <lucide-icon name="rotate-ccw" size="12" />
             }
-            Resubmit
+            Fix and resubmit to WhatsApp
           </button>
+        }
+        @if (template(); as tpl) {
+          @if (canActivate()) {
+            @if (tpl.is_active) {
+              <button
+                type="button"
+                (click)="toggleActive(false)"
+                [disabled]="transitioning() !== null"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-500 hover:bg-amber-500/10 disabled:opacity-50"
+                title="Hides this template from every campaign / workflow / composer picker. The row stays in the library for audit."
+              >
+                @if (transitioning() === 'deactivate') {
+                  <lucide-icon name="loader-2" size="12" class="animate-spin" />
+                } @else {
+                  <lucide-icon name="toggle-right" size="12" />
+                }
+                Deactivate
+              </button>
+            } @else {
+              <button
+                type="button"
+                (click)="toggleActive(true)"
+                [disabled]="transitioning() !== null"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-500 hover:bg-emerald-500/10 disabled:opacity-50"
+                title="Makes this template selectable in every campaign / workflow / composer picker again."
+              >
+                @if (transitioning() === 'activate') {
+                  <lucide-icon name="loader-2" size="12" class="animate-spin" />
+                } @else {
+                  <lucide-icon name="toggle-left" size="12" />
+                }
+                Activate
+              </button>
+            }
+          }
         }
         @if (showArchiveButton()) {
           <button
@@ -169,7 +227,8 @@
           <button
             type="button"
             (click)="save()"
-            [disabled]="saving()"
+            [disabled]="saving() || !dirty()"
+            [title]="!saving() && !dirty() ? 'Nothing to save — edit a field to enable.' : ''"
             class="btn btn-primary disabled:opacity-50"
           >
             @if (saving()) {
@@ -183,6 +242,55 @@
         }
       </div>
     </div>
+
+    <!-- Attribution metadata bar — shows author, last edit, and latest
+         reviewer so the reviewing operator knows at a glance who to talk
+         to. Only rendered once the template has been saved (draft
+         onwards); the `/new` route has no ids to attribute yet. -->
+    @if (template(); as t) {
+      <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+        <span class="inline-flex items-center gap-1">
+          <lucide-icon name="user" size="10" class="text-faint" />
+          Created by
+          <strong class="text-default">{{ staffName(t.created_by_user_id) }}</strong>
+          <span class="text-faint">·</span>
+          <span [title]="t.created_at">{{ t.created_at | date: 'mediumDate' }}</span>
+        </span>
+        @if (t.updated_by_user_id && t.updated_by_user_id !== t.created_by_user_id) {
+          <span class="inline-flex items-center gap-1">
+            <lucide-icon name="edit-3" size="10" class="text-faint" />
+            Last edited by
+            <strong class="text-default">{{ staffName(t.updated_by_user_id) }}</strong>
+            <span class="text-faint">·</span>
+            <span [title]="t.updated_at">{{ t.updated_at | date: 'mediumDate' }}</span>
+          </span>
+        }
+        @if (
+          t.last_reviewed_by_user_id &&
+          (t.last_reviewed_action === 'approve' ||
+            t.last_reviewed_action === 'publish' ||
+            t.last_reviewed_action === 'reject')
+        ) {
+          @let approvedAction = t.last_reviewed_action === 'reject' ? 'Rejected' : 'Approved';
+          <span class="inline-flex items-center gap-1">
+            <lucide-icon
+              [name]="t.last_reviewed_action === 'reject' ? 'x-circle' : 'check-circle-2'"
+              size="10"
+              [class.text-red-500]="t.last_reviewed_action === 'reject'"
+              [class.text-emerald-500]="t.last_reviewed_action !== 'reject'"
+            />
+            {{ approvedAction }} by
+            <strong class="text-default">{{ staffName(t.last_reviewed_by_user_id) }}</strong>
+            @if (t.last_reviewed_at) {
+              <span class="text-faint">·</span>
+              <span [title]="t.last_reviewed_at">
+                {{ t.last_reviewed_at | date: 'mediumDate' }}
+              </span>
+            }
+          </span>
+        }
+      </div>
+    }
 
     @if (lockKind() === 'meta_approved') {
       <div
@@ -210,18 +318,42 @@
         to re-check Meta (usually 5–30 minutes for Utility templates, up to 24 h for Marketing). If
         Meta rejects, you'll get options to fix and resubmit.
       </div>
-    } @else if (lockKind() === 'internal_review') {
+    } @else if (lockKind() === 'internal_pending') {
       <div
         class="mt-3 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400"
       >
-        <strong>Locked for internal review.</strong>
+        <strong>Waiting for internal review.</strong>
         This template is in
-        <code class="font-mono">{{ template()?.internal_status }}</code>
+        <code class="font-mono">in_review</code>
         and can't be edited until a reviewer approves or rejects it. If you have the
         <em>templates.review</em>
         permission you'll see a
         <strong>Review</strong>
         button above; otherwise ask your Admin or Owner to review it.
+      </div>
+    } @else if (lockKind() === 'internal_approved') {
+      <!-- Legacy state — new approvals now auto-publish, so no template
+           should land here anymore. Kept for backwards-compat with rows
+           that landed in `approved` before the workflow was collapsed. -->
+      <div
+        class="mt-3 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400"
+      >
+        <strong>Approved — waiting for legacy publish click.</strong>
+        This template was approved before approvals started auto-publishing. Click
+        <strong>Publish to library</strong>
+        above to make it live. New approvals from now on skip this step.
+      </div>
+    } @else if (lockKind() === 'internal_published') {
+      <div
+        class="mt-3 rounded-md border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-sm text-sky-400"
+      >
+        <strong>Published — this template is live.</strong>
+        Campaigns, automations, and workflows may already reference it, so editing here is locked to
+        prevent silently changing what customers receive. To make changes, click
+        <strong>Archive</strong>
+        above and author a new versioned copy — give it a name like
+        <code class="font-mono">{{ template()?.name }}_v2</code>
+        so old references stay pointed at this one until you're ready to swap them over.
       </div>
     }
     @if (template()?.external_status === 'rejected') {

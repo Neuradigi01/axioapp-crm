@@ -907,6 +907,10 @@ export class CreateCampaignModalComponent {
     const filter: TemplateListQuery = {
       channel: channel as TemplateChannel,
       internal_status: 'published',
+      // Skip inactive rows — Owner/Admin flipped them off to block
+      // exactly this use. The picker only shows things campaigns can
+      // actually send. Templates library page keeps showing everything.
+      is_active: true,
       limit: 200,
     };
     this.templatesApi

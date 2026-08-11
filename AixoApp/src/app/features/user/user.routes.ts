@@ -58,11 +58,15 @@ export const userRoutes: Routes = [
       },
       {
         // Integrations — promoted to a top-level sidebar module.
-        // Owner-only via the `settings.integrations.manage` permission
-        // key. OAuth callbacks (Google + Meta) and the redirect from
-        // the legacy /user/settings/integrations URL both land here.
+        // Open to every role: the page itself renders per-card
+        // visibility. Google Calendar (per-user) is always shown so
+        // any user can wire their own calendar to receive appointment
+        // sync; org-level cards (Google Ads, Meta Ads, WhatsApp, Email)
+        // are gated inline by their respective permission keys
+        // (`settings.integrations.manage`, `email.accounts.manage`).
+        // OAuth callbacks (Google + Meta) and the redirect from the
+        // legacy /user/settings/integrations URL both land here.
         path: 'integrations',
-        canActivate: [permissionGuard('settings.integrations.manage')],
         loadComponent: () =>
           import('./core/settings/integrations/integrations-page.component').then(
             (m) => m.IntegrationsPageComponent,

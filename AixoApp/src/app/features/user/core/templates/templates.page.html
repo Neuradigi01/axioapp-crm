@@ -143,6 +143,8 @@
               >
                 External
               </th>
+              <th class="hidden px-4 py-2 text-left font-medium md:table-cell">Created by</th>
+              <th class="hidden px-4 py-2 text-left font-medium md:table-cell">Approved by</th>
               <th class="hidden px-4 py-2 text-left font-medium md:table-cell">Updated</th>
               <th class="hidden px-4 py-2 text-left font-medium md:table-cell">v</th>
             </tr>
@@ -170,13 +172,53 @@
                   <app-channel-chip [channel]="row.channel" />
                 </td>
                 <td class="overflow-hidden px-1 py-2 align-top md:px-4 md:py-3">
-                  <app-template-status-badge [internal]="row.internal_status" />
+                  <div class="flex flex-wrap items-center gap-1">
+                    <app-template-status-badge [internal]="row.internal_status" />
+                    @if (row.internal_status === 'in_review' && canReview()) {
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-500"
+                        title="Waiting for a reviewer with templates.review — click the row to open and approve or reject."
+                      >
+                        <lucide-icon name="alert-circle" size="10" />
+                        Needs approval
+                      </span>
+                    }
+                    @if (!row.is_active) {
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full border border-zinc-500/30 bg-zinc-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-muted"
+                        title="Inactive — hidden from every send picker. Only an Owner/Admin (or holder of templates.activate) can flip it back on."
+                      >
+                        <lucide-icon name="pause-circle" size="10" />
+                        Inactive
+                      </span>
+                    }
+                  </div>
                 </td>
                 <td class="overflow-hidden px-1 py-2 align-top md:px-4 md:py-3">
                   <app-template-status-badge
                     [external]="row.external_status"
                     [rejectionReason]="row.external_rejection_reason"
                   />
+                </td>
+                <td
+                  class="hidden px-4 py-3 text-xs whitespace-nowrap text-muted md:table-cell"
+                  [title]="row.created_by_user_id ?? ''"
+                >
+                  {{ staffName(row.created_by_user_id) }}
+                </td>
+                <td
+                  class="hidden px-4 py-3 text-xs whitespace-nowrap text-muted md:table-cell"
+                  [title]="row.last_reviewed_by_user_id ?? ''"
+                >
+                  @if (
+                    row.last_reviewed_by_user_id &&
+                    row.last_reviewed_action !== 'submit' &&
+                    row.last_reviewed_action !== 'reject'
+                  ) {
+                    {{ staffName(row.last_reviewed_by_user_id) }}
+                  } @else {
+                    <span class="text-faint">—</span>
+                  }
                 </td>
                 <td class="hidden px-4 py-3 text-xs whitespace-nowrap text-muted md:table-cell">
                   {{ row.updated_at | date: 'mediumDate' }}

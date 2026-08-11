@@ -1,26 +1,32 @@
 /**
- * Settings → Integrations page. Owner-only (gated by
- * `settings.integrations.manage`). Replaces the old read-only
- * placeholder; Steps 7 + 8 build it out.
+ * Settings → Integrations page. Open to every role: the page
+ * renders per-card visibility gated by two existing permission
+ * keys.
  *
- * Layout:
+ *   - `settings.integrations.manage` → Google Ads, Meta Ads,
+ *     WhatsApp, status/DLQ panel (Owner + Admin default).
+ *   - `email.accounts.admin`         → Email (Gmail / Outlook /
+ *     SMTP) sender card. Uses the `admin` key (Owner + Admin only)
+ *     NOT `email.accounts.manage`, which every role holds for
+ *     self-connect flows elsewhere and would leak this org-level
+ *     card to Employees.
+ *   - (no key)                        → Google Calendar — always
+ *     visible so any user can wire their own calendar to receive
+ *     appointment sync.
  *
- *   ┌─────────────────────────────────────────────────────┐
- *   │  Google Ads card                                    │
- *   ├─────────────────────────────────────────────────────┤
- *   │  Meta Ads card                                      │
- *   ├─────────────────────────────────────────────────────┤
- *   │  Dead-letter summary  (count + "view all" link to   │
- *   │  Step 8's full DLQ surface — Step 7 just shows the  │
- *   │  count to give Owners awareness)                    │
- *   └─────────────────────────────────────────────────────┘
+ * The `_refresh()` API burst is skipped entirely for roles without
+ * `settings.integrations.manage` (every endpoint in that fan-out
+ * requires the key server-side); the calendar card fetches its own
+ * status independently.
  *
  * On init: reads `?status=…&reason=…` from the URL. Google's and
  * Meta's OAuth callbacks bounce here with one of:
  *   `google_connected` / `google_denied` / `google_error`
  *   `meta_connected`   / `meta_denied`   / `meta_error`
- * Shows a one-line banner accordingly, then refetches the
- * integrations list so each card re-renders from the new state.
+ *   `google_calendar_connected` / `google_calendar_denied` / `google_calendar_error`
+ * Shows a one-line banner accordingly, then refetches (subject to
+ * the permission gate above) so each card re-renders from the new
+ * state.
  *
  * Loads `subscriptions` once + passes the array down to each card.
  * Each card filters to its own `integration_id` client-side — keeps
@@ -42,6 +48,7 @@ import { forkJoin } from 'rxjs';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { FurnitureAuthService } from '../../auth/auth.service';
 import { DlqListComponent } from './dlq-list.component';
 import { EmailSenderCardComponent } from './email-sender-card.component';
 import { FieldMappingEditorComponent } from './field-mapping-editor.component';
@@ -91,6 +98,39 @@ export class IntegrationsPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(FurnitureAuthService);
+
+  // --- per-card permission gates -----------------------------------
+  //
+  // The page itself is open to every role (route dropped its guard,
+  // module descriptor is `always_visible`) because Google Calendar is
+  // per-user and every role must be able to wire their own. The
+  // org-level cards below are shown / hidden per-user based on the
+  // two existing permission keys — Owner + Admin have both by default;
+  // any custom role granted these keys inherits access uniformly.
+
+  /** True when the caller may see Google Ads / Meta Ads / WhatsApp
+   *  cards + the DLQ + field-mapping surfaces. */
+  protected readonly canManageOrgIntegrations = computed(() =>
+    this.auth.currentPermissions().includes('settings.integrations.manage'),
+  );
+
+  /** True when the caller may see the Email (Gmail / Outlook / SMTP)
+   *  sender card. Gated on `email.accounts.admin` (the org-wide-view
+   *  key), NOT `email.accounts.manage` — the manage key is granted to
+   *  every role for a self-connect flow and would leak this org-level
+   *  card to Employees. Only Owner + Admin templates hold
+   *  `email.accounts.admin`; custom roles need that specific key
+   *  to see this card. */
+  protected readonly canManageEmailSenders = computed(() =>
+    this.auth.currentPermissions().includes('email.accounts.admin'),
+  );
+
+  /** Any org-scoped card visible → drives the empty-state banner
+   *  Employees see when only the Calendar card is on the page. */
+  protected readonly hasAnyOrgCard = computed(
+    () => this.canManageOrgIntegrations() || this.canManageEmailSenders(),
+  );
 
   // --- top-level signals --------------------------------------------
 
@@ -187,63 +227,84 @@ export class IntegrationsPageComponent {
     const ws: { status: 'connected' | 'error' | 'not_connected'; label: string } = w?.connected_at
       ? { status: 'connected', label: 'Connected' }
       : { status: 'not_connected', label: 'Not connected' };
-    return [
-      {
-        id: 'google_ads',
-        label: 'Google Ads',
-        type: 'Ad platform',
-        description:
-          'Lead Form Extensions → CRM. New form submissions land in Leads automatically.',
-        letter: 'G',
-        icon: null,
-        iconBg: 'bg-white',
-        iconText: 'text-blue-600',
-        status: gs.status,
-        statusLabel: gs.label,
-        anchor: 'card-google-ads',
-      },
-      {
-        id: 'meta_ads',
-        label: 'Meta Ads',
-        type: 'Ad platform',
-        description:
-          'Facebook + Instagram lead ads. Subscribe once and every Page lead flows into Leads.',
-        letter: 'f',
-        icon: null,
-        iconBg: 'bg-blue-600',
-        iconText: 'text-white',
-        status: ms.status,
-        statusLabel: ms.label,
-        anchor: 'card-meta-ads',
-      },
-      {
-        id: 'whatsapp',
-        label: 'WhatsApp',
-        type: 'Messaging',
-        description:
-          'Two-way inbox in Conversations. Send templates from Campaigns and Automations.',
-        letter: null,
-        icon: 'message-circle',
-        iconBg: 'bg-emerald-500',
-        iconText: 'text-white',
-        status: ws.status,
-        statusLabel: ws.label,
-        anchor: 'card-whatsapp',
-      },
-      {
-        id: 'google_calendar',
-        label: 'Google Calendar',
-        type: 'Calendar',
-        description: 'Mirror appointments into each rep’s Google Calendar. Per-user connection.',
-        letter: null,
-        icon: 'calendar',
-        iconBg: 'bg-white',
-        iconText: 'text-blue-600',
-        status: 'not_connected',
-        statusLabel: 'Per-user',
-        anchor: 'card-google-calendar',
-      },
-      {
+    // Build the tile list with per-permission gating so the summary
+    // grid matches the detail cards below — Employees / custom roles
+    // without the manage keys see only the Google Calendar tile.
+    const tiles: Array<{
+      id: string;
+      label: string;
+      type: string;
+      description: string;
+      letter: string | null;
+      icon: string | null;
+      iconBg: string;
+      iconText: string;
+      status: 'connected' | 'error' | 'not_connected';
+      statusLabel: string;
+      anchor: string;
+    }> = [];
+    if (this.canManageOrgIntegrations()) {
+      tiles.push(
+        {
+          id: 'google_ads',
+          label: 'Google Ads',
+          type: 'Ad platform',
+          description:
+            'Lead Form Extensions → CRM. New form submissions land in Leads automatically.',
+          letter: 'G',
+          icon: null,
+          iconBg: 'bg-white',
+          iconText: 'text-blue-600',
+          status: gs.status,
+          statusLabel: gs.label,
+          anchor: 'card-google-ads',
+        },
+        {
+          id: 'meta_ads',
+          label: 'Meta Ads',
+          type: 'Ad platform',
+          description:
+            'Facebook + Instagram lead ads. Subscribe once and every Page lead flows into Leads.',
+          letter: 'f',
+          icon: null,
+          iconBg: 'bg-blue-600',
+          iconText: 'text-white',
+          status: ms.status,
+          statusLabel: ms.label,
+          anchor: 'card-meta-ads',
+        },
+        {
+          id: 'whatsapp',
+          label: 'WhatsApp',
+          type: 'Messaging',
+          description:
+            'Two-way inbox in Conversations. Send templates from Campaigns and Automations.',
+          letter: null,
+          icon: 'message-circle',
+          iconBg: 'bg-emerald-500',
+          iconText: 'text-white',
+          status: ws.status,
+          statusLabel: ws.label,
+          anchor: 'card-whatsapp',
+        },
+      );
+    }
+    // Google Calendar is always shown — every role wires their own.
+    tiles.push({
+      id: 'google_calendar',
+      label: 'Google Calendar',
+      type: 'Calendar',
+      description: 'Mirror appointments into each rep’s Google Calendar. Per-user connection.',
+      letter: null,
+      icon: 'calendar',
+      iconBg: 'bg-white',
+      iconText: 'text-blue-600',
+      status: 'not_connected',
+      statusLabel: 'Per-user',
+      anchor: 'card-google-calendar',
+    });
+    if (this.canManageEmailSenders()) {
+      tiles.push({
         id: 'email',
         label: 'Email',
         type: 'Messaging',
@@ -256,8 +317,9 @@ export class IntegrationsPageComponent {
         status: 'not_connected',
         statusLabel: 'Manage below',
         anchor: 'card-email-sender',
-      },
-    ];
+      });
+    }
+    return tiles;
   });
 
   /** Expand the clicked connector's detailed card (toggle: clicking
@@ -331,6 +393,22 @@ export class IntegrationsPageComponent {
   private _refresh(): void {
     this.loading.set(true);
     this.loadError.set(null);
+    // Every one of these endpoints requires `settings.integrations.manage`
+    // server-side (they hydrate the Google Ads / Meta Ads / WhatsApp /
+    // status-panel / DLQ cards, all of which are hidden for roles
+    // without that key). Firing them for an Employee 403s and paints
+    // an "Access denied" banner over a page that's otherwise valid
+    // — the Google Calendar card underneath doesn't need any of it.
+    // Skip the whole call cluster when the caller can't manage org
+    // integrations; the calendar card fetches its own status.
+    if (!this.canManageOrgIntegrations()) {
+      this.integrations.set([]);
+      this.subscriptions.set([]);
+      this.dlqTotal.set(null);
+      this.whatsapp.set(null);
+      this.loading.set(false);
+      return;
+    }
     forkJoin({
       integrations: this.api.list(),
       subscriptions: this.api.listSubscriptions(),

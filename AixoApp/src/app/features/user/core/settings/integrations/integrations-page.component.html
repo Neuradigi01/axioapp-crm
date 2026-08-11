@@ -75,14 +75,30 @@
         Could not load integrations: {{ loadError() }}
       </div>
     } @else {
-      <!-- Step 8: Delivery status dashboard panel. Above the provider
-         cards so an Owner glances at it first. -->
-      <app-integration-status (openDlq)="toggleDlq()"></app-integration-status>
+      @if (canManageOrgIntegrations()) {
+        <!-- Step 8: Delivery status dashboard panel. Above the provider
+           cards so an Owner glances at it first. Hidden for roles
+           without `settings.integrations.manage` — they don't own the
+           org connectors those metrics summarise. -->
+        <app-integration-status (openDlq)="toggleDlq()"></app-integration-status>
 
-      <!-- Step 8: Inline DLQ table — visible only when the operator
-         clicks the status banner or the bottom-card link. -->
-      @if (dlqVisible()) {
-        <app-dlq-list [visible]="dlqVisible()" (changed)="onDlqChanged()"></app-dlq-list>
+        <!-- Step 8: Inline DLQ table — visible only when the operator
+           clicks the status banner or the bottom-card link. -->
+        @if (dlqVisible()) {
+          <app-dlq-list [visible]="dlqVisible()" (changed)="onDlqChanged()"></app-dlq-list>
+        }
+      }
+
+      <!-- Employees / custom roles without any org-manage keys land
+           here with only the Google Calendar card visible. The banner
+           makes it obvious that the extra cards they might expect are
+           gated on a permission an Owner / Admin has to grant. -->
+      @if (!hasAnyOrgCard()) {
+        <div class="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs text-muted">
+          Connect your Google Calendar below to receive appointment reminders on your calendar. More
+          integrations (Google Ads, Meta Ads, WhatsApp, Email) are managed by your Owner or Admin —
+          ask them to grant the relevant permission on your role if you need access.
+        </div>
       }
 
       <!-- Available connections grid (AIXO pattern). Compact summary
@@ -180,7 +196,7 @@
            clean grid). Each block reveals when its summary tile above
            is clicked. Anchor ids let the tile's toggle scroll the
            opened block into view. -->
-      @if (expandedConnector() === 'google_ads') {
+      @if (canManageOrgIntegrations() && expandedConnector() === 'google_ads') {
         <div id="card-google-ads">
           <app-google-card
             [integration]="google()"
@@ -202,7 +218,7 @@
         </div>
       }
 
-      @if (expandedConnector() === 'meta_ads') {
+      @if (canManageOrgIntegrations() && expandedConnector() === 'meta_ads') {
         <div id="card-meta-ads">
           <app-meta-card
             [integration]="meta()"
@@ -212,13 +228,13 @@
         </div>
       }
 
-      @if (expandedConnector() === 'whatsapp') {
+      @if (canManageOrgIntegrations() && expandedConnector() === 'whatsapp') {
         <div id="card-whatsapp">
           <app-whatsapp-card [status]="whatsapp()" (changed)="onCardChanged()"></app-whatsapp-card>
         </div>
       }
 
-      @if (expandedConnector() === 'email') {
+      @if (canManageEmailSenders() && expandedConnector() === 'email') {
         <div id="card-email-sender">
           <app-email-sender-card></app-email-sender-card>
         </div>
@@ -226,39 +242,47 @@
 
       <!-- Compact DLQ summary card (Step 7) — kept as a quick-access
          link to expand the inline table even when the status banner
-         isn't showing. -->
-      <section
-        class="rounded-xl border border-subtle bg-surface p-4 shadow-sm"
-        data-testid="dlq-summary"
-      >
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <lucide-icon name="inbox" size="16" class="text-muted" aria-hidden="true"></lucide-icon>
-            <h3 class="text-sm font-medium text-default">Dead-letter queue</h3>
-          </div>
-          @if (dlqTotal() !== null) {
-            @if (dlqTotal()! > 0) {
-              <button
-                type="button"
-                class="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 ring-1 border-amber-500/20 hover:bg-amber-500/10"
-                (click)="toggleDlq()"
-              >
-                {{ dlqTotal() }} payload{{ dlqTotal() === 1 ? '' : 's' }} total · view table
-              </button>
-            } @else {
-              <span
-                class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20"
-              >
-                All clear
-              </span>
+         isn't showing. Hidden for roles without the org-integrations
+         manage key; there's nothing they can act on there. -->
+      @if (canManageOrgIntegrations()) {
+        <section
+          class="rounded-xl border border-subtle bg-surface p-4 shadow-sm"
+          data-testid="dlq-summary"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <lucide-icon
+                name="inbox"
+                size="16"
+                class="text-muted"
+                aria-hidden="true"
+              ></lucide-icon>
+              <h3 class="text-sm font-medium text-default">Dead-letter queue</h3>
+            </div>
+            @if (dlqTotal() !== null) {
+              @if (dlqTotal()! > 0) {
+                <button
+                  type="button"
+                  class="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 ring-1 border-amber-500/20 hover:bg-amber-500/10"
+                  (click)="toggleDlq()"
+                >
+                  {{ dlqTotal() }} payload{{ dlqTotal() === 1 ? '' : 's' }} total · view table
+                </button>
+              } @else {
+                <span
+                  class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20"
+                >
+                  All clear
+                </span>
+              }
             }
-          }
-        </div>
-        <p class="mt-2 text-xs text-muted">
-          Webhook payloads that exhausted their retry budget or failed validation land here. Click a
-          row's Replay button to re-enqueue, or Discard to silence (the row stays for audit).
-        </p>
-      </section>
+          </div>
+          <p class="mt-2 text-xs text-muted">
+            Webhook payloads that exhausted their retry budget or failed validation land here. Click
+            a row's Replay button to re-enqueue, or Discard to silence (the row stays for audit).
+          </p>
+        </section>
+      }
     }
 
     <!-- Step 8: Field-mapping editor modal. Renders only when a card
