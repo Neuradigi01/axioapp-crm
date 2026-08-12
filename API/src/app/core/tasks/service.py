@@ -120,6 +120,213 @@ def _snapshot(t: Task) -> dict[str, Any]:
     return snapshot(t, fields=_SNAPSHOT_FIELDS)
 
 
+def _task_snapshot_for_event(t: Task) -> dict[str, Any]:
+    """Rich event-payload snapshot. Kept separate from ``_snapshot`` (the
+    audit snapshot) because the workflow trigger payload needs the ISO
+    datetime + a couple of derived fields the audit trail doesn't care
+    about. Any change here should be additive so subscribers built
+    against the current shape keep working."""
+    return {
+        "id": str(t.id),
+        "title": t.title,
+        "description": t.description,
+        "due_at": t.due_at.isoformat() if t.due_at else None,
+        "priority": t.priority.value if hasattr(t.priority, "value") else str(t.priority),
+        "status": t.status.value if hasattr(t.status, "value") else str(t.status),
+        "assigned_to_id": str(t.assigned_to_id) if t.assigned_to_id else None,
+        "related_entity_type": t.related_entity_type,
+        "related_entity_id": (
+            str(t.related_entity_id) if t.related_entity_id else None
+        ),
+        "followup_type": (
+            t.followup_type.value
+            if t.followup_type is not None and hasattr(t.followup_type, "value")
+            else (str(t.followup_type) if t.followup_type is not None else None)
+        ),
+    }
+
+
+async def _build_task_event_payload(
+    session: AsyncSession, *, task: Task, org_id: uuid.UUID
+) -> dict[str, Any]:
+    """Assemble the trigger-event payload for a task.
+
+    Snapshots the assignee (User), the linked contact (if the task
+    points at one via `related_entity_type='contact'`), and the org
+    alongside the task itself — so workflow subscribers can render
+    variables like ``{{contact.full_name}}``, ``{{assignee.email}}``,
+    ``{{task.title}}`` without any additional DB round-trips.
+    """
+    from sqlalchemy import select as _select
+
+    from src.app.core.contacts.models import Contact
+    from src.app.core.tenants.models import Organization
+    from src.app.core.users.models import User
+
+    payload: dict[str, Any] = {
+        "task_id": str(task.id),
+        "assigned_to_id": str(task.assigned_to_id) if task.assigned_to_id else None,
+        "contact_id": (
+            str(task.related_entity_id)
+            if task.related_entity_type == "contact" and task.related_entity_id
+            else None
+        ),
+        "task": _task_snapshot_for_event(task),
+    }
+
+    if task.assigned_to_id is not None:
+        assignee = (
+            await session.execute(_select(User).where(User.legacy_uuid == task.assigned_to_id))
+        ).scalar_one_or_none()
+        if assignee is not None:
+            payload["assignee"] = {
+                "id": str(assignee.legacy_uuid),
+                "full_name": assignee.full_name,
+                "email": assignee.email,
+            }
+
+    if task.related_entity_type == "contact" and task.related_entity_id:
+        contact = (
+            await session.execute(_select(Contact).where(Contact.id == task.related_entity_id))
+        ).scalar_one_or_none()
+        if contact is not None:
+            payload["contact"] = {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "email": contact.email,
+                "phone": contact.phone,
+            }
+
+    org = (
+        await session.execute(_select(Organization).where(Organization.id == org_id))
+    ).scalar_one_or_none()
+    if org is not None:
+        payload["org"] = {
+            "id": str(org.id),
+            "name": org.name,
+            "slug": org.slug,
+        }
+
+    return payload
+
+
+def _fmt_due_at(dt: datetime | None) -> str:
+    """Human-friendly due-at string for notification bodies. Localises
+    to the org's TZ later if we want; UTC-naive is fine for the v1
+    since the assignee already knows their own timezone context."""
+    if dt is None:
+        return "no due date"
+    return dt.strftime("%b %d, %H:%M")
+
+
+async def _notify_task_event(
+    *,
+    org_id: uuid.UUID,
+    task: Task,
+    event_type: str,
+) -> None:
+    """Send a bell + (opt-in) email notification to the task's assignee.
+
+    Separate from the workflow-bus publisher — the publisher fires
+    user-authored workflows (custom template, filters, etc.), while
+    this call is the guaranteed built-in notification the assignee
+    gets regardless of whether any workflow is configured.
+
+    Safe to call after commit; every failure is swallowed by
+    `notifications.notify` itself.
+    """
+    if task.assigned_to_id is None:
+        return
+    if event_type == "task.assigned":
+        title = f"New task: {task.title}"
+        body = f"Due {_fmt_due_at(task.due_at)} · Priority {task.priority.value}"
+    elif event_type == "task.completed":
+        title = f"Task completed: {task.title}"
+        body = "Marked done."
+    else:
+        return
+
+    payload: dict[str, Any] = {
+        "task_id": str(task.id),
+        "title": task.title,
+        "due_at": task.due_at.isoformat() if task.due_at else None,
+        "priority": task.priority.value,
+        "assigned_to_id": str(task.assigned_to_id),
+        "related_entity_type": task.related_entity_type,
+        "related_entity_id": (
+            str(task.related_entity_id) if task.related_entity_id else None
+        ),
+    }
+
+    from src.app.core.notifications import service as notifications
+
+    await notifications.notify(
+        org_id=org_id,
+        user_id=task.assigned_to_id,
+        type=event_type,
+        title=title,
+        body=body,
+        payload=payload,
+    )
+
+
+async def _publish_task_assigned(
+    session: AsyncSession, *, org_id: uuid.UUID, task: Task
+) -> None:
+    """Publish `task.assigned` to the events bus. Fires on both the
+    initial assignment (task creation with a non-creator assignee) and
+    every subsequent reassignment. The `event_id` includes the current
+    assignee so a reassign back-and-forth still delivers each hop —
+    dedupe is per (task, assignee), not per task.
+
+    Wrapped in a broad try so an event-bus outage never blocks the
+    caller's mutation."""
+    try:
+        from src.app.core.events.bus import publish as events_publish
+
+        payload = await _build_task_event_payload(session, task=task, org_id=org_id)
+        await events_publish(
+            "task.assigned",
+            payload,
+            org_id=org_id,
+            event_id=f"task_assigned:{task.id}:{task.assigned_to_id}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "tasks.publish_task_assigned failed org=%s task=%s",
+            org_id,
+            task.id,
+        )
+
+
+async def _publish_task_completed(
+    session: AsyncSession, *, org_id: uuid.UUID, task: Task
+) -> None:
+    """Publish `task.completed` when a task's status transitions to
+    ``done``. Idempotent per task — a duplicate publish is caught by
+    the events bus dedupe on `event_id`."""
+    try:
+        from src.app.core.events.bus import publish as events_publish
+
+        payload = await _build_task_event_payload(session, task=task, org_id=org_id)
+        await events_publish(
+            "task.completed",
+            payload,
+            org_id=org_id,
+            event_id=f"task_completed:{task.id}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "tasks.publish_task_completed failed org=%s task=%s",
+            org_id,
+            task.id,
+        )
+
+
 async def get_task(session: AsyncSession, task_id: uuid.UUID) -> Task | None:
     """Return a single task, scoped to the active tenant."""
     return await _da.get_task_by_id(session, task_id)
@@ -161,6 +368,19 @@ async def create_task(
         entity_id=task.id,
         after=_snapshot(task),
     )
+
+    # Fire `task.assigned` only when the assignee isn't the creator —
+    # a rep creating a self-note doesn't need an email to themselves.
+    # Explicit assignees (delegation) always publish, even if the
+    # picked user is the creator, because that was a conscious action.
+    is_self_assign = (
+        payload.assigned_to_id is None and task.assigned_to_id == current_user_id
+    )
+    if not is_self_assign:
+        await _publish_task_assigned(session, org_id=org_id, task=task)
+        await _notify_task_event(
+            org_id=org_id, task=task, event_type="task.assigned"
+        )
     return task
 
 
@@ -173,6 +393,10 @@ async def update_task(
     task = ensure_found(await get_task(session, task_id), entity="task")
 
     before = _snapshot(task)
+    # Snapshot the specific fields that drive workflow events BEFORE
+    # applying the patch, so we can compare to the post-write state.
+    prior_assignee = task.assigned_to_id
+    prior_status = task.status
     changes = payload.model_dump(exclude_unset=True)
     if "custom_data" in changes:
         changes["custom_data"] = await validate_custom_data(
@@ -198,6 +422,21 @@ async def update_task(
         before=before,
         after=_snapshot(task),
     )
+
+    # Detect the two transitions the workflow engine cares about and
+    # publish independently — both can happen in the same PATCH (a
+    # user might reassign + complete in one call), and each is a
+    # separate trigger event.
+    if task.assigned_to_id != prior_assignee and task.assigned_to_id is not None:
+        await _publish_task_assigned(session, org_id=task.org_id, task=task)
+        await _notify_task_event(
+            org_id=task.org_id, task=task, event_type="task.assigned"
+        )
+    if task.status == TaskStatus.done and prior_status != TaskStatus.done:
+        await _publish_task_completed(session, org_id=task.org_id, task=task)
+        await _notify_task_event(
+            org_id=task.org_id, task=task, event_type="task.completed"
+        )
     return task
 
 
@@ -390,6 +629,7 @@ async def bulk_reassign_tasks(
     # roll back a whole reassign batch.
     reassigned = 0
     audit_batch: list[tuple[uuid.UUID, dict[str, Any], dict[str, Any]]] = []
+    reassigned_tasks: list[Task] = []
     for task in tasks:
         if task.assigned_to_id == assigned_to_id:
             continue
@@ -406,6 +646,7 @@ async def bulk_reassign_tasks(
             user_id=actor_user_id,
         )
         audit_batch.append((task.id, before_snap, _snapshot(task)))
+        reassigned_tasks.append(task)
         reassigned += 1
 
     await session.commit()
@@ -418,6 +659,9 @@ async def bulk_reassign_tasks(
             before=before_snap,
             after=after_snap,
         )
+    for task in reassigned_tasks:
+        await _publish_task_assigned(session, org_id=org_id, task=task)
+        await _notify_task_event(org_id=org_id, task=task, event_type="task.assigned")
     return reassigned
 
 
@@ -440,6 +684,7 @@ async def bulk_mark_done_tasks(
     done = 0
     skipped = 0
     audit_batch: list[tuple[uuid.UUID, dict[str, Any], dict[str, Any]]] = []
+    completed_tasks: list[Task] = []
     for task in tasks:
         if task.status == TaskStatus.done:
             skipped += 1
@@ -448,6 +693,7 @@ async def bulk_mark_done_tasks(
         task.status = TaskStatus.done
         task.last_activity_at = datetime.now(UTC)
         audit_batch.append((task.id, before_snap, _snapshot(task)))
+        completed_tasks.append(task)
         done += 1
 
     await session.commit()
@@ -460,6 +706,9 @@ async def bulk_mark_done_tasks(
             before=before_snap,
             after=after_snap,
         )
+    for task in completed_tasks:
+        await _publish_task_completed(session, org_id=org_id, task=task)
+        await _notify_task_event(org_id=org_id, task=task, event_type="task.completed")
     return done, skipped
 
 
