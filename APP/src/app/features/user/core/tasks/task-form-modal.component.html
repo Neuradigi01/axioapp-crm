@@ -94,7 +94,7 @@
       }
     </div>
 
-    @if (hasAssigneeDropdown() && !isHidden('assigned_to_id')) {
+    @if (hasAssigneeDropdown && !isHidden('assigned_to_id')) {
       <label class="block text-sm">
         <span class="mb-1 block text-xs font-medium text-muted">
           {{ stdField('assigned_to_id')?.label ?? 'Assignee' }}
@@ -111,7 +111,7 @@
           <span class="mt-1 block text-xs text-muted">{{ help }}</span>
         }
       </label>
-    } @else if (!hasAssigneeDropdown()) {
+    } @else if (!hasAssigneeDropdown) {
       <p class="rounded-md bg-surface-2 px-3 py-2 text-xs text-muted">
         Task will be assigned to you.
       </p>

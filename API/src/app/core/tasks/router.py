@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.permissions.service import role_has_permission
 from src.app.core.tasks.models import TaskPriority, TaskStatus
 from src.app.core.tasks.schemas import (
     TaskBulkDelete,
@@ -157,8 +158,16 @@ async def create_task_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("tasks.write")),
 ) -> TaskOut:
+    # Only Owner / Admin / Sales Manager can delegate — everyone else
+    # is self-assign only. The service enforces the rule; the router
+    # just resolves the flag from the caller's role once.
+    can_assign_others = await role_has_permission(db, user.role_id, "tasks.assign_others")
     task = await create_task(
-        db, org_id=user.org_id, current_user_id=user.legacy_uuid, payload=payload
+        db,
+        org_id=user.org_id,
+        current_user_id=user.legacy_uuid,
+        payload=payload,
+        can_assign_others=can_assign_others,
     )
     return TaskOut.model_validate(task)
 
@@ -174,7 +183,10 @@ async def create_task_endpoint(
 async def bulk_reassign_tasks_endpoint(
     payload: TaskBulkReassign,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_permissions("tasks.write")),
+    # Reassigning is delegation by definition — Employee / Support Agent
+    # don't get this power. Gated at the router with the same perm the
+    # create + update flows check inside the service.
+    user: User = Depends(require_permissions("tasks.assign_others")),
 ) -> TaskBulkReassignResult:
     n = await bulk_reassign_tasks(
         db,
@@ -224,9 +236,19 @@ async def update_task_endpoint(
     task_id: uuid.UUID,
     payload: TaskUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("tasks.write")),
+    user: User = Depends(require_permissions("tasks.write")),
 ) -> TaskOut:
-    task = await update_task(db, task_id=task_id, payload=payload)
+    # PATCH that changes `assigned_to_id` to another user counts as a
+    # delegation — same gate as create_task. Self-updates (title, due
+    # date, status flips) work for anyone with tasks.write.
+    can_assign_others = await role_has_permission(db, user.role_id, "tasks.assign_others")
+    task = await update_task(
+        db,
+        task_id=task_id,
+        payload=payload,
+        current_user_id=user.legacy_uuid,
+        can_assign_others=can_assign_others,
+    )
     return TaskOut.model_validate(task)
 
 

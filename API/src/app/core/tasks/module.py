@@ -17,6 +17,6 @@ MODULE = ModuleDescriptor(
     route="/api/v1/tasks",
     frontend_route="/user/tasks",
     menu_position=510,
-    permissions=["tasks.read", "tasks.write"],
+    permissions=["tasks.read", "tasks.write", "tasks.assign_others"],
     section="My Work",
 )

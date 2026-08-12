@@ -338,7 +338,24 @@ async def create_task(
     org_id: uuid.UUID,
     current_user_id: uuid.UUID,
     payload: TaskCreate,
+    can_assign_others: bool = False,
 ) -> Task:
+    # Delegation gate — Employees can only create tasks for themselves.
+    # Router resolves `can_assign_others` from the caller's role once
+    # and passes it in; the service is the authoritative check.
+    if (
+        payload.assigned_to_id is not None
+        and payload.assigned_to_id != current_user_id
+        and not can_assign_others
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "You can only create tasks assigned to yourself. "
+                "Owner or Admin permission is required to delegate tasks "
+                "to other users."
+            ),
+        )
     cleaned_custom = await validate_custom_data(
         session,
         entity_type=_TASK_ENTITY,
@@ -389,8 +406,30 @@ async def update_task(
     *,
     task_id: uuid.UUID,
     payload: TaskUpdate,
+    current_user_id: uuid.UUID | None = None,
+    can_assign_others: bool = False,
 ) -> Task:
     task = ensure_found(await get_task(session, task_id), entity="task")
+
+    # Delegation gate — a PATCH that changes assigned_to_id to someone
+    # other than the caller counts as delegation. Non-delegation PATCHes
+    # (title fix, status flip, own-task reassign) are unaffected.
+    incoming_assignee = payload.model_dump(exclude_unset=True).get("assigned_to_id")
+    if (
+        incoming_assignee is not None
+        and incoming_assignee != task.assigned_to_id
+        and current_user_id is not None
+        and incoming_assignee != current_user_id
+        and not can_assign_others
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "You can only re-assign tasks to yourself. "
+                "Owner or Admin permission is required to delegate tasks "
+                "to other users."
+            ),
+        )
 
     before = _snapshot(task)
     # Snapshot the specific fields that drive workflow events BEFORE

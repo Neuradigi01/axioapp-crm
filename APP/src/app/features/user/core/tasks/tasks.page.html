@@ -163,7 +163,7 @@
     >
       @for (t of state.items(); track t.id) {
         <li class="px-3 py-3" [class.bg-surface-2]="isSelected(t.id)">
-          <!-- Header row: select + complete + title + row-select checkbox -->
+          <!-- Header row: select checkbox + round complete-toggle + title -->
           <div class="flex items-start gap-2">
             <input
               type="checkbox"
@@ -171,15 +171,28 @@
               [checked]="isSelected(t.id)"
               (click)="toggleRow(t.id, $event)"
               [attr.aria-label]="'Select task ' + t.title"
+              title="Select for bulk actions (Reassign / Delete)"
             />
-            <input
-              type="checkbox"
-              [checked]="t.status === 'done'"
+            <!-- Round toggle — universal "task done" iconography so it
+                 doesn't get confused with the square selection checkbox
+                 next to it. Filled + checkmark when done. -->
+            <button
+              type="button"
+              (click)="toggleComplete(t, t.status !== 'done')"
               [disabled]="togglingId() !== null"
-              (change)="toggleComplete(t, $any($event.target).checked)"
-              class="mt-0.5 h-4 w-4 shrink-0 rounded border-subtle text-default focus:ring-accent disabled:cursor-not-allowed"
-              aria-label="Mark task complete"
-            />
+              [class]="
+                'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition disabled:cursor-not-allowed ' +
+                (t.status === 'done'
+                  ? 'border-emerald-500 bg-emerald-500 text-white'
+                  : 'border-muted bg-surface text-transparent hover:border-emerald-500 hover:text-emerald-500')
+              "
+              [attr.aria-label]="
+                t.status === 'done' ? 'Mark task as open' : 'Mark task as complete'
+              "
+              [attr.title]="t.status === 'done' ? 'Mark as not done' : 'Mark as complete'"
+            >
+              <lucide-icon name="check" size="12" aria-hidden="true"></lucide-icon>
+            </button>
             <button
               type="button"
               (click)="openEdit(t)"
@@ -351,8 +364,8 @@
         <tbody class="divide-y divide-subtle">
           @for (t of state.items(); track t.id) {
             <tr class="group hover:bg-surface-2" [class.bg-surface-2]="isSelected(t.id)">
-              <!-- Selection checkbox (Step 2). Separate from the
-                   quick-complete checkbox below. -->
+              <!-- Selection checkbox — square, matches Contacts / Leads
+                   / Campaigns list pages. Feeds bulk-actions bar. -->
               <td class="px-3 py-2 align-middle" (click)="$event.stopPropagation()">
                 <input
                   type="checkbox"
@@ -360,18 +373,30 @@
                   [checked]="isSelected(t.id)"
                   (click)="toggleRow(t.id, $event)"
                   [attr.aria-label]="'Select task ' + t.title"
+                  title="Select for bulk actions (Reassign / Delete)"
                 />
               </td>
-              <!-- Existing quick-complete checkbox. -->
+              <!-- Round complete-toggle — visually distinct from the
+                   square selection checkbox to the left. Fills with a
+                   checkmark when done. -->
               <td class="px-3 py-2 align-middle">
-                <input
-                  type="checkbox"
-                  [checked]="t.status === 'done'"
+                <button
+                  type="button"
+                  (click)="toggleComplete(t, t.status !== 'done')"
                   [disabled]="togglingId() !== null"
-                  (change)="toggleComplete(t, $any($event.target).checked)"
-                  class="h-4 w-4 rounded border-subtle text-default focus:ring-accent disabled:cursor-not-allowed"
-                  aria-label="Mark task complete"
-                />
+                  [class]="
+                    'flex h-5 w-5 items-center justify-center rounded-full border transition disabled:cursor-not-allowed ' +
+                    (t.status === 'done'
+                      ? 'border-emerald-500 bg-emerald-500 text-white'
+                      : 'border-muted bg-surface text-transparent hover:border-emerald-500 hover:text-emerald-500')
+                  "
+                  [attr.aria-label]="
+                    t.status === 'done' ? 'Mark task as open' : 'Mark task as complete'
+                  "
+                  [attr.title]="t.status === 'done' ? 'Mark as not done' : 'Mark as complete'"
+                >
+                  <lucide-icon name="check" size="12" aria-hidden="true"></lucide-icon>
+                </button>
               </td>
               <td class="px-3 py-2">
                 <div class="flex items-center gap-2">
@@ -502,6 +527,7 @@
     [task]="editingTask()"
     [assignees]="assignees()"
     [callerUuid]="callerUuid()"
+    [canAssignOthers]="canAssignOthers()"
     (saved)="onSaved()"
     (cancelled)="closeModal()"
   />
@@ -557,6 +583,20 @@
     [submitting]="state.bulkSubmitting()"
     (confirm)="onBulkDelete()"
     (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Mark-complete confirm — fires the task.completed workflow so
+     the assignee gets an email, worth a click-through. -->
+@if (completingTask(); as t) {
+  <app-confirm-dialog
+    [title]="'Mark task “' + t.title + '” as complete?'"
+    [body]="'This will notify the assignee by email (if their notification workflow is on) and close the task. You can reopen it any time by clicking the circle again.'"
+    [confirmLabel]="'Mark as done'"
+    [danger]="false"
+    [submitting]="togglingId() === t.id"
+    (confirm)="confirmCompleteRow()"
+    (cancel)="closeCompleteRow()"
   />
 }
 

@@ -115,6 +115,9 @@ _CORE_ADMIN_KEYS: list[str] = [
     "whatsapp.flows.manage",
     "tasks.read",
     "tasks.write",
+    # Delegate tasks to other users. Owner + Admin get this by default;
+    # Employees can create tasks only for themselves.
+    "tasks.assign_others",
     "pipelines.read",
     "pipelines.manage",
     "pipelines.write",
@@ -266,6 +269,8 @@ _CORE_SALES_MANAGER_KEYS: list[str] = [
     "walk_ins.write",
     "tasks.read",
     "tasks.write",
+    # Sales Manager runs the team — delegates tasks to reps.
+    "tasks.assign_others",
     "activities.read",
     "activities.write",
     "pipelines.read",
