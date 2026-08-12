@@ -178,10 +178,16 @@ async def rollup_query(
             WHERE (time_in + make_interval(mins => :offset_min))::date
                 = (NOW() + make_interval(mins => :offset_min))::date
           ) AS today_count,
+          -- "Converted today" pivots on `updated_at` (bumped when the
+          -- status flips to 'converted' via `convert_to_lead`) instead
+          -- of `time_in`. Otherwise a walk-in that arrived yesterday
+          -- and got converted today would silently miss this count —
+          -- operators expect this to reflect TODAY'S conversion action,
+          -- not "arrived AND converted on the same day".
           COUNT(*) FILTER (
-            WHERE (time_in + make_interval(mins => :offset_min))::date
+            WHERE status = 'converted'
+              AND (updated_at + make_interval(mins => :offset_min))::date
                 = (NOW() + make_interval(mins => :offset_min))::date
-              AND status = 'converted'
           ) AS today_converted,
           COUNT(*) FILTER (WHERE time_out IS NULL) AS open_now,
           COUNT(*) FILTER (
