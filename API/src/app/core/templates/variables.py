@@ -177,6 +177,27 @@ _INVOICE_VARS: tuple[VariableDef, ...] = (
     VariableDef("invoice.pdf_url", "Invoice PDF link", type=VariableType.url),
 )
 
+_TASK_VARS: tuple[VariableDef, ...] = (
+    # Populated by the `task.assigned` / `task.completed` publishers in
+    # ``core/tasks/service.py``. Templates bound to those triggers use
+    # these to render subject + body variables.
+    VariableDef("task.title", "Task title"),
+    VariableDef("task.description", "Task description"),
+    VariableDef("task.due_at", "Task due date", type=VariableType.date),
+    VariableDef("task.priority", "Task priority"),
+    VariableDef("task.status", "Task status"),
+    VariableDef("task.followup_type", "Task follow-up type"),
+)
+
+_ASSIGNEE_VARS: tuple[VariableDef, ...] = (
+    # Snapshot of the User the task is assigned to — carried on
+    # `task.assigned` / `task.completed` payloads so the operator's
+    # template can address the assignee by name and route the send
+    # to their email.
+    VariableDef("assignee.full_name", "Assignee full name"),
+    VariableDef("assignee.email", "Assignee email"),
+)
+
 
 # --- Per-channel allow-list --------------------------------------------
 
@@ -195,6 +216,8 @@ ALLOWED_VARIABLES_BY_CHANNEL: dict[ConversationChannel, list[VariableDef]] = {
         *_APPOINTMENT_VARS,
         *_QUOTE_VARS,
         *_INVOICE_VARS,
+        *_TASK_VARS,
+        *_ASSIGNEE_VARS,
     ],
     ConversationChannel.whatsapp: [
         *_CONTACT_VARS,
@@ -204,6 +227,8 @@ ALLOWED_VARIABLES_BY_CHANNEL: dict[ConversationChannel, list[VariableDef]] = {
         *_APPOINTMENT_VARS,
         *_QUOTE_VARS,
         *_INVOICE_VARS,
+        *_TASK_VARS,
+        *_ASSIGNEE_VARS,
     ],
     ConversationChannel.sms: [
         # SMS bodies are tight — surface only the high-signal short

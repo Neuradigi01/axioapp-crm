@@ -434,7 +434,17 @@ def _resolve_handler_for_node(node: dict[str, Any]) -> ActionHandler:
 async def _build_handler_context(session: AsyncSession, run: WorkflowRun) -> dict[str, Any]:
     """Context dict passed to every action handler. Steps 7-11 read
     ``contact`` / ``trigger_payload`` / ``run_state`` from here to
-    render variables."""
+    render variables.
+
+    Additionally spreads every dict-valued top-level key of
+    ``trigger_payload`` into the top level of the context so template
+    bodies can use short forms like ``{{ task.title }}`` or
+    ``{{ assignee.email }}`` instead of the long
+    ``{{ trigger_payload.task.title }}`` form. The spread is additive
+    (never overwrites ``contact`` / ``trigger_payload`` / ``run_state``)
+    and only shallow, so callers relying on the original
+    ``trigger_payload.*`` path still work.
+    """
     contact_dict: dict[str, Any] | None = None
     if run.contact_id is not None:
         from sqlalchemy import select as _select
@@ -451,11 +461,19 @@ async def _build_handler_context(session: AsyncSession, run: WorkflowRun) -> dic
                 "email": contact.email,
                 "phone": contact.phone,
             }
-    return {
+    trigger_payload = run.trigger_payload or {}
+    context: dict[str, Any] = {
         "contact": contact_dict,
-        "trigger_payload": run.trigger_payload or {},
+        "trigger_payload": trigger_payload,
         "run_state": run.state or {},
     }
+    _RESERVED_TOP_KEYS = {"contact", "trigger_payload", "run_state"}
+    for k, v in trigger_payload.items():
+        if k in _RESERVED_TOP_KEYS:
+            continue
+        if isinstance(v, dict) and k not in context:
+            context[k] = v
+    return context
 
 
 # --- _advance -----------------------------------------------------------

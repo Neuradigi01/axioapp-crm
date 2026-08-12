@@ -168,6 +168,31 @@ _INVOICE_OVERDUE_BODY = (
     "— The {{ org.name }} team"
 )
 
+_TASK_ASSIGNED_NAME = "Task Assigned"
+_TASK_ASSIGNED_SUBJECT = "New task for you: {{ task.title }}"
+_TASK_ASSIGNED_BODY = (
+    "Hi {{ assignee.full_name }},\n\n"
+    "You've been assigned a new task in {{ org.name }}:\n\n"
+    "  Task:     {{ task.title }}\n"
+    "  Due:      {{ task.due_at }}\n"
+    "  Priority: {{ task.priority }}\n\n"
+    "{{ task.description }}\n\n"
+    "Open the CRM to see the full details.\n\n"
+    "— The {{ org.name }} team"
+)
+
+_TASK_COMPLETED_NAME = "Task Completed"
+_TASK_COMPLETED_SUBJECT = "Task completed: {{ task.title }}"
+_TASK_COMPLETED_BODY = (
+    "Hi {{ assignee.full_name }},\n\n"
+    "The following task has been marked complete in {{ org.name }}:\n\n"
+    "  Task:     {{ task.title }}\n"
+    "  Due:      {{ task.due_at }}\n"
+    "  Priority: {{ task.priority }}\n\n"
+    "No further action needed.\n\n"
+    "— The {{ org.name }} team"
+)
+
 
 async def seed_user_welcome_template(
     session: AsyncSession,
@@ -585,6 +610,62 @@ async def seed_contact_birthday_template(
     )
 
 
+async def seed_task_assigned_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> MessageTemplate:
+    """Email notification — fires from the "Task Assigned" preset
+    workflow when a task lands on a user (either at creation with an
+    explicit assignee, on PATCH that changes assigned_to_id, or from
+    bulk reassign).
+
+    Reuses the shared email-invoice shaper because the column shape
+    is identical (transactional category, subject set,
+    ``external_status=n_a``)."""
+    return await _seed_email_invoice_template(
+        session,
+        org_id=org_id,
+        name=_TASK_ASSIGNED_NAME,
+        subject=_TASK_ASSIGNED_SUBJECT,
+        body=_TASK_ASSIGNED_BODY,
+        variables=[
+            "assignee.full_name",
+            "task.title",
+            "task.due_at",
+            "task.priority",
+            "task.description",
+            "org.name",
+        ],
+        change_note="seeded by tasks-triggers track (Task Assigned)",
+    )
+
+
+async def seed_task_completed_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> MessageTemplate:
+    """Email notification — fires from the "Task Completed" preset
+    workflow when a task's status flips to ``done`` (via PATCH or
+    bulk mark-done)."""
+    return await _seed_email_invoice_template(
+        session,
+        org_id=org_id,
+        name=_TASK_COMPLETED_NAME,
+        subject=_TASK_COMPLETED_SUBJECT,
+        body=_TASK_COMPLETED_BODY,
+        variables=[
+            "assignee.full_name",
+            "task.title",
+            "task.due_at",
+            "task.priority",
+            "org.name",
+        ],
+        change_note="seeded by tasks-triggers track (Task Completed)",
+    )
+
+
 async def seed_lead_stale_30d_template(
     session: AsyncSession,
     *,
@@ -617,5 +698,7 @@ __all__ = [
     "seed_invoice_sent_template",
     "seed_lead_confirmation_template",
     "seed_lead_stale_30d_template",
+    "seed_task_assigned_template",
+    "seed_task_completed_template",
     "seed_user_welcome_template",
 ]

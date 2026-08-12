@@ -312,6 +312,28 @@ _PRESET_SPECS: list[_PresetSpec] = [
         recipient="contact.email",
         template_seeder="seed_lead_stale_30d_template",
     ),
+    _PresetSpec(
+        name="Task Assigned",
+        event_type="task.assigned",
+        channel="email",
+        node_type="send.email",
+        # Recipient is the assignee, whose email is embedded in the
+        # trigger payload at `assignee.email` by the tasks publisher.
+        # `custom` walks the payload; no new resolver code needed.
+        recipient={"kind": "custom", "path": "assignee.email"},
+        template_seeder="seed_task_assigned_template",
+    ),
+    _PresetSpec(
+        name="Task Completed",
+        event_type="task.completed",
+        channel="email",
+        node_type="send.email",
+        # Same recipient shape as Task Assigned — the task's assignee
+        # is who should hear about the completion so they see the
+        # confirmation in their inbox alongside the create email.
+        recipient={"kind": "custom", "path": "assignee.email"},
+        template_seeder="seed_task_completed_template",
+    ),
 ]
 
 # Sentinel category so the workflows page + backfill migration can
