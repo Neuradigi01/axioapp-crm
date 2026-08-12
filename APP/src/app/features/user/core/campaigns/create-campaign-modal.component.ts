@@ -48,6 +48,7 @@ import {
   TemplatesApiService,
 } from '../templates/templates-api.service';
 import { TemplateStatusBadgeComponent } from '../templates/template-status-badge.component';
+import { FieldErrorComponent } from '../shared/forms/field-error.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 
@@ -138,6 +139,7 @@ const _TEMPLATE_CHANNELS: ReadonlySet<ConversationChannel> = new Set<Conversatio
     TemplateStatusBadgeComponent,
     MobileSelectComponent,
     MobileDateTimeComponent,
+    FieldErrorComponent,
   ],
   templateUrl: './create-campaign-modal.component.html',
 })

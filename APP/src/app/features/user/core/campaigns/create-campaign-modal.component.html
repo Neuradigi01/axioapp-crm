@@ -44,8 +44,6 @@
     <form [formGroup]="form" (ngSubmit)="save()" class="space-y-3">
       @if (step() === 1) {
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          @let nameCtrl = form.controls.name;
-          @let channelCtrl = form.controls.channel;
           <label class="block text-sm">
             <span class="block text-xs font-medium text-muted">
               Name <span class="text-red-500">*</span>
@@ -53,18 +51,12 @@
             <input
               type="text"
               formControlName="name"
-              [class]="
-                'mt-1 block w-full rounded-lg border bg-surface px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 ' +
-                (nameCtrl.touched && nameCtrl.invalid
-                  ? 'border-red-500/40 focus:border-red-500 focus:ring-red-500'
-                  : 'border-subtle focus:border-muted focus:ring-accent')
-              "
+              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
-            @if (nameCtrl.touched && nameCtrl.invalid) {
-              <span class="mt-0.5 block text-[11px] text-red-500">
-                Give the campaign a name so you can find it later.
-              </span>
-            }
+            <crm-field-error
+              [control]="form.controls.name"
+              message="Give the campaign a name so you can find it later."
+            />
           </label>
           <label class="block text-sm">
             <span class="block text-xs font-medium text-muted">
@@ -73,11 +65,10 @@
             <div class="mt-1">
               <crm-mobile-select formControlName="channel" [options]="channels" />
             </div>
-            @if (channelCtrl.touched && channelCtrl.invalid) {
-              <span class="mt-0.5 block text-[11px] text-red-500">
-                Pick WhatsApp or Email — this can't be changed after save.
-              </span>
-            }
+            <crm-field-error
+              [control]="form.controls.channel"
+              message="Pick WhatsApp or Email — this can't be changed after save."
+            />
           </label>
         </div>
 
@@ -457,6 +448,10 @@
                       </option>
                     }
                   </select>
+                  <crm-field-error
+                    [control]="form.controls.email_account_id"
+                    message="Pick a verified mailbox to send from."
+                  />
                 </label>
                 <label class="block text-sm">
                   <span class="block text-xs font-medium text-muted">
@@ -473,6 +468,10 @@
                   <span class="mt-0.5 block text-[10px] text-muted">
                     Shown in inbox before the address.
                   </span>
+                  <crm-field-error
+                    [control]="form.controls.sender_name"
+                    message="Enter a sender name — this shows in the inbox before the address."
+                  />
                 </label>
               </div>
 
@@ -518,6 +517,10 @@
                   maxlength="998"
                   [placeholder]="subjectPlaceholder"
                   class="block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                <crm-field-error
+                  [control]="form.controls.subject"
+                  message="Enter a subject — this is the first thing recipients see in their inbox."
                 />
                 <span class="mt-1 flex items-center gap-2 text-[10px] text-muted">
                   Insert variable:

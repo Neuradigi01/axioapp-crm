@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { FieldErrorComponent } from '../../shared/forms/field-error.component';
 import {
   MobileSelectComponent,
   MobileSelectOption,
@@ -105,6 +106,7 @@ function waNameValidator(control: AbstractControl): { waName: true } | null {
     TestSendModalComponent,
     VersionsDrawerComponent,
     MobileSelectComponent,
+    FieldErrorComponent,
   ],
   templateUrl: './template-editor.page.html',
 })

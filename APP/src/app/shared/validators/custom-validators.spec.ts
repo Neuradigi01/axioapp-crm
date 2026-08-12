@@ -44,12 +44,27 @@ describe('shared validators', () => {
       }
     });
 
-    it('rejects digits, emoji, symbols, too short', () => {
-      for (const v of ['John123', '😀', '<script>', 'J', 'A@B', '  ']) {
+    it('rejects digits, emoji, symbols with "disallowed characters" reason', () => {
+      for (const v of ['John123', '😀', '<script>', 'A@B']) {
         expect(nameValidator(ctl(v)))
           .withContext(v)
           .toEqual({ nameInvalid: REASON.invalidName });
       }
+    });
+
+    it('rejects too-short names with a length-specific reason', () => {
+      // 'J' is a valid character but fails the 2-char minimum; the
+      // error must call that out instead of blaming the character set.
+      for (const v of ['J', 'a', '  ']) {
+        expect(nameValidator(ctl(v)))
+          .withContext(v)
+          .toEqual({ nameInvalid: REASON.nameTooShort });
+      }
+    });
+
+    it('rejects too-long names with a length-specific reason', () => {
+      const v = 'A'.repeat(101);
+      expect(nameValidator(ctl(v))).toEqual({ nameInvalid: REASON.nameTooLong });
     });
   });
 

@@ -21,6 +21,7 @@ import { BaseFormModalComponent } from '../shared/components/base-form-modal.com
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { FieldErrorComponent } from '../shared/forms/field-error.component';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
@@ -80,6 +81,7 @@ const FOLLOWUP_VALUES: readonly string[] = FOLLOWUP_OPTIONS.map((o) => o.value);
     DynamicFormComponent,
     MobileSelectComponent,
     MobileDateTimeComponent,
+    FieldErrorComponent,
   ],
   templateUrl: './task-form-modal.component.html',
 })

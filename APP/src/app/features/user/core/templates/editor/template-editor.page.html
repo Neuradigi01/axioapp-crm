@@ -397,7 +397,9 @@
           class="flex flex-col gap-3 rounded-xl border border-subtle bg-surface p-4"
         >
           <label class="block">
-            <span class="text-xs font-medium text-default">Template name</span>
+            <span class="text-xs font-medium text-default">
+              Template name <span class="text-red-500">*</span>
+            </span>
             <input
               type="text"
               formControlName="name"
@@ -405,6 +407,10 @@
               class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm focus:border-muted focus:outline-none"
               [class.border-red-400]="waNameInvalid()"
               placeholder="e.g. welcome_lead"
+            />
+            <crm-field-error
+              [control]="headerForm.controls.name"
+              message="Give the template a name."
             />
             @if (channel() === 'whatsapp') {
               <p class="mt-1 text-[10px] text-muted">
