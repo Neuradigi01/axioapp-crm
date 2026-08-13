@@ -37,6 +37,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.app.shared.db import Base
 from src.app.shared.orm import TenantScoped
 
+# tasks/chatbot-builder Step 1 — flag for auto-created contacts from
+# unknown inbound WhatsApp numbers. A nightly Celery sweeper deletes
+# placeholders with no messages in 30 days AND no active bot runs.
+# See Case #23 in ``tasks/chatbot-builder/README.md``.
+
 # Step 22 — DPDP-ready opt-in state machine. Defined here so both
 # Contact and ConsentEvent share one ENUM definition and the
 # campaign send guard can import the literal set without an ORM dep.
@@ -225,6 +230,16 @@ class Contact(Base, TenantScoped):
     anonymised_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+    # tasks/chatbot-builder Step 1 — auto-created contact from an
+    # unknown inbound WhatsApp number. Nightly Celery sweeper deletes
+    # placeholders with no messages in 30 days AND no active bot runs.
+    # Kept as an authoritative column (not custom_data) because the
+    # sweeper query needs to hit an index; see Case #23.
+    is_placeholder: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -262,6 +262,16 @@ class Message(Base, TenantScoped):
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # tasks/chatbot-builder Step 1 — populated on bot-authored
+    # outbounds so the human-takeover detection can distinguish "the
+    # bot sent this" from "a real user sent this" without a mutable
+    # sender_type enum. SET NULL on run delete so the message survives
+    # if the run is garbage-collected.
+    chatbot_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_chatbot_runs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
