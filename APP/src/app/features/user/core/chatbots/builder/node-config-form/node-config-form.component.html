@@ -12,7 +12,7 @@
             [value]="getText(field.key)"
             (input)="onText(field.key, $any($event.target).value)"
             [placeholder]="field.placeholder ?? ''"
-            [maxlength]="field.maxLength ?? null"
+            [attr.maxlength]="field.maxLength ?? null"
             class="w-full px-2 py-1.5 text-xs bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent"
           />
         }
@@ -22,7 +22,7 @@
             [value]="getText(field.key)"
             (input)="onText(field.key, $any($event.target).value)"
             [placeholder]="field.placeholder ?? ''"
-            [maxlength]="field.maxLength ?? null"
+            [attr.maxlength]="field.maxLength ?? null"
             [rows]="field.rows ?? 3"
             class="w-full px-2 py-1.5 text-xs bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent resize-y"
           ></textarea>
