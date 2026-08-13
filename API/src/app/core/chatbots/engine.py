@@ -473,15 +473,20 @@ async def resume_run(
     if run.status != "parked":
         return {"result": "not_parked", "status": run.status}
 
+    ctx = dict(run.context or {})
     if resume_event:
-        ctx = dict(run.context or {})
         if "text" in resume_event:
             ctx["last_inbound_text"] = resume_event.get("text")
         if "message_id" in resume_event:
             ctx["last_inbound_message_id"] = resume_event.get("message_id")
-        # Drop the park key so a stale resume doesn't loop.
-        ctx.pop("park_key", None)
-        run.context = ctx
+    # Drop the park key so a stale resume doesn't loop.
+    ctx.pop("park_key", None)
+    # Flag the resume so node handlers (text_button, list, ask_*)
+    # know to interpret ``last_inbound_text`` as a reply to their
+    # parked prompt rather than the initial trigger. Handlers clear
+    # the flag before advancing to the next node.
+    ctx["resumed_from_park"] = True
+    run.context = ctx
 
     run.status = "running"
     await session.commit()

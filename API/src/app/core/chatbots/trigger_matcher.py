@@ -354,13 +354,19 @@ async def on_inbound(envelope: dict[str, Any]) -> None:
                 )
 
             # --- Idempotency guard (Case #1) --------------------------
-            active_exists = await _dal.has_active_run_for_bot_conversation(
+            # If an active run already exists for this bot on this
+            # conversation, wake the parked run with the new inbound
+            # instead of starting a fresh run. Step 6's resume_run
+            # sets ``context.resumed_from_park`` so the parked node
+            # handler interprets ``last_inbound_text`` as the reply
+            # to its prompt.
+            active_run = await _dal.get_active_run_for_bot_conversation(
                 session,
                 org_id=org_id,
                 bot_id=winner.id,
                 conversation_id=conversation_id,
             )
-            if active_exists:
+            if active_run is not None:
                 _dal.insert_trigger_diagnostic(
                     session,
                     org_id=org_id,
@@ -368,9 +374,17 @@ async def on_inbound(envelope: dict[str, Any]) -> None:
                     conversation_id=conversation_id,
                     message_id=message_id,
                     reason="active_run_exists",
-                    detail="inbound will resume the parked run in Step 6",
+                    detail=f"resuming parked run {active_run.id}",
                 )
                 await session.commit()
+                await _engine.resume_run(
+                    session,
+                    run_id=active_run.id,
+                    resume_event={
+                        "text": text,
+                        "message_id": str(message_id) if message_id else None,
+                    },
+                )
                 return
 
             # --- Fire the run ---------------------------------------

@@ -164,6 +164,8 @@ _TRANSACTION_EXCEPTIONS: dict[str, str] = {
     "core/chatbots/engine.py": "Chatbot execution engine (own txn / session)",
     "core/chatbots/trigger_matcher.py": "Chatbot bus subscriber + matcher (own txn)",
     "core/chatbots/tasks.py": "Celery chatbot workers (process_step + sweep_test_runs)",
+    "core/chatbots/channel_bridge.py": "Bot-outbound sender (own txn, mirrors WA auto_reply.py)",
+    "core/chatbots/nodes/template.py": "Template node retags outbound Message as bot-authored",
     # --- Pack billing module — router-only PDF generation shell, completion deferred
     "packs/furniture/modules/billing/router.py": "Pack billing PDF stub (Phase 4 follow-up)",
 }
@@ -313,6 +315,7 @@ _HELPER_CRUD_EXCEPTIONS: dict[str, str] = {
     "core/chatbots/engine.py": "Chatbot execution engine (CRUD on runs / step_runs)",
     "core/chatbots/trigger_matcher.py": "Chatbot bus subscriber (lookup + start_run + diagnostics)",
     "core/chatbots/tasks.py": "Celery chatbot workers (sweeps + step processor)",
+    "core/chatbots/channel_bridge.py": "Bot-outbound sender (Message insert + conv update)",
 }
 
 

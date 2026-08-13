@@ -32,3 +32,10 @@ class ChatbotVersionConflict(ChatbotError):
 
 class ChatbotNotFound(ChatbotError):
     """No bot with the given id in the requested org. 404."""
+
+
+class NodeNotAvailable(ChatbotError):
+    """A node type is present in the palette but its runtime is not
+    yet configured (e.g. WA Commerce catalog / product nodes without
+    a Meta Commerce catalog configured). Handler returns an errored
+    NodeResult with this reason; engine cancels the run."""

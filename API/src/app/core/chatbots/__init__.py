@@ -43,3 +43,10 @@ from src.app.core.chatbots import models as _models  # noqa: F401
 from src.app.core.chatbots.trigger_matcher import register_bus_subscribers
 
 register_bus_subscribers()
+
+# tasks/chatbot-builder Step 7 — side-effect import of the nodes
+# package registers every node handler against the engine's
+# NODE_REGISTRY. Import ordering matters: engine → matcher →
+# nodes, so the registry exists before any node file calls
+# `register_node`.
+from src.app.core.chatbots import nodes as _nodes_pkg  # noqa: F401,E402

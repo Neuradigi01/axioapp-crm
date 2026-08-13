@@ -347,17 +347,39 @@ async def has_active_run_for_bot_conversation(
     ``(bot_id, conversation_id)`` in this org. Idempotency guard —
     Case #1 in the README: rapid duplicate inbounds must not spawn
     parallel runs."""
+    return (
+        await get_active_run_for_bot_conversation(
+            session,
+            org_id=org_id,
+            bot_id=bot_id,
+            conversation_id=conversation_id,
+        )
+    ) is not None
+
+
+async def get_active_run_for_bot_conversation(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    bot_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+) -> ChatbotRun | None:
+    """Return the active (running / parked) run for this
+    (bot, conversation) in this org, or None. Used by the matcher
+    to fire ``engine.resume_run`` on rapid duplicate inbounds
+    (Case #1)."""
     stmt = (
-        select(ChatbotRun.id)
+        select(ChatbotRun)
         .where(
             ChatbotRun.org_id == org_id,
             ChatbotRun.chatbot_id == bot_id,
             ChatbotRun.conversation_id == conversation_id,
             ChatbotRun.status.in_(("running", "parked")),
         )
+        .order_by(ChatbotRun.started_at.desc())
         .limit(1)
     )
-    return (await session.execute(stmt)).scalar_one_or_none() is not None
+    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 def insert_trigger_diagnostic(
@@ -501,6 +523,25 @@ async def increment_conversation_meter(
     )
     row = result.first()
     return int(row[0]) if row else None
+
+
+async def load_conversation_for_bot(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID | None,
+) -> "Conversation | None":  # noqa: UP037  (str-annotated to keep model import local)
+    """Load one conversation row for the node handlers. Returns
+    None for a null id (test-fire simulated runs may have no linked
+    conversation)."""
+    if conversation_id is None:
+        return None
+    from src.app.core.conversations.models import Conversation
+
+    return (
+        await session.execute(
+            select(Conversation).where(Conversation.id == conversation_id)
+        )
+    ).scalar_one_or_none()
 
 
 async def list_step_runs_for_run(
