@@ -16,7 +16,8 @@ import { extractApiError } from '@core/services/api-error.util';
 
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
 import { ChatbotsApiService, TriggerConfig } from '../chatbots-api.service';
-import { CanvasStateService } from './canvas-state.service';
+import { CanvasNode, CanvasStateService } from './canvas-state.service';
+import { NodeConfigFormComponent } from './node-config-form/node-config-form.component';
 import { NodeTypeMeta, getNodeType } from './node-type-registry';
 import { ChatbotPaletteComponent } from './palette/palette.component';
 import { TriggerConfigModalComponent } from './trigger-modal/trigger-config.modal';
@@ -50,6 +51,7 @@ import { TriggerConfigModalComponent } from './trigger-modal/trigger-config.moda
     ChatbotPaletteComponent,
     TriggerConfigModalComponent,
     ConfirmDialogComponent,
+    NodeConfigFormComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './builder.page.html',
@@ -68,10 +70,91 @@ export class ChatbotBuilderPageComponent {
 
   readonly bot = this.canvas.bot;
   readonly nodes = this.canvas.nodes;
+  readonly edges = this.canvas.edges;
   readonly triggerConfig = this.canvas.triggerConfig;
   readonly selectedNodeId = this.canvas.selectedNodeId;
   readonly dirty = this.canvas.dirty;
   readonly saving = this.canvas.saving;
+  readonly pendingSourceId = this.canvas.pendingSourceId;
+
+  /** Layout constants matching the template — kept here so the SVG
+   *  edge computation and the DOM stay in sync. Node position `x/y`
+   *  in the graph is anchored at the top-left of the card AFTER the
+   *  trigger-column offset (`TRIGGER_LEFT + TRIGGER_WIDTH + GAP`). */
+  private readonly CANVAS_PAD = 24;
+  private readonly TRIGGER_LEFT = this.CANVAS_PAD;
+  private readonly TRIGGER_TOP = this.CANVAS_PAD;
+  private readonly TRIGGER_WIDTH = 320;
+  private readonly TRIGGER_HEIGHT = 118;
+  private readonly NODE_LEFT_OFFSET = 380;
+  private readonly NODE_WIDTH = 320;
+  private readonly NODE_HEADER_H = 44;
+
+  /** Where each node's LEFT (input) port lives, absolute canvas
+   *  coordinates. */
+  inputPortPos(node: CanvasNode): { x: number; y: number } {
+    return {
+      x: this.NODE_LEFT_OFFSET + node.position.x,
+      y: node.position.y + this.NODE_HEADER_H / 2,
+    };
+  }
+
+  /** Where each node's RIGHT (output) port lives, per label. Labeled
+   *  ports are stacked below the header at fixed row heights so a
+   *  card of the same width has predictable port coordinates. */
+  outputPortPos(node: CanvasNode, labelIndex = 0): { x: number; y: number } {
+    return {
+      x: this.NODE_LEFT_OFFSET + node.position.x + this.NODE_WIDTH,
+      y: node.position.y + this.NODE_HEADER_H / 2 + labelIndex * 22,
+    };
+  }
+
+  triggerPortPos(): { x: number; y: number } {
+    return {
+      x: this.TRIGGER_LEFT + this.TRIGGER_WIDTH,
+      y: this.TRIGGER_TOP + this.TRIGGER_HEIGHT / 2,
+    };
+  }
+
+  /** Build the SVG path `d` attribute for a smooth cubic between two
+   *  points — control points offset horizontally by half the distance
+   *  so edges bend cleanly right-to-left even when nodes overlap
+   *  vertically. */
+  edgePath(from: { x: number; y: number }, to: { x: number; y: number }): string {
+    const dx = Math.max(60, (to.x - from.x) / 2);
+    return `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`;
+  }
+
+  /** For every persisted edge, resolve its source + target port coords
+   *  into a renderable path spec. Returns `null` for orphan edges
+   *  (source/target not on the canvas any more). */
+  readonly renderedEdges = computed(() => {
+    const nodesById = new Map(this.nodes().map((n) => [n.id, n]));
+    return this.edges()
+      .map((e) => {
+        const target = nodesById.get(e.target);
+        if (!target) return null;
+        const to = this.inputPortPos(target);
+        const from =
+          e.source === 'trigger'
+            ? this.triggerPortPos()
+            : (() => {
+                const src = nodesById.get(e.source);
+                if (!src) return null;
+                const meta = getNodeType(src.type);
+                const labels = meta?.labels ?? [];
+                const idx = e.label && labels.length ? Math.max(0, labels.indexOf(e.label)) : 0;
+                return this.outputPortPos(src, idx);
+              })();
+        if (!from) return null;
+        return { id: e.id, label: e.label ?? null, d: this.edgePath(from, to) };
+      })
+      .filter((x): x is { id: string; label: string | null; d: string } => x !== null);
+  });
+
+  /** Show a "click a target to connect" hint while a source port is
+   *  active. */
+  readonly isConnecting = computed(() => this.pendingSourceId() !== null);
 
   readonly triggerSummary = computed(() => {
     const cfg = this.triggerConfig();
@@ -171,7 +254,48 @@ export class ChatbotBuilderPageComponent {
   }
 
   selectNode(nodeId: string): void {
+    // If a source port is pending, treat clicks on nodes as connect-
+    // completion attempts. Any click on the card itself is treated as
+    // "connect to this node's input" for ergonomics.
+    if (this.pendingSourceId()) {
+      this.canvas.completeConnect(nodeId);
+      return;
+    }
     this.canvas.selectedNodeId.set(nodeId);
+  }
+
+  onOutputPortClick(sourceId: string, label: string | null, evt: MouseEvent): void {
+    evt.stopPropagation();
+    if (this.pendingSourceId() === sourceId && this.canvas.pendingSourceLabel() === label) {
+      this.canvas.cancelConnect();
+      return;
+    }
+    this.canvas.beginConnect(sourceId, label);
+  }
+
+  onInputPortClick(targetId: string, evt: MouseEvent): void {
+    evt.stopPropagation();
+    if (!this.pendingSourceId()) return;
+    this.canvas.completeConnect(targetId);
+  }
+
+  /** Click on empty canvas — clears any pending connect gesture and
+   *  deselects the current node. */
+  onCanvasClick(): void {
+    if (this.pendingSourceId()) {
+      this.canvas.cancelConnect();
+      return;
+    }
+    this.canvas.selectedNodeId.set(null);
+  }
+
+  deleteEdge(edgeId: string, evt: MouseEvent): void {
+    evt.stopPropagation();
+    this.canvas.deleteEdge(edgeId);
+  }
+
+  patchNodeConfig(nodeId: string, patch: Record<string, unknown>): void {
+    this.canvas.updateNodeConfig(nodeId, patch);
   }
 
   deleteNode(nodeId: string, evt: MouseEvent): void {

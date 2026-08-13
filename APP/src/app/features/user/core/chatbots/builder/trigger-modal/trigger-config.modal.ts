@@ -10,7 +10,20 @@ import {
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { MobileSelectComponent } from '../../../shared/forms/mobile-select.component';
 import { TriggerConfig } from '../../chatbots-api.service';
+
+const CHANNEL_OPTIONS = [
+  { value: 'any', label: 'Any channel (WhatsApp + Email)' },
+  { value: 'whatsapp', label: 'WhatsApp only' },
+  { value: 'email', label: 'Email only' },
+];
+
+const MODE_OPTIONS = [
+  { value: 'any', label: 'Any inbound message (no filter)' },
+  { value: 'keyword', label: 'Keyword match' },
+  { value: 'regex', label: 'Regex pattern' },
+];
 
 /**
  * Bot-trigger configuration modal (tasks/chatbot-builder Step 13 /
@@ -23,7 +36,7 @@ import { TriggerConfig } from '../../chatbots-api.service';
 @Component({
   selector: 'app-chatbot-trigger-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -59,30 +72,22 @@ import { TriggerConfig } from '../../chatbots-api.service';
             <label class="block text-[11px] font-medium text-muted mb-1.5 uppercase tracking-wide"
               >Channel</label
             >
-            <select
-              [ngModel]="channel()"
-              (ngModelChange)="channel.set($event)"
-              class="w-full px-3 py-2 text-sm bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent"
-            >
-              <option value="any">Any channel (WhatsApp + Email)</option>
-              <option value="whatsapp">WhatsApp only</option>
-              <option value="email">Email only</option>
-            </select>
+            <crm-mobile-select
+              [options]="channelOptions"
+              [value]="channel()"
+              (valueChange)="channel.set($any($event))"
+            />
           </div>
 
           <div>
             <label class="block text-[11px] font-medium text-muted mb-1.5 uppercase tracking-wide"
               >Match mode</label
             >
-            <select
-              [ngModel]="mode()"
-              (ngModelChange)="mode.set($event)"
-              class="w-full px-3 py-2 text-sm bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent"
-            >
-              <option value="any">Any inbound message (no filter)</option>
-              <option value="keyword">Keyword match</option>
-              <option value="regex">Regex pattern</option>
-            </select>
+            <crm-mobile-select
+              [options]="modeOptions"
+              [value]="mode()"
+              (valueChange)="mode.set($any($event))"
+            />
             <p class="text-[11px] text-muted mt-1">
               Keyword match covers most bots. Use regex only for advanced patterns.
             </p>
@@ -205,6 +210,9 @@ export class TriggerConfigModalComponent {
 
   @Output() save = new EventEmitter<TriggerConfig>();
   @Output() close = new EventEmitter<void>();
+
+  readonly channelOptions = CHANNEL_OPTIONS;
+  readonly modeOptions = MODE_OPTIONS;
 
   readonly channel = signal<TriggerConfig['channel']>('any');
   readonly mode = signal<TriggerConfig['mode']>('any');

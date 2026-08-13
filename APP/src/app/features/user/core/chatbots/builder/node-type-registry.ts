@@ -14,6 +14,43 @@ export type NodeCategory = 'message' | 'action' | 'crm' | 'ai';
 export type PaletteTab = 'messages' | 'actions';
 export type OutputTopology = 'single' | 'labeled' | 'dynamic';
 
+/**
+ * Schema-driven form field descriptor. One field per `configSchema`
+ * entry; the `NodeConfigFormComponent` renders any schema uniformly.
+ *
+ * `key` uses dot notation (`header_media.type`) so nested defaults
+ * flatten cleanly. Nested arrays of primitives are handled by the
+ * `string_list` field; nested arrays of objects (buttons, list rows)
+ * are handled by dedicated repeaters (`button_list`, `list_rows`).
+ * Complex-shape fields without a dedicated renderer fall back to a
+ * per-field JSON textarea via `type: 'json'`.
+ */
+export type FieldType =
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'select'
+  | 'boolean'
+  | 'string_list'
+  | 'button_list'
+  | 'json';
+
+export interface FieldSchema {
+  key: string;
+  label: string;
+  type: FieldType;
+  help?: string;
+  placeholder?: string;
+  options?: readonly { value: string; label: string }[];
+  min?: number;
+  max?: number;
+  step?: number;
+  rows?: number;
+  maxLength?: number;
+  /** Cap for `button_list` / `string_list` (e.g. WA text_button = 3 buttons). */
+  maxItems?: number;
+}
+
 export interface NodeTypeMeta {
   type: string;
   label: string;
@@ -33,6 +70,10 @@ export interface NodeTypeMeta {
   beta?: boolean;
   /** Default config the palette drops onto the canvas. */
   defaultConfig: Record<string, unknown>;
+  /** Form fields rendered on the node card. When absent the node
+   *  falls back to a raw-JSON textarea (transitional — every node
+   *  gets a schema in the follow-up push). */
+  configSchema?: readonly FieldSchema[];
 }
 
 // prettier-ignore
@@ -46,6 +87,12 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
       body: 'How can I help?',
       buttons: [{ id: 'yes', title: 'Yes' }, { id: 'no', title: 'No' }],
     },
+    configSchema: [
+      { key: 'body', label: 'Message', type: 'textarea', rows: 3, maxLength: 1024,
+        placeholder: 'Enter message here', help: 'Max 1024 characters.' },
+      { key: 'buttons', label: 'Buttons', type: 'button_list', maxItems: 3,
+        help: 'Up to 3 reply buttons. Each button becomes an output port.' },
+    ],
   },
   {
     type: 'media_button', label: 'Media Button', icon: 'image',
@@ -56,6 +103,17 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
       header_media: { type: 'image', media_id: '' },
       buttons: [{ id: 'yes', title: 'Yes' }, { id: 'no', title: 'No' }],
     },
+    configSchema: [
+      { key: 'header_media.type', label: 'Media type', type: 'select', options: [
+        { value: 'image', label: 'Image' }, { value: 'video', label: 'Video' },
+        { value: 'document', label: 'Document' },
+      ] },
+      { key: 'header_media.media_id', label: 'Media ID', type: 'text',
+        placeholder: 'WA media ID or file token',
+        help: 'Upload flow lands in a follow-up; paste an ID for now.' },
+      { key: 'body', label: 'Message', type: 'textarea', rows: 3, maxLength: 1024 },
+      { key: 'buttons', label: 'Buttons', type: 'button_list', maxItems: 3 },
+    ],
   },
   {
     type: 'list', label: 'List', icon: 'list',
@@ -104,6 +162,23 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
       expected_format: 'text', max_retries: 2, timeout_seconds: 79200,
       retry_message: "Sorry, I didn't catch that — please try again.",
     },
+    configSchema: [
+      { key: 'prompt', label: 'Question', type: 'textarea', rows: 2, maxLength: 1024,
+        placeholder: "e.g. What's your name?" },
+      { key: 'save_to', label: 'Save answer to', type: 'text',
+        placeholder: 'contact.full_name',
+        help: 'Field path: contact.<field> or lead.<field> or contact.custom.<key>.' },
+      { key: 'expected_format', label: 'Expected format', type: 'select', options: [
+        { value: 'text', label: 'Free text' }, { value: 'email', label: 'Email' },
+        { value: 'phone', label: 'Phone number' }, { value: 'number', label: 'Number' },
+        { value: 'date', label: 'Date' }, { value: 'url', label: 'URL' },
+      ] },
+      { key: 'max_retries', label: 'Max retries on invalid', type: 'number', min: 0, max: 5, step: 1 },
+      { key: 'timeout_seconds', label: 'Timeout (seconds)', type: 'number', min: 30, step: 60,
+        help: 'How long to wait for a reply before firing the "timeout" branch.' },
+      { key: 'retry_message', label: 'Retry message', type: 'textarea', rows: 2, maxLength: 1024,
+        help: 'Sent when the reply doesn\'t match the expected format.' },
+    ],
   },
   {
     type: 'ask_address', label: 'Ask Address', icon: 'map-pin',
@@ -155,18 +230,43 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
     category: 'action', paletteTab: 'actions', outputs: 'single',
     hint: 'Pause for N seconds / minutes / hours / days.',
     defaultConfig: { amount: 5, unit: 'minutes' },
+    configSchema: [
+      { key: 'amount', label: 'Wait for', type: 'number', min: 1, step: 1 },
+      { key: 'unit', label: 'Unit', type: 'select', options: [
+        { value: 'seconds', label: 'Seconds' }, { value: 'minutes', label: 'Minutes' },
+        { value: 'hours', label: 'Hours' }, { value: 'days', label: 'Days' },
+      ] },
+    ],
   },
   {
     type: 'add_tag', label: 'Add Tag', icon: 'tag',
     category: 'action', paletteTab: 'actions', outputs: 'single',
     hint: 'Add or remove tags on the contact.',
     defaultConfig: { entity: 'contact', operation: 'add', tags: [] },
+    configSchema: [
+      { key: 'entity', label: 'Entity', type: 'select', options: [
+        { value: 'contact', label: 'Contact' }, { value: 'lead', label: 'Lead' },
+      ] },
+      { key: 'operation', label: 'Operation', type: 'select', options: [
+        { value: 'add', label: 'Add tags' }, { value: 'remove', label: 'Remove tags' },
+      ] },
+      { key: 'tags', label: 'Tags', type: 'string_list',
+        placeholder: 'Type a tag, press Enter' },
+    ],
   },
   {
     type: 'set_custom_field', label: 'Set Custom Field', icon: 'pencil',
     category: 'action', paletteTab: 'actions', outputs: 'single',
     hint: 'Write a static or templated value to a field.',
     defaultConfig: { save_to: 'contact.custom.', value: '' },
+    configSchema: [
+      { key: 'save_to', label: 'Save to field', type: 'text',
+        placeholder: 'contact.custom.lead_score',
+        help: 'Format: contact.<field>, lead.<field>, or contact.custom.<key>.' },
+      { key: 'value', label: 'Value', type: 'textarea', rows: 2,
+        placeholder: 'A literal value or {{template.expression}}',
+        help: 'Static text or a Jinja-style template referencing answers / contact / lead.' },
+    ],
   },
   {
     type: 'api_request', label: 'API Request', icon: 'globe',

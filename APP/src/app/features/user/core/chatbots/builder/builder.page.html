@@ -82,13 +82,56 @@
           );
           background-size: 22px 22px;
         "
+        (click)="onCanvasClick()"
       >
-        <div class="p-6 min-w-[1200px] min-h-[900px] relative">
-          <!-- Trigger card (always at top) -->
+        @if (isConnecting()) {
+          <div
+            class="sticky top-2 z-30 mx-auto w-fit px-3 py-1.5 rounded-full text-[11px] font-medium bg-accent-soft text-accent border border-accent/40 shadow-md"
+          >
+            Click a node's left dot to connect · Esc / click canvas to cancel
+          </div>
+        }
+
+        <div class="p-6 min-w-[1400px] min-h-[900px] relative">
+          <!-- Edges — SVG overlay, behind the node cards -->
+          <svg
+            class="absolute inset-0 pointer-events-none"
+            width="100%"
+            height="100%"
+            style="overflow: visible"
+          >
+            <defs>
+              <marker
+                id="chatbot-edge-arrow"
+                viewBox="0 0 10 10"
+                refX="8"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+              </marker>
+            </defs>
+            <g class="text-accent">
+              @for (edge of renderedEdges(); track edge.id) {
+                <path
+                  [attr.d]="edge.d"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  fill="none"
+                  marker-end="url(#chatbot-edge-arrow)"
+                  opacity="0.9"
+                />
+              }
+            </g>
+          </svg>
+
+          <!-- Trigger card (always at top-left) -->
           <button
             type="button"
-            (click)="openTriggerModal()"
-            class="block w-[320px] p-4 rounded-xl border-2 border-accent bg-accent-soft text-left hover:brightness-110 transition-colors"
+            (click)="openTriggerModal(); $event.stopPropagation()"
+            class="relative block w-[320px] p-4 rounded-xl border-2 border-accent bg-accent-soft text-left hover:brightness-110 transition-colors"
           >
             <div class="flex items-center gap-2">
               <span
@@ -118,6 +161,19 @@
             <div class="mt-2 text-[10px] text-muted">
               Channel: {{ triggerConfig()?.channel ?? 'any' }}
             </div>
+
+            <!-- Trigger output port (single) -->
+            <span
+              (click)="onOutputPortClick('trigger', null, $event)"
+              [class]="
+                'absolute right-[-8px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-accent cursor-pointer transition-colors ' +
+                (pendingSourceId() === 'trigger'
+                  ? 'bg-accent'
+                  : 'bg-surface hover:bg-accent hover:border-accent')
+              "
+              title="Drag from here to a node's left dot to connect"
+              aria-label="Trigger output port"
+            ></span>
           </button>
 
           <!-- Nodes -->
@@ -131,10 +187,10 @@
                   ? 'border-accent ring-2 ring-accent/20'
                   : 'border-subtle hover:border-default')
               "
-              (click)="selectNode(node.id)"
+              (click)="selectNode(node.id); $event.stopPropagation()"
             >
               <!-- Node header -->
-              <div class="flex items-center gap-2 px-3 py-2.5 border-b border-subtle">
+              <div class="flex items-center gap-2 px-3 py-2.5 border-b border-subtle relative">
                 <lucide-icon
                   [name]="nodeMeta(node.type)?.icon ?? 'list'"
                   size="14"
@@ -158,25 +214,91 @@
                 >
                   <lucide-icon name="trash-2" size="12"></lucide-icon>
                 </button>
+
+                <!-- Input port (left) -->
+                <span
+                  (click)="onInputPortClick(node.id, $event)"
+                  [class]="
+                    'absolute left-[-8px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-subtle cursor-pointer transition-colors ' +
+                    (isConnecting()
+                      ? 'bg-surface ring-2 ring-accent/40 hover:bg-accent hover:border-accent'
+                      : 'bg-surface hover:bg-accent hover:border-accent')
+                  "
+                  title="Click to connect the pending edge to this node"
+                  aria-label="Input port"
+                ></span>
               </div>
 
-              <!-- Node body — v1 raw-JSON config fallback until
-                   Step 14 per-node components land. -->
+              <!-- Node body — schema-driven form when the node type
+                   has a `configSchema`, JSON fallback otherwise (drops
+                   away as we ship remaining schemas in Push 2). -->
               <div class="p-3 space-y-2">
-                <label class="block text-[10px] font-medium text-muted uppercase tracking-wide">
-                  Config (JSON)
-                </label>
-                <textarea
-                  #cfgTextarea
-                  [value]="node.config | json"
-                  (input)="updateNodeConfigJson(node.id, cfgTextarea.value)"
-                  rows="6"
-                  class="w-full px-2 py-2 text-[11px] font-mono bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent resize-y"
-                ></textarea>
-                <p class="text-[10px] text-muted">
-                  Pretty per-node forms land in Step 14. This v1 accepts raw JSON so you can still
-                  build + save valid graphs today.
-                </p>
+                @if (nodeMeta(node.type)?.configSchema; as schema) {
+                  <app-node-config-form
+                    [schema]="schema"
+                    [config]="node.config"
+                    (patch)="patchNodeConfig(node.id, $event)"
+                  ></app-node-config-form>
+                } @else {
+                  <label class="block text-[10px] font-medium text-muted uppercase tracking-wide">
+                    Config (JSON)
+                  </label>
+                  <textarea
+                    #cfgTextarea
+                    [value]="node.config | json"
+                    (input)="updateNodeConfigJson(node.id, cfgTextarea.value)"
+                    rows="6"
+                    class="w-full px-2 py-2 text-[11px] font-mono bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent resize-y"
+                  ></textarea>
+                  <p class="text-[10px] text-muted">
+                    Per-node form for this type lands in the next push — raw JSON works today.
+                  </p>
+                }
+              </div>
+
+              <!-- Output ports — one per label for `labeled`, or a
+                   single generic port for `single` / `dynamic`. Wire-
+                   up for per-button output ports on dynamic types is
+                   a follow-up; for now the whole node has one port
+                   to keep click-to-connect simple. -->
+              <div
+                class="flex flex-col items-end gap-1 px-3 pb-2 pt-1 border-t border-subtle bg-app/40"
+              >
+                @if (
+                  nodeMeta(node.type)?.outputs === 'labeled' && nodeMeta(node.type)?.labels?.length
+                ) {
+                  @for (lbl of nodeMeta(node.type)?.labels ?? []; track lbl; let li = $index) {
+                    <div
+                      class="flex items-center gap-1.5 text-[10px] text-muted relative w-full justify-end"
+                    >
+                      <span>{{ lbl }}</span>
+                      <span
+                        (click)="onOutputPortClick(node.id, lbl, $event)"
+                        [class]="
+                          'w-3 h-3 rounded-full border-2 border-accent cursor-pointer transition-colors ' +
+                          (pendingSourceId() === node.id && canvas.pendingSourceLabel() === lbl
+                            ? 'bg-accent'
+                            : 'bg-surface hover:bg-accent')
+                        "
+                        title="Click to start a connection from this port"
+                        aria-label="Output port"
+                      ></span>
+                    </div>
+                  }
+                } @else {
+                  <div class="flex items-center gap-1.5 text-[10px] text-muted">
+                    <span>next</span>
+                    <span
+                      (click)="onOutputPortClick(node.id, null, $event)"
+                      [class]="
+                        'w-3 h-3 rounded-full border-2 border-accent cursor-pointer transition-colors ' +
+                        (pendingSourceId() === node.id ? 'bg-accent' : 'bg-surface hover:bg-accent')
+                      "
+                      title="Click to start a connection from this port"
+                      aria-label="Output port"
+                    ></span>
+                  </div>
+                }
               </div>
             </div>
           }

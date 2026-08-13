@@ -42,6 +42,15 @@ export class CanvasStateService {
   readonly saving = signal<boolean>(false);
   readonly expectedVersion = signal<number>(1);
 
+  /** Click-to-connect state — set to the source node id (or literal
+   *  `'trigger'`) when the user clicks an output port. The next
+   *  input-port click on a different node closes the pair into an
+   *  edge. Clicking empty canvas / Escape clears it. */
+  readonly pendingSourceId = signal<string | null>(null);
+  /** Optional label for the pending edge (labeled ports carry
+   *  `answered / invalid / timeout / …`). */
+  readonly pendingSourceLabel = signal<string | null>(null);
+
   readonly selectedNode = computed(() => {
     const id = this.selectedNodeId();
     if (!id) return null;
@@ -52,22 +61,36 @@ export class CanvasStateService {
     this.bot.set(bot);
     this.triggerConfig.set({ ...bot.trigger_config });
     const graph = bot.graph ?? { nodes: [], edges: [] };
-    this.nodes.set(
-      (graph.nodes ?? []).map((n) => ({
-        id: n.id,
-        type: n.type,
-        position: n.position ?? { x: 40, y: 40 },
-        config: this.clone(n.config ?? {}),
-      })),
-    );
-    this.edges.set(
-      (graph.edges ?? []).map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        label: e.label ?? null,
-      })),
-    );
+    const loadedNodes = (graph.nodes ?? []).map((n) => ({
+      id: n.id,
+      type: n.type,
+      position: n.position ?? { x: 40, y: 40 },
+      config: this.clone(n.config ?? {}),
+    }));
+    const loadedEdges: CanvasEdge[] = (graph.edges ?? []).map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      label: e.label ?? null,
+    }));
+
+    // Re-derive the UI-only trigger→entry edge on load. The entry
+    // point is the first node that has no incoming edge; `addNode`
+    // wired one in for empty graphs, but stored bots may have been
+    // built via API or older UI so we walk the topology here.
+    const incomingIds = new Set(loadedEdges.map((e) => e.target));
+    const entry = loadedNodes.find((n) => !incomingIds.has(n.id));
+    if (entry) {
+      loadedEdges.push({
+        id: `e_trigger_${entry.id}`,
+        source: 'trigger',
+        target: entry.id,
+        label: null,
+      });
+    }
+
+    this.nodes.set(loadedNodes);
+    this.edges.set(loadedEdges);
     this.selectedNodeId.set(null);
     this.dirty.set(false);
     this.expectedVersion.set(bot.version_number);
@@ -82,6 +105,8 @@ export class CanvasStateService {
     this.dirty.set(false);
     this.saving.set(false);
     this.expectedVersion.set(1);
+    this.pendingSourceId.set(null);
+    this.pendingSourceLabel.set(null);
   }
 
   addNode(meta: NodeTypeMeta, position: { x: number; y: number }): CanvasNode {
@@ -92,10 +117,49 @@ export class CanvasStateService {
       position,
       config: this.clone(meta.defaultConfig),
     };
+    const wasEmpty = this.nodes().length === 0;
+    const triggerAlreadyWired = this.edges().some((e) => e.source === 'trigger');
     this.nodes.update((rows) => [...rows, node]);
     this.selectedNodeId.set(id);
     this.dirty.set(true);
+    // First node on a fresh canvas auto-wires from the trigger so the
+    // flow visually reads "Trigger → this node" without a manual
+    // click-to-connect gesture. Skipped if the operator already
+    // pointed the trigger somewhere else.
+    if (wasEmpty && !triggerAlreadyWired) {
+      this.addEdge('trigger', id, null);
+    }
     return node;
+  }
+
+  /** Start / cancel / complete a click-to-connect gesture. */
+  beginConnect(sourceId: string, label: string | null = null): void {
+    this.pendingSourceId.set(sourceId);
+    this.pendingSourceLabel.set(label);
+  }
+
+  cancelConnect(): void {
+    this.pendingSourceId.set(null);
+    this.pendingSourceLabel.set(null);
+  }
+
+  completeConnect(targetId: string): boolean {
+    const src = this.pendingSourceId();
+    if (!src) return false;
+    if (src === targetId) {
+      this.cancelConnect();
+      return false;
+    }
+    const label = this.pendingSourceLabel();
+    // Drop any existing edge on the same source+label so a port can only
+    // point to one target at a time (Pabbly convention). Trigger edges
+    // are virtual (source = 'trigger') and stored in the same list.
+    this.edges.update((rows) =>
+      rows.filter((e) => !(e.source === src && (e.label ?? null) === label)),
+    );
+    this.addEdge(src, targetId, label);
+    this.cancelConnect();
+    return true;
   }
 
   updateNodeConfig(nodeId: string, patch: Record<string, unknown>): void {
@@ -138,9 +202,16 @@ export class CanvasStateService {
   }
 
   serializeGraph(): { nodes: CanvasNode[]; edges: CanvasEdge[] } {
+    // `source: 'trigger'` is a UI-only virtual edge that lets the
+    // canvas draw "Trigger → first node" cleanly. The backend graph
+    // schema is a DAG of real nodes only (`core/chatbots/graph.py`
+    // Kahn's-algorithm cycle check would treat a `trigger` source as
+    // an unresolved reference and reject the save). Strip them.
     return {
       nodes: this.nodes().map((n) => this.clone(n)),
-      edges: this.edges().map((e) => this.clone(e)),
+      edges: this.edges()
+        .filter((e) => e.source !== 'trigger')
+        .map((e) => this.clone(e)),
     };
   }
 
