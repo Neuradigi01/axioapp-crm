@@ -40,11 +40,11 @@ interface StatusFilter {
 }
 
 const STATUS_FILTERS: StatusFilter[] = [
-  { value: '', label: 'All', tone: 'bg-zinc-100 text-zinc-700' },
-  { value: 'draft', label: 'Draft', tone: 'bg-amber-50 text-amber-700' },
-  { value: 'live', label: 'Live', tone: 'bg-emerald-50 text-emerald-700' },
-  { value: 'paused', label: 'Paused', tone: 'bg-blue-50 text-blue-700' },
-  { value: 'archived', label: 'Archived', tone: 'bg-zinc-100 text-zinc-500' },
+  { value: '', label: 'All', tone: 'bg-surface-2 text-default' },
+  { value: 'draft', label: 'Draft', tone: 'bg-amber-500/15 text-amber-500' },
+  { value: 'live', label: 'Live', tone: 'bg-emerald-500/15 text-emerald-500' },
+  { value: 'paused', label: 'Paused', tone: 'bg-sky-500/15 text-sky-500' },
+  { value: 'archived', label: 'Archived', tone: 'bg-surface-2 text-muted' },
 ];
 
 @Component({
@@ -231,6 +231,6 @@ export class ChatbotsListPageComponent {
 
   statusTone(status: ChatbotStatus): string {
     const match = STATUS_FILTERS.find((f) => f.value === status);
-    return match?.tone ?? 'bg-zinc-100 text-zinc-700';
+    return match?.tone ?? 'bg-surface-2 text-default';
   }
 }
