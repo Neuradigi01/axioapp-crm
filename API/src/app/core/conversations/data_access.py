@@ -257,6 +257,28 @@ async def count_outbound_messages_for_conversation(
     return int((await session.execute(stmt)).scalar_one() or 0)
 
 
+async def count_inbound_messages_before(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    exclude_message_id: uuid.UUID,
+) -> int:
+    """Count ``direction='in'`` messages on the conversation OTHER than
+    the one just inserted (``exclude_message_id``). Used by
+    ``tasks/chatbot-builder`` Step 4 to derive the ``is_first_message``
+    flag on the inbound-event payload — ``count == 0`` at the moment
+    the freshly-inserted inbound row is excluded means "this is the
+    first inbound on the conversation"."""
+    stmt = (
+        select(func.count())
+        .select_from(Message)
+        .where(Message.conversation_id == conversation_id)
+        .where(Message.direction == MessageDirection.in_)
+        .where(Message.id != exclude_message_id)
+    )
+    return int((await session.execute(stmt)).scalar_one() or 0)
+
+
 def insert_message(session: AsyncSession, message: Message) -> None:
     """Register an already-constructed Message for INSERT."""
     session.add(message)

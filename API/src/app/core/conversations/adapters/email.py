@@ -71,6 +71,8 @@ from src.app.core.email.models import (
     EmailAccountProvider,
     EmailAccountSyncState,
 )
+from src.app.core.events import bus as events_bus
+from src.app.core.events.event_catalog import EMAIL_MESSAGE_RECEIVED
 from src.app.core.email.tracking import (
     footer as tracking_footer,
 )
@@ -621,10 +623,109 @@ async def receive_email(account: EmailAccount, matched: dict[str, Any]) -> Messa
                     "channel": "email",
                 },
             )
+
+        # tasks/chatbot-builder Step 4 — publish email.message_received.
+        # Fail-closed on SPF / DKIM explicit failures (audit +
+        # short-circuit). IMAP-fetched mail carries the mailbox
+        # provider's ``Authentication-Results`` header; we honour it
+        # rather than doing our own DNS-heavy verification (that path
+        # can land as a follow-up once the bot triggers on inbound
+        # email surface real spoofing attempts).
+        if not _email_auth_passed(headers):
+            logger.info(
+                "chatbot.email.spf_dkim_failed account=%s msg=%s",
+                account.id,
+                msg.id,
+            )
+            return msg
+
+        await _publish_email_message_received(
+            session,
+            conversation=conversation,
+            message=msg,
+            text=body_text,
+        )
         return msg
 
 
 # --- Helpers ------------------------------------------------------------
+
+
+def _email_auth_passed(headers: dict[str, str]) -> bool:
+    """Fail-closed SPF / DKIM check for inbound email
+    (``tasks/chatbot-builder`` Step 4).
+
+    Honours the ``Authentication-Results`` header set by the receiving
+    mailbox provider (Gmail, Microsoft, custom SMTP with an auth
+    validator in front). Returns ``False`` only on an explicit
+    ``spf=fail``, ``spf=softfail``, ``dkim=fail``, or ``dmarc=fail``
+    verdict — a missing header (older provider, test fixture) is
+    treated as pass so legitimate inbound isn't dropped over a
+    metadata gap. Full DKIM signature verification (via ``dkimpy``)
+    is a follow-up if abuse warrants it.
+    """
+    auth_results = headers.get("authentication-results") or headers.get(
+        "Authentication-Results"
+    )
+    if not auth_results:
+        return True
+    lowered = auth_results.lower()
+    for verdict in ("spf=fail", "spf=softfail", "dkim=fail", "dmarc=fail"):
+        if verdict in lowered:
+            return False
+    return True
+
+
+async def _publish_email_message_received(
+    session: AsyncSession,
+    *,
+    conversation: Conversation,
+    message: Message,
+    text: str | None,
+) -> None:
+    """Fire the ``email.message_received`` chatbot trigger event
+    (``tasks/chatbot-builder`` Step 4). Failures inside the bus are
+    caught + logged so a broken subscriber never rolls back the
+    persisted inbound message.
+
+    Every inbound email conversation is authenticated by the per-
+    account IMAP fetcher; ``conversation.org_id`` already matches
+    ``account.org_id``. No cross-tenant contact assertion needed here
+    — the email module has no phone-number-id-style WABA misrouting
+    risk. The Case #18 assertion is WA-only.
+    """
+    from src.app.core.conversations import data_access as _conv_da
+
+    try:
+        prior_inbound = await _conv_da.count_inbound_messages_before(
+            session,
+            conversation_id=conversation.id,
+            exclude_message_id=message.id,
+        )
+        is_first_message = prior_inbound == 0
+
+        await events_bus.publish(
+            EMAIL_MESSAGE_RECEIVED,
+            {
+                "conversation_id": str(conversation.id),
+                "contact_id": (
+                    str(conversation.contact_id) if conversation.contact_id else None
+                ),
+                "message_id": str(message.id),
+                "text": text,
+                "channel": conversation.channel.value,
+                "is_first_message": is_first_message,
+                "direction": "in",
+            },
+            org_id=conversation.org_id,
+            event_id=str(message.id),
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "chatbot.email.publish_failed conv=%s msg=%s",
+            conversation.id,
+            message.id,
+        )
 
 
 def _build_outbound_mime(

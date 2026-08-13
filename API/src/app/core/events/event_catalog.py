@@ -84,6 +84,11 @@ EMAIL_REPLIED = "email.replied"
 
 WHATSAPP_MESSAGE_RECEIVED = "whatsapp.message_received"
 WHATSAPP_TEMPLATE_REPLIED = "whatsapp.template_replied"
+# tasks/chatbot-builder Step 4 — inbound email as a first-class
+# trigger event for chatbots. Payload mirrors WHATSAPP_MESSAGE_RECEIVED
+# (org_id, conversation_id, contact_id, message_id, text,
+# is_first_message, direction='in').
+EMAIL_MESSAGE_RECEIVED = "email.message_received"
 
 
 # --- Activities ----------------------------------------------------------
@@ -178,6 +183,7 @@ ALL_EVENTS: tuple[str, ...] = (
     EMAIL_REPLIED,
     WHATSAPP_MESSAGE_RECEIVED,
     WHATSAPP_TEMPLATE_REPLIED,
+    EMAIL_MESSAGE_RECEIVED,
     # Activities
     PHONE_CALL_LOGGED,
     MEETING_BOOKED,
@@ -248,6 +254,7 @@ EVENT_DESCRIPTIONS: dict[str, str] = {
     EMAIL_REPLIED: "Recipient replied to the conversation thread.",
     WHATSAPP_MESSAGE_RECEIVED: "Inbound WhatsApp message from a contact.",
     WHATSAPP_TEMPLATE_REPLIED: "Contact replied to a template-initiated WA conversation.",
+    EMAIL_MESSAGE_RECEIVED: "Inbound email from a contact.",
     PHONE_CALL_LOGGED: "Phone-call activity recorded against a contact.",
     MEETING_BOOKED: "Meeting added to a contact's timeline.",
     TASK_CREATED: "A task is created.",
@@ -347,6 +354,7 @@ __all__ = [
     "USER_ROLE_CHANGED",
     "USER_SIGNED_UP",
     "WALK_IN_REGISTERED",
+    "EMAIL_MESSAGE_RECEIVED",
     "WHATSAPP_MESSAGE_RECEIVED",
     "WHATSAPP_TEMPLATE_REPLIED",
     "WORKFLOW_SCHEDULE_FIRED",

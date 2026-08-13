@@ -42,6 +42,8 @@ from src.app.core.contacts.models import Contact
 from src.app.core.conversations import data_access as _da
 from src.app.core.conversations.adapters import InboundMessage
 from src.app.core.conversations.adapters.email import send_email
+from src.app.core.events import bus as events_bus
+from src.app.core.events.event_catalog import WHATSAPP_MESSAGE_RECEIVED
 from src.app.core.conversations.adapters.whatsapp import (
     resolve_whatsapp_adapter,
 )
@@ -913,7 +915,105 @@ async def receive_webhook(
                 conversation=conv,
                 inbound_text=parsed.text,
             )
+
+    # tasks/chatbot-builder Step 4 — publish whatsapp.message_received.
+    # Runs AFTER all existing inline processing (auto-reply / keyword
+    # rules / assignment / AI) so behaviour is unchanged for orgs not
+    # running bots. Any exception here is caught + logged so a broken
+    # subscriber never rolls back the persisted inbound message.
+    if conv.channel == ConversationChannel.whatsapp:
+        await _publish_inbound_message_received(
+            session,
+            event_type=WHATSAPP_MESSAGE_RECEIVED,
+            conversation=conv,
+            message=msg,
+            text=parsed.text,
+        )
     return msg
+
+
+async def _publish_inbound_message_received(
+    session: AsyncSession,
+    *,
+    event_type: str,
+    conversation: Conversation,
+    message: Message,
+    text: str | None,
+) -> None:
+    """Publish the chatbot trigger event with the cross-tenant guard
+    from README §Case 18 + the ``is_first_message`` derivation from
+    Decision §2.
+
+    Fires audit ``security.cross_tenant_webhook_rejected`` and
+    short-circuits when the linked contact belongs to a different
+    org than the conversation — that state can only arise from
+    upstream WABA misrouting or a compromised phone-number-id
+    mapping, either way we refuse to publish an event carrying a
+    payload from a mismatched tenant.
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        # --- Cross-tenant assertion (§Case 18) ------------------------
+        if conversation.contact_id is not None:
+            contact = await contacts_service.get_contact(session, conversation.contact_id)
+            if contact is not None and contact.org_id != conversation.org_id:
+                await audit.log(
+                    action="security.cross_tenant_webhook_rejected",
+                    entity_type="conversation",
+                    entity_id=conversation.id,
+                    after={
+                        "conversation_org_id": str(conversation.org_id),
+                        "contact_org_id": str(contact.org_id),
+                        "channel": conversation.channel.value,
+                    },
+                    org_id=conversation.org_id,
+                )
+                logger.warning(
+                    "chatbot.inbound.cross_tenant_rejected conv=%s conv_org=%s contact_org=%s",
+                    conversation.id,
+                    conversation.org_id,
+                    contact.org_id,
+                )
+                return
+
+        # --- is_first_message derivation (Decision §2) ----------------
+        prior_inbound_count = await _da.count_inbound_messages_before(
+            session,
+            conversation_id=conversation.id,
+            exclude_message_id=message.id,
+        )
+        is_first_message = prior_inbound_count == 0
+
+        # --- Publish --------------------------------------------------
+        # Payload holds only fields the matcher + node handlers need;
+        # no full contact / conversation serialisation to keep PII
+        # bleed off the event bus.
+        await events_bus.publish(
+            event_type,
+            {
+                "conversation_id": str(conversation.id),
+                "contact_id": (
+                    str(conversation.contact_id) if conversation.contact_id else None
+                ),
+                "message_id": str(message.id),
+                "text": text,
+                "channel": conversation.channel.value,
+                "is_first_message": is_first_message,
+                "direction": "in",
+            },
+            org_id=conversation.org_id,
+            event_id=str(message.id),
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "chatbot.inbound.publish_failed event_type=%s conv=%s msg=%s",
+            event_type,
+            conversation.id,
+            message.id,
+        )
 
 
 async def react_to_message(
