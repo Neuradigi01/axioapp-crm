@@ -182,6 +182,13 @@ beat_schedule = {
         "task": "src.app.core.chatbots.tasks.sweep_test_runs",
         "schedule": crontab(minute=15),
     },
+    # tasks/chatbot-builder Step 9 — every-60s sweep that resumes
+    # parked chatbot runs whose ``next_step_at <= now()``. Handles
+    # both delay-node expiry and Ask-* 22h timeout in one tick.
+    "chatbots-sweep-waits": {
+        "task": "src.app.core.chatbots.tasks.sweep_chatbot_waits",
+        "schedule": 60.0,
+    },
     # tasks/workflows Step 11 — every-2-min sweep that fires the
     # ``timeout`` outbound edge on parked ``flow_control.wait_for_event``
     # nodes whose ``expires_at`` has lapsed. Distinct from the

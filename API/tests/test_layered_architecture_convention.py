@@ -170,6 +170,8 @@ _TRANSACTION_EXCEPTIONS: dict[str, str] = {
     "core/chatbots/nodes/ask_address.py": "Ask-Address handler commits after save-target write",
     "core/chatbots/nodes/ask_location.py": "Ask-Location handler commits after save-target write",
     "core/chatbots/nodes/ask_media.py": "Ask-Media handler commits after save-target write",
+    "core/chatbots/nodes/add_tag.py": "Add-Tag handler commits after tag remove",
+    "core/chatbots/nodes/set_custom_field.py": "Set-Custom-Field handler commits after save-target write",
     # --- Pack billing module — router-only PDF generation shell, completion deferred
     "packs/furniture/modules/billing/router.py": "Pack billing PDF stub (Phase 4 follow-up)",
 }

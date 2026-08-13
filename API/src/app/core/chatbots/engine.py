@@ -474,18 +474,27 @@ async def resume_run(
         return {"result": "not_parked", "status": run.status}
 
     ctx = dict(run.context or {})
+    resumed_by = "inbound"
     if resume_event:
         if "text" in resume_event:
             ctx["last_inbound_text"] = resume_event.get("text")
         if "message_id" in resume_event:
             ctx["last_inbound_message_id"] = resume_event.get("message_id")
+        # Sweeper stamps ``_resumed_by`` to distinguish timeout /
+        # delay_expired from inbound. Matcher-driven resumes omit
+        # the key (default 'inbound').
+        resumed_by = str(resume_event.get("_resumed_by") or "inbound")
     # Drop the park key so a stale resume doesn't loop.
     ctx.pop("park_key", None)
-    # Flag the resume so node handlers (text_button, list, ask_*)
-    # know to interpret ``last_inbound_text`` as a reply to their
-    # parked prompt rather than the initial trigger. Handlers clear
-    # the flag before advancing to the next node.
+    # Also clear next_step_at — the sweeper picks parked rows by
+    # this column, so leaving it set would cause a re-sweep next
+    # tick and an infinite resume loop.
+    run.next_step_at = None
+    # Flag the resume so node handlers (text_button, list, ask_*,
+    # delay) know to interpret last_inbound_* / resumed_by
+    # correctly. Handlers clear these before advancing.
     ctx["resumed_from_park"] = True
+    ctx["resumed_by"] = resumed_by
     run.context = ctx
 
     run.status = "running"

@@ -81,6 +81,72 @@ async def _process_step_async(run_id: str) -> dict[str, Any]:
 
 
 @_shared_task(
+    name="src.app.core.chatbots.tasks.sweep_chatbot_waits",
+)
+def sweep_chatbot_waits() -> dict[str, int]:
+    """Beat-scheduled (every 60s). Picks up parked chatbot runs whose
+    ``next_step_at <= now()`` and re-dispatches
+    :func:`process_step` via ``engine.resume_run``.
+
+    Handles two park kinds transparently:
+      * ``("delay", node_id)``  → resumed_by='delay_expired'
+      * ``("reply", conv_id)``  → resumed_by='timeout' (Ask-* 22h)
+    """
+    return asyncio.run(_sweep_chatbot_waits_async())
+
+
+async def _sweep_chatbot_waits_async() -> dict[str, int]:
+    from sqlalchemy import select
+
+    from src.app.core.chatbots import engine
+    from src.app.core.chatbots.models import ChatbotRun
+    from src.app.shared.db import async_session
+
+    now_ts = datetime.now(UTC)
+    resumed = 0
+    errored = 0
+
+    async with async_session() as session:
+        stmt = (
+            select(ChatbotRun)
+            .where(
+                ChatbotRun.status == "parked",
+                ChatbotRun.next_step_at.is_not(None),
+                ChatbotRun.next_step_at <= now_ts,
+                ChatbotRun.is_test.is_(False),
+            )
+            .limit(200)
+        )
+        rows = (await session.execute(stmt)).scalars().all()
+        for run in rows:
+            park_key = (run.context or {}).get("park_key") or []
+            resume_kind = "delay_expired"
+            if isinstance(park_key, list) and park_key and park_key[0] == "reply":
+                resume_kind = "timeout"
+            try:
+                await engine.resume_run(
+                    session,
+                    run_id=run.id,
+                    resume_event={"_resumed_by": resume_kind},
+                )
+                resumed += 1
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "chatbots.sweep_chatbot_waits failed run=%s", run.id
+                )
+                errored += 1
+
+    if resumed or errored:
+        logger.info(
+            "chatbots.sweep_chatbot_waits resumed=%d errored=%d cutoff=%s",
+            resumed,
+            errored,
+            now_ts,
+        )
+    return {"resumed": resumed, "errored": errored}
+
+
+@_shared_task(
     name="src.app.core.chatbots.tasks.sweep_test_runs",
 )
 def sweep_test_runs() -> dict[str, int]:
