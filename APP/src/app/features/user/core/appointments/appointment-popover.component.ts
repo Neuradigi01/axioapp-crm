@@ -8,6 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { format } from 'date-fns';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService } from '../auth/auth.service';
@@ -63,6 +64,15 @@ export class AppointmentPopoverComponent {
   @Output() readonly dismiss = new EventEmitter<void>();
 
   protected readonly canWrite = computed(() => this.auth.hasPermission('appointments.write'));
+
+  /** Formatted "5 Aug 2026, 15:30" for the header — mirrors the row's
+   *  time chip but with the day + month prefix so the popover reads
+   *  standalone without needing to look back at the list row. */
+  protected readonly whenLabel = computed<string | null>(() => {
+    const a = this._appointment();
+    if (!a) return null;
+    return format(new Date(a.scheduled_at), 'd MMM yyyy, HH:mm');
+  });
 
   /** Reassign is only meaningful on `scheduled` appointments — reassigning
    *  a completed / cancelled / no-show slot has no operational effect and
