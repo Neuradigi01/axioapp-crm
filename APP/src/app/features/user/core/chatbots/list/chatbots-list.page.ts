@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -67,6 +67,7 @@ const STATUS_FILTERS: StatusFilter[] = [
 export class ChatbotsListPageComponent {
   private readonly api = inject(ChatbotsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
 
   readonly statusFilters = STATUS_FILTERS;
 
@@ -140,7 +141,9 @@ export class ChatbotsListPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (created) => {
-          window.location.href = `/user/chatbots/${created.id}/edit`;
+          this.createSubmitting.set(false);
+          this.createModalOpen.set(false);
+          this.router.navigate(['/user/chatbots', created.id, 'edit']);
         },
         error: (err) => {
           this.createError.set(extractApiError(err) ?? 'Failed to create bot.');
@@ -251,7 +254,7 @@ export class ChatbotsListPageComponent {
                 const msg = result.conflicts.map((c) => `${c.kind}: ${c.detail}`).join(' · ');
                 this.error.set(`Imported with conflicts: ${msg}`);
               }
-              window.location.href = `/user/chatbots/${result.created_bot_id}/edit`;
+              this.router.navigate(['/user/chatbots', result.created_bot_id, 'edit']);
             },
             error: (err) => this.error.set(extractApiError(err) ?? 'Import failed.'),
           });

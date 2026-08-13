@@ -105,10 +105,15 @@ def _require_org_id() -> uuid.UUID:
 
 
 def _actor_user_id(user: User) -> uuid.UUID | None:
-    """Best-effort user-id extraction. Some auth flows may attach a
-    User without an id (system tokens); the audit trail records
-    NULL then."""
-    return getattr(user, "id", None)
+    """Best-effort user-id extraction for the UUID audit FKs.
+
+    Post-DR.7 ``User.id`` is the bigint PK of ``tbl_user_login``; the
+    UUID identity that every ``*_by_user_id`` audit column expects
+    lives on ``User.legacy_uuid``. Returning ``user.id`` here
+    surfaces the classic ``asyncpg`` cast error (``$N::UUID`` gets an
+    int) — always resolve to ``legacy_uuid``. System tokens without a
+    bound user record NULL."""
+    return getattr(user, "legacy_uuid", None)
 
 
 # --- save-target picker (mounted FIRST so '/save-targets' doesn't
