@@ -33,11 +33,10 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.chatbots import data_access as dal
 from src.app.core.chatbots.exceptions import InvalidSaveTarget
-from src.app.core.custom_fields.models import CustomFieldDefinition
 from src.app.core.standard_fields import registry as sf_registry
 
 # Custom-field keys are constrained so JSONB path resolution can't be
@@ -142,23 +141,10 @@ async def list_save_targets(
             )
         )
 
-    custom_rows = (
-        (
-            await session.execute(
-                select(CustomFieldDefinition)
-                .where(
-                    CustomFieldDefinition.org_id == org_id,
-                    CustomFieldDefinition.entity_type == entity,
-                    CustomFieldDefinition.is_hidden.is_(False),
-                )
-                .order_by(
-                    CustomFieldDefinition.display_order,
-                    CustomFieldDefinition.field_key,
-                )
-            )
-        )
-        .scalars()
-        .all()
+    custom_rows = await dal.list_visible_custom_fields_for_org(
+        session,
+        org_id=org_id,
+        entity_type=entity,
     )
     for cf in custom_rows:
         if not _CUSTOM_KEY_RE.match(cf.field_key):
@@ -229,15 +215,12 @@ async def validate_save_target(
             raise InvalidSaveTarget(
                 f"custom field key '{key}' collides with a system column on {entity}"
             )
-        cf = (
-            await session.execute(
-                select(CustomFieldDefinition).where(
-                    CustomFieldDefinition.org_id == org_id,
-                    CustomFieldDefinition.entity_type == entity,
-                    CustomFieldDefinition.field_key == key,
-                )
-            )
-        ).scalar_one_or_none()
+        cf = await dal.get_custom_field_by_key(
+            session,
+            org_id=org_id,
+            entity_type=entity,
+            field_key=key,
+        )
         if cf is None:
             raise InvalidSaveTarget(
                 f"custom field '{entity}.custom.{key}' not defined in org"

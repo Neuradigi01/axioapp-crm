@@ -31,6 +31,9 @@ import src.app.core.workflows.models  # noqa: F401
 # the module registry before the lifespan permission-fanout sweep.
 import src.app.core.workflows.module  # noqa: F401
 
+# tasks/chatbot-builder Step 3 — chatbots MODULE descriptor.
+import src.app.core.chatbots.module  # noqa: F401
+
 # Import the pack's billing __init__ so its PDF renderer registers
 # itself with `core.billing.pdf_registry` at startup.
 import src.app.packs.furniture.modules.billing  # noqa: F401
@@ -132,6 +135,7 @@ from src.app.core.users.router import router as users_router
 from src.app.core.walk_ins.router import router as walk_ins_router
 from src.app.core.workflows.router import router as workflows_router
 from src.app.core.workflows.router import schedules_router as workflow_schedules_router
+from src.app.core.chatbots.router import router as chatbots_router
 from src.app.packs.furniture.modules.billing.router import (
     router as fp_pos_router,
 )
@@ -325,6 +329,10 @@ app.include_router(workflows_router, prefix="/api/v1")
 # (``/api/v1/workflows/{workflow_id}/schedules``) stay on
 # ``workflows_router``.
 app.include_router(workflow_schedules_router, prefix="/api/v1")
+# tasks/chatbot-builder Step 3 — chatbots CRUD + versions +
+# save-target picker. Trigger dispatch (Step 5) and test-fire
+# (Step 6) mount later.
+app.include_router(chatbots_router, prefix="/api/v1")
 # Step 8 — public tracking endpoints (open pixel, click redirect,
 # unsubscribe landing). Intentionally unauthenticated — the recipient's
 # email client fetches them with no JWT. Rate limiting is inside the

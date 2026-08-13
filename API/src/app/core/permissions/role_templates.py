@@ -170,6 +170,14 @@ _CORE_ADMIN_KEYS: list[str] = [
     "workflows.clone",
     "workflows.view_analytics",
     "workflows.view_diagnostics",
+    # tasks/chatbot-builder Step 3 — Pabbly-Chatflow-style inbound-
+    # message bot module. Admin gets all four keys: list/get (view),
+    # create/patch/pause (edit), draft→live + rollback (publish),
+    # archive (delete).
+    "chatbots.view",
+    "chatbots.edit",
+    "chatbots.publish",
+    "chatbots.delete",
 ]
 
 
@@ -243,6 +251,10 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     # tool stay Admin/Owner.
     "workflows.read",
     "workflows.view_analytics",
+    # tasks/chatbot-builder Step 3 — Employee sees the Chat Bots
+    # sidebar entry as read-only (list, get, version history, save-
+    # target picker). Mutation, publish, and archive stay Owner/Admin.
+    "chatbots.view",
 ]
 
 
