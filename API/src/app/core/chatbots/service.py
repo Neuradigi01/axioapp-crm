@@ -358,6 +358,215 @@ async def rollback_to_version_service(
     return bot
 
 
+# --- Export / Import (Step 15) -------------------------------------------
+
+
+async def export_chatbot_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    chatbot_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Serialise a bot to the portable export envelope. No org UUIDs,
+    user emails, HMAC keys, or run history leak through — only the
+    minimum required to reconstruct the bot in a different org.
+
+    Custom-field references are extracted by walking the graph for
+    ``save_to`` values matching ``contact.custom.<key>`` /
+    ``lead.custom.<key>``; the importer uses these to detect missing
+    fields in the target org.
+    """
+    from datetime import UTC, datetime
+
+    bot = await get_chatbot_service(session, org_id=org_id, chatbot_id=chatbot_id)
+
+    from src.app.core.chatbots.save_target_registry import (
+        collect_save_targets_from_graph,
+    )
+
+    save_targets = collect_save_targets_from_graph(bot.graph or {})
+    referenced_custom: list[dict[str, Any]] = []
+    for qk in save_targets:
+        if ".custom." in qk:
+            entity, _, key = qk.split(".", 2)
+            referenced_custom.append({"entity": entity, "field_key": key})
+
+    referenced_templates: list[dict[str, Any]] = []
+    for node in (bot.graph or {}).get("nodes", []):
+        if node.get("type") != "template":
+            continue
+        tid = (node.get("config") or {}).get("template_id")
+        if tid:
+            referenced_templates.append({"template_id": str(tid)})
+
+    from src.app.core.tenants import data_access as tenants_da
+
+    org = await tenants_da.get_organization_by_id(session, org_id)
+    org_name = getattr(org, "name", "Unknown") or "Unknown"
+
+    return {
+        "chatbot_export_version": 1,
+        "exported_at": datetime.now(UTC).isoformat(),
+        "source_org_name": org_name,
+        "bot": {
+            "name": bot.name,
+            "description": bot.description,
+            "category": bot.category,
+            "priority": bot.priority,
+            "trigger_config": bot.trigger_config,
+            "graph": bot.graph,
+            "referenced_custom_fields": referenced_custom,
+            "referenced_templates": referenced_templates,
+        },
+    }
+
+
+async def import_chatbot_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    envelope: dict[str, Any],
+    name_override: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> dict[str, Any]:
+    """Create a new bot in ``org_id`` from an export envelope. Returns
+    ``{created_bot_id, conflicts}``.
+
+    Conflicts are informational — a missing custom-field / template
+    doesn't block the import; the bot lands as a draft and the
+    operator wires the references before publishing.
+    """
+    version = envelope.get("chatbot_export_version")
+    if version != 1:
+        raise InvalidGraph(
+            f"unsupported chatbot_export_version: {version!r} (expected 1)"
+        )
+
+    bot_payload = envelope.get("bot") or {}
+    if not isinstance(bot_payload, dict) or not bot_payload.get("name"):
+        raise InvalidGraph("envelope.bot is missing or has no name")
+
+    conflicts: list[dict[str, str]] = []
+
+    # Custom-field conflicts — missing fields in the target org.
+    referenced_custom = bot_payload.get("referenced_custom_fields") or []
+    for ref in referenced_custom:
+        entity = ref.get("entity")
+        field_key = ref.get("field_key")
+        if not entity or not field_key:
+            continue
+        cf = await dal.get_custom_field_by_key(
+            session, org_id=org_id, entity_type=entity, field_key=field_key
+        )
+        if cf is None:
+            conflicts.append(
+                {
+                    "kind": "missing_custom_field",
+                    "detail": f"{entity}.custom.{field_key}",
+                }
+            )
+
+    # Template conflicts — the exporter recorded template IDs from
+    # the source org; those IDs won't exist in the target org.
+    # Operator remaps template references manually after import.
+    for tref in bot_payload.get("referenced_templates") or []:
+        tid = tref.get("template_id")
+        if tid:
+            conflicts.append(
+                {
+                    "kind": "missing_template",
+                    "detail": f"template_id={tid} (remap after import)",
+                }
+            )
+
+    # Name-collision — bump with " (imported)" suffix, or use the
+    # override.
+    final_name = (name_override or bot_payload["name"]).strip()
+    existing = await dal.list_chatbots(session, org_id=org_id, search=final_name, limit=1)
+    if existing[0] and any(
+        (row.name or "").lower() == final_name.lower() for row in existing[0]
+    ):
+        conflicts.append(
+            {
+                "kind": "name_collision",
+                "detail": f"'{final_name}' already exists — appending ' (imported)'",
+            }
+        )
+        final_name = f"{final_name} (imported)"
+
+    # Persist as a fresh draft.
+    trigger_config = bot_payload.get("trigger_config") or {}
+    graph = bot_payload.get("graph") or {"nodes": [], "edges": []}
+    # Regenerate node + edge ids so importing twice into the same
+    # org can't collide on internal IDs. Graph-shape stays identical.
+    graph = _regenerate_graph_ids(graph)
+
+    bot = await dal.insert_chatbot(
+        session,
+        org_id=org_id,
+        name=final_name,
+        description=bot_payload.get("description"),
+        category=str(bot_payload.get("category") or "Custom"),
+        folder_id=None,
+        priority=int(bot_payload.get("priority") or 100),
+        trigger_config=trigger_config,
+        graph=graph,
+        created_by_user_id=actor_user_id,
+    )
+    await session.flush()
+
+    await dal.insert_chatbot_version(
+        session,
+        org_id=org_id,
+        chatbot_id=bot.id,
+        version_number=1,
+        graph=graph,
+        trigger_config=trigger_config,
+        change_note="imported",
+        created_by_user_id=actor_user_id,
+    )
+    await session.commit()
+    await session.refresh(bot)
+
+    return {"created_bot_id": bot.id, "conflicts": conflicts}
+
+
+def _regenerate_graph_ids(graph: dict[str, Any]) -> dict[str, Any]:
+    """Replace node + edge IDs with fresh short random ones. Edges
+    get their source/target references remapped in lockstep so the
+    graph shape is preserved."""
+    import secrets
+
+    nodes = graph.get("nodes") or []
+    edges = graph.get("edges") or []
+    id_map: dict[str, str] = {}
+    new_nodes: list[dict[str, Any]] = []
+    for node in nodes:
+        old_id = node.get("id")
+        if not old_id:
+            continue
+        new_id = f"n_{secrets.token_hex(4)}"
+        id_map[old_id] = new_id
+        new_nodes.append({**node, "id": new_id})
+    new_edges: list[dict[str, Any]] = []
+    for edge in edges:
+        source = edge.get("source")
+        target = edge.get("target")
+        new_source = id_map.get(source, source)
+        new_target = id_map.get(target, target)
+        if new_source is None or new_target is None:
+            continue
+        new_edges.append(
+            {
+                **edge,
+                "id": f"e_{secrets.token_hex(4)}",
+                "source": new_source,
+                "target": new_target,
+            }
+        )
+    return {"nodes": new_nodes, "edges": new_edges}
+
+
 # --- Test-fire (Step 6) ---------------------------------------------------
 
 

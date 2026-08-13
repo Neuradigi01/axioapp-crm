@@ -76,7 +76,7 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | — | [Template Library](template-library/README.md) | 14 | Core (side track — central multi-channel template library; precursor to `automation-engine`) |
 | — | [Automation Engine](automation-engine/README.md) | 14 | Core (side track — event-triggered automation; depends on `template-library`) |
 | — | [DAL Backfill](dal-backfill/README.md) | 14 | Core (side track — align every module to Router → Service → DAL; manager spec 2026-06-25) |
-| — | [Chat Bot Builder](chatbot-builder/README.md) | 15 | Core (side track — Pabbly-Chatflow-style inbound-message bot module; manager spec 2026-08-13) |
+| — | [Chat Bot Builder](chatbot-builder/README.md) | 15 | Core (side track — Pabbly-Chatflow-style inbound-message bot module; manager spec 2026-08-13; **COMPLETED**) |
 
 **Total: 169 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides + Lead-Capture (4 tracks) + Pricing-and-Billing side tracks).
 

@@ -7,6 +7,13 @@
         Design bot flows for inbound WhatsApp + email conversations.
       </p>
     </div>
+    <label
+      class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 text-zinc-700 text-sm font-medium hover:bg-zinc-50 cursor-pointer"
+    >
+      <lucide-icon name="upload" size="16"></lucide-icon>
+      Import
+      <input type="file" accept="application/json" class="hidden" (change)="onImportFile($event)" />
+    </label>
     <button
       type="button"
       (click)="createBot()"
@@ -166,6 +173,13 @@
                         class="block px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
                         >Edit</a
                       >
+                      <button
+                        type="button"
+                        (click)="exportBot(row)"
+                        class="block w-full text-left px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
+                      >
+                        Export JSON
+                      </button>
                       @if (row.status === 'draft' || row.status === 'paused') {
                         <button
                           type="button"

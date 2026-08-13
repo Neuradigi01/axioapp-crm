@@ -212,4 +212,47 @@ export class ChatbotsApiService {
   testFire(id: string, payload: TestFireRequest): Observable<TestFireResponse> {
     return this.http.post<TestFireResponse>(`${this.base}/${id}/test-fire`, payload);
   }
+
+  /** Step 15 — bot export (returns portable envelope). */
+  export(id: string): Observable<ChatbotExportEnvelope> {
+    return this.http.get<ChatbotExportEnvelope>(`${this.base}/${id}/export`);
+  }
+
+  /** Step 15 — bot import (creates new bot from envelope). */
+  import(payload: ChatbotImportRequest): Observable<ChatbotImportResult> {
+    return this.http.post<ChatbotImportResult>(`${this.base}/import`, payload);
+  }
+}
+
+// --- Step 15 export / import types ---------------------------------------
+
+export interface ChatbotExportEnvelope {
+  chatbot_export_version: number;
+  exported_at: string;
+  source_org_name: string;
+  bot: {
+    name: string;
+    description: string | null;
+    category: string;
+    priority: number;
+    trigger_config: TriggerConfig;
+    graph: ChatbotGraph;
+    referenced_custom_fields: Array<{ entity: string; field_key: string }>;
+    referenced_templates: Array<{ template_id: string }>;
+  };
+}
+
+export interface ChatbotImportRequest {
+  envelope: ChatbotExportEnvelope;
+  name_override?: string | null;
+}
+
+export interface ChatbotImportConflict {
+  kind: 'missing_custom_field' | 'missing_template' | 'name_collision';
+  detail: string;
+}
+
+export interface ChatbotImportResult {
+  created_bot_id: string;
+  conflicts: ChatbotImportConflict[];
 }

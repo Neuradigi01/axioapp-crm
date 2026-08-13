@@ -98,6 +98,22 @@ async def create_organization(
             "tenants.create_organization workflow_seed_failed org=%s", org.id
         )
 
+    # tasks/chatbot-builder Step 15 — install the 3 default chat bots
+    # (Welcome / Lead Qualification / FAQ Router) as drafts. Same
+    # soft-fail contract as the workflows seeder — a broken bot seed
+    # never blocks org creation; the backfill migration
+    # 0195_bf_chatbot_seeds cleans up any misses.
+    try:
+        from src.app.core.chatbots.seeds import install_default_chatbots
+
+        await install_default_chatbots(session, org_id=org.id, user_id=None)
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "tenants.create_organization chatbot_seed_failed org=%s", org.id
+        )
+
     return org
 
 

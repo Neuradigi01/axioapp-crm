@@ -155,6 +155,64 @@ export class ChatbotsListPageComponent {
       });
   }
 
+  /** Step 15 — download a portable export of the bot as JSON. */
+  exportBot(row: ChatbotListItem): void {
+    this.actionsMenuFor.set(null);
+    this.api
+      .export(row.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (envelope) => {
+          const blob = new Blob([JSON.stringify(envelope, null, 2)], {
+            type: 'application/json',
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${row.name.replace(/[^a-z0-9]+/gi, '_')}.chatbot.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        },
+        error: (err) => this.error.set(extractApiError(err) ?? 'Export failed.'),
+      });
+  }
+
+  /** Step 15 — file picker → parse → POST to /import. */
+  onImportFile(evt: Event): void {
+    const input = evt.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    file
+      .text()
+      .then((text) => {
+        let envelope: unknown;
+        try {
+          envelope = JSON.parse(text);
+        } catch {
+          this.error.set('Selected file is not valid JSON.');
+          return;
+        }
+        this.api
+          .import({ envelope: envelope as never, name_override: null })
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({
+            next: (result) => {
+              if (result.conflicts.length) {
+                const msg = result.conflicts.map((c) => `${c.kind}: ${c.detail}`).join('\n');
+                window.alert(`Bot imported with conflicts:\n${msg}`);
+              }
+              window.location.href = `/user/chatbots/${result.created_bot_id}/edit`;
+            },
+            error: (err) => this.error.set(extractApiError(err) ?? 'Import failed.'),
+          });
+      })
+      .finally(() => {
+        input.value = ''; // reset picker so the same file can be re-selected
+      });
+  }
+
   toggleActionsMenu(botId: string): void {
     this.actionsMenuFor.set(this.actionsMenuFor() === botId ? null : botId);
   }

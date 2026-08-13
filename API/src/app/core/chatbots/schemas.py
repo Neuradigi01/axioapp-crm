@@ -281,3 +281,70 @@ class TestFireResponse(BaseModel):
     canceled_reason: str | None
     error: str | None
     steps: list[TestFireStepEntry]
+
+
+# --- Export / Import (Step 15) -------------------------------------------
+
+
+CHATBOT_EXPORT_VERSION = 1
+
+
+class ChatbotExportBotBody(BaseModel):
+    """Inner ``bot`` payload of the export envelope. Deliberately
+    plain — no org UUIDs, user emails, or HMAC keys are ever exported.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    description: str | None
+    category: str
+    priority: int
+    trigger_config: dict[str, Any]
+    graph: dict[str, Any]
+    referenced_custom_fields: list[dict[str, Any]]
+    referenced_templates: list[dict[str, Any]]
+
+
+class ChatbotExportEnvelope(BaseModel):
+    """Portable bot export — round-trips through the import endpoint
+    to reconstruct the bot in a different org with new IDs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    chatbot_export_version: int = Field(default=CHATBOT_EXPORT_VERSION)
+    exported_at: datetime
+    source_org_name: str
+    bot: ChatbotExportBotBody
+
+
+class ChatbotImportRequest(BaseModel):
+    """POST body for ``/chatbots/import``. Accepts the same shape the
+    export endpoint produces."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    envelope: ChatbotExportEnvelope
+    # Operator can override the imported bot's name to disambiguate
+    # from an existing bot with the same name in this org.
+    name_override: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class ChatbotImportConflict(BaseModel):
+    """One conflict item surfaced to the operator during import
+    preview / commit."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str  # "missing_custom_field" | "missing_template" | "name_collision"
+    detail: str
+
+
+class ChatbotImportResult(BaseModel):
+    """Import outcome — includes any conflicts the operator should
+    know about (missing custom fields, missing templates)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    created_bot_id: uuid.UUID
+    conflicts: list[ChatbotImportConflict]

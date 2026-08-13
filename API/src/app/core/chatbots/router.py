@@ -40,6 +40,8 @@ from src.app.core.chatbots.permissions import (
 )
 from src.app.core.chatbots.schemas import (
     ChatbotCreate,
+    ChatbotImportRequest,
+    ChatbotImportResult,
     ChatbotListItem,
     ChatbotRead,
     ChatbotUpdate,
@@ -342,6 +344,56 @@ async def list_versions_endpoint(
     except ChatbotError as exc:
         raise _chatbot_http_map(exc) from exc
     return [ChatbotVersionRead.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/{chatbot_id}/export",
+    response_model=dict,
+)
+async def export_chatbot_endpoint(
+    chatbot_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_VIEW)),
+) -> dict:
+    """Portable bot export. Returns the envelope described by
+    :class:`schemas.ChatbotExportEnvelope`. Read-gated — anyone
+    who can see the bot can export it (analogous to the
+    workflows export)."""
+    org_id = _require_org_id()
+    try:
+        return await chatbots_service.export_chatbot_service(
+            db, org_id=org_id, chatbot_id=chatbot_id
+        )
+    except ChatbotError as exc:
+        raise _chatbot_http_map(exc) from exc
+
+
+@router.post(
+    "/import",
+    response_model=ChatbotImportResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def import_chatbot_endpoint(
+    payload: ChatbotImportRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_EDIT)),
+) -> ChatbotImportResult:
+    """Create a new bot from an export envelope. Any custom-field /
+    template references that don't exist in the target org are
+    surfaced as ``conflicts`` — the bot lands as a draft and the
+    operator remaps references before publishing."""
+    org_id = _require_org_id()
+    try:
+        result = await chatbots_service.import_chatbot_service(
+            db,
+            org_id=org_id,
+            envelope=payload.envelope.model_dump(),
+            name_override=payload.name_override,
+            actor_user_id=_actor_user_id(user),
+        )
+    except ChatbotError as exc:
+        raise _chatbot_http_map(exc) from exc
+    return ChatbotImportResult(**result)
 
 
 @router.post(

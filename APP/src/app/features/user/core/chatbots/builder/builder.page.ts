@@ -14,7 +14,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import { ChatbotRead, ChatbotsApiService, TriggerConfig } from '../chatbots-api.service';
+import { ChatbotsApiService, TriggerConfig } from '../chatbots-api.service';
 import { CanvasStateService } from './canvas-state.service';
 import { NodeTypeMeta, getNodeType } from './node-type-registry';
 import { ChatbotPaletteComponent } from './palette/palette.component';
