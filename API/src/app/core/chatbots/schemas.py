@@ -232,3 +232,52 @@ class ChatbotVersionRead(BaseModel):
     change_note: str | None
     created_by_user_id: uuid.UUID | None
     created_at: datetime
+
+
+# --- Test-fire (Step 6) --------------------------------------------------
+
+
+class TestFireRequest(BaseModel):
+    """POST body for ``/chatbots/{id}/test-fire`` (Case #22 / Decision §17).
+
+    The endpoint always runs dry — the ``dry_run`` flag is not
+    operator-settable; sends are transcript-only, save-to writes
+    land in a per-run scratch, and the run row is auto-deleted after
+    24h via :func:`core.chatbots.tasks.sweep_test_runs`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    simulated_inbound_text: str = Field(..., min_length=0, max_length=4096)
+    simulated_channel: str = Field(default="whatsapp", pattern=r"^(whatsapp|email)$")
+    simulated_contact_id: uuid.UUID | None = None
+    simulated_conversation_id: uuid.UUID | None = None
+    simulated_is_first_message: bool = False
+
+
+class TestFireStepEntry(BaseModel):
+    """One line in the test-fire transcript."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    node_id: str
+    node_type: str
+    status: str
+    output_edge_label: str | None
+    skip_reason: str | None
+    error: str | None
+    output: dict[str, Any]
+
+
+class TestFireResponse(BaseModel):
+    """Test-fire result. Callers render ``steps`` as a transcript
+    and ``final_status`` in the header (``completed`` / ``canceled``
+    / ``errored`` / ``parked``)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: uuid.UUID
+    final_status: str
+    canceled_reason: str | None
+    error: str | None
+    steps: list[TestFireStepEntry]

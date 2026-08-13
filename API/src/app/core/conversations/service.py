@@ -381,6 +381,37 @@ async def send_outbound(
             user_id=user_id,
             org_id=conv.org_id,
         )
+
+    # tasks/chatbot-builder Step 6 — human-takeover cancel (Case #10).
+    # ``send_outbound`` is the human-authored outbound path; every
+    # message it inserts has ``chatbot_run_id IS NULL``. When a human
+    # jumps in on a conversation with a parked bot run, cancel the
+    # run so the bot doesn't step over the human's reply.
+    # Best-effort: any failure inside cancel is logged + swallowed
+    # so the outbound message itself is never rolled back.
+    try:
+        from src.app.core.chatbots import engine as _chatbot_engine
+
+        canceled = await _chatbot_engine.cancel_parked_runs_for_conversation(
+            session,
+            conversation_id=conv.id,
+            reason="human_took_over",
+        )
+        if canceled:
+            import logging
+
+            logging.getLogger(__name__).info(
+                "chatbots.human_takeover canceled=%d conv=%s user=%s",
+                canceled,
+                conv.id,
+                user_id,
+            )
+    except Exception:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "chatbots.human_takeover_failed conv=%s", conv.id
+        )
     return msg
 
 

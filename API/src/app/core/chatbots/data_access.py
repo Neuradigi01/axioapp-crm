@@ -14,11 +14,13 @@ import uuid
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.chatbots.models import (
     Chatbot,
     ChatbotRun,
+    ChatbotStepRun,
     ChatbotTriggerDiagnostic,
     ChatbotVersion,
 )
@@ -381,3 +383,180 @@ def insert_trigger_diagnostic(
     )
     session.add(row)
     return row
+
+
+# --- Step 6 engine helpers ------------------------------------------------
+
+
+async def get_run(
+    session: AsyncSession,
+    *,
+    run_id: uuid.UUID,
+) -> ChatbotRun | None:
+    """Load a run without org filter — the Celery task caller doesn't
+    have request context; the `org_id` is on the loaded row and every
+    subsequent query is scoped to it."""
+    return (
+        await session.execute(select(ChatbotRun).where(ChatbotRun.id == run_id))
+    ).scalar_one_or_none()
+
+
+async def list_parked_runs_for_conversation(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+) -> list[ChatbotRun]:
+    """All runs on a conversation currently in ``parked`` status. Hot
+    path is the partial index ``ix_chatbot_runs_conv_parked WHERE
+    status='parked'`` from Step 1."""
+    return list(
+        (
+            await session.execute(
+                select(ChatbotRun).where(
+                    ChatbotRun.conversation_id == conversation_id,
+                    ChatbotRun.status == "parked",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+def insert_step_run(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run_id: uuid.UUID,
+    node_id: str,
+    node_type: str,
+    status: str,
+    input: dict[str, Any] | None = None,
+    output: dict[str, Any] | None = None,
+    output_edge_label: str | None = None,
+    skip_reason: str | None = None,
+    error: str | None = None,
+) -> ChatbotStepRun:
+    """Append an audit row for one node execution. Caller commits.
+    Feeds the diagnostics UI in a follow-up track."""
+    row = ChatbotStepRun(
+        org_id=org_id,
+        run_id=run_id,
+        node_id=node_id,
+        node_type=node_type,
+        status=status,
+        input=input or {},
+        output=output or {},
+        output_edge_label=output_edge_label,
+        skip_reason=skip_reason,
+        error=error,
+    )
+    session.add(row)
+    return row
+
+
+# --- Meters (Decision §9) ------------------------------------------------
+
+
+async def increment_conversation_meter(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    bot_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    cap: int,
+) -> int | None:
+    """Atomically increment the per-(bot, conversation) reply counter
+    with cap + 24h-window reset. Returns the new count on success or
+    ``None`` when the cap is hit and the window hasn't rolled over.
+
+    Single-statement UPSERT so concurrent workers on the same
+    conversation can't lost-update each other. The partial-index
+    ``uq_chatbot_meters_bot_conv`` (Step 1) makes ON CONFLICT
+    deterministic for the per-(bot, conversation) shape.
+    """
+    stmt = sql_text(
+        """
+        INSERT INTO tbl_chatbot_meters (org_id, bot_id, conversation_id, count, window_start)
+        VALUES (:org_id, :bot_id, :conv_id, 1, now())
+        ON CONFLICT (org_id, bot_id, conversation_id)
+            WHERE bot_id IS NOT NULL AND conversation_id IS NOT NULL
+        DO UPDATE SET
+            count = CASE
+                WHEN now() > tbl_chatbot_meters.window_start + INTERVAL '24 hours' THEN 1
+                ELSE tbl_chatbot_meters.count + 1
+            END,
+            window_start = CASE
+                WHEN now() > tbl_chatbot_meters.window_start + INTERVAL '24 hours' THEN now()
+                ELSE tbl_chatbot_meters.window_start
+            END
+        WHERE tbl_chatbot_meters.count < :cap
+           OR now() > tbl_chatbot_meters.window_start + INTERVAL '24 hours'
+        RETURNING count
+        """
+    )
+    result = await session.execute(
+        stmt,
+        {"org_id": org_id, "bot_id": bot_id, "conv_id": conversation_id, "cap": cap},
+    )
+    row = result.first()
+    return int(row[0]) if row else None
+
+
+async def list_step_runs_for_run(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run_id: uuid.UUID,
+) -> list[ChatbotStepRun]:
+    """Ordered audit trail for one run. Feeds the test-fire response
+    transcript + the future diagnostics UI."""
+    return list(
+        (
+            await session.execute(
+                select(ChatbotStepRun)
+                .where(
+                    ChatbotStepRun.org_id == org_id,
+                    ChatbotStepRun.run_id == run_id,
+                )
+                .order_by(ChatbotStepRun.started_at.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+async def increment_org_meter(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    cap: int,
+) -> int | None:
+    """Atomically increment the per-org global reply counter. Same
+    semantics as :func:`increment_conversation_meter` but keyed on
+    the ``(bot_id IS NULL AND conversation_id IS NULL)`` partial
+    unique index."""
+    stmt = sql_text(
+        """
+        INSERT INTO tbl_chatbot_meters (org_id, bot_id, conversation_id, count, window_start)
+        VALUES (:org_id, NULL, NULL, 1, now())
+        ON CONFLICT (org_id)
+            WHERE bot_id IS NULL AND conversation_id IS NULL
+        DO UPDATE SET
+            count = CASE
+                WHEN now() > tbl_chatbot_meters.window_start + INTERVAL '24 hours' THEN 1
+                ELSE tbl_chatbot_meters.count + 1
+            END,
+            window_start = CASE
+                WHEN now() > tbl_chatbot_meters.window_start + INTERVAL '24 hours' THEN now()
+                ELSE tbl_chatbot_meters.window_start
+            END
+        WHERE tbl_chatbot_meters.count < :cap
+           OR now() > tbl_chatbot_meters.window_start + INTERVAL '24 hours'
+        RETURNING count
+        """
+    )
+    result = await session.execute(stmt, {"org_id": org_id, "cap": cap})
+    row = result.first()
+    return int(row[0]) if row else None

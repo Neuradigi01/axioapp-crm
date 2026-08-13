@@ -158,10 +158,12 @@ _TRANSACTION_EXCEPTIONS: dict[str, str] = {
     "core/workflows/engine.py": "Workflow execution engine (own txn / session)",
     "core/workflows/tasks.py": "Celery workflow workers (sweeps + A/B + cached counters)",
     "core/workflows/trigger_handlers.py": "Event-bus subscriber (own txn)",
-    # --- Chatbots module helpers (bus subscriber + engine — own session,
-    # run outside a request context). Mirrors the workflows exemption.
+    # --- Chatbots module helpers (bus subscriber + engine + Celery
+    # workers — own session semantics, run outside a request context).
+    # Mirrors the workflows exemption.
     "core/chatbots/engine.py": "Chatbot execution engine (own txn / session)",
     "core/chatbots/trigger_matcher.py": "Chatbot bus subscriber + matcher (own txn)",
+    "core/chatbots/tasks.py": "Celery chatbot workers (process_step + sweep_test_runs)",
     # --- Pack billing module — router-only PDF generation shell, completion deferred
     "packs/furniture/modules/billing/router.py": "Pack billing PDF stub (Phase 4 follow-up)",
 }
@@ -305,11 +307,12 @@ _HELPER_CRUD_EXCEPTIONS: dict[str, str] = {
     "core/workflows/trigger_handlers.py": "Event-bus subscriber (lookup + start_run)",
     "core/workflows/ab_testing.py": "A/B testing engine helper (own session)",
     "core/workflows/diagnostics.py": "Diagnostics trace (read-only, own session)",
-    # --- Chatbots module helpers (bus subscriber + engine). Own session
-    # semantics; the matcher + engine stub run under the bus subscriber's
-    # own async_session, not a request-scoped one.
-    "core/chatbots/engine.py": "Chatbot execution engine (CRUD on runs)",
+    # --- Chatbots module helpers (bus subscriber + engine + Celery
+    # workers). Own session semantics; the matcher + engine + sweeper
+    # run under their own async_session, not a request-scoped one.
+    "core/chatbots/engine.py": "Chatbot execution engine (CRUD on runs / step_runs)",
     "core/chatbots/trigger_matcher.py": "Chatbot bus subscriber (lookup + start_run + diagnostics)",
+    "core/chatbots/tasks.py": "Celery chatbot workers (sweeps + step processor)",
 }
 
 

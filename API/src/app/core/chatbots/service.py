@@ -24,6 +24,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.chatbots import data_access as dal
+from src.app.core.chatbots import engine as _engine
 from src.app.core.chatbots import save_target_registry as save_targets
 from src.app.core.chatbots.exceptions import (
     ChatbotNotFound,
@@ -355,6 +356,89 @@ async def rollback_to_version_service(
     await session.commit()
     await session.refresh(bot)
     return bot
+
+
+# --- Test-fire (Step 6) ---------------------------------------------------
+
+
+async def test_fire_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    chatbot_id: uuid.UUID,
+    simulated_inbound_text: str,
+    simulated_channel: str,
+    simulated_contact_id: uuid.UUID | None,
+    simulated_conversation_id: uuid.UUID | None,
+    simulated_is_first_message: bool,
+) -> dict[str, Any]:
+    """Dry-walk a bot's graph with a synthetic inbound. Case #22 /
+    Decision §17.
+
+    * ``is_test=True`` is FORCED on the created run — no operator
+      knob.
+    * Handlers see ``ctx.is_test=True`` so any handler that would
+      send / write skips the real dispatch and records a
+      transcript-only entry (Steps 7-10 wire that behaviour).
+    * The run is stepped inline (no Celery dispatch) so the caller
+      gets a complete transcript on return.
+    * The run row is persisted with ``is_test=true`` and swept by
+      :func:`core.chatbots.tasks.sweep_test_runs` after 24h.
+    """
+    bot = await get_chatbot_service(session, org_id=org_id, chatbot_id=chatbot_id)
+
+    synthetic_event = {
+        "org_id": str(org_id),
+        "conversation_id": (
+            str(simulated_conversation_id) if simulated_conversation_id else None
+        ),
+        "contact_id": str(simulated_contact_id) if simulated_contact_id else None,
+        "message_id": None,
+        "text": simulated_inbound_text,
+        "channel": simulated_channel,
+        "is_first_message": simulated_is_first_message,
+        "direction": "in",
+    }
+
+    run = await _engine.start_run(
+        session,
+        bot=bot,
+        event=synthetic_event,
+        is_test=True,
+    )
+
+    # Inline step loop — the engine's Celery dispatch is gated by
+    # `is_test`, so we step it here up to the hard cap and return
+    # whatever transcript accumulates.
+    hops = 0
+    while run.status == "running" and hops < 100:
+        hops += 1
+        await _engine.process_step(run.id)
+        # Reload run — process_step opens its own session + commits.
+        await session.refresh(run)
+
+    steps = await dal.list_step_runs_for_run(
+        session, org_id=org_id, run_id=run.id
+    )
+
+    return {
+        "run_id": run.id,
+        "final_status": run.status,
+        "canceled_reason": run.canceled_reason,
+        "error": run.error,
+        "steps": [
+            {
+                "node_id": s.node_id,
+                "node_type": s.node_type,
+                "status": s.status,
+                "output_edge_label": s.output_edge_label,
+                "skip_reason": s.skip_reason,
+                "error": s.error,
+                "output": s.output or {},
+            }
+            for s in steps
+        ],
+    }
 
 
 # --- internal helpers ------------------------------------------------------

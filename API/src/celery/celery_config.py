@@ -176,6 +176,12 @@ beat_schedule = {
         "task": "src.app.core.workflows.tasks.sweep_waits",
         "schedule": 60.0,
     },
+    # tasks/chatbot-builder Step 6 — hourly cleanup of test-fire
+    # ChatbotRun rows older than 24h. Case #22 / Decision §17.
+    "chatbots-sweep-test-runs": {
+        "task": "src.app.core.chatbots.tasks.sweep_test_runs",
+        "schedule": crontab(minute=15),
+    },
     # tasks/workflows Step 11 — every-2-min sweep that fires the
     # ``timeout`` outbound edge on parked ``flow_control.wait_for_event``
     # nodes whose ``expires_at`` has lapsed. Distinct from the

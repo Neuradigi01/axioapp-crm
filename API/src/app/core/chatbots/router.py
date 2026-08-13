@@ -44,6 +44,8 @@ from src.app.core.chatbots.schemas import (
     ChatbotRead,
     ChatbotUpdate,
     ChatbotVersionRead,
+    TestFireRequest,
+    TestFireResponse,
 )
 from src.app.core.users.models import User
 from src.app.shared.context import get_context
@@ -340,6 +342,39 @@ async def list_versions_endpoint(
     except ChatbotError as exc:
         raise _chatbot_http_map(exc) from exc
     return [ChatbotVersionRead.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/{chatbot_id}/test-fire",
+    response_model=TestFireResponse,
+)
+async def test_fire_endpoint(
+    chatbot_id: uuid.UUID,
+    payload: TestFireRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_EDIT)),
+) -> TestFireResponse:
+    """Dry-run a bot with a synthetic inbound. Case #22 /
+    Decision §17: ``dry_run=true`` is enforced server-side, sends
+    are transcript-only, save-to writes go to per-run scratch, and
+    the test run auto-deletes after 24h.
+
+    Requires ``chatbots.edit`` (this is authoring, not consumption)."""
+    org_id = _require_org_id()
+    try:
+        result = await chatbots_service.test_fire_service(
+            db,
+            org_id=org_id,
+            chatbot_id=chatbot_id,
+            simulated_inbound_text=payload.simulated_inbound_text,
+            simulated_channel=payload.simulated_channel,
+            simulated_contact_id=payload.simulated_contact_id,
+            simulated_conversation_id=payload.simulated_conversation_id,
+            simulated_is_first_message=payload.simulated_is_first_message,
+        )
+    except ChatbotError as exc:
+        raise _chatbot_http_map(exc) from exc
+    return TestFireResponse(**result)
 
 
 @router.post(
