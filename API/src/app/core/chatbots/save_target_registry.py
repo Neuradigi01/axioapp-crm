@@ -250,6 +250,144 @@ async def validate_save_target(
     )
 
 
+async def write_save_target(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    qualified_key: str,
+    value: Any,
+    contact_id: uuid.UUID | None,
+    lead_id: uuid.UUID | None,
+) -> dict[str, Any]:
+    """Persist ``value`` to the target described by ``qualified_key``.
+
+    Re-validates the target at write-time (Case #6 mid-run rename
+    guard) — even if the picker allowed the target at save-time, a
+    custom field could have been renamed / deleted since.
+
+    Returns a small dict describing what was written (for the
+    step_run's ``output`` transcript). Raises
+    :class:`InvalidSaveTarget` when the target no longer resolves
+    or the entity object is missing — caller records that in a
+    ``save_failed`` skip on the step run.
+
+    ``run_variable.<name>`` targets are handled by the caller (they
+    live in the run's ``context.answers``); this function only
+    persists to Contact / Lead rows.
+    """
+    if qualified_key.startswith("run_variable."):
+        # Caller stores this in ``run.context.answers`` directly —
+        # nothing hits the DB.
+        return {"entity": "run_variable", "field_key": qualified_key.split(".", 1)[1]}
+
+    target = await validate_save_target(
+        session, org_id=org_id, qualified_key=qualified_key
+    )
+
+    if target.entity == "contact":
+        if contact_id is None:
+            raise InvalidSaveTarget(
+                f"save_to '{qualified_key}' requires a contact_id — the run has none"
+            )
+        return await _write_to_contact(
+            session,
+            org_id=org_id,
+            contact_id=contact_id,
+            target=target,
+            value=value,
+        )
+    if target.entity == "lead":
+        if lead_id is None:
+            raise InvalidSaveTarget(
+                f"save_to '{qualified_key}' requires a lead_id — the run has none"
+            )
+        return await _write_to_lead(
+            session,
+            org_id=org_id,
+            lead_id=lead_id,
+            target=target,
+            value=value,
+        )
+    if target.entity == "walk_in":
+        # v1 doesn't support walk_in save targets from bots (bots
+        # run against Conversation → Contact, not a walk_in row).
+        # The picker already excludes walk_in; this is defence-in-
+        # depth in case a graph is imported from a different env.
+        raise InvalidSaveTarget(
+            "walk_in save targets aren't supported from bots (Case #21)"
+        )
+
+    raise InvalidSaveTarget(f"unsupported entity '{target.entity}' for bot save_to")
+
+
+async def _write_to_contact(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    contact_id: uuid.UUID,
+    target: SaveTarget,
+    value: Any,
+) -> dict[str, Any]:
+    contact = await dal.load_contact_for_bot_write(
+        session, org_id=org_id, contact_id=contact_id
+    )
+    if contact is None:
+        raise InvalidSaveTarget(f"contact {contact_id} not found in org")
+
+    if target.is_custom:
+        current = dict(contact.custom_data or {})
+        current[target.field_key] = value
+        contact.custom_data = current
+    else:
+        # Standard field write — belt-and-braces guard against a
+        # bot writing to a sensitive column that slipped past the
+        # picker allow-list. hasattr() also rejects fields that
+        # were removed from the ORM since the graph was saved.
+        if not hasattr(contact, target.field_key):
+            raise InvalidSaveTarget(
+                f"contact has no column '{target.field_key}'"
+            )
+        setattr(contact, target.field_key, value)
+
+    return {
+        "entity": "contact",
+        "contact_id": str(contact_id),
+        "field_key": target.field_key,
+        "is_custom": target.is_custom,
+    }
+
+
+async def _write_to_lead(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    lead_id: uuid.UUID,
+    target: SaveTarget,
+    value: Any,
+) -> dict[str, Any]:
+    lead = await dal.load_lead_for_bot_write(
+        session, org_id=org_id, lead_id=lead_id
+    )
+    if lead is None:
+        raise InvalidSaveTarget(f"lead {lead_id} not found in org")
+
+    if target.is_custom:
+        current = dict(lead.custom_data or {})
+        current[target.field_key] = value
+        lead.custom_data = current
+    else:
+        if not hasattr(lead, target.field_key):
+            raise InvalidSaveTarget(f"lead has no column '{target.field_key}'")
+        setattr(lead, target.field_key, value)
+
+    return {
+        "entity": "lead",
+        "lead_id": str(lead_id),
+        "field_key": target.field_key,
+        "is_custom": target.is_custom,
+    }
+
+
 def collect_save_targets_from_graph(graph: dict[str, Any]) -> list[str]:
     """Walk a graph payload and return every ``config.save_to`` value
     found on Ask-* / Set-Custom-Field nodes. The service calls

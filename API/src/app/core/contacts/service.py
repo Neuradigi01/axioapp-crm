@@ -115,6 +115,76 @@ async def get_contact_by_phone(session: AsyncSession, phone: str) -> Contact | N
     return await data_access.get_contact_by_phone(session, phone)
 
 
+async def get_or_create_placeholder_contact(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    external_id: str,
+    channel: str,
+) -> Contact:
+    """Idempotent placeholder-contact resolver
+    (``tasks/chatbot-builder`` Case #7 + #23).
+
+    Chatbots need a Contact to persist Ask-* answers against, but an
+    inbound from an unknown phone / email doesn't yet have one. This
+    helper looks up (phone or email) → Contact; if none exists,
+    creates a minimal row flagged ``is_placeholder=true`` for the
+    nightly TTL sweeper to reclaim if no meaningful interaction
+    follows within 30 days.
+
+    Repeat calls with the same ``(org_id, external_id, channel)``
+    return the same row — safe for the matcher to invoke on every
+    inbound.
+    """
+    normalised = (external_id or "").strip()
+    if not normalised:
+        raise ValueError("external_id is required")
+
+    if channel == "whatsapp":
+        existing = await data_access.get_contact_by_phone(session, normalised)
+        if existing is not None and existing.org_id == org_id:
+            return existing
+        contact = Contact(
+            org_id=org_id,
+            phone=normalised,
+            full_name=f"Contact {normalised[-4:]}",
+            source="chatbot_placeholder",
+            is_placeholder=True,
+        )
+    elif channel == "email":
+        # Contact lookup by email — no data_access helper today so
+        # we do a scoped query here. Service layer is allowed to
+        # compose reads (not execute them) — this stays on the
+        # ``get_contact_by_email`` DAL helper if it exists.
+        from sqlalchemy import select
+
+        existing = (
+            await session.execute(
+                select(Contact).where(
+                    Contact.org_id == org_id,
+                    Contact.email == normalised,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            return existing
+        contact = Contact(
+            org_id=org_id,
+            email=normalised,
+            full_name=normalised.split("@", 1)[0] if "@" in normalised else normalised,
+            source="chatbot_placeholder",
+            is_placeholder=True,
+        )
+    else:
+        raise ValueError(f"unsupported channel for placeholder contact: {channel!r}")
+
+    session.add(contact)
+    await session.flush()
+    await session.commit()
+    await session.refresh(contact)
+    return contact
+
+
 async def hydrate_contacts_by_ids(
     session: AsyncSession,
     *,

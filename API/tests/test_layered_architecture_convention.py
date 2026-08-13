@@ -166,6 +166,10 @@ _TRANSACTION_EXCEPTIONS: dict[str, str] = {
     "core/chatbots/tasks.py": "Celery chatbot workers (process_step + sweep_test_runs)",
     "core/chatbots/channel_bridge.py": "Bot-outbound sender (own txn, mirrors WA auto_reply.py)",
     "core/chatbots/nodes/template.py": "Template node retags outbound Message as bot-authored",
+    "core/chatbots/nodes/ask_question.py": "Ask-Question handler commits after save-target write",
+    "core/chatbots/nodes/ask_address.py": "Ask-Address handler commits after save-target write",
+    "core/chatbots/nodes/ask_location.py": "Ask-Location handler commits after save-target write",
+    "core/chatbots/nodes/ask_media.py": "Ask-Media handler commits after save-target write",
     # --- Pack billing module — router-only PDF generation shell, completion deferred
     "packs/furniture/modules/billing/router.py": "Pack billing PDF stub (Phase 4 follow-up)",
 }

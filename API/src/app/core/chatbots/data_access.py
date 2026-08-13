@@ -525,6 +525,39 @@ async def increment_conversation_meter(
     return int(row[0]) if row else None
 
 
+async def load_contact_for_bot_write(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    contact_id: uuid.UUID,
+) -> "Contact | None":  # noqa: UP037
+    """Fetch a Contact row for the Ask-* nodes' save-to path.
+    Tenant-scoped."""
+    from src.app.core.contacts.models import Contact
+
+    return (
+        await session.execute(
+            select(Contact).where(Contact.org_id == org_id, Contact.id == contact_id)
+        )
+    ).scalar_one_or_none()
+
+
+async def load_lead_for_bot_write(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    lead_id: uuid.UUID,
+) -> "Lead | None":  # noqa: UP037
+    """Fetch a Lead row for the Ask-* nodes' save-to path."""
+    from src.app.core.leads.models import Lead
+
+    return (
+        await session.execute(
+            select(Lead).where(Lead.org_id == org_id, Lead.id == lead_id)
+        )
+    ).scalar_one_or_none()
+
+
 async def load_conversation_for_bot(
     session: AsyncSession,
     *,

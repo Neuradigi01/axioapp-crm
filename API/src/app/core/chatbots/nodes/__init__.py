@@ -21,6 +21,10 @@ from __future__ import annotations
 # Side-effect imports — each module calls ``engine.register_node``
 # at its bottom, so importing the package registers everything.
 from src.app.core.chatbots.nodes import (  # noqa: F401
+    ask_address,
+    ask_location,
+    ask_media,
+    ask_question,
     catalog_message,
     list as _list_node,
     media_button,
