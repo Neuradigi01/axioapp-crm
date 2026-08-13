@@ -7,7 +7,15 @@
   >
     <header class="border-b border-subtle pb-2">
       <h3 class="text-sm font-semibold text-default">{{ a.title }}</h3>
-      <div class="mt-0.5 flex items-center gap-2">
+      <p
+        class="mt-1 inline-flex items-center gap-1.5 font-mono text-[11px] tabular-nums text-default"
+      >
+        <lucide-icon name="calendar-clock" class="h-3 w-3 text-muted" aria-hidden="true" />
+        {{ whenLabel() }}
+        <span class="text-faint">·</span>
+        <span class="text-muted">{{ a.duration_min }} min</span>
+      </p>
+      <div class="mt-1 flex items-center gap-2">
         <p class="text-[10px] uppercase tracking-wide text-muted">
           {{ a.status }}
         </p>

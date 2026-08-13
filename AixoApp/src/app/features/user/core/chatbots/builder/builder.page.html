@@ -1,0 +1,329 @@
+<div class="flex flex-col h-screen bg-app">
+  <!-- Top bar -->
+  <header
+    class="flex items-center gap-3 px-4 py-2.5 border-b border-subtle bg-surface flex-shrink-0"
+  >
+    <a
+      routerLink="/user/chatbots"
+      class="p-1.5 rounded hover:bg-surface-2 text-muted"
+      aria-label="Back to chat bots"
+    >
+      <lucide-icon name="arrow-left" size="16"></lucide-icon>
+    </a>
+    <div class="flex items-center gap-2 flex-1 min-w-0">
+      <h1 class="text-sm font-semibold text-default truncate">
+        {{ bot()?.name ?? 'Loading…' }}
+      </h1>
+      @if (bot()) {
+        <span
+          [class]="
+            'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ' +
+            (isLive() ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500')
+          "
+        >
+          {{ bot()?.status }}
+        </span>
+      }
+      @if (dirty()) {
+        <span class="text-[11px] text-amber-500">• Unsaved</span>
+      }
+    </div>
+
+    @if (error()) {
+      <span class="text-xs text-red-500 mr-2">{{ error() }}</span>
+    }
+
+    <button
+      type="button"
+      (click)="toggleLive()"
+      [disabled]="!bot() || dirty() || saving()"
+      [class]="
+        'px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ' +
+        (isLive()
+          ? 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25'
+          : 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25') +
+        ' disabled:opacity-40 disabled:cursor-not-allowed'
+      "
+    >
+      {{ isLive() ? 'Pause' : 'Make Live' }}
+    </button>
+
+    <button
+      type="button"
+      (click)="save()"
+      [disabled]="!dirty() || saving()"
+      class="px-3.5 py-1.5 bg-accent-soft text-accent hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-md text-xs font-semibold"
+    >
+      {{ saving() ? 'Saving…' : 'Save' }}
+    </button>
+  </header>
+
+  <!-- Body -->
+  <div class="flex flex-1 min-h-0">
+    @if (loading()) {
+      <div class="flex-1 flex items-center justify-center text-sm text-muted">
+        <lucide-icon name="loader-2" size="16" class="animate-spin mr-2"></lucide-icon>
+        Loading builder…
+      </div>
+    } @else if (!bot()) {
+      <div class="flex-1 flex items-center justify-center text-sm text-red-500">Bot not found.</div>
+    } @else {
+      <!-- Palette -->
+      <app-chatbot-palette (add)="onPaletteAdd($event)"></app-chatbot-palette>
+
+      <!-- Canvas -->
+      <main
+        class="flex-1 overflow-auto relative bg-app"
+        style="
+          background-image: radial-gradient(
+            circle at 1px 1px,
+            rgba(127, 127, 127, 0.15) 1px,
+            transparent 0
+          );
+          background-size: 22px 22px;
+        "
+        (click)="onCanvasClick()"
+      >
+        @if (isConnecting()) {
+          <div
+            class="sticky top-2 z-30 mx-auto w-fit px-3 py-1.5 rounded-full text-[11px] font-medium bg-accent-soft text-accent border border-accent/40 shadow-md"
+          >
+            Click a node's left dot to connect · Esc / click canvas to cancel
+          </div>
+        }
+
+        <div class="p-6 min-w-[1400px] min-h-[900px] relative">
+          <!-- Edges — SVG overlay, behind the node cards -->
+          <svg
+            class="absolute inset-0 pointer-events-none"
+            width="100%"
+            height="100%"
+            style="overflow: visible"
+          >
+            <defs>
+              <marker
+                id="chatbot-edge-arrow"
+                viewBox="0 0 10 10"
+                refX="8"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+              </marker>
+            </defs>
+            <g class="text-accent">
+              @for (edge of renderedEdges(); track edge.id) {
+                <path
+                  [attr.d]="edge.d"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  fill="none"
+                  marker-end="url(#chatbot-edge-arrow)"
+                  opacity="0.9"
+                />
+              }
+            </g>
+          </svg>
+
+          <!-- Trigger card (always at top-left) -->
+          <button
+            type="button"
+            (click)="openTriggerModal(); $event.stopPropagation()"
+            class="relative block w-[320px] p-4 rounded-xl border-2 border-accent bg-accent-soft text-left hover:brightness-110 transition-colors"
+          >
+            <div class="flex items-center gap-2">
+              <span
+                class="w-6 h-6 rounded bg-accent-soft inline-flex items-center justify-center text-accent"
+              >
+                <lucide-icon name="zap" size="14"></lucide-icon>
+              </span>
+              <span class="text-xs font-semibold text-default uppercase tracking-wide">
+                Trigger
+              </span>
+              <span class="text-[10px] text-muted ml-auto">click to edit</span>
+            </div>
+            <div class="mt-3 text-sm font-medium text-default">
+              {{ triggerSummary() }}
+            </div>
+            @if (triggerConfig()?.mode === 'keyword' && triggerConfig()?.keywords?.length) {
+              <div class="mt-2 flex flex-wrap gap-1">
+                @for (kw of triggerConfig()?.keywords ?? []; track kw) {
+                  <span
+                    class="inline-flex px-2 py-0.5 rounded-full text-[10px] bg-surface text-default"
+                  >
+                    {{ kw }}
+                  </span>
+                }
+              </div>
+            }
+            <div class="mt-2 text-[10px] text-muted">
+              Channel: {{ triggerConfig()?.channel ?? 'any' }}
+            </div>
+
+            <!-- Trigger output port (single) -->
+            <span
+              (click)="onOutputPortClick('trigger', null, $event)"
+              [class]="
+                'absolute right-[-8px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-accent cursor-pointer transition-colors ' +
+                (pendingSourceId() === 'trigger'
+                  ? 'bg-accent'
+                  : 'bg-surface hover:bg-accent hover:border-accent')
+              "
+              title="Drag from here to a node's left dot to connect"
+              aria-label="Trigger output port"
+            ></span>
+          </button>
+
+          <!-- Nodes -->
+          @for (node of nodes(); track node.id) {
+            <div
+              [style.left.px]="node.position.x + 380"
+              [style.top.px]="node.position.y"
+              [class]="
+                'absolute w-[320px] bg-surface border rounded-xl shadow-lg transition-colors ' +
+                (selectedNodeId() === node.id
+                  ? 'border-accent ring-2 ring-accent/20'
+                  : 'border-subtle hover:border-default')
+              "
+              (click)="selectNode(node.id); $event.stopPropagation()"
+            >
+              <!-- Node header -->
+              <div class="flex items-center gap-2 px-3 py-2.5 border-b border-subtle relative">
+                <lucide-icon
+                  [name]="nodeMeta(node.type)?.icon ?? 'list'"
+                  size="14"
+                  class="text-muted"
+                ></lucide-icon>
+                <span class="text-xs font-semibold text-default flex-1 truncate">
+                  {{ nodeMeta(node.type)?.label ?? node.type }}
+                </span>
+                @if (nodeMeta(node.type)?.beta) {
+                  <span
+                    class="px-1 py-px text-[8px] font-bold uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-500 rounded"
+                  >
+                    Beta
+                  </span>
+                }
+                <button
+                  type="button"
+                  (click)="deleteNode(node.id, $event)"
+                  class="p-1 rounded hover:bg-red-500/10 text-muted hover:text-red-500"
+                  aria-label="Delete node"
+                >
+                  <lucide-icon name="trash-2" size="12"></lucide-icon>
+                </button>
+
+                <!-- Input port (left) -->
+                <span
+                  (click)="onInputPortClick(node.id, $event)"
+                  [class]="
+                    'absolute left-[-8px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-subtle cursor-pointer transition-colors ' +
+                    (isConnecting()
+                      ? 'bg-surface ring-2 ring-accent/40 hover:bg-accent hover:border-accent'
+                      : 'bg-surface hover:bg-accent hover:border-accent')
+                  "
+                  title="Click to connect the pending edge to this node"
+                  aria-label="Input port"
+                ></span>
+              </div>
+
+              <!-- Node body — schema-driven form when the node type
+                   has a `configSchema`, JSON fallback otherwise (drops
+                   away as we ship remaining schemas in Push 2). -->
+              <div class="p-3 space-y-2">
+                @if (nodeMeta(node.type)?.configSchema; as schema) {
+                  <app-node-config-form
+                    [schema]="schema"
+                    [config]="node.config"
+                    (patch)="patchNodeConfig(node.id, $event)"
+                  ></app-node-config-form>
+                } @else {
+                  <label class="block text-[10px] font-medium text-muted uppercase tracking-wide">
+                    Config (JSON)
+                  </label>
+                  <textarea
+                    #cfgTextarea
+                    [value]="node.config | json"
+                    (input)="updateNodeConfigJson(node.id, cfgTextarea.value)"
+                    rows="6"
+                    class="w-full px-2 py-2 text-[11px] font-mono bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent resize-y"
+                  ></textarea>
+                  <p class="text-[10px] text-muted">
+                    Unknown node type — showing raw JSON. Update the frontend registry to add a
+                    schema for this type.
+                  </p>
+                }
+              </div>
+
+              <!-- Output ports — one per label for `labeled`, or a
+                   single generic port for `single` / `dynamic`. Wire-
+                   up for per-button output ports on dynamic types is
+                   a follow-up; for now the whole node has one port
+                   to keep click-to-connect simple. -->
+              <div
+                class="flex flex-col items-end gap-1 px-3 pb-2 pt-1 border-t border-subtle bg-app/40"
+              >
+                @if (
+                  nodeMeta(node.type)?.outputs === 'labeled' && nodeMeta(node.type)?.labels?.length
+                ) {
+                  @for (lbl of nodeMeta(node.type)?.labels ?? []; track lbl; let li = $index) {
+                    <div
+                      class="flex items-center gap-1.5 text-[10px] text-muted relative w-full justify-end"
+                    >
+                      <span>{{ lbl }}</span>
+                      <span
+                        (click)="onOutputPortClick(node.id, lbl, $event)"
+                        [class]="
+                          'w-3 h-3 rounded-full border-2 border-accent cursor-pointer transition-colors ' +
+                          (pendingSourceId() === node.id && canvas.pendingSourceLabel() === lbl
+                            ? 'bg-accent'
+                            : 'bg-surface hover:bg-accent')
+                        "
+                        title="Click to start a connection from this port"
+                        aria-label="Output port"
+                      ></span>
+                    </div>
+                  }
+                } @else {
+                  <div class="flex items-center gap-1.5 text-[10px] text-muted">
+                    <span>next</span>
+                    <span
+                      (click)="onOutputPortClick(node.id, null, $event)"
+                      [class]="
+                        'w-3 h-3 rounded-full border-2 border-accent cursor-pointer transition-colors ' +
+                        (pendingSourceId() === node.id ? 'bg-accent' : 'bg-surface hover:bg-accent')
+                      "
+                      title="Click to start a connection from this port"
+                      aria-label="Output port"
+                    ></span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </main>
+    }
+  </div>
+</div>
+
+@if (triggerModalOpen() && triggerConfig(); as _open) {
+  <app-chatbot-trigger-modal
+    [config]="triggerConfig()!"
+    (save)="onTriggerSave($event)"
+    (close)="triggerModalOpen.set(false)"
+  ></app-chatbot-trigger-modal>
+}
+
+@if (deleteNodeId()) {
+  <app-confirm-dialog
+    [title]="'Delete this node?'"
+    [body]="'Its outbound edges will be removed too.'"
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    (confirm)="confirmDeleteNode()"
+    (cancel)="cancelDeleteNode()"
+  ></app-confirm-dialog>
+}

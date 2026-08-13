@@ -1,0 +1,245 @@
+<div class="flex flex-col h-full min-h-0 bg-app">
+  <!-- Header -->
+  <header class="flex items-center gap-3 px-6 py-4 border-b border-subtle bg-surface flex-shrink-0">
+    <div class="flex-1">
+      <h1 class="text-xl font-semibold text-default">Chat Bots</h1>
+      <p class="text-xs text-muted mt-0.5">
+        Design bot flows for inbound WhatsApp + email conversations.
+      </p>
+    </div>
+    <label
+      class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-subtle bg-surface text-default text-sm font-medium hover:bg-surface-2 cursor-pointer"
+    >
+      <lucide-icon name="upload" size="16"></lucide-icon>
+      Import
+      <input type="file" accept="application/json" class="hidden" (change)="onImportFile($event)" />
+    </label>
+    <button
+      type="button"
+      (click)="openCreateModal()"
+      class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-accent-soft text-accent text-sm font-medium hover:brightness-110"
+    >
+      <lucide-icon name="plus" size="16"></lucide-icon>
+      New bot
+    </button>
+  </header>
+
+  <!-- Filter bar -->
+  <div class="flex items-center gap-3 px-6 py-3 border-b border-subtle bg-surface flex-shrink-0">
+    <div class="flex items-center gap-2 flex-wrap">
+      @for (filter of statusFilters; track filter.value) {
+        <button
+          type="button"
+          (click)="selectedStatus.set(filter.value)"
+          [class]="
+            'px-3 py-1.5 rounded-full text-xs font-medium transition-colors ' +
+            (selectedStatus() === filter.value
+              ? filter.tone + ' ring-1 ring-inset ring-subtle'
+              : 'text-muted hover:text-default hover:bg-surface-2')
+          "
+        >
+          {{ filter.label }}
+        </button>
+      }
+    </div>
+
+    <div class="flex-1"></div>
+
+    <div class="relative">
+      <lucide-icon
+        name="search"
+        size="14"
+        class="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+      ></lucide-icon>
+      <input
+        type="text"
+        [ngModel]="search()"
+        (ngModelChange)="search.set($event)"
+        placeholder="Search bots…"
+        class="pl-9 pr-3 py-2 w-64 text-sm bg-surface text-default border border-subtle rounded-lg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+      />
+    </div>
+  </div>
+
+  <!-- Error banner -->
+  @if (error()) {
+    <div
+      class="px-6 py-2 bg-red-500/10 border-b border-red-500/30 text-sm text-red-500 flex-shrink-0"
+    >
+      {{ error() }}
+    </div>
+  }
+
+  <!-- Body -->
+  <main class="flex-1 overflow-auto">
+    @if (loading()) {
+      <div class="flex items-center justify-center h-full text-sm text-muted">
+        <lucide-icon name="loader-2" size="16" class="animate-spin mr-2"></lucide-icon>
+        Loading chat bots…
+      </div>
+    } @else if (!hasAnyRows()) {
+      <!-- Empty state -->
+      <div class="flex flex-col items-center justify-center h-full text-center px-6 py-12">
+        <div
+          class="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 text-muted"
+        >
+          <lucide-icon name="bot" size="32"></lucide-icon>
+        </div>
+        <h2 class="text-lg font-semibold text-default">No chat bots yet</h2>
+        <p class="text-sm text-muted mt-1 max-w-md">
+          Design bot flows for inbound WhatsApp + email conversations. Trigger on keywords, ask
+          questions, and hand off to a human when needed.
+        </p>
+        <button
+          type="button"
+          (click)="openCreateModal()"
+          class="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-soft text-accent text-sm font-medium hover:brightness-110"
+        >
+          <lucide-icon name="plus" size="16"></lucide-icon>
+          Create your first bot
+        </button>
+      </div>
+    } @else if (!hasRows()) {
+      <div
+        class="flex flex-col items-center justify-center h-full text-center px-6 py-12 text-muted text-sm"
+      >
+        No bots match your search.
+      </div>
+    } @else {
+      <!-- Table -->
+      <div class="min-w-full">
+        <table class="min-w-full text-sm">
+          <thead class="bg-app border-b border-subtle sticky top-0">
+            <tr class="text-left text-xs uppercase tracking-wider text-muted">
+              <th class="px-6 py-3 font-medium">Name</th>
+              <th class="px-6 py-3 font-medium">Trigger</th>
+              <th class="px-6 py-3 font-medium">Status</th>
+              <th class="px-6 py-3 font-medium">Category</th>
+              <th class="px-6 py-3 font-medium">Updated</th>
+              <th class="px-6 py-3 font-medium w-12"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-subtle">
+            @for (row of filteredRows(); track row.id) {
+              <tr class="bg-surface hover:bg-surface-2">
+                <td class="px-6 py-3">
+                  <a
+                    [routerLink]="['/user/chatbots', row.id, 'edit']"
+                    class="text-default font-medium hover:underline"
+                  >
+                    {{ row.name }}
+                  </a>
+                  @if (row.description) {
+                    <div class="text-xs text-muted mt-0.5 line-clamp-1">
+                      {{ row.description }}
+                    </div>
+                  }
+                </td>
+                <td class="px-6 py-3 text-default">
+                  {{ triggerSummary(row) }}
+                  <span class="text-xs text-muted ml-1"
+                    >·
+                    {{ row.trigger_config.channel }}
+                  </span>
+                </td>
+                <td class="px-6 py-3">
+                  <span
+                    [class]="
+                      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ' +
+                      statusTone(row.status)
+                    "
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full bg-current opacity-60"></span>
+                    {{ row.status }}
+                  </span>
+                </td>
+                <td class="px-6 py-3 text-default">{{ row.category }}</td>
+                <td class="px-6 py-3 text-muted text-xs">
+                  {{ row.updated_at | date: 'MMM d, y, h:mm a' }}
+                </td>
+                <td class="px-6 py-3 relative text-right">
+                  <button
+                    type="button"
+                    (click)="toggleActionsMenu(row.id)"
+                    class="p-1.5 rounded hover:bg-surface-2 text-muted"
+                    aria-label="Row actions"
+                  >
+                    <lucide-icon name="more-vertical" size="16"></lucide-icon>
+                  </button>
+                  @if (actionsMenuFor() === row.id) {
+                    <div
+                      class="absolute right-6 top-10 z-10 w-44 bg-surface border border-subtle rounded-lg shadow-lg py-1"
+                    >
+                      <a
+                        [routerLink]="['/user/chatbots', row.id, 'edit']"
+                        class="block px-3 py-1.5 text-sm text-default hover:bg-surface-2"
+                        >Edit</a
+                      >
+                      <button
+                        type="button"
+                        (click)="exportBot(row)"
+                        class="block w-full text-left px-3 py-1.5 text-sm text-default hover:bg-surface-2"
+                      >
+                        Export JSON
+                      </button>
+                      @if (row.status === 'draft' || row.status === 'paused') {
+                        <button
+                          type="button"
+                          (click)="publish(row)"
+                          class="block w-full text-left px-3 py-1.5 text-sm text-emerald-500 hover:bg-emerald-500/10"
+                        >
+                          Publish (make Live)
+                        </button>
+                      }
+                      @if (row.status === 'live') {
+                        <button
+                          type="button"
+                          (click)="pause(row)"
+                          class="block w-full text-left px-3 py-1.5 text-sm text-sky-500 hover:bg-sky-500/10"
+                        >
+                          Pause
+                        </button>
+                      }
+                      @if (row.status !== 'archived') {
+                        <div class="my-1 border-t border-subtle"></div>
+                        <button
+                          type="button"
+                          (click)="archive(row)"
+                          class="block w-full text-left px-3 py-1.5 text-sm text-red-500 hover:bg-red-500/10"
+                        >
+                          Archive
+                        </button>
+                      }
+                    </div>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </main>
+</div>
+
+@if (createModalOpen()) {
+  <app-chatbot-create-modal
+    [submitting]="createSubmitting()"
+    [errorMessage]="createError()"
+    (create)="submitCreateBot($event)"
+    (close)="closeCreateModal()"
+  ></app-chatbot-create-modal>
+}
+
+@if (archiveTarget(); as target) {
+  <app-confirm-dialog
+    [title]="'Archive ' + target.name + '?'"
+    [body]="'Existing parked runs will be canceled.'"
+    [confirmLabel]="'Archive'"
+    [danger]="true"
+    [submitting]="archiveSubmitting()"
+    [error]="archiveError()"
+    (confirm)="confirmArchive()"
+    (cancel)="cancelArchive()"
+  ></app-confirm-dialog>
+}

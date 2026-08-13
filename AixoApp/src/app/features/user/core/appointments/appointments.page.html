@@ -316,9 +316,9 @@
               >
                 <span
                   class="hidden font-mono text-[11px] whitespace-nowrap text-faint tabular-nums lg:inline"
-                  [title]="a.last_activity_at ? 'Last activity' : ''"
+                  [title]="a.last_activity_at ? 'Last activity' : 'Created'"
                 >
-                  {{ a.last_activity_at | relativeTime }}
+                  {{ a.last_activity_at ?? a.created_at | relativeTime }}
                 </span>
                 <span
                   class="hidden items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ring-1 md:inline-flex"

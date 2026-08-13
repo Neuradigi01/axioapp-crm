@@ -128,8 +128,8 @@ export class AppointmentsPageComponent {
 
   // --- Filter + sort + scope ---------------------------------------------
 
-  readonly sortKey = signal<AppointmentSortKey>('scheduled_at');
-  readonly sortOrder = signal<SortOrder>('asc');
+  readonly sortKey = signal<AppointmentSortKey>('created_at');
+  readonly sortOrder = signal<SortOrder>('desc');
   readonly statusFilter = signal<StatusFilter>('all');
   readonly chips = FILTER_CHIPS;
 
@@ -276,7 +276,7 @@ export class AppointmentsPageComponent {
         }
       },
       queryKey: 'sort',
-      defaultValue: 'scheduled_at',
+      defaultValue: 'created_at',
     },
     order: {
       read: () => this.sortOrder(),
@@ -284,7 +284,7 @@ export class AppointmentsPageComponent {
         if (v === 'asc' || v === 'desc') this.sortOrder.set(v);
       },
       queryKey: 'order',
-      defaultValue: 'asc',
+      defaultValue: 'desc',
     },
   };
 

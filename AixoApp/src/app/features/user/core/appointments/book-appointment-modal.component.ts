@@ -8,7 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, Subject } from 'rxjs';
@@ -200,7 +200,22 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
     assigned_to_id: this.assigneeControl,
   });
 
-  readonly canSubmit = computed(() => this.me() !== null && !this.submitting$());
+  /** Reactive form validity — `form.valid` is a plain getter and won't
+   *  refresh a computed on its own, so pipe status changes through a
+   *  signal. Seeded with the current status (`INVALID` on first render
+   *  because `title`, `scheduled_at`, `duration_min`, and
+   *  `assigned_to_id` all start blank / required). */
+  private readonly formStatus = toSignal(this.form.statusChanges, {
+    initialValue: this.form.status,
+  });
+
+  readonly canSubmit = computed(
+    () =>
+      this.me() !== null &&
+      !this.submitting$() &&
+      this.formStatus() === 'VALID' &&
+      this.selectedContact() !== null,
+  );
 
   override ngOnInit(): void {
     super.ngOnInit();

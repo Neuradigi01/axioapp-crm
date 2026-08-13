@@ -358,6 +358,28 @@ export const userRoutes: Routes = [
           import('./core/workflows/workflows.page').then((m) => m.WorkflowsPageComponent),
       },
       {
+        // tasks/chatbot-builder Step 12 — chatbots list page. Sidebar
+        // entry is auto-registered by backend `core.chatbots.module.py`
+        // (Step 3); this route is what the sidebar item links to.
+        // Builder page + node editors land in Steps 13-14.
+        path: 'chatbots',
+        canActivate: [permissionGuard('chatbots.view')],
+        loadComponent: () =>
+          import('./core/chatbots/list/chatbots-list.page').then(
+            (m) => m.ChatbotsListPageComponent,
+          ),
+      },
+      {
+        // tasks/chatbot-builder Step 13 — Pabbly-style bot builder
+        // canvas. Write-gated because every interaction implies a
+        // mutation; read-only Employees land on the list page and
+        // see disabled "Edit" affordances there.
+        path: 'chatbots/:id/edit',
+        canActivate: [permissionGuard('chatbots.edit')],
+        loadComponent: () =>
+          import('./core/chatbots/builder/builder.page').then((m) => m.ChatbotBuilderPageComponent),
+      },
+      {
         // tasks/workflows Step 16 — gallery of 15 default workflow
         // templates. Read-gated; the "Use this template" CTA inside
         // the page needs `workflows.clone` server-side, but the
