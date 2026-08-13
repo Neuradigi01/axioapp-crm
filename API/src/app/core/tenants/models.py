@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, time
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Integer, Numeric, String, Text, Time, text
+from sqlalchemy import Boolean, DateTime, Integer, LargeBinary, Numeric, String, Text, Time, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -95,4 +95,14 @@ class Organization(Base):
         Boolean,
         nullable=False,
         server_default=text("true"),
+    )
+    # tasks/chatbot-builder Step 11 — 32-byte per-org HMAC key that
+    # signs email-reply URLs the customer clicks from a bot-sent
+    # email. Rotating this key instantly invalidates every
+    # previously-issued signature for the org. Populated by migration
+    # 0194 via ``pgcrypto.gen_random_bytes(32)``.
+    chatbot_signed_url_key: Mapped[bytes] = mapped_column(
+        LargeBinary,
+        nullable=False,
+        server_default=text("gen_random_bytes(32)"),
     )

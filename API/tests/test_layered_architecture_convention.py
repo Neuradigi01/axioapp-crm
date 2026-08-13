@@ -174,6 +174,8 @@ _TRANSACTION_EXCEPTIONS: dict[str, str] = {
     "core/chatbots/nodes/set_custom_field.py": "Set-Custom-Field handler commits after save-target write",
     "core/chatbots/nodes/handoff_to_human.py": "Handoff handler commits after Conversation.assigned_to_id set",
     "core/chatbots/nodes/connect_flow.py": "Connect-Flow handler commits after target-bot start",
+    "core/chatbots/signed_reply_urls.py": "Signed-URL nonce sign/verify/consume (own txn)",
+    "core/chatbots/reply_router.py": "Public reply URL router (unauthenticated webhook-style, own txn)",
     # --- Pack billing module — router-only PDF generation shell, completion deferred
     "packs/furniture/modules/billing/router.py": "Pack billing PDF stub (Phase 4 follow-up)",
 }
@@ -324,6 +326,8 @@ _HELPER_CRUD_EXCEPTIONS: dict[str, str] = {
     "core/chatbots/trigger_matcher.py": "Chatbot bus subscriber (lookup + start_run + diagnostics)",
     "core/chatbots/tasks.py": "Celery chatbot workers (sweeps + step processor)",
     "core/chatbots/channel_bridge.py": "Bot-outbound sender (Message insert + conv update)",
+    "core/chatbots/signed_reply_urls.py": "Signed-URL nonce sign/verify/consume (own session)",
+    "core/chatbots/reply_router.py": "Public reply URL router (unauthenticated webhook-style)",
 }
 
 

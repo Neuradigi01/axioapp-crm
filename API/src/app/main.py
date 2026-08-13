@@ -136,6 +136,7 @@ from src.app.core.walk_ins.router import router as walk_ins_router
 from src.app.core.workflows.router import router as workflows_router
 from src.app.core.workflows.router import schedules_router as workflow_schedules_router
 from src.app.core.chatbots.router import router as chatbots_router
+from src.app.core.chatbots.reply_router import router as chatbots_reply_router
 from src.app.packs.furniture.modules.billing.router import (
     router as fp_pos_router,
 )
@@ -333,6 +334,13 @@ app.include_router(workflow_schedules_router, prefix="/api/v1")
 # save-target picker. Trigger dispatch (Step 5) and test-fire
 # (Step 6) mount later.
 app.include_router(chatbots_router, prefix="/api/v1")
+
+# tasks/chatbot-builder Step 11 — public signed-reply URL endpoints
+# (``/r/{sig}`` GET + POST). Deliberately unauthenticated — the
+# customer clicks these from an email client. Mounted at ROOT (not
+# ``/api/v1``) so email URLs stay short + memorable, and so mail-
+# client link scanners don't strip a versioned API path.
+app.include_router(chatbots_reply_router)
 # Step 8 — public tracking endpoints (open pixel, click redirect,
 # unsubscribe landing). Intentionally unauthenticated — the recipient's
 # email client fetches them with no JWT. Rate limiting is inside the
