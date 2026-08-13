@@ -15,7 +15,9 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
 import { ChatbotListItem, ChatbotStatus, ChatbotsApiService } from '../chatbots-api.service';
+import { ChatbotCreateModalComponent } from './create-bot-modal/create-bot-modal.component';
 
 /**
  * Chatbots list page (tasks/chatbot-builder Step 12).
@@ -50,7 +52,15 @@ const STATUS_FILTERS: StatusFilter[] = [
 @Component({
   selector: 'app-chatbots-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, DatePipe],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    LucideAngularModule,
+    DatePipe,
+    ConfirmDialogComponent,
+    ChatbotCreateModalComponent,
+  ],
   templateUrl: './chatbots-list.page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -66,6 +76,14 @@ export class ChatbotsListPageComponent {
   readonly search = signal<string>('');
   readonly selectedStatus = signal<'' | ChatbotStatus>('');
   readonly actionsMenuFor = signal<string | null>(null);
+
+  readonly createModalOpen = signal<boolean>(false);
+  readonly createSubmitting = signal<boolean>(false);
+  readonly createError = signal<string | null>(null);
+
+  readonly archiveTarget = signal<ChatbotListItem | null>(null);
+  readonly archiveSubmitting = signal<boolean>(false);
+  readonly archiveError = signal<string | null>(null);
 
   readonly filteredRows = computed(() => {
     const term = this.search().trim().toLowerCase();
@@ -102,22 +120,32 @@ export class ChatbotsListPageComponent {
       });
   }
 
-  createBot(): void {
-    // v1 CTA — the builder (Step 13) creates the bot server-side
-    // and the list refreshes when the operator returns. Until Step
-    // 13 lands the builder route, the "New bot" button routes to
-    // a placeholder — we still register the intent by POSTing a
-    // named draft here.
-    const name = window.prompt('Name your new bot');
-    if (!name || !name.trim()) return;
+  openCreateModal(): void {
+    this.createError.set(null);
+    this.createModalOpen.set(true);
+  }
+
+  closeCreateModal(): void {
+    if (this.createSubmitting()) return;
+    this.createModalOpen.set(false);
+  }
+
+  submitCreateBot(name: string): void {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    this.createSubmitting.set(true);
+    this.createError.set(null);
     this.api
-      .create({ name: name.trim(), category: 'Custom' })
+      .create({ name: trimmed, category: 'Custom' })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (created) => {
           window.location.href = `/user/chatbots/${created.id}/edit`;
         },
-        error: (err) => this.error.set(extractApiError(err) ?? 'Failed to create bot.'),
+        error: (err) => {
+          this.createError.set(extractApiError(err) ?? 'Failed to create bot.');
+          this.createSubmitting.set(false);
+        },
       });
   }
 
@@ -144,14 +172,34 @@ export class ChatbotsListPageComponent {
   }
 
   archive(row: ChatbotListItem): void {
-    if (!window.confirm(`Archive "${row.name}"? Existing parked runs will be canceled.`)) return;
     this.actionsMenuFor.set(null);
+    this.archiveError.set(null);
+    this.archiveTarget.set(row);
+  }
+
+  cancelArchive(): void {
+    if (this.archiveSubmitting()) return;
+    this.archiveTarget.set(null);
+  }
+
+  confirmArchive(): void {
+    const row = this.archiveTarget();
+    if (!row) return;
+    this.archiveSubmitting.set(true);
+    this.archiveError.set(null);
     this.api
       .archive(row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => this.reload(this.selectedStatus()),
-        error: (err) => this.error.set(extractApiError(err) ?? 'Archive failed.'),
+        next: () => {
+          this.archiveSubmitting.set(false);
+          this.archiveTarget.set(null);
+          this.reload(this.selectedStatus());
+        },
+        error: (err) => {
+          this.archiveError.set(extractApiError(err) ?? 'Archive failed.');
+          this.archiveSubmitting.set(false);
+        },
       });
   }
 
@@ -200,8 +248,8 @@ export class ChatbotsListPageComponent {
           .subscribe({
             next: (result) => {
               if (result.conflicts.length) {
-                const msg = result.conflicts.map((c) => `${c.kind}: ${c.detail}`).join('\n');
-                window.alert(`Bot imported with conflicts:\n${msg}`);
+                const msg = result.conflicts.map((c) => `${c.kind}: ${c.detail}`).join(' · ');
+                this.error.set(`Imported with conflicts: ${msg}`);
               }
               window.location.href = `/user/chatbots/${result.created_bot_id}/edit`;
             },

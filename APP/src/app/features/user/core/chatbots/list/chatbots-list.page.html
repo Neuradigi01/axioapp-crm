@@ -16,7 +16,7 @@
     </label>
     <button
       type="button"
-      (click)="createBot()"
+      (click)="openCreateModal()"
       class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-accent-soft text-accent text-sm font-medium hover:brightness-110"
     >
       <lucide-icon name="plus" size="16"></lucide-icon>
@@ -92,7 +92,7 @@
         </p>
         <button
           type="button"
-          (click)="createBot()"
+          (click)="openCreateModal()"
           class="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-soft text-accent text-sm font-medium hover:brightness-110"
         >
           <lucide-icon name="plus" size="16"></lucide-icon>
@@ -221,3 +221,25 @@
     }
   </main>
 </div>
+
+@if (createModalOpen()) {
+  <app-chatbot-create-modal
+    [submitting]="createSubmitting()"
+    [errorMessage]="createError()"
+    (create)="submitCreateBot($event)"
+    (close)="closeCreateModal()"
+  ></app-chatbot-create-modal>
+}
+
+@if (archiveTarget(); as target) {
+  <app-confirm-dialog
+    [title]="'Archive ' + target.name + '?'"
+    [body]="'Existing parked runs will be canceled.'"
+    [confirmLabel]="'Archive'"
+    [danger]="true"
+    [submitting]="archiveSubmitting()"
+    [error]="archiveError()"
+    (confirm)="confirmArchive()"
+    (cancel)="cancelArchive()"
+  ></app-confirm-dialog>
+}

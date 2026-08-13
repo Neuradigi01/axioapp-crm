@@ -193,3 +193,14 @@
     (close)="triggerModalOpen.set(false)"
   ></app-chatbot-trigger-modal>
 }
+
+@if (deleteNodeId()) {
+  <app-confirm-dialog
+    [title]="'Delete this node?'"
+    [body]="'Its outbound edges will be removed too.'"
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    (confirm)="confirmDeleteNode()"
+    (cancel)="cancelDeleteNode()"
+  ></app-confirm-dialog>
+}

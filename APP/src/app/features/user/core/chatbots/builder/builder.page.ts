@@ -14,6 +14,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
 import { ChatbotsApiService, TriggerConfig } from '../chatbots-api.service';
 import { CanvasStateService } from './canvas-state.service';
 import { NodeTypeMeta, getNodeType } from './node-type-registry';
@@ -48,6 +49,7 @@ import { TriggerConfigModalComponent } from './trigger-modal/trigger-config.moda
     LucideAngularModule,
     ChatbotPaletteComponent,
     TriggerConfigModalComponent,
+    ConfirmDialogComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './builder.page.html',
@@ -62,6 +64,7 @@ export class ChatbotBuilderPageComponent {
   readonly loading = signal<boolean>(true);
   readonly error = signal<string | null>(null);
   readonly triggerModalOpen = signal<boolean>(false);
+  readonly deleteNodeId = signal<string | null>(null);
 
   readonly bot = this.canvas.bot;
   readonly nodes = this.canvas.nodes;
@@ -173,8 +176,18 @@ export class ChatbotBuilderPageComponent {
 
   deleteNode(nodeId: string, evt: MouseEvent): void {
     evt.stopPropagation();
-    if (!window.confirm('Delete this node? Its outbound edges will be removed too.')) return;
-    this.canvas.deleteNode(nodeId);
+    this.deleteNodeId.set(nodeId);
+  }
+
+  cancelDeleteNode(): void {
+    this.deleteNodeId.set(null);
+  }
+
+  confirmDeleteNode(): void {
+    const id = this.deleteNodeId();
+    if (!id) return;
+    this.canvas.deleteNode(id);
+    this.deleteNodeId.set(null);
   }
 
   nodeMeta(type: string): NodeTypeMeta | undefined {
