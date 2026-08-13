@@ -402,3 +402,55 @@ class ChatbotPendingReply(Base, TenantScoped):
     # ENUM — this row is write-once and never joined against enum
     # columns.
     channel: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class ChatbotVersion(Base, TenantScoped):
+    """Append-only version history for a bot definition
+    (``tasks/chatbot-builder`` Step 2, migration 0190).
+
+    Every ``save_chatbot_service`` writes a row here BEFORE bumping
+    ``tbl_chatbots.version_number``. Version number matches
+    ``tbl_chatbots.version_number`` at the moment of that save, so
+    rollback reads ``WHERE chatbot_id=? AND version_number=?`` and
+    restores the JSONB blobs verbatim. UniqueConstraint on
+    ``(chatbot_id, version_number)`` blocks concurrent double-saves
+    from colliding on the same slot.
+    """
+
+    __tablename__ = "tbl_chatbot_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "chatbot_id",
+            "version_number",
+            name="uq_chatbot_versions_bot_version",
+        ),
+        Index(
+            "ix_chatbot_versions_bot_created",
+            "chatbot_id",
+            sql_text("created_at DESC"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    chatbot_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_chatbots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    graph: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    trigger_config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    change_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )

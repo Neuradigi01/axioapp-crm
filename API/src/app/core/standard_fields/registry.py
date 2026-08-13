@@ -63,6 +63,12 @@ class StandardFieldDef:
     that tries to set a prop not in this set returns 422. `__post_init__`
     rejects illegal combinations at registration time so a developer
     catches the mistake on startup, not on the first API call.
+
+    ``bot_writable`` (``tasks/chatbot-builder`` Step 2) gates whether
+    an Ask-* / Set-Custom-Field chatbot node may write to this field.
+    Default False so new fields are opt-in; sensitive columns
+    (``role``, ``owner_id``, ``balance``, verification timestamps,
+    ``pin_hash``) are never listed and therefore never bot-writable.
     """
 
     entity: str
@@ -79,6 +85,7 @@ class StandardFieldDef:
     backend_required: bool
     backend_validators: tuple[str, ...]
     overridable_props: frozenset[str]
+    bot_writable: bool = False
 
     def __post_init__(self) -> None:
         if not self.entity or not self.entity.replace("_", "").isalnum():
@@ -140,6 +147,25 @@ def list_all() -> list[StandardFieldDef]:
     return list(_REGISTRY.values())
 
 
+def list_bot_writable(entity: str) -> list[StandardFieldDef]:
+    """Registered standard fields for ``entity`` where
+    ``bot_writable=True``. Consumed by
+    :mod:`core.chatbots.save_target_registry` to build the Ask-* /
+    Set-Custom-Field save-to picker.
+
+    Ordered by ``default_display_order`` then ``field_key`` for
+    stable dropdown UX.
+    """
+    return sorted(
+        (
+            d
+            for (e, _), d in _REGISTRY.items()
+            if e == entity and d.bot_writable
+        ),
+        key=lambda d: (d.default_display_order, d.field_key),
+    )
+
+
 def list_entities() -> list[str]:
     """Distinct entity names registered."""
     return sorted({e for (e, _) in _REGISTRY.keys()})
@@ -192,6 +218,7 @@ register(
         backend_required=True,
         backend_validators=("max 255 chars",),
         overridable_props=frozenset({"label", "placeholder", "help", "display_order"}),
+        bot_writable=True,
     )
 )
 
@@ -213,6 +240,7 @@ register(
         overridable_props=frozenset(
             {"label", "placeholder", "help", "required", "hidden", "display_order"}
         ),
+        bot_writable=True,
     )
 )
 
@@ -234,6 +262,7 @@ register(
         overridable_props=frozenset(
             {"label", "placeholder", "help", "required", "hidden", "display_order"}
         ),
+        bot_writable=True,
     )
 )
 
@@ -255,6 +284,7 @@ register(
         overridable_props=frozenset(
             {"label", "placeholder", "help", "required", "hidden", "display_order"}
         ),
+        bot_writable=True,
     )
 )
 
@@ -327,6 +357,7 @@ register(
                 "display_order",
             }
         ),
+        bot_writable=True,
     )
 )
 
@@ -348,6 +379,7 @@ register(
         overridable_props=frozenset(
             {"label", "placeholder", "help", "required", "hidden", "display_order"}
         ),
+        bot_writable=True,
     )
 )
 
@@ -370,6 +402,7 @@ register(
         backend_required=True,
         backend_validators=("max 32 chars",),
         overridable_props=frozenset({"label", "placeholder", "help", "display_order"}),
+        bot_writable=True,
     )
 )
 
@@ -389,6 +422,7 @@ register(
         backend_required=True,
         backend_validators=("max 255 chars",),
         overridable_props=frozenset({"label", "placeholder", "help", "display_order"}),
+        bot_writable=True,
     )
 )
 
@@ -410,6 +444,7 @@ register(
         overridable_props=frozenset(
             {"label", "placeholder", "help", "required", "hidden", "display_order"}
         ),
+        bot_writable=True,
     )
 )
 
@@ -452,6 +487,7 @@ register(
         overridable_props=frozenset(
             {"label", "placeholder", "help", "required", "hidden", "display_order"}
         ),
+        bot_writable=True,
     )
 )
 
@@ -470,6 +506,7 @@ register(
         default_display_order=5,
         backend_required=False,
         backend_validators=("must be ≥ 0",),
+        bot_writable=True,
         overridable_props=frozenset(
             {
                 "label",
