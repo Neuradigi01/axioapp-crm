@@ -404,6 +404,62 @@ class ChatbotPendingReply(Base, TenantScoped):
     channel: Mapped[str] = mapped_column(String(32), nullable=False)
 
 
+class ChatbotTriggerDiagnostic(Base, TenantScoped):
+    """One row per matcher decision the operator would want to
+    inspect (``tasks/chatbot-builder`` Step 5, migration 0192).
+
+    Fed by :mod:`core.chatbots.trigger_matcher` on every inbound
+    message that reaches the matcher; the diagnostics UI (follow-up
+    track) reads from here to answer "why did / didn't my bot fire".
+    Nightly sweeper TTLs rows > 90 days.
+
+    ``reason`` is a short slug — ``skipped_by_priority``,
+    ``opted_out``, ``active_run_exists``, ``no_match``,
+    ``regex_error``, ``matched_and_dispatched``. String not enum so
+    new reasons don't require a migration.
+    """
+
+    __tablename__ = "tbl_chatbot_trigger_diagnostics"
+    __table_args__ = (
+        Index(
+            "ix_chatbot_trigger_diag_org_created",
+            "org_id",
+            sql_text("created_at DESC"),
+        ),
+        Index(
+            "ix_chatbot_trigger_diag_conv",
+            "conversation_id",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    bot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_chatbots.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_conversations.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+
+
 class ChatbotVersion(Base, TenantScoped):
     """Append-only version history for a bot definition
     (``tasks/chatbot-builder`` Step 2, migration 0190).

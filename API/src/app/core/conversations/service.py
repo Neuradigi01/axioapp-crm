@@ -855,12 +855,54 @@ async def receive_webhook(
 
             logging.getLogger(__name__).exception("opt-in auto-flip failed for conv %s", conv.id)
 
+    # tasks/chatbot-builder Step 5 — precedence pre-check (Decision §12).
+    # If any live bot would match this inbound AND the org has the
+    # ``chatbot_disable_inline_when_active_bot`` flag on (default TRUE),
+    # skip the inline auto-reply / keyword-rules block below so the
+    # bot's response isn't shadowed by a stale inline reply. The bus
+    # publisher at the end of this function still fires — that's what
+    # actually starts the bot run.
+    bot_will_handle = False
+    if conv.channel == ConversationChannel.whatsapp and not customer_opted_out:
+        try:
+            from src.app.core.chatbots.trigger_matcher import has_any_matching_bot
+            from src.app.core.tenants import data_access as tenants_da
+
+            org_row = await tenants_da.get_organization_by_id(session, conv.org_id)
+            precedence_enabled = bool(
+                getattr(org_row, "chatbot_disable_inline_when_active_bot", True)
+            )
+            if precedence_enabled:
+                prior_inbound = await _da.count_inbound_messages_before(
+                    session,
+                    conversation_id=conv.id,
+                    exclude_message_id=msg.id,
+                )
+                bot_will_handle = await has_any_matching_bot(
+                    session,
+                    org_id=conv.org_id,
+                    channel="whatsapp",
+                    text=parsed.text,
+                    is_first_message=(prior_inbound == 0),
+                )
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "chatbot.precedence_precheck_failed conv=%s", conv.id
+            )
+            bot_will_handle = False
+
     # whatsapp-platform-upgrade Step 16 — fire auto-reply pipeline.
     # Greeting + out-of-hours away dispatch after the inbound row is
     # persisted so cooldown queries see consistent state. Failures
     # are caught inside `dispatch_auto_replies`; this call never
     # raises into the webhook handler.
-    if conv.channel == ConversationChannel.whatsapp and not customer_opted_out:
+    if (
+        conv.channel == ConversationChannel.whatsapp
+        and not customer_opted_out
+        and not bot_will_handle
+    ):
         from src.app.core.integrations.whatsapp.auto_reply import (
             dispatch_auto_replies,
         )

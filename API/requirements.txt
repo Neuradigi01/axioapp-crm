@@ -31,3 +31,11 @@ python-magic-bin==0.4.14; sys_platform == "win32"
 stripe>=10.0.0
 bleach[css]>=6.1.0
 croniter>=2.0,<3.0
+
+# tasks/chatbot-builder Step 5 — linear-time regex for the trigger
+# matcher (no ReDoS surface). The matcher gracefully falls back to
+# Python `re` with a save-time complexity linter + 4KB text cap if
+# this fails to install on a given platform (e.g. Windows dev where
+# a C++ toolchain isn't available). Container base is Linux where
+# the wheel resolves cleanly.
+google-re2>=1.1; sys_platform != "win32"

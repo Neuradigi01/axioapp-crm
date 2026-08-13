@@ -16,7 +16,12 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app.core.chatbots.models import Chatbot, ChatbotVersion
+from src.app.core.chatbots.models import (
+    Chatbot,
+    ChatbotRun,
+    ChatbotTriggerDiagnostic,
+    ChatbotVersion,
+)
 from src.app.core.custom_fields.models import CustomFieldDefinition
 
 
@@ -297,3 +302,82 @@ async def get_custom_field_by_key(
             )
         )
     ).scalar_one_or_none()
+
+
+# --- Step 5 matcher helpers -----------------------------------------------
+
+
+async def list_live_bots_for_channel(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    channel: str,
+) -> list[Chatbot]:
+    """Every ``status='live'`` bot in the org whose trigger config
+    accepts the given inbound channel. Bots with channel ``any`` or
+    matching ``channel`` are returned.
+
+    Ordered by ``priority DESC, created_at ASC`` — the matcher's
+    tiebreak order (Decision §13). Single-query enumeration; the
+    matcher iterates the list in-memory.
+    """
+    stmt = (
+        select(Chatbot)
+        .where(
+            Chatbot.org_id == org_id,
+            Chatbot.status == "live",
+            (Chatbot.trigger_config["channel"].astext == channel)
+            | (Chatbot.trigger_config["channel"].astext == "any"),
+        )
+        .order_by(Chatbot.priority.desc(), Chatbot.created_at.asc())
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def has_active_run_for_bot_conversation(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    bot_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+) -> bool:
+    """True iff a ``running`` or ``parked`` run exists for
+    ``(bot_id, conversation_id)`` in this org. Idempotency guard —
+    Case #1 in the README: rapid duplicate inbounds must not spawn
+    parallel runs."""
+    stmt = (
+        select(ChatbotRun.id)
+        .where(
+            ChatbotRun.org_id == org_id,
+            ChatbotRun.chatbot_id == bot_id,
+            ChatbotRun.conversation_id == conversation_id,
+            ChatbotRun.status.in_(("running", "parked")),
+        )
+        .limit(1)
+    )
+    return (await session.execute(stmt)).scalar_one_or_none() is not None
+
+
+def insert_trigger_diagnostic(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    bot_id: uuid.UUID | None,
+    conversation_id: uuid.UUID | None,
+    message_id: uuid.UUID | None,
+    reason: str,
+    detail: str | None = None,
+) -> ChatbotTriggerDiagnostic:
+    """Stage a diagnostics row for the matcher decision. Caller
+    commits (matcher batches diagnostics with its main session
+    commit)."""
+    row = ChatbotTriggerDiagnostic(
+        org_id=org_id,
+        bot_id=bot_id,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        reason=reason,
+        detail=detail,
+    )
+    session.add(row)
+    return row

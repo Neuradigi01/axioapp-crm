@@ -31,6 +31,7 @@ from src.app.core.chatbots.exceptions import (
     InvalidGraph,
 )
 from src.app.core.chatbots.graph import validate_graph_with_db
+from src.app.core.chatbots.trigger_matcher import UnsafeRegex, lint_regex_pattern
 from src.app.core.chatbots.models import Chatbot, ChatbotVersion
 from src.app.core.chatbots.schemas import (
     ChatbotCreate,
@@ -47,9 +48,10 @@ async def create_chatbot_service(
     payload: ChatbotCreate,
     actor_user_id: uuid.UUID | None,
 ) -> Chatbot:
-    """Create a fresh bot. Runs graph + save-target validation on the
-    initial payload (usually empty for a brand-new bot, but a
-    Duplicate / Import flow may seed a full graph)."""
+    """Create a fresh bot. Runs graph + save-target + trigger-regex
+    validation on the initial payload (usually empty for a brand-new
+    bot, but Duplicate / Import may seed a full graph + trigger)."""
+    _validate_trigger_config(payload.trigger_config)
     await _validate_graph_and_save_targets(
         session,
         org_id=org_id,
@@ -155,6 +157,10 @@ async def save_chatbot_service(
 
     graph_changed = payload.graph is not None
     trigger_changed = payload.trigger_config is not None
+
+    if trigger_changed:
+        assert payload.trigger_config is not None
+        _validate_trigger_config(payload.trigger_config)
 
     if graph_changed:
         graph_obj = payload.graph  # type: ignore[assignment]
@@ -352,6 +358,19 @@ async def rollback_to_version_service(
 
 
 # --- internal helpers ------------------------------------------------------
+
+
+def _validate_trigger_config(trigger_config: TriggerConfig) -> None:
+    """Save-time regex safety gate. Pydantic already enforced the
+    500-char cap + mode-vs-payload consistency; :func:`lint_regex_pattern`
+    layers the ReDoS complexity linter on top (no-op when google-re2
+    is installed — that engine has no ReDoS surface)."""
+    if trigger_config.mode != "regex" or not trigger_config.regex_pattern:
+        return
+    try:
+        lint_regex_pattern(trigger_config.regex_pattern)
+    except UnsafeRegex as exc:
+        raise InvalidGraph(f"trigger regex_pattern rejected: {exc}") from exc
 
 
 async def _validate_graph_and_save_targets(

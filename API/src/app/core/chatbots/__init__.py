@@ -36,3 +36,10 @@ from __future__ import annotations
 # Register models with the shared metadata for Alembic autogenerate
 # and pin-test discovery.
 from src.app.core.chatbots import models as _models  # noqa: F401
+
+# tasks/chatbot-builder Step 5 — subscribe the trigger matcher to
+# the two message-received events at package-import time. Mirrors
+# ``core.automation.__init__``'s side-effect registration pattern.
+from src.app.core.chatbots.trigger_matcher import register_bus_subscribers
+
+register_bus_subscribers()
