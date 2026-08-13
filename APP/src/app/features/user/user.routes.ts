@@ -370,6 +370,16 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // tasks/chatbot-builder Step 13 — Pabbly-style bot builder
+        // canvas. Write-gated because every interaction implies a
+        // mutation; read-only Employees land on the list page and
+        // see disabled "Edit" affordances there.
+        path: 'chatbots/:id/edit',
+        canActivate: [permissionGuard('chatbots.edit')],
+        loadComponent: () =>
+          import('./core/chatbots/builder/builder.page').then((m) => m.ChatbotBuilderPageComponent),
+      },
+      {
         // tasks/workflows Step 16 — gallery of 15 default workflow
         // templates. Read-gated; the "Use this template" CTA inside
         // the page needs `workflows.clone` server-side, but the

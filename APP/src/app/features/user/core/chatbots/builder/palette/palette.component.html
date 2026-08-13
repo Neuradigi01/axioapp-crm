@@ -1,0 +1,78 @@
+<div
+  class="flex flex-col h-full min-h-0 bg-zinc-950 border-r border-zinc-800 w-[280px] flex-shrink-0"
+>
+  <!-- Tab bar -->
+  <div class="flex border-b border-zinc-800 flex-shrink-0">
+    <button
+      type="button"
+      (click)="tab.set('messages')"
+      [class]="
+        'flex-1 px-3 pt-3.5 pb-3 text-sm font-semibold transition-colors border-b-2 ' +
+        (tab() === 'messages'
+          ? 'text-zinc-100 border-blue-500'
+          : 'text-zinc-500 border-transparent hover:text-zinc-300')
+      "
+    >
+      Messages
+    </button>
+    <button
+      type="button"
+      (click)="tab.set('actions')"
+      [class]="
+        'flex-1 px-3 pt-3.5 pb-3 text-sm font-semibold transition-colors border-b-2 ' +
+        (tab() === 'actions'
+          ? 'text-zinc-100 border-blue-500'
+          : 'text-zinc-500 border-transparent hover:text-zinc-300')
+      "
+    >
+      Actions
+    </button>
+  </div>
+
+  <!-- Search -->
+  <div class="px-3 pt-3 pb-2 flex-shrink-0">
+    <div class="relative">
+      <lucide-icon
+        name="search"
+        size="14"
+        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500"
+      ></lucide-icon>
+      <input
+        type="text"
+        [ngModel]="search()"
+        (ngModelChange)="search.set($event)"
+        placeholder="Search nodes…"
+        class="w-full pl-8 pr-3 py-1.5 text-xs bg-zinc-900 text-zinc-100 border border-zinc-800 rounded-md placeholder:text-zinc-500 focus:outline-none focus:border-blue-500"
+      />
+    </div>
+  </div>
+
+  <!-- Tiles -->
+  <div class="flex-1 overflow-y-auto px-3 py-2">
+    <div class="grid grid-cols-2 gap-2">
+      @for (tile of filteredTiles(); track tile.type) {
+        <button
+          type="button"
+          (click)="onTile(tile)"
+          [title]="tile.hint"
+          class="relative flex flex-col items-center justify-center gap-2 px-2 py-3.5 bg-zinc-900 border border-zinc-800 rounded-lg text-center transition-all hover:border-zinc-600 hover:-translate-y-0.5"
+        >
+          @if (tile.beta) {
+            <span
+              class="absolute top-1 right-1 px-1 py-px text-[8px] font-bold uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-300 rounded"
+            >
+              Beta
+            </span>
+          }
+          <lucide-icon [name]="tile.icon" size="20" class="text-zinc-300"></lucide-icon>
+          <span class="text-[11px] font-medium text-zinc-100 leading-tight">
+            {{ tile.label }}
+          </span>
+        </button>
+      }
+    </div>
+    @if (filteredTiles().length === 0) {
+      <p class="text-center text-xs text-zinc-500 py-8">No nodes match your search.</p>
+    }
+  </div>
+</div>

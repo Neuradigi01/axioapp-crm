@@ -1,0 +1,195 @@
+<div class="flex flex-col h-screen bg-zinc-950">
+  <!-- Top bar -->
+  <header
+    class="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-800 bg-zinc-900 flex-shrink-0"
+  >
+    <a
+      routerLink="/user/chatbots"
+      class="p-1.5 rounded hover:bg-zinc-800 text-zinc-400"
+      aria-label="Back to chat bots"
+    >
+      <lucide-icon name="arrow-left" size="16"></lucide-icon>
+    </a>
+    <div class="flex items-center gap-2 flex-1 min-w-0">
+      <h1 class="text-sm font-semibold text-zinc-100 truncate">
+        {{ bot()?.name ?? 'Loading…' }}
+      </h1>
+      @if (bot()) {
+        <span
+          [class]="
+            'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ' +
+            (isLive() ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300')
+          "
+        >
+          {{ bot()?.status }}
+        </span>
+      }
+      @if (dirty()) {
+        <span class="text-[11px] text-amber-400">• Unsaved</span>
+      }
+    </div>
+
+    @if (error()) {
+      <span class="text-xs text-red-400 mr-2">{{ error() }}</span>
+    }
+
+    <button
+      type="button"
+      (click)="toggleLive()"
+      [disabled]="!bot() || dirty() || saving()"
+      [class]="
+        'px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ' +
+        (isLive()
+          ? 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+          : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25') +
+        ' disabled:opacity-40 disabled:cursor-not-allowed'
+      "
+    >
+      {{ isLive() ? 'Pause' : 'Make Live' }}
+    </button>
+
+    <button
+      type="button"
+      (click)="save()"
+      [disabled]="!dirty() || saving()"
+      class="px-3.5 py-1.5 bg-blue-500 hover:bg-blue-400 disabled:opacity-40 disabled:cursor-not-allowed rounded-md text-xs font-semibold text-white"
+    >
+      {{ saving() ? 'Saving…' : 'Save' }}
+    </button>
+  </header>
+
+  <!-- Body -->
+  <div class="flex flex-1 min-h-0">
+    @if (loading()) {
+      <div class="flex-1 flex items-center justify-center text-sm text-zinc-500">
+        <lucide-icon name="loader-2" size="16" class="animate-spin mr-2"></lucide-icon>
+        Loading builder…
+      </div>
+    } @else if (!bot()) {
+      <div class="flex-1 flex items-center justify-center text-sm text-red-400">Bot not found.</div>
+    } @else {
+      <!-- Palette -->
+      <app-chatbot-palette (add)="onPaletteAdd($event)"></app-chatbot-palette>
+
+      <!-- Canvas -->
+      <main
+        class="flex-1 overflow-auto relative"
+        style="
+          background-image: radial-gradient(
+            circle at 1px 1px,
+            rgba(255, 255, 255, 0.045) 1px,
+            transparent 0
+          );
+          background-size: 22px 22px;
+        "
+      >
+        <div class="p-6 min-w-[1200px] min-h-[900px] relative">
+          <!-- Trigger card (always at top) -->
+          <button
+            type="button"
+            (click)="openTriggerModal()"
+            class="block w-[320px] p-4 rounded-xl border border-blue-500 bg-gradient-to-b from-blue-500/10 to-zinc-900 text-left hover:from-blue-500/20 transition-colors"
+          >
+            <div class="flex items-center gap-2">
+              <span
+                class="w-6 h-6 rounded bg-blue-500/20 inline-flex items-center justify-center text-blue-300"
+              >
+                <lucide-icon name="zap" size="14"></lucide-icon>
+              </span>
+              <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wide">
+                Trigger
+              </span>
+              <span class="text-[10px] text-zinc-500 ml-auto">click to edit</span>
+            </div>
+            <div class="mt-3 text-sm font-medium text-zinc-100">
+              {{ triggerSummary() }}
+            </div>
+            @if (triggerConfig()?.mode === 'keyword' && triggerConfig()?.keywords?.length) {
+              <div class="mt-2 flex flex-wrap gap-1">
+                @for (kw of triggerConfig()?.keywords ?? []; track kw) {
+                  <span
+                    class="inline-flex px-2 py-0.5 rounded-full text-[10px] bg-blue-500/20 text-blue-200"
+                  >
+                    {{ kw }}
+                  </span>
+                }
+              </div>
+            }
+            <div class="mt-2 text-[10px] text-zinc-500">
+              Channel: {{ triggerConfig()?.channel ?? 'any' }}
+            </div>
+          </button>
+
+          <!-- Nodes -->
+          @for (node of nodes(); track node.id) {
+            <div
+              [style.left.px]="node.position.x + 380"
+              [style.top.px]="node.position.y"
+              [class]="
+                'absolute w-[320px] bg-zinc-900 border rounded-xl shadow-lg transition-colors ' +
+                (selectedNodeId() === node.id
+                  ? 'border-blue-500 ring-2 ring-blue-500/20'
+                  : 'border-zinc-800 hover:border-zinc-600')
+              "
+              (click)="selectNode(node.id)"
+            >
+              <!-- Node header -->
+              <div class="flex items-center gap-2 px-3 py-2.5 border-b border-zinc-800">
+                <lucide-icon
+                  [name]="nodeMeta(node.type)?.icon ?? 'list'"
+                  size="14"
+                  class="text-zinc-400"
+                ></lucide-icon>
+                <span class="text-xs font-semibold text-zinc-300 flex-1 truncate">
+                  {{ nodeMeta(node.type)?.label ?? node.type }}
+                </span>
+                @if (nodeMeta(node.type)?.beta) {
+                  <span
+                    class="px-1 py-px text-[8px] font-bold uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-300 rounded"
+                  >
+                    Beta
+                  </span>
+                }
+                <button
+                  type="button"
+                  (click)="deleteNode(node.id, $event)"
+                  class="p-1 rounded hover:bg-red-500/20 text-zinc-500 hover:text-red-400"
+                  aria-label="Delete node"
+                >
+                  <lucide-icon name="trash-2" size="12"></lucide-icon>
+                </button>
+              </div>
+
+              <!-- Node body — v1 raw-JSON config fallback until
+                   Step 14 per-node components land. -->
+              <div class="p-3 space-y-2">
+                <label class="block text-[10px] font-medium text-zinc-500 uppercase tracking-wide">
+                  Config (JSON)
+                </label>
+                <textarea
+                  #cfgTextarea
+                  [value]="node.config | json"
+                  (input)="updateNodeConfigJson(node.id, cfgTextarea.value)"
+                  rows="6"
+                  class="w-full px-2 py-2 text-[11px] font-mono bg-zinc-950 text-zinc-100 border border-zinc-800 rounded-md focus:outline-none focus:border-blue-500 resize-y"
+                ></textarea>
+                <p class="text-[10px] text-zinc-500">
+                  Pretty per-node forms land in Step 14. This v1 accepts raw JSON so you can still
+                  build + save valid graphs today.
+                </p>
+              </div>
+            </div>
+          }
+        </div>
+      </main>
+    }
+  </div>
+</div>
+
+@if (triggerModalOpen() && triggerConfig(); as _open) {
+  <app-chatbot-trigger-modal
+    [config]="triggerConfig()!"
+    (save)="onTriggerSave($event)"
+    (close)="triggerModalOpen.set(false)"
+  ></app-chatbot-trigger-modal>
+}
