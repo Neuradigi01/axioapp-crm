@@ -12,6 +12,8 @@ export const REASON = {
   invalidEmail: 'invalid email format',
   invalidPhone: 'phone must be 8–15 digits, optionally starting with + (E.164 format)',
   invalidName: 'name contains disallowed characters',
+  nameTooShort: 'name must be at least 2 characters',
+  nameTooLong: 'name must be at most 100 characters',
   weakPassword: 'password must be 8–128 chars with upper, lower, digit, and special',
   invalidUrl: 'invalid URL',
   invalidNumber: 'value must be a number',
@@ -45,6 +47,11 @@ export const PHONE_RE_SRC = '^\\+?[0-9]{8,15}$';
 export const URL_RE_SRC = '^https?://[^\\s]+$';
 
 const NAME_RE = new RegExp(NAME_RE_SRC);
+// Character-class check only (no length bounds). Lets the validator
+// distinguish "too short" from "bad characters" so the error message
+// tells the operator the actual problem instead of always blaming the
+// character set.
+const NAME_CHARS_ONLY_RE = /^[A-Za-zÀ-ÿ' .-]*$/;
 const EMAIL_RE = new RegExp(EMAIL_RE_SRC);
 const PHONE_RE = new RegExp(PHONE_RE_SRC);
 const URL_RE = new RegExp(URL_RE_SRC);
@@ -92,12 +99,25 @@ export function matchFieldValidator(matchField: string): ValidatorFn {
  * Rejects names with digits, emoji, or symbols outside `.` `-` `'`.
  * Latin + accented Latin only for v1; broaden to `\p{L}` if the target
  * market expands.
+ *
+ * Returns a `nameInvalid` error keyed to the specific failure — length
+ * vs. character-set — so the UI can render "must be at least 2
+ * characters" for a 1-letter input instead of the misleading
+ * "disallowed characters" (a single letter is a valid character but
+ * fails the length bound).
  */
 export function nameValidator(control: AbstractControl): ValidationErrors | null {
   const raw = control.value;
   if (isEmpty(raw)) return null;
   const value = String(raw).trim();
-  return NAME_RE.test(value) ? null : { nameInvalid: REASON.invalidName };
+  if (NAME_RE.test(value)) return null;
+  // Report the actual reason the composite regex failed.
+  if (!NAME_CHARS_ONLY_RE.test(value)) {
+    return { nameInvalid: REASON.invalidName };
+  }
+  if (value.length < 2) return { nameInvalid: REASON.nameTooShort };
+  if (value.length > 100) return { nameInvalid: REASON.nameTooLong };
+  return { nameInvalid: REASON.invalidName };
 }
 
 /**

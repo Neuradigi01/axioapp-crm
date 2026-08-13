@@ -48,6 +48,9 @@ import {
   TemplatesApiService,
 } from '../templates/templates-api.service';
 import { TemplateStatusBadgeComponent } from '../templates/template-status-badge.component';
+import { FieldErrorComponent } from '../shared/forms/field-error.component';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 
 /**
  * Step 15 — local picker row. Both the WhatsApp and non-WhatsApp
@@ -134,6 +137,9 @@ const _TEMPLATE_CHANNELS: ReadonlySet<ConversationChannel> = new Set<Conversatio
     SendFromPickerComponent,
     AbTestSectionComponent,
     TemplateStatusBadgeComponent,
+    MobileSelectComponent,
+    MobileDateTimeComponent,
+    FieldErrorComponent,
   ],
   templateUrl: './create-campaign-modal.component.html',
 })
@@ -237,7 +243,7 @@ export class CreateCampaignModalComponent {
    *  warning `computed()` blocks below react to channel changes
    *  (form controls aren't signals on their own). Synced via the
    *  valueChanges subscription in the constructor. */
-  protected readonly channelSignal = signal<ConversationChannel>('whatsapp');
+  protected readonly channelSignal = signal<ConversationChannel | null>(null);
 
   /** `null` = not yet loaded or WhatsApp not connected (409). The
    *  banner is hidden in both cases — the user sees no error, and
@@ -412,6 +418,11 @@ export class CreateCampaignModalComponent {
    *  least one condition or handpicked contact. */
   protected readonly step1Complete = computed<boolean>(() => {
     if (!this.nameValue().trim()) return false;
+    // Channel must be picked explicitly — the operator has to consciously
+    // choose WhatsApp or Email before the wizard advances. Prevents
+    // accidental "wrong channel" submits when the trigger reads
+    // "Select…" but the user click-throughs.
+    if (!this.channelSignal()) return false;
     const mode = this.audienceMode();
     if (mode === 'everyone') return true;
     if (mode === 'group') return this.selectedGroupId() !== null;
@@ -478,8 +489,11 @@ export class CreateCampaignModalComponent {
       nonNullable: true,
       validators: [Validators.required, Validators.maxLength(255)],
     }),
-    channel: this.fb.control<ConversationChannel>('whatsapp', {
-      nonNullable: true,
+    // No default — force the operator to pick a channel explicitly.
+    // The trigger renders "Select…" until then, and the step-1 Next
+    // button stays disabled (see `step1Complete`) so nobody advances
+    // with an accidental channel choice.
+    channel: this.fb.control<ConversationChannel | null>(null, {
       validators: [Validators.required],
     }),
     audience_q: this.fb.control<string | null>(null),
@@ -524,6 +538,7 @@ export class CreateCampaignModalComponent {
         email_account_id: v.email_account_id ?? null,
         sender_name: v.sender_name ?? '',
         subject: v.subject ?? '',
+        reply_to: v.reply_to ?? '',
       });
     };
     this.form.controls.email_account_id.valueChanges
@@ -533,6 +548,9 @@ export class CreateCampaignModalComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(_pushEmailBranchState);
     this.form.controls.subject.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(_pushEmailBranchState);
+    this.form.controls.reply_to.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(_pushEmailBranchState);
 
@@ -546,6 +564,9 @@ export class CreateCampaignModalComponent {
       .subscribe((channel) => {
         this.channelSignal.set(channel);
         this.selectedTemplateId.set(null);
+        // Skip the branch-specific side-effects until the operator
+        // actually picks a channel (initial state is null now).
+        if (!channel) return;
         this._loadTemplates(channel);
         if (channel === 'whatsapp' && this.capacity() === null) {
           this._loadCapacity();
@@ -589,11 +610,9 @@ export class CreateCampaignModalComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((v) => this.nameValue.set(v ?? ''));
 
-    // Initial load — default channel is whatsapp.
-    this._loadTemplates(this.form.controls.channel.value);
-    if (this.form.controls.channel.value === 'whatsapp') {
-      this._loadCapacity();
-    }
+    // No initial channel load — templates + capacity fetch lazily the
+    // first time the operator picks WhatsApp or Email (see the channel
+    // `valueChanges` subscription above).
 
     // Load saved groups once for the audience builder dropdown.
     this._loadGroups();
@@ -693,23 +712,49 @@ export class CreateCampaignModalComponent {
     email_account_id: string | null;
     sender_name: string;
     subject: string;
+    reply_to: string;
   }>({
     email_account_id: null,
     sender_name: '',
     subject: '',
+    reply_to: '',
   });
 
-  /** True when the Email branch is missing any of its required fields.
-   *  Drives the disabled state on the submit button so the operator
-   *  can't send a payload the backend would 422. */
+  /** Basic email shape check for the optional Reply-to field. Kept
+   *  loose on purpose — the authoritative check runs on the backend
+   *  via Pydantic's `EmailStr`; this one just catches the common
+   *  "typed a name instead of an email" case so the operator sees
+   *  the error inline in Step 2 instead of after clicking Save on
+   *  Step 3. */
+  private static isPlausibleEmail(v: string): boolean {
+    return /^\S+@\S+\.\S+$/.test(v);
+  }
+
+  /** True when the operator typed something into Reply-to that
+   *  clearly isn't an email (missing `@` or `.`). Blocks Next on
+   *  Step 2 so the backend never gets to 422 on it. */
+  protected readonly replyToInvalid = computed<boolean>(() => {
+    if (!this.isEmailChannel()) return false;
+    const v = this.emailBranchState().reply_to.trim();
+    if (!v) return false; // Empty is fine — the field is optional.
+    return !CreateCampaignModalComponent.isPlausibleEmail(v);
+  });
+
+  /** True when the Email branch is missing any of its required fields
+   *  OR the optional Reply-to is malformed. Drives the disabled state
+   *  on Next / Save Draft so the operator can't send a payload the
+   *  backend would 422. */
   protected readonly emailBranchIncomplete = computed<boolean>(() => {
     if (!this.isEmailChannel()) return false;
     const v = this.emailBranchState();
-    return (
+    if (
       !v.email_account_id ||
       !(v.sender_name && v.sender_name.trim()) ||
       !(v.subject && v.subject.trim())
-    );
+    ) {
+      return true;
+    }
+    return this.replyToInvalid();
   });
 
   private _loadEmailAccounts(): void {
@@ -1047,6 +1092,14 @@ export class CreateCampaignModalComponent {
     // 'everyone' mode leaves `audience` as {} — backend treats as
     // "all org contacts" (already the existing default behaviour).
 
+    // Channel is picked explicitly on step 1 (no default); step1Complete
+    // gates progression, but a rogue Save keystroke could still fire —
+    // catch it before we build a payload with a null channel.
+    if (!v.channel) {
+      this.submitError.set('Pick a channel on step 1 before saving.');
+      return;
+    }
+    const channel = v.channel;
     // Templates-only: campaigns always send through the central
     // library, never free-text or inline HTML. Guard here even though
     // the Next button on step 2 already blocks progression without a
@@ -1067,7 +1120,7 @@ export class CreateCampaignModalComponent {
     // Campaigns v1 Step 03 — Email required-field guard. Backend
     // enforces the same invariant; catching it client-side keeps the
     // error inline instead of round-tripping a 422.
-    if (v.channel === 'email') {
+    if (channel === 'email') {
       const missing: string[] = [];
       if (!v.email_account_id) missing.push('a sender mailbox');
       if (!(v.sender_name && v.sender_name.trim())) missing.push('a sender name');
@@ -1083,7 +1136,7 @@ export class CreateCampaignModalComponent {
     this.api
       .create({
         name: v.name,
-        channel: v.channel,
+        channel,
         audience_filter: audience,
         template: null,
         template_id: this.selectedTemplateId(),
@@ -1104,11 +1157,11 @@ export class CreateCampaignModalComponent {
         winner_holdback_hours: v.winner_holdback_hours ?? 24,
         // Campaigns v1 Step 03 — Email sender identity + subject + preheader.
         // Null on non-Email channels so backend + DB row stay clean.
-        email_account_id: v.channel === 'email' ? (v.email_account_id ?? null) : null,
-        sender_name: v.channel === 'email' ? (v.sender_name ?? null) : null,
-        reply_to: v.channel === 'email' ? (v.reply_to ?? null) : null,
-        subject: v.channel === 'email' ? (v.subject ?? null) : null,
-        preheader: v.channel === 'email' ? (v.preheader ?? null) : null,
+        email_account_id: channel === 'email' ? (v.email_account_id ?? null) : null,
+        sender_name: channel === 'email' ? (v.sender_name ?? null) : null,
+        reply_to: channel === 'email' ? (v.reply_to ?? null) : null,
+        subject: channel === 'email' ? (v.subject ?? null) : null,
+        preheader: channel === 'email' ? (v.preheader ?? null) : null,
         body_html: null,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))

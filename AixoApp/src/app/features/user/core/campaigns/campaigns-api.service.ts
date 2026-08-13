@@ -178,6 +178,19 @@ export interface CampaignStats {
   unsubscribed: number;
 }
 
+export interface CampaignDashboardStats {
+  /** Start of the aggregation window (first of the current month, UTC). */
+  since: string;
+  sent: number;
+  delivered: number;
+  read: number;
+  /** `delivered / sent`. `null` when `sent` is 0 so the UI can render
+   *  "—" instead of a misleading 0%. */
+  delivery_rate: number | null;
+  /** `read / delivered`. `null` when `delivered` is 0. */
+  read_rate: number | null;
+}
+
 export interface CampaignMessage {
   id: string;
   org_id: string;
@@ -226,6 +239,10 @@ export class CampaignsApiService extends BaseCrudApiService<
 
   stats(id: string): Observable<CampaignStats> {
     return this.http.get<CampaignStats>(`${this.base}/${id}/stats`);
+  }
+
+  dashboardStats(): Observable<CampaignDashboardStats> {
+    return this.http.get<CampaignDashboardStats>(`${this.base}/dashboard-stats`);
   }
 
   listMessages(id: string, status?: CampaignMessageStatus): Observable<CampaignMessage[]> {

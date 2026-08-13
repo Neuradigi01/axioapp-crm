@@ -7,12 +7,26 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
-import { Campaign, CampaignStatus, CampaignsApiService } from './campaigns-api.service';
+import { environment } from '../../../../../environments/environment';
+import {
+  Campaign,
+  CampaignDashboardStats,
+  CampaignStatus,
+  CampaignsApiService,
+} from './campaigns-api.service';
 import { CreateCampaignModalComponent } from './create-campaign-modal.component';
+
+/** Minimal shape returned by `GET /users` — enough to resolve
+ *  `created_by_id` → display name for the Created By column. */
+interface OrgUser {
+  id: string;
+  full_name: string;
+  is_active: boolean;
+}
 import { extractApiError } from '@core/services/api-error.util';
 
 interface ChannelStyle {
@@ -99,11 +113,27 @@ type ChannelFilter = 'all' | 'whatsapp' | 'email';
 })
 export class CampaignsPageComponent {
   private readonly api = inject(CampaignsApiService);
+  private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly items = signal<Campaign[]>([]);
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
+  /** Aggregated this-month KPIs powering the top cards. `null` until
+   *  the first fetch resolves; failure keeps it `null` so the cards
+   *  render "—" without swallowing the list load. */
+  protected readonly dashboardStats = signal<CampaignDashboardStats | null>(null);
+
+  /** Org users, loaded once on init and used to resolve
+   *  `created_by_id` → real full name in the Created By column.
+   *  Fetch failure just leaves the map empty — the column falls back
+   *  to a truncated id so the row still renders. */
+  private readonly users = signal<OrgUser[]>([]);
+  private readonly usersById = computed<Map<string, OrgUser>>(() => {
+    const map = new Map<string, OrgUser>();
+    for (const u of this.users()) map.set(u.id, u);
+    return map;
+  });
   protected readonly modalOpen = signal(false);
   protected readonly busyId = signal<string | null>(null);
 
@@ -156,23 +186,21 @@ export class CampaignsPageComponent {
     });
   });
 
-  /** Preview stats row — 4 cards with delta strings. Per-campaign
-   *  stats aren't in the list payload; real "sent this month" +
-   *  rates land when the batch analytics endpoint ships (deferred
-   *  from Campaigns v1). We show what we have (client-side status
-   *  counts) with an honest "—" for the aggregates we can't compute
-   *  yet, so the visual matches the preview without lying. */
+  /** Preview stats row — 3 cards. `thisMonth` is the count of
+   *  messages actually SENT this month (from the aggregated dashboard
+   *  endpoint), not campaigns created — the label used to mislead
+   *  before the endpoint shipped. `deliveryRate` / `readRate` are
+   *  formatted percentages or "—" when the denominator is zero. */
   protected readonly stats = computed(() => {
     const rows = this.items();
     const byStatus = (s: CampaignStatus) => rows.filter((r) => r.status === s).length;
-    const now = new Date();
-    const thisMonth = rows.filter((r) => {
-      if (!r.created_at) return false;
-      const dt = new Date(r.created_at);
-      return dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear();
-    }).length;
+    const ds = this.dashboardStats();
+    const pct = (r: number | null | undefined): string =>
+      r === null || r === undefined ? '—' : `${Math.round(r * 100)}%`;
     return {
-      thisMonth,
+      thisMonth: ds?.sent ?? 0,
+      deliveryRate: pct(ds?.delivery_rate),
+      readRate: pct(ds?.read_rate),
       running: byStatus('running'),
       scheduled: byStatus('scheduled'),
       sent: byStatus('done'),
@@ -216,6 +244,26 @@ export class CampaignsPageComponent {
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load campaigns.');
         },
+      });
+    // Dashboard KPIs load independently — a failed aggregation must
+    // not block the list, and vice versa. The cards fall back to "—"
+    // when the fetch fails.
+    this.api
+      .dashboardStats()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (s) => this.dashboardStats.set(s),
+        error: () => this.dashboardStats.set(null),
+      });
+    // Org users for the Created By column. Independent of the list
+    // load; a `/users` failure just leaves names unresolved (the
+    // helpers fall back to a shortened id).
+    this.http
+      .get<OrgUser[]>(`${environment.apiBaseUrl}/users`)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => this.users.set(rows),
+        error: () => this.users.set([]),
       });
   }
 
@@ -292,6 +340,66 @@ export class CampaignsPageComponent {
 
   protected onSearchInput(event: Event): void {
     this.search.set((event.target as HTMLInputElement).value);
+  }
+
+  /** Export the currently visible (filter- + search-aware) campaign
+   *  list as a CSV. Columns mirror the on-screen table so the download
+   *  matches what the operator picked; per-row send/delivered/read
+   *  counts aren't in the list payload and would require N+1 stats
+   *  calls, so they're deliberately omitted from the v1 export. */
+  protected downloadCsv(): void {
+    const rows = this.filteredItems();
+    if (rows.length === 0) {
+      this.loadError.set('Nothing to export — the current filter matches no campaigns.');
+      return;
+    }
+    const header = [
+      'Name',
+      'Channel',
+      'Template',
+      'Audience',
+      'Status',
+      'Scheduled',
+      'Created by',
+      'Created at',
+    ];
+    const escape = (v: string): string => {
+      // RFC 4180 — wrap in quotes if the value contains a comma, quote,
+      // or newline, and double any internal quotes.
+      if (/[",\r\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+      return v;
+    };
+    const body = rows.map((c) =>
+      [
+        c.name,
+        this.channelStyle(c.channel).label,
+        this.templatePreview(c),
+        this.audiencePreview(c),
+        this.statusStyle(c.status).label,
+        this.formatSchedule(c.schedule_at, c.status),
+        this.createdByName(c),
+        this.relativeDate(c.created_at),
+      ]
+        .map(escape)
+        .join(','),
+    );
+    // Prepend BOM so Excel opens UTF-8 correctly on Windows (otherwise
+    // accented chars in campaign names render as mojibake).
+    const csv = '﻿' + [header.join(','), ...body].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const today = new Date();
+    const stamp =
+      `${today.getFullYear()}-` +
+      `${String(today.getMonth() + 1).padStart(2, '0')}-` +
+      `${String(today.getDate()).padStart(2, '0')}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `campaigns-${stamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   // --- Selection ---------------------------------------------------
@@ -475,19 +583,31 @@ export class CampaignsPageComponent {
     });
   }
 
-  protected createdByInitial(c: Campaign): string {
-    if (!c.created_by_id) return 'S';
-    return c.created_by_id.charAt(0).toUpperCase();
-  }
-
   protected createdByName(c: Campaign): string {
     if (!c.created_by_id) return 'System';
-    return 'User';
+    const hit = this.usersById().get(c.created_by_id);
+    // Fall back to a shortened id when `/users` hasn't loaded yet or
+    // the campaign was created by a user no longer in the org — better
+    // than mislabelling every row "User".
+    return hit?.full_name || c.created_by_id.slice(0, 8) + '…';
+  }
+
+  protected createdByInitial(c: Campaign): string {
+    if (!c.created_by_id) return 'S';
+    const name = this.usersById().get(c.created_by_id)?.full_name;
+    if (name) {
+      // First letter of first + last word — matches how avatar
+      // fallbacks render elsewhere in the app (e.g. contacts list).
+      const parts = name.trim().split(/\s+/);
+      const first = parts[0]?.[0] ?? '';
+      const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
+      return (first + last).toUpperCase() || '?';
+    }
+    return c.created_by_id.charAt(0).toUpperCase();
   }
 
   protected createdByBg(c: Campaign): string {
     if (!c.created_by_id) return 'bg-surface-2 text-muted';
-    const idx = c.created_by_id.charCodeAt(0) % 9;
     const palette = [
       'bg-emerald-100 text-emerald-700',
       'bg-violet-100 text-violet-700',
@@ -499,7 +619,11 @@ export class CampaignsPageComponent {
       'bg-teal-100 text-teal-700',
       'bg-indigo-100 text-indigo-700',
     ];
-    return palette[idx];
+    // Hash the id so the same user always gets the same colour tile
+    // regardless of load order.
+    let hash = 0;
+    for (const ch of c.created_by_id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+    return palette[hash % palette.length];
   }
 
   protected clearFilters(): void {

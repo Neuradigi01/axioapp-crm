@@ -45,23 +45,30 @@
       @if (step() === 1) {
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label class="block text-sm">
-            <span class="block text-xs font-medium text-muted">Name</span>
+            <span class="block text-xs font-medium text-muted">
+              Name <span class="text-red-500">*</span>
+            </span>
             <input
               type="text"
               formControlName="name"
               class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            <crm-field-error
+              [control]="form.controls.name"
+              message="Give the campaign a name so you can find it later."
+            />
           </label>
           <label class="block text-sm">
-            <span class="block text-xs font-medium text-muted">Channel</span>
-            <select
-              formControlName="channel"
-              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-            >
-              @for (c of channels; track c.value) {
-                <option [value]="c.value">{{ c.label }}</option>
-              }
-            </select>
+            <span class="block text-xs font-medium text-muted">
+              Channel <span class="text-red-500">*</span>
+            </span>
+            <div class="mt-1">
+              <crm-mobile-select formControlName="channel" [options]="channels" />
+            </div>
+            <crm-field-error
+              [control]="form.controls.channel"
+              message="Pick WhatsApp or Email — this can't be changed after save."
+            />
           </label>
         </div>
 
@@ -441,6 +448,10 @@
                       </option>
                     }
                   </select>
+                  <crm-field-error
+                    [control]="form.controls.email_account_id"
+                    message="Pick a verified mailbox to send from."
+                  />
                 </label>
                 <label class="block text-sm">
                   <span class="block text-xs font-medium text-muted">
@@ -457,6 +468,10 @@
                   <span class="mt-0.5 block text-[10px] text-muted">
                     Shown in inbox before the address.
                   </span>
+                  <crm-field-error
+                    [control]="form.controls.sender_name"
+                    message="Enter a sender name — this shows in the inbox before the address."
+                  />
                 </label>
               </div>
 
@@ -467,11 +482,23 @@
                   formControlName="reply_to"
                   maxlength="320"
                   placeholder="hello@yourshop.com"
-                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                  [class]="
+                    'mt-1 block w-full rounded-lg border bg-surface px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 ' +
+                    (replyToInvalid()
+                      ? 'border-red-500/40 focus:border-red-500 focus:ring-red-500'
+                      : 'border-subtle focus:border-muted focus:ring-accent')
+                  "
                 />
-                <span class="mt-0.5 block text-[10px] text-muted">
-                  Where replies land. Defaults to the mailbox address at send time.
-                </span>
+                @if (replyToInvalid()) {
+                  <span class="mt-0.5 block text-[11px] text-red-500">
+                    Enter a valid email address (e.g. hello&#64;yourshop.com) — or leave the field
+                    blank to reply to the mailbox address.
+                  </span>
+                } @else {
+                  <span class="mt-0.5 block text-[10px] text-muted">
+                    Where replies land. Defaults to the mailbox address at send time.
+                  </span>
+                }
               </label>
 
               <label class="block text-sm">
@@ -490,6 +517,10 @@
                   maxlength="998"
                   [placeholder]="subjectPlaceholder"
                   class="block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                <crm-field-error
+                  [control]="form.controls.subject"
+                  message="Enter a subject — this is the first thing recipients see in their inbox."
                 />
                 <span class="mt-1 flex items-center gap-2 text-[10px] text-muted">
                   Insert variable:
@@ -667,11 +698,9 @@
           <span class="block text-xs font-medium text-muted">
             Schedule (optional — leave blank to send when you click Start)
           </span>
-          <input
-            type="datetime-local"
-            formControlName="schedule_at"
-            class="mt-1 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          />
+          <div class="mt-1">
+            <crm-mobile-datetime formControlName="schedule_at" placeholder="Pick date & time" />
+          </div>
         </label>
 
         @if (isWhatsAppChannel()) {

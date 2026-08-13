@@ -28,6 +28,10 @@
           [attr.placeholder]="stdField('title')?.placeholder"
           class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
         />
+        <crm-field-error
+          [control]="form.controls.title"
+          message="Give the task a short title so you can find it later."
+        />
         @if (stdField('title')?.help_text; as help) {
           <span class="mt-1 block text-xs text-muted">{{ help }}</span>
         }
@@ -79,6 +83,10 @@
             [value]="form.controls.priority.value"
             (valueChange)="form.controls.priority.setValue($any($event))"
           />
+          <crm-field-error
+            [control]="form.controls.priority"
+            message="Pick a priority so the task shows on the right dashboard."
+          />
           @if (stdField('priority')?.help_text; as help) {
             <span class="mt-1 block text-xs text-muted">{{ help }}</span>
           }
@@ -86,7 +94,7 @@
       }
     </div>
 
-    @if (hasAssigneeDropdown() && !isHidden('assigned_to_id')) {
+    @if (hasAssigneeDropdown && !isHidden('assigned_to_id')) {
       <label class="block text-sm">
         <span class="mb-1 block text-xs font-medium text-muted">
           {{ stdField('assigned_to_id')?.label ?? 'Assignee' }}
@@ -103,7 +111,7 @@
           <span class="mt-1 block text-xs text-muted">{{ help }}</span>
         }
       </label>
-    } @else if (!hasAssigneeDropdown()) {
+    } @else if (!hasAssigneeDropdown) {
       <p class="rounded-md bg-surface-2 px-3 py-2 text-xs text-muted">
         Task will be assigned to you.
       </p>

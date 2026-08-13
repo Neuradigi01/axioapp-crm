@@ -21,6 +21,7 @@ import { BaseFormModalComponent } from '../shared/components/base-form-modal.com
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { FieldErrorComponent } from '../shared/forms/field-error.component';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
@@ -80,6 +81,7 @@ const FOLLOWUP_VALUES: readonly string[] = FOLLOWUP_OPTIONS.map((o) => o.value);
     DynamicFormComponent,
     MobileSelectComponent,
     MobileDateTimeComponent,
+    FieldErrorComponent,
   ],
   templateUrl: './task-form-modal.component.html',
 })
@@ -137,6 +139,11 @@ export class TaskFormModalComponent extends BaseFormModalComponent implements On
   /** Caller's own UUID — used as the implicit assignee when the
    *  dropdown is hidden. */
   @Input() callerUuid: string | null = null;
+  /** Whether the caller may delegate a task to a different user.
+   *  Owner / Admin / Sales Manager have `tasks.assign_others`;
+   *  Employee / Support Agent don't. When false, the dropdown is
+   *  hidden and the task auto-assigns to the caller. */
+  @Input() canAssignOthers = false;
 
   @Output() readonly saved = new EventEmitter<Task>();
   @Output() readonly cancelled = new EventEmitter<void>();
@@ -172,7 +179,13 @@ export class TaskFormModalComponent extends BaseFormModalComponent implements On
     followup_type: ['' as '' | TaskFollowupType, [commonValidators.picklist(FOLLOWUP_VALUES)]],
   });
 
-  protected readonly hasAssigneeDropdown = computed(() => this.assignees.length > 0);
+  /** Show the Assignee dropdown only when there ARE other users to
+   *  pick from AND the caller has `tasks.assign_others`. Employees
+   *  hitting this modal see no picker — their task auto-assigns to
+   *  themselves. */
+  protected get hasAssigneeDropdown(): boolean {
+    return this.assignees.length > 0 && this.canAssignOthers;
+  }
   protected readonly isEdit = computed(() => this.task !== null);
 
   // T5 — contact picker state. Optional on every task; when set, the

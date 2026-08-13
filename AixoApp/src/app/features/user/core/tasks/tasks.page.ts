@@ -16,6 +16,7 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { environment } from '../../../../../environments/environment';
 import { FurnitureAuthService } from '../auth/auth.service';
+import { ToastHostService } from '../notifications/toast-host.service';
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import {
@@ -90,12 +91,18 @@ export class TasksPageComponent {
   private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(FurnitureAuthService);
+  private readonly toast = inject(ToastHostService);
   private readonly usersDir = inject(UsersDirectoryService);
 
   protected readonly state = inject(TasksListState);
 
   protected readonly canViewAll = signal(false);
   protected readonly callerUuid = signal<string | null>(null);
+  /** Does the current user have `tasks.assign_others`?  Owner / Admin /
+   *  Sales Manager get true; Employee / Support Agent get false. Drives
+   *  the Assignee dropdown visibility in the task-form modal and hides
+   *  bulk-reassign for users who lack delegation rights. */
+  protected readonly canAssignOthers = signal<boolean>(false);
 
   protected readonly assignees = signal<TaskAssignee[]>([]);
   protected readonly assigneeMap = computed(() => {
@@ -123,6 +130,11 @@ export class TasksPageComponent {
   // T2 — single-row delete confirmation.
   protected readonly deletingTask = signal<Task | null>(null);
   protected readonly deleteSubmitting = signal(false);
+
+  // Mark-complete confirmation. Only fires when flipping open → done
+  // (destructive-ish: fires a webhook + email to the assignee).
+  // Re-opening a done task is silent since the action is safe to undo.
+  protected readonly completingTask = signal<Task | null>(null);
 
   // T15 — saved views for the tasks list.
   private readonly savedViewsApi = inject(SavedViewsApiService);
@@ -241,7 +253,16 @@ export class TasksPageComponent {
 
   constructor() {
     this.state.bulkActions.set([
-      { key: 'reassign', label: 'Reassign to…', icon: 'user-cog', permissionKey: 'tasks.write' },
+      // Delegation gate — Employees can only own their own tasks and
+      // must not see the Reassign bulk action. Backend rejects the
+      // POST anyway, but hiding the button here avoids the confusing
+      // "why did this fail?" moment.
+      {
+        key: 'reassign',
+        label: 'Reassign to…',
+        icon: 'user-cog',
+        permissionKey: 'tasks.assign_others',
+      },
       { key: 'done', label: 'Mark done', icon: 'check-circle-2', permissionKey: 'tasks.write' },
       {
         key: 'delete',
@@ -259,6 +280,7 @@ export class TasksPageComponent {
         next: (me) => {
           const canView = me.permission_keys.includes('users.read');
           this.canViewAll.set(canView);
+          this.canAssignOthers.set(me.permission_keys.includes('tasks.assign_others'));
           this.callerUuid.set(me.id);
           this.activeChip.set(canView ? 'all' : 'mine');
           this.scope.set(canView ? 'all' : 'mine');
@@ -339,8 +361,33 @@ export class TasksPageComponent {
     }
   }
 
+  /** Entry point from the round complete-toggle button. Opens a
+   *  confirm dialog when the click is a mark-as-done (destructive-ish
+   *  — completing fires the task.completed workflow which emails the
+   *  assignee). Reopening a done task is silent — the action is safe
+   *  and low-cost, no need to interrupt. */
   protected toggleComplete(task: Task, checked: boolean): void {
     if (this.togglingId()) return;
+    if (checked) {
+      this.completingTask.set(task);
+      return;
+    }
+    this._applyComplete(task, false);
+  }
+
+  /** Called by the confirm dialog's Confirm button. */
+  protected confirmCompleteRow(): void {
+    const task = this.completingTask();
+    if (!task) return;
+    this.completingTask.set(null);
+    this._applyComplete(task, true);
+  }
+
+  protected closeCompleteRow(): void {
+    this.completingTask.set(null);
+  }
+
+  private _applyComplete(task: Task, checked: boolean): void {
     this.togglingId.set(task.id);
     this.api
       .update(task.id, { status: checked ? 'done' : 'open' })
@@ -349,6 +396,16 @@ export class TasksPageComponent {
         next: () => {
           this.togglingId.set(null);
           this.fetch();
+          this.toast.push({
+            title: checked
+              ? `Task "${task.title}" marked as done`
+              : `Task "${task.title}" reopened`,
+            body: checked
+              ? 'Click the green circle again to mark it as open.'
+              : 'Click the circle again to mark it as done.',
+            tone: checked ? 'success' : 'info',
+            durationMs: 4_000,
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.togglingId.set(null);

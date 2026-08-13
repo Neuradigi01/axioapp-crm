@@ -12,6 +12,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
+import { FieldErrorComponent } from '../../shared/forms/field-error.component';
 import { InrPipe } from '../../shared/pipes/inr.pipe';
 import { extractApiError } from '@core/services/api-error.util';
 import { StaffApiService, StaffWithPerformance } from '../staff-api.service';
@@ -31,7 +32,7 @@ import { StaffApiService, StaffWithPerformance } from '../staff-api.service';
   selector: 'app-staff-targets-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, InrPipe],
+  imports: [ReactiveFormsModule, InrPipe, FieldErrorComponent],
   templateUrl: './targets.component.html',
 })
 export class StaffTargetsTabComponent {

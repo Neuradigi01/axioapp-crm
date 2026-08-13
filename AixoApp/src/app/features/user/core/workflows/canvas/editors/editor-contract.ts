@@ -347,6 +347,12 @@ export const EVENT_TYPES: readonly EventTypeOption[] = [
     waitable: true,
   },
   {
+    type: 'task.assigned',
+    label: 'Task assigned',
+    description: 'A task was assigned (or re-assigned) to a user.',
+    waitable: false,
+  },
+  {
     type: 'task.completed',
     label: 'Task completed',
     description: 'Task moved to done.',
