@@ -62,6 +62,13 @@ celery.autodiscover_tasks(
         # Without this entry the engine can't dispatch + parked waits
         # never resume.
         "src.app.core.workflows.tasks",
+        # tasks/chatbot-builder — chatbot engine tasks: process_step
+        # (re-enqueued per node hop by engine.start_run / advance_run),
+        # sweep_chatbot_waits (60s beat), sweep_test_runs (hourly).
+        # Without this entry the worker discards every enqueued
+        # message as ``KeyError`` and bot runs stay stuck at their
+        # first node forever.
+        "src.app.core.chatbots.tasks",
         # tasks/dashboard-updates Step 6 — nightly grooming that flips
         # ``open`` tasks whose ``due_at`` is > 7 days ago to ``missed``
         # so the dashboard's Overdue bucket doesn't grow unbounded.

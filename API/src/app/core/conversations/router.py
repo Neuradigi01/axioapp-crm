@@ -1132,11 +1132,17 @@ async def _handle_whatsapp_webhook(
         # conversations. ``config.phone_id`` is the Meta-side
         # phone-number-id that the webhook authenticator already
         # resolved this inbound to.
+        # WhatsApp adapters are constructed per-org (not registered
+        # in the global channel registry), so parse here with the
+        # already-built ``adapter`` and pass through as ``pre_parsed``
+        # to skip ``resolve(channel)`` inside ``receive_webhook``.
+        parsed_inbound = adapter.parse_webhook(payload)
         msg = await receive_webhook(
             db,
             channel=ConversationChannel.whatsapp,
             payload=payload,
             received_via_phone_id=config.phone_id,
+            pre_parsed=parsed_inbound,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

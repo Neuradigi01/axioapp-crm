@@ -318,6 +318,37 @@ async def on_inbound(envelope: dict[str, Any]) -> None:
                     await session.commit()
                     return
 
+            # --- Parked-run resume takes priority over trigger match --
+            # A run parked at a button/list/ask-question node is waiting
+            # for THIS user's reply. The reply text (e.g. the tapped
+            # button title "Buy Property") almost never matches a bot
+            # trigger keyword, so without this check every reply falls
+            # through to ``no_match`` and the parked run sits forever.
+            parked_runs = await _dal.list_parked_runs_for_conversation(
+                session, conversation_id=conversation_id
+            )
+            if parked_runs:
+                parked = max(parked_runs, key=lambda r: r.started_at)
+                _dal.insert_trigger_diagnostic(
+                    session,
+                    org_id=org_id,
+                    bot_id=parked.chatbot_id,
+                    conversation_id=conversation_id,
+                    message_id=message_id,
+                    reason="active_run_exists",
+                    detail=f"resuming parked run {parked.id}",
+                )
+                await session.commit()
+                await _engine.resume_run(
+                    session,
+                    run_id=parked.id,
+                    resume_event={
+                        "text": text,
+                        "message_id": str(message_id) if message_id else None,
+                    },
+                )
+                return
+
             # --- Matcher pass ----------------------------------------
             matches = await find_matching_bots(
                 session,
