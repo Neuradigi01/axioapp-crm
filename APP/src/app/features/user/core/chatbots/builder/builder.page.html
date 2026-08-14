@@ -207,7 +207,8 @@
             (mousedown)="onNodeHeaderMouseDown('trigger', $event)"
             [style.left.px]="triggerPosition().x"
             [style.top.px]="triggerPosition().y"
-            class="absolute block w-[320px] p-4 rounded-2xl border-2 border-accent bg-accent-soft text-left hover:brightness-110 transition-all cursor-move select-none shadow-[0_0_0_4px_rgba(0,0,0,0.02),0_8px_24px_-6px_rgba(0,0,0,0.25)] hover:shadow-[0_0_0_6px_rgba(0,0,0,0.02),0_10px_28px_-6px_rgba(0,0,0,0.35)]"
+            [style.width.px]="cardWidth()"
+            class="absolute block p-4 rounded-2xl border-2 border-accent bg-accent-soft text-left hover:brightness-110 transition-all cursor-move select-none shadow-[0_0_0_4px_rgba(0,0,0,0.02),0_8px_24px_-6px_rgba(0,0,0,0.25)] hover:shadow-[0_0_0_6px_rgba(0,0,0,0.02),0_10px_28px_-6px_rgba(0,0,0,0.35)]"
           >
             <div class="flex items-center gap-2">
               <span
@@ -252,15 +253,35 @@
               title="Click to start an edge from the trigger"
               aria-label="Trigger output port"
             ></span>
+
+            <!-- Resize grip (bottom-right corner) — drag to change
+                 the shared card width. Diagonal chevron reads as an
+                 image-style resize affordance. -->
+            <span
+              (mousedown)="onCardResizeMouseDown($event)"
+              class="absolute right-1 bottom-1 w-3.5 h-3.5 cursor-se-resize text-accent/70 hover:text-accent"
+              title="Drag to resize all cards"
+              aria-label="Resize"
+            >
+              <svg viewBox="0 0 12 12" fill="none" class="w-full h-full">
+                <path
+                  d="M 11 5 L 5 11 M 11 8 L 8 11 M 11 11 L 11 11"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </span>
           </button>
 
           <!-- Nodes -->
           @for (node of nodes(); track node.id) {
             <div
-              [style.left.px]="node.position.x + 380"
+              [style.left.px]="node.position.x + nodeLeftOffset()"
               [style.top.px]="node.position.y"
+              [style.width.px]="cardWidth()"
               [class]="
-                'absolute w-[320px] bg-surface border rounded-2xl transition-all overflow-hidden ' +
+                'absolute bg-surface border rounded-2xl transition-all overflow-hidden ' +
                 (selectedNodeId() === node.id
                   ? 'border-accent ring-2 ring-accent/20 shadow-[0_10px_28px_-8px_rgba(0,0,0,0.35)]'
                   : 'border-subtle hover:border-default shadow-[0_6px_18px_-6px_rgba(0,0,0,0.25)] hover:shadow-[0_10px_24px_-8px_rgba(0,0,0,0.30)]')
@@ -345,7 +366,11 @@
                   <app-node-config-form
                     [schema]="schema"
                     [config]="node.config"
+                    [nodeId]="node.id"
+                    [nodeIsPending]="pendingSourceId() === node.id"
+                    [pendingPortLabel]="canvas.pendingSourceLabel()"
                     (patch)="patchNodeConfig(node.id, $event)"
+                    (portClick)="onOutputPortClick(node.id, $event.label, $event.event)"
                   ></app-node-config-form>
                 } @else {
                   <label class="block text-[10px] font-medium text-muted uppercase tracking-wide">
@@ -365,41 +390,62 @@
                 }
               </div>
 
-              <!-- Output ports — one per port returned by
-                   `outputPortsFor(node)`. Covers all three topologies
-                   uniformly: `single` = one "next" port; `labeled` =
-                   one port per meta.labels entry (answered / invalid /
-                   timeout / true / false / …); `dynamic` = one port
-                   per button (text/media_button) or per row (list),
-                   labelled by the button/row id so each branch can
-                   route to its own downstream node. -->
-              <div
-                class="flex flex-col items-end gap-1.5 px-3.5 pb-3 pt-2 border-t border-subtle bg-app/30"
-              >
-                @for (port of outputPortsFor(node); track port.label ?? '__default__') {
-                  <div
-                    class="flex items-center gap-2 text-[11px] text-muted relative w-full justify-end group"
-                  >
-                    <span
-                      class="truncate max-w-[220px] font-medium group-hover:text-default transition-colors"
-                      [title]="port.title"
+              <!-- Bottom output-port section — hidden for node types
+                   that render inline per-button ports (text_button /
+                   media_button — those live inside the button rows in
+                   the config form, matching Pabbly). Everything else
+                   (single / labeled / list) still uses this stacked
+                   port list. Uses `@if` rather than `[hidden]` because
+                   Tailwind's `flex` utility wins the specificity fight
+                   against the browser's `[hidden]` UA rule. -->
+              @if (node.type !== 'text_button' && node.type !== 'media_button') {
+                <div
+                  class="flex flex-col items-end gap-1.5 px-3.5 pb-3 pt-2 border-t border-subtle bg-app/30"
+                >
+                  @for (port of outputPortsFor(node); track port.label ?? '__default__') {
+                    <div
+                      class="flex items-center gap-2 text-[11px] text-muted relative w-full justify-end group"
                     >
-                      {{ port.title }}
-                    </span>
-                    <span
-                      (click)="onOutputPortClick(node.id, port.label, $event)"
-                      [class]="
-                        'w-4 h-4 rounded-full border-2 border-accent cursor-pointer transition-all flex-shrink-0 shadow-sm mr-[-8px] ' +
-                        (pendingSourceId() === node.id && canvas.pendingSourceLabel() === port.label
-                          ? 'bg-accent scale-110'
-                          : 'bg-surface hover:bg-accent hover:scale-110')
-                      "
-                      title="Click to start a connection from this port"
-                      aria-label="Output port"
-                    ></span>
-                  </div>
-                }
-              </div>
+                      <span
+                        class="truncate max-w-[220px] font-medium group-hover:text-default transition-colors"
+                        [title]="port.title"
+                      >
+                        {{ port.title }}
+                      </span>
+                      <span
+                        (click)="onOutputPortClick(node.id, port.label, $event)"
+                        [class]="
+                          'w-4 h-4 rounded-full border-2 border-accent cursor-pointer transition-all flex-shrink-0 shadow-sm mr-[-8px] ' +
+                          (pendingSourceId() === node.id &&
+                          canvas.pendingSourceLabel() === port.label
+                            ? 'bg-accent scale-110'
+                            : 'bg-surface hover:bg-accent hover:scale-110')
+                        "
+                        title="Click to start a connection from this port"
+                        aria-label="Output port"
+                      ></span>
+                    </div>
+                  }
+                </div>
+              }
+
+              <!-- Resize grip on the bottom-right corner of every
+                   node card — drag to change the shared card width. -->
+              <span
+                (mousedown)="onCardResizeMouseDown($event)"
+                class="absolute right-1 bottom-1 w-3.5 h-3.5 cursor-se-resize text-muted hover:text-accent"
+                title="Drag to resize all cards"
+                aria-label="Resize"
+              >
+                <svg viewBox="0 0 12 12" fill="none" class="w-full h-full">
+                  <path
+                    d="M 11 5 L 5 11 M 11 8 L 8 11"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </span>
             </div>
           }
         </div>

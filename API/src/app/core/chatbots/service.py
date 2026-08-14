@@ -173,19 +173,6 @@ async def save_chatbot_service(
             current_bot_id=bot.id,
         )
 
-    if graph_changed or trigger_changed:
-        # Snapshot the PRIOR state before mutating the row.
-        await dal.insert_chatbot_version(
-            session,
-            org_id=org_id,
-            chatbot_id=bot.id,
-            version_number=bot.version_number,
-            graph=bot.graph,
-            trigger_config=bot.trigger_config,
-            change_note=payload.change_note,
-            created_by_user_id=actor_user_id,
-        )
-
     updates: dict[str, Any] = {}
     if payload.name is not None:
         updates["name"] = payload.name
@@ -205,7 +192,30 @@ async def save_chatbot_service(
         updates["graph"] = payload.graph.model_dump()
 
     if graph_changed or trigger_changed:
-        updates["version_number"] = bot.version_number + 1
+        new_version = bot.version_number + 1
+        updates["version_number"] = new_version
+        # Version-history rows represent the state AT that version
+        # number — so save N writes row N with the *new* payload,
+        # not row N-1 with the prior state. This keeps rollback
+        # semantics clean and avoids the unique-constraint collision
+        # with the version-1 row that `create_chatbot_service`
+        # (and imports / seeds) write at bot creation time.
+        new_graph = (
+            payload.graph.model_dump() if graph_changed else bot.graph
+        )
+        new_trigger = (
+            payload.trigger_config.model_dump() if trigger_changed else bot.trigger_config
+        )
+        await dal.insert_chatbot_version(
+            session,
+            org_id=org_id,
+            chatbot_id=bot.id,
+            version_number=new_version,
+            graph=new_graph,
+            trigger_config=new_trigger,
+            change_note=payload.change_note,
+            created_by_user_id=actor_user_id,
+        )
 
     if updates:
         await dal.update_chatbot_fields(
@@ -331,15 +341,21 @@ async def rollback_to_version_service(
     if version is None:
         raise ChatbotNotFound(f"version {version_id} not found on bot {chatbot_id}")
 
-    # Snapshot current state before mutating.
+    # Version-history row represents the state AT the new version
+    # number (post-rollback), matching the save-flow semantics — so
+    # the row records the RESTORED blobs, not the pre-rollback ones,
+    # and there's no collision with the pre-existing row at
+    # `bot.version_number` (see `save_chatbot_service` for the same
+    # reasoning).
+    new_version = bot.version_number + 1
     await dal.insert_chatbot_version(
         session,
         org_id=org_id,
         chatbot_id=bot.id,
-        version_number=bot.version_number,
-        graph=bot.graph,
-        trigger_config=bot.trigger_config,
-        change_note=f"pre-rollback snapshot (rolling back to v{version.version_number})",
+        version_number=new_version,
+        graph=version.graph,
+        trigger_config=version.trigger_config,
+        change_note=f"rolled back to v{version.version_number}",
         created_by_user_id=actor_user_id,
     )
 
@@ -349,7 +365,7 @@ async def rollback_to_version_service(
         updates={
             "graph": version.graph,
             "trigger_config": version.trigger_config,
-            "version_number": bot.version_number + 1,
+            "version_number": new_version,
         },
         updated_by_user_id=actor_user_id,
     )

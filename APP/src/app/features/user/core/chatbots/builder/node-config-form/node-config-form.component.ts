@@ -33,8 +33,19 @@ interface ButtonRow {
 export class NodeConfigFormComponent {
   @Input({ required: true }) schema: readonly FieldSchema[] = [];
   @Input({ required: true }) config: Record<string, unknown> = {};
+  /** When set, `button_list` rows render an inline output port on
+   *  the right of the row so operators can wire each button to its
+   *  own downstream. Matches Pabbly's inline-port pattern. */
+  @Input() nodeId: string | null = null;
+  /** Highlight the port whose label matches this — used to show
+   *  which port is currently "pending" a connection completion. */
+  @Input() pendingPortLabel: string | null = null;
+  /** Whether the node this form belongs to is the current
+   *  `pendingSourceId` — used with `pendingPortLabel` to highlight. */
+  @Input() nodeIsPending = false;
 
   @Output() readonly patch = new EventEmitter<Record<string, unknown>>();
+  @Output() readonly portClick = new EventEmitter<{ label: string; event: MouseEvent }>();
 
   /** Read a possibly-nested value at `dot.path` from the config. */
   getValue(key: string): unknown {
@@ -196,6 +207,13 @@ export class NodeConfigFormComponent {
     } catch {
       // Keep the last-good value; template shows the parse error.
     }
+  }
+
+  /** Bubble a button-row port click up to the builder page which
+   *  owns the connect state machine. */
+  onPortClick(label: string, evt: MouseEvent): void {
+    evt.stopPropagation();
+    this.portClick.emit({ label, event: evt });
   }
 
   private nextButtonId(list: ButtonRow[]): string {

@@ -98,37 +98,80 @@ export class ChatbotBuilderPageComponent {
   readonly triggerPosition = this.canvas.triggerPosition;
   readonly zoom = this.canvas.zoom;
   readonly paletteCollapsed = this.canvas.paletteCollapsed;
+  readonly cardWidth = this.canvas.cardWidth;
 
   readonly zoomPercent = computed(() => Math.round(this.zoom() * 100));
 
-  /** Layout constants matching the template — kept here so the SVG
-   *  edge computation and the DOM stay in sync. Node position `x/y`
-   *  in the graph is anchored at the top-left of the card AFTER the
-   *  trigger-column offset (`TRIGGER_LEFT + TRIGGER_WIDTH + GAP`). */
+  /** Active card-resize gesture, if any. Started from the bottom-right
+   *  corner grip on the trigger card or any node — the source id is
+   *  incidental since `cardWidth` is a single global signal, but we
+   *  keep it for symmetry with the drag-to-move gesture. */
+  private cardResizeStart: { startX: number; startWidth: number } | null = null;
+
+  onCardResizeMouseDown(evt: MouseEvent): void {
+    if (evt.button !== 0) return;
+    evt.preventDefault();
+    evt.stopPropagation();
+    this.cardResizeStart = {
+      startX: evt.clientX,
+      startWidth: this.canvas.cardWidth(),
+    };
+  }
+
+  /** Layout constants matching the template. Card widths (trigger +
+   *  nodes) are shared via the `cardWidth` signal so a resize on any
+   *  card grip rescales the whole graph consistently. */
   private readonly CANVAS_PAD = 24;
   private readonly TRIGGER_LEFT = this.CANVAS_PAD;
   private readonly TRIGGER_TOP = this.CANVAS_PAD;
-  private readonly TRIGGER_WIDTH = 320;
   private readonly TRIGGER_HEIGHT = 118;
-  private readonly NODE_LEFT_OFFSET = 380;
-  private readonly NODE_WIDTH = 320;
   private readonly NODE_HEADER_H = 44;
+  /** Gap between the trigger card's right edge and the first node
+   *  column. Node positions are relative to this anchor. */
+  private readonly TRIGGER_GAP = 60;
+
+  /** X anchor of the node column — moves with the shared cardWidth
+   *  so nodes never overlap the trigger. */
+  nodeLeftOffset(): number {
+    return this.CANVAS_PAD + this.cardWidth() + this.TRIGGER_GAP;
+  }
 
   /** Where each node's LEFT (input) port lives, absolute canvas
    *  coordinates. */
   inputPortPos(node: CanvasNode): { x: number; y: number } {
     return {
-      x: this.NODE_LEFT_OFFSET + node.position.x,
+      x: this.nodeLeftOffset() + node.position.x,
       y: node.position.y + this.NODE_HEADER_H / 2,
     };
   }
 
-  /** Where each node's RIGHT (output) port lives, per label. Labeled
-   *  ports are stacked below the header at fixed row heights so a
-   *  card of the same width has predictable port coordinates. */
+  /** Where each node's RIGHT (output) port lives.
+   *
+   *  For `labeled` / `single` topology the ports are stacked below
+   *  the header at 22 px rows.
+   *
+   *  For `dynamic` topology (text_button / media_button) the ports
+   *  are rendered INSIDE the button rows in the config form (Pabbly-
+   *  style), so we compute Y from the buttons-area start plus the
+   *  button row index. Constants are approximate because the schema
+   *  form has variable content above buttons, but visually the SVG
+   *  edge lands within a few pixels of the actual port dot. */
   outputPortPos(node: CanvasNode, labelIndex = 0): { x: number; y: number } {
+    const x = this.nodeLeftOffset() + node.position.x + this.cardWidth();
+    if (node.type === 'text_button') {
+      return {
+        x,
+        y: node.position.y + 198 + labelIndex * 46,
+      };
+    }
+    if (node.type === 'media_button') {
+      return {
+        x,
+        y: node.position.y + 322 + labelIndex * 46,
+      };
+    }
     return {
-      x: this.NODE_LEFT_OFFSET + node.position.x + this.NODE_WIDTH,
+      x,
       y: node.position.y + this.NODE_HEADER_H / 2 + labelIndex * 22,
     };
   }
@@ -139,7 +182,7 @@ export class ChatbotBuilderPageComponent {
     // the right edge, centered vertically.
     const pos = this.triggerPosition();
     return {
-      x: this.TRIGGER_LEFT + pos.x + this.TRIGGER_WIDTH,
+      x: this.TRIGGER_LEFT + pos.x + this.cardWidth(),
       y: this.TRIGGER_TOP + pos.y + this.TRIGGER_HEIGHT / 2,
     };
   }
@@ -414,6 +457,14 @@ export class ChatbotBuilderPageComponent {
 
   @HostListener('document:mousemove', ['$event'])
   onDocumentMouseMove(evt: MouseEvent): void {
+    // Card resize takes priority over move — the corner grip
+    // handler set `cardResizeStart` above.
+    if (this.cardResizeStart) {
+      const z = this.canvas.zoom() || 1;
+      const dx = (evt.clientX - this.cardResizeStart.startX) / z;
+      this.canvas.setCardWidth(this.cardResizeStart.startWidth + dx);
+      return;
+    }
     const drag = this.dragState;
     if (!drag) return;
     // Divide by zoom so a mouse move of N screen pixels translates
@@ -440,6 +491,12 @@ export class ChatbotBuilderPageComponent {
 
   @HostListener('document:mouseup', ['$event'])
   onDocumentMouseUp(_evt: MouseEvent): void {
+    if (this.cardResizeStart) {
+      this.cardResizeStart = null;
+      this.suppressNextClick = true;
+      setTimeout(() => (this.suppressNextClick = false), 0);
+      return;
+    }
     const drag = this.dragState;
     if (!drag) return;
     this.dragState = null;

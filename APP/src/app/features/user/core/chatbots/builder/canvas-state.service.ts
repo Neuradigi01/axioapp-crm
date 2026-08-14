@@ -56,10 +56,24 @@ export class CanvasStateService {
    *  left rail to a narrow strip so the operator sees more canvas
    *  while designing. */
   readonly paletteCollapsed = signal<boolean>(false);
+  /** Palette width in px (session-only). Drag-resizable via the
+   *  handle on the palette's right edge. */
+  readonly paletteWidth = signal<number>(280);
+  /** Card width in px (session-only) shared by the trigger card and
+   *  every node card. Kept as ONE global knob so the whole graph
+   *  stays visually consistent — per-card widths would make the
+   *  canvas read as unfinished. */
+  readonly cardWidth = signal<number>(320);
 
   private readonly ZOOM_MIN = 0.25;
   private readonly ZOOM_MAX = 2;
   private readonly ZOOM_STEPS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
+
+  private readonly PALETTE_MIN = 220;
+  private readonly PALETTE_MAX = 480;
+  private readonly CARD_MIN = 260;
+  private readonly CARD_MAX = 480;
+  private readonly CARD_STEPS: readonly number[] = [260, 300, 320, 360, 400, 440, 480];
 
   setZoom(next: number): void {
     const clamped = Math.min(this.ZOOM_MAX, Math.max(this.ZOOM_MIN, next));
@@ -84,6 +98,32 @@ export class CanvasStateService {
 
   togglePalette(): void {
     this.paletteCollapsed.update((v) => !v);
+  }
+
+  setPaletteWidth(px: number): void {
+    const clamped = Math.min(this.PALETTE_MAX, Math.max(this.PALETTE_MIN, Math.round(px)));
+    this.paletteWidth.set(clamped);
+  }
+
+  setCardWidth(px: number): void {
+    const clamped = Math.min(this.CARD_MAX, Math.max(this.CARD_MIN, Math.round(px)));
+    this.cardWidth.set(clamped);
+  }
+
+  cardWidthNarrower(): void {
+    const cur = this.cardWidth();
+    const next = [...this.CARD_STEPS].reverse().find((w) => w < cur) ?? this.CARD_MIN;
+    this.setCardWidth(next);
+  }
+
+  cardWidthWider(): void {
+    const cur = this.cardWidth();
+    const next = this.CARD_STEPS.find((w) => w > cur) ?? this.CARD_MAX;
+    this.setCardWidth(next);
+  }
+
+  cardWidthReset(): void {
+    this.setCardWidth(320);
   }
 
   /** Click-to-connect state — set to the source node id (or literal
@@ -155,6 +195,8 @@ export class CanvasStateService {
     this.triggerPosition.set({ x: 0, y: 0 });
     this.zoom.set(1);
     this.paletteCollapsed.set(false);
+    this.paletteWidth.set(280);
+    this.cardWidth.set(320);
   }
 
   addNode(meta: NodeTypeMeta, position: { x: number; y: number }): CanvasNode {

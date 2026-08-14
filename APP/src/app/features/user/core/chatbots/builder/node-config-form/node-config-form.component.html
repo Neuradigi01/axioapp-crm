@@ -96,7 +96,9 @@
         @case ('button_list') {
           <div class="space-y-1.5">
             @for (btn of getButtonList(field.key); track btn.id; let i = $index) {
-              <div class="flex items-center gap-2 p-2 border border-subtle bg-app rounded-md">
+              <div
+                class="relative flex items-center gap-2 p-2 pr-4 border border-subtle bg-app rounded-md"
+              >
                 <span
                   class="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0"
                   aria-hidden="true"
@@ -125,6 +127,23 @@
                 >
                   <lucide-icon name="trash-2" size="12"></lucide-icon>
                 </button>
+                <!-- Inline output port — sits on the right edge of the
+                     button row so each button visibly owns its own
+                     downstream branch (matches Pabbly's inline port). -->
+                @if (nodeId) {
+                  <span
+                    (click)="onPortClick(btn.id, $event)"
+                    (mousedown)="$event.stopPropagation()"
+                    [class]="
+                      'absolute right-[-16px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-accent cursor-pointer transition-all shadow-sm ' +
+                      (nodeIsPending && pendingPortLabel === btn.id
+                        ? 'bg-accent scale-110'
+                        : 'bg-surface hover:bg-accent hover:scale-110')
+                    "
+                    title="Click to start a connection from this button"
+                    aria-label="Button output port"
+                  ></span>
+                }
               </div>
             }
             @if (field.maxItems === undefined || getButtonList(field.key).length < field.maxItems) {

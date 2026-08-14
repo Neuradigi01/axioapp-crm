@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
+  HostListener,
   Output,
   computed,
   inject,
@@ -53,6 +54,32 @@ export class ChatbotPaletteComponent {
     // click-to-add UX works without a drag. Parent listens for
     // `add` for its own bookkeeping.
     this.canvas.addNode(meta, this.nextDropPosition());
+  }
+
+  /** Active resize gesture, if any — the width-drag handle records
+   *  the mouse start-X + current palette width, then the document
+   *  mousemove listener updates the width until mouseup. */
+  private resizeStart: { startX: number; startWidth: number } | null = null;
+
+  onResizeMouseDown(evt: MouseEvent): void {
+    if (evt.button !== 0) return;
+    evt.preventDefault();
+    this.resizeStart = {
+      startX: evt.clientX,
+      startWidth: this.canvas.paletteWidth(),
+    };
+  }
+
+  @HostListener('document:mousemove', ['$event'])
+  onDocumentMouseMove(evt: MouseEvent): void {
+    if (!this.resizeStart) return;
+    const dx = evt.clientX - this.resizeStart.startX;
+    this.canvas.setPaletteWidth(this.resizeStart.startWidth + dx);
+  }
+
+  @HostListener('document:mouseup')
+  onDocumentMouseUp(): void {
+    this.resizeStart = null;
   }
 
   private nextDropPosition(): { x: number; y: number } {

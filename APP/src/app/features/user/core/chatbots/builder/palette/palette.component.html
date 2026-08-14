@@ -21,7 +21,8 @@
   </div>
 } @else {
   <div
-    class="flex flex-col h-full min-h-0 bg-surface border-r border-subtle w-[280px] flex-shrink-0"
+    class="relative flex flex-col h-full min-h-0 bg-surface border-r border-subtle flex-shrink-0"
+    [style.width.px]="canvas.paletteWidth()"
   >
     <!-- Tab bar + collapse -->
     <div class="flex items-stretch border-b border-subtle flex-shrink-0">
@@ -105,6 +106,24 @@
       @if (filteredTiles().length === 0) {
         <p class="text-center text-xs text-muted py-8">No nodes match your search.</p>
       }
+    </div>
+
+    <!-- Resize handle — visible vertical grip on the right edge so
+         operators can find it. Full-height hit target with a small
+         centered dotted grip for affordance. -->
+    <div
+      (mousedown)="onResizeMouseDown($event)"
+      class="group absolute top-0 right-[-4px] bottom-0 w-2 cursor-col-resize hover:bg-accent/20 z-10 flex items-center justify-center"
+      title="Drag to resize palette"
+      aria-label="Resize palette"
+    >
+      <div
+        class="w-1 h-8 rounded-full bg-subtle group-hover:bg-accent transition-colors flex flex-col items-center justify-center gap-1"
+      >
+        <span class="w-0.5 h-0.5 rounded-full bg-muted group-hover:bg-white"></span>
+        <span class="w-0.5 h-0.5 rounded-full bg-muted group-hover:bg-white"></span>
+        <span class="w-0.5 h-0.5 rounded-full bg-muted group-hover:bg-white"></span>
+      </div>
     </div>
   </div>
 }
