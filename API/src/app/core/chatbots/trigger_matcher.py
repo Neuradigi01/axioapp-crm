@@ -318,6 +318,39 @@ async def on_inbound(envelope: dict[str, Any]) -> None:
                     await session.commit()
                     return
 
+            # --- Bot mute window (End Bot node) ----------------------
+            # If a previous flow's End Bot node set a mute on this
+            # conversation, silently swallow ALL bot activity (new
+            # triggers AND parked-run resumes) until it expires.
+            # Mute is an explicit "shut up" from the operator's flow
+            # design; parked runs during a mute stay parked and expire
+            # via the normal wait-timeout sweeper.
+            from datetime import UTC, datetime
+
+            from src.app.core.conversations.models import Conversation
+            from sqlalchemy import select
+
+            conv_row = (
+                await session.execute(
+                    select(Conversation.bot_muted_until).where(
+                        Conversation.id == conversation_id
+                    )
+                )
+            ).first()
+            muted_until = conv_row[0] if conv_row else None
+            if muted_until is not None and muted_until > datetime.now(UTC):
+                _dal.insert_trigger_diagnostic(
+                    session,
+                    org_id=org_id,
+                    bot_id=None,
+                    conversation_id=conversation_id,
+                    message_id=message_id,
+                    reason="bot_muted",
+                    detail=f"muted_until={muted_until.isoformat()}",
+                )
+                await session.commit()
+                return
+
             # --- Parked-run resume takes priority over trigger match --
             # A run parked at a button/list/ask-question node is waiting
             # for THIS user's reply. The reply text (e.g. the tapped

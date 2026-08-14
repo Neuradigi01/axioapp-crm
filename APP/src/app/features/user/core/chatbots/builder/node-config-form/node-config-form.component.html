@@ -3,6 +3,9 @@
     <div>
       <label class="block text-[10px] font-medium text-muted uppercase tracking-wide mb-1">
         {{ field.label }}
+        @if (field.required) {
+          <span class="text-red-500" aria-label="required">*</span>
+        }
       </label>
 
       @switch (field.type) {

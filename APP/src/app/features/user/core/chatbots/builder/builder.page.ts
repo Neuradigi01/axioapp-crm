@@ -11,6 +11,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
@@ -64,6 +65,7 @@ export class ChatbotBuilderPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly snackBar = inject(MatSnackBar);
   readonly canvas = inject(CanvasStateService);
 
   readonly loading = signal<boolean>(true);
@@ -338,8 +340,14 @@ export class ChatbotBuilderPageComponent {
         next: (updated) => {
           this.canvas.bot.set(updated);
           this.canvas.markSaved(updated.version_number);
+          this.showToast(`Saved · v${updated.version_number}`);
         },
         error: (err) => {
+          // Console-log the raw error so operators (or us) can dig into
+          // the underlying cause via devtools. The user-facing message
+          // is the extracted API detail so version-conflict / validation
+          // messages surface directly.
+          console.error('chatbot.save.failed', err);
           this.error.set(extractApiError(err) ?? 'Save failed.');
           this.canvas.saving.set(false);
         },
@@ -353,14 +361,40 @@ export class ChatbotBuilderPageComponent {
       this.error.set('Save your unsaved changes before toggling Live.');
       return;
     }
-    const call = this.isLive() ? this.api.pause(bot.id) : this.api.publish(bot.id);
+    const goingLive = !this.isLive();
+    const call = goingLive ? this.api.publish(bot.id) : this.api.pause(bot.id);
     call.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (updated) => {
         this.canvas.bot.set(updated);
         this.canvas.markSaved(updated.version_number);
+        this.showToast(goingLive ? 'Bot is now live' : 'Bot paused');
       },
-      error: (err) => this.error.set(extractApiError(err) ?? 'Status change failed.'),
+      error: (err) => {
+        console.error('chatbot.toggleLive.failed', err);
+        this.error.set(extractApiError(err) ?? 'Status change failed.');
+      },
     });
+  }
+
+  private showToast(message: string): void {
+    this.snackBar.open(message, 'OK', {
+      duration: 3000,
+      horizontalPosition: 'right',
+      verticalPosition: 'top',
+    });
+  }
+
+  /** Prevent tab close / refresh when unsaved changes are pending —
+   *  otherwise operators lose 20 minutes of graph editing on an
+   *  accidental Ctrl+W. Modern browsers ignore the returned string
+   *  and show their own generic warning, but returning any value
+   *  triggers the dialog. */
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.dirty()) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
   }
 
   openTriggerModal(): void {

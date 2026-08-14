@@ -167,6 +167,13 @@ class Conversation(Base, TenantScoped):
     acquisition_referral_payload: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB, nullable=True
     )
+    # tasks/chatbot-builder — set by the ``end_bot`` node when its
+    # ``mute_hours`` is > 0. While this is a future timestamp the
+    # trigger matcher refuses to fire any bot on this conversation
+    # (records a ``bot_muted`` diagnostic and returns). NULL = no mute.
+    bot_muted_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

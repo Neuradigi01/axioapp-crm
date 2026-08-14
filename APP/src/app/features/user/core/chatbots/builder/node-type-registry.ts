@@ -49,6 +49,10 @@ export interface FieldSchema {
   maxLength?: number;
   /** Cap for `button_list` / `string_list` (e.g. WA text_button = 3 buttons). */
   maxItems?: number;
+  /** Show a red asterisk next to the label so the operator knows the
+   *  backend will reject a Save with this field empty. Purely visual —
+   *  actual validation stays on the backend so the two never drift. */
+  required?: boolean;
 }
 
 export interface NodeTypeMeta {
@@ -89,9 +93,9 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
     },
     configSchema: [
       { key: 'body', label: 'Message', type: 'textarea', rows: 3, maxLength: 1024,
-        placeholder: 'Enter message here', help: 'Max 1024 characters.' },
+        placeholder: 'Enter message here', help: 'Max 1024 characters.', required: true },
       { key: 'buttons', label: 'Buttons', type: 'button_list', maxItems: 3,
-        help: 'Up to 3 reply buttons. Each button becomes an output port.' },
+        help: 'Up to 3 reply buttons. Each button becomes an output port.', required: true },
     ],
   },
   {
@@ -111,8 +115,8 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
       { key: 'header_media.media_id', label: 'Media ID', type: 'text',
         placeholder: 'WA media ID or file token',
         help: 'Upload flow lands in a follow-up; paste an ID for now.' },
-      { key: 'body', label: 'Message', type: 'textarea', rows: 3, maxLength: 1024 },
-      { key: 'buttons', label: 'Buttons', type: 'button_list', maxItems: 3 },
+      { key: 'body', label: 'Message', type: 'textarea', rows: 3, maxLength: 1024, required: true },
+      { key: 'buttons', label: 'Buttons', type: 'button_list', maxItems: 3, required: true },
     ],
   },
   {
@@ -202,9 +206,9 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
     },
     configSchema: [
       { key: 'prompt', label: 'Question', type: 'textarea', rows: 2, maxLength: 1024,
-        placeholder: "e.g. What's your name?" },
+        placeholder: "e.g. What's your name?", required: true },
       { key: 'save_to', label: 'Save answer to', type: 'text',
-        placeholder: 'contact.full_name',
+        placeholder: 'contact.full_name', required: true,
         help: 'Field path: contact.<field> or lead.<field> or contact.custom.<key>.' },
       { key: 'expected_format', label: 'Expected format', type: 'select', options: [
         { value: 'text', label: 'Free text' }, { value: 'email', label: 'Email' },
@@ -379,6 +383,24 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
   },
 
   // --- Actions tab · CRM extras (4) ---
+  {
+    type: 'end_bot', label: 'End Bot', icon: 'check-circle-2',
+    category: 'crm', paletteTab: 'actions', outputs: 'single',
+    hint: 'Cleanly end the flow + optionally mute the bot for N hours.',
+    defaultConfig: {
+      final_bot_message: "Thanks, we'll be in touch shortly.",
+      mute_hours: 0,
+    },
+    configSchema: [
+      { key: 'final_bot_message', label: 'Final message (optional)', type: 'textarea',
+        rows: 2, maxLength: 1024,
+        placeholder: "Thanks, we'll be in touch shortly.",
+        help: 'Leave empty to end silently.' },
+      { key: 'mute_hours', label: 'Mute bot for (hours)', type: 'number',
+        min: 0, max: 720,
+        help: 'Prevents the trigger from firing again on this conversation for N hours. 0 = no mute. Max 720 (30 days).' },
+    ],
+  },
   {
     type: 'handoff_to_human', label: 'Handoff to Human', icon: 'bot',
     category: 'crm', paletteTab: 'actions', outputs: 'single',

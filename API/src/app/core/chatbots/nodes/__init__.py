@@ -26,6 +26,7 @@ from src.app.core.chatbots.nodes import (  # noqa: F401
     ask_media,
     ask_question,
     catalog_message,
+    end_bot,
     list as _list_node,
     media_button,
     multi_product,
