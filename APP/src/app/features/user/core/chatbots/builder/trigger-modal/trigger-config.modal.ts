@@ -2,9 +2,11 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   EventEmitter,
   Input,
   Output,
+  ViewChild,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -121,6 +123,7 @@ const MODE_OPTIONS = [
                   type="text"
                   placeholder="Add keyword, press Enter"
                   (keydown.enter)="addKeyword(kwInput.value); kwInput.value = ''"
+                  (blur)="addKeyword(kwInput.value); kwInput.value = ''"
                   class="flex-1 min-w-[100px] bg-transparent text-xs text-default focus:outline-none"
                 />
               </div>
@@ -221,6 +224,12 @@ export class TriggerConfigModalComponent {
   readonly caseSensitive = signal<boolean>(false);
   readonly firstMessageOnly = signal<boolean>(false);
 
+  /** Reference to the keyword-entry input so `onSave` can flush any
+   *  typed-but-not-Enter-submitted text into the list before emitting
+   *  the config. Without this, "hi" typed into the box + click Save
+   *  silently drops the value. */
+  @ViewChild('kwInput') private kwInputRef?: ElementRef<HTMLInputElement>;
+
   addKeyword(raw: string): void {
     const kw = (raw ?? '').trim();
     if (!kw) return;
@@ -237,6 +246,16 @@ export class TriggerConfigModalComponent {
   }
 
   onSave(): void {
+    // Flush any typed-but-not-Enter-submitted keyword before building
+    // the payload. The keyword input is uncontrolled; without this
+    // the operator's last word gets dropped on the floor.
+    if (this.mode() === 'keyword' && this.kwInputRef) {
+      const pending = this.kwInputRef.nativeElement.value;
+      if (pending.trim()) {
+        this.addKeyword(pending);
+        this.kwInputRef.nativeElement.value = '';
+      }
+    }
     const cfg: TriggerConfig = {
       channel: this.channel(),
       mode: this.mode(),

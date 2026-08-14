@@ -87,6 +87,7 @@
               (keydown.enter)="
                 addStringItem(field.key, strItemInput.value); strItemInput.value = ''
               "
+              (blur)="addStringItem(field.key, strItemInput.value); strItemInput.value = ''"
               class="flex-1 min-w-[80px] bg-transparent text-xs text-default focus:outline-none"
             />
           </div>

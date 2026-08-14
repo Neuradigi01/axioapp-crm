@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   inject,
   signal,
@@ -68,6 +69,24 @@ export class ChatbotBuilderPageComponent {
   readonly triggerModalOpen = signal<boolean>(false);
   readonly deleteNodeId = signal<string | null>(null);
 
+  /** Active drag gesture, if any. Set on node-header mousedown, read
+   *  by the document-level mousemove listener, cleared on mouseup. */
+  private dragState: {
+    nodeId: string;
+    startMouseX: number;
+    startMouseY: number;
+    startPosX: number;
+    startPosY: number;
+    moved: boolean;
+  } | null = null;
+
+  /** Set true for one tick after a drag ends so the trailing click
+   *  (browsers fire click on the mousedown target after mouseup) is
+   *  swallowed by `selectNode` — otherwise dragging a node would
+   *  also select it, or worse, complete a pending click-to-connect
+   *  gesture. */
+  private suppressNextClick = false;
+
   readonly bot = this.canvas.bot;
   readonly nodes = this.canvas.nodes;
   readonly edges = this.canvas.edges;
@@ -76,6 +95,11 @@ export class ChatbotBuilderPageComponent {
   readonly dirty = this.canvas.dirty;
   readonly saving = this.canvas.saving;
   readonly pendingSourceId = this.canvas.pendingSourceId;
+  readonly triggerPosition = this.canvas.triggerPosition;
+  readonly zoom = this.canvas.zoom;
+  readonly paletteCollapsed = this.canvas.paletteCollapsed;
+
+  readonly zoomPercent = computed(() => Math.round(this.zoom() * 100));
 
   /** Layout constants matching the template — kept here so the SVG
    *  edge computation and the DOM stay in sync. Node position `x/y`
@@ -110,9 +134,13 @@ export class ChatbotBuilderPageComponent {
   }
 
   triggerPortPos(): { x: number; y: number } {
+    // Trigger card is absolutely positioned at CANVAS_PAD + user
+    // drag offset (`triggerPosition` — session-only). Port sits on
+    // the right edge, centered vertically.
+    const pos = this.triggerPosition();
     return {
-      x: this.TRIGGER_LEFT + this.TRIGGER_WIDTH,
-      y: this.TRIGGER_TOP + this.TRIGGER_HEIGHT / 2,
+      x: this.TRIGGER_LEFT + pos.x + this.TRIGGER_WIDTH,
+      y: this.TRIGGER_TOP + pos.y + this.TRIGGER_HEIGHT / 2,
     };
   }
 
@@ -254,6 +282,14 @@ export class ChatbotBuilderPageComponent {
   }
 
   selectNode(nodeId: string): void {
+    // Swallow the trailing click that follows a drag gesture — the
+    // drag itself already moved the node; a click here would either
+    // change the selection unexpectedly or complete a pending
+    // click-to-connect gesture the user didn't intend.
+    if (this.suppressNextClick) {
+      this.suppressNextClick = false;
+      return;
+    }
     // If a source port is pending, treat clicks on nodes as connect-
     // completion attempts. Any click on the card itself is treated as
     // "connect to this node's input" for ergonomics.
@@ -292,6 +328,105 @@ export class ChatbotBuilderPageComponent {
   deleteEdge(edgeId: string, evt: MouseEvent): void {
     evt.stopPropagation();
     this.canvas.deleteEdge(edgeId);
+  }
+
+  /** Node-header mousedown starts a drag gesture. We defer any real
+   *  move to the document mousemove listener so the drag survives
+   *  the cursor leaving the node card. The `moved` flag distinguishes
+   *  a click (no drag) from a drag on mouseup so header clicks still
+   *  select the node. Pass `'trigger'` as `nodeId` to drag the
+   *  trigger card (session-only, not persisted). */
+  onNodeHeaderMouseDown(nodeId: string, evt: MouseEvent): void {
+    // Left button only — right-click / middle-click shouldn't drag.
+    if (evt.button !== 0) return;
+    // If a connect gesture is active, defer to click-to-connect
+    // rather than dragging.
+    if (this.pendingSourceId()) return;
+    let startPos: { x: number; y: number };
+    if (nodeId === 'trigger') {
+      startPos = this.triggerPosition();
+    } else {
+      const node = this.nodes().find((n) => n.id === nodeId);
+      if (!node) return;
+      startPos = node.position;
+    }
+    evt.preventDefault();
+    this.dragState = {
+      nodeId,
+      startMouseX: evt.clientX,
+      startMouseY: evt.clientY,
+      startPosX: startPos.x,
+      startPosY: startPos.y,
+      moved: false,
+    };
+  }
+
+  @HostListener('document:mousemove', ['$event'])
+  onDocumentMouseMove(evt: MouseEvent): void {
+    const drag = this.dragState;
+    if (!drag) return;
+    // Divide by zoom so a mouse move of N screen pixels translates
+    // to N canvas-pixels regardless of the current zoom level —
+    // otherwise dragging at 50 % zoom moves the card at half speed.
+    const z = this.canvas.zoom() || 1;
+    const dx = (evt.clientX - drag.startMouseX) / z;
+    const dy = (evt.clientY - drag.startMouseY) / z;
+    // Small deadzone — a stray 1-2px jitter shouldn't count as a
+    // drag; below the threshold the mouseup handler treats it as a
+    // click and selects the node instead.
+    if (!drag.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+    drag.moved = true;
+    // Clamp to non-negative — graph coords are anchored at the trigger-
+    // column offset so negative x would push cards under the palette.
+    const nextX = Math.max(0, drag.startPosX + dx);
+    const nextY = Math.max(0, drag.startPosY + dy);
+    if (drag.nodeId === 'trigger') {
+      this.canvas.triggerPosition.set({ x: nextX, y: nextY });
+    } else {
+      this.canvas.updateNodePosition(drag.nodeId, { x: nextX, y: nextY });
+    }
+  }
+
+  @HostListener('document:mouseup', ['$event'])
+  onDocumentMouseUp(_evt: MouseEvent): void {
+    const drag = this.dragState;
+    if (!drag) return;
+    this.dragState = null;
+    if (drag.moved) {
+      this.suppressNextClick = true;
+      // Auto-clear on the next macrotask so a genuine future click
+      // isn't accidentally eaten if the browser doesn't emit the
+      // trailing click (e.g. drag ended outside the node).
+      setTimeout(() => (this.suppressNextClick = false), 0);
+    } else if (drag.nodeId !== 'trigger') {
+      this.canvas.selectedNodeId.set(drag.nodeId);
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.pendingSourceId()) {
+      this.canvas.cancelConnect();
+      return;
+    }
+    if (this.dragState) {
+      // Snap back to where we started — cancels an in-progress drag.
+      const snapback = { x: this.dragState.startPosX, y: this.dragState.startPosY };
+      if (this.dragState.nodeId === 'trigger') {
+        this.canvas.triggerPosition.set(snapback);
+      } else {
+        this.canvas.updateNodePosition(this.dragState.nodeId, snapback);
+      }
+      this.dragState = null;
+    }
+  }
+
+  /** Whether a header click should proceed to `selectNode`. During a
+   *  drag we bail out on the click at mousedown level (see the
+   *  header handler), so this only needs to guard against the tail
+   *  end of a drag being counted as a select. */
+  isDragging(): boolean {
+    return this.dragState !== null && this.dragState.moved;
   }
 
   patchNodeConfig(nodeId: string, patch: Record<string, unknown>): void {

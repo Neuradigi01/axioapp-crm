@@ -92,7 +92,46 @@
           </div>
         }
 
-        <div class="p-6 min-w-[1400px] min-h-[900px] relative">
+        <!-- Zoom controls (floating, bottom-right of canvas viewport) -->
+        <div
+          class="fixed z-30 bottom-6 right-6 flex items-center gap-1 p-1 bg-surface border border-subtle rounded-full shadow-lg"
+          (click)="$event.stopPropagation()"
+        >
+          <button
+            type="button"
+            (click)="canvas.zoomOut()"
+            [disabled]="zoom() <= 0.25"
+            class="p-1.5 rounded-full hover:bg-surface-2 text-muted hover:text-default disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Zoom out"
+            aria-label="Zoom out"
+          >
+            <lucide-icon name="minus" size="14"></lucide-icon>
+          </button>
+          <button
+            type="button"
+            (click)="canvas.zoomReset()"
+            class="min-w-[52px] px-2 py-0.5 text-[11px] font-semibold text-default hover:bg-surface-2 rounded"
+            title="Reset zoom to 100 %"
+          >
+            {{ zoomPercent() }}%
+          </button>
+          <button
+            type="button"
+            (click)="canvas.zoomIn()"
+            [disabled]="zoom() >= 2"
+            class="p-1.5 rounded-full hover:bg-surface-2 text-muted hover:text-default disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Zoom in"
+            aria-label="Zoom in"
+          >
+            <lucide-icon name="plus" size="14"></lucide-icon>
+          </button>
+        </div>
+
+        <div
+          class="p-6 min-w-[1400px] min-h-[900px] relative"
+          [style.transform]="'scale(' + zoom() + ')'"
+          style="transform-origin: top left"
+        >
           <!-- Edges — SVG overlay, behind the node cards -->
           <svg
             class="absolute inset-0 pointer-events-none"
@@ -127,11 +166,14 @@
             </g>
           </svg>
 
-          <!-- Trigger card (always at top-left) -->
+          <!-- Trigger card (starts top-left; user-draggable) -->
           <button
             type="button"
             (click)="openTriggerModal(); $event.stopPropagation()"
-            class="relative block w-[320px] p-4 rounded-xl border-2 border-accent bg-accent-soft text-left hover:brightness-110 transition-colors"
+            (mousedown)="onNodeHeaderMouseDown('trigger', $event)"
+            [style.left.px]="triggerPosition().x"
+            [style.top.px]="triggerPosition().y"
+            class="absolute block w-[320px] p-4 rounded-xl border-2 border-accent bg-accent-soft text-left hover:brightness-110 transition-colors cursor-move select-none"
           >
             <div class="flex items-center gap-2">
               <span
@@ -189,8 +231,11 @@
               "
               (click)="selectNode(node.id); $event.stopPropagation()"
             >
-              <!-- Node header -->
-              <div class="flex items-center gap-2 px-3 py-2.5 border-b border-subtle relative">
+              <!-- Node header — also the drag handle -->
+              <div
+                (mousedown)="onNodeHeaderMouseDown(node.id, $event)"
+                class="flex items-center gap-2 px-3 py-2.5 border-b border-subtle relative cursor-move select-none"
+              >
                 <lucide-icon
                   [name]="nodeMeta(node.type)?.icon ?? 'list'"
                   size="14"

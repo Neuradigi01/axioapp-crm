@@ -42,6 +42,50 @@ export class CanvasStateService {
   readonly saving = signal<boolean>(false);
   readonly expectedVersion = signal<number>(1);
 
+  /** Session-only position of the trigger card on the canvas. The
+   *  trigger isn't a node in the backend graph (see
+   *  `serializeGraph` — trigger-sourced edges are UI-only), so its
+   *  position isn't persisted. Resets to `(0, 0)` on every load. */
+  readonly triggerPosition = signal<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  /** Canvas zoom (session-only). `1` = 100 %. Bounded to [0.25, 2]
+   *  by `setZoom` / `zoomIn` / `zoomOut`. Applied via CSS transform
+   *  on the canvas content wrapper. */
+  readonly zoom = signal<number>(1);
+  /** Palette open / collapsed (session-only). Collapsed shrinks the
+   *  left rail to a narrow strip so the operator sees more canvas
+   *  while designing. */
+  readonly paletteCollapsed = signal<boolean>(false);
+
+  private readonly ZOOM_MIN = 0.25;
+  private readonly ZOOM_MAX = 2;
+  private readonly ZOOM_STEPS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
+
+  setZoom(next: number): void {
+    const clamped = Math.min(this.ZOOM_MAX, Math.max(this.ZOOM_MIN, next));
+    this.zoom.set(Math.round(clamped * 100) / 100);
+  }
+
+  zoomIn(): void {
+    const cur = this.zoom();
+    const next = this.ZOOM_STEPS.find((z) => z > cur) ?? this.ZOOM_MAX;
+    this.setZoom(next);
+  }
+
+  zoomOut(): void {
+    const cur = this.zoom();
+    const next = [...this.ZOOM_STEPS].reverse().find((z) => z < cur) ?? this.ZOOM_MIN;
+    this.setZoom(next);
+  }
+
+  zoomReset(): void {
+    this.setZoom(1);
+  }
+
+  togglePalette(): void {
+    this.paletteCollapsed.update((v) => !v);
+  }
+
   /** Click-to-connect state — set to the source node id (or literal
    *  `'trigger'`) when the user clicks an output port. The next
    *  input-port click on a different node closes the pair into an
@@ -94,6 +138,7 @@ export class CanvasStateService {
     this.selectedNodeId.set(null);
     this.dirty.set(false);
     this.expectedVersion.set(bot.version_number);
+    this.triggerPosition.set({ x: 0, y: 0 });
   }
 
   reset(): void {
@@ -107,6 +152,9 @@ export class CanvasStateService {
     this.expectedVersion.set(1);
     this.pendingSourceId.set(null);
     this.pendingSourceLabel.set(null);
+    this.triggerPosition.set({ x: 0, y: 0 });
+    this.zoom.set(1);
+    this.paletteCollapsed.set(false);
   }
 
   addNode(meta: NodeTypeMeta, position: { x: number; y: number }): CanvasNode {
