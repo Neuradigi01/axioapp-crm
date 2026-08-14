@@ -3,7 +3,9 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   HostListener,
+  ViewChild,
   computed,
   inject,
   signal,
@@ -274,14 +276,108 @@ export class ChatbotBuilderPageComponent {
                 return this.outputPortPos(src, idx);
               })();
         if (!from) return null;
-        return { id: e.id, label: e.label ?? null, d: this.edgePath(from, to) };
+        // Midpoint for the edge label — cubic Bézier control points
+        // are horizontal so the true midpoint is close to the linear
+        // midpoint; good enough for a visual label anchor.
+        const midX = (from.x + to.x) / 2;
+        const midY = (from.y + to.y) / 2;
+        return {
+          id: e.id,
+          label: e.label ?? null,
+          d: this.edgePath(from, to),
+          midX,
+          midY,
+        };
       })
-      .filter((x): x is { id: string; label: string | null; d: string } => x !== null);
+      .filter(
+        (
+          x,
+        ): x is {
+          id: string;
+          label: string | null;
+          d: string;
+          midX: number;
+          midY: number;
+        } => x !== null,
+      );
   });
 
   /** Show a "click a target to connect" hint while a source port is
    *  active. */
   readonly isConnecting = computed(() => this.pendingSourceId() !== null);
+
+  /** Ref to the scroll container so ``fitToScreen`` knows how much
+   *  viewport it has to fit the graph into. */
+  @ViewChild('canvasViewport', { static: false })
+  private canvasViewportRef?: ElementRef<HTMLElement>;
+
+  /** Node ids reachable from the trigger via edge traversal. Nodes
+   *  NOT in this set are visually flagged as orphans (dashed border)
+   *  so operators notice branches they forgot to wire. Recomputed
+   *  every time nodes or edges change (signals-driven). */
+  readonly reachableNodeIds = computed(() => {
+    const outByNode = new Map<string, string[]>();
+    for (const edge of this.edges()) {
+      const list = outByNode.get(edge.source);
+      if (list) list.push(edge.target);
+      else outByNode.set(edge.source, [edge.target]);
+    }
+    const reached = new Set<string>();
+    const stack: string[] = ['trigger'];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const target of outByNode.get(cur) ?? []) {
+        if (!reached.has(target)) {
+          reached.add(target);
+          stack.push(target);
+        }
+      }
+    }
+    return reached;
+  });
+
+  isOrphan(nodeId: string): boolean {
+    return !this.reachableNodeIds().has(nodeId);
+  }
+
+  /** True when the node's config is missing any field marked
+   *  ``required: true`` in its schema. Read as ``[has red badge in
+   *  header]`` — pure UI signal, backend still does the real
+   *  validation on Save so no drift risk. */
+  nodeHasError(node: CanvasNode): boolean {
+    const meta = getNodeType(node.type);
+    if (!meta?.configSchema) return false;
+    for (const field of meta.configSchema) {
+      if (!field.required) continue;
+      const parts = field.key.split('.');
+      let cur: unknown = node.config;
+      for (const p of parts) {
+        if (cur === null || cur === undefined || typeof cur !== 'object') {
+          cur = undefined;
+          break;
+        }
+        cur = (cur as Record<string, unknown>)[p];
+      }
+      if (
+        cur === null ||
+        cur === undefined ||
+        cur === '' ||
+        (Array.isArray(cur) && cur.length === 0)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Fit the current graph inside the visible canvas viewport by
+   *  shrinking zoom just enough. Called from the ``Fit`` button in
+   *  the zoom pill. */
+  fitToScreen(): void {
+    const el = this.canvasViewportRef?.nativeElement;
+    if (!el) return;
+    this.canvas.fitToScreen(el.clientWidth, el.clientHeight);
+  }
 
   readonly triggerSummary = computed(() => {
     const cfg = this.triggerConfig();
@@ -340,7 +436,7 @@ export class ChatbotBuilderPageComponent {
         next: (updated) => {
           this.canvas.bot.set(updated);
           this.canvas.markSaved(updated.version_number);
-          this.showToast(`Saved · v${updated.version_number}`);
+          this.showToast(`Your bot has been saved (v${updated.version_number}).`);
         },
         error: (err) => {
           // Console-log the raw error so operators (or us) can dig into
@@ -367,7 +463,9 @@ export class ChatbotBuilderPageComponent {
       next: (updated) => {
         this.canvas.bot.set(updated);
         this.canvas.markSaved(updated.version_number);
-        this.showToast(goingLive ? 'Bot is now live' : 'Bot paused');
+        this.showToast(
+          goingLive ? 'Your bot is now live and ready to reply.' : 'Your bot has been paused.',
+        );
       },
       error: (err) => {
         console.error('chatbot.toggleLive.failed', err);

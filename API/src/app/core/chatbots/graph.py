@@ -73,8 +73,9 @@ NODE_TYPES: frozenset[str] = frozenset(
         "assign_ai_assistant",
         "delay",
         "connect_flow",
-        # CRM extras (4)
+        # CRM extras (5)
         "handoff_to_human",
+        "end_bot",
         "create_lead",
         "book_appointment",
         "create_task",

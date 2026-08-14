@@ -86,6 +86,7 @@
            squares) reads as a proper drafting surface instead of a
            bare dot field. -->
       <main
+        #canvasViewport
         class="flex-1 overflow-auto relative bg-app"
         style="
           background-image:
@@ -111,6 +112,7 @@
              — slightly larger + subtle backdrop-blur so it reads as
              a real floating pill against the grid. -->
         <div
+          #zoomControls
           class="fixed z-30 bottom-6 right-6 flex items-center gap-0.5 p-1 bg-surface/90 backdrop-blur border border-subtle rounded-full shadow-xl"
           (click)="$event.stopPropagation()"
         >
@@ -141,6 +143,17 @@
             aria-label="Zoom in"
           >
             <lucide-icon name="plus" size="14"></lucide-icon>
+          </button>
+          <span class="w-px h-4 bg-subtle mx-1"></span>
+          <button
+            type="button"
+            (click)="fitToScreen()"
+            class="px-2 py-1.5 text-[11px] font-medium text-muted hover:text-default hover:bg-surface-2 rounded-full transition-colors flex items-center gap-1"
+            title="Fit the whole graph on screen"
+            aria-label="Fit to screen"
+          >
+            <lucide-icon name="maximize-2" size="12"></lucide-icon>
+            Fit
           </button>
         </div>
 
@@ -205,6 +218,37 @@
                   marker-end="url(#chatbot-edge-arrow)"
                   opacity="0.85"
                 />
+              }
+            </g>
+            <!-- Edge labels — rendered on top of the paths so the
+                 button-id / port-name is visible on the wire even
+                 when zoomed out. Only shown for edges that carry a
+                 label (labeled + dynamic ports; single-port edges
+                 stay clean). -->
+            <g class="pointer-events-none">
+              @for (edge of renderedEdges(); track edge.id) {
+                @if (edge.label) {
+                  <rect
+                    [attr.x]="edge.midX - edge.label.length * 3.6 - 6"
+                    [attr.y]="edge.midY - 9"
+                    [attr.width]="edge.label.length * 7.2 + 12"
+                    height="18"
+                    rx="9"
+                    ry="9"
+                    class="fill-surface stroke-subtle"
+                    stroke-width="1"
+                    opacity="0.95"
+                  />
+                  <text
+                    [attr.x]="edge.midX"
+                    [attr.y]="edge.midY + 4"
+                    text-anchor="middle"
+                    class="fill-default"
+                    style="font-size: 10px; font-weight: 600; font-family: inherit"
+                  >
+                    {{ edge.label }}
+                  </text>
+                }
               }
             </g>
           </svg>
@@ -295,7 +339,9 @@
                 'absolute bg-surface border rounded-2xl transition-all overflow-hidden ' +
                 (selectedNodeId() === node.id
                   ? 'border-accent ring-2 ring-accent/20 shadow-[0_10px_28px_-8px_rgba(0,0,0,0.35)]'
-                  : 'border-subtle hover:border-default shadow-[0_6px_18px_-6px_rgba(0,0,0,0.25)] hover:shadow-[0_10px_24px_-8px_rgba(0,0,0,0.30)]')
+                  : isOrphan(node.id)
+                    ? 'border-amber-500/60 border-dashed shadow-[0_6px_18px_-6px_rgba(0,0,0,0.25)]'
+                    : 'border-subtle hover:border-default shadow-[0_6px_18px_-6px_rgba(0,0,0,0.25)] hover:shadow-[0_10px_24px_-8px_rgba(0,0,0,0.30)]')
               "
               (click)="selectNode(node.id); $event.stopPropagation()"
             >
@@ -342,6 +388,23 @@
                     class="px-1.5 py-px text-[8px] font-bold uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-500 rounded"
                   >
                     Beta
+                  </span>
+                }
+                @if (nodeHasError(node)) {
+                  <span
+                    class="inline-flex items-center gap-1 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider bg-red-500/15 text-red-500 rounded"
+                    title="This node has empty required fields. Save will fail until you fill them in."
+                  >
+                    <lucide-icon name="alert-triangle" size="10"></lucide-icon>
+                    Fix
+                  </span>
+                }
+                @if (isOrphan(node.id)) {
+                  <span
+                    class="inline-flex items-center gap-1 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-500 rounded"
+                    title="This node isn't reachable from the trigger — it will never fire. Wire an incoming edge to make it part of the flow."
+                  >
+                    Orphan
                   </span>
                 }
                 <button
