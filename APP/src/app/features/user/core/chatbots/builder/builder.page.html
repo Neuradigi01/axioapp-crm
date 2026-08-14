@@ -35,6 +35,17 @@
 
     <button
       type="button"
+      (click)="openTestModal()"
+      [disabled]="!bot() || dirty() || saving()"
+      class="px-3 py-1.5 rounded-md text-xs font-semibold border border-subtle text-default hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors"
+      title="Simulate an inbound message — no real sends"
+    >
+      <lucide-icon name="zap" size="12"></lucide-icon>
+      Test
+    </button>
+
+    <button
+      type="button"
       (click)="toggleLive()"
       [disabled]="!bot() || dirty() || saving()"
       [class]="
@@ -471,4 +482,12 @@
     (confirm)="confirmDeleteNode()"
     (cancel)="cancelDeleteNode()"
   ></app-confirm-dialog>
+}
+
+@if (testModalOpen() && bot()) {
+  <app-chatbot-test-modal
+    [botId]="bot()!.id"
+    [triggerConfig]="triggerConfig()"
+    (close)="testModalOpen.set(false)"
+  ></app-chatbot-test-modal>
 }

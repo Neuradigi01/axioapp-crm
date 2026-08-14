@@ -21,6 +21,7 @@ import { CanvasNode, CanvasStateService } from './canvas-state.service';
 import { NodeConfigFormComponent } from './node-config-form/node-config-form.component';
 import { NodeTypeMeta, getNodeType } from './node-type-registry';
 import { ChatbotPaletteComponent } from './palette/palette.component';
+import { ChatbotTestFireModalComponent } from './test-fire-modal/test-fire-modal.component';
 import { TriggerConfigModalComponent } from './trigger-modal/trigger-config.modal';
 
 /**
@@ -53,6 +54,7 @@ import { TriggerConfigModalComponent } from './trigger-modal/trigger-config.moda
     TriggerConfigModalComponent,
     ConfirmDialogComponent,
     NodeConfigFormComponent,
+    ChatbotTestFireModalComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './builder.page.html',
@@ -68,6 +70,7 @@ export class ChatbotBuilderPageComponent {
   readonly error = signal<string | null>(null);
   readonly triggerModalOpen = signal<boolean>(false);
   readonly deleteNodeId = signal<string | null>(null);
+  readonly testModalOpen = signal<boolean>(false);
 
   /** Active drag gesture, if any. Set on node-header mousedown, read
    *  by the document-level mousemove listener, cleared on mouseup. */
@@ -362,6 +365,14 @@ export class ChatbotBuilderPageComponent {
 
   openTriggerModal(): void {
     this.triggerModalOpen.set(true);
+  }
+
+  openTestModal(): void {
+    if (this.dirty()) {
+      this.error.set('Save your unsaved changes before running a test.');
+      return;
+    }
+    this.testModalOpen.set(true);
   }
 
   onTriggerSave(cfg: TriggerConfig): void {
