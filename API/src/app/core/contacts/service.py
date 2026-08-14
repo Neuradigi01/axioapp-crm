@@ -50,14 +50,24 @@ _CONTACT_FK_BLOCKERS = {
     "tbl_appointments": "appointment",
     "tbl_walk_ins": "walk-in",
 }
-_FK_TABLE_RE = re.compile(r'on table "(tbl_\w+)"')
+# Match the referring (child) table name, not tbl_contacts itself.
+# Postgres formats the error as:
+#     update or delete on table "tbl_contacts" violates foreign key
+#     constraint "tbl_leads_contact_id_fkey" on table "tbl_leads"
+#     DETAIL:  Key (id)=(...) is still referenced from table "tbl_leads".
+# The DETAIL line unambiguously names the blocking table; the earlier
+# regex just did `re.search(r'on table "(tbl_\w+)"')` and picked up
+# "tbl_contacts" (the first hit), which was never in the blocker map,
+# so every conflict fell through to the generic fallback message.
+_FK_REFERENCING_RE = re.compile(r'is still referenced from table "(tbl_\w+)"')
 
 
-def _contact_delete_conflict_detail(exc: IntegrityError, *, plural: bool) -> str:
-    """Turn a FK-RESTRICT `IntegrityError` on tbl_contacts into a
-    specific message naming the blocking dependency (lead /
-    appointment / walk-in) so the user knows what to remove first."""
-    match = _FK_TABLE_RE.search(str(exc.orig) if exc.orig else str(exc))
+def _fallback_conflict_message(exc: IntegrityError, *, plural: bool) -> str:
+    """Best-effort message from the driver text when the enumeration
+    query failed. Extracts the referring table from the DETAIL line —
+    covers the case where the enumeration itself blew up (session in
+    a bad state, DB gone, etc.)."""
+    match = _FK_REFERENCING_RE.search(str(exc.orig) if exc.orig else str(exc))
     label = _CONTACT_FK_BLOCKERS.get(match.group(1)) if match else None
     subject = "one or more contacts have" if plural else "this contact has"
     if label:
@@ -69,6 +79,53 @@ def _contact_delete_conflict_detail(exc: IntegrityError, *, plural: bool) -> str
     return (
         f"Cannot delete — {subject} linked leads, appointments, or walk-ins. "
         "Delete those first, or use Anonymise to wipe PII while keeping history."
+    )
+
+
+def _join_and(parts: list[str]) -> str:
+    if len(parts) == 1:
+        return parts[0]
+    if len(parts) == 2:
+        return f"{parts[0]} and {parts[1]}"
+    return ", ".join(parts[:-1]) + f", and {parts[-1]}"
+
+
+async def _contact_delete_conflict_detail(
+    session: AsyncSession,
+    exc: IntegrityError,
+    *,
+    contact_ids: list[uuid.UUID],
+    org_id: uuid.UUID | None,
+    plural: bool,
+) -> str:
+    """Build a specific 'cannot delete' message by counting the actual
+    RESTRICT-FK dependencies (leads / appointments / walk-ins) for the
+    affected contacts. Falls back to a regex-parsed message from the
+    driver error if the count query itself fails."""
+    try:
+        if plural:
+            assert org_id is not None
+            counts = await data_access.count_delete_blockers_for_contacts(
+                session, ids=contact_ids, org_id=org_id
+            )
+        else:
+            counts = await data_access.count_delete_blockers_for_contact(
+                session, contact_ids[0]
+            )
+    except SQLAlchemyError:
+        return _fallback_conflict_message(exc, plural=plural)
+
+    parts: list[str] = []
+    for key, label in (("leads", "lead"), ("appointments", "appointment"), ("walk_ins", "walk-in")):
+        n = counts.get(key, 0)
+        if n:
+            parts.append(f"{n} linked {label}{'s' if n != 1 else ''}")
+    if not parts:
+        return _fallback_conflict_message(exc, plural=plural)
+    subject = "the selected contacts have" if plural else "this contact has"
+    return (
+        f"Cannot delete — {subject} {_join_and(parts)}. "
+        "Delete them first, or use Anonymise to wipe PII while keeping history."
     )
 
 
@@ -439,7 +496,13 @@ async def delete_contact(session: AsyncSession, *, contact_id: uuid.UUID) -> Non
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=_contact_delete_conflict_detail(exc, plural=False),
+            detail=await _contact_delete_conflict_detail(
+                session,
+                exc,
+                contact_ids=[contact_uuid],
+                org_id=contact_org_id,
+                plural=False,
+            ),
         ) from exc
 
     await log_entity_change(
@@ -961,7 +1024,13 @@ async def bulk_delete_contacts(
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=_contact_delete_conflict_detail(exc, plural=True),
+            detail=await _contact_delete_conflict_detail(
+                session,
+                exc,
+                contact_ids=ids,
+                org_id=org_id,
+                plural=True,
+            ),
         ) from exc
     return deleted
 

@@ -112,7 +112,13 @@ class AppointmentBulkCancelResult(BaseModel):
     """`cancelled` counts rows actually transitioned this call.
     `skipped` counts rows ignored because they weren't in `scheduled`
     (already completed/cancelled/no_show). Mirrors the partial-success
-    pattern used by walk-ins bulk-checkout."""
+    pattern used by walk-ins bulk-checkout.
+
+    `skipped_by_status` breaks the skipped total down by the terminal
+    state that blocked the cancel — the UI uses it to build an
+    actionable message ("2 already completed — delete them instead of
+    cancelling") rather than the vague "skipped" toast."""
 
     cancelled: int
     skipped: int
+    skipped_by_status: dict[str, int] = Field(default_factory=dict)

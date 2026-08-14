@@ -213,6 +213,60 @@ async def delete_contacts_in_org(
     return int(result.rowcount or 0)
 
 
+# Counts across the three FK-RESTRICT tables that block a contact delete
+# (tbl_leads / tbl_appointments / tbl_walk_ins — the only RESTRICT
+# targets on tbl_contacts). Kept as one round-trip via a SELECT of three
+# scalar subqueries so the failure-message enumeration on a bulk
+# 25-contact delete stays a single query, not three.
+_CONTACT_BLOCKER_COUNT_SINGLE_SQL = text(
+    "SELECT "
+    "(SELECT count(*) FROM tbl_leads WHERE contact_id = :cid) AS leads, "
+    "(SELECT count(*) FROM tbl_appointments WHERE contact_id = :cid) AS appointments, "
+    "(SELECT count(*) FROM tbl_walk_ins WHERE contact_id = :cid) AS walk_ins"
+)
+
+_CONTACT_BLOCKER_COUNT_BULK_SQL = text(
+    "SELECT "
+    "(SELECT count(*) FROM tbl_leads "
+    "  WHERE contact_id = ANY(:ids) AND org_id = :org) AS leads, "
+    "(SELECT count(*) FROM tbl_appointments "
+    "  WHERE contact_id = ANY(:ids) AND org_id = :org) AS appointments, "
+    "(SELECT count(*) FROM tbl_walk_ins "
+    "  WHERE contact_id = ANY(:ids) AND org_id = :org) AS walk_ins"
+)
+
+
+async def count_delete_blockers_for_contact(
+    session: AsyncSession, contact_id: uuid.UUID
+) -> dict[str, int]:
+    """How many leads / appointments / walk-ins currently point at this contact.
+
+    Used by the delete conflict handler to build a message that names
+    the specific dependency counts instead of the generic 'may have
+    linked leads, appointments, or walk-ins' fallback.
+    """
+    row = (
+        await session.execute(_CONTACT_BLOCKER_COUNT_SINGLE_SQL, {"cid": str(contact_id)})
+    ).one()
+    return {"leads": int(row.leads), "appointments": int(row.appointments), "walk_ins": int(row.walk_ins)}
+
+
+async def count_delete_blockers_for_contacts(
+    session: AsyncSession, *, ids: list[uuid.UUID], org_id: uuid.UUID
+) -> dict[str, int]:
+    """Bulk variant — aggregate counts across a batch of contact ids.
+    Scoped by org_id to match the delete WHERE clause (belt to RLS)."""
+    if not ids:
+        return {"leads": 0, "appointments": 0, "walk_ins": 0}
+    row = (
+        await session.execute(
+            _CONTACT_BLOCKER_COUNT_BULK_SQL,
+            {"ids": [str(i) for i in ids], "org": str(org_id)},
+        )
+    ).one()
+    return {"leads": int(row.leads), "appointments": int(row.appointments), "walk_ins": int(row.walk_ins)}
+
+
 async def bulk_append_tag(
     session: AsyncSession,
     *,

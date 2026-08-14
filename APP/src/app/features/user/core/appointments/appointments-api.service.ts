@@ -135,13 +135,23 @@ export class AppointmentsApiService extends BaseCrudApiService<
   }
 
   /** Bulk-cancel — rows not currently in `scheduled` are skipped.
-   * Returns `{cancelled, skipped}` so the FE can surface the
-   * partial-success split. */
+   * Returns `{cancelled, skipped, skipped_by_status}` so the FE can
+   * surface an actionable partial-success message ("2 already
+   * completed — delete them instead of cancelling") rather than a
+   * vague "skipped" count. */
   bulkCancel(
     ids: string[],
     body: { reason?: string | null } = {},
-  ): Observable<{ cancelled: number; skipped: number }> {
-    return this.http.post<{ cancelled: number; skipped: number }>(`${this.base}/bulk-cancel`, {
+  ): Observable<{
+    cancelled: number;
+    skipped: number;
+    skipped_by_status: Record<string, number>;
+  }> {
+    return this.http.post<{
+      cancelled: number;
+      skipped: number;
+      skipped_by_status: Record<string, number>;
+    }>(`${this.base}/bulk-cancel`, {
       ids,
       reason: body.reason ?? null,
     });

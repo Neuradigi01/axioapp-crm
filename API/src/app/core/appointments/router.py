@@ -188,11 +188,13 @@ async def bulk_cancel_appointments_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("appointments.write")),
 ) -> AppointmentBulkCancelResult:
-    cancelled, skipped = await bulk_cancel_appointments(
+    cancelled, skipped, skipped_by_status = await bulk_cancel_appointments(
         db,
         ids=payload.ids,
         org_id=user.org_id,
         reason=payload.reason,
         actor_user_id=user.legacy_uuid,
     )
-    return AppointmentBulkCancelResult(cancelled=cancelled, skipped=skipped)
+    return AppointmentBulkCancelResult(
+        cancelled=cancelled, skipped=skipped, skipped_by_status=skipped_by_status
+    )

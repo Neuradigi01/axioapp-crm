@@ -903,7 +903,7 @@ async def bulk_cancel_appointments(
     org_id: uuid.UUID,
     reason: str | None,
     actor_user_id: uuid.UUID | None,
-) -> tuple[int, int]:
+) -> tuple[int, int, dict[str, int]]:
     """Move every row currently in `scheduled` to `cancelled`. Rows in
     any other state are skipped (counted as `skipped`) — same partial
     success semantic as walk-ins bulk-checkout. Each cancelled row
@@ -914,15 +914,22 @@ async def bulk_cancel_appointments(
     ORM instances in ``cancelled_appts`` and reuse them for the
     lifecycle event publish. Every cancelled row now emits an
     ``appointments.cancelled`` audit entry to match the single-row
-    cancel path."""
+    cancel path.
+
+    Returns ``(cancelled, skipped, skipped_by_status)`` — the per-status
+    breakdown lets the UI say "2 already completed — delete them
+    instead" instead of a bare "skipped 2" toast that leaves the user
+    guessing why nothing happened."""
     appts = await _da.list_appointments_by_ids_in_org(session, ids=ids, org_id=org_id)
 
     cancelled = 0
     skipped = 0
+    skipped_by_status: dict[str, int] = {}
     cancelled_appts: list[tuple[Appointment, dict[str, Any]]] = []
     for appt in appts:
         if appt.status != AppointmentStatus.scheduled:
             skipped += 1
+            skipped_by_status[appt.status.value] = skipped_by_status.get(appt.status.value, 0) + 1
             continue
         before_status = appt.status.value
         before_snap = _snapshot(appt)
@@ -971,7 +978,7 @@ async def bulk_cancel_appointments(
             extras={"reason": reason} if reason else None,
         )
 
-    return cancelled, skipped
+    return cancelled, skipped, skipped_by_status
 
 
 # --- Step-10 event publisher ----------------------------------------------
