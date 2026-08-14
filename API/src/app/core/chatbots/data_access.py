@@ -445,6 +445,57 @@ async def list_parked_runs_for_conversation(
     )
 
 
+async def count_runs_by_status(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    chatbot_id: uuid.UUID,
+) -> dict[str, int]:
+    """Return ``{status: count}`` for every non-test run of this bot.
+    Missing statuses are absent (caller defaults to 0). Cheap single
+    query — hits ``ix_chatbot_runs_bot_conv_status``."""
+    stmt = (
+        select(ChatbotRun.status, func.count())
+        .where(
+            ChatbotRun.org_id == org_id,
+            ChatbotRun.chatbot_id == chatbot_id,
+            ChatbotRun.is_test.is_(False),
+        )
+        .group_by(ChatbotRun.status)
+    )
+    return {row[0]: int(row[1]) for row in (await session.execute(stmt)).all()}
+
+
+async def top_executed_nodes(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    chatbot_id: uuid.UUID,
+    limit: int = 5,
+) -> list[tuple[str, str, int]]:
+    """Return the top ``limit`` (node_id, node_type, execution_count)
+    tuples across every non-test run of this bot, ordered by count
+    DESC. Executions include both completed and errored step runs so
+    a hot node isn't hidden by transient failures."""
+    stmt = (
+        select(
+            ChatbotStepRun.node_id,
+            ChatbotStepRun.node_type,
+            func.count().label("executions"),
+        )
+        .join(ChatbotRun, ChatbotRun.id == ChatbotStepRun.run_id)
+        .where(
+            ChatbotRun.org_id == org_id,
+            ChatbotRun.chatbot_id == chatbot_id,
+            ChatbotRun.is_test.is_(False),
+        )
+        .group_by(ChatbotStepRun.node_id, ChatbotStepRun.node_type)
+        .order_by(func.count().desc())
+        .limit(limit)
+    )
+    return [(row[0], row[1], int(row[2])) for row in (await session.execute(stmt)).all()]
+
+
 def insert_step_run(
     session: AsyncSession,
     *,

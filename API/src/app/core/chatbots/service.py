@@ -320,6 +320,43 @@ async def list_versions_service(
     )
 
 
+async def get_stats_service(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    chatbot_id: uuid.UUID,
+) -> dict:
+    """Aggregate run + step-run stats for the bot. Test-mode runs are
+    excluded so operators see real customer activity. Two cheap
+    queries; suitable for on-open modal load without background
+    pre-compute."""
+    await get_chatbot_service(session, org_id=org_id, chatbot_id=chatbot_id)
+    by_status = await dal.count_runs_by_status(
+        session, org_id=org_id, chatbot_id=chatbot_id
+    )
+    top = await dal.top_executed_nodes(
+        session, org_id=org_id, chatbot_id=chatbot_id, limit=5
+    )
+    completed = by_status.get("completed", 0)
+    canceled = by_status.get("canceled", 0)
+    errored = by_status.get("errored", 0)
+    finished = completed + canceled + errored
+    completion_rate = (completed / finished) if finished > 0 else 0.0
+    return {
+        "total_runs": sum(by_status.values()),
+        "running": by_status.get("running", 0),
+        "parked": by_status.get("parked", 0),
+        "completed": completed,
+        "canceled": canceled,
+        "errored": errored,
+        "completion_rate": round(completion_rate, 3),
+        "top_nodes": [
+            {"node_id": nid, "node_type": ntype, "executions": count}
+            for nid, ntype, count in top
+        ],
+    }
+
+
 async def rollback_to_version_service(
     session: AsyncSession,
     *,

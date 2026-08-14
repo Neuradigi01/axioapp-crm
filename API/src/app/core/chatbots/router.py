@@ -44,6 +44,7 @@ from src.app.core.chatbots.schemas import (
     ChatbotImportResult,
     ChatbotListItem,
     ChatbotRead,
+    ChatbotStats,
     ChatbotUpdate,
     ChatbotVersionRead,
     TestFireRequest,
@@ -349,6 +350,28 @@ async def list_versions_endpoint(
     except ChatbotError as exc:
         raise _chatbot_http_map(exc) from exc
     return [ChatbotVersionRead.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/{chatbot_id}/stats",
+    response_model=ChatbotStats,
+)
+async def get_stats_endpoint(
+    chatbot_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_VIEW)),
+) -> ChatbotStats:
+    """Aggregate stats: run counts by status + completion rate + top
+    executed nodes. Read-only, computed on demand — no cache. Test-mode
+    runs excluded."""
+    org_id = _require_org_id()
+    try:
+        stats = await chatbots_service.get_stats_service(
+            db, org_id=org_id, chatbot_id=chatbot_id
+        )
+    except ChatbotError as exc:
+        raise _chatbot_http_map(exc) from exc
+    return ChatbotStats.model_validate(stats)
 
 
 @router.get(

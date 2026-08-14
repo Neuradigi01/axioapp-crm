@@ -234,6 +234,34 @@ class ChatbotVersionRead(BaseModel):
     created_at: datetime
 
 
+class NodeHitCount(BaseModel):
+    """One row of the "most executed nodes" leaderboard."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    node_id: str
+    node_type: str
+    executions: int
+
+
+class ChatbotStats(BaseModel):
+    """Aggregate stats for a single chatbot. Read-only, computed on
+    the fly from ``tbl_chatbot_runs`` + ``tbl_chatbot_step_runs`` —
+    no materialised view (v1). Test-mode runs (``is_test=true``)
+    are excluded so the numbers reflect real customer activity."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    total_runs: int
+    running: int
+    parked: int
+    completed: int
+    canceled: int
+    errored: int
+    completion_rate: float  # completed / (completed + canceled + errored)
+    top_nodes: list[NodeHitCount]
+
+
 # --- Test-fire (Step 6) --------------------------------------------------
 
 
