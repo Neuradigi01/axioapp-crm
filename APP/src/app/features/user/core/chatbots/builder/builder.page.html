@@ -11,9 +11,26 @@
       <lucide-icon name="arrow-left" size="16"></lucide-icon>
     </a>
     <div class="flex items-center gap-2 flex-1 min-w-0">
-      <h1 class="text-sm font-semibold text-default truncate">
-        {{ bot()?.name ?? 'Loading…' }}
-      </h1>
+      @if (renaming()) {
+        <input
+          #renameInput
+          type="text"
+          [value]="bot()?.name ?? ''"
+          (keydown.enter)="commitRename(renameInput.value)"
+          (keydown.escape)="cancelRename()"
+          (blur)="commitRename(renameInput.value)"
+          class="text-sm font-semibold text-default bg-app border border-accent rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-accent/30 min-w-[200px]"
+          autofocus
+        />
+      } @else {
+        <h1
+          class="text-sm font-semibold text-default truncate cursor-text hover:bg-surface-2 rounded px-1 -mx-1"
+          title="Click to rename"
+          (click)="startRename()"
+        >
+          {{ bot()?.name ?? 'Loading…' }}
+        </h1>
+      }
       @if (bot()) {
         <span
           [class]="
@@ -32,6 +49,28 @@
     @if (error()) {
       <span class="text-xs text-red-500 mr-2">{{ error() }}</span>
     }
+
+    <button
+      type="button"
+      (click)="openStats()"
+      [disabled]="!bot()"
+      class="px-3 py-1.5 rounded-md text-xs font-semibold border border-subtle text-default hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors"
+      title="Run counts, completion rate, top nodes"
+    >
+      <lucide-icon name="bar-chart-3" size="12"></lucide-icon>
+      Stats
+    </button>
+
+    <button
+      type="button"
+      (click)="openHistory()"
+      [disabled]="!bot()"
+      class="px-3 py-1.5 rounded-md text-xs font-semibold border border-subtle text-default hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors"
+      title="View past versions and roll back"
+    >
+      <lucide-icon name="clock" size="12"></lucide-icon>
+      History
+    </button>
 
     <button
       type="button"
@@ -616,6 +655,19 @@
     (confirm)="confirmPublish()"
     (cancel)="cancelPublish()"
   ></app-confirm-dialog>
+}
+
+@if (historyModalOpen() && bot()) {
+  <app-chatbot-history-modal
+    [botId]="bot()!.id"
+    [currentVersion]="bot()!.version_number"
+    (close)="closeHistory()"
+    (restored)="onHistoryRestored()"
+  ></app-chatbot-history-modal>
+}
+
+@if (statsModalOpen() && bot()) {
+  <app-chatbot-stats-modal [botId]="bot()!.id" (close)="closeStats()"></app-chatbot-stats-modal>
 }
 
 <!-- Node right-click context menu — anchored to the click position.

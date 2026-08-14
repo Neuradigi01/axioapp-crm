@@ -23,7 +23,9 @@ import { ChatbotsApiService, TriggerConfig } from '../chatbots-api.service';
 import { CanvasNode, CanvasStateService } from './canvas-state.service';
 import { NodeConfigFormComponent } from './node-config-form/node-config-form.component';
 import { NodeTypeMeta, getNodeType } from './node-type-registry';
+import { ChatbotHistoryModalComponent } from './history-modal/history-modal.component';
 import { ChatbotMinimapComponent } from './minimap/minimap.component';
+import { ChatbotStatsModalComponent } from './stats-modal/stats-modal.component';
 import { ChatbotPaletteComponent } from './palette/palette.component';
 import { ChatbotTestFireModalComponent } from './test-fire-modal/test-fire-modal.component';
 import { TriggerConfigModalComponent } from './trigger-modal/trigger-config.modal';
@@ -60,6 +62,8 @@ import { TriggerConfigModalComponent } from './trigger-modal/trigger-config.moda
     NodeConfigFormComponent,
     ChatbotTestFireModalComponent,
     ChatbotMinimapComponent,
+    ChatbotHistoryModalComponent,
+    ChatbotStatsModalComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './builder.page.html',
@@ -79,6 +83,9 @@ export class ChatbotBuilderPageComponent {
   readonly testModalOpen = signal<boolean>(false);
   readonly helpModalOpen = signal<boolean>(false);
   readonly publishConfirmOpen = signal<boolean>(false);
+  readonly renaming = signal<boolean>(false);
+  readonly historyModalOpen = signal<boolean>(false);
+  readonly statsModalOpen = signal<boolean>(false);
 
   /** Right-click node menu — the id of the node whose context menu
    *  is open, plus screen coordinates where the operator clicked. */
@@ -489,6 +496,77 @@ export class ChatbotBuilderPageComponent {
 
   closeHelp(): void {
     this.helpModalOpen.set(false);
+  }
+
+  openHistory(): void {
+    if (!this.bot()) return;
+    this.historyModalOpen.set(true);
+  }
+
+  closeHistory(): void {
+    this.historyModalOpen.set(false);
+  }
+
+  /** Called after a version restore — reload the bot so the canvas
+   *  reflects the restored graph. */
+  onHistoryRestored(): void {
+    const bot = this.bot();
+    if (!bot) return;
+    this.showToast('Version restored.');
+    this.loadBot(bot.id);
+  }
+
+  openStats(): void {
+    if (!this.bot()) return;
+    this.statsModalOpen.set(true);
+  }
+
+  closeStats(): void {
+    this.statsModalOpen.set(false);
+  }
+
+  startRename(): void {
+    if (!this.bot()) return;
+    this.renaming.set(true);
+  }
+
+  cancelRename(): void {
+    this.renaming.set(false);
+  }
+
+  /** PATCH just the ``name`` field on the bot. Rejects empty / unchanged
+   *  values silently. Uses the same optimistic-lock cursor the graph
+   *  save uses so a concurrent editor's save doesn't get overwritten. */
+  commitRename(nextRaw: string): void {
+    if (!this.renaming()) return;
+    const bot = this.bot();
+    if (!bot) {
+      this.renaming.set(false);
+      return;
+    }
+    const next = (nextRaw ?? '').trim();
+    if (!next || next === bot.name) {
+      this.renaming.set(false);
+      return;
+    }
+    this.renaming.set(false);
+    this.api
+      .update(bot.id, {
+        expected_version: this.canvas.expectedVersion(),
+        name: next,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.canvas.bot.set(updated);
+          this.canvas.markSaved(updated.version_number);
+          this.showToast(`Renamed to "${updated.name}".`);
+        },
+        error: (err) => {
+          console.error('chatbot.rename.failed', err);
+          this.error.set(extractApiError(err) ?? 'Rename failed.');
+        },
+      });
   }
 
   readonly triggerSummary = computed(() => {

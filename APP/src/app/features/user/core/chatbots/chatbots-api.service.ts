@@ -111,6 +111,23 @@ export interface ChatbotVersionRead {
   created_at: string;
 }
 
+export interface NodeHitCount {
+  node_id: string;
+  node_type: string;
+  executions: number;
+}
+
+export interface ChatbotStats {
+  total_runs: number;
+  running: number;
+  parked: number;
+  completed: number;
+  canceled: number;
+  errored: number;
+  completion_rate: number;
+  top_nodes: NodeHitCount[];
+}
+
 export interface SaveTargetEntry {
   entity: string;
   field_key: string;
@@ -197,6 +214,10 @@ export class ChatbotsApiService {
     return this.http.get<ChatbotVersionRead[]>(`${this.base}/${id}/versions`, {
       params: { limit },
     });
+  }
+
+  getStats(id: string): Observable<ChatbotStats> {
+    return this.http.get<ChatbotStats>(`${this.base}/${id}/stats`);
   }
 
   rollback(id: string, versionId: string): Observable<ChatbotRead> {
