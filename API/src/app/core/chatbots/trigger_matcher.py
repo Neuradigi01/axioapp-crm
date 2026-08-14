@@ -325,7 +325,7 @@ async def on_inbound(envelope: dict[str, Any]) -> None:
             # Mute is an explicit "shut up" from the operator's flow
             # design; parked runs during a mute stay parked and expire
             # via the normal wait-timeout sweeper.
-            from datetime import UTC, datetime
+            from datetime import UTC, datetime, timedelta
 
             from src.app.core.conversations.models import Conversation
             from sqlalchemy import select
@@ -347,6 +347,42 @@ async def on_inbound(envelope: dict[str, Any]) -> None:
                     message_id=message_id,
                     reason="bot_muted",
                     detail=f"muted_until={muted_until.isoformat()}",
+                )
+                await session.commit()
+                return
+
+            # --- Trigger rate limit per conversation ------------------
+            # Cap how often a fresh bot run can be spawned on the same
+            # conversation — protects against loops (customer spams
+            # keywords) and runaway costs. Parked-run resumes below are
+            # NOT counted (they're advancing an already-running flow).
+            # Cooldown: at most 1 fresh run per 5 s. Chosen so a real
+            # burst of "hi hi hi hi" doesn't fan out to 4 concurrent
+            # runs, but a genuine second inquiry 10 s later still fires.
+            from sqlalchemy import func
+
+            from src.app.core.chatbots.models import ChatbotRun
+
+            cutoff = datetime.now(UTC) - timedelta(seconds=5)
+            recent_runs = (
+                await session.execute(
+                    select(func.count())
+                    .select_from(ChatbotRun)
+                    .where(
+                        ChatbotRun.conversation_id == conversation_id,
+                        ChatbotRun.started_at >= cutoff,
+                    )
+                )
+            ).scalar_one()
+            if recent_runs > 0:
+                _dal.insert_trigger_diagnostic(
+                    session,
+                    org_id=org_id,
+                    bot_id=None,
+                    conversation_id=conversation_id,
+                    message_id=message_id,
+                    reason="rate_limited",
+                    detail=f"recent_runs={recent_runs} within 5s",
                 )
                 await session.commit()
                 return
