@@ -78,6 +78,7 @@ export class ChatbotBuilderPageComponent {
   readonly deleteNodeId = signal<string | null>(null);
   readonly testModalOpen = signal<boolean>(false);
   readonly helpModalOpen = signal<boolean>(false);
+  readonly publishConfirmOpen = signal<boolean>(false);
 
   /** Right-click node menu — the id of the node whose context menu
    *  is open, plus screen coordinates where the operator clicked. */
@@ -503,10 +504,34 @@ export class ChatbotBuilderPageComponent {
 
   readonly isLive = computed(() => this.bot()?.status === 'live');
 
+  /** Auto-save timer handle. Every 30 s the timer checks ``dirty()``
+   *  and fires a save if the operator has pending changes AND no save
+   *  is already in flight. Silent — only the normal Save toast fires
+   *  on success. Cleared on component destroy via ``destroyRef``. */
+  private autoSaveTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly AUTO_SAVE_INTERVAL_MS = 30_000;
+
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
       if (id) this.loadBot(id);
+    });
+
+    // Kick off the auto-save loop. Interval fires forever; the guard
+    // inside skips when there's nothing to save.
+    this.autoSaveTimer = setInterval(() => {
+      if (this.dirty() && !this.saving() && this.bot() && !this.loading()) {
+        this.save();
+      }
+    }, this.AUTO_SAVE_INTERVAL_MS);
+
+    // Clean up the timer when the component tears down so it doesn't
+    // keep firing after the operator navigates away.
+    this.destroyRef.onDestroy(() => {
+      if (this.autoSaveTimer !== null) {
+        clearInterval(this.autoSaveTimer);
+        this.autoSaveTimer = null;
+      }
     });
   }
 
@@ -561,6 +586,9 @@ export class ChatbotBuilderPageComponent {
       });
   }
 
+  /** Guard: publishing (going Live) opens a confirmation dialog first —
+   *  once live, the bot starts replying to real customers on real
+   *  conversations. Pausing skips the guard (safe direction). */
   toggleLive(): void {
     const bot = this.bot();
     if (!bot) return;
@@ -568,7 +596,25 @@ export class ChatbotBuilderPageComponent {
       this.error.set('Save your unsaved changes before toggling Live.');
       return;
     }
-    const goingLive = !this.isLive();
+    if (!this.isLive()) {
+      this.publishConfirmOpen.set(true);
+      return;
+    }
+    this.applyStatusChange(false);
+  }
+
+  confirmPublish(): void {
+    this.publishConfirmOpen.set(false);
+    this.applyStatusChange(true);
+  }
+
+  cancelPublish(): void {
+    this.publishConfirmOpen.set(false);
+  }
+
+  private applyStatusChange(goingLive: boolean): void {
+    const bot = this.bot();
+    if (!bot) return;
     const call = goingLive ? this.api.publish(bot.id) : this.api.pause(bot.id);
     call.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (updated) => {

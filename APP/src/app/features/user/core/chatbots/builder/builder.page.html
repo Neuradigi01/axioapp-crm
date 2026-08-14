@@ -608,6 +608,16 @@
   ></app-chatbot-test-modal>
 }
 
+@if (publishConfirmOpen()) {
+  <app-confirm-dialog
+    [title]="'Make this bot live?'"
+    [body]="'It will start replying to real customers on every matching WhatsApp / Email inbound. You can pause it any time.'"
+    [confirmLabel]="'Yes, make live'"
+    (confirm)="confirmPublish()"
+    (cancel)="cancelPublish()"
+  ></app-confirm-dialog>
+}
+
 <!-- Node right-click context menu — anchored to the click position.
      Backdrop swallows the next click to close. -->
 @if (contextMenuNodeId(); as ctxNodeId) {
