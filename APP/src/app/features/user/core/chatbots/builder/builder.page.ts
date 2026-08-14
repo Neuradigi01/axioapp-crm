@@ -153,6 +153,53 @@ export class ChatbotBuilderPageComponent {
     return `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`;
   }
 
+  /** Per-node list of output ports. `single` topology → one unlabelled
+   *  "next" port. `labeled` → one port per meta.labels entry (fixed).
+   *  `dynamic` → one port per config-driven item (text_button /
+   *  media_button = per button, list = per row across sections). Each
+   *  port's `label` is what gets persisted on the edge — for dynamic
+   *  nodes we use the button/row `id` so the backend engine can look
+   *  up the matched button reliably. */
+  outputPortsFor(node: CanvasNode): { label: string | null; title: string }[] {
+    const meta = getNodeType(node.type);
+    if (!meta) return [{ label: null, title: 'next' }];
+    if (meta.outputs === 'single') return [{ label: null, title: 'next' }];
+    if (meta.outputs === 'labeled') {
+      return (meta.labels ?? []).map((l) => ({ label: l, title: l }));
+    }
+    // dynamic — read the config to enumerate ports.
+    const cfg = node.config ?? {};
+    if (node.type === 'text_button' || node.type === 'media_button') {
+      const buttons = Array.isArray(cfg['buttons']) ? (cfg['buttons'] as unknown[]) : [];
+      const ports = buttons.map((b, i) => {
+        const row = (b ?? {}) as Record<string, unknown>;
+        const id = typeof row['id'] === 'string' ? (row['id'] as string) : `btn_${i + 1}`;
+        const title = typeof row['title'] === 'string' ? (row['title'] as string) : id;
+        return { label: id, title: title || id };
+      });
+      // Always expose a fallback "default" port so a text_button with no
+      // buttons yet is still connectable.
+      return ports.length ? ports : [{ label: null, title: 'next' }];
+    }
+    if (node.type === 'list') {
+      const sections = Array.isArray(cfg['sections']) ? (cfg['sections'] as unknown[]) : [];
+      const rows: { label: string; title: string }[] = [];
+      sections.forEach((s, si) => {
+        const section = (s ?? {}) as Record<string, unknown>;
+        const secRows = Array.isArray(section['rows']) ? (section['rows'] as unknown[]) : [];
+        secRows.forEach((r, ri) => {
+          const row = (r ?? {}) as Record<string, unknown>;
+          const id =
+            typeof row['id'] === 'string' ? (row['id'] as string) : `row_${si + 1}_${ri + 1}`;
+          const title = typeof row['title'] === 'string' ? (row['title'] as string) : id;
+          rows.push({ label: id, title: title || id });
+        });
+      });
+      return rows.length ? rows : [{ label: null, title: 'next' }];
+    }
+    return [{ label: null, title: 'next' }];
+  }
+
   /** For every persisted edge, resolve its source + target port coords
    *  into a renderable path spec. Returns `null` for orphan edges
    *  (source/target not on the canvas any more). */
@@ -169,9 +216,13 @@ export class ChatbotBuilderPageComponent {
             : (() => {
                 const src = nodesById.get(e.source);
                 if (!src) return null;
-                const meta = getNodeType(src.type);
-                const labels = meta?.labels ?? [];
-                const idx = e.label && labels.length ? Math.max(0, labels.indexOf(e.label)) : 0;
+                const ports = this.outputPortsFor(src);
+                const idx = e.label
+                  ? Math.max(
+                      0,
+                      ports.findIndex((p) => p.label === e.label),
+                    )
+                  : 0;
                 return this.outputPortPos(src, idx);
               })();
         if (!from) return null;
