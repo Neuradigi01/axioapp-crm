@@ -2,9 +2,11 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   EventEmitter,
   Input,
   Output,
+  ViewChild,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -119,11 +121,19 @@ const MODE_OPTIONS = [
                 <input
                   #kwInput
                   type="text"
-                  placeholder="Add keyword, press Enter"
+                  placeholder="Add keyword, press Enter or comma"
                   (keydown.enter)="addKeyword(kwInput.value); kwInput.value = ''"
+                  (keydown.comma)="
+                    addKeyword(kwInput.value); kwInput.value = ''; $event.preventDefault()
+                  "
+                  (blur)="addKeyword(kwInput.value); kwInput.value = ''"
                   class="flex-1 min-w-[100px] bg-transparent text-xs text-default focus:outline-none"
                 />
               </div>
+              <p class="text-[11px] text-muted mt-1">
+                Type each keyword and press Enter, or separate with commas. Matching is
+                word-boundary — "hi" won't match "hii".
+              </p>
             </div>
           }
 
@@ -221,11 +231,33 @@ export class TriggerConfigModalComponent {
   readonly caseSensitive = signal<boolean>(false);
   readonly firstMessageOnly = signal<boolean>(false);
 
+  /** Reference to the keyword-entry input so `onSave` can flush any
+   *  typed-but-not-Enter-submitted text into the list before emitting
+   *  the config. Without this, "hi" typed into the box + click Save
+   *  silently drops the value. */
+  @ViewChild('kwInput') private kwInputRef?: ElementRef<HTMLInputElement>;
+
   addKeyword(raw: string): void {
-    const kw = (raw ?? '').trim();
-    if (!kw) return;
-    if (this.keywords().includes(kw)) return;
-    this.keywords.update((rows) => [...rows, kw]);
+    // Split on commas so operators can type or paste multiple keywords
+    // at once ("hi, hello, hey") without remembering to press Enter
+    // between each — the previous behaviour stored the joined string as
+    // one keyword and silently broke trigger matching.
+    const parts = (raw ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (parts.length === 0) return;
+    this.keywords.update((rows) => {
+      const seen = new Set(rows);
+      const next = [...rows];
+      for (const p of parts) {
+        if (!seen.has(p)) {
+          seen.add(p);
+          next.push(p);
+        }
+      }
+      return next;
+    });
   }
 
   removeKeyword(kw: string): void {
@@ -233,10 +265,31 @@ export class TriggerConfigModalComponent {
   }
 
   onBackdropClick(evt: MouseEvent): void {
-    if (evt.target === evt.currentTarget) this.close.emit();
+    if (evt.target !== evt.currentTarget) return;
+    // Same flush-on-close behaviour as `onSave` — a keyword typed but
+    // not Enter-submitted is otherwise dropped when the operator dismisses
+    // the modal by clicking outside.
+    if (this.mode() === 'keyword' && this.kwInputRef) {
+      const pending = this.kwInputRef.nativeElement.value;
+      if (pending.trim()) {
+        this.addKeyword(pending);
+        this.kwInputRef.nativeElement.value = '';
+      }
+    }
+    this.close.emit();
   }
 
   onSave(): void {
+    // Flush any typed-but-not-Enter-submitted keyword before building
+    // the payload. The keyword input is uncontrolled; without this
+    // the operator's last word gets dropped on the floor.
+    if (this.mode() === 'keyword' && this.kwInputRef) {
+      const pending = this.kwInputRef.nativeElement.value;
+      if (pending.trim()) {
+        this.addKeyword(pending);
+        this.kwInputRef.nativeElement.value = '';
+      }
+    }
     const cfg: TriggerConfig = {
       channel: this.channel(),
       mode: this.mode(),

@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
+  HostListener,
   Output,
   computed,
   inject,
@@ -30,7 +31,7 @@ import { NODE_TYPES, NodeTypeMeta, PaletteTab } from '../node-type-registry';
   templateUrl: './palette.component.html',
 })
 export class ChatbotPaletteComponent {
-  private readonly canvas = inject(CanvasStateService);
+  readonly canvas = inject(CanvasStateService);
 
   readonly tab = signal<PaletteTab>('messages');
   readonly search = signal<string>('');
@@ -55,13 +56,44 @@ export class ChatbotPaletteComponent {
     this.canvas.addNode(meta, this.nextDropPosition());
   }
 
+  /** Active resize gesture, if any — the width-drag handle records
+   *  the mouse start-X + current palette width, then the document
+   *  mousemove listener updates the width until mouseup. */
+  private resizeStart: { startX: number; startWidth: number } | null = null;
+
+  onResizeMouseDown(evt: MouseEvent): void {
+    if (evt.button !== 0) return;
+    evt.preventDefault();
+    this.resizeStart = {
+      startX: evt.clientX,
+      startWidth: this.canvas.paletteWidth(),
+    };
+  }
+
+  @HostListener('document:mousemove', ['$event'])
+  onDocumentMouseMove(evt: MouseEvent): void {
+    if (!this.resizeStart) return;
+    const dx = evt.clientX - this.resizeStart.startX;
+    this.canvas.setPaletteWidth(this.resizeStart.startWidth + dx);
+  }
+
+  @HostListener('document:mouseup')
+  onDocumentMouseUp(): void {
+    this.resizeStart = null;
+  }
+
   private nextDropPosition(): { x: number; y: number } {
+    // Cards are 320px wide × ~260px tall on average. A 30px cascade
+    // (the original v1) stacks them almost on top of each other; a
+    // proper flow reads top-to-bottom in a single column so operators
+    // don't have to hunt for the last-added node.
+    //
+    // Strategy: drop each new node directly below the last one in a
+    // column, snapping y to 240px increments. `updateNodePosition`
+    // takes over once the operator drags a card manually.
     const existing = this.canvas.nodes();
-    // Cascade successive drops so they don't stack on top of each
-    // other. The builder canvas is CSS-positioned; nodes are
-    // ~320px wide (mockup.html width), so 30px offsets stay
-    // visible.
-    const offset = existing.length * 30;
-    return { x: 100 + offset, y: 100 + offset };
+    if (!existing.length) return { x: 0, y: 0 };
+    const lastY = Math.max(...existing.map((n) => n.position.y));
+    return { x: 0, y: lastY + 240 };
   }
 }

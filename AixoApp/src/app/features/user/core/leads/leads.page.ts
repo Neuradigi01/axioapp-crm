@@ -399,6 +399,27 @@ export class LeadsPageComponent {
   readonly submitting = signal(false);
   readonly formError = signal<string | null>(null);
 
+  /** Prominent info banner shown at the top of the leads page after a
+   *  create call comes back as ``ingest_action: 'merged'`` — the new
+   *  submission linked to an existing open lead on the same contact
+   *  instead of creating a duplicate. Includes the target lead id so
+   *  the banner can render a "View existing lead" jump button; the
+   *  vague "list didn't grow" outcome otherwise reads as a silent
+   *  failure. Cleared on close, on any next create, and when the
+   *  user dismisses the banner. */
+  readonly mergedNotice = signal<{ leadId: string; contactName: string | null } | null>(null);
+
+  protected dismissMergedNotice(): void {
+    this.mergedNotice.set(null);
+  }
+
+  protected openMergedLead(): void {
+    const notice = this.mergedNotice();
+    if (!notice) return;
+    this.mergedNotice.set(null);
+    this.router.navigate(['/user/leads', notice.leadId]);
+  }
+
   // --- Multi-select + bulk + reassign state -------------------------------
 
   /** Row ids selected on the list view. Pipeline board has its own
@@ -1312,6 +1333,7 @@ export class LeadsPageComponent {
   private submitCreate(payload: LeadCreate): void {
     this.submitting.set(true);
     this.formError.set(null);
+    this.mergedNotice.set(null);
     // Use the header-aware create so we can tell the operator when
     // their form submission MERGED into an existing open lead
     // (touchpoint added to timeline) versus creating a fresh row —
@@ -1320,20 +1342,20 @@ export class LeadsPageComponent {
       .createWithAction(payload)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: ({ action }) => {
+        next: ({ lead, action }) => {
           this.submitting.set(false);
+          this.closeModal();
           if (action === 'merged') {
-            // Leave the modal OPEN so the operator sees the message
-            // and understands why the list didn't grow. They can hit
-            // Cancel to dismiss and jump to the existing lead.
-            this.formError.set(
-              'This contact already has an open lead — a new touchpoint was added to that lead instead of creating a duplicate.',
-            );
-            this.reload();
-          } else {
-            this.closeModal();
-            this.reload();
+            // Prior UX kept the modal open with a small red text at the
+            // BOTTOM of a scrollable form section — operators kept missing
+            // it and reported "the lead isn't being added, no message
+            // shown." Now the modal closes and a prominent info banner
+            // pops at the top of the leads page with a jump button so
+            // the outcome is unmistakable and immediately actionable.
+            const contactName = this.contactsById()[payload.contact_id]?.full_name ?? null;
+            this.mergedNotice.set({ leadId: lead.id, contactName });
           }
+          this.reload();
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);

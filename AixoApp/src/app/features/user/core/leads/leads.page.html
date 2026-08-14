@@ -376,6 +376,45 @@
     }
   </div>
 
+  @if (mergedNotice(); as notice) {
+    <div
+      class="mb-4 flex items-start justify-between gap-3 rounded-md bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300 ring-1 border-emerald-500/25"
+    >
+      <div class="flex-1">
+        <p class="font-medium">
+          @if (notice.contactName) {
+            {{ notice.contactName }} already has an open lead — a touchpoint was added to it instead
+            of creating a duplicate.
+          } @else {
+            This contact already has an open lead — a touchpoint was added to it instead of creating
+            a duplicate.
+          }
+        </p>
+        <p class="mt-1 text-xs text-emerald-300/80">
+          A new lead is only created for won or lost contacts. The existing open lead's timeline now
+          shows this submission.
+        </p>
+      </div>
+      <div class="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          (click)="openMergedLead()"
+          class="rounded-md bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-200 hover:bg-emerald-500/30"
+        >
+          View existing lead
+        </button>
+        <button
+          type="button"
+          aria-label="Dismiss"
+          (click)="dismissMergedNotice()"
+          class="rounded-md px-2 py-1 text-xs text-emerald-300/80 hover:text-emerald-100"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  }
+
   @if (state.loadError(); as err) {
     <p class="rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 border-red-500/20">
       {{ err }}

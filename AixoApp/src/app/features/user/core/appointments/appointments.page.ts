@@ -517,7 +517,7 @@ export class AppointmentsPageComponent {
           this.closeBulkModal();
           if (result.skipped > 0) {
             this.state.loadError.set(
-              `${result.cancelled} cancelled; ${result.skipped} skipped (already cancelled / completed / no-show).`,
+              this.formatBulkCancelSkipMessage(result.cancelled, result.skipped_by_status),
             );
           }
           this.reload();
@@ -527,6 +527,31 @@ export class AppointmentsPageComponent {
           this.state.bulkError.set(extractApiError(err) ?? 'Could not cancel appointments.');
         },
       });
+  }
+
+  /** Build the toast text for a bulk-cancel that skipped rows. Uses
+   *  the per-status breakdown from the API so the user sees *why*
+   *  nothing (or only some) got cancelled — a completed appointment
+   *  can only be deleted, not cancelled, and the message should say
+   *  so instead of just "skipped 2". */
+  private formatBulkCancelSkipMessage(
+    cancelled: number,
+    skippedByStatus: Record<string, number>,
+  ): string {
+    const label: Record<string, string> = {
+      completed: 'already completed',
+      cancelled: 'already cancelled',
+      no_show: 'marked no-show',
+    };
+    const parts = Object.entries(skippedByStatus)
+      .filter(([, n]) => n > 0)
+      .map(([status, n]) => `${n} ${label[status] ?? status}`);
+    const detail = parts.length ? parts.join(', ') : 'not in the scheduled state';
+    const hint =
+      skippedByStatus['completed'] || skippedByStatus['no_show']
+        ? ' Completed and no-show appointments can only be deleted, not cancelled.'
+        : '';
+    return `${cancelled} cancelled; skipped ${detail}.${hint}`;
   }
 
   // --- Popover -----------------------------------------------------------

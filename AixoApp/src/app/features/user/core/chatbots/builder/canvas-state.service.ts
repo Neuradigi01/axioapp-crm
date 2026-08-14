@@ -42,6 +42,123 @@ export class CanvasStateService {
   readonly saving = signal<boolean>(false);
   readonly expectedVersion = signal<number>(1);
 
+  /** Session-only position of the trigger card on the canvas. The
+   *  trigger isn't a node in the backend graph (see
+   *  `serializeGraph` — trigger-sourced edges are UI-only), so its
+   *  position isn't persisted. Resets to `(0, 0)` on every load. */
+  readonly triggerPosition = signal<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  /** Canvas zoom (session-only). `1` = 100 %. Bounded to [0.25, 2]
+   *  by `setZoom` / `zoomIn` / `zoomOut`. Applied via CSS transform
+   *  on the canvas content wrapper. */
+  readonly zoom = signal<number>(1);
+  /** Palette open / collapsed (session-only). Collapsed shrinks the
+   *  left rail to a narrow strip so the operator sees more canvas
+   *  while designing. */
+  readonly paletteCollapsed = signal<boolean>(false);
+  /** Palette width in px (session-only). Drag-resizable via the
+   *  handle on the palette's right edge. */
+  readonly paletteWidth = signal<number>(280);
+  /** Card width in px (session-only) shared by the trigger card and
+   *  every node card. Kept as ONE global knob so the whole graph
+   *  stays visually consistent — per-card widths would make the
+   *  canvas read as unfinished. */
+  readonly cardWidth = signal<number>(320);
+
+  private readonly ZOOM_MIN = 0.25;
+  private readonly ZOOM_MAX = 2;
+  private readonly ZOOM_STEPS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
+
+  private readonly PALETTE_MIN = 220;
+  private readonly PALETTE_MAX = 480;
+  private readonly CARD_MIN = 260;
+  private readonly CARD_MAX = 480;
+  private readonly CARD_STEPS: readonly number[] = [260, 300, 320, 360, 400, 440, 480];
+
+  setZoom(next: number): void {
+    const clamped = Math.min(this.ZOOM_MAX, Math.max(this.ZOOM_MIN, next));
+    this.zoom.set(Math.round(clamped * 100) / 100);
+  }
+
+  zoomIn(): void {
+    const cur = this.zoom();
+    const next = this.ZOOM_STEPS.find((z) => z > cur) ?? this.ZOOM_MAX;
+    this.setZoom(next);
+  }
+
+  zoomOut(): void {
+    const cur = this.zoom();
+    const next = [...this.ZOOM_STEPS].reverse().find((z) => z < cur) ?? this.ZOOM_MIN;
+    this.setZoom(next);
+  }
+
+  zoomReset(): void {
+    this.setZoom(1);
+  }
+
+  /** Fit-to-screen: shrink zoom just enough that the bounding box of
+   *  the trigger + every node fits within the given viewport size.
+   *  Never zooms IN past 100 % — big graphs zoom out, small graphs
+   *  stay at 1.0 (avoids a jarring auto-zoom on new bots). Passes
+   *  through the same clamping as ``setZoom``.
+   *
+   *  Caller supplies the viewport dimensions because the service
+   *  doesn't touch the DOM. Content size is estimated from the node
+   *  bounding box plus a per-card height fudge (nodes have variable
+   *  height depending on their schema; 320 px is a safe upper bound
+   *  that keeps the whole card visible after the scale). */
+  fitToScreen(viewportWidth: number, viewportHeight: number): void {
+    const CANVAS_PAD = 24;
+    const TRIGGER_GAP = 60;
+    const CARD_HEIGHT_ESTIMATE = 320;
+    const width = this.cardWidth();
+    const nodes = this.nodes();
+    const nodeLeftAnchor = CANVAS_PAD + width + TRIGGER_GAP;
+
+    let rightEdge = CANVAS_PAD + width; // trigger card
+    let bottomEdge = CANVAS_PAD + 118; // trigger card height
+    for (const n of nodes) {
+      rightEdge = Math.max(rightEdge, nodeLeftAnchor + n.position.x + width);
+      bottomEdge = Math.max(bottomEdge, n.position.y + CARD_HEIGHT_ESTIMATE);
+    }
+    // Add breathing room so the outermost node isn't glued to the edge.
+    const contentWidth = rightEdge + CANVAS_PAD;
+    const contentHeight = bottomEdge + CANVAS_PAD;
+    if (viewportWidth <= 0 || viewportHeight <= 0) return;
+    const scale = Math.min(viewportWidth / contentWidth, viewportHeight / contentHeight, 1);
+    this.setZoom(scale);
+  }
+
+  togglePalette(): void {
+    this.paletteCollapsed.update((v) => !v);
+  }
+
+  setPaletteWidth(px: number): void {
+    const clamped = Math.min(this.PALETTE_MAX, Math.max(this.PALETTE_MIN, Math.round(px)));
+    this.paletteWidth.set(clamped);
+  }
+
+  setCardWidth(px: number): void {
+    const clamped = Math.min(this.CARD_MAX, Math.max(this.CARD_MIN, Math.round(px)));
+    this.cardWidth.set(clamped);
+  }
+
+  cardWidthNarrower(): void {
+    const cur = this.cardWidth();
+    const next = [...this.CARD_STEPS].reverse().find((w) => w < cur) ?? this.CARD_MIN;
+    this.setCardWidth(next);
+  }
+
+  cardWidthWider(): void {
+    const cur = this.cardWidth();
+    const next = this.CARD_STEPS.find((w) => w > cur) ?? this.CARD_MAX;
+    this.setCardWidth(next);
+  }
+
+  cardWidthReset(): void {
+    this.setCardWidth(320);
+  }
+
   /** Click-to-connect state — set to the source node id (or literal
    *  `'trigger'`) when the user clicks an output port. The next
    *  input-port click on a different node closes the pair into an
@@ -94,6 +211,7 @@ export class CanvasStateService {
     this.selectedNodeId.set(null);
     this.dirty.set(false);
     this.expectedVersion.set(bot.version_number);
+    this.triggerPosition.set({ x: 0, y: 0 });
   }
 
   reset(): void {
@@ -107,6 +225,11 @@ export class CanvasStateService {
     this.expectedVersion.set(1);
     this.pendingSourceId.set(null);
     this.pendingSourceLabel.set(null);
+    this.triggerPosition.set({ x: 0, y: 0 });
+    this.zoom.set(1);
+    this.paletteCollapsed.set(false);
+    this.paletteWidth.set(280);
+    this.cardWidth.set(320);
   }
 
   addNode(meta: NodeTypeMeta, position: { x: number; y: number }): CanvasNode {

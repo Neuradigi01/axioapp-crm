@@ -1,0 +1,213 @@
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+  (click)="onBackdropClick($event)"
+>
+  <div
+    class="bg-surface border border-subtle rounded-xl w-[640px] max-w-[94vw] max-h-[86vh] flex flex-col shadow-2xl"
+    (click)="$event.stopPropagation()"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="test-fire-title"
+  >
+    <header class="flex items-center gap-3 px-5 py-4 border-b border-subtle flex-shrink-0">
+      <span
+        class="w-8 h-8 rounded-lg bg-accent-soft text-accent inline-flex items-center justify-center"
+      >
+        <lucide-icon name="zap" size="16"></lucide-icon>
+      </span>
+      <div class="flex-1">
+        <h2 id="test-fire-title" class="text-sm font-semibold text-default">Test this bot</h2>
+        <p class="text-[11px] text-muted mt-0.5">
+          Simulate an inbound message — nothing gets sent to real customers.
+        </p>
+      </div>
+      <button
+        type="button"
+        (click)="close.emit()"
+        [disabled]="running()"
+        class="p-1.5 rounded hover:bg-surface-2 text-muted hover:text-default disabled:opacity-40"
+        aria-label="Close"
+      >
+        <lucide-icon name="x" size="16"></lucide-icon>
+      </button>
+    </header>
+
+    <!-- INPUT (only visible before + during first run) -->
+    @if (!result()) {
+      <div class="px-5 py-4 space-y-3 overflow-y-auto">
+        <div>
+          <label class="block text-[11px] font-medium text-muted mb-1.5 uppercase tracking-wide">
+            Simulated inbound message
+          </label>
+          <textarea
+            [ngModel]="message()"
+            (ngModelChange)="message.set($event); error.set(null)"
+            [disabled]="running()"
+            placeholder="e.g. Hi, I want to know about your properties"
+            rows="3"
+            maxlength="4000"
+            class="w-full px-3 py-2 text-sm bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent resize-y"
+          ></textarea>
+          @if (suggestedKeywords.length) {
+            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+              <span class="text-[10px] text-muted uppercase tracking-wide">Try a keyword:</span>
+              @for (kw of suggestedKeywords; track kw) {
+                <button
+                  type="button"
+                  (click)="applySuggestion(kw)"
+                  class="px-2 py-0.5 rounded-full text-xs bg-accent-soft text-accent hover:brightness-110"
+                >
+                  {{ kw }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-medium text-muted mb-1.5 uppercase tracking-wide">
+              Channel
+            </label>
+            <crm-mobile-select
+              [options]="channelOptions"
+              [value]="channel()"
+              (valueChange)="channel.set($any($event))"
+            />
+          </div>
+          <label
+            class="flex items-center gap-2 pt-6 text-xs text-default cursor-pointer select-none"
+          >
+            <input
+              type="checkbox"
+              [checked]="firstMessage()"
+              (change)="firstMessage.set($any($event.target).checked)"
+              [disabled]="running()"
+              class="h-4 w-4 accent-current"
+            />
+            First-ever message from this contact
+          </label>
+        </div>
+
+        @if (error()) {
+          <div
+            class="px-3 py-2 rounded-md bg-red-500/10 border border-red-500/30 text-xs text-red-500"
+          >
+            {{ error() }}
+          </div>
+        }
+      </div>
+    }
+
+    <!-- RESULT (visible after a run completes) -->
+    @if (result(); as res) {
+      <div class="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-muted">Result:</span>
+          <span
+            [class]="
+              'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide ' +
+              statusTone(res.final_status)
+            "
+          >
+            {{ res.final_status }}
+          </span>
+          @if (res.canceled_reason) {
+            <span class="text-[11px] text-muted">· {{ res.canceled_reason }}</span>
+          }
+          @if (res.error) {
+            <span class="text-[11px] text-red-500">· {{ res.error }}</span>
+          }
+        </div>
+
+        @if (!res.steps.length) {
+          <div
+            class="px-3 py-6 rounded-md border border-dashed border-subtle text-center text-xs text-muted"
+          >
+            No nodes ran — the trigger didn't match. Try a different message or channel.
+          </div>
+        } @else {
+          <ol class="space-y-2">
+            @for (step of res.steps; track step.node_id + '__' + $index; let i = $index) {
+              <li class="flex items-start gap-3 px-3 py-2 rounded-md border border-subtle bg-app">
+                <span
+                  class="w-6 h-6 rounded-full bg-surface-2 inline-flex items-center justify-center text-[10px] font-bold text-muted flex-shrink-0 mt-0.5"
+                >
+                  {{ i + 1 }}
+                </span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-semibold text-default">{{ step.node_type }}</span>
+                    <span
+                      class="text-[10px] font-mono text-muted truncate max-w-[220px]"
+                      [title]="step.node_id"
+                    >
+                      {{ step.node_id }}
+                    </span>
+                    <span [class]="'text-[10px] font-semibold ' + stepTone(step.status)">
+                      · {{ step.status }}
+                    </span>
+                    @if (step.output_edge_label) {
+                      <span
+                        class="text-[10px] px-1.5 py-px rounded-full bg-accent-soft text-accent"
+                      >
+                        → {{ step.output_edge_label }}
+                      </span>
+                    }
+                  </div>
+                  @if (step.skip_reason) {
+                    <p class="text-[11px] text-amber-500 mt-0.5">Skip: {{ step.skip_reason }}</p>
+                  }
+                  @if (step.error) {
+                    <p class="text-[11px] text-red-500 mt-0.5">Error: {{ step.error }}</p>
+                  }
+                  @if (step.output && (step.output | json) !== '{}') {
+                    <pre
+                      class="mt-1 px-2 py-1.5 bg-surface-2 rounded text-[11px] font-mono text-default overflow-x-auto max-h-[200px]"
+                      >{{ step.output | json }}</pre
+                    >
+                  }
+                </div>
+              </li>
+            }
+          </ol>
+        }
+      </div>
+    }
+
+    <footer
+      class="flex items-center justify-end gap-2 px-5 py-3 border-t border-subtle flex-shrink-0"
+    >
+      @if (result()) {
+        <button
+          type="button"
+          (click)="reset()"
+          class="px-3.5 py-1.5 text-xs font-medium text-muted hover:text-default"
+        >
+          Run again
+        </button>
+      }
+      <button
+        type="button"
+        (click)="close.emit()"
+        [disabled]="running()"
+        class="px-3.5 py-1.5 text-xs font-medium text-muted hover:text-default disabled:opacity-40"
+      >
+        Close
+      </button>
+      @if (!result()) {
+        <button
+          type="button"
+          (click)="run()"
+          [disabled]="running() || !message().trim()"
+          class="px-3.5 py-1.5 text-xs font-semibold bg-accent-soft text-accent hover:brightness-110 rounded-md disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+        >
+          @if (running()) {
+            <lucide-icon name="loader-2" size="12" class="animate-spin"></lucide-icon>
+          }
+          {{ running() ? 'Running…' : 'Run test' }}
+        </button>
+      }
+    </footer>
+  </div>
+</div>
