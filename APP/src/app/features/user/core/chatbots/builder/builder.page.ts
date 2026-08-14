@@ -23,6 +23,7 @@ import { ChatbotsApiService, TriggerConfig } from '../chatbots-api.service';
 import { CanvasNode, CanvasStateService } from './canvas-state.service';
 import { NodeConfigFormComponent } from './node-config-form/node-config-form.component';
 import { NodeTypeMeta, getNodeType } from './node-type-registry';
+import { ChatbotMinimapComponent } from './minimap/minimap.component';
 import { ChatbotPaletteComponent } from './palette/palette.component';
 import { ChatbotTestFireModalComponent } from './test-fire-modal/test-fire-modal.component';
 import { TriggerConfigModalComponent } from './trigger-modal/trigger-config.modal';
@@ -58,6 +59,7 @@ import { TriggerConfigModalComponent } from './trigger-modal/trigger-config.moda
     ConfirmDialogComponent,
     NodeConfigFormComponent,
     ChatbotTestFireModalComponent,
+    ChatbotMinimapComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './builder.page.html',
@@ -75,6 +77,16 @@ export class ChatbotBuilderPageComponent {
   readonly triggerModalOpen = signal<boolean>(false);
   readonly deleteNodeId = signal<string | null>(null);
   readonly testModalOpen = signal<boolean>(false);
+  readonly helpModalOpen = signal<boolean>(false);
+
+  /** Right-click node menu — the id of the node whose context menu
+   *  is open, plus screen coordinates where the operator clicked. */
+  readonly contextMenuNodeId = signal<string | null>(null);
+  readonly contextMenuPos = signal<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  /** Node search box (visible pill at top of canvas). Empty string
+   *  hides the dropdown. */
+  readonly searchQuery = signal<string>('');
 
   /** Active drag gesture, if any. Set on node-header mousedown, read
    *  by the document-level mousemove listener, cleared on mouseup. */
@@ -377,6 +389,105 @@ export class ChatbotBuilderPageComponent {
     const el = this.canvasViewportRef?.nativeElement;
     if (!el) return;
     this.canvas.fitToScreen(el.clientWidth, el.clientHeight);
+  }
+
+  /** Case-insensitive fuzzy match on node type, label, and message
+   *  body. Returns up to 8 hits so the dropdown stays scannable on
+   *  a 50-node graph. */
+  readonly searchResults = computed(() => {
+    const q = this.searchQuery().trim().toLowerCase();
+    if (q.length < 1) return [];
+    const hits: { id: string; label: string; type: string; snippet: string }[] = [];
+    for (const n of this.nodes()) {
+      const meta = getNodeType(n.type);
+      const label = meta?.label ?? n.type;
+      const cfg = (n.config as Record<string, unknown>) ?? {};
+      const bodyRaw = cfg['body'] ?? cfg['prompt'] ?? cfg['message'] ?? '';
+      const body = typeof bodyRaw === 'string' ? bodyRaw : '';
+      const haystack = `${label} ${n.type} ${body}`.toLowerCase();
+      if (haystack.includes(q)) {
+        hits.push({
+          id: n.id,
+          label,
+          type: n.type,
+          snippet: body.slice(0, 60),
+        });
+        if (hits.length >= 8) break;
+      }
+    }
+    return hits;
+  });
+
+  /** Scroll the canvas viewport so the given node is centered, then
+   *  select it. Used by the search dropdown + minimap click. Position
+   *  is the node's absolute canvas coordinate scaled by current zoom. */
+  jumpToNode(nodeId: string): void {
+    const node = this.nodes().find((n) => n.id === nodeId);
+    const el = this.canvasViewportRef?.nativeElement;
+    if (!node || !el) return;
+    const z = this.zoom();
+    const absX = (this.nodeLeftOffset() + node.position.x) * z;
+    const absY = node.position.y * z;
+    el.scrollTo({
+      left: Math.max(0, absX - el.clientWidth / 2 + (this.cardWidth() * z) / 2),
+      top: Math.max(0, absY - el.clientHeight / 2 + 100),
+      behavior: 'smooth',
+    });
+    this.canvas.selectedNodeId.set(nodeId);
+    this.searchQuery.set('');
+  }
+
+  /** Right-click on a node header — capture the screen coordinates
+   *  and open the context menu, suppressing the browser default. */
+  onNodeContextMenu(nodeId: string, evt: MouseEvent): void {
+    evt.preventDefault();
+    evt.stopPropagation();
+    this.contextMenuNodeId.set(nodeId);
+    this.contextMenuPos.set({ x: evt.clientX, y: evt.clientY });
+  }
+
+  closeContextMenu(): void {
+    this.contextMenuNodeId.set(null);
+  }
+
+  /** Clone the node's type + config, drop the copy on the canvas
+   *  offset by ~40 px so it doesn't overlap the original. Config is
+   *  JSON-cloned via the canvas service's ``updateNodeConfig`` so
+   *  nested objects don't share references. */
+  duplicateNode(nodeId: string): void {
+    const src = this.nodes().find((n) => n.id === nodeId);
+    if (!src) {
+      this.closeContextMenu();
+      return;
+    }
+    const meta = getNodeType(src.type);
+    if (!meta) {
+      this.closeContextMenu();
+      return;
+    }
+    const copy = this.canvas.addNode(meta, {
+      x: src.position.x + 40,
+      y: src.position.y + 40,
+    });
+    // ``addNode`` seeded the copy with defaultConfig; overlay the
+    // source config so the operator gets a real duplicate.
+    this.canvas.updateNodeConfig(copy.id, JSON.parse(JSON.stringify(src.config)));
+    this.closeContextMenu();
+  }
+
+  /** Called from the context menu's Delete row — routes through the
+   *  same confirmation modal as clicking the trash icon. */
+  requestDeleteFromMenu(nodeId: string): void {
+    this.deleteNodeId.set(nodeId);
+    this.closeContextMenu();
+  }
+
+  openHelp(): void {
+    this.helpModalOpen.set(true);
+  }
+
+  closeHelp(): void {
+    this.helpModalOpen.set(false);
   }
 
   readonly triggerSummary = computed(() => {

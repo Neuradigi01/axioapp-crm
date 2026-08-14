@@ -108,6 +108,58 @@
           </div>
         }
 
+        <!-- Node search — sticky pill at top-center of the canvas.
+             Type any word from a node's label, type, or message body.
+             Click a hit to scroll+select. -->
+        <div class="sticky top-2 z-30 mx-auto w-fit" (click)="$event.stopPropagation()">
+          <div
+            class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface/90 backdrop-blur border border-subtle shadow-md"
+          >
+            <lucide-icon name="search" size="12" class="text-muted"></lucide-icon>
+            <input
+              type="text"
+              [value]="searchQuery()"
+              (input)="searchQuery.set($any($event.target).value)"
+              placeholder="Search nodes…"
+              class="bg-transparent text-[12px] text-default placeholder:text-muted focus:outline-none w-[180px]"
+            />
+            @if (searchQuery()) {
+              <button
+                type="button"
+                (click)="searchQuery.set('')"
+                class="text-muted hover:text-default"
+                aria-label="Clear search"
+              >
+                <lucide-icon name="x" size="12"></lucide-icon>
+              </button>
+            }
+          </div>
+          @if (searchResults().length > 0) {
+            <div
+              class="mt-1 py-1 rounded-lg bg-surface border border-subtle shadow-xl min-w-[240px] max-h-[280px] overflow-y-auto"
+            >
+              @for (hit of searchResults(); track hit.id) {
+                <button
+                  type="button"
+                  (click)="jumpToNode(hit.id)"
+                  class="w-full text-left px-3 py-2 text-[12px] hover:bg-surface-2 flex flex-col gap-0.5"
+                >
+                  <span class="font-semibold text-default">{{ hit.label }}</span>
+                  @if (hit.snippet) {
+                    <span class="text-[11px] text-muted truncate">{{ hit.snippet }}</span>
+                  }
+                </button>
+              }
+            </div>
+          } @else if (searchQuery().length > 0) {
+            <div
+              class="mt-1 px-3 py-2 rounded-lg bg-surface border border-subtle shadow-xl text-[11px] text-muted"
+            >
+              No nodes match "{{ searchQuery() }}"
+            </div>
+          }
+        </div>
+
         <!-- Zoom controls (floating, bottom-right of canvas viewport)
              — slightly larger + subtle backdrop-blur so it reads as
              a real floating pill against the grid. -->
@@ -344,6 +396,7 @@
                     : 'border-subtle hover:border-default shadow-[0_6px_18px_-6px_rgba(0,0,0,0.25)] hover:shadow-[0_10px_24px_-8px_rgba(0,0,0,0.30)]')
               "
               (click)="selectNode(node.id); $event.stopPropagation()"
+              (contextmenu)="onNodeContextMenu(node.id, $event)"
             >
               <!-- Category accent strip — 3px on the top edge, colored
                    by the node's category so operators visually chunk
@@ -553,4 +606,154 @@
     [triggerConfig]="triggerConfig()"
     (close)="testModalOpen.set(false)"
   ></app-chatbot-test-modal>
+}
+
+<!-- Node right-click context menu — anchored to the click position.
+     Backdrop swallows the next click to close. -->
+@if (contextMenuNodeId(); as ctxNodeId) {
+  <div
+    class="fixed inset-0 z-50"
+    (click)="closeContextMenu()"
+    (contextmenu)="closeContextMenu(); $event.preventDefault()"
+  >
+    <div
+      class="absolute min-w-[160px] py-1 bg-surface border border-subtle rounded-lg shadow-2xl"
+      [style.left.px]="contextMenuPos().x"
+      [style.top.px]="contextMenuPos().y"
+      (click)="$event.stopPropagation()"
+    >
+      <button
+        type="button"
+        (click)="duplicateNode(ctxNodeId)"
+        class="w-full text-left px-3 py-2 text-[12px] text-default hover:bg-surface-2 flex items-center gap-2"
+      >
+        <lucide-icon name="copy" size="12" class="text-muted"></lucide-icon>
+        Duplicate
+      </button>
+      <button
+        type="button"
+        (click)="requestDeleteFromMenu(ctxNodeId)"
+        class="w-full text-left px-3 py-2 text-[12px] text-red-500 hover:bg-red-500/10 flex items-center gap-2"
+      >
+        <lucide-icon name="trash-2" size="12"></lucide-icon>
+        Delete
+      </button>
+    </div>
+  </div>
+}
+
+<!-- Minimap — floating thumbnail of the whole graph, bottom-left
+     (to the right of the help button). Click a node rectangle to
+     jump the canvas to it. -->
+@if (nodes().length > 0) {
+  <app-chatbot-minimap (jumpTo)="jumpToNode($event)"></app-chatbot-minimap>
+}
+
+<!-- Floating Help button — bottom-left corner. Opens a quick guide
+     modal so operators new to the builder don't have to guess. -->
+<button
+  type="button"
+  (click)="openHelp()"
+  class="fixed z-30 bottom-6 left-6 w-11 h-11 rounded-full bg-accent-soft text-accent border border-accent/40 shadow-xl hover:brightness-110 transition-all flex items-center justify-center"
+  title="How to use the builder"
+  aria-label="Help"
+>
+  <lucide-icon name="help-circle" size="18"></lucide-icon>
+</button>
+
+@if (helpModalOpen()) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    (click)="closeHelp()"
+  >
+    <div
+      class="bg-surface border border-subtle rounded-xl w-[560px] max-w-[92vw] max-h-[85vh] overflow-y-auto shadow-2xl"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="flex items-center gap-3 px-5 py-4 border-b border-subtle">
+        <span
+          class="w-8 h-8 rounded-lg bg-accent-soft text-accent inline-flex items-center justify-center"
+        >
+          <lucide-icon name="help-circle" size="16"></lucide-icon>
+        </span>
+        <div class="flex-1">
+          <h2 class="text-sm font-semibold text-default">How the bot builder works</h2>
+          <p class="text-[11px] text-muted mt-0.5">A quick guide to designing a flow.</p>
+        </div>
+        <button
+          type="button"
+          (click)="closeHelp()"
+          class="p-1.5 rounded hover:bg-surface-2 text-muted hover:text-default"
+          aria-label="Close"
+        >
+          <lucide-icon name="x" size="16"></lucide-icon>
+        </button>
+      </header>
+      <div class="px-5 py-4 space-y-4 text-[12px] text-default leading-relaxed">
+        <section>
+          <h3 class="text-[13px] font-semibold text-default mb-1">1. The Trigger</h3>
+          <p class="text-muted">
+            The green card on the left is where every conversation begins. Click it to set channel
+            (WhatsApp / Email / any), match mode (keyword / regex / any inbound), and optionally
+            "First message only" so the bot won't re-fire on returning customers.
+          </p>
+        </section>
+        <section>
+          <h3 class="text-[13px] font-semibold text-default mb-1">2. Add nodes</h3>
+          <p class="text-muted">
+            Pick from the left palette (Messages tab for sends, Actions tab for asks + CRM actions).
+            Click a tile to drop it on the canvas. The first node auto-wires from the Trigger.
+          </p>
+        </section>
+        <section>
+          <h3 class="text-[13px] font-semibold text-default mb-1">3. Connect nodes</h3>
+          <p class="text-muted">
+            Click the small dot on the RIGHT of a node (output port) → then click the target node
+            (or its LEFT dot). Text Button and Media Button have one dot per button row — wire each
+            to a different downstream. Ask Question has three ports: answered / invalid / timeout.
+          </p>
+        </section>
+        <section>
+          <h3 class="text-[13px] font-semibold text-default mb-1">4. Badges to watch</h3>
+          <ul class="text-muted list-disc list-inside space-y-1">
+            <li>
+              <span
+                class="inline-block px-1.5 py-px text-[9px] font-bold uppercase bg-red-500/15 text-red-500 rounded"
+                >Fix</span
+              >
+              — a required field is empty. Save will fail until you fill it in.
+            </li>
+            <li>
+              <span
+                class="inline-block px-1.5 py-px text-[9px] font-bold uppercase bg-amber-500/15 text-amber-500 rounded"
+                >Orphan</span
+              >
+              — the node isn't reachable from the Trigger. It will never fire.
+            </li>
+          </ul>
+        </section>
+        <section>
+          <h3 class="text-[13px] font-semibold text-default mb-1">5. Right-click a node</h3>
+          <p class="text-muted">
+            Opens a menu with <b>Duplicate</b> (copy the node + config in one click) and
+            <b>Delete</b> (with confirmation).
+          </p>
+        </section>
+        <section>
+          <h3 class="text-[13px] font-semibold text-default mb-1">6. Finish with End Bot</h3>
+          <p class="text-muted">
+            Drop an End Bot node as the last step of each branch. Optionally send a final message
+            and mute the bot for N hours so it doesn't re-trigger on the next "hi".
+          </p>
+        </section>
+        <section>
+          <h3 class="text-[13px] font-semibold text-default mb-1">7. Save & Publish</h3>
+          <p class="text-muted">
+            Save often (top-right button; a green toast confirms). Click Publish when you're ready —
+            the bot only replies to real customers when it's LIVE.
+          </p>
+        </section>
+      </div>
+    </div>
+  </div>
 }
