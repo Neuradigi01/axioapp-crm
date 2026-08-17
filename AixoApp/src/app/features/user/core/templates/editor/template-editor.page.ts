@@ -24,6 +24,8 @@ import {
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
+import { timer } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
@@ -70,6 +72,13 @@ import { WaFormComponent, WaFormGroup } from './wa-form.component';
 type ChannelOption = '' | 'whatsapp' | 'email' | 'sms' | 'facebook' | 'instagram' | 'push';
 
 const LOCKED_STATUSES = new Set(['in_review', 'approved', 'published']);
+
+/** Cadence for the editor's external-status auto-poll. The Celery
+ *  sweep refreshes the DB every 2 min; this bounds how quickly the
+ *  editor's status badge reflects that refresh. 15 s keeps the badge
+ *  feeling live without hammering the API when a template sits pending
+ *  for a full 24 h. */
+const EXTERNAL_STATUS_POLL_MS = 15_000;
 
 /** Meta's WA template-name regex. Anything else is rejected as
  *  "Invalid parameter" (code 100) at ``/message_templates`` submission,
@@ -357,19 +366,6 @@ export class TemplateEditorPageComponent {
     const externalOk = t.external_status === 'n_a' || t.external_status === 'rejected';
     return internalOk && externalOk;
   });
-  /** Step 14 — Refresh-status button. Visible for WhatsApp templates
-   *  whose external_status is anything other than n_a (i.e. they
-   *  have been submitted to Meta) AND for users with submit_external
-   *  permission. The button hits the manual /sync-external endpoint
-   *  so the operator doesn't have to wait for the hourly Celery
-   *  sweep. */
-  protected readonly showRefreshExternalButton = computed(() => {
-    const t = this.template();
-    if (t === null) return false;
-    if (t.channel !== 'whatsapp') return false;
-    if (!this.canSubmitExternal()) return false;
-    return t.external_status !== 'n_a';
-  });
   /** Step 14 — Resubmit affordance for Meta-rejected templates. Moves
    *  the template back to draft + clears external_status to n_a so
    *  the operator can edit and re-submit. */
@@ -605,6 +601,44 @@ export class TemplateEditorPageComponent {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
       if (id) this.loadTemplate(id);
+    });
+
+    // Auto-poll for external-status updates while a WhatsApp template
+    // sits in ``pending`` or ``paused`` (Meta hasn't ruled yet). The
+    // Celery sweep refreshes the DB every 2 min; polling the DB every
+    // 15 s keeps the editor's status badge current without an operator
+    // click. The effect self-cancels the moment status leaves the
+    // pending/paused set — approved / rejected / n_a rows never poll.
+    effect((onCleanup) => {
+      const t = this.template();
+      if (
+        !t ||
+        t.channel !== 'whatsapp' ||
+        (t.external_status !== 'pending' && t.external_status !== 'paused')
+      ) {
+        return;
+      }
+      const id = t.id;
+      const sub = timer(EXTERNAL_STATUS_POLL_MS, EXTERNAL_STATUS_POLL_MS)
+        .pipe(switchMap(() => this.api.get(id)))
+        .subscribe({
+          next: (row) => {
+            const current = this.template();
+            // Route may have changed to a different template mid-poll;
+            // drop the reply so we don't clobber the new one.
+            if (!current || current.id !== row.id) return;
+            if (current.external_status === row.external_status) return;
+            this.applyTransition(row, `Meta status: ${row.external_status}`);
+            if (row.external_status === 'rejected') {
+              this.loadExternalStatus(row.id);
+            }
+          },
+          error: () => {
+            // Non-fatal — a transient blip just delays the next tick;
+            // the sweep + next successful poll will catch up.
+          },
+        });
+      onCleanup(() => sub.unsubscribe());
     });
   }
 
@@ -1042,25 +1076,6 @@ export class TemplateEditorPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (row) => this.applyTransition(row, 'Submitted to Meta'),
-        error: (err: HttpErrorResponse) => this.applyTransitionError(err),
-      });
-  }
-
-  /** Step 14 — manually refresh external_status against the provider.
-   *  Re-pulls `external-status` afterwards so the rejection_reason
-   *  banner shown for newly-rejected rows reflects Meta's payload. */
-  protected refreshExternalStatus(): void {
-    const t = this.template();
-    if (!t || this.transitioning()) return;
-    this.transitioning.set('sync_external');
-    this.api
-      .syncExternal(t.id)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (row) => {
-          this.applyTransition(row, `Meta status: ${row.external_status}`);
-          this.loadExternalStatus(row.id);
-        },
         error: (err: HttpErrorResponse) => this.applyTransitionError(err),
       });
   }

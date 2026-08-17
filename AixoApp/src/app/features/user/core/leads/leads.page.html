@@ -2,11 +2,14 @@
   <header class="flex flex-wrap items-end justify-between gap-3">
     <div>
       <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
-        Leads
+        Leads Center
+        @if (leadsCenterCount(); as label) {
+          <span class="ml-1 text-[18px] font-medium text-muted">({{ label }})</span>
+        }
       </h1>
       <p class="mt-1 text-[14px] text-muted">
         @if (totalCount() !== null) {
-          {{ totalCount() }} total leads · {{ newTodayCount() }} new today
+          {{ totalCount() }} matching · {{ newTodayCount() }} new today
         } @else {
           {{ loadedCount() }} loaded · {{ newTodayCount() }} new today
         }
@@ -81,250 +84,326 @@
     </div>
   </header>
 
-  <!-- Chip strip: status / scope / no-activity / sort -->
-  <div class="flex flex-wrap items-center gap-2 text-xs">
-    <!-- Status chips -->
-    <div class="inline-flex overflow-hidden rounded-full ring-1 border-subtle bg-surface">
-      @for (
-        s of [
-          { v: '', label: 'All' },
-          { v: 'active', label: 'Active' },
-          { v: 'won', label: 'Won' },
-          { v: 'lost', label: 'Lost' },
-        ];
-        track s.v
-      ) {
-        <button
-          type="button"
-          (click)="setStatus(s.v)"
-          class="px-2.5 py-1 transition"
-          [class.bg-accent]="statusControl.value === s.v"
-          [class.text-white]="statusControl.value === s.v"
-          [class.text-default]="statusControl.value !== s.v"
-          [class.hover:bg-surface-2]="statusControl.value !== s.v"
-        >
-          {{ s.label }}
-        </button>
-      }
-    </div>
-
-    <!-- Scope toggle (hidden for junior staff) -->
-    @if (canChangeScope()) {
-      <div class="inline-flex overflow-hidden rounded-full ring-1 border-subtle bg-surface">
-        @for (
-          sc of [
-            { v: 'mine', label: 'Mine' },
-            { v: 'team', label: 'Team' },
-            { v: 'all', label: 'All' },
-          ];
-          track sc.v
-        ) {
-          <button
-            type="button"
-            (click)="setScope(sc.v)"
-            class="px-2.5 py-1 transition"
-            [class.bg-accent]="scope() === sc.v"
-            [class.text-white]="scope() === sc.v"
-            [class.text-default]="scope() !== sc.v"
-            [class.hover:bg-surface-2]="scope() !== sc.v"
-          >
-            {{ sc.label }}
-          </button>
-        }
-      </div>
-    }
-
-    <!-- No-activity chip -->
-    <select
-      [value]="noActivityFilter()"
-      (change)="setNoActivity($any($event.target).value)"
-      class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-      aria-label="No activity filter"
-    >
-      <option value="">Any activity</option>
-      <option value="7d">No activity 7d+</option>
-      <option value="14d">No activity 14d+</option>
-      <option value="30d">No activity 30d+</option>
-    </select>
-
-    <!-- Sort dropdown — applies to both pipeline (within-stage order)
-         and list views. -->
-    <select
-      [value]="sortKey() + ':' + sortOrder()"
-      (change)="setSort($any($event.target).value)"
-      class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-      aria-label="Sort"
-    >
-      <option value="created_at:desc">Newest first</option>
-      <option value="created_at:asc">Oldest first</option>
-      <option value="last_activity_at:desc">Recent activity</option>
-      <option value="last_activity_at:asc">Stale (oldest activity)</option>
-      <option value="lead_score:desc">Hottest score</option>
-      <option value="lead_score:asc">Coldest score</option>
-      <option value="contact_name:asc">Contact A→Z</option>
-      <option value="contact_name:desc">Contact Z→A</option>
-    </select>
-
-    <!-- Spacer pushes power-user buttons to the right. -->
-    <div class="ml-auto flex items-center gap-2">
-      <!-- Saved views (Step 7) — popover lists owned + shared.
-           Click outside to close is wired via the global doc listener
-           on the trigger button. -->
-      <div class="relative">
-        <button
-          type="button"
-          (click)="toggleViewsMenu()"
-          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
-          title="Saved views"
-          aria-haspopup="menu"
-          [attr.aria-expanded]="viewsMenuOpen()"
-        >
-          <lucide-icon [name]="currentViewName() ? 'bookmark-check' : 'bookmark'" class="h-4 w-4" />
-          {{ currentViewName() ?? 'Default view' }}
-          <lucide-icon name="chevron-down" class="h-3 w-3 text-faint" />
-        </button>
-        @if (viewsMenuOpen()) {
-          <!-- Click-catcher closes the menu when the user clicks
-               outside. Sits behind the panel so panel clicks don't
-               bubble through. -->
-          <button
-            type="button"
-            aria-hidden="true"
-            tabindex="-1"
-            class="fixed inset-0 z-30 cursor-default bg-transparent"
-            (click)="closeViewsMenu()"
-          ></button>
-          <div
-            role="menu"
-            class="absolute right-0 z-40 mt-1 w-72 rounded-lg border border-subtle bg-surface shadow-lg ring-1 ring-black ring-opacity-5"
-          >
-            @if (savedViews().length === 0) {
-              <p class="px-3 py-4 text-center text-xs text-muted">No saved views yet.</p>
-            } @else {
-              <ul class="max-h-60 overflow-auto py-1 text-xs">
-                @for (view of savedViews(); track view.id) {
-                  <li>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      (click)="applyView(view)"
-                      class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-surface-2"
-                      [class.bg-surface-2]="view.id === currentViewId()"
-                    >
-                      @if (view.id === currentViewId()) {
-                        <lucide-icon name="check" class="h-3.5 w-3.5 text-default" />
-                      } @else {
-                        <span class="inline-block h-3.5 w-3.5"></span>
-                      }
-                      <span class="flex-1 truncate text-default">{{ view.name }}</span>
-                      @if (view.shared) {
-                        <lucide-icon
-                          name="users"
-                          class="h-3.5 w-3.5 text-faint"
-                          aria-label="Shared with team"
-                        />
-                      }
-                    </button>
-                  </li>
-                }
-              </ul>
+  <!-- Sir's Leads Center toolbar: floating-label 2-row grid + Search
+       button + Export In Excel + secondary buttons (Saved views,
+       Advanced, Columns, Reset, Scope). Replaces the legacy chip strip
+       + small filter grid. All dropdowns use `crm-mobile-select` for
+       consistent styling. Responsive: 1 col mobile → 2 col sm → 3 col
+       md → 6 col lg on row 1; same collapse on row 2. -->
+  <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
+    <!-- Row 0: Export In Excel + secondary controls (top-right of the toolbar) -->
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <!-- Left: scope toggle (junior reps hidden) + no-activity dropdown -->
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        @if (canChangeScope()) {
+          <div class="inline-flex overflow-hidden rounded-full ring-1 border-subtle bg-surface">
+            @for (
+              sc of [
+                { v: 'mine', label: 'Mine' },
+                { v: 'team', label: 'Team' },
+                { v: 'all', label: 'All' },
+              ];
+              track sc.v
+            ) {
+              <button
+                type="button"
+                (click)="setScope(sc.v)"
+                class="px-2.5 py-1 transition"
+                [class.bg-accent]="scope() === sc.v"
+                [class.text-white]="scope() === sc.v"
+                [class.text-default]="scope() !== sc.v"
+                [class.hover:bg-surface-2]="scope() !== sc.v"
+              >
+                {{ sc.label }}
+              </button>
             }
-            @if (isCurrentViewOwner()) {
+          </div>
+        }
+        <select
+          [value]="noActivityFilter()"
+          (change)="setNoActivity($any($event.target).value)"
+          class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-xs text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          aria-label="No activity filter"
+        >
+          <option value="">Any activity</option>
+          <option value="7d">No activity 7d+</option>
+          <option value="14d">No activity 14d+</option>
+          <option value="30d">No activity 30d+</option>
+        </select>
+      </div>
+      <!-- Right: saved views + advanced filter + columns + export -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="relative">
+          <button
+            type="button"
+            (click)="toggleViewsMenu()"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
+            title="Saved views"
+            aria-haspopup="menu"
+            [attr.aria-expanded]="viewsMenuOpen()"
+          >
+            <lucide-icon
+              [name]="currentViewName() ? 'bookmark-check' : 'bookmark'"
+              class="h-4 w-4"
+            />
+            {{ currentViewName() ?? 'Default view' }}
+            <lucide-icon name="chevron-down" class="h-3 w-3 text-faint" />
+          </button>
+          @if (viewsMenuOpen()) {
+            <button
+              type="button"
+              aria-hidden="true"
+              tabindex="-1"
+              class="fixed inset-0 z-30 cursor-default bg-transparent"
+              (click)="closeViewsMenu()"
+            ></button>
+            <div
+              role="menu"
+              class="absolute right-0 z-40 mt-1 w-72 rounded-lg border border-subtle bg-surface shadow-lg ring-1 ring-black ring-opacity-5"
+            >
+              @if (savedViews().length === 0) {
+                <p class="px-3 py-4 text-center text-xs text-muted">No saved views yet.</p>
+              } @else {
+                <ul class="max-h-60 overflow-auto py-1 text-xs">
+                  @for (view of savedViews(); track view.id) {
+                    <li>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        (click)="applyView(view)"
+                        class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-surface-2"
+                        [class.bg-surface-2]="view.id === currentViewId()"
+                      >
+                        @if (view.id === currentViewId()) {
+                          <lucide-icon name="check" class="h-3.5 w-3.5 text-default" />
+                        } @else {
+                          <span class="inline-block h-3.5 w-3.5"></span>
+                        }
+                        <span class="flex-1 truncate text-default">{{ view.name }}</span>
+                        @if (view.shared) {
+                          <lucide-icon
+                            name="users"
+                            class="h-3.5 w-3.5 text-faint"
+                            aria-label="Shared with team"
+                          />
+                        }
+                      </button>
+                    </li>
+                  }
+                </ul>
+              }
+              @if (isCurrentViewOwner()) {
+                <div class="border-t border-subtle py-1 text-xs">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    (click)="updateCurrentView()"
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-default hover:bg-surface-2"
+                  >
+                    <lucide-icon name="pencil" class="h-3.5 w-3.5" />
+                    Update this view
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    (click)="toggleCurrentViewShared()"
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-default hover:bg-surface-2"
+                  >
+                    <lucide-icon name="users" class="h-3.5 w-3.5" />
+                    @if (currentView()?.shared) {
+                      Make private
+                    } @else {
+                      Share with team
+                    }
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    (click)="openDeleteViewConfirm()"
+                    class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-red-600 hover:bg-red-500/10"
+                  >
+                    <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
+                    Delete this view
+                  </button>
+                </div>
+              }
               <div class="border-t border-subtle py-1 text-xs">
                 <button
                   type="button"
                   role="menuitem"
-                  (click)="updateCurrentView()"
+                  (click)="openSaveViewModal()"
                   class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-default hover:bg-surface-2"
                 >
-                  <lucide-icon name="pencil" class="h-3.5 w-3.5" />
-                  Update this view
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  (click)="toggleCurrentViewShared()"
-                  class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-default hover:bg-surface-2"
-                >
-                  <lucide-icon name="users" class="h-3.5 w-3.5" />
-                  @if (currentView()?.shared) {
-                    Make private
-                  } @else {
-                    Share with team
-                  }
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  (click)="openDeleteViewConfirm()"
-                  class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-red-600 hover:bg-red-500/10"
-                >
-                  <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
-                  Delete this view
+                  <lucide-icon name="plus" class="h-3.5 w-3.5" />
+                  Save current as view…
                 </button>
               </div>
-            }
-            <div class="border-t border-subtle py-1 text-xs">
-              <button
-                type="button"
-                role="menuitem"
-                (click)="openSaveViewModal()"
-                class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-default hover:bg-surface-2"
-              >
-                <lucide-icon name="plus" class="h-3.5 w-3.5" />
-                Save current as view…
-              </button>
             </div>
-          </div>
-        }
-      </div>
-
-      <!-- Advanced filter (DSL) -->
-      <button
-        type="button"
-        (click)="openAdvancedFilter()"
-        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
-        title="Advanced filter"
-      >
-        <lucide-icon name="sliders-horizontal" class="h-4 w-4" />
-        Advanced
-        @if (advancedFilterCount() > 0) {
-          <span
-            class="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-medium text-white"
-            aria-label="active filter clauses"
-          >
-            {{ advancedFilterCount() }}
-          </span>
-        }
-      </button>
-
-      <!-- Column customization (list view only) -->
-      @if (view() === 'list') {
-        <app-column-customization-menu
-          [columns]="columns()"
-          pageKey="leads"
-          [defaults]="defaultColumns"
-          (columnsChange)="onColumnsChange($event)"
-        />
-      }
-
-      <!-- Export CSV — permission-gated; backend re-enforces. -->
-      @if (canExport()) {
+          }
+        </div>
         <button
           type="button"
-          (click)="onExportCsv()"
-          [disabled]="exporting()"
-          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
-          title="Export current filter as CSV"
+          (click)="openAdvancedFilter()"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
+          title="Advanced filter"
         >
-          <lucide-icon name="download" class="h-4 w-4" />
-          @if (exporting()) {
-            Exporting…
-          } @else {
-            Export CSV
+          <lucide-icon name="sliders-horizontal" class="h-4 w-4" />
+          Advanced
+          @if (advancedFilterCount() > 0) {
+            <span
+              class="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-medium text-white"
+              aria-label="active filter clauses"
+            >
+              {{ advancedFilterCount() }}
+            </span>
           }
         </button>
+        @if (view() === 'list') {
+          <app-column-customization-menu
+            [columns]="columns()"
+            pageKey="leads"
+            [defaults]="defaultColumns"
+            (columnsChange)="onColumnsChange($event)"
+          />
+        }
+        @if (canExport()) {
+          <button
+            type="button"
+            (click)="onToolbarExport()"
+            [disabled]="exporting()"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-60"
+            title="Export current filter as CSV (opens in Excel)"
+          >
+            <lucide-icon name="file-spreadsheet" class="h-4 w-4" />
+            @if (exporting()) {
+              Exporting…
+            } @else {
+              Export In Excel
+            }
+          </button>
+        }
+      </div>
+    </div>
+
+    <!-- Row 1: Date · Between · Order By/As · Source · Data Search · [spacer] -->
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+      <label class="block">
+        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Date (from)</span>
+        <input
+          type="date"
+          [formControl]="createdFromControl"
+          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+      </label>
+      <label class="block">
+        <span class="text-[11px] font-medium uppercase tracking-wider text-muted"
+          >Between (to)</span
+        >
+        <input
+          type="date"
+          [formControl]="createdToControl"
+          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+      </label>
+      <div class="block">
+        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Order By/As</span>
+        <crm-mobile-select
+          class="mt-1 block"
+          [options]="sortFieldOptions"
+          [value]="sortKey()"
+          (valueChange)="setSortField($event)"
+        />
+      </div>
+      <div class="block">
+        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Source Wise</span>
+        <crm-mobile-select
+          class="mt-1 block"
+          [options]="sourceSelectOptions()"
+          [value]="sourceControl.value"
+          (valueChange)="sourceControl.setValue($event)"
+        />
+      </div>
+      <label class="block">
+        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Data Search</span>
+        <div class="relative mt-1">
+          <lucide-icon
+            name="search"
+            class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
+          />
+          <input
+            id="leads_q"
+            type="search"
+            [formControl]="searchControl"
+            (keyup.enter)="onToolbarSearch()"
+            placeholder="Name, phone, email…"
+            class="block w-full rounded-lg border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
+      </label>
+      <div class="block">
+        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Status</span>
+        <crm-mobile-select
+          class="mt-1 block"
+          [options]="stageSelectOptions()"
+          [value]="stageControlValue()"
+          (valueChange)="onToolbarStageChange($event)"
+        />
+      </div>
+    </div>
+
+    <!-- Row 2: Remarks · User · Order Type · Reset · Search -->
+    <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+      <label class="block">
+        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Remarks</span>
+        <input
+          type="text"
+          [formControl]="remarksControl"
+          (keyup.enter)="onToolbarSearch()"
+          placeholder="Note contains…"
+          maxlength="64"
+          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+      </label>
+      @if (canFilterByOwner()) {
+        <div class="block">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-muted">User</span>
+          <crm-mobile-select
+            class="mt-1 block"
+            [options]="assigneeSelectOptions()"
+            [value]="assigneeControl.value"
+            (valueChange)="assigneeControl.setValue($event)"
+          />
+        </div>
       }
+      <div class="block">
+        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Order Type</span>
+        <crm-mobile-select
+          class="mt-1 block"
+          [options]="orderOptions"
+          [value]="sortOrder()"
+          (valueChange)="setSortOrder($event)"
+        />
+      </div>
+      <div
+        class="flex flex-col gap-2 sm:col-span-2 sm:flex-row sm:items-end sm:justify-end md:col-span-3 lg:col-span-3"
+      >
+        <button
+          type="button"
+          (click)="onToolbarReset()"
+          class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2 sm:w-auto"
+        >
+          <lucide-icon name="rotate-ccw" class="h-3.5 w-3.5" />
+          Reset
+        </button>
+        <button
+          type="button"
+          (click)="onToolbarSearch()"
+          class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-6 py-1.5 text-xs font-semibold text-white shadow-sm hover:brightness-95 sm:w-auto"
+        >
+          <lucide-icon name="search" class="h-3.5 w-3.5" />
+          Search
+        </button>
+      </div>
     </div>
   </div>
 
@@ -333,48 +412,6 @@
       {{ err }}
     </p>
   }
-
-  <!-- Filters -->
-  <div class="grid grid-cols-1 gap-3 sm:grid-cols-5">
-    <div class="sm:col-span-2">
-      <label for="leads_q" class="sr-only">Search</label>
-      <div class="relative">
-        <lucide-icon
-          name="search"
-          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
-        />
-        <input
-          id="leads_q"
-          type="search"
-          [formControl]="searchControl"
-          placeholder="Search by contact name, phone, or email…"
-          class="block w-full rounded-lg border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-      </div>
-    </div>
-    <div>
-      <label class="sr-only">Source</label>
-      <!-- crm-mobile-select: in-DOM picker (not the native OS one).
-           Avoids the DevTools mobile-emulation overlap issue where
-           the browser's native select popup renders full-screen and
-           covers the whole viewport. -->
-      <crm-mobile-select
-        [options]="sourceSelectOptions()"
-        [value]="sourceControl.value"
-        (valueChange)="sourceControl.setValue($event)"
-      />
-    </div>
-    @if (canFilterByOwner()) {
-      <div>
-        <label class="sr-only">Owner</label>
-        <crm-mobile-select
-          [options]="assigneeSelectOptions()"
-          [value]="assigneeControl.value"
-          (valueChange)="assigneeControl.setValue($event)"
-        />
-      </div>
-    }
-  </div>
 
   @if (mergedNotice(); as notice) {
     <div
@@ -778,16 +815,18 @@
   />
 }
 
-<!-- Single-lead reassign (from pencil on a card / list row). -->
-@if (singleReassignLead(); as lead) {
-  <app-reassign-modal
-    [entityLabel]="'lead'"
-    [count]="1"
-    [currentOwnerId]="lead.assigned_to_id"
-    [submitting]="singleReassignSubmitting()"
-    [error]="singleReassignError()"
-    (confirm)="onSingleReassign($event)"
-    (cancel)="closeSingleReassign()"
+<!-- Single-lead update / reassign (sir's Update Status modal). The
+     card pencil opens this instead of the old mini reassign modal so
+     the rep can change owner + stage + remarks + schedule the next
+     follow-up in one shot. Bulk reassign still uses `app-reassign-modal`
+     via the bulk-modal branch below. -->
+@if (updateStatusLead(); as lead) {
+  <app-update-status-modal
+    [lead]="lead"
+    [contact]="updateStatusContact()"
+    [pipelineStages]="pipelineStages()"
+    (saved)="onUpdateStatusSaved($event)"
+    (cancelled)="closeUpdateStatus()"
   />
 }
 
