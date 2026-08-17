@@ -113,6 +113,15 @@
         <div class="flex items-center gap-2">
           <button
             type="button"
+            (click)="openUpdateStatus()"
+            [disabled]="pipelineStages().length === 0"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:brightness-95 disabled:opacity-50"
+          >
+            <lucide-icon name="clipboard-list" size="14" aria-hidden="true"></lucide-icon>
+            Update Status
+          </button>
+          <button
+            type="button"
             (click)="openEdit()"
             class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
           >
@@ -180,6 +189,7 @@
           <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <!-- Left column: Lead standard + custom fields. -->
             <div class="space-y-4 lg:col-span-2">
+              <app-lead-follow-ups-panel [leadId]="l.id" />
               <div class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
                 <h2 class="text-xs font-semibold uppercase tracking-wide text-muted">Standard</h2>
                 <dl class="mt-3 space-y-2 text-sm">
@@ -391,6 +401,16 @@
     [submitError]="formError()"
     (save)="onSave($event)"
     (cancel)="closeModal()"
+  />
+}
+
+@if (updateStatusOpen() && lead(); as l) {
+  <app-update-status-modal
+    [lead]="l"
+    [contact]="contact()"
+    [pipelineStages]="pipelineStages()"
+    (saved)="onUpdateStatusSaved($event)"
+    (cancelled)="closeUpdateStatus()"
   />
 }
 

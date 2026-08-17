@@ -196,6 +196,13 @@ export class LeadsPageComponent {
   /** "No activity in N days" chip — translates to `last_activity_lt`. */
   readonly noActivityFilter = signal<'' | '7d' | '14d' | '30d'>('');
 
+  /** Leads Center toolbar: inclusive date range on `created_at`.
+   *  Empty string = unbounded on that side. YYYY-MM-DD (the shape a
+   *  `<input type="date">` emits) — passed to the backend as-is; the
+   *  server UTC-anchors both bounds. */
+  readonly createdFromControl = new FormControl<string>('', { nonNullable: true });
+  readonly createdToControl = new FormControl<string>('', { nonNullable: true });
+
   /** Visibility scope: which leads to show before any other filter.
    * Junior reps default to "mine" and don't see the toggle; managers
    * default to "team"; admin/owner default to "all". */
@@ -234,6 +241,23 @@ export class LeadsPageComponent {
   /** Server-reported total. `null` on cursor-only pages (we only ask
    * for it on the first page of a filter set). */
   readonly totalCount = signal<number | null>(null);
+
+  /** Server-reported unfiltered total — the tenant's whole leads set.
+   *  Requested only on the first page of a filter set (opt-in via
+   *  `with_unfiltered_total=true`). Powers the `(filtered/total)`
+   *  count in the Leads Center header. `null` until the first
+   *  response lands. */
+  readonly unfilteredTotal = signal<number | null>(null);
+
+  /** Header label: `"X/Y"` when both counts are known, otherwise the
+   *  best partial (`X` alone or `?`). */
+  readonly leadsCenterCount = computed<string>(() => {
+    const filtered = this.totalCount();
+    const unfiltered = this.unfilteredTotal();
+    if (filtered !== null && unfiltered !== null) return `${filtered}/${unfiltered}`;
+    if (filtered !== null) return `${filtered}`;
+    return '';
+  });
 
   /** 1-based page index, derived from `cursorHistory.length`. */
   readonly currentPage = computed(() => this.cursorHistory().length + 1);
@@ -574,6 +598,12 @@ export class LeadsPageComponent {
     this.statusControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.resetCursorAndReload());
+    this.createdFromControl.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.resetCursorAndReload());
+    this.createdToControl.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.resetCursorAndReload());
 
     // Whenever leads change, fetch any contacts we don't already have cached.
     effect(() => {
@@ -617,6 +647,8 @@ export class LeadsPageComponent {
       assigned_to: this.resolveAssignee(),
       unassigned_only: this.assigneeControl.value === 'unassigned' ? true : undefined,
       last_activity_lt: this.resolveNoActivityCutoff() ?? undefined,
+      created_from: this.createdFromControl.value.trim() || undefined,
+      created_to: this.createdToControl.value.trim() || undefined,
       sort: this.sortKey(),
       order: this.sortOrder(),
     };
@@ -630,10 +662,15 @@ export class LeadsPageComponent {
       // is amortised across the whole walk. The server returns `null`
       // for `total` on subsequent pages.
       base.with_total = this.cursorHistory().length === 0;
+      // Leads Center header opts in for the extra tenant-wide count
+      // on the first page only (subsequent pages don't need to
+      // recompute an unchanged value).
+      base.with_unfiltered_total = this.cursorHistory().length === 0;
     } else {
       // Pipeline view: keep the existing one-shot bulk fetch.
       base.size = 200;
       base.with_total = true;
+      base.with_unfiltered_total = true;
     }
     return base;
   }
@@ -650,6 +687,9 @@ export class LeadsPageComponent {
           this.nextCursor.set(resp.next_cursor);
           if (resp.total !== null && resp.total !== undefined) {
             this.totalCount.set(resp.total);
+          }
+          if (resp.unfiltered_total !== null && resp.unfiltered_total !== undefined) {
+            this.unfilteredTotal.set(resp.unfiltered_total);
           }
           this.state.loading.set(false);
         },
@@ -669,6 +709,32 @@ export class LeadsPageComponent {
     this.cursorHistory.set([]);
     this.totalCount.set(null);
     this.reload();
+  }
+
+  /** Leads Center toolbar Search button. Auto-refetch already fires
+   *  on every filter change (see the `valueChanges` subscriptions in
+   *  the constructor); this handler exists so sir's screenshot Search
+   *  button has something to bind to and gives the rep a visible
+   *  "refresh with current filters" affordance. */
+  protected onToolbarSearch(): void {
+    this.resetCursorAndReload();
+  }
+
+  /** Leads Center toolbar Reset button. Clears the new date-range +
+   *  the shared filter controls back to defaults + re-fetches. Does
+   *  NOT touch scope / saved view / advanced-filter DSL — those have
+   *  their own dedicated reset affordances. */
+  protected onToolbarReset(): void {
+    this.createdFromControl.setValue('', { emitEvent: false });
+    this.createdToControl.setValue('', { emitEvent: false });
+    this.searchControl.setValue('', { emitEvent: false });
+    this.sourceControl.setValue('', { emitEvent: false });
+    this.assigneeControl.setValue('', { emitEvent: false });
+    this.statusControl.setValue('', { emitEvent: false });
+    this.noActivityFilter.set('');
+    this.sortKey.set('created_at');
+    this.sortOrder.set('desc');
+    this.resetCursorAndReload();
   }
 
   // --- Step 6: pagination handlers ---------------------------------------
@@ -1034,7 +1100,8 @@ export class LeadsPageComponent {
       key !== 'created_at' &&
       key !== 'last_activity_at' &&
       key !== 'lead_score' &&
-      key !== 'contact_name'
+      key !== 'contact_name' &&
+      key !== 'next_follow_up_due'
     ) {
       return;
     }

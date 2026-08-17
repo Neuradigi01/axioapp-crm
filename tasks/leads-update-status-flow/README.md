@@ -170,9 +170,9 @@ Attacker HIGH #1. New Pydantic schema `FollowUpContactBasics { full_name?, phone
 |---|---|---|---|
 | 1 | [Backend: `POST /leads/{id}/log-update` atomic endpoint + narrow contact schema](step-1-backend-log-update-endpoint.md) | **COMPLETED** 2026-08-17 | ~45 min |
 | 2 | [Backend: extend `GET /leads` with `created_from`/`created_to` + `sort=next_follow_up_due` + CSV cell escape + `(filtered/total)` count](step-2-backend-list-filters.md) | **COMPLETED** 2026-08-17 | ~30 min |
-| 3 | [Frontend: `UpdateStatusModal` component + lead-detail header button + `logUpdate` FE API method](step-3-frontend-update-status-modal.md) | Pending | ~45 min |
-| 4 | [Frontend: Follow-Up History panel on lead-detail page (reads `tbl_tasks` via existing `TasksApiService`)](step-4-frontend-follow-up-panel.md) | Pending | ~30 min |
-| 5 | [Frontend: Leads Center two-row toolbar rebuild (wires to standard query params, keeps saved views + advanced-filter as secondary buttons)](step-5-frontend-leads-center-toolbar.md) | Pending | ~45 min |
+| 3 | [Frontend: `UpdateStatusModal` component + lead-detail header button + `logUpdate` FE API method](step-3-frontend-update-status-modal.md) | **COMPLETED** 2026-08-17 | ~45 min |
+| 4 | [Frontend: Follow-Up History panel on lead-detail page (reads `tbl_tasks` via existing `TasksApiService`)](step-4-frontend-follow-up-panel.md) | **COMPLETED** 2026-08-17 | ~30 min |
+| 5 | [Frontend: Leads Center two-row toolbar rebuild (wires to standard query params, keeps saved views + advanced-filter as secondary buttons)](step-5-frontend-leads-center-toolbar.md) | **COMPLETED** 2026-08-17 (additive scope — see step MD) | ~45 min |
 
 **Total: ~3.25 hours across 5 steps.** Each step under 30 min to review per Rule 8; stop-and-report per Rule 9.
 

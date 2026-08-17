@@ -2,11 +2,14 @@
   <header class="flex flex-wrap items-end justify-between gap-3">
     <div>
       <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
-        Leads
+        Leads Center
+        @if (leadsCenterCount(); as label) {
+          <span class="ml-1 text-[18px] font-medium text-muted">({{ label }})</span>
+        }
       </h1>
       <p class="mt-1 text-[14px] text-muted">
         @if (totalCount() !== null) {
-          {{ totalCount() }} total leads · {{ newTodayCount() }} new today
+          {{ totalCount() }} matching · {{ newTodayCount() }} new today
         } @else {
           {{ loadedCount() }} loaded · {{ newTodayCount() }} new today
         }
@@ -163,6 +166,8 @@
       <option value="lead_score:asc">Coldest score</option>
       <option value="contact_name:asc">Contact A→Z</option>
       <option value="contact_name:desc">Contact Z→A</option>
+      <option value="next_follow_up_due:asc">Next follow-up (earliest)</option>
+      <option value="next_follow_up_due:desc">Next follow-up (latest)</option>
     </select>
 
     <!-- Spacer pushes power-user buttons to the right. -->
@@ -334,6 +339,50 @@
     </p>
   }
 
+  <!-- Leads Center date-range toolbar (Step 5 of leads-update-status-flow).
+       Adds the `created_at` range inputs sir's screenshot exposes, plus
+       explicit Search / Reset actions. Sits above the search-and-source
+       filters grid — Data Search / Source / Owner stay in the grid
+       below so existing users see no regression. -->
+  <div
+    class="grid grid-cols-2 items-end gap-3 rounded-lg border border-subtle bg-surface p-3 md:grid-cols-6"
+  >
+    <label class="block">
+      <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Date (from)</span>
+      <input
+        type="date"
+        [formControl]="createdFromControl"
+        class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+      />
+    </label>
+    <label class="block">
+      <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Between (to)</span>
+      <input
+        type="date"
+        [formControl]="createdToControl"
+        class="mt-1 block w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+      />
+    </label>
+    <div class="col-span-2 flex items-end justify-end gap-2 md:col-span-4">
+      <button
+        type="button"
+        (click)="onToolbarReset()"
+        class="inline-flex h-[34px] items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 text-xs font-medium text-default hover:bg-surface-2"
+      >
+        <lucide-icon name="rotate-ccw" class="h-3.5 w-3.5" />
+        Reset
+      </button>
+      <button
+        type="button"
+        (click)="onToolbarSearch()"
+        class="inline-flex h-[34px] items-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-white shadow-sm hover:brightness-95"
+      >
+        <lucide-icon name="search" class="h-3.5 w-3.5" />
+        Search
+      </button>
+    </div>
+  </div>
+
   <!-- Filters -->
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-5">
     <div class="sm:col-span-2">
@@ -347,6 +396,7 @@
           id="leads_q"
           type="search"
           [formControl]="searchControl"
+          (keyup.enter)="onToolbarSearch()"
           placeholder="Search by contact name, phone, or email…"
           class="block w-full rounded-lg border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
