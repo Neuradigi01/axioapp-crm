@@ -14,9 +14,10 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from src.app.core.leads.models import LeadSource, LeadStatus
+from src.app.core.tasks.models import TaskFollowupType
 from src.app.shared.schemas import (
     BulkDelete,
     BulkDeleteResult,
@@ -127,6 +128,102 @@ class MoveStageRequest(BaseModel):
         return self
 
 
+# --- Update Status flow (leads-update-status-flow track) ---
+#
+# Bounds on ``NextFollowUpSpec.due_at``. Reject wildly out-of-band
+# datetimes (year 1950, year 9999) so the leads-list sort by next
+# follow-up and any downstream Celery scheduler that reads the value
+# don't get poisoned by placeholder pickers or hostile input.
+_FOLLOWUP_LOOKBACK_DAYS = 365
+_FOLLOWUP_LOOKAHEAD_DAYS = 5 * 365
+
+
+class FollowUpContactBasics(BaseModel):
+    """Narrow contact patch surface exposed by the log-update endpoint.
+
+    Only three fields — ``full_name``, ``phone``, ``email``. The wider
+    ``contacts.update_service`` accepts ``assigned_to_id`` / ``tags`` /
+    ``custom_data`` / ``source`` too; forwarding the whole payload
+    would let a rep with ``leads.write`` mutate contact-owned fields
+    a plain PATCH on ``/contacts`` would gate behind ``contacts.write``
+    + additional permissions. Every unknown key is rejected.
+    """
+
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    phone: str | None = Field(default=None, min_length=1, max_length=32)
+    email: EmailStr | None = None
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class NextFollowUpSpec(BaseModel):
+    """One scheduled follow-up task to create alongside the log-update.
+
+    Persists as a ``tbl_tasks`` row with ``followup_type`` set — the
+    dashboard's Today's Follow-ups widget picks it up unchanged.
+    """
+
+    due_at: datetime
+    followup_type: TaskFollowupType
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def _bound_due_at(self) -> NextFollowUpSpec:
+        from datetime import UTC, timedelta
+        from datetime import datetime as _dt
+
+        now = _dt.now(UTC)
+        # Normalise: treat naive datetimes as UTC so the comparison never
+        # raises on mixed-awareness inputs.
+        due = self.due_at if self.due_at.tzinfo else self.due_at.replace(tzinfo=UTC)
+        earliest = now - timedelta(days=_FOLLOWUP_LOOKBACK_DAYS)
+        latest = now + timedelta(days=_FOLLOWUP_LOOKAHEAD_DAYS)
+        if due < earliest or due > latest:
+            raise ValueError(
+                f"due_at must be within {_FOLLOWUP_LOOKBACK_DAYS} days in the past "
+                f"and {_FOLLOWUP_LOOKAHEAD_DAYS} days in the future"
+            )
+        return self
+
+
+class LogUpdateRequest(BaseModel):
+    """Payload for ``POST /api/v1/leads/{id}/log-update``.
+
+    ``if_current_stage`` is an optimistic-lock guard: the modal captures
+    the lead's stage at open time and sends it here; if the DB has moved
+    on since, the endpoint responds 409 so the rep re-opens with the
+    fresh state instead of clobbering a colleague's move with fabricated
+    ``status_change`` history.
+
+    ``remarks`` is always written as a ``type='note'`` activity so it
+    appears on the standard timeline without a new activity type.
+
+    ``contact_basics`` / ``pipeline_stage`` / ``source`` / ``next_follow_up``
+    are all optional — a bare ``{"if_current_stage":X, "remarks":"…"}``
+    payload logs a note and does nothing else.
+    """
+
+    if_current_stage: str = Field(min_length=1, max_length=64)
+    contact_basics: FollowUpContactBasics | None = None
+    pipeline_stage: str | None = Field(default=None, min_length=1, max_length=64)
+    source: LeadSource | None = None
+    remarks: str = Field(min_length=1, max_length=2000)
+    next_follow_up: NextFollowUpSpec | None = None
+    # Lost-reason pair — required (server side) when the target stage
+    # is is_lost. Same picklist + shape as MoveStageRequest so the modal
+    # can carry the reason atomically instead of firing a second call.
+    lost_reason: str | None = Field(default=None, max_length=32)
+    lost_reason_other: str | None = Field(default=None, max_length=255)
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    @model_validator(mode="after")
+    def _check_lost_reason(self) -> LogUpdateRequest:
+        _validate_lost_reason_pair(self.lost_reason, self.lost_reason_other)
+        return self
+
+
 class LeadOut(TimestampedOrgScopedOut):
     id: uuid.UUID
     contact_id: uuid.UUID
@@ -161,6 +258,19 @@ class LeadOut(TimestampedOrgScopedOut):
     # first entry into an is_won / is_lost stage.
     won_at: datetime | None = None
     lost_at: datetime | None = None
+
+
+class LogUpdateResponse(BaseModel):
+    """Response body for the log-update endpoint.
+
+    ``next_follow_up_task_id`` is non-null iff the request supplied a
+    ``next_follow_up`` block and the task was inserted. FE uses this
+    to prepend the new task into the Follow-Up History panel without a
+    refetch.
+    """
+
+    lead: LeadOut
+    next_follow_up_task_id: uuid.UUID | None = None
 
 
 class LeadIngestOut(LeadOut):

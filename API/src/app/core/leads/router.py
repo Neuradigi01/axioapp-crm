@@ -53,6 +53,8 @@ from src.app.core.leads.schemas import (
     LeadScoringRuleOut,
     LeadScoringRuleUpdate,
     LeadUpdate,
+    LogUpdateRequest,
+    LogUpdateResponse,
     MoveStageRequest,
     PipelineValueRollup,
 )
@@ -68,6 +70,7 @@ from src.app.core.leads.service import (
     list_leads_visible_to,
     list_leads_where,
     list_scoring_rules,
+    log_update_for_lead,
     move_stage_for_lead,
     pipeline_value_rollup,
     reassign_lead,
@@ -470,6 +473,38 @@ async def move_lead_stage_endpoint(
         caller=user,
     )
     return LeadOut.model_validate(lead)
+
+
+@router.post("/{lead_id}/log-update", response_model=LogUpdateResponse)
+async def log_lead_update_endpoint(
+    lead_id: uuid.UUID,
+    payload: LogUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("leads.write")),
+) -> LogUpdateResponse:
+    """Atomic Update-Status endpoint powering the modal.
+
+    See ``log_update_for_lead`` for the write ordering. When
+    ``contact_basics`` is supplied the caller must additionally hold
+    ``contacts.write`` — the leads-write scope alone would otherwise
+    become a side-door around the contacts-write permission gate.
+    """
+    if payload.contact_basics is not None:
+        if not await role_has_permission(db, user.role_id, "contacts.write"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Missing permission(s): contacts.write",
+            )
+    lead, next_task_id = await log_update_for_lead(
+        db,
+        lead_id=lead_id,
+        caller=user,
+        payload=payload,
+    )
+    return LogUpdateResponse(
+        lead=LeadOut.model_validate(lead),
+        next_follow_up_task_id=next_task_id,
+    )
 
 
 # --- Reassign + bulk endpoints ----------------------------------------------

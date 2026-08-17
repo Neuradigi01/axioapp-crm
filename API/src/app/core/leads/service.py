@@ -45,6 +45,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import activities, audit
 from src.app.core.activities.models import ActivityType
+from src.app.core.contacts import data_access as _contacts_da
 from src.app.core.contacts.models import Contact
 from src.app.core.leads import data_access as _da
 from src.app.core.leads import filter_dsl, scoring
@@ -60,9 +61,13 @@ from src.app.core.leads.schemas import (
     LeadScoringRuleCreate,
     LeadScoringRuleUpdate,
     LeadUpdate,
+    LogUpdateRequest,
 )
+from src.app.core.pipelines import data_access as _pipelines_da
 from src.app.core.pipelines import move_card
 from src.app.core.pipelines.service import get_pipeline_by_key
+from src.app.core.tasks import data_access as _tasks_da
+from src.app.core.tasks.models import Task
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.queries import ensure_found
@@ -209,9 +214,7 @@ async def create_lead(
         # `Lead.assigned_to_id` would happily accept a UUID belonging
         # to a user in another org. Enforce membership here so a POST
         # with `assigned_to_id=<foreign-org-user>` fails 422.
-        await _assert_user_in_org(
-            session, org_id=org_id, user_uuid=payload.assigned_to_id
-        )
+        await _assert_user_in_org(session, org_id=org_id, user_uuid=payload.assigned_to_id)
     stage_key = await _resolve_initial_stage(session, requested=payload.pipeline_stage)
     cleaned_custom = await validate_custom_data(
         session,
@@ -479,11 +482,7 @@ async def update_lead(
     if "contact_id" in changes and changes["contact_id"] is not None:
         await _ensure_contact_in_scope(session, changes["contact_id"])
 
-    if (
-        "assigned_to_id" in changes
-        and changes["assigned_to_id"] is not None
-        and caller is not None
-    ):
+    if "assigned_to_id" in changes and changes["assigned_to_id"] is not None and caller is not None:
         await _assert_user_in_org(
             session,
             org_id=caller.org_id,
@@ -629,10 +628,7 @@ async def _build_list_query(
         if unknown:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "unknown custom-field key(s) in filter: "
-                    f"{sorted(set(unknown))}"
-                ),
+                detail=(f"unknown custom-field key(s) in filter: {sorted(set(unknown))}"),
             )
         for key, value in _custom_pairs:
             filters.append(Lead.custom_data[key].astext == value)
@@ -960,9 +956,7 @@ async def move_stage_for_lead(
     else:
         lead = ensure_found(await get_lead(session, lead_id), entity="lead")
     from_stage = lead.pipeline_stage
-    from_status = (
-        lead.status.value if hasattr(lead.status, "value") else str(lead.status)
-    )
+    from_status = lead.status.value if hasattr(lead.status, "value") else str(lead.status)
 
     pipeline = await get_pipeline_by_key(session, key=_LEADS_PIPELINE_KEY)
     new_stage = (
@@ -1019,7 +1013,8 @@ async def move_stage_for_lead(
             needs_commit = True
         # F22 lifecycle timestamp — stamp first-lost only.
         if lead.lost_at is None:
-            from datetime import UTC, datetime as _dt
+            from datetime import UTC
+            from datetime import datetime as _dt
 
             lead.lost_at = _dt.now(UTC)
             needs_commit = True
@@ -1038,7 +1033,8 @@ async def move_stage_for_lead(
             needs_commit = True
         # F22 lifecycle timestamp — stamp first-won only.
         if lead.won_at is None:
-            from datetime import UTC, datetime as _dt
+            from datetime import UTC
+            from datetime import datetime as _dt
 
             lead.won_at = _dt.now(UTC)
             needs_commit = True
@@ -1090,9 +1086,7 @@ async def _publish_lead_status_changed(
         ).scalar_one_or_none()
 
         to_stage = lead.pipeline_stage
-        to_status = (
-            lead.status.value if hasattr(lead.status, "value") else str(lead.status)
-        )
+        to_status = lead.status.value if hasattr(lead.status, "value") else str(lead.status)
 
         payload: dict = {
             "lead_id": str(lead.id),
@@ -1106,9 +1100,7 @@ async def _publish_lead_status_changed(
                 "pipeline_stage": to_stage,
                 "status": to_status,
                 "source": str(lead.source) if lead.source else None,
-                "assigned_to_id": (
-                    str(lead.assigned_to_id) if lead.assigned_to_id else None
-                ),
+                "assigned_to_id": (str(lead.assigned_to_id) if lead.assigned_to_id else None),
                 "budget": float(lead.budget) if lead.budget is not None else None,
                 "lost_reason": lead.lost_reason,
             },
@@ -1602,6 +1594,245 @@ async def pipeline_value_rollup(
     }
 
 
+# --- Update Status flow: atomic log-update endpoint ---
+#
+# Wraps a rep's Update-Status click into a single-commit write:
+#   - Optional contact-basics patch (narrow: full_name/phone/email only).
+#   - Optional pipeline_stage move + status/won_at/lost_at sync + a
+#     `status_change` activity row.
+#   - Optional source change.
+#   - Always a `note` activity carrying the remarks text.
+#   - Optional next-follow-up `tbl_tasks` row.
+#
+# Every write goes through a DAL (never a reused service that owns its
+# own commit boundary), so a downstream failure rolls the whole modal
+# submission back atomically. Reused services (`move_stage_for_lead`,
+# `contacts.update_contact`, `tasks.service.create_task`) would each
+# commit mid-transaction and defeat atomicity — pin-test #3 in
+# `tests/test_leads_log_update.py` catches any drift back to them.
+
+
+def _apply_stage_lifecycle(
+    lead: Lead,
+    *,
+    new_stage: Any,
+    lost_reason: str | None,
+    lost_reason_other: str | None,
+    won_value: Any = None,
+    close_date: Any = None,
+    won_reason: str | None = None,
+) -> None:
+    """Sync ``lead.status`` + won/lost stamps with ``new_stage``.
+
+    Extracted from ``move_stage_for_lead`` so both paths agree on how a
+    stage transition maps to derived lifecycle columns. Mutates ``lead``
+    in place; caller is responsible for the surrounding transaction.
+
+    First-lost / first-won stamping is one-shot — a re-drag back into
+    the same terminal stage does not reset the timestamp, so the
+    timeline shows the *first* close instead of the latest kanban
+    shuffle. Matches the historical ``move_stage_for_lead`` behaviour.
+    """
+    from datetime import UTC
+    from datetime import datetime as _dt
+
+    new_status = (
+        LeadStatus.won
+        if new_stage is not None and new_stage.is_won
+        else LeadStatus.lost
+        if new_stage is not None and new_stage.is_lost
+        else LeadStatus.active
+    )
+    if lead.status != new_status:
+        lead.status = new_status
+    if new_stage is not None and new_stage.is_lost:
+        if lead.lost_reason != lost_reason:
+            lead.lost_reason = lost_reason
+        if lead.lost_reason_other != lost_reason_other:
+            lead.lost_reason_other = lost_reason_other
+        if lead.lost_at is None:
+            lead.lost_at = _dt.now(UTC)
+    if new_stage is not None and new_stage.is_won:
+        if won_value is not None and lead.won_value != won_value:
+            lead.won_value = won_value
+        if close_date is not None and lead.close_date != close_date:
+            lead.close_date = close_date
+        if won_reason is not None and lead.won_reason != won_reason:
+            lead.won_reason = won_reason
+        if lead.won_at is None:
+            lead.won_at = _dt.now(UTC)
+
+
+async def log_update_for_lead(
+    session: AsyncSession,
+    *,
+    lead_id: uuid.UUID,
+    caller: Any,
+    payload: LogUpdateRequest,
+) -> tuple[Lead, uuid.UUID | None]:
+    """Atomic Update-Status write path.
+
+    Returns ``(refreshed_lead, next_follow_up_task_id | None)``.
+    Raises 404 (lead missing or cross-org / not visible), 409
+    (``if_current_stage`` guard tripped), 422 (contact shared across
+    multiple leads / target stage invalid / lost-reason rules).
+    """
+    from src.app.core.permissions.service import role_has_permission
+
+    # 1. Load + defence-in-depth org check + row-level visibility.
+    lead = await _da.get_lead_by_id(session, lead_id)
+    if lead is None or lead.org_id != caller.org_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="lead not found")
+    if lead.assigned_to_id != caller.legacy_uuid and not await role_has_permission(
+        session, caller.role_id, "users.read"
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="lead not found")
+
+    # 2. Optimistic stage-drift guard. Reject stale submissions rather
+    #    than clobbering a concurrent move with fabricated history.
+    if payload.if_current_stage != lead.pipeline_stage:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": "stage_drifted", "current_stage": lead.pipeline_stage},
+        )
+
+    org_id = caller.org_id
+    actor_id = caller.legacy_uuid
+
+    # 3. Optional narrow contact-basics patch.
+    if payload.contact_basics is not None:
+        lead_count = await _da.count_leads_for_contact(session, lead.contact_id)
+        if lead_count > 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"error": "contact_shared", "lead_count": lead_count},
+            )
+        contact = await _contacts_da.get_contact(session, lead.contact_id)
+        if contact is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="linked contact not found",
+            )
+        basics = payload.contact_basics
+        if basics.full_name is not None:
+            contact.full_name = basics.full_name
+        if basics.phone is not None:
+            contact.phone = basics.phone
+        if basics.email is not None:
+            contact.email = basics.email
+
+    # 4. Optional stage move — read `from_stage` fresh from the DB so a
+    #    client-supplied field can never fabricate transition history.
+    next_stage_key: str | None = None
+    if payload.pipeline_stage is not None and payload.pipeline_stage != lead.pipeline_stage:
+        pipeline = await get_pipeline_by_key(session, key=_LEADS_PIPELINE_KEY)
+        if pipeline is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="no 'leads' pipeline configured for this org",
+            )
+        new_stage = next((s for s in pipeline.stages if s.key == payload.pipeline_stage), None)
+        if new_stage is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"pipeline_stage {payload.pipeline_stage!r} is not part of the leads pipeline",
+            )
+        if new_stage.is_lost and payload.lost_reason is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="lost_reason is required when moving a lead to a Lost stage",
+            )
+        from_stage = lead.pipeline_stage
+        await _pipelines_da.update_card_pipeline_stage(
+            session,
+            table=_LEADS_CARD_TABLE,
+            card_id=lead_id,
+            to_key=payload.pipeline_stage,
+        )
+        # The DAL issued a raw UPDATE; keep the in-memory ORM instance
+        # in sync so the response payload reflects the new stage.
+        lead.pipeline_stage = payload.pipeline_stage
+        _apply_stage_lifecycle(
+            lead,
+            new_stage=new_stage,
+            lost_reason=payload.lost_reason,
+            lost_reason_other=payload.lost_reason_other,
+        )
+        await activities.record_in_session(
+            session,
+            org_id=org_id,
+            entity_type=_LEAD_ENTITY,
+            entity_id=lead_id,
+            type=ActivityType.status_change,
+            payload={
+                "pipeline": _LEADS_PIPELINE_KEY,
+                "from": from_stage,
+                "to": payload.pipeline_stage,
+            },
+            user_id=actor_id,
+        )
+        next_stage_key = payload.pipeline_stage
+
+    # 5. Optional source change.
+    if payload.source is not None and payload.source != lead.source:
+        lead.source = payload.source
+
+    # 6. Always: note activity carrying the remarks text. Rides the
+    #    same session so a downstream failure below rolls it back.
+    await activities.record_in_session(
+        session,
+        org_id=org_id,
+        entity_type=_LEAD_ENTITY,
+        entity_id=lead_id,
+        type=ActivityType.note,
+        payload={"text": payload.remarks},
+        user_id=actor_id,
+    )
+
+    # 7. Optional next-follow-up task.
+    next_task_id: uuid.UUID | None = None
+    if payload.next_follow_up is not None:
+        # Truncate remarks in the title so the dashboard follow-up
+        # widget renders one clean line — full remarks live in the
+        # note activity written above.
+        title = f"Follow up: {payload.remarks[:80]}"
+        task = Task(
+            org_id=org_id,
+            title=title,
+            due_at=payload.next_follow_up.due_at,
+            assigned_to_id=lead.assigned_to_id or actor_id,
+            related_entity_type=_LEAD_ENTITY,
+            related_entity_id=lead_id,
+            followup_type=payload.next_follow_up.followup_type,
+        )
+        _tasks_da.insert_task(session, task)
+        await session.flush()
+        next_task_id = task.id
+
+    # 8. Single commit + refresh.
+    await session.commit()
+    await session.refresh(lead)
+
+    # 9. Post-commit publish of the stage transition so automations /
+    #    workflows see the same envelope kanban-drag would produce. Any
+    #    subscriber failure is swallowed inside the publisher — the
+    #    modal submission is already committed and shouldn't unwind.
+    if next_stage_key is not None:
+        await _publish_lead_status_changed(
+            session,
+            org_id=org_id,
+            lead=lead,
+            from_stage=payload.if_current_stage,
+            from_status=(
+                LeadStatus.active.value
+                if payload.if_current_stage != next_stage_key
+                else lead.status.value
+            ),
+        )
+
+    return lead, next_task_id
+
+
 __all__ = [
     "bulk_delete_leads",
     "bulk_move_stage",
@@ -1615,6 +1846,7 @@ __all__ = [
     "list_leads",
     "list_leads_where",
     "list_scoring_rules",
+    "log_update_for_lead",
     "move_stage_for_lead",
     "pipeline_value_rollup",
     "reassign_lead",

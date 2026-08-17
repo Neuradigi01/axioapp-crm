@@ -124,9 +124,7 @@ async def list_leads_by_ids_in_org(
     a round-trip. Belt + suspenders on org_id."""
     if not ids:
         return []
-    result = await session.execute(
-        select(Lead).where(Lead.id.in_(ids), Lead.org_id == org_id)
-    )
+    result = await session.execute(select(Lead).where(Lead.id.in_(ids), Lead.org_id == org_id))
     return list(result.scalars().all())
 
 
@@ -186,6 +184,26 @@ async def contact_exists_in_org(session: AsyncSession, contact_id: uuid.UUID) ->
         await session.execute(select(Contact.id).where(Contact.id == contact_id))
     ).scalar_one_or_none()
     return contact is not None
+
+
+async def count_leads_for_contact(session: AsyncSession, contact_id: uuid.UUID) -> int:
+    """Count leads linked to ``contact_id`` in the active tenant.
+
+    Used by the log-update endpoint's shared-contact guard — a rep
+    editing contact-basics through the Update Status modal is only
+    allowed when the underlying contact is on exactly this one lead;
+    if the same contact is shared across multiple leads, the modal
+    must direct them to the contacts page instead of silently
+    rewriting fields visible on N unrelated leads.
+
+    Tenant scoping is automatic via the ORM filter on ``TenantScoped``."""
+    return int(
+        (
+            await session.execute(
+                select(func.count()).select_from(Lead).where(Lead.contact_id == contact_id)
+            )
+        ).scalar_one()
+    )
 
 
 async def user_has_active_membership(
