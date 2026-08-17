@@ -135,6 +135,13 @@ export class MobileSelectComponent implements ControlValueAccessor {
    *  (via `writeValue`). Reads `writtenValue` first so a form control
    *  can override an initial input value. */
   private readonly writtenValue = signal<string | null>(null);
+  /** Flips true the first time Angular Forms calls `writeValue`. Once
+   *  set, the `[value]` input sync effect stops writing so a
+   *  form-control-owned value can't be clobbered by the input's default
+   *  empty string on the effect's first run (which fires AFTER
+   *  writeValue during CVA setup — the exact bug that blanked the
+   *  Channel dropdown when navigating Step 2 → Step 1). */
+  private readonly formControlOwned = signal(false);
   protected readonly currentValue = computed<string>(() => {
     const w = this.writtenValue();
     return w !== null ? w : this.value();
@@ -158,8 +165,12 @@ export class MobileSelectComponent implements ControlValueAccessor {
     // `untracked` so the effect only fires when the input actually
     // changes — otherwise a user pick (which sets writtenValue) would
     // re-trigger the effect and clobber it back to the input value.
+    // Skipped entirely once a FormControl has taken ownership so
+    // Angular Forms's writeValue isn't overwritten by the input's
+    // default '' on the effect's first pass.
     effect(() => {
       const v = this.value();
+      if (untracked(() => this.formControlOwned())) return;
       if (v !== untracked(() => this.writtenValue())) this.writtenValue.set(v);
     });
 
@@ -200,6 +211,7 @@ export class MobileSelectComponent implements ControlValueAccessor {
 
   // --- ControlValueAccessor ------------------------------------------
   writeValue(value: string | null | undefined): void {
+    this.formControlOwned.set(true);
     this.writtenValue.set(value ?? '');
   }
 

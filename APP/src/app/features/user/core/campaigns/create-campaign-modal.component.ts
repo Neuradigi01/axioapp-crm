@@ -921,13 +921,12 @@ export class CreateCampaignModalComponent {
     });
   }
 
-  /** Step 15 — channel-aware central-library load. Campaigns v1 Step 01
-   *  broadened the WhatsApp query: instead of pre-filtering to
-   *  `external_status=approved`, we now fetch every published WA
-   *  template (approved, pending, rejected) so the picker can show
-   *  status + rejection reason inline and the operator understands
-   *  why a template can't be selected. Non-approved rows render
-   *  disabled — see `isRowSelectable`. */
+  /** Channel-aware central-library load. Only pulls templates the
+   *  operator can actually send on the selected channel: published +
+   *  active, plus `external_status='approved'` for WhatsApp (Meta
+   *  rejects sends of unapproved HSMs, and pending/n_a rows just
+   *  clutter the picker). Non-WA channels have no external review, so
+   *  every published+active row qualifies. */
   private _loadTemplates(channel: ConversationChannel): void {
     const cached = this.templatesCache.get(channel);
     if (cached) {
@@ -958,6 +957,9 @@ export class CreateCampaignModalComponent {
       is_active: true,
       limit: 200,
     };
+    if (channel === 'whatsapp') {
+      filter.external_status = 'approved';
+    }
     this.templatesApi
       .list(filter)
       .pipe(takeUntilDestroyed(this.destroyRef))
