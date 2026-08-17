@@ -2,18 +2,10 @@
  * Group create + edit page (`/user/contacts/groups/new` and
  * `/user/contacts/groups/:id/edit`).
  *
- * Two modes, set at creation and immutable thereafter:
- *
- *   Dynamic — filter inputs (q / source / tag); the group re-resolves
- *             at send time so new matching contacts auto-include.
- *   Static  — searchable contact picker; member set frozen at save.
- *
- * On create, the mode toggle is editable. On edit, the toggle is
- * disabled (backend rejects mode flips via `update_group`).
- *
- * Live audience-size preview: a debounced call to `/preview-size`
- * shows "X contacts match" as the operator types in dynamic mode
- * or as they pick contacts in static mode.
+ * New groups are always static — a searchable contact picker whose
+ * member set is frozen at save. The dynamic (filter-based) mode is
+ * still hydrated on edit for legacy groups created before the UI
+ * was simplified, but no new dynamic groups can be created.
  */
 import { HttpErrorResponse } from '@angular/common/http';
 import {
@@ -62,8 +54,9 @@ export class ContactGroupEditPageComponent {
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
 
-  // Mode toggle — editable on create, locked on edit.
-  protected readonly mode = signal<'dynamic' | 'static'>('dynamic');
+  // New groups are always static. `mode` is only ever flipped to
+  // `dynamic` when loading a legacy dynamic group on the edit route.
+  protected readonly mode = signal<'dynamic' | 'static'>('static');
 
   // Live audience-size preview.
   protected readonly previewCount = signal<number | null>(null);
@@ -173,11 +166,6 @@ export class ContactGroupEditPageComponent {
       this.mode();
       this.previewTrigger$.next();
     });
-  }
-
-  protected onModeChange(next: 'dynamic' | 'static'): void {
-    if (this.isEdit()) return; // locked on edit
-    this.mode.set(next);
   }
 
   protected onContactSelect(contact: ContactListItem): void {

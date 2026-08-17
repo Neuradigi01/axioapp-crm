@@ -13,8 +13,7 @@
         Contact groups
       </h1>
       <p class="mt-1 text-[13px] leading-snug text-muted md:text-[14px]">
-        Saved audiences for campaign targeting. Dynamic groups re-resolve on every send; static
-        groups stay frozen at creation.
+        Saved audiences for campaign targeting.
       </p>
     </div>
     <div class="flex flex-wrap items-center gap-2 sm:shrink-0">
@@ -53,8 +52,7 @@
       <lucide-icon name="users" class="mx-auto h-10 w-10 text-faint" />
       <h2 class="mt-3 text-base font-medium text-default">No groups yet</h2>
       <p class="mx-auto mt-1 max-w-md text-sm text-muted">
-        Save a filter as a group (Dynamic) for repeat campaigns to the same audience, or build a
-        fixed list (Static) for one-off blasts where you don't want new contacts auto-included.
+        Group contacts together to send campaigns to a saved audience.
       </p>
       <a
         routerLink="/user/contacts/groups/new"
@@ -74,12 +72,6 @@
               class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted"
             >
               Name
-            </th>
-            <th
-              scope="col"
-              class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted"
-            >
-              Mode
             </th>
             <th
               scope="col"
@@ -108,23 +100,6 @@
                 <div class="font-medium text-default">{{ g.name }}</div>
                 @if (g.description) {
                   <div class="text-xs text-muted">{{ g.description }}</div>
-                }
-              </td>
-              <td class="px-4 py-2 text-sm">
-                @if (g.is_dynamic) {
-                  <span
-                    class="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-xs font-medium text-indigo-400 ring-1 ring-indigo-200"
-                  >
-                    <lucide-icon name="refresh-cw" class="h-3 w-3" />
-                    Dynamic
-                  </span>
-                } @else {
-                  <span
-                    class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 border-subtle"
-                  >
-                    <lucide-icon name="pin" class="h-3 w-3" />
-                    Static
-                  </span>
                 }
               </td>
               <td class="px-4 py-2 text-right text-sm font-mono text-default">

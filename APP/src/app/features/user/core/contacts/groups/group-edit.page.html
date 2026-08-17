@@ -6,10 +6,9 @@
       </h1>
       <p class="mt-1 text-[14px] text-muted">
         @if (isEdit()) {
-          Update the group's name, description, and member set. Mode (Dynamic / Static) is locked
-          after creation — delete and recreate to switch.
+          Update the group's name, description, and member set.
         } @else {
-          Pick a mode, give the group a name, and define who belongs.
+          Give the group a name and pick the contacts that belong to it.
         }
       </p>
     </div>
@@ -29,49 +28,6 @@
     </p>
   } @else {
     <form [formGroup]="form" (ngSubmit)="save()" class="space-y-5">
-      <!-- Mode toggle -->
-      <fieldset class="rounded-md border border-subtle p-3">
-        <legend class="px-1 text-xs font-medium text-muted">Mode</legend>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <button
-            type="button"
-            class="rounded-md border p-3 text-left transition"
-            [class.border-indigo-500]="mode() === 'dynamic'"
-            [class.bg-indigo-500/10]="mode() === 'dynamic'"
-            [class.border-subtle]="mode() !== 'dynamic'"
-            [class.opacity-50]="isEdit() && mode() !== 'dynamic'"
-            [disabled]="isEdit()"
-            (click)="onModeChange('dynamic')"
-          >
-            <div class="flex items-center gap-2">
-              <lucide-icon name="refresh-cw" class="h-4 w-4" />
-              <span class="font-medium text-default">Dynamic</span>
-            </div>
-            <p class="mt-1 text-[14px] text-muted">
-              Filter-based; recomputes on every send. New matching contacts auto-include.
-            </p>
-          </button>
-          <button
-            type="button"
-            class="rounded-md border p-3 text-left transition"
-            [class.border-muted]="mode() === 'static'"
-            [class.bg-surface-2]="mode() === 'static'"
-            [class.border-subtle]="mode() !== 'static'"
-            [class.opacity-50]="isEdit() && mode() !== 'static'"
-            [disabled]="isEdit()"
-            (click)="onModeChange('static')"
-          >
-            <div class="flex items-center gap-2">
-              <lucide-icon name="pin" class="h-4 w-4" />
-              <span class="font-medium text-default">Static</span>
-            </div>
-            <p class="mt-1 text-[14px] text-muted">
-              Fixed contact list; frozen at save. New matching contacts do NOT auto-include.
-            </p>
-          </button>
-        </div>
-      </fieldset>
-
       <!-- Basics -->
       <div class="grid grid-cols-1 gap-3">
         <label class="block text-sm">
