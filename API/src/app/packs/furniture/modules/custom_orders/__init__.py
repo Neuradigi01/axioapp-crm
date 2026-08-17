@@ -35,7 +35,7 @@ from src.app.packs.furniture.modules.custom_orders.service import (
     update_order,
 )
 
-register_pipeline_table("fp_custom_orders")
+register_pipeline_table("fp_custom_orders", activity_entity_type="custom_order")
 
 
 # Standard-field overrides for the custom-order create/edit wizard's

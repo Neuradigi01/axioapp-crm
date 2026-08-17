@@ -44,7 +44,12 @@ logger = logging.getLogger(__name__)
 # Modules that own pipeline-tracked tables call register_pipeline_table()
 # from their __init__.py at import time. Empty by default — Step 2.11
 # (Leads) is the first known consumer.
-_PIPELINE_TRACKED_TABLES: set[str] = set()
+#
+# Maps card_table (physical name, e.g. ``tbl_leads``) → activity
+# entity_type (friendly name the activities module + timeline UI use,
+# e.g. ``lead``). ``move_card`` logs status_change activities under the
+# friendly name so the lead-detail timeline can find them.
+_PIPELINE_TRACKED_TABLES: dict[str, str] = {}
 
 # Defensive: only allow simple ASCII identifiers as registered table
 # names. The names land inside a raw SQL UPDATE, so this is the second
@@ -62,15 +67,19 @@ def _slugify_stage_key(name: str) -> str:
     return s[:64]
 
 
-def register_pipeline_table(name: str) -> None:
+def register_pipeline_table(name: str, *, activity_entity_type: str) -> None:
     """Register a table name that `move_card` is allowed to UPDATE.
+
+    ``activity_entity_type`` is the friendly key the activities module
+    uses (e.g. ``lead``, ``walk_in``) — status_change rows are stamped
+    with it so the entity's timeline can fetch them.
 
     Modules call this on import. Idempotent. Raises ValueError if the
     name doesn't match the SQL-safe identifier pattern.
     """
     if not _TABLE_NAME_RE.match(name):
         raise ValueError(f"pipeline-tracked table name {name!r} must match [a-z][a-z0-9_]*")
-    _PIPELINE_TRACKED_TABLES.add(name)
+    _PIPELINE_TRACKED_TABLES[name] = activity_entity_type
 
 
 async def list_pipelines(session: AsyncSession) -> list[Pipeline]:
@@ -354,7 +363,7 @@ async def move_card(
     await session.commit()
 
     await activities.log(
-        entity_type=card_table,
+        entity_type=_PIPELINE_TRACKED_TABLES[card_table],
         entity_id=card_id,
         type=activities.ActivityType.status_change,
         payload={
