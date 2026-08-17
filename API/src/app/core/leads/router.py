@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -143,9 +143,14 @@ async def list_leads_endpoint(
     source: str | None = Query(default=None, max_length=64),
     last_activity_lt: datetime | None = Query(default=None),
     last_activity_gt: datetime | None = Query(default=None),
-    sort: Literal["created_at", "last_activity_at", "lead_score", "contact_name"] = Query(
-        default="created_at"
-    ),
+    # Inclusive date range on ``created_at``. UTC-anchored; a bare date
+    # like ``2026-08-16`` becomes ``2026-08-16 00:00:00+00 ≤ created_at
+    # < 2026-08-17 00:00:00+00`` server-side.
+    created_from: date | None = Query(default=None),
+    created_to: date | None = Query(default=None),
+    sort: Literal[
+        "created_at", "last_activity_at", "lead_score", "contact_name", "next_follow_up_due"
+    ] = Query(default="created_at"),
     order: Literal["asc", "desc"] = Query(default="desc"),
     # Offset mode (legacy callers): page + size.
     page: int = Query(default=1, ge=1),
@@ -156,13 +161,17 @@ async def list_leads_endpoint(
     cursor: str | None = Query(default=None, max_length=512),
     limit: int | None = Query(default=None, ge=1, le=200),
     with_total: bool = Query(default=True),
+    # Leads Center header opts in to also compute the tenant-wide count
+    # so the UI can render `(filtered/total)`. Off by default because
+    # the extra COUNT is wasted work for legacy callers.
+    with_unfiltered_total: bool = Query(default=False),
     # Filter DSL: URL-encoded JSON object (see ``leads.filter_dsl``).
     filter_param: str | None = Query(default=None, alias="filter", max_length=4096),
     db: AsyncSession = Depends(get_db),
     caller: User = Depends(require_permissions("leads.read")),
 ) -> LeadListResponse:
     filter_dsl_payload = _parse_filter_param(filter_param)
-    rows, total, next_cursor = await list_leads_visible_to(
+    rows, total, next_cursor, unfiltered_total = await list_leads_visible_to(
         db,
         caller=caller,
         stage=stage,
@@ -173,6 +182,8 @@ async def list_leads_endpoint(
         source=source,
         last_activity_lt=last_activity_lt,
         last_activity_gt=last_activity_gt,
+        created_from=created_from,
+        created_to=created_to,
         sort=sort,
         order=order,
         custom_filters=_extract_custom_filters(request),
@@ -182,10 +193,12 @@ async def list_leads_endpoint(
         cursor=cursor,
         limit=limit,
         with_total=with_total,
+        with_unfiltered_total=with_unfiltered_total,
     )
     return LeadListResponse(
         items=[LeadOut.model_validate(r) for r in rows],
         total=total,
+        unfiltered_total=unfiltered_total,
         page=page,
         size=limit if cursor is not None and limit is not None else size,
         next_cursor=next_cursor,
@@ -243,9 +256,11 @@ async def export_leads_csv_endpoint(
     source: str | None = Query(default=None, max_length=64),
     last_activity_lt: datetime | None = Query(default=None),
     last_activity_gt: datetime | None = Query(default=None),
-    sort: Literal["created_at", "last_activity_at", "lead_score", "contact_name"] = Query(
-        default="created_at"
-    ),
+    created_from: date | None = Query(default=None),
+    created_to: date | None = Query(default=None),
+    sort: Literal[
+        "created_at", "last_activity_at", "lead_score", "contact_name", "next_follow_up_due"
+    ] = Query(default="created_at"),
     order: Literal["asc", "desc"] = Query(default="desc"),
     filter_param: str | None = Query(default=None, alias="filter", max_length=4096),
     db: AsyncSession = Depends(get_db),
@@ -255,8 +270,10 @@ async def export_leads_csv_endpoint(
 
     Columns: every lead-direct field + ``contact_name`` / ``phone`` /
     ``email`` from the joined contact + one column per active custom
-    field definition for the org. Phone is Excel-safe-prefixed so
-    spreadsheet apps don't strip the leading ``+`` and zeros.
+    field definition for the org. Every free-text cell is Excel-safe
+    prefixed with a leading apostrophe when its value starts with
+    ``= + - @ \\t \\r`` so opening the file in Excel does not evaluate
+    formulas typed by end-users.
     """
     filter_dsl_payload = _parse_filter_param(filter_param)
     where_clause, needs_join = await list_leads_where(
@@ -268,6 +285,8 @@ async def export_leads_csv_endpoint(
         source=source,
         last_activity_lt=last_activity_lt,
         last_activity_gt=last_activity_gt,
+        created_from=created_from,
+        created_to=created_to,
         custom_filters=_extract_custom_filters(request),
         filter_dsl_payload=filter_dsl_payload,
         sort=sort,

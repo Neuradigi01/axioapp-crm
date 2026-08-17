@@ -304,10 +304,16 @@ class LeadListResponse(BaseModel):
         response carries ``next_cursor``. ``total`` is populated only
         when the caller opts in with ``with_total=true`` because the
         COUNT undoes the keyset performance win on large tables.
+
+    ``unfiltered_total`` is the tenant-wide count (no WHERE filters
+    beyond the TenantScoped ORM predicate). Non-null only when the
+    caller opts in with ``with_unfiltered_total=true``; the Leads
+    Center header uses it to render ``(filtered/total)``.
     """
 
     items: list[LeadOut]
     total: int | None = None
+    unfiltered_total: int | None = None
     page: int = 1
     size: int = 50
     next_cursor: str | None = None

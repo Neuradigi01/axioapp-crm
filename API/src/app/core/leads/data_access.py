@@ -32,12 +32,13 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import delete, func, or_, select, tuple_
+from sqlalchemy import delete, func, or_, select, true, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import BinaryExpression, ClauseElement
 
 from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import Lead, LeadScoringRule, LeadStatus
+from src.app.core.tasks.models import Task, TaskStatus
 from src.app.core.users.models import OrganizationMember, User
 
 # --- Leads --------------------------------------------------------------
@@ -77,6 +78,7 @@ async def list_leads_with_where(
     keyset_clause: ClauseElement | None = None,
     offset: int = 0,
     limit: int,
+    followup_sort_order: str | None = None,
 ) -> list[Lead]:
     """Paginated SELECT against the leads table.
 
@@ -86,15 +88,48 @@ async def list_leads_with_where(
     is supplied the caller typically passes ``offset=0`` and uses
     cursor-only semantics; offset-mode callers pass
     ``keyset_clause=None``.
+
+    ``followup_sort_order`` (``"asc"`` / ``"desc"``) composes a
+    ``LEFT JOIN LATERAL`` against ``tbl_tasks`` picking the earliest
+    open follow-up task per lead and orders by that column with
+    ``NULLS LAST``. Only offset-mode callers should set it — cursor
+    pagination is not eligible for this sort (the keyset primitive
+    can't cheaply reconstruct the lateral aggregate). When set,
+    ``primary_order`` is ignored.
     """
     base = select(Lead)
     if needs_contact_join:
         base = base.join(Contact, Lead.contact_id == Contact.id)
+
+    if followup_sort_order is not None:
+        # Per-lead earliest open follow-up due-at. The lateral runs
+        # once per leads row; ``ix_tbl_tasks_related`` narrows the
+        # per-row lookup to O(few).
+        fu_lateral = (
+            select(func.min(Task.due_at).label("min_due_at"))
+            .where(Task.related_entity_type == "lead")
+            .where(Task.related_entity_id == Lead.id)
+            .where(Task.status == TaskStatus.open)
+            .lateral("fu")
+        )
+        base = base.outerjoin(fu_lateral, true())
+        min_col = fu_lateral.c.min_due_at
+        followup_primary = (
+            min_col.asc().nulls_last()
+            if followup_sort_order == "asc"
+            else min_col.desc().nulls_last()
+        )
+        # The lead-id secondary keeps the ordering deterministic on
+        # ties (e.g. two leads with the same MIN(due_at), or two
+        # leads with NULL follow-ups).
+        base = base.order_by(followup_primary, secondary_order)
+    else:
+        base = base.order_by(primary_order, secondary_order)
+
     if where is not None:
         base = base.where(where)
     if keyset_clause is not None:
         base = base.where(keyset_clause)
-    base = base.order_by(primary_order, secondary_order)
     if offset:
         base = base.offset(offset)
     base = base.limit(limit)

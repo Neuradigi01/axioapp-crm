@@ -78,7 +78,11 @@ async def export_rows(
     where_clause: ColumnElement | None,
     needs_contact_join: bool,
     sort: Literal[
-        "created_at", "last_activity_at", "lead_score", "contact_name"
+        "created_at",
+        "last_activity_at",
+        "lead_score",
+        "contact_name",
+        "next_follow_up_due",
     ] = "created_at",
     order: Literal["asc", "desc"] = "desc",
 ) -> AsyncIterator[bytes]:
@@ -131,8 +135,19 @@ async def export_rows(
         "lead_score": Lead.lead_score,
         "contact_name": Contact.full_name,
     }
-    primary_col = sort_col_map[sort]
-    primary_order = primary_col.desc() if order == "desc" else primary_col.asc()
+    # ``next_follow_up_due`` sort is a lateral aggregate — cheap for
+    # the paginated list but adds a per-row lateral to every batch of
+    # a 50k-row export. Fall back to `created_at DESC` for the CSV
+    # sort in that case; the *filter set* is preserved (the WHERE
+    # clause was already applied), only the row order in the file
+    # differs. Callers exporting by next-follow-up can re-sort in
+    # Excel by the ``last_activity_at`` / ``created_at`` columns.
+    if sort == "next_follow_up_due":
+        primary_col = Lead.created_at
+        primary_order = primary_col.desc() if order == "desc" else primary_col.asc()
+    else:
+        primary_col = sort_col_map[sort]
+        primary_order = primary_col.desc() if order == "desc" else primary_col.asc()
 
     last_id: uuid.UUID | None = None
     while True:
@@ -169,19 +184,19 @@ async def export_rows(
 def _row_values(lead: Lead, contact: Contact, custom_columns: Iterable[str]) -> list[str]:
     row: list[str] = [
         str(lead.id),
-        contact.full_name or "",
+        _excel_safe(contact.full_name),
         _excel_safe_phone(contact.phone),
-        contact.email or "",
+        _excel_safe(contact.email),
         lead.status.value,
         lead.source.value,
-        lead.pipeline_stage or "",
+        _excel_safe(lead.pipeline_stage),
         str(lead.assigned_to_id) if lead.assigned_to_id is not None else "",
         str(lead.lead_score),
         str(lead.budget) if lead.budget is not None else "",
         _iso(lead.expected_close_date),
         _iso(lead.last_activity_at),
-        lead.lost_reason or "",
-        lead.lost_reason_other or "",
+        _excel_safe(lead.lost_reason),
+        _excel_safe(lead.lost_reason_other),
         _iso(lead.created_at),
         _iso(lead.updated_at),
     ]
@@ -191,12 +206,29 @@ def _row_values(lead: Lead, contact: Contact, custom_columns: Iterable[str]) -> 
         if value is None:
             row.append("")
         elif isinstance(value, (list, tuple)):
-            row.append("|".join(str(v) for v in value))
+            row.append(_excel_safe("|".join(str(v) for v in value)))
         elif isinstance(value, bool):
             row.append("true" if value else "false")
         else:
-            row.append(str(value))
+            row.append(_excel_safe(str(value)))
     return row
+
+
+# Characters Excel / Google Sheets / Numbers interpret as the start of a
+# formula. Prefixing user-supplied cells that begin with one of these
+# with a leading apostrophe forces the receiving app to render the raw
+# text — closing the OWASP "CSV formula injection" hole.
+_EXCEL_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _excel_safe(value: str | None) -> str:
+    """Return ``value`` with a leading ``'`` when its first character
+    would start an Excel formula. Empty / ``None`` passes through."""
+    if not value:
+        return ""
+    if value[0] in _EXCEL_FORMULA_PREFIXES:
+        return "'" + value
+    return value
 
 
 def _excel_safe_phone(value: str | None) -> str:

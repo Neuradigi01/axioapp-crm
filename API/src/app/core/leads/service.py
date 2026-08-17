@@ -75,6 +75,9 @@ from src.app.shared.db.queries import ensure_found
 # Server-side whitelist for `?sort=` on the list endpoint. Anything
 # outside this set is rejected at the router via FastAPI's Literal
 # Query validation. `contact_name` sorts via a JOIN to `contacts`.
+# `next_follow_up_due` is NOT in this table — its column comes from a
+# lateral subquery over `tbl_tasks` composed at query time in the DAL
+# (see `list_leads_with_where`'s ``followup_sort_order`` kwarg).
 _SORT_COLUMNS = {
     "created_at": Lead.created_at,
     "last_activity_at": Lead.last_activity_at,
@@ -571,6 +574,8 @@ async def _build_list_query(
     source: str | None,
     last_activity_lt: datetime | None,
     last_activity_gt: datetime | None,
+    created_from: date | None = None,
+    created_to: date | None = None,
     custom_filters: Iterable[tuple[str, str]],
     filter_dsl_payload: dict[str, Any] | None,
     sort: str,
@@ -580,6 +585,11 @@ async def _build_list_query(
 
     Returned tuple: ``(where_clause_or_None, filters_list, needs_contact_join)``.
     """
+    from datetime import UTC
+    from datetime import datetime as _dt
+    from datetime import time as _time
+    from datetime import timedelta as _td
+
     filters: list[Any] = []
     needs_contact_join = False
 
@@ -602,6 +612,15 @@ async def _build_list_query(
         )
     if last_activity_gt is not None:
         filters.append(Lead.last_activity_at > last_activity_gt)
+    if created_from is not None:
+        # Inclusive lower bound at start-of-day UTC.
+        filters.append(Lead.created_at >= _dt.combine(created_from, _time(0), tzinfo=UTC))
+    if created_to is not None:
+        # Inclusive end-of-day: `<= created_to 23:59:59` expressed as
+        # `< next-day 00:00` so partial-second timestamps land inside.
+        filters.append(
+            Lead.created_at < _dt.combine(created_to + _td(days=1), _time(0), tzinfo=UTC)
+        )
     if q:
         like = f"%{q}%"
         filters.append(
@@ -723,7 +742,11 @@ async def list_leads_visible_to(
     source: str | None = None,
     last_activity_lt: datetime | None = None,
     last_activity_gt: datetime | None = None,
-    sort: Literal["created_at", "last_activity_at", "lead_score", "contact_name"] = "created_at",
+    created_from: date | None = None,
+    created_to: date | None = None,
+    sort: Literal[
+        "created_at", "last_activity_at", "lead_score", "contact_name", "next_follow_up_due"
+    ] = "created_at",
     order: Literal["asc", "desc"] = "desc",
     custom_filters: Iterable[tuple[str, str]] = (),
     filter_dsl_payload: dict[str, Any] | None = None,
@@ -732,7 +755,8 @@ async def list_leads_visible_to(
     cursor: str | None = None,
     limit: int | None = None,
     with_total: bool = True,
-) -> tuple[list[Lead], int | None, str | None]:
+    with_unfiltered_total: bool = False,
+) -> tuple[list[Lead], int | None, str | None, int | None]:
     """Row-level visibility wrapper.
 
     Callers without `users.read` (employees vs. managers) only see
@@ -762,6 +786,8 @@ async def list_leads_visible_to(
         source=source,
         last_activity_lt=last_activity_lt,
         last_activity_gt=last_activity_gt,
+        created_from=created_from,
+        created_to=created_to,
         sort=sort,
         order=order,
         custom_filters=custom_filters,
@@ -771,6 +797,7 @@ async def list_leads_visible_to(
         cursor=cursor,
         limit=limit,
         with_total=with_total,
+        with_unfiltered_total=with_unfiltered_total,
     )
 
 
@@ -785,7 +812,11 @@ async def list_leads(
     source: str | None = None,
     last_activity_lt: datetime | None = None,
     last_activity_gt: datetime | None = None,
-    sort: Literal["created_at", "last_activity_at", "lead_score", "contact_name"] = "created_at",
+    created_from: date | None = None,
+    created_to: date | None = None,
+    sort: Literal[
+        "created_at", "last_activity_at", "lead_score", "contact_name", "next_follow_up_due"
+    ] = "created_at",
     order: Literal["asc", "desc"] = "desc",
     custom_filters: Iterable[tuple[str, str]] = (),
     filter_dsl_payload: dict[str, Any] | None = None,
@@ -794,7 +825,8 @@ async def list_leads(
     cursor: str | None = None,
     limit: int | None = None,
     with_total: bool = True,
-) -> tuple[list[Lead], int | None, str | None]:
+    with_unfiltered_total: bool = False,
+) -> tuple[list[Lead], int | None, str | None, int | None]:
     """Filtered list of leads, supporting two pagination modes."""
     where, _filters, needs_contact_join = await _build_list_query(
         session,
@@ -806,21 +838,38 @@ async def list_leads(
         source=source,
         last_activity_lt=last_activity_lt,
         last_activity_gt=last_activity_gt,
+        created_from=created_from,
+        created_to=created_to,
         custom_filters=custom_filters,
         filter_dsl_payload=filter_dsl_payload,
         sort=sort,
     )
 
-    primary = _order_clause(sort, order)
-    # Secondary key on `Lead.id` makes the keyset bound unambiguous on
-    # ties and matches the composite indexes added in migration 0070.
-    secondary = Lead.id.desc() if order == "desc" else Lead.id.asc()
+    # ``next_follow_up_due`` sort composes a lateral subquery inside the
+    # DAL; the primary/secondary orders here are ignored on that path
+    # (the DAL builds the lateral column's order itself).
+    followup_sort_order: Literal["asc", "desc"] | None = None
+    if sort == "next_follow_up_due":
+        followup_sort_order = order
+        primary = None
+        secondary = Lead.id.desc() if order == "desc" else Lead.id.asc()
+    else:
+        primary = _order_clause(sort, order)
+        # Secondary key on `Lead.id` makes the keyset bound unambiguous
+        # on ties and matches the composite indexes added in migration 0070.
+        secondary = Lead.id.desc() if order == "desc" else Lead.id.asc()
 
     total: int | None = None
     if with_total:
         total = await _da.count_leads_with_where(
             session, where=where, needs_contact_join=needs_contact_join
         )
+
+    # Tenant-wide unfiltered count (no WHERE beyond the TenantScoped ORM
+    # filter). Used by the Leads Center header to render `(filtered/total)`.
+    unfiltered_total: int | None = None
+    if with_unfiltered_total:
+        unfiltered_total = await _da.count_leads_with_where(session, where=None)
 
     cursor_eligible_sorts = {"created_at", "last_activity_at", "lead_score"}
     if cursor is not None and sort not in cursor_eligible_sorts:
@@ -860,7 +909,7 @@ async def list_leads(
         if has_more and page_rows:
             tail = page_rows[-1]
             next_cursor = _encode_cursor(getattr(tail, sort), tail.id)
-        return page_rows, total, next_cursor
+        return page_rows, total, next_cursor, unfiltered_total
 
     # --- offset mode (default / legacy) ---
     effective_size = max(_LIMIT_MIN, min(_LIMIT_MAX, size))
@@ -874,6 +923,7 @@ async def list_leads(
         keyset_clause=None,
         offset=(effective_page - 1) * effective_size,
         limit=effective_size + 1,
+        followup_sort_order=followup_sort_order,
     )
     has_more = len(rows) > effective_size
     page_rows = list(rows[:effective_size])
@@ -881,7 +931,7 @@ async def list_leads(
     if has_more and page_rows and sort in cursor_eligible_sorts:
         tail = page_rows[-1]
         next_cursor = _encode_cursor(getattr(tail, sort), tail.id)
-    return page_rows, total, next_cursor
+    return page_rows, total, next_cursor, unfiltered_total
 
 
 async def list_leads_where(
@@ -894,9 +944,13 @@ async def list_leads_where(
     source: str | None = None,
     last_activity_lt: datetime | None = None,
     last_activity_gt: datetime | None = None,
+    created_from: date | None = None,
+    created_to: date | None = None,
     custom_filters: Iterable[tuple[str, str]] = (),
     filter_dsl_payload: dict[str, Any] | None = None,
-    sort: Literal["created_at", "last_activity_at", "lead_score", "contact_name"] = "created_at",
+    sort: Literal[
+        "created_at", "last_activity_at", "lead_score", "contact_name", "next_follow_up_due"
+    ] = "created_at",
 ) -> tuple[Any, bool]:
     """Companion to ``list_leads`` used by the CSV export: builds and
     returns the same combined WHERE clause + JOIN hint, without
@@ -910,6 +964,8 @@ async def list_leads_where(
         source=source,
         last_activity_lt=last_activity_lt,
         last_activity_gt=last_activity_gt,
+        created_from=created_from,
+        created_to=created_to,
         custom_filters=custom_filters,
         filter_dsl_payload=filter_dsl_payload,
         sort=sort,
