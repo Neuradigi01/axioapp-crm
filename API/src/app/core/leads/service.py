@@ -576,6 +576,7 @@ async def _build_list_query(
     last_activity_gt: datetime | None,
     created_from: date | None = None,
     created_to: date | None = None,
+    remarks_contains: str | None = None,
     custom_filters: Iterable[tuple[str, str]],
     filter_dsl_payload: dict[str, Any] | None,
     sort: str,
@@ -621,6 +622,32 @@ async def _build_list_query(
         filters.append(
             Lead.created_at < _dt.combine(created_to + _td(days=1), _time(0), tzinfo=UTC)
         )
+    if remarks_contains:
+        # Toolbar Remarks filter — matches any note activity's text on
+        # this lead (case-insensitive substring). Uses EXISTS so the
+        # leads row is returned once regardless of how many notes match.
+        # ``%`` / ``_`` / ``\`` are escaped so a literal wildcard in the
+        # rep's query doesn't widen the search unexpectedly (Attacker
+        # MED — ILIKE wildcard leak). Length is capped at the router
+        # boundary.
+        from sqlalchemy import literal
+        from sqlalchemy import select as _select
+        from sqlalchemy import text as _text
+
+        from src.app.core.activities.models import Activity, ActivityType
+
+        escaped = remarks_contains.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        subq = (
+            _select(literal(1))
+            .select_from(Activity)
+            .where(Activity.entity_type == "lead")
+            .where(Activity.entity_id == Lead.id)
+            .where(Activity.type == ActivityType.note)
+            .where(_text("(payload ->> 'text') ILIKE :pat ESCAPE '\\'"))
+            .params(pat=pattern)
+        )
+        filters.append(subq.exists())
     if q:
         like = f"%{q}%"
         filters.append(
@@ -744,6 +771,7 @@ async def list_leads_visible_to(
     last_activity_gt: datetime | None = None,
     created_from: date | None = None,
     created_to: date | None = None,
+    remarks_contains: str | None = None,
     sort: Literal[
         "created_at", "last_activity_at", "lead_score", "contact_name", "next_follow_up_due"
     ] = "created_at",
@@ -788,6 +816,7 @@ async def list_leads_visible_to(
         last_activity_gt=last_activity_gt,
         created_from=created_from,
         created_to=created_to,
+        remarks_contains=remarks_contains,
         sort=sort,
         order=order,
         custom_filters=custom_filters,
@@ -814,6 +843,7 @@ async def list_leads(
     last_activity_gt: datetime | None = None,
     created_from: date | None = None,
     created_to: date | None = None,
+    remarks_contains: str | None = None,
     sort: Literal[
         "created_at", "last_activity_at", "lead_score", "contact_name", "next_follow_up_due"
     ] = "created_at",

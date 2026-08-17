@@ -263,6 +263,9 @@ export interface LeadListQuery {
    * Accepts a YYYY-MM-DD string; the backend UTC-anchors both bounds. */
   created_from?: string;
   created_to?: string;
+  /** Case-insensitive substring match against any `note` activity on
+   * the lead. Capped at 64 chars server-side. */
+  remarks_contains?: string;
   sort?: LeadSortKey;
   order?: SortOrder;
   /** Offset mode (legacy). When `cursor` is set, page is ignored. */

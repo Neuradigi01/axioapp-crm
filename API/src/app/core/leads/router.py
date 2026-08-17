@@ -148,6 +148,10 @@ async def list_leads_endpoint(
     # < 2026-08-17 00:00:00+00`` server-side.
     created_from: date | None = Query(default=None),
     created_to: date | None = Query(default=None),
+    # Toolbar Remarks filter — matches any note activity's text on the
+    # lead. Capped at 64 chars so a huge substring can't fan out a
+    # slow ILIKE across the org's whole activity history.
+    remarks_contains: str | None = Query(default=None, max_length=64),
     sort: Literal[
         "created_at", "last_activity_at", "lead_score", "contact_name", "next_follow_up_due"
     ] = Query(default="created_at"),
@@ -184,6 +188,7 @@ async def list_leads_endpoint(
         last_activity_gt=last_activity_gt,
         created_from=created_from,
         created_to=created_to,
+        remarks_contains=remarks_contains,
         sort=sort,
         order=order,
         custom_filters=_extract_custom_filters(request),
@@ -258,6 +263,10 @@ async def export_leads_csv_endpoint(
     last_activity_gt: datetime | None = Query(default=None),
     created_from: date | None = Query(default=None),
     created_to: date | None = Query(default=None),
+    # Toolbar Remarks filter — matches any note activity's text on the
+    # lead. Capped at 64 chars so a huge substring can't fan out a
+    # slow ILIKE across the org's whole activity history.
+    remarks_contains: str | None = Query(default=None, max_length=64),
     sort: Literal[
         "created_at", "last_activity_at", "lead_score", "contact_name", "next_follow_up_due"
     ] = Query(default="created_at"),

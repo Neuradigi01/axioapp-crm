@@ -389,12 +389,44 @@ export class LeadsPageComponent {
   ]);
 
   /** `crm-mobile-select` shape for the assignee filter — sentinel
-   *  "All owners" + "Me" + one entry per active org user. */
+   *  "All owners" + "Me" + "Unassigned" + one entry per active org user. */
   readonly assigneeSelectOptions = computed<{ value: string; label: string }[]>(() => [
     { value: '', label: 'All owners' },
     { value: 'me', label: 'Me' },
+    { value: 'unassigned', label: 'Unassigned' },
     ...this.users().map((u) => ({ value: u.id, label: u.full_name })),
   ]);
+
+  /** `crm-mobile-select` shape for the Leads Center Status filter —
+   *  sentinel "All statuses" first, then one entry per pipeline stage
+   *  (sir's ask: merge legacy Status chips + Category dropdown into
+   *  one dropdown that lists every stage). */
+  readonly stageSelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'All statuses' },
+    ...[...this.pipelineStages()]
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((s) => ({ value: s.key, label: s.name })),
+  ]);
+
+  /** `crm-mobile-select` options for the sort field. Kept in sync with
+   *  the backend's `sort` enum + the two `next_follow_up_due` entries
+   *  Step 2 added. */
+  readonly sortFieldOptions: ReadonlyArray<{ value: LeadSortKey; label: string }> = [
+    { value: 'created_at', label: 'Date created' },
+    { value: 'last_activity_at', label: 'Last activity' },
+    { value: 'lead_score', label: 'Score' },
+    { value: 'contact_name', label: 'Contact name' },
+    { value: 'next_follow_up_due', label: 'Next follow-up' },
+  ];
+
+  readonly orderOptions: ReadonlyArray<{ value: SortOrder; label: string }> = [
+    { value: 'desc', label: 'Descending' },
+    { value: 'asc', label: 'Ascending' },
+  ];
+
+  /** Leads Center Remarks filter — matches any note activity text on
+   *  the lead. Server caps at 64 chars. */
+  readonly remarksControl = new FormControl<string>('', { nonNullable: true });
 
   /** Header subtitle counts: `loadedCount` is what's on screen now,
    * `totalCount` is server-reported for the active filter. */
@@ -604,6 +636,9 @@ export class LeadsPageComponent {
     this.createdToControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.resetCursorAndReload());
+    this.remarksControl.valueChanges
+      .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.resetCursorAndReload());
 
     // Whenever leads change, fetch any contacts we don't already have cached.
     effect(() => {
@@ -649,6 +684,8 @@ export class LeadsPageComponent {
       last_activity_lt: this.resolveNoActivityCutoff() ?? undefined,
       created_from: this.createdFromControl.value.trim() || undefined,
       created_to: this.createdToControl.value.trim() || undefined,
+      remarks_contains: this.remarksControl.value.trim() || undefined,
+      stage: this.stageControlValue() || undefined,
       sort: this.sortKey(),
       order: this.sortOrder(),
     };
@@ -727,14 +764,70 @@ export class LeadsPageComponent {
   protected onToolbarReset(): void {
     this.createdFromControl.setValue('', { emitEvent: false });
     this.createdToControl.setValue('', { emitEvent: false });
+    this.remarksControl.setValue('', { emitEvent: false });
     this.searchControl.setValue('', { emitEvent: false });
     this.sourceControl.setValue('', { emitEvent: false });
     this.assigneeControl.setValue('', { emitEvent: false });
     this.statusControl.setValue('', { emitEvent: false });
+    this.stageControlValue.set('');
     this.noActivityFilter.set('');
     this.sortKey.set('created_at');
     this.sortOrder.set('desc');
     this.resetCursorAndReload();
+  }
+
+  /** Toolbar Status cell handler — writes to the same `statusControl`
+   *  the legacy chip strip used, so the existing chip strip and the
+   *  new toolbar stay in sync. Sir's Status dropdown lists pipeline
+   *  stages, so we route into `sortKey` for stage OR into
+   *  `statusControl` for the legacy Active/Won/Lost — collision-free
+   *  because the values sets don't overlap. Value `""` clears. */
+  protected onToolbarStageChange(value: string): void {
+    // Pipeline stage keys never overlap with LeadStatus enum values
+    // (`active`/`won`/`lost` are enum entries, stage keys are org-
+    // configured slugs like `proposal`/`qualified`). Route by set
+    // membership.
+    const stageKeys = this.pipelineStages().map((s) => s.key);
+    if (value === '' || stageKeys.includes(value)) {
+      this.stageControlValue.set(value);
+      this.resetCursorAndReload();
+    }
+  }
+
+  /** Leads Center Status dropdown value. Separate from `statusControl`
+   *  (the legacy Active/Won/Lost pill) so the toolbar can drive
+   *  ``stage`` filtering independently. */
+  readonly stageControlValue = signal<string>('');
+
+  /** Sort field dropdown handler — the toolbar splits Order By/As
+   *  from Order Type, so we no longer read the "key:order" combined
+   *  string. */
+  protected setSortField(value: string): void {
+    if (
+      value === 'created_at' ||
+      value === 'last_activity_at' ||
+      value === 'lead_score' ||
+      value === 'contact_name' ||
+      value === 'next_follow_up_due'
+    ) {
+      this.sortKey.set(value);
+      this.resetCursorAndReload();
+    }
+  }
+
+  protected setSortOrder(value: string): void {
+    if (value === 'asc' || value === 'desc') {
+      this.sortOrder.set(value);
+      this.resetCursorAndReload();
+    }
+  }
+
+  /** Export-in-Excel handler. Wraps the existing `onExportCsv` — one
+   *  entry point either place a caller wants to trigger a download.
+   *  Kept as a separate method so the sir's-toolbar link and the
+   *  legacy chip-strip button can rename independently. */
+  protected onToolbarExport(): void {
+    this.onExportCsv();
   }
 
   // --- Step 6: pagination handlers ---------------------------------------

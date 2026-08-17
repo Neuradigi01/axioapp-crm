@@ -48,7 +48,6 @@ import { commonValidators } from '../shared/validators';
 import {
   Lead,
   LeadSource,
-  LeadStatus,
   LeadsApiService,
   LogUpdateRequest,
   NextFollowUpSpec,
@@ -61,8 +60,12 @@ interface FormShape {
   contact_phone: FormControl<string>;
   contact_email: FormControl<string>;
   source: FormControl<LeadSource>;
+  /** Renamed in the UI as "Status" per sir's ask — the dropdown lists
+   *  the org's pipeline stages (proposal / qualified / won / lost /
+   *  etc.). Server maps stage → `LeadStatus` (active/won/lost) inside
+   *  `log_update_for_lead` so the FE doesn't ship a redundant `status`
+   *  field. */
   pipeline_stage: FormControl<string>;
-  status: FormControl<LeadStatus>;
   remarks: FormControl<string>;
   next_follow_up_at: FormControl<string>;
   next_follow_up_type: FormControl<FollowUpType>;
@@ -78,12 +81,6 @@ const SOURCE_OPTIONS: ReadonlyArray<MobileSelectOption> = [
   { value: 'meta_ads', label: 'Meta Ads' },
   { value: 'whatsapp_flow', label: 'WhatsApp' },
   { value: 'bulk_import', label: 'Bulk import' },
-];
-
-const STATUS_OPTIONS: ReadonlyArray<MobileSelectOption> = [
-  { value: 'active', label: 'Active' },
-  { value: 'won', label: 'Won' },
-  { value: 'lost', label: 'Lost' },
 ];
 
 const FOLLOWUP_TYPE_OPTIONS: ReadonlyArray<MobileSelectOption> = [
@@ -143,7 +140,6 @@ export class UpdateStatusModalComponent {
   protected readonly errorBanner = signal<string | null>(null);
 
   protected readonly sourceOptions = SOURCE_OPTIONS;
-  protected readonly statusOptions = STATUS_OPTIONS;
   protected readonly followupTypeOptions = FOLLOWUP_TYPE_OPTIONS;
   protected readonly lostReasonOptions = LOST_REASON_OPTIONS;
 
@@ -174,7 +170,6 @@ export class UpdateStatusModalComponent {
       nonNullable: true,
       validators: [Validators.required, Validators.maxLength(64)],
     }),
-    status: this.fb.control<LeadStatus>('active', { nonNullable: true }),
     remarks: this.fb.control<string>('', {
       nonNullable: true,
       validators: [Validators.required, Validators.maxLength(REMARKS_MAX)],
@@ -234,7 +229,6 @@ export class UpdateStatusModalComponent {
         contact_email: c?.email ?? '',
         source: l.source,
         pipeline_stage: l.pipeline_stage,
-        status: l.status,
         remarks: '',
         next_follow_up_at: this._defaultFollowUpAt(),
         next_follow_up_type: 'call',
@@ -246,25 +240,6 @@ export class UpdateStatusModalComponent {
       this.stageDriftedTo.set(null);
       this.sharedContactCount.set(null);
       this.errorBanner.set(null);
-    });
-
-    // Auto-derive Status from Stage. Status is presented read-only for
-    // won/lost stages so a rep can't create a mismatched (Active on Won)
-    // combination through the modal — matches how the backend's
-    // move-stage endpoint auto-syncs status on any stage transition.
-    effect(() => {
-      const key = this.form.controls.pipeline_stage.value;
-      const stage = this.pipelineStages().find((s) => s.key === key);
-      if (!stage) return;
-      const derived: LeadStatus = stage.is_won ? 'won' : stage.is_lost ? 'lost' : 'active';
-      if (this.form.controls.status.value !== derived) {
-        this.form.controls.status.setValue(derived, { emitEvent: false });
-      }
-      if (stage.is_won || stage.is_lost) {
-        this.form.controls.status.disable({ emitEvent: false });
-      } else {
-        this.form.controls.status.enable({ emitEvent: false });
-      }
     });
 
     // Toggle lost-reason validators when the stage moves in/out of Lost.

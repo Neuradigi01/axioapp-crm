@@ -122,16 +122,16 @@
             />
           </label>
 
-          <label class="block">
+          <label class="block sm:col-span-2">
             <span class="text-xs font-medium text-default"
-              >Category <span class="text-red-500">*</span></span
+              >Status <span class="text-red-500">*</span></span
             >
             @if (stageOptions().length > 0) {
               <crm-mobile-select
                 class="mt-1 block"
                 [options]="stageOptions()"
                 formControlName="pipeline_stage"
-                placeholder="Select category"
+                placeholder="Select status"
               />
             } @else {
               <div
@@ -139,19 +139,11 @@
               ></div>
             }
             @if (form.controls.pipeline_stage.touched && form.controls.pipeline_stage.invalid) {
-              <p class="mt-1 text-xs text-red-500">Category is required.</p>
-            }
-          </label>
-
-          <label class="block">
-            <span class="text-xs font-medium text-default">Status</span>
-            <crm-mobile-select
-              class="mt-1 block"
-              [options]="statusOptions"
-              formControlName="status"
-            />
-            @if (stageIsWon() || stageIsLost()) {
-              <p class="mt-1 text-xs text-muted">Auto-set by category.</p>
+              <p class="mt-1 text-xs text-red-500">Status is required.</p>
+            } @else if (stageIsWon() || stageIsLost()) {
+              <p class="mt-1 text-xs text-muted">
+                Moving to <strong>{{ stageIsWon() ? 'Won' : 'Lost' }}</strong> closes the lead.
+              </p>
             }
           </label>
 
