@@ -84,15 +84,22 @@ async def submit_external(
     needed by the WA submission path; the router pulls them from the
     SOPS-managed config and passes them in.
     """
+    from src.app.core.templates.service import ensure_wa_extension_row
+
     template = await get_template(session, org_id=org_id, template_id=template_id)
 
     if template.channel != ConversationChannel.whatsapp:
         raise ExternalSubmissionNotSupported(channel=template.channel.value)
 
     # Resolve the WA extension row via the Step-9 reciprocal link.
+    # Auto-materialize a minimal row when the historical create path
+    # skipped it (e.g. the org connected WhatsApp after authoring the
+    # template). WhatsAppNotConnected bubbles up when the org has no
+    # WA integration to attach the row to — router maps to 409 with
+    # a "connect WhatsApp first" message.
     wa_row = await wa_da.get_by_message_template_id(session, template.id)
     if wa_row is None:
-        raise MissingExtensionRow(channel=template.channel.value, template_id=template.id)
+        wa_row = await ensure_wa_extension_row(session, template=template)
 
     # Delegate to the existing WA submission service. It talks to
     # Meta, updates the WA row's submission_status, and the

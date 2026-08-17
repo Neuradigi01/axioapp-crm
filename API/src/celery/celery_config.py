@@ -130,14 +130,18 @@ beat_schedule = {
         "task": "src.app.core.integrations.whatsapp.health_tasks.refresh_phone_health_all_orgs",
         "schedule": crontab(minute=20),
     },
-    # tasks/template-library Step 14 — hourly per-org sweep that
+    # tasks/template-library Step 14 — every-2-min per-org sweep that
     # re-asks Meta for the current status of every pending / paused
     # central template. Webhook coverage is the primary path; this
-    # sweep is the safety net for missed events. Offset to minute=35
-    # so it doesn't contend with the other hourly Meta sweeps.
+    # sweep is the safety net for missed events AND the primary
+    # freshness path for the editor (the UI polls the DB while a
+    # template is pending, so the sweep cadence bounds how quickly
+    # the editor's status badge flips). Only orgs with pending /
+    # paused templates are touched — an org whose templates are all
+    # approved/archived costs zero Meta calls.
     "templates-sync-external-status": {
         "task": "src.app.core.templates.tasks.sync_external_status_all",
-        "schedule": crontab(minute=35),
+        "schedule": crontab(minute="*/2"),
     },
     # tasks/automation-engine Step 10 — every-15-minute sweep across
     # tbl_appointments that publishes appointment.reminder_24h and

@@ -1,4 +1,4 @@
-"""Hourly external-status sweep Celery task
+"""Every-2-min external-status sweep Celery task
 (``tasks/template-library`` Step 14).
 
 One beat-driven task — :func:`sync_external_status_all` — iterates
@@ -8,8 +8,11 @@ the org's RLS context. Per-org failures are logged + the loop
 continues so one broken integration doesn't stall the others.
 
 Rate-friendly: at most one Meta Graph call per pending-template per
-org per hour. Even at 1,000 orgs × 5 pending templates = 5,000
-calls/hour worker-side — well inside Meta's per-token rate limit.
+org per 2-min tick. A typical org with 5 pending templates spends
+150 calls/hour against its own WABA token — well inside Meta's
+per-WABA rate limit. Only orgs with something actually pending get
+touched, so the cost scales with in-flight submissions, not with
+total org count.
 
 Mirrors the celery-absent shim shape of
 :mod:`core.integrations.whatsapp.health_tasks` so dev shells without
@@ -57,10 +60,10 @@ logger = logging.getLogger(__name__)
     name="src.app.core.templates.tasks.sync_external_status_all",
 )
 def sync_external_status_all() -> dict[str, Any]:
-    """Beat-driven hourly sweep. Resolves the Meta App credentials
-    from the SOPS-managed config once, then iterates every org with
-    a connected WhatsApp integration AND at least one pending /
-    paused central template. Per-org rollbacks on failure."""
+    """Beat-driven every-2-min sweep. Resolves the Meta App
+    credentials from the SOPS-managed config once, then iterates
+    every org with a connected WhatsApp integration AND at least one
+    pending / paused central template. Per-org rollbacks on failure."""
     return asyncio.run(_sync_external_status_all_async())
 
 

@@ -32,6 +32,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.conversations.adapters.whatsapp import WhatsAppNotConnected
 from src.app.core.conversations.models import ConversationChannel
 from src.app.core.permissions.service import list_permissions_for_role
 from src.app.core.templates import data_access as templates_da
@@ -668,6 +669,11 @@ async def submit_external_endpoint(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
+    except WhatsAppNotConnected as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
     return TemplateRead.model_validate(template)
 
 
@@ -701,9 +707,9 @@ async def sync_external_endpoint(
     user: User = Depends(require_permissions(PERM_SUBMIT_EXTERNAL)),
 ) -> TemplateRead:
     """Step 14 — manually refresh ``external_status`` against the
-    provider (Meta for WhatsApp). Counterpart to the hourly Celery
-    sweep; the operator clicks "Refresh status" in the editor and
-    sees the live verdict without waiting for the next sweep.
+    provider (Meta for WhatsApp). Admin escape hatch to force a
+    per-template sync outside the every-2-min Celery sweep; the
+    editor UI polls the DB directly and doesn't call this endpoint.
 
     Same permission gate as ``/submit-external`` — the operator who
     can submit can also re-check. Returns the updated central row."""

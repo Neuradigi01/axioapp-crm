@@ -709,9 +709,87 @@ async def set_active(
     return template
 
 
+async def ensure_wa_extension_row(
+    session: AsyncSession,
+    *,
+    template: MessageTemplate,
+) -> Any:
+    """Resolve the WhatsApp extension row for a WA central template,
+    creating a minimal row from stored central data if none exists.
+
+    Recovers from the historical case where a central WA template
+    was authored before the org connected WhatsApp (or before the
+    Step-9 bridge landed), leaving no ``tbl_whatsapp_templates`` row
+    to submit / send from. The extension is created with the stored
+    body, name, and language; header / footer / buttons default off
+    (Meta's marketing category, ``DRAFT`` submission status). The
+    operator can edit those in the template editor afterwards; each
+    save runs ``_upsert_wa_extension`` and patches the row in place.
+
+    Raises ``WhatsAppNotConnected`` when the org has no connected
+    WA integration to attach the row to — the caller should surface
+    that as a "connect WhatsApp first" 409.
+    """
+    from sqlalchemy import select as _select
+
+    from src.app.core.conversations.adapters.whatsapp import (
+        WhatsAppNotConnected,
+    )
+    from src.app.core.integrations.models import (
+        Integration,
+        IntegrationProvider,
+    )
+    from src.app.core.integrations.whatsapp import data_access as wa_da
+    from src.app.core.integrations.whatsapp.models import (
+        WhatsAppTemplate,
+        WhatsAppTemplateSubmissionStatus,
+    )
+
+    existing = await wa_da.get_by_message_template_id(session, template.id)
+    if existing is not None:
+        return existing
+
+    integration = (
+        await session.execute(
+            _select(Integration).where(
+                Integration.provider == IntegrationProvider.whatsapp
+            )
+        )
+    ).scalar_one_or_none()
+    if integration is None:
+        raise WhatsAppNotConnected(
+            "Connect WhatsApp in Settings → Integrations before submitting "
+            "or sending this template."
+        )
+
+    body = template.body_text or ""
+    components: list[dict[str, Any]] = [{"type": "BODY", "text": body}]
+    row = WhatsAppTemplate(
+        org_id=template.org_id,
+        integration_id=integration.id,
+        name=template.name,
+        language=template.language,
+        category="marketing",
+        status="DRAFT",
+        body=body,
+        body_components=components,
+        submission_status=WhatsAppTemplateSubmissionStatus.draft,
+        message_template_id=template.id,
+    )
+    session.add(row)
+    await session.flush()
+    logger.info(
+        "wa extension auto-created for central template %s (org=%s)",
+        template.id,
+        template.org_id,
+    )
+    return row
+
+
 __all__: list[str] = [
     "archive_template",
     "create_template",
+    "ensure_wa_extension_row",
     "get_template",
     "get_version",
     "list_templates",

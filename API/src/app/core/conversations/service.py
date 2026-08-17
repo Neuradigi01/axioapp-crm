@@ -441,6 +441,9 @@ async def send_template_message(
         resolve_named_body_to_positional_params,
     )
     from src.app.core.tenants import data_access as _tenants_da
+    from src.app.core.templates import data_access as _templates_da
+    from src.app.core.templates.models import TemplateExternalStatus
+    from src.app.core.templates.service import ensure_wa_extension_row
 
     conv = await get_conversation(session, conversation_id)
     if conv.channel != ConversationChannel.whatsapp:
@@ -454,11 +457,38 @@ async def send_template_message(
             f"Settings → WhatsApp → Block List to send again."
         )
 
-    template = await _wa_da.get_by_id(session, template_id)
-    if template is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="template not found")
-    if (template.status or "").upper() != "APPROVED":
-        raise ValueError("Only APPROVED templates can be sent — this template is not approved yet.")
+    # The picker + chatbot template node now pass central library IDs
+    # (``tbl_message_templates.id``). Resolve central first, then
+    # materialize/find the matching WA extension row for the actual
+    # Meta send. Legacy callers that still pass a WA extension row
+    # id (``tbl_whatsapp_templates.id``) are handled by the fallback
+    # branch so existing bookmarks / integrations don't break.
+    central = await _templates_da.get_template(
+        session, org_id=conv.org_id, template_id=template_id
+    )
+    if central is not None:
+        if central.channel != ConversationChannel.whatsapp:
+            raise ValueError(
+                "Only WhatsApp templates can be sent through this endpoint."
+            )
+        if central.external_status != TemplateExternalStatus.approved:
+            raise ValueError(
+                "Only APPROVED templates can be sent — this template is not approved yet."
+            )
+        if not central.is_active:
+            raise ValueError(
+                "This template is inactive; ask an Owner / Admin to activate it "
+                "in the templates library before sending."
+            )
+        template = await ensure_wa_extension_row(session, template=central)
+    else:
+        template = await _wa_da.get_by_id(session, template_id)
+        if template is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="template not found")
+        if (template.status or "").upper() != "APPROVED":
+            raise ValueError(
+                "Only APPROVED templates can be sent — this template is not approved yet."
+            )
 
     # Auto-resolve any CRM named variables (`{{contact.full_name}}`,
     # `{{org.name}}`, ...) in the template's original body against

@@ -476,7 +476,7 @@ class MetaGraphClient:
         """``GET /{meta_template_id}?fields=status,rejected_reason,category,language,name``.
 
         Used by the central template library's status-sync path
-        (hourly Celery sweep + manual "Refresh status" button). The
+        (every-2-min Celery sweep + admin ``/sync-external`` endpoint). The
         node-id endpoint works on the template id directly — no need
         to scope to ``/{waba_id}/message_templates``. Meta returns
         ``status`` (APPROVED / REJECTED / PENDING / PAUSED /

@@ -6,8 +6,8 @@ status story Step 9 started:
 
 * :func:`sync_external_status` — re-queries a single template's
   status from its provider (today: Meta for WhatsApp templates).
-  Used by the manual "Refresh status" button and by Step 14's
-  hourly Celery sweep.
+  Used by Step 14's every-2-min Celery sweep + by the
+  ``POST /templates/{id}/sync-external`` admin endpoint.
 * :func:`sync_all_pending` — bulk-syncs every ``pending`` or
   ``paused`` template in the org. Per-template failures are logged
   and the loop continues so one rejected WABA doesn't stall the
@@ -242,7 +242,7 @@ async def _fetch_wa_status(
 
     if not wa_row.meta_template_id:
         # Never submitted — nothing to sync. Treat as n_a so the
-        # operator's "Refresh" click resolves cleanly.
+        # sweep + the admin endpoint resolve cleanly.
         return TemplateExternalStatus.n_a, None
 
     bundle = await get_active_config(session)

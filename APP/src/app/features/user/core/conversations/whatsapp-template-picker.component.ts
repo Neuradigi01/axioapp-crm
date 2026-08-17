@@ -5,8 +5,11 @@
  * be sent outside the window.
  *
  * Flow:
- *   1. Button opens a popover listing APPROVED templates
- *      (`GET /integrations/whatsapp/templates?status=APPROVED`).
+ *   1. Button opens a popover listing APPROVED templates from the
+ *      central library (`GET /api/v1/templates?channel=whatsapp&
+ *      external_status=approved&is_active=true`). Reads the same
+ *      surface the templates page authors into, so operator-created
+ *      WA templates appear here the moment Meta approves them.
  *   2. Selecting a template with zero variables sends immediately.
  *   3. Selecting a template with `{{n}}` placeholders expands an
  *      inline variables form; Send is disabled until every slot is
@@ -32,11 +35,55 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
-import {
-  IntegrationsApiService,
-  WhatsAppTemplate,
-} from '../settings/integrations/integrations-api.service';
+import { TemplateRead, TemplatesApiService } from '../templates/templates-api.service';
 import { ConversationMessage, ConversationsApiService } from './conversations-api.service';
+
+/** Display shape the picker template renders. Adapts a central
+ *  library ``TemplateRead`` into the exact fields the popover markup
+ *  reads — keeps the HTML unchanged when the data source moved from
+ *  the legacy WA-only endpoint to the central library. */
+interface PickerRow {
+  id: string;
+  name: string;
+  category: string;
+  language: string;
+  body: string;
+  variable_count: number;
+  header_text: string | null;
+  footer_text: string | null;
+}
+
+/** Positional Meta placeholder ``{{n}}`` regex — matches the pattern
+ *  the WA extension row's ``variable_count`` counts. Named CRM vars
+ *  like ``{{contact.first_name}}`` are resolved server-side from the
+ *  conversation's contact + org, so they contribute zero operator
+ *  input slots. */
+const POSITIONAL_VAR_RE = /\{\{\s*(\d+)\s*\}\}/g;
+
+function positionalVariableCount(body: string): number {
+  const seen = new Set<number>();
+  for (const match of body.matchAll(POSITIONAL_VAR_RE)) {
+    seen.add(Number.parseInt(match[1], 10));
+  }
+  return seen.size;
+}
+
+function toPickerRow(t: TemplateRead): PickerRow {
+  const wa = t.whatsapp ?? null;
+  return {
+    id: t.id,
+    name: t.name,
+    // Meta's WA category (marketing / utility / authentication) if
+    // the extension row set one; fall back to the central row's
+    // send-guard category so the badge is never blank.
+    category: wa?.category ?? t.category,
+    language: t.language,
+    body: t.body_text,
+    variable_count: positionalVariableCount(t.body_text),
+    header_text: wa?.header_text ?? null,
+    footer_text: wa?.footer_text ?? null,
+  };
+}
 
 @Component({
   selector: 'app-whatsapp-template-picker',
@@ -46,7 +93,7 @@ import { ConversationMessage, ConversationsApiService } from './conversations-ap
   templateUrl: './whatsapp-template-picker.component.html',
 })
 export class WhatsAppTemplatePickerComponent {
-  private readonly integrationsApi = inject(IntegrationsApiService);
+  private readonly templatesApi = inject(TemplatesApiService);
   private readonly conversationsApi = inject(ConversationsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -60,8 +107,8 @@ export class WhatsAppTemplatePickerComponent {
   protected readonly loading = signal<boolean>(false);
   protected readonly sending = signal<boolean>(false);
   protected readonly search = signal<string>('');
-  protected readonly templates = signal<WhatsAppTemplate[]>([]);
-  protected readonly selected = signal<WhatsAppTemplate | null>(null);
+  protected readonly templates = signal<PickerRow[]>([]);
+  protected readonly selected = signal<PickerRow | null>(null);
   /** Variable slot values, indexed by `{{n}}` (1-based). */
   protected readonly variableValues = signal<Record<string, string>>({});
   /** Inline error message shown inside the popover — kept local so it
@@ -135,7 +182,7 @@ export class WhatsAppTemplatePickerComponent {
     this.close();
   }
 
-  protected pick(t: WhatsAppTemplate): void {
+  protected pick(t: PickerRow): void {
     this.selected.set(t);
     // Reset variable inputs on switch — otherwise a slot value from
     // the previous template's index N would bleed into the new one.
@@ -190,12 +237,21 @@ export class WhatsAppTemplatePickerComponent {
 
   private _load(): void {
     this.loading.set(true);
-    this.integrationsApi
-      .listWhatsAppTemplates({ status: 'APPROVED' })
+    this.templatesApi
+      .list({
+        channel: 'whatsapp',
+        external_status: 'approved',
+        is_active: true,
+        // 200 is the max the list endpoint allows. Any org with more
+        // than 200 approved WA templates is already in "search me
+        // first" territory — the popover has a client-side filter
+        // for the visible slice.
+        limit: 200,
+      })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (rows) => {
-          this.templates.set(rows);
+        next: (res) => {
+          this.templates.set(res.items.map(toPickerRow));
           this.loading.set(false);
         },
         error: () => {
