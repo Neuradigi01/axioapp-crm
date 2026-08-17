@@ -168,6 +168,13 @@ export interface LogUpdateRequest {
   source?: LeadSource | null;
   remarks: string;
   next_follow_up?: NextFollowUpSpec | null;
+  /** Owner change — supply BOTH `set_assigned_to=true` AND the target
+   *  `assigned_to_id` (nullable, `null` clears the owner). Omit the
+   *  sentinel to leave owner untouched. Backend writes a `reassign`
+   *  activity in the same atomic transaction. Requires
+   *  `leads.reassign`. */
+  assigned_to_id?: string | null;
+  set_assigned_to?: boolean;
   lost_reason?: string | null;
   lost_reason_other?: string | null;
 }

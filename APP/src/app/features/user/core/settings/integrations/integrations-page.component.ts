@@ -224,9 +224,18 @@ export class IntegrationsPageComponent {
     };
     const gs = statusFor(g);
     const ms = statusFor(m);
-    const ws: { status: 'connected' | 'error' | 'not_connected'; label: string } = w?.connected_at
-      ? { status: 'connected', label: 'Connected' }
-      : { status: 'not_connected', label: 'Not connected' };
+    // Bug fix: the tile previously read `w?.connected_at` — which is a
+    // historical timestamp the backend leaves populated even after
+    // disconnect. Result: the tile kept showing "Connected" until the
+    // row was deleted from the DB. Every other tile keys off `status`,
+    // which is what disconnect actually flips to `'disconnected'`.
+    const ws: { status: 'connected' | 'error' | 'not_connected'; label: string } = (() => {
+      const raw = (w?.status ?? '').toLowerCase();
+      if (raw === 'error' || raw === 'expired')
+        return { status: 'error' as const, label: 'Reconnect required' };
+      if (raw === 'connected') return { status: 'connected' as const, label: 'Connected' };
+      return { status: 'not_connected' as const, label: 'Not connected' };
+    })();
     // Build the tile list with per-permission gating so the summary
     // grid matches the detail cards below — Employees / custom roles
     // without the manage keys see only the Google Calendar tile.

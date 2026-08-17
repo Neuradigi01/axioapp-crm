@@ -18,7 +18,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
 import { of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
-import { ContactsApiService } from '../contacts/contacts-api.service';
+import { Contact, ContactsApiService } from '../contacts/contacts-api.service';
 import {
   ItemMovedEvent,
   PipelineItem,
@@ -49,6 +49,7 @@ import { AdvancedFilterModalComponent } from './advanced-filter-modal.component'
 import { ColumnCustomizationMenuComponent } from './column-customization-menu.component';
 import { LeadCardComponent } from './lead-card.component';
 import { LeadFormModalComponent } from './lead-form-modal.component';
+import { UpdateStatusModalComponent } from './update-status-modal.component';
 import {
   LostReasonConfirm,
   LostReasonModalComponent,
@@ -130,6 +131,7 @@ class LeadsListState extends ListPageState<Lead> {}
     PipelineBoardComponent,
     LeadCardComponent,
     LeadFormModalComponent,
+    UpdateStatusModalComponent,
     RelativeTimePipe,
     BulkActionBarComponent,
     ReassignModalComponent,
@@ -489,6 +491,13 @@ export class LeadsPageComponent {
   readonly singleReassignLead = signal<Lead | null>(null);
   readonly singleReassignSubmitting = signal(false);
   readonly singleReassignError = signal<string | null>(null);
+
+  /** Update Status modal (sir's "lead action center"). Opened from the
+   *  kanban card / list row pencil — supersedes the old mini reassign
+   *  modal for the single-lead flow. Bulk reassign still uses its own
+   *  reassign-modal instance below. */
+  readonly updateStatusLead = signal<Lead | null>(null);
+  readonly updateStatusContact = signal<Contact | null>(null);
 
   /** Pending move-stage that's waiting on a Lost-reason. The Step 1
    * backend rejects a move into an `is_lost=true` stage with 422 and
@@ -1547,10 +1556,55 @@ export class LeadsPageComponent {
   // --- Single reassign (pencil on a card / list row) ----------------------
 
   protected openSingleReassign(lead: Lead): void {
-    this.singleReassignError.set(null);
-    this.singleReassignLead.set(lead);
+    // Sir's ask: the card pencil now opens the full Update Status
+    // modal instead of the mini reassign modal. The Owner dropdown in
+    // that modal covers the reassign case (with auto-remarks) + lets
+    // the rep also change stage / add notes / schedule the next
+    // follow-up in one shot. The mini reassign modal is kept as a
+    // component for bulk-reassign only (see `state.bulkModal`).
+    this.updateStatusContact.set(null);
+    this.updateStatusLead.set(lead);
+    // Fire-and-forget contact hydrate so the Name / WhatsApp / Email
+    // cells inside the modal render prefilled. If it fails the modal
+    // still opens with empty contact fields — the rep can type or leave
+    // them alone.
+    this.contactsApi
+      .get(lead.contact_id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (contact) => {
+          // Only apply if the modal is still showing this lead — otherwise
+          // a slow fetch could clobber a newer selection.
+          if (this.updateStatusLead()?.id === lead.id) {
+            this.updateStatusContact.set(contact);
+          }
+        },
+        error: () => {
+          /* silent — modal renders without prefill */
+        },
+      });
   }
 
+  protected closeUpdateStatus(): void {
+    this.updateStatusLead.set(null);
+    this.updateStatusContact.set(null);
+  }
+
+  /** Update Status modal's `saved` output. Trigger a full refetch —
+   *  patching one row in-place is fragile across list + pipeline
+   *  views (a stage change can move the card to a different column,
+   *  a status filter can drop it off-page entirely). Cheap one-shot
+   *  call keeps both surfaces truthful. */
+  protected onUpdateStatusSaved(_event: {
+    lead: Lead;
+    next_follow_up_task_id: string | null;
+  }): void {
+    this.closeUpdateStatus();
+    this.resetCursorAndReload();
+  }
+
+  // Legacy single-row reassign handlers kept for the bulk-reassign
+  // modal shape below. Not reachable from the card pencil anymore.
   protected closeSingleReassign(): void {
     this.singleReassignLead.set(null);
     this.singleReassignSubmitting.set(false);

@@ -1863,6 +1863,30 @@ async def log_update_for_lead(
     if payload.source is not None and payload.source != lead.source:
         lead.source = payload.source
 
+    # 5b. Optional owner change (reassign). Only fires when the FE
+    #     explicitly sets `set_assigned_to=true` — needed because
+    #     `assigned_to_id=null` is a legal "clear owner" signal that
+    #     Pydantic can't distinguish from an omitted field. Requires
+    #     `leads.reassign` (checked in the router).
+    if payload.set_assigned_to and payload.assigned_to_id != lead.assigned_to_id:
+        prior_owner = lead.assigned_to_id
+        lead.assigned_to_id = payload.assigned_to_id
+        # Structured reassign activity so the timeline can render a
+        # proper "Reassigned Ravi → Priya" row (payload preview
+        # resolves the UUIDs to full names on the FE).
+        await activities.record_in_session(
+            session,
+            org_id=org_id,
+            entity_type=_LEAD_ENTITY,
+            entity_id=lead_id,
+            type=ActivityType.reassign,
+            payload={
+                "from": str(prior_owner) if prior_owner is not None else None,
+                "to": str(payload.assigned_to_id) if payload.assigned_to_id is not None else None,
+            },
+            user_id=actor_id,
+        )
+
     # 6. Always: note activity carrying the remarks text. Rides the
     #    same session so a downstream failure below rolls it back.
     await activities.record_in_session(

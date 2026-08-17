@@ -44,7 +44,9 @@ import { extractApiError } from '@core/services/api-error.util';
 import { Contact } from '../contacts/contacts-api.service';
 import { PipelineStage } from '../pipelines/pipelines-api.service';
 import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
+import { UserMini, UsersDirectoryService } from '../shared/services/users-directory.service';
 import { commonValidators } from '../shared/validators';
+import { LeadFollowUpsPanelComponent } from './lead-follow-ups-panel.component';
 import {
   Lead,
   LeadSource,
@@ -66,6 +68,12 @@ interface FormShape {
    *  `log_update_for_lead` so the FE doesn't ship a redundant `status`
    *  field. */
   pipeline_stage: FormControl<string>;
+  /** Owner (assignee) — empty string = "Unassigned". The modal opens
+   *  pre-selected with the lead's current owner; the submit builder
+   *  emits `set_assigned_to=true` + `assigned_to_id` only when the
+   *  value differs from the loaded lead, so a rep who just wanted to
+   *  add a note doesn't inadvertently touch ownership. */
+  assigned_to_id: FormControl<string>;
   remarks: FormControl<string>;
   next_follow_up_at: FormControl<string>;
   next_follow_up_type: FormControl<FollowUpType>;
@@ -113,13 +121,37 @@ const LOST_REASON_OPTIONS: ReadonlyArray<MobileSelectOption> = [
   selector: 'app-update-status-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, ReactiveFormsModule, MobileSelectComponent],
+  imports: [
+    LucideAngularModule,
+    ReactiveFormsModule,
+    MobileSelectComponent,
+    LeadFollowUpsPanelComponent,
+  ],
   templateUrl: './update-status-modal.component.html',
 })
 export class UpdateStatusModalComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(LeadsApiService);
+  private readonly usersDir = inject(UsersDirectoryService);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** Org user roster — feeds the Owner dropdown + is consulted for the
+   *  "Reassigned from Ravi to Priya." auto-remark string. Cached
+   *  session-wide by the directory service; empty array on failure. */
+  protected readonly orgUsers = signal<UserMini[]>([]);
+  protected readonly ownerOptions = computed<MobileSelectOption[]>(() => [
+    { value: '', label: '— Unassigned —' },
+    ...this.orgUsers()
+      .slice()
+      .sort((a, b) => a.full_name.localeCompare(b.full_name))
+      .map((u) => ({ value: u.id, label: u.full_name || u.email })),
+  ]);
+
+  private ownerLabel(id: string | null): string {
+    if (!id) return 'Unassigned';
+    const hit = this.orgUsers().find((u) => u.id === id);
+    return hit ? hit.full_name?.trim() || hit.email : 'Unassigned';
+  }
 
   readonly lead = input.required<Lead>();
   readonly contact = input<Contact | null>(null);
@@ -170,6 +202,7 @@ export class UpdateStatusModalComponent {
       nonNullable: true,
       validators: [Validators.required, Validators.maxLength(64)],
     }),
+    assigned_to_id: this.fb.control<string>('', { nonNullable: true }),
     remarks: this.fb.control<string>('', {
       nonNullable: true,
       validators: [Validators.required, Validators.maxLength(REMARKS_MAX)],
@@ -201,6 +234,15 @@ export class UpdateStatusModalComponent {
    *  rejects submissions where a colleague moved the lead in the
    *  meantime — 409 becomes the drift banner. */
   private originalStage = '';
+  /** The lead's owner-id at modal-open time. Compared against
+   *  `form.controls.assigned_to_id` in the payload builder to decide
+   *  whether to ship `set_assigned_to=true`. `''` = Unassigned. */
+  private originalOwner = '';
+  /** The exact "Reassigned from A to B." sentence we last auto-prepended
+   *  to the Remarks textarea. Stored so we can rewrite / remove it when
+   *  the owner selection changes again — without ever clobbering text
+   *  the rep typed themselves. `''` = no auto-remark active. */
+  private autoRemarksSeed = '';
 
   /** True when the currently-selected pipeline_stage is a Lost stage —
    *  the reason picker + free-text row become required. Read from the
@@ -229,12 +271,17 @@ export class UpdateStatusModalComponent {
         contact_email: c?.email ?? '',
         source: l.source,
         pipeline_stage: l.pipeline_stage,
+        assigned_to_id: l.assigned_to_id ?? '',
         remarks: '',
         next_follow_up_at: this._defaultFollowUpAt(),
         next_follow_up_type: 'call',
         lost_reason: l.lost_reason ?? '',
         lost_reason_other: l.lost_reason_other ?? '',
       });
+      // Remember the original owner so auto-remarks + payload builder
+      // can tell when the rep actually touched the dropdown.
+      this.originalOwner = l.assigned_to_id ?? '';
+      this.autoRemarksSeed = '';
       // Clear per-submit error state whenever the modal re-opens with
       // a different lead.
       this.stageDriftedTo.set(null);
@@ -261,6 +308,53 @@ export class UpdateStatusModalComponent {
       }
       other.updateValueAndValidity({ emitEvent: false });
     });
+
+    // Load the org's user directory for the Owner dropdown + the
+    // auto-remarks name lookup. One request per session (service caches).
+    this.usersDir
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (users) => this.orgUsers.set(users),
+        error: () => this.orgUsers.set([]),
+      });
+  }
+
+  /** Owner-dropdown change handler. Prepends "Reassigned from A to B."
+   *  to the Remarks textarea so every reassignment lands a searchable
+   *  note on the timeline — the rep can add more context after it or
+   *  wipe the whole thing before submit. Idempotent: if the effect
+   *  fires again for a later owner pick, we rewrite the previously
+   *  auto-inserted sentence in place instead of stacking multiple
+   *  copies on top of each other. */
+  protected onOwnerChange(newId: string): void {
+    // `emitEvent: true` (default) on the setValue calls below is
+    // deliberate — the modal's submit button reads `formStatus()`
+    // (bridged from `form.statusChanges`), so auto-filling the
+    // previously-empty required Remarks field MUST emit the event or
+    // the button stays disabled even though the form is now valid.
+    this.form.controls.assigned_to_id.setValue(newId);
+    const current = this.form.controls.remarks.value;
+    // Strip the previous auto-insertion (if any and still at the top
+    // untouched) so we can rewrite it against the freshly-picked owner.
+    let base = current;
+    if (this.autoRemarksSeed && current.startsWith(this.autoRemarksSeed)) {
+      base = current.slice(this.autoRemarksSeed.length).trimStart();
+    }
+    // No reassignment if the owner just returned to its original value.
+    if (newId === this.originalOwner) {
+      this.autoRemarksSeed = '';
+      this.form.controls.remarks.setValue(base);
+      return;
+    }
+    const fromLabel = this.ownerLabel(this.originalOwner || null);
+    const toLabel = this.ownerLabel(newId || null);
+    const seed = `Reassigned from ${fromLabel} to ${toLabel}.`;
+    const joined = base.length > 0 ? `${seed} ${base}` : seed;
+    this.autoRemarksSeed = seed + (base.length > 0 ? ' ' : '');
+    this.form.controls.remarks.setValue(joined);
+    this.form.controls.remarks.markAsDirty();
+    this.form.controls.remarks.markAsTouched();
   }
 
   cancel(): void {
@@ -308,6 +402,14 @@ export class UpdateStatusModalComponent {
     }
     if (raw.source !== l.source) {
       payload.source = raw.source;
+    }
+    // Owner change — sentinel + null-safe id. Backend requires
+    // `set_assigned_to=true` to distinguish an intentional
+    // "clear owner" (`assigned_to_id=null`) from "field omitted".
+    const currentOwnerFormValue = raw.assigned_to_id ?? '';
+    if (currentOwnerFormValue !== this.originalOwner) {
+      payload.set_assigned_to = true;
+      payload.assigned_to_id = currentOwnerFormValue === '' ? null : currentOwnerFormValue;
     }
     if (raw.next_follow_up_at) {
       // <input type="datetime-local"> gives us a local wall-clock time

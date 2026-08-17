@@ -516,12 +516,21 @@ async def log_lead_update_endpoint(
     ``contact_basics`` is supplied the caller must additionally hold
     ``contacts.write`` — the leads-write scope alone would otherwise
     become a side-door around the contacts-write permission gate.
+    Same rule for ``assigned_to_id``: an owner change requires the
+    dedicated ``leads.reassign`` permission so this endpoint can't be
+    used to bypass the reassign gate.
     """
     if payload.contact_basics is not None:
         if not await role_has_permission(db, user.role_id, "contacts.write"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Missing permission(s): contacts.write",
+            )
+    if payload.set_assigned_to:
+        if not await role_has_permission(db, user.role_id, "leads.reassign"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Missing permission(s): leads.reassign",
             )
     lead, next_task_id = await log_update_for_lead(
         db,

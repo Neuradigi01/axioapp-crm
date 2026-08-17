@@ -210,6 +210,20 @@ class LogUpdateRequest(BaseModel):
     source: LeadSource | None = None
     remarks: str = Field(min_length=1, max_length=2000)
     next_follow_up: NextFollowUpSpec | None = None
+    # Owner change — when supplied AND different from the lead's
+    # current owner, the service updates `assigned_to_id` inside the
+    # same atomic transaction AND writes a `reassign` activity so the
+    # timeline shows a proper "Reassigned Ravi → Priya" row.
+    # ``null`` = clear owner (Unassigned). Omit the key = no change.
+    # Reuses the existing `leads.reassign` permission (checked in the
+    # router alongside `leads.write` when this field is present).
+    assigned_to_id: uuid.UUID | None = None
+    # Sentinel: the client sends `set_assigned_to=false` to mean "the
+    # field is not being changed" — needed because Pydantic can't tell
+    # `assigned_to_id: null` (intentional unassign) from "field omitted"
+    # once the payload is deserialised. The FE sets it to `true` only
+    # when the Owner control was actually touched.
+    set_assigned_to: bool = False
     # Lost-reason pair — required (server side) when the target stage
     # is is_lost. Same picklist + shape as MoveStageRequest so the modal
     # can carry the reason atomically instead of firing a second call.

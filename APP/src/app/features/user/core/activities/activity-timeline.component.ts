@@ -15,6 +15,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { Activity, ActivityType, ActivitiesApiService } from './activities-api.service';
 import { RelativeTimePipe } from './relative-time.pipe';
 import type { LucideIconName } from '../shared/icons';
+import { UserMini, UsersDirectoryService } from '../shared/services/users-directory.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
@@ -105,6 +106,7 @@ interface DayGroup {
 })
 export class ActivityTimelineComponent {
   private readonly api = inject(ActivitiesApiService);
+  private readonly usersDir = inject(UsersDirectoryService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly entityType = input.required<string>();
@@ -113,6 +115,12 @@ export class ActivityTimelineComponent {
   protected readonly items = signal<Activity[]>([]);
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
+
+  /** id → user, populated once per session from the cached
+   *  `/users` directory. Used to resolve the raw UUIDs the backend
+   *  stores in reassign activity payloads into "Alice → Bob" for
+   *  the timeline preview line. */
+  private readonly usersById = signal<Map<string, UserMini>>(new Map());
 
   protected readonly groups = computed<DayGroup[]>(() => {
     const buckets = new Map<string, Activity[]>();
@@ -136,6 +144,19 @@ export class ActivityTimelineComponent {
       if (!eType || !eId) return;
       this.reload();
     });
+
+    this.usersDir
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (users) => {
+          this.usersById.set(new Map(users.map((u) => [u.id, u])));
+        },
+        error: () => {
+          // Leave the map empty — resolveUserName falls back to a
+          // short id fragment so the timeline stays readable.
+        },
+      });
   }
 
   /** Public so a sibling component can refresh the timeline. */
@@ -185,7 +206,9 @@ export class ActivityTimelineComponent {
       const from = (payload as { from?: unknown }).from;
       const to = (payload as { to?: unknown }).to;
       const note = (payload as { note?: unknown }).note;
-      const line = typeof from === 'string' && typeof to === 'string' ? `${from} → ${to}` : '';
+      const fromLabel = this.resolveUserName(from);
+      const toLabel = this.resolveUserName(to);
+      const line = fromLabel && toLabel ? `${fromLabel} → ${toLabel}` : '';
       return note && typeof note === 'string' ? [line, note].filter(Boolean).join(' · ') : line;
     }
     if (a.type === 'reschedule') {
@@ -204,6 +227,21 @@ export class ActivityTimelineComponent {
     // Empty for anything with no meaningful payload — the row's title
     // ("Reassigned" / "Task" / etc.) still renders on its own line.
     return '';
+  }
+
+  /** Resolve a reassign payload's `from`/`to` id into a friendly name.
+   *  - `null` or missing → "Unassigned" (first assignment or unassign).
+   *  - Known user id → the user's full name (falls back to email if
+   *    the name is blank).
+   *  - Unknown id (deactivated user not in the roster, or roster still
+   *    loading) → the first 8 chars of the UUID so the row is at least
+   *    scannable. */
+  private resolveUserName(raw: unknown): string {
+    if (raw == null) return 'Unassigned';
+    if (typeof raw !== 'string' || raw.length === 0) return 'Unassigned';
+    const hit = this.usersById().get(raw);
+    if (hit) return hit.full_name?.trim() || hit.email || raw.slice(0, 8);
+    return raw.slice(0, 8);
   }
 
   private toLocalDay(iso: string): string {

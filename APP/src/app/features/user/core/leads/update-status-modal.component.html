@@ -122,6 +122,21 @@
             />
           </label>
 
+          <label class="block">
+            <span class="text-xs font-medium text-default">Owner</span>
+            <crm-mobile-select
+              class="mt-1 block"
+              [options]="ownerOptions()"
+              [value]="form.controls.assigned_to_id.value"
+              (valueChange)="onOwnerChange($event)"
+              placeholder="Assign to…"
+            />
+            <span class="mt-1 block text-xs text-muted">
+              Changing the owner prepends a "Reassigned from … to …" line to Remarks so the timeline
+              captures who moved the lead.
+            </span>
+          </label>
+
           <label class="block sm:col-span-2">
             <span class="text-xs font-medium text-default"
               >Status <span class="text-red-500">*</span></span
@@ -234,6 +249,16 @@
               formControlName="next_follow_up_type"
             />
           </label>
+        </div>
+
+        <!-- Follow-Up History table embedded below the form, per sir's
+             screenshot. Reuses `app-lead-follow-ups-panel` — the same
+             component the lead-detail Overview tab shows so the rep
+             sees identical rows in both places. Amber-header table lists
+             every open follow-up task on this lead with Mark-done +
+             Reschedule inline. -->
+        <div class="mt-5">
+          <app-lead-follow-ups-panel [leadId]="lead().id" />
         </div>
       </div>
 

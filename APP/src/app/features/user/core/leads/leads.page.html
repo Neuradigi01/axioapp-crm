@@ -815,16 +815,18 @@
   />
 }
 
-<!-- Single-lead reassign (from pencil on a card / list row). -->
-@if (singleReassignLead(); as lead) {
-  <app-reassign-modal
-    [entityLabel]="'lead'"
-    [count]="1"
-    [currentOwnerId]="lead.assigned_to_id"
-    [submitting]="singleReassignSubmitting()"
-    [error]="singleReassignError()"
-    (confirm)="onSingleReassign($event)"
-    (cancel)="closeSingleReassign()"
+<!-- Single-lead update / reassign (sir's Update Status modal). The
+     card pencil opens this instead of the old mini reassign modal so
+     the rep can change owner + stage + remarks + schedule the next
+     follow-up in one shot. Bulk reassign still uses `app-reassign-modal`
+     via the bulk-modal branch below. -->
+@if (updateStatusLead(); as lead) {
+  <app-update-status-modal
+    [lead]="lead"
+    [contact]="updateStatusContact()"
+    [pipelineStages]="pipelineStages()"
+    (saved)="onUpdateStatusSaved($event)"
+    (cancelled)="closeUpdateStatus()"
   />
 }
 
