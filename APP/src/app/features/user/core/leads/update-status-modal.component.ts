@@ -30,6 +30,7 @@ import {
   signal,
 } from '@angular/core';
 import {
+  AbstractControl,
   FormBuilder,
   FormControl,
   FormGroup,
@@ -387,11 +388,15 @@ export class UpdateStatusModalComponent {
 
   /** Validator: bound `next_follow_up_at` to the same window the
    *  backend enforces (`now - 1y ≤ v ≤ now + 5y`). Empty passes — the
-   *  form-level required is toggled by the caller, not by this validator. */
+   *  form-level required is toggled by the caller, not by this validator.
+   *
+   *  Typed as `AbstractControl` (not `FormControl<string>`) because
+   *  `ValidatorFn` is contravariant in its input — Angular's stricter
+   *  compile-time check (`ng serve`) rejects the narrower signature. */
   private _followUpAtBoundsValidator(
-    control: FormControl<string>,
+    control: AbstractControl,
   ): { followUpOutOfRange: string } | null {
-    const raw = control.value;
+    const raw = ((control.value as string | null | undefined) ?? '').toString();
     if (!raw) return null;
     const due = new Date(raw);
     if (Number.isNaN(due.getTime())) {
