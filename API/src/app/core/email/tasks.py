@@ -98,7 +98,6 @@ def backfill_account(account_id: str) -> dict[str, Any]:
 
 async def _backfill_account_async(account_id: uuid.UUID) -> dict[str, Any]:
     from src.app.core.email import service as email_service
-    from src.app.core.email.sync_daemon import dispatch_inbound
     from src.app.shared.context import (
         RequestContext,
         reset_context,
@@ -147,10 +146,11 @@ async def _backfill_account_async(account_id: uuid.UUID) -> dict[str, Any]:
                     "account_id": str(account_id),
                 }
 
-            # Hand each matched message to Step 5's handler (no-op
-            # until Step 5 ships).
-            for m in result.matched:
-                await dispatch_inbound(account, _normalise_match(account, m))
+            # Enrich each match with body_text + raw_b64, then hand
+            # to Step 5's handler. The provider sync primitives return
+            # metadata-only records to keep the scan cheap — body is
+            # fetched here, once per match.
+            await _dispatch_matched_messages(account, session, result.matched)
 
             if result.new_cursor:
                 account.sync_cursor = result.new_cursor
@@ -204,10 +204,7 @@ async def _sync_account_incremental_async(
     account_id: uuid.UUID,
 ) -> dict[str, Any]:
     from src.app.core.email import service as email_service
-    from src.app.core.email.sync_daemon import (
-        account_lock,
-        dispatch_inbound,
-    )
+    from src.app.core.email.sync_daemon import account_lock
     from src.app.shared.context import (
         RequestContext,
         reset_context,
@@ -283,8 +280,7 @@ async def _sync_account_incremental_async(
                     await session.commit()
                     return await _backfill_account_async(account_id)
 
-                for m in result.matched:
-                    await dispatch_inbound(account, _normalise_match(account, m))
+                await _dispatch_matched_messages(account, session, result.matched)
 
                 if result.new_cursor:
                     account.sync_cursor = result.new_cursor
@@ -643,9 +639,22 @@ async def _provider_incremental(account, session):
     raise RuntimeError(f"unknown email provider: {account.provider}")
 
 
-def _normalise_match(account, matched) -> dict:
+def _normalise_match(
+    account,
+    matched,
+    *,
+    body_text: str = "",
+    raw_b64: str | None = None,
+) -> dict:
     """Flatten a provider-specific MatchedMessage into the
-    provider-neutral dict shape Step 5's handler consumes."""
+    provider-neutral dict shape Step 5's handler consumes.
+
+    ``body_text`` and ``raw_b64`` are populated by
+    :func:`_fetch_body_for_match` before this is called (the provider
+    sync primitives deliberately return metadata-only MatchedMessage
+    records to keep the scan cheap; body fetch is a per-match cost
+    paid only for the matched subset).
+    """
     # Gmail and Microsoft each carry slightly different ids on the
     # MatchedMessage dataclass; normalise here so the inbound
     # handler doesn't have to know which one it got.
@@ -668,8 +677,170 @@ def _normalise_match(account, matched) -> dict:
         "conversation_id": data.get("gmail_thread_id") or data.get("graph_conversation_id"),
         "headers": data.get("headers", {}),
         "contact_id": data.get("matched_contact_id"),
-        "raw_b64": None,
+        "body_text": body_text,
+        "raw_b64": raw_b64,
     }
+
+
+# Cap persisted body-text at 64 KB (well past the useful signal-to-
+# noise threshold for CRM triage — reply text, opening line, key ask).
+# Full raw MIME still lives on the payload column for audit / forensics.
+_BODY_TEXT_MAX_CHARS = 64_000
+
+
+def _extract_body_text_from_mime(raw_mime: bytes) -> str:
+    """Parse raw RFC-822 bytes + return the best-effort plaintext body.
+
+    Prefers ``text/plain`` (verbatim). Falls back to ``text/html`` with
+    tags stripped when no plain part exists (marketing / rich-format
+    email increasingly ships HTML-only). Returns "" on unparseable or
+    empty payloads — caller falls back to the subject as bubble text.
+    """
+    from email import policy
+    from email.parser import BytesParser
+
+    if not raw_mime:
+        return ""
+    try:
+        msg = BytesParser(policy=policy.default).parsebytes(raw_mime)
+    except Exception:
+        log.warning("email body parse failed; returning empty", exc_info=True)
+        return ""
+
+    plain_part = msg.get_body(preferencelist=("plain",))
+    if plain_part is not None:
+        try:
+            content = plain_part.get_content()
+            if isinstance(content, str) and content.strip():
+                return content.strip()[:_BODY_TEXT_MAX_CHARS]
+        except Exception:
+            log.warning("email plain-part decode failed", exc_info=True)
+
+    html_part = msg.get_body(preferencelist=("html",))
+    if html_part is not None:
+        try:
+            html = html_part.get_content()
+            if isinstance(html, str) and html.strip():
+                import re as _re
+
+                # Strip scripts/styles first (their content isn't
+                # user-visible + often huge), then all remaining tags,
+                # then collapse whitespace runs.
+                stripped = _re.sub(
+                    r"<(script|style)[^>]*>.*?</\1>",
+                    " ",
+                    html,
+                    flags=_re.DOTALL | _re.IGNORECASE,
+                )
+                stripped = _re.sub(r"<[^>]+>", " ", stripped)
+                stripped = _re.sub(r"\s+", " ", stripped).strip()
+                if stripped:
+                    return stripped[:_BODY_TEXT_MAX_CHARS]
+        except Exception:
+            log.warning("email html-part decode failed", exc_info=True)
+
+    return ""
+
+
+async def _fetch_body_for_match(account, session, matched) -> tuple[str, str | None]:
+    """Fetch raw MIME for a MatchedMessage + extract plaintext body.
+
+    Provider sync primitives fetch metadata only (cheap); this is the
+    per-match body-fetch step. Returns ``(body_text, raw_b64)`` where
+    ``raw_b64`` is the base64-encoded raw MIME (kept on the message
+    payload for audit / re-parse). Both fall back to ``("", None)``
+    when the provider fetch fails — the caller persists whatever it
+    can (subject → bubble text) rather than dropping the whole message.
+    """
+    import base64
+
+    if account.provider == EmailAccountProvider.gmail:
+        from src.app.core.email.gmail.client import GmailClient, GmailHTTPError
+
+        gmail_id = getattr(matched, "gmail_message_id", None) or (
+            matched.get("gmail_message_id") if isinstance(matched, dict) else None
+        )
+        if not gmail_id:
+            return "", None
+        client = GmailClient(account=account, session=session)
+        try:
+            detail = await client.get_message(gmail_id, format="raw")
+        except GmailHTTPError as exc:
+            if exc.status_code == 404:
+                return "", None
+            log.warning(
+                "gmail get_message(raw) failed account=%s msg=%s status=%s",
+                account.id,
+                gmail_id,
+                exc.status_code,
+            )
+            return "", None
+        except Exception:
+            log.exception(
+                "gmail get_message(raw) unexpected error account=%s msg=%s",
+                account.id,
+                gmail_id,
+            )
+            return "", None
+        raw_b64url = detail.get("raw")
+        if not isinstance(raw_b64url, str):
+            return "", None
+        try:
+            raw_mime = base64.urlsafe_b64decode(raw_b64url)
+        except Exception:
+            log.warning("gmail raw base64url decode failed msg=%s", gmail_id, exc_info=True)
+            return "", None
+        body = _extract_body_text_from_mime(raw_mime)
+        return body, base64.b64encode(raw_mime).decode("ascii")
+
+    if account.provider == EmailAccountProvider.microsoft:
+        from src.app.core.email.microsoft.client import GraphClient, GraphHTTPError
+
+        graph_id = getattr(matched, "graph_message_id", None) or (
+            matched.get("graph_message_id") if isinstance(matched, dict) else None
+        )
+        if not graph_id:
+            return "", None
+        client = GraphClient(account=account, session=session)
+        try:
+            raw_mime = await client.get_message_raw(graph_id)
+        except GraphHTTPError as exc:
+            if exc.status_code == 404:
+                return "", None
+            log.warning(
+                "graph get_message_raw failed account=%s msg=%s status=%s",
+                account.id,
+                graph_id,
+                exc.status_code,
+            )
+            return "", None
+        except Exception:
+            log.exception(
+                "graph get_message_raw unexpected error account=%s msg=%s",
+                account.id,
+                graph_id,
+            )
+            return "", None
+        if not raw_mime:
+            return "", None
+        body = _extract_body_text_from_mime(raw_mime)
+        return body, base64.b64encode(raw_mime).decode("ascii")
+
+    return "", None
+
+
+async def _dispatch_matched_messages(account, session, matched_list) -> None:
+    """Enrich every match with body_text + raw_b64, then hand to the
+    inbound dispatcher. Extracted so the backfill + incremental paths
+    can share the same body-fetch loop instead of duplicating it."""
+    from src.app.core.email.sync_daemon import dispatch_inbound
+
+    for m in matched_list:
+        body_text, raw_b64 = await _fetch_body_for_match(account, session, m)
+        await dispatch_inbound(
+            account,
+            _normalise_match(account, m, body_text=body_text, raw_b64=raw_b64),
+        )
 
 
 __all__ = [
