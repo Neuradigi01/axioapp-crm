@@ -100,9 +100,22 @@ def _extract_custom_filters(request: Request) -> list[tuple[str, str]]:
 async def list_contacts_endpoint(
     request: Request,
     q: str | None = Query(default=None, max_length=255),
-    source: str | None = Query(default=None, max_length=64),
-    tag: str | None = Query(default=None, max_length=64),
-    assigned_to_id: uuid.UUID | None = Query(default=None),
+    source: list[str] | None = Query(
+        default=None,
+        description=(
+            "Filter by source. Repeat the param (`?source=X&source=Y`) "
+            "to match any of several sources — the column-header filter "
+            "popover sends this shape."
+        ),
+    ),
+    tag: list[str] | None = Query(
+        default=None,
+        description="Filter by tag. Repeatable — OR-set semantics.",
+    ),
+    assigned_to_id: list[uuid.UUID] | None = Query(
+        default=None,
+        description="Filter by owner UUID. Repeatable — OR-set semantics.",
+    ),
     exclude_anonymised: bool = Query(
         default=False,
         description=(
@@ -121,9 +134,9 @@ async def list_contacts_endpoint(
     rows, total = await list_contacts(
         db,
         q=q,
-        source=source,
-        tag=tag,
-        assigned_to_id=assigned_to_id,
+        sources=source,
+        tags=tag,
+        assigned_to_ids=assigned_to_id,
         custom_filters=_extract_custom_filters(request),
         sort=sort,
         order=order,
@@ -192,9 +205,9 @@ async def check_duplicate_endpoint(
 async def export_csv_endpoint(
     request: Request,
     q: str | None = Query(default=None, max_length=255),
-    source: str | None = Query(default=None, max_length=64),
-    tag: str | None = Query(default=None, max_length=64),
-    assigned_to_id: uuid.UUID | None = Query(default=None),
+    source: list[str] | None = Query(default=None),
+    tag: list[str] | None = Query(default=None),
+    assigned_to_id: list[uuid.UUID] | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("contacts.read")),
 ) -> StreamingResponse:
@@ -209,9 +222,9 @@ async def export_csv_endpoint(
     rows = await export_contacts_csv_rows(
         db,
         q=q,
-        source=source,
-        tag=tag,
-        assigned_to_id=assigned_to_id,
+        sources=source,
+        tags=tag,
+        assigned_to_ids=assigned_to_id,
         custom_filters=_extract_custom_filters(request),
     )
     # Fetch every visible contact custom field for the org. Same order

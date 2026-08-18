@@ -89,13 +89,21 @@ async def delete_contact_row(session: AsyncSession, contact: Contact) -> None:
 def _build_filters(
     *,
     q: str | None,
-    source: str | None,
-    tag: str | None,
-    assigned_to_id: uuid.UUID | None,
+    sources: list[str] | None,
+    tags: list[str] | None,
+    assigned_to_ids: list[uuid.UUID] | None,
     custom_filters: Iterable[tuple[str, str]],
     exclude_anonymised: bool = False,
 ) -> list[ColumnElement[bool]]:
-    """Shared filter assembler used by list / export / count helpers."""
+    """Shared filter assembler used by list / export / count helpers.
+
+    Multi-value semantics — `sources`, `tags`, and `assigned_to_ids`
+    take a list and produce an OR-set (rows matching any listed value).
+    Empty / None lists are ignored. Backed by the column-header filter
+    popover on the frontend, which lets an operator tick several
+    values on the same column at once. Same shape any other list page
+    can adopt when it wires the shared `app-column-filter`.
+    """
     filters: list[ColumnElement[bool]] = []
     if q:
         like = f"%{q}%"
@@ -106,12 +114,16 @@ def _build_filters(
                 Contact.email.ilike(like),
             )
         )
-    if source:
-        filters.append(Contact.source == source)
-    if tag:
-        filters.append(Contact.tags.contains([tag]))
-    if assigned_to_id is not None:
-        filters.append(Contact.assigned_to_id == assigned_to_id)
+    if sources:
+        filters.append(Contact.source.in_(sources))
+    if tags:
+        # OR of per-tag `@>` (contains) checks — row matches when its
+        # tags array contains at least one of the requested tags. Uses
+        # the same operator as the existing single-tag filter so no new
+        # index characteristic is introduced.
+        filters.append(or_(*(Contact.tags.contains([t]) for t in tags)))
+    if assigned_to_ids:
+        filters.append(Contact.assigned_to_id.in_(assigned_to_ids))
     if exclude_anonymised:
         filters.append(Contact.anonymised_at.is_(None))
     for key, value in custom_filters:
@@ -122,9 +134,9 @@ def _build_filters(
 def build_contact_list_query(
     *,
     q: str | None,
-    source: str | None,
-    tag: str | None,
-    assigned_to_id: uuid.UUID | None,
+    sources: list[str] | None,
+    tags: list[str] | None,
+    assigned_to_ids: list[uuid.UUID] | None,
     custom_filters: Iterable[tuple[str, str]],
     sort_column: Any,
     sort: str,
@@ -140,9 +152,9 @@ def build_contact_list_query(
     """
     filters = _build_filters(
         q=q,
-        source=source,
-        tag=tag,
-        assigned_to_id=assigned_to_id,
+        sources=sources,
+        tags=tags,
+        assigned_to_ids=assigned_to_ids,
         custom_filters=custom_filters,
         exclude_anonymised=exclude_anonymised,
     )
@@ -340,17 +352,17 @@ async def count_contacts_filtered(
     session: AsyncSession,
     *,
     q: str | None,
-    source: str | None,
-    tag: str | None,
-    assigned_to_id: uuid.UUID | None,
+    sources: list[str] | None,
+    tags: list[str] | None,
+    assigned_to_ids: list[uuid.UUID] | None,
     custom_filters: Iterable[tuple[str, str]],
 ) -> int:
     """Total contacts matching the filter set — used by CSV-export cap."""
     filters = _build_filters(
         q=q,
-        source=source,
-        tag=tag,
-        assigned_to_id=assigned_to_id,
+        sources=sources,
+        tags=tags,
+        assigned_to_ids=assigned_to_ids,
         custom_filters=custom_filters,
     )
     stmt = select(func.count()).select_from(Contact)
@@ -629,9 +641,9 @@ async def list_contacts_for_export(
     session: AsyncSession,
     *,
     q: str | None,
-    source: str | None,
-    tag: str | None,
-    assigned_to_id: uuid.UUID | None,
+    sources: list[str] | None,
+    tags: list[str] | None,
+    assigned_to_ids: list[uuid.UUID] | None,
     custom_filters: Iterable[tuple[str, str]],
 ) -> list[Contact]:
     """Resolve every matching contact (no pagination) for CSV export.
@@ -641,9 +653,9 @@ async def list_contacts_for_export(
     """
     filters = _build_filters(
         q=q,
-        source=source,
-        tag=tag,
-        assigned_to_id=assigned_to_id,
+        sources=sources,
+        tags=tags,
+        assigned_to_ids=assigned_to_ids,
         custom_filters=custom_filters,
     )
     stmt = select(Contact).order_by(Contact.created_at.desc(), Contact.id.desc())

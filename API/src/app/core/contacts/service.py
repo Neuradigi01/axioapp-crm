@@ -982,9 +982,9 @@ async def list_contacts(
     session: AsyncSession,
     *,
     q: str | None = None,
-    source: str | None = None,
-    tag: str | None = None,
-    assigned_to_id: uuid.UUID | None = None,
+    sources: list[str] | None = None,
+    tags: list[str] | None = None,
+    assigned_to_ids: list[uuid.UUID] | None = None,
     custom_filters: Iterable[tuple[str, str]] = (),
     sort: Literal["full_name", "created_at", "last_activity_at"] = "created_at",
     order: Literal["asc", "desc"] = "desc",
@@ -996,11 +996,11 @@ async def list_contacts(
 
     - `q` matches full_name / phone / email via ILIKE; trigram GIN index
       accelerates the full_name leg.
-    - `source` is exact match.
-    - `tag` checks the value is contained in the `tags` array.
-    - `assigned_to_id` filters by owner. None means no filter (show all);
-      the "show only unassigned" UI predicate is wired in Step 2 via a
-      separate query param so we don't overload the UUID semantic here.
+    - `sources`, `tags`, `assigned_to_ids` are multi-value OR-sets — a
+      row matches when its value belongs to the given list. Backs the
+      column-header filter popovers on the list page (an operator can
+      tick e.g. Source ∈ {Walk-in, Website}). `None` / empty means no
+      filter on that column.
     - `custom_filters` is an iterable of `(key, expected_string_value)`
       pairs that translate to `custom_data ->> key = :value`. String
       compare is intentional: it's what the master prompt example uses
@@ -1011,9 +1011,9 @@ async def list_contacts(
     """
     base = data_access.build_contact_list_query(
         q=q,
-        source=source,
-        tag=tag,
-        assigned_to_id=assigned_to_id,
+        sources=sources,
+        tags=tags,
+        assigned_to_ids=assigned_to_ids,
         custom_filters=custom_filters,
         sort_column=_SORT_COLUMNS[sort],
         sort=sort,
@@ -1275,9 +1275,9 @@ async def export_contacts_csv_rows(
     session: AsyncSession,
     *,
     q: str | None = None,
-    source: str | None = None,
-    tag: str | None = None,
-    assigned_to_id: uuid.UUID | None = None,
+    sources: list[str] | None = None,
+    tags: list[str] | None = None,
+    assigned_to_ids: list[uuid.UUID] | None = None,
     custom_filters: Iterable[tuple[str, str]] = (),
 ) -> list[Contact]:
     """Resolve the export filter to a list of contacts (≤ EXPORT_CSV_MAX_ROWS).
@@ -1290,9 +1290,9 @@ async def export_contacts_csv_rows(
     total = await data_access.count_contacts_filtered(
         session,
         q=q,
-        source=source,
-        tag=tag,
-        assigned_to_id=assigned_to_id,
+        sources=sources,
+        tags=tags,
+        assigned_to_ids=assigned_to_ids,
         custom_filters=custom_filters,
     )
     if total > EXPORT_CSV_MAX_ROWS:
@@ -1307,8 +1307,8 @@ async def export_contacts_csv_rows(
     return await data_access.list_contacts_for_export(
         session,
         q=q,
-        source=source,
-        tag=tag,
-        assigned_to_id=assigned_to_id,
+        sources=sources,
+        tags=tags,
+        assigned_to_ids=assigned_to_ids,
         custom_filters=custom_filters,
     )
