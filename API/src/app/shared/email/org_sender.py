@@ -17,8 +17,17 @@ Preference order:
   2. Any verified :class:`EmailSmtpSender` for the org (oldest first)
      → :class:`OrgSmtpBackend`.
   3. Any :class:`core.email.models.EmailAccount` whose
-     ``sync_state='live'`` for the org (oldest first) →
-     :class:`OrgOauthBackend`.
+     ``sync_state != 'disconnected'`` for the org (oldest first) →
+     :class:`OrgOauthBackend`. The OAuth gate is deliberately loose:
+     ``sync_state`` describes the *inbound* sync lifecycle
+     (pending → backfilling → live [→ error]) but outbound send only
+     needs a live refresh_token, which is nulled at the same instant
+     as the ``disconnected`` flip in :func:`core.email.service.disconnect_account`.
+     Requiring ``sync_state='live'`` here made every workflow email
+     wait on the 30-day backfill task to complete after OAuth — and
+     stay silently broken forever if that task got killed mid-run.
+     Ordering by ``connected_at`` gives the oldest-connected mailbox
+     first pick, matching the SMTP branch's "first-verified wins" bias.
   4. ``None`` — caller decides how to skip (never silently falls
      back to the platform Brevo sender).
 """
@@ -174,7 +183,8 @@ async def resolve_org_sender(
         select(EmailAccount)
         .where(
             EmailAccount.org_id == org_id,
-            EmailAccount.sync_state == EmailAccountSyncState.live,
+            EmailAccount.sync_state != EmailAccountSyncState.disconnected,
+            EmailAccount.refresh_token_enc.is_not(None),
         )
         .order_by(EmailAccount.connected_at.asc())
         .limit(1)

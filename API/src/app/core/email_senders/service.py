@@ -389,13 +389,22 @@ async def list_unified_senders(
         # thinking a re-sync is in flight when it isn't.
         if r.sync_state == EmailAccountSyncState.disconnected:
             continue
+        # `verified` here means "the outbound resolver will pick this
+        # up right now" — must stay in lockstep with the OAuth branch
+        # of `shared.email.org_sender.resolve_org_sender`. Both
+        # deliberately DON'T require sync_state='live': the inbound
+        # 30-day backfill is orthogonal to send readiness. Requiring
+        # 'live' meant every workflow email waited on that backfill
+        # + stayed silently broken forever when the backfill task got
+        # killed mid-run.
+        sendable = r.refresh_token_enc is not None
         merged.append(
             UnifiedSenderOut(
                 kind=provider,  # type: ignore[arg-type]
                 id=str(r.id),
                 from_address=r.email_address,
                 display_name=r.display_name,
-                verified=r.sync_state == EmailAccountSyncState.live,
+                verified=sendable,
                 # OAuth mailboxes don't carry a default flag today —
                 # the resolver falls through to them only when no
                 # verified SMTP sender exists.

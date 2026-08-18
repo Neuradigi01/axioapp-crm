@@ -137,18 +137,22 @@
                        - SMTP:            verified = user clicked the
                          magic-link (proves ownership of the mailbox).
                          Un-verified → "Pending" until they click it.
-                       - Gmail/Microsoft: OAuth grant succeeded (that's
-                         how the row exists at all), but backend still
-                         sets ``verified = (sync_state == 'live')`` —
-                         so a row can exist with tokens yet be
-                         un-verified when the initial backfill task
-                         hasn't flipped sync_state to live yet (e.g.
-                         Redis blip during OAuth callback). Distinguish
-                         those states so the operator sees the real
-                         picture. The `email-sweep-stuck-pending`
-                         Celery task auto-recovers within ~60s; the
-                         Reconnect button is the manual escape hatch
-                         if the sweep can't. -->
+                       - Gmail/Microsoft: verified = row still has a
+                         valid refresh_token AND sync_state is not
+                         disconnected. Deliberately decoupled from the
+                         inbound-backfill lifecycle — an OAuth mailbox
+                         can send outbound the instant consent is
+                         granted, even while the initial 30-day inbox
+                         scan is still catching up. The "Syncing…"
+                         branch below is now only ever hit if the
+                         operator manually revokes the refresh_token
+                         out-of-band (rare); the Reconnect button
+                         re-runs OAuth to restore it. -->
+                  <!-- Gate must stay in lockstep with the OAuth
+                       branch of shared/email/org_sender.py
+                       resolve_org_sender — if you change one, change
+                       the other. -->
+
                   @if (row.kind === 'smtp') {
                     @if (row.verified) {
                       <span

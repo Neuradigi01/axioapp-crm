@@ -61,6 +61,16 @@ log = logging.getLogger(__name__)
 _MAX_CONSECUTIVE_ERRORS = 3
 # Poll-fallback freshness: skip accounts synced within this window.
 _POLL_FRESHNESS_WINDOW = timedelta(minutes=5)
+# Stuck-backfill recovery cutoff. The per-account backfill has a
+# 30-min hard time limit (see `backfill_account` above); we wait a
+# small buffer past that before treating a `backfilling` row as
+# abandoned (worker SIGKILL, docker restart, host reboot — none of
+# which trigger the BaseException cleanup below).
+_BACKFILLING_STUCK_CUTOFF = timedelta(minutes=40)
+# Stuck-error recovery cutoff. A transient Gmail/Graph blip flips the
+# row to `error`; retrying every 15 min turns those into a self-
+# healing account without spamming a genuinely-revoked one.
+_ERROR_RETRY_CUTOFF = timedelta(minutes=15)
 # Renewal scan: enqueue renewal when watch/subscription expires
 # within this window.
 _RENEWAL_LEAD_TIME = timedelta(hours=24)
@@ -423,27 +433,39 @@ async def _poll_fallback_async() -> dict[str, Any]:
 
 @shared_task(name="src.app.core.email.tasks.sweep_stuck_pending")
 def sweep_stuck_pending() -> dict[str, Any]:
-    """Every 60s — recover email accounts stuck in ``sync_state='pending'``
-    past the freshness window.
+    """Every 60s — recover email accounts stuck outside ``sync_state='live'``
+    past the per-state freshness window.
 
     Why this exists: ``sync_daemon.enqueue_backfill`` is a fire-and-
     forget wrapper — if Redis / the Celery broker was blipping during
     the OAuth callback, the ``backfill_account.delay()`` swallows the
-    connection error + the row stays ``pending`` forever, so
-    ``resolve_org_sender`` never picks the account up + workflow email
-    sends silently skip with ``org_sender_not_configured``. Ajay's
+    connection error + the row stays ``pending`` forever. Ajay's
     Workspace hit this on 2026-08-04 (see
     ``memory/project_workflows_absorb_automation.md``); we hand-flipped
     his ``sync_state`` to unblock, but every future OAuth completion
-    would have the same silent-fail exposure.
+    would have the same silent-fail exposure. Symptom is always the
+    same: ``resolve_org_sender`` never picks the account up + workflow
+    email sends silently skip with ``org_sender_not_configured``.
 
-    Sweep logic: find every non-disconnected account still ``pending``
-    older than 5 minutes (long enough that the connect-flow's initial
-    enqueue would have completed on a healthy broker) and re-enqueue
-    backfill. The backfill task is idempotent — a duplicate on an
-    already-transitioning row is a no-op. Cap at 200/tick to bound
-    wall-clock; a healthy environment should never accumulate more
-    than a handful in a minute.
+    Three non-live states can leave an account stuck; each has its own
+    cutoff:
+
+      * ``pending`` — enqueue was lost (broker blip). Recover after
+        5 min (long enough that a healthy enqueue would have started
+        the task).
+      * ``backfilling`` — worker was killed mid-run (docker restart,
+        SIGKILL, host reboot). The BaseException cleanup at the top of
+        this file only fires when the async frame terminates, so a
+        cold kill leaves the row here. Recover after 40 min (past the
+        30-min hard time-limit plus buffer).
+      * ``error`` — a real backfill exception. Retry after 15 min so a
+        transient Gmail/Graph blip self-heals; a genuinely revoked
+        account will keep bouncing back to ``error`` on each attempt
+        (operator sees ``last_sync_error`` and clicks Reconnect).
+
+    ``disconnected`` rows are excluded — the operator explicitly
+    revoked. The backfill task is idempotent, so a duplicate enqueue
+    on an already-transitioning row is a no-op. Cap at 200/tick.
     """
     return asyncio.run(_sweep_stuck_pending_async())
 
@@ -454,30 +476,54 @@ async def _sweep_stuck_pending_async() -> dict[str, Any]:
     from src.app.core.email.sync_daemon import enqueue_backfill
     from src.app.shared.db import async_session
 
-    cutoff = datetime.now(UTC) - _POLL_FRESHNESS_WINDOW
+    now = datetime.now(UTC)
+    pending_cutoff = now - _POLL_FRESHNESS_WINDOW
+    backfilling_cutoff = now - _BACKFILLING_STUCK_CUTOFF
+    error_cutoff = now - _ERROR_RETRY_CUTOFF
     async with async_session() as session:
         rows = (
             await session.execute(
                 text(
                     """
-                    SELECT id
+                    SELECT id, sync_state
                       FROM tbl_email_accounts
-                     WHERE sync_state = 'pending'
-                       AND disconnected_at IS NULL
-                       AND (connected_at IS NULL OR connected_at < :cutoff)
+                     WHERE disconnected_at IS NULL
+                       AND (
+                            (sync_state = 'pending'
+                             AND (connected_at IS NULL
+                                  OR connected_at < :pending_cutoff))
+                         OR (sync_state = 'backfilling'
+                             AND (last_sync_at IS NULL
+                                  OR last_sync_at < :backfilling_cutoff)
+                             AND (connected_at IS NULL
+                                  OR connected_at < :backfilling_cutoff))
+                         OR (sync_state = 'error'
+                             AND (last_sync_at IS NULL
+                                  OR last_sync_at < :error_cutoff))
+                       )
                      LIMIT 200
                     """
                 ),
-                {"cutoff": cutoff},
+                {
+                    "pending_cutoff": pending_cutoff,
+                    "backfilling_cutoff": backfilling_cutoff,
+                    "error_cutoff": error_cutoff,
+                },
             )
         ).all()
 
-    for (aid,) in rows:
+    by_state: dict[str, int] = {}
+    for aid, state in rows:
         enqueue_backfill(aid)
+        by_state[state] = by_state.get(state, 0) + 1
 
     if rows:
-        log.info("email.sweep_stuck_pending re-enqueued=%d", len(rows))
-    return {"enqueued": len(rows)}
+        log.info(
+            "email.sweep_stuck_pending re-enqueued=%d by_state=%s",
+            len(rows),
+            by_state,
+        )
+    return {"enqueued": len(rows), "by_state": by_state}
 
 
 @shared_task(name="src.app.core.email.tasks.scan_renewals")
