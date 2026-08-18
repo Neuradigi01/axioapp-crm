@@ -520,6 +520,13 @@ async def update_lead(
         before=before,
         after=_snapshot(lead),
     )
+    if changed_fields:
+        await _publish_lead_updated(
+            session,
+            org_id=lead.org_id,
+            lead=lead,
+            changed_fields=sorted(changed_fields),
+        )
     return lead
 
 
@@ -1214,6 +1221,7 @@ async def _publish_lead_status_changed(
                 "support_email": getattr(org, "support_email", "") or "",
             }
 
+        updated_iso = lead.updated_at.isoformat() if lead.updated_at else ""
         await events_publish(
             "lead.status_changed",
             payload,
@@ -1221,14 +1229,113 @@ async def _publish_lead_status_changed(
             # Include both stages so consecutive fires on the same
             # lead land as distinct event_ids — otherwise dedup would
             # collapse the second transition into a replay.
-            event_id=f"lead_status_changed:{lead.id}:{from_stage}->{to_stage}:"
-            f"{lead.updated_at.isoformat() if lead.updated_at else ''}",
+            event_id=f"lead_status_changed:{lead.id}:{from_stage}->{to_stage}:{updated_iso}",
         )
+
+        # Fire specialization events alongside so operators can
+        # subscribe directly to "lead converted" / "lead lost" without
+        # adding a status-value condition on `lead.status_changed`.
+        # Payload envelope is identical — same handlers work either
+        # way. Only fire on the transitioning tick (from_status must
+        # actually differ from the terminal status).
+        if to_status == "won" and from_status != "won":
+            await events_publish(
+                "lead.converted",
+                payload,
+                org_id=org_id,
+                event_id=f"lead_converted:{lead.id}:{updated_iso}",
+            )
+        elif to_status == "lost" and from_status != "lost":
+            await events_publish(
+                "lead.lost",
+                payload,
+                org_id=org_id,
+                event_id=f"lead_lost:{lead.id}:{updated_iso}",
+            )
     except Exception:
         import logging
 
         logging.getLogger(__name__).exception(
             "leads.move_stage publish_lead_status_changed_failed org=%s lead=%s",
+            org_id,
+            lead.id,
+        )
+
+
+async def _publish_lead_updated(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    lead: Lead,
+    changed_fields: list[str],
+) -> None:
+    """Emit ``lead.updated`` for any non-stage field change. Stage
+    transitions get their own ``lead.status_changed`` fire via
+    :func:`_publish_lead_status_changed` — this event covers the
+    "operator edited name / budget / custom_data / assignment" surface
+    so workflows can subscribe without hooking every field. Failures
+    are swallowed + logged; a bus hiccup must never bubble back to
+    the operator who just saved a form."""
+    try:
+        from sqlalchemy import select
+
+        from src.app.core.contacts.models import Contact
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+
+        contact = (
+            await session.execute(select(Contact).where(Contact.id == lead.contact_id))
+        ).scalar_one_or_none()
+        org = (
+            await session.execute(select(Organization).where(Organization.id == org_id))
+        ).scalar_one_or_none()
+
+        payload: dict = {
+            "lead_id": str(lead.id),
+            "contact_id": str(lead.contact_id),
+            "changed_fields": changed_fields,
+            "lead": {
+                "id": str(lead.id),
+                "pipeline_stage": lead.pipeline_stage,
+                "status": lead.status.value if hasattr(lead.status, "value") else str(lead.status),
+                "source": str(lead.source) if lead.source else None,
+                "assigned_to_id": (str(lead.assigned_to_id) if lead.assigned_to_id else None),
+                "budget": float(lead.budget) if lead.budget is not None else None,
+            },
+        }
+        if contact is not None:
+            full = contact.full_name or ""
+            parts = full.split(None, 1) if full else []
+            first = parts[0] if parts else ""
+            last = parts[1] if len(parts) > 1 else ""
+            payload["contact"] = {
+                "id": str(contact.id),
+                "first_name": first,
+                "last_name": last,
+                "full_name": full,
+                "email": contact.email,
+                "phone": contact.phone,
+            }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+                "support_email": getattr(org, "support_email", "") or "",
+            }
+
+        updated_iso = lead.updated_at.isoformat() if lead.updated_at else ""
+        await events_publish(
+            "lead.updated",
+            payload,
+            org_id=org_id,
+            event_id=f"lead_updated:{lead.id}:{updated_iso}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "leads.update_lead publish_lead_updated_failed org=%s lead=%s",
             org_id,
             lead.id,
         )

@@ -224,6 +224,23 @@ async def get_message_by_channel_message_id(
     ).scalar_one_or_none()
 
 
+async def get_message_by_channel_id_org_scoped(
+    session: AsyncSession,
+    *,
+    channel_message_id: str,
+) -> Message | None:
+    """Reverse lookup by Meta wamid without a known conversation_id.
+    Used by the WhatsApp status-webhook path where the payload only
+    carries the wamid + the receiving phone; org scoping is enforced
+    by the RLS policy set from the router's ``set_context()`` call.
+    Meta wamids are globally unique so a single-row match is safe."""
+    return (
+        await session.execute(
+            select(Message).where(Message.channel_message_id == channel_message_id)
+        )
+    ).scalar_one_or_none()
+
+
 async def get_last_inbound_message(
     session: AsyncSession, conversation_id: uuid.UUID
 ) -> Message | None:
@@ -475,6 +492,7 @@ __all__ = [
     "find_conversation_for_channel_external",
     "get_conversation_by_id",
     "get_last_inbound_message",
+    "get_message_by_channel_id_org_scoped",
     "get_message_by_channel_message_id",
     "get_message_by_id",
     "get_tag_assignment",

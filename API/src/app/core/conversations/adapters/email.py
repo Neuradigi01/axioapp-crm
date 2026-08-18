@@ -71,8 +71,6 @@ from src.app.core.email.models import (
     EmailAccountProvider,
     EmailAccountSyncState,
 )
-from src.app.core.events import bus as events_bus
-from src.app.core.events.event_catalog import EMAIL_MESSAGE_RECEIVED
 from src.app.core.email.tracking import (
     footer as tracking_footer,
 )
@@ -85,6 +83,8 @@ from src.app.core.email.tracking import (
 from src.app.core.email.tracking import (
     tokens as tracking_tokens,
 )
+from src.app.core.events import bus as events_bus
+from src.app.core.events.event_catalog import EMAIL_MESSAGE_RECEIVED, EMAIL_REPLIED
 from src.app.core.notifications.service import notify
 from src.app.core.settings.models import OrgSettings
 from src.app.core.tenants import data_access as tenants_da
@@ -645,6 +645,22 @@ async def receive_email(account: EmailAccount, matched: dict[str, Any]) -> Messa
             message=msg,
             text=body_text,
         )
+
+        # If the inbound message references a prior message (via
+        # In-Reply-To / References headers), it's a reply to something
+        # we sent — fire the workflow-facing ``email.replied`` event
+        # alongside the chatbot ``email.message_received`` fire above.
+        # Distinct events because reply-to-CRM-outbound has different
+        # workflow semantics than "any inbound landed" (the reply is
+        # the trigger for sales-follow-up flows).
+        if thread_keys:
+            await _publish_email_replied(
+                session,
+                conversation=conversation,
+                message=msg,
+                text=body_text,
+                subject=headers.get("subject", ""),
+            )
         return msg
 
 
@@ -723,6 +739,46 @@ async def _publish_email_message_received(
     except Exception:  # noqa: BLE001
         logger.exception(
             "chatbot.email.publish_failed conv=%s msg=%s",
+            conversation.id,
+            message.id,
+        )
+
+
+async def _publish_email_replied(
+    session: AsyncSession,
+    *,
+    conversation: Conversation,
+    message: Message,
+    text: str | None,
+    subject: str,
+) -> None:
+    """Fire ``email.replied`` when an inbound email threads back to a
+    prior outbound. Distinct from ``email.message_received`` (which
+    fires on every inbound) — this event fires only when the sender
+    replied to something the CRM sent, which is the trigger operators
+    want for sales-follow-up + support-response workflows.
+
+    Fire-and-forget: a bus/subscriber failure never rolls back the
+    persisted inbound message.
+    """
+    try:
+        payload: dict[str, Any] = {
+            "conversation_id": str(conversation.id),
+            "contact_id": (str(conversation.contact_id) if conversation.contact_id else None),
+            "message_id": str(message.id),
+            "subject": subject or "",
+            "preview": (text or "")[:500],
+            "channel": conversation.channel.value,
+        }
+        await events_bus.publish(
+            EMAIL_REPLIED,
+            payload,
+            org_id=conversation.org_id,
+            event_id=f"email_replied:{message.id}",
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "email.replied.publish_failed conv=%s msg=%s",
             conversation.id,
             message.id,
         )

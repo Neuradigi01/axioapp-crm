@@ -43,15 +43,20 @@ USER_ROLE_CHANGED = "user.role_changed"
 # --- Leads + contacts -----------------------------------------------------
 
 LEAD_CREATED = "lead.created"
+LEAD_UPDATED = "lead.updated"
 LEAD_STATUS_CHANGED = "lead.status_changed"
 LEAD_SCORE_THRESHOLD = "lead.score_threshold"
 LEAD_ASSIGNED = "lead.assigned"
 LEAD_CONVERTED = "lead.converted"
+LEAD_LOST = "lead.lost"
 LEAD_STALE_7D = "lead.stale_7d"
 LEAD_STALE_30D = "lead.stale_30d"
 LEAD_STALE_90D = "lead.stale_90d"
 
 CONTACT_CREATED = "contact.created"
+CONTACT_UPDATED = "contact.updated"
+CONTACT_TAG_ADDED = "contact.tag_added"
+CONTACT_TAG_REMOVED = "contact.tag_removed"
 CONTACT_BIRTHDAY = "contact.birthday"
 CONTACT_ANNIVERSARY = "contact.anniversary"
 CONTACT_OPT_IN_CHANGED = "contact.opt_in_changed"
@@ -81,8 +86,10 @@ ORDER_REFUNDED = "order.refunded"
 EMAIL_OPENED = "email.opened"
 EMAIL_CLICKED = "email.clicked"
 EMAIL_REPLIED = "email.replied"
+EMAIL_BOUNCED = "email.bounced"
 
 WHATSAPP_MESSAGE_RECEIVED = "whatsapp.message_received"
+WHATSAPP_MESSAGE_READ = "whatsapp.message_read"
 WHATSAPP_TEMPLATE_REPLIED = "whatsapp.template_replied"
 # tasks/chatbot-builder Step 4 — inbound email as a first-class
 # trigger event for chatbots. Payload mirrors WHATSAPP_MESSAGE_RECEIVED
@@ -152,14 +159,19 @@ ALL_EVENTS: tuple[str, ...] = (
     USER_ROLE_CHANGED,
     # Leads + contacts
     LEAD_CREATED,
+    LEAD_UPDATED,
     LEAD_STATUS_CHANGED,
     LEAD_SCORE_THRESHOLD,
     LEAD_ASSIGNED,
     LEAD_CONVERTED,
+    LEAD_LOST,
     LEAD_STALE_7D,
     LEAD_STALE_30D,
     LEAD_STALE_90D,
     CONTACT_CREATED,
+    CONTACT_UPDATED,
+    CONTACT_TAG_ADDED,
+    CONTACT_TAG_REMOVED,
     CONTACT_BIRTHDAY,
     CONTACT_ANNIVERSARY,
     CONTACT_OPT_IN_CHANGED,
@@ -181,7 +193,9 @@ ALL_EVENTS: tuple[str, ...] = (
     EMAIL_OPENED,
     EMAIL_CLICKED,
     EMAIL_REPLIED,
+    EMAIL_BOUNCED,
     WHATSAPP_MESSAGE_RECEIVED,
+    WHATSAPP_MESSAGE_READ,
     WHATSAPP_TEMPLATE_REPLIED,
     EMAIL_MESSAGE_RECEIVED,
     # Activities
@@ -225,14 +239,19 @@ EVENT_DESCRIPTIONS: dict[str, str] = {
         "A new lead lands from ANY source — manual / API, embed widget, "
         "Google Ads, Meta Ads, CSV import."
     ),
+    LEAD_UPDATED: "Any editable lead field changes (name, contact info, budget, custom fields).",
     LEAD_STATUS_CHANGED: "Lead transitions between pipeline stages.",
     LEAD_SCORE_THRESHOLD: "Lead score crosses a configured threshold.",
     LEAD_ASSIGNED: "Lead owner assignment changes.",
-    LEAD_CONVERTED: "Lead promoted to a confirmed contact.",
+    LEAD_CONVERTED: "Lead moved to a 'won' pipeline stage (specialization of status_changed).",
+    LEAD_LOST: "Lead moved to a 'lost' pipeline stage (specialization of status_changed).",
     LEAD_STALE_7D: "Lead has had no activity in 7 days.",
     LEAD_STALE_30D: "Lead has had no activity in 30 days.",
     LEAD_STALE_90D: "Lead has had no activity in 90 days.",
     CONTACT_CREATED: "A new contact is added to the CRM.",
+    CONTACT_UPDATED: "Any editable contact field changes (name, phone, email, custom fields).",
+    CONTACT_TAG_ADDED: "A tag was applied to a contact.",
+    CONTACT_TAG_REMOVED: "A tag was removed from a contact.",
     CONTACT_BIRTHDAY: "Daily sweep finds a contact whose birthday is today.",
     CONTACT_ANNIVERSARY: "Anniversary of contact becoming a customer.",
     CONTACT_OPT_IN_CHANGED: "Contact's marketing opt-in state changes.",
@@ -252,7 +271,15 @@ EVENT_DESCRIPTIONS: dict[str, str] = {
     EMAIL_OPENED: "Tracking pixel hit on a sent automation email.",
     EMAIL_CLICKED: "Recipient clicked a tracked link in the email.",
     EMAIL_REPLIED: "Recipient replied to the conversation thread.",
+    EMAIL_BOUNCED: (
+        "Hard/soft bounce report received (mailbox unknown, over-quota, "
+        "policy reject, etc.)."
+    ),
     WHATSAPP_MESSAGE_RECEIVED: "Inbound WhatsApp message from a contact.",
+    WHATSAPP_MESSAGE_READ: (
+        "Recipient opened a WhatsApp message we sent (Meta 'read' status). "
+        "Only fires when the recipient has read receipts enabled."
+    ),
     WHATSAPP_TEMPLATE_REPLIED: "Contact replied to a template-initiated WA conversation.",
     EMAIL_MESSAGE_RECEIVED: "Inbound email from a contact.",
     PHONE_CALL_LOGGED: "Phone-call activity recorded against a contact.",
@@ -312,6 +339,10 @@ __all__ = [
     "CONTACT_BIRTHDAY",
     "CONTACT_CREATED",
     "CONTACT_OPT_IN_CHANGED",
+    "CONTACT_TAG_ADDED",
+    "CONTACT_TAG_REMOVED",
+    "CONTACT_UPDATED",
+    "EMAIL_BOUNCED",
     "EMAIL_CLICKED",
     "EMAIL_OPENED",
     "EMAIL_REPLIED",
@@ -326,11 +357,13 @@ __all__ = [
     "LEAD_ASSIGNED",
     "LEAD_CONVERTED",
     "LEAD_CREATED",
+    "LEAD_LOST",
     "LEAD_SCORE_THRESHOLD",
     "LEAD_STALE_30D",
     "LEAD_STALE_7D",
     "LEAD_STALE_90D",
     "LEAD_STATUS_CHANGED",
+    "LEAD_UPDATED",
     "MEETING_BOOKED",
     "NOTE_ADDED",
     "ORDER_DELIVERED",
@@ -356,6 +389,7 @@ __all__ = [
     "WALK_IN_REGISTERED",
     "EMAIL_MESSAGE_RECEIVED",
     "WHATSAPP_MESSAGE_RECEIVED",
+    "WHATSAPP_MESSAGE_READ",
     "WHATSAPP_TEMPLATE_REPLIED",
     "WORKFLOW_SCHEDULE_FIRED",
     "is_known_event",

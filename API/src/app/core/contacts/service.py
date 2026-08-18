@@ -429,6 +429,12 @@ async def update_contact(
             user_uuid=changes["assigned_to_id"],
         )
 
+    # Snapshot tags BEFORE mutation so we can compute the added/removed
+    # sets after the commit. Contact.tags is a list column — we treat
+    # membership changes as set semantics (order changes don't count).
+    tags_before: set[str] = {str(t) for t in (contact.tags or [])}
+    changed_fields = list(changes.keys())
+
     for key, value in changes.items():
         setattr(contact, key, value)
     await session.commit()
@@ -441,7 +447,155 @@ async def update_contact(
         before=before,
         after=_snapshot(contact),
     )
+    if changed_fields:
+        await _publish_contact_updated(
+            session=session,
+            org_id=contact.org_id,
+            contact=contact,
+            changed_fields=sorted(changed_fields),
+        )
+        if "tags" in changes:
+            tags_after: set[str] = {str(t) for t in (contact.tags or [])}
+            added = sorted(tags_after - tags_before)
+            removed = sorted(tags_before - tags_after)
+            for tag in added:
+                await _publish_contact_tag_event(
+                    session=session,
+                    org_id=contact.org_id,
+                    contact=contact,
+                    event_type="contact.tag_added",
+                    tag=tag,
+                )
+            for tag in removed:
+                await _publish_contact_tag_event(
+                    session=session,
+                    org_id=contact.org_id,
+                    contact=contact,
+                    event_type="contact.tag_removed",
+                    tag=tag,
+                )
     return contact
+
+
+async def _publish_contact_updated(
+    *,
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    contact: Contact,
+    changed_fields: list[str],
+) -> None:
+    """Fire-and-forget ``contact.updated`` publisher. Same shape as
+    ``_publish_contact_created`` — subscribers get the current snapshot
+    plus a ``changed_fields`` list so a workflow condition can gate on
+    "only fire when phone changed" without pulling the before/after
+    itself."""
+    try:
+        from sqlalchemy import select as _select
+
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+
+        org = (
+            await session.execute(_select(Organization).where(Organization.id == org_id))
+        ).scalar_one_or_none()
+
+        payload: dict[str, Any] = {
+            "contact_id": str(contact.id),
+            "changed_fields": changed_fields,
+            "contact": {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "email": contact.email,
+                "phone": contact.phone,
+                "source": contact.source.value if contact.source else None,
+                "tags": list(contact.tags or []),
+                "custom_data": contact.custom_data or {},
+            },
+        }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+            }
+
+        updated_iso = contact.updated_at.isoformat() if contact.updated_at else ""
+        await events_publish(
+            "contact.updated",
+            payload,
+            org_id=org_id,
+            event_id=f"contact_updated:{contact.id}:{updated_iso}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "contacts.update publish_contact_updated_failed org=%s contact=%s",
+            org_id,
+            contact.id,
+        )
+
+
+async def _publish_contact_tag_event(
+    *,
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    contact: Contact,
+    event_type: str,
+    tag: str,
+) -> None:
+    """Fire-and-forget publisher for ``contact.tag_added`` /
+    ``contact.tag_removed``. One event per tag mutation so workflow
+    conditions can compare on ``tag`` directly (``{{event.tag}}``)
+    rather than diffing arrays."""
+    try:
+        from sqlalchemy import select as _select
+
+        from src.app.core.events.bus import publish as events_publish
+        from src.app.core.tenants.models import Organization
+
+        org = (
+            await session.execute(_select(Organization).where(Organization.id == org_id))
+        ).scalar_one_or_none()
+
+        payload: dict[str, Any] = {
+            "contact_id": str(contact.id),
+            "tag": tag,
+            "tags": list(contact.tags or []),
+            "contact": {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "email": contact.email,
+                "phone": contact.phone,
+            },
+        }
+        if org is not None:
+            payload["org"] = {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+            }
+
+        # event_id keys on the mutation direction + tag so consecutive
+        # add/remove/add flips on the same tag don't collapse via dedup.
+        updated_iso = contact.updated_at.isoformat() if contact.updated_at else ""
+        direction = "added" if event_type.endswith("added") else "removed"
+        await events_publish(
+            event_type,
+            payload,
+            org_id=org_id,
+            event_id=f"contact_tag_{direction}:{contact.id}:{tag}:{updated_iso}",
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "contacts.update publish_contact_tag_event_failed org=%s contact=%s tag=%s event=%s",
+            org_id,
+            contact.id,
+            tag,
+            event_type,
+        )
 
 
 async def delete_contact(session: AsyncSession, *, contact_id: uuid.UUID) -> None:

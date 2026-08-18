@@ -367,6 +367,7 @@ async def persist_bounce_events(
     recorded = 0
     suppressed = 0
     skipped = 0
+    published_events: list[BounceEvent] = []
 
     for ev in events:
         existing = (
@@ -391,6 +392,7 @@ async def persist_bounce_events(
         session.add(row)
         await session.flush()
         recorded += 1
+        published_events.append(ev)
 
         if ev.bounce_type in _SUPPRESSING_TYPES:
             # Idempotent (org_id, channel, address) write. Existing
@@ -427,11 +429,87 @@ async def persist_bounce_events(
         suppressed,
         skipped,
     )
+
+    # Fan out ``email.bounced`` to the event bus for every freshly-
+    # persisted event (skip provider re-deliveries so a webhook retry
+    # doesn't double-fire subscriber workflows). Best-effort with
+    # per-event contact lookup; a bus / subscriber failure never rolls
+    # back the already-committed suppression row.
+    if published_events:
+        await _publish_bounce_events(session, org_id=org_id, events=published_events)
+
     return {
         "recorded": recorded,
         "suppressed": suppressed,
         "skipped_dupes": skipped,
     }
+
+
+async def _publish_bounce_events(
+    session,
+    *,
+    org_id: uuid.UUID,
+    events: list[BounceEvent],
+) -> None:
+    """Emit ``email.bounced`` per event. Contact lookup is best-effort
+    — bounces for unknown addresses (e.g. a rep manually typed a bad
+    address in Test Send) still fire without ``contact_id`` so the
+    operator can wire an alert workflow on ``email_address`` alone."""
+    from sqlalchemy import select as _select
+
+    from src.app.core.contacts.models import Contact
+    from src.app.core.events.bus import publish as events_publish
+    from src.app.core.events.event_catalog import EMAIL_BOUNCED
+
+    addresses = sorted({ev.email_address.lower() for ev in events if ev.email_address})
+    contact_by_email: dict[str, Contact] = {}
+    if addresses:
+        try:
+            rows = (
+                await session.execute(
+                    _select(Contact).where(
+                        Contact.org_id == org_id,
+                        Contact.email.in_(addresses),
+                    )
+                )
+            ).scalars().all()
+            for c in rows:
+                if c.email:
+                    contact_by_email[c.email.lower()] = c
+        except Exception:
+            logger.exception(
+                "email.bounce_handler contact_lookup_failed org=%s",
+                org_id,
+            )
+
+    for ev in events:
+        contact = contact_by_email.get(ev.email_address.lower())
+        payload: dict[str, Any] = {
+            "email_address": ev.email_address,
+            "bounce_type": ev.bounce_type,
+            "provider": ev.provider,
+            "contact_id": str(contact.id) if contact is not None else None,
+        }
+        if contact is not None:
+            payload["contact"] = {
+                "id": str(contact.id),
+                "full_name": contact.full_name,
+                "email": contact.email,
+                "phone": contact.phone,
+            }
+        try:
+            await events_publish(
+                EMAIL_BOUNCED,
+                payload,
+                org_id=org_id,
+                event_id=f"email_bounced:{ev.provider}:{ev.provider_event_id}",
+            )
+        except Exception:
+            logger.exception(
+                "email.bounce_handler publish_failed org=%s event_id=%s",
+                org_id,
+                ev.provider_event_id,
+            )
 
 
 __all__ = [

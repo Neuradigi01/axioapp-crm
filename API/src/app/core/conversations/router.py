@@ -1086,6 +1086,8 @@ async def _handle_whatsapp_webhook(
     # in place; messages[] flow through the existing inbound pipeline.
     status_events = parse_statuses(payload)
     if status_events:
+        from src.app.core.conversations.service import apply_channel_status_to_message
+
         updated = 0
         for event in status_events:
             ok = await apply_meta_status(
@@ -1097,6 +1099,18 @@ async def _handle_whatsapp_webhook(
             )
             if ok:
                 updated += 1
+            # Also reflect the status onto the parallel Message row +
+            # publish workflow events (``whatsapp.message_read``).
+            # apply_meta_status covers CampaignMessage; this covers
+            # the general Message table used by the inbox. Both are
+            # keyed by the same Meta wamid, so a single status event
+            # updates both.
+            await apply_channel_status_to_message(
+                db,
+                channel_message_id=event.channel_message_id,
+                meta_status=event.status,
+                timestamp=event.timestamp,
+            )
         return {"updated": updated}
 
     # whatsapp-platform-upgrade Step 23 — early block-list drop.

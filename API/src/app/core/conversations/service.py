@@ -42,13 +42,9 @@ from src.app.core.contacts.models import Contact
 from src.app.core.conversations import data_access as _da
 from src.app.core.conversations.adapters import InboundMessage
 from src.app.core.conversations.adapters.email import send_email
-from src.app.core.events import bus as events_bus
-from src.app.core.events.event_catalog import WHATSAPP_MESSAGE_RECEIVED
 from src.app.core.conversations.adapters.whatsapp import (
     resolve_whatsapp_adapter,
 )
-from src.app.core.email import service as email_service
-from src.app.core.email.models import EmailAccountSyncState
 from src.app.core.conversations.models import (
     Conversation,
     ConversationChannel,
@@ -58,6 +54,10 @@ from src.app.core.conversations.models import (
 )
 from src.app.core.conversations.registry import resolve
 from src.app.core.conversations.schemas import ConversationPatch
+from src.app.core.email import service as email_service
+from src.app.core.email.models import EmailAccountSyncState
+from src.app.core.events import bus as events_bus
+from src.app.core.events.event_catalog import WHATSAPP_MESSAGE_RECEIVED
 from src.app.core.notifications.service import notify
 from src.app.shared.db.queries import ensure_found
 
@@ -438,10 +438,10 @@ async def send_template_message(
         extract_named_body,
         resolve_named_body_to_positional_params,
     )
-    from src.app.core.tenants import data_access as _tenants_da
     from src.app.core.templates import data_access as _templates_da
     from src.app.core.templates.models import TemplateExternalStatus
     from src.app.core.templates.service import ensure_wa_extension_row
+    from src.app.core.tenants import data_access as _tenants_da
 
     conv = await get_conversation(session, conversation_id)
     if conv.channel != ConversationChannel.whatsapp:
@@ -1113,6 +1113,120 @@ async def _publish_inbound_message_received(
         logger.exception(
             "chatbot.inbound.publish_failed event_type=%s conv=%s msg=%s",
             event_type,
+            conversation.id,
+            message.id,
+        )
+
+
+async def apply_channel_status_to_message(
+    session: AsyncSession,
+    *,
+    channel_message_id: str,
+    meta_status: str,
+    timestamp: datetime,
+) -> Message | None:
+    """Reflect a Meta ``statuses[]`` event onto the ``Message`` row +
+    publish the workflow event when appropriate.
+
+    Complementary to :func:`campaigns.service.apply_meta_status` which
+    only touches the ``CampaignMessage`` mirror. Campaign sends land
+    in BOTH tables (Message via the send path, CampaignMessage via
+    the dispatcher's bookkeeping); regular inbox sends land only in
+    Message. Wiring both keeps the ``read_at`` column consistent
+    across the two send paths.
+
+    Only ``delivered`` and ``read`` status events cause a write —
+    ``sent`` is already stamped at send time, ``failed`` doesn't
+    affect a delivered/read timestamp. Forward-only: an already-read
+    row is not downgraded by a late-arriving ``delivered``.
+
+    Publishes ``whatsapp.message_read`` on the read transition so
+    workflow triggers can react. Returns the (possibly updated)
+    Message or ``None`` when the wamid isn't ours (manual reply from
+    the inbox that predates this handler, or wamid from a different
+    integration).
+    """
+    if not channel_message_id or meta_status not in {"delivered", "read"}:
+        return None
+
+    row = await _da.get_message_by_channel_id_org_scoped(
+        session, channel_message_id=channel_message_id
+    )
+    if row is None:
+        return None
+
+    changed = False
+    read_transition = False
+
+    if meta_status == "delivered" and row.delivered_at is None:
+        row.delivered_at = timestamp
+        changed = True
+    elif meta_status == "read":
+        if row.delivered_at is None:
+            # Meta occasionally skips the ``delivered`` event when the
+            # recipient opens the message so quickly the two states
+            # collapse. Fill both so downstream analytics don't show a
+            # read-with-no-delivery gap.
+            row.delivered_at = timestamp
+            changed = True
+        if row.read_at is None:
+            row.read_at = timestamp
+            changed = True
+            read_transition = True
+
+    if changed:
+        await session.commit()
+        await session.refresh(row)
+
+    if read_transition:
+        conversation = await _da.get_conversation_by_id(session, row.conversation_id)
+        await _publish_message_read(
+            session,
+            conversation=conversation,
+            message=row,
+            timestamp=timestamp,
+        )
+
+    return row
+
+
+async def _publish_message_read(
+    session: AsyncSession,
+    *,
+    conversation: Conversation | None,
+    message: Message,
+    timestamp: datetime,
+) -> None:
+    """Fire ``whatsapp.message_read`` for a freshly-stamped read
+    transition. Fire-and-forget; a bus / subscriber failure never
+    rolls back the timestamp write above."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    if conversation is None:
+        return
+
+    from src.app.core.events.event_catalog import WHATSAPP_MESSAGE_READ
+
+    try:
+        payload: dict[str, Any] = {
+            "conversation_id": str(conversation.id),
+            "contact_id": (str(conversation.contact_id) if conversation.contact_id else None),
+            "message_id": str(message.id),
+            "channel_message_id": message.channel_message_id,
+            "channel": conversation.channel.value,
+            "read_at": timestamp.isoformat(),
+        }
+        await events_bus.publish(
+            WHATSAPP_MESSAGE_READ,
+            payload,
+            org_id=conversation.org_id,
+            event_id=f"whatsapp_message_read:{message.id}",
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "whatsapp.message_read.publish_failed conv=%s msg=%s",
             conversation.id,
             message.id,
         )
