@@ -56,6 +56,7 @@
           <button
             type="button"
             (click)="openTestSendModal()"
+            [title]="testSendTooltip()"
             class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
           >
             <lucide-icon name="send" size="12" />
