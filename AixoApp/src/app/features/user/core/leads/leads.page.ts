@@ -18,7 +18,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
 import { of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
-import { ContactsApiService } from '../contacts/contacts-api.service';
+import { Contact, ContactsApiService } from '../contacts/contacts-api.service';
 import {
   ItemMovedEvent,
   PipelineItem,
@@ -49,6 +49,7 @@ import { AdvancedFilterModalComponent } from './advanced-filter-modal.component'
 import { ColumnCustomizationMenuComponent } from './column-customization-menu.component';
 import { LeadCardComponent } from './lead-card.component';
 import { LeadFormModalComponent } from './lead-form-modal.component';
+import { UpdateStatusModalComponent } from './update-status-modal.component';
 import {
   LostReasonConfirm,
   LostReasonModalComponent,
@@ -130,6 +131,7 @@ class LeadsListState extends ListPageState<Lead> {}
     PipelineBoardComponent,
     LeadCardComponent,
     LeadFormModalComponent,
+    UpdateStatusModalComponent,
     RelativeTimePipe,
     BulkActionBarComponent,
     ReassignModalComponent,
@@ -196,6 +198,13 @@ export class LeadsPageComponent {
   /** "No activity in N days" chip — translates to `last_activity_lt`. */
   readonly noActivityFilter = signal<'' | '7d' | '14d' | '30d'>('');
 
+  /** Leads Center toolbar: inclusive date range on `created_at`.
+   *  Empty string = unbounded on that side. YYYY-MM-DD (the shape a
+   *  `<input type="date">` emits) — passed to the backend as-is; the
+   *  server UTC-anchors both bounds. */
+  readonly createdFromControl = new FormControl<string>('', { nonNullable: true });
+  readonly createdToControl = new FormControl<string>('', { nonNullable: true });
+
   /** Visibility scope: which leads to show before any other filter.
    * Junior reps default to "mine" and don't see the toggle; managers
    * default to "team"; admin/owner default to "all". */
@@ -234,6 +243,23 @@ export class LeadsPageComponent {
   /** Server-reported total. `null` on cursor-only pages (we only ask
    * for it on the first page of a filter set). */
   readonly totalCount = signal<number | null>(null);
+
+  /** Server-reported unfiltered total — the tenant's whole leads set.
+   *  Requested only on the first page of a filter set (opt-in via
+   *  `with_unfiltered_total=true`). Powers the `(filtered/total)`
+   *  count in the Leads Center header. `null` until the first
+   *  response lands. */
+  readonly unfilteredTotal = signal<number | null>(null);
+
+  /** Header label: `"X/Y"` when both counts are known, otherwise the
+   *  best partial (`X` alone or `?`). */
+  readonly leadsCenterCount = computed<string>(() => {
+    const filtered = this.totalCount();
+    const unfiltered = this.unfilteredTotal();
+    if (filtered !== null && unfiltered !== null) return `${filtered}/${unfiltered}`;
+    if (filtered !== null) return `${filtered}`;
+    return '';
+  });
 
   /** 1-based page index, derived from `cursorHistory.length`. */
   readonly currentPage = computed(() => this.cursorHistory().length + 1);
@@ -365,12 +391,44 @@ export class LeadsPageComponent {
   ]);
 
   /** `crm-mobile-select` shape for the assignee filter — sentinel
-   *  "All owners" + "Me" + one entry per active org user. */
+   *  "All owners" + "Me" + "Unassigned" + one entry per active org user. */
   readonly assigneeSelectOptions = computed<{ value: string; label: string }[]>(() => [
     { value: '', label: 'All owners' },
     { value: 'me', label: 'Me' },
+    { value: 'unassigned', label: 'Unassigned' },
     ...this.users().map((u) => ({ value: u.id, label: u.full_name })),
   ]);
+
+  /** `crm-mobile-select` shape for the Leads Center Status filter —
+   *  sentinel "All statuses" first, then one entry per pipeline stage
+   *  (sir's ask: merge legacy Status chips + Category dropdown into
+   *  one dropdown that lists every stage). */
+  readonly stageSelectOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: '', label: 'All statuses' },
+    ...[...this.pipelineStages()]
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((s) => ({ value: s.key, label: s.name })),
+  ]);
+
+  /** `crm-mobile-select` options for the sort field. Kept in sync with
+   *  the backend's `sort` enum + the two `next_follow_up_due` entries
+   *  Step 2 added. */
+  readonly sortFieldOptions: ReadonlyArray<{ value: LeadSortKey; label: string }> = [
+    { value: 'created_at', label: 'Date created' },
+    { value: 'last_activity_at', label: 'Last activity' },
+    { value: 'lead_score', label: 'Score' },
+    { value: 'contact_name', label: 'Contact name' },
+    { value: 'next_follow_up_due', label: 'Next follow-up' },
+  ];
+
+  readonly orderOptions: ReadonlyArray<{ value: SortOrder; label: string }> = [
+    { value: 'desc', label: 'Descending' },
+    { value: 'asc', label: 'Ascending' },
+  ];
+
+  /** Leads Center Remarks filter — matches any note activity text on
+   *  the lead. Server caps at 64 chars. */
+  readonly remarksControl = new FormControl<string>('', { nonNullable: true });
 
   /** Header subtitle counts: `loadedCount` is what's on screen now,
    * `totalCount` is server-reported for the active filter. */
@@ -433,6 +491,13 @@ export class LeadsPageComponent {
   readonly singleReassignLead = signal<Lead | null>(null);
   readonly singleReassignSubmitting = signal(false);
   readonly singleReassignError = signal<string | null>(null);
+
+  /** Update Status modal (sir's "lead action center"). Opened from the
+   *  kanban card / list row pencil — supersedes the old mini reassign
+   *  modal for the single-lead flow. Bulk reassign still uses its own
+   *  reassign-modal instance below. */
+  readonly updateStatusLead = signal<Lead | null>(null);
+  readonly updateStatusContact = signal<Contact | null>(null);
 
   /** Pending move-stage that's waiting on a Lost-reason. The Step 1
    * backend rejects a move into an `is_lost=true` stage with 422 and
@@ -574,6 +639,15 @@ export class LeadsPageComponent {
     this.statusControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.resetCursorAndReload());
+    this.createdFromControl.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.resetCursorAndReload());
+    this.createdToControl.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.resetCursorAndReload());
+    this.remarksControl.valueChanges
+      .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.resetCursorAndReload());
 
     // Whenever leads change, fetch any contacts we don't already have cached.
     effect(() => {
@@ -617,6 +691,10 @@ export class LeadsPageComponent {
       assigned_to: this.resolveAssignee(),
       unassigned_only: this.assigneeControl.value === 'unassigned' ? true : undefined,
       last_activity_lt: this.resolveNoActivityCutoff() ?? undefined,
+      created_from: this.createdFromControl.value.trim() || undefined,
+      created_to: this.createdToControl.value.trim() || undefined,
+      remarks_contains: this.remarksControl.value.trim() || undefined,
+      stage: this.stageControlValue() || undefined,
       sort: this.sortKey(),
       order: this.sortOrder(),
     };
@@ -630,10 +708,15 @@ export class LeadsPageComponent {
       // is amortised across the whole walk. The server returns `null`
       // for `total` on subsequent pages.
       base.with_total = this.cursorHistory().length === 0;
+      // Leads Center header opts in for the extra tenant-wide count
+      // on the first page only (subsequent pages don't need to
+      // recompute an unchanged value).
+      base.with_unfiltered_total = this.cursorHistory().length === 0;
     } else {
       // Pipeline view: keep the existing one-shot bulk fetch.
       base.size = 200;
       base.with_total = true;
+      base.with_unfiltered_total = true;
     }
     return base;
   }
@@ -650,6 +733,9 @@ export class LeadsPageComponent {
           this.nextCursor.set(resp.next_cursor);
           if (resp.total !== null && resp.total !== undefined) {
             this.totalCount.set(resp.total);
+          }
+          if (resp.unfiltered_total !== null && resp.unfiltered_total !== undefined) {
+            this.unfilteredTotal.set(resp.unfiltered_total);
           }
           this.state.loading.set(false);
         },
@@ -669,6 +755,88 @@ export class LeadsPageComponent {
     this.cursorHistory.set([]);
     this.totalCount.set(null);
     this.reload();
+  }
+
+  /** Leads Center toolbar Search button. Auto-refetch already fires
+   *  on every filter change (see the `valueChanges` subscriptions in
+   *  the constructor); this handler exists so sir's screenshot Search
+   *  button has something to bind to and gives the rep a visible
+   *  "refresh with current filters" affordance. */
+  protected onToolbarSearch(): void {
+    this.resetCursorAndReload();
+  }
+
+  /** Leads Center toolbar Reset button. Clears the new date-range +
+   *  the shared filter controls back to defaults + re-fetches. Does
+   *  NOT touch scope / saved view / advanced-filter DSL — those have
+   *  their own dedicated reset affordances. */
+  protected onToolbarReset(): void {
+    this.createdFromControl.setValue('', { emitEvent: false });
+    this.createdToControl.setValue('', { emitEvent: false });
+    this.remarksControl.setValue('', { emitEvent: false });
+    this.searchControl.setValue('', { emitEvent: false });
+    this.sourceControl.setValue('', { emitEvent: false });
+    this.assigneeControl.setValue('', { emitEvent: false });
+    this.statusControl.setValue('', { emitEvent: false });
+    this.stageControlValue.set('');
+    this.noActivityFilter.set('');
+    this.sortKey.set('created_at');
+    this.sortOrder.set('desc');
+    this.resetCursorAndReload();
+  }
+
+  /** Toolbar Status cell handler — writes to the same `statusControl`
+   *  the legacy chip strip used, so the existing chip strip and the
+   *  new toolbar stay in sync. Sir's Status dropdown lists pipeline
+   *  stages, so we route into `sortKey` for stage OR into
+   *  `statusControl` for the legacy Active/Won/Lost — collision-free
+   *  because the values sets don't overlap. Value `""` clears. */
+  protected onToolbarStageChange(value: string): void {
+    // Pipeline stage keys never overlap with LeadStatus enum values
+    // (`active`/`won`/`lost` are enum entries, stage keys are org-
+    // configured slugs like `proposal`/`qualified`). Route by set
+    // membership.
+    const stageKeys = this.pipelineStages().map((s) => s.key);
+    if (value === '' || stageKeys.includes(value)) {
+      this.stageControlValue.set(value);
+      this.resetCursorAndReload();
+    }
+  }
+
+  /** Leads Center Status dropdown value. Separate from `statusControl`
+   *  (the legacy Active/Won/Lost pill) so the toolbar can drive
+   *  ``stage`` filtering independently. */
+  readonly stageControlValue = signal<string>('');
+
+  /** Sort field dropdown handler — the toolbar splits Order By/As
+   *  from Order Type, so we no longer read the "key:order" combined
+   *  string. */
+  protected setSortField(value: string): void {
+    if (
+      value === 'created_at' ||
+      value === 'last_activity_at' ||
+      value === 'lead_score' ||
+      value === 'contact_name' ||
+      value === 'next_follow_up_due'
+    ) {
+      this.sortKey.set(value);
+      this.resetCursorAndReload();
+    }
+  }
+
+  protected setSortOrder(value: string): void {
+    if (value === 'asc' || value === 'desc') {
+      this.sortOrder.set(value);
+      this.resetCursorAndReload();
+    }
+  }
+
+  /** Export-in-Excel handler. Wraps the existing `onExportCsv` — one
+   *  entry point either place a caller wants to trigger a download.
+   *  Kept as a separate method so the sir's-toolbar link and the
+   *  legacy chip-strip button can rename independently. */
+  protected onToolbarExport(): void {
+    this.onExportCsv();
   }
 
   // --- Step 6: pagination handlers ---------------------------------------
@@ -1034,7 +1202,8 @@ export class LeadsPageComponent {
       key !== 'created_at' &&
       key !== 'last_activity_at' &&
       key !== 'lead_score' &&
-      key !== 'contact_name'
+      key !== 'contact_name' &&
+      key !== 'next_follow_up_due'
     ) {
       return;
     }
@@ -1387,10 +1556,55 @@ export class LeadsPageComponent {
   // --- Single reassign (pencil on a card / list row) ----------------------
 
   protected openSingleReassign(lead: Lead): void {
-    this.singleReassignError.set(null);
-    this.singleReassignLead.set(lead);
+    // Sir's ask: the card pencil now opens the full Update Status
+    // modal instead of the mini reassign modal. The Owner dropdown in
+    // that modal covers the reassign case (with auto-remarks) + lets
+    // the rep also change stage / add notes / schedule the next
+    // follow-up in one shot. The mini reassign modal is kept as a
+    // component for bulk-reassign only (see `state.bulkModal`).
+    this.updateStatusContact.set(null);
+    this.updateStatusLead.set(lead);
+    // Fire-and-forget contact hydrate so the Name / WhatsApp / Email
+    // cells inside the modal render prefilled. If it fails the modal
+    // still opens with empty contact fields — the rep can type or leave
+    // them alone.
+    this.contactsApi
+      .get(lead.contact_id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (contact) => {
+          // Only apply if the modal is still showing this lead — otherwise
+          // a slow fetch could clobber a newer selection.
+          if (this.updateStatusLead()?.id === lead.id) {
+            this.updateStatusContact.set(contact);
+          }
+        },
+        error: () => {
+          /* silent — modal renders without prefill */
+        },
+      });
   }
 
+  protected closeUpdateStatus(): void {
+    this.updateStatusLead.set(null);
+    this.updateStatusContact.set(null);
+  }
+
+  /** Update Status modal's `saved` output. Trigger a full refetch —
+   *  patching one row in-place is fragile across list + pipeline
+   *  views (a stage change can move the card to a different column,
+   *  a status filter can drop it off-page entirely). Cheap one-shot
+   *  call keeps both surfaces truthful. */
+  protected onUpdateStatusSaved(_event: {
+    lead: Lead;
+    next_follow_up_task_id: string | null;
+  }): void {
+    this.closeUpdateStatus();
+    this.resetCursorAndReload();
+  }
+
+  // Legacy single-row reassign handlers kept for the bulk-reassign
+  // modal shape below. Not reachable from the card pencil anymore.
   protected closeSingleReassign(): void {
     this.singleReassignLead.set(null);
     this.singleReassignSubmitting.set(false);

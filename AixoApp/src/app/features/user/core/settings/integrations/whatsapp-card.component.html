@@ -680,3 +680,22 @@
     </form>
   }
 </section>
+
+<!-- Themed disconnect confirmation. Replaces window.confirm() so the
+     dialog matches the rest of the app instead of showing the origin-
+     branded browser alert. Danger-styled (red primary) because this
+     stops every outbound WhatsApp campaign until the operator
+     reconnects — an intentional-only action. -->
+@if (disconnectConfirmOpen()) {
+  <app-confirm-dialog
+    [title]="'Disconnect WhatsApp?'"
+    [body]="'Campaigns will stop sending until you reconnect. The phone_id and waba_id will be remembered so you can paste a fresh token to reconnect later — you won\'t have to retype identifiers.'"
+    [confirmLabel]="'Disconnect'"
+    [cancelLabel]="'Keep connected'"
+    [danger]="true"
+    [submitting]="disconnecting()"
+    [error]="disconnectConfirmError()"
+    (confirm)="confirmDisconnect()"
+    (cancel)="closeDisconnectConfirm()"
+  />
+}

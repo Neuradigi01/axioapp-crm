@@ -1,0 +1,179 @@
+<section class="overflow-hidden rounded-lg border border-subtle bg-surface shadow-sm">
+  <header
+    class="flex items-center justify-between gap-3 bg-amber-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-700"
+  >
+    <div class="flex items-center gap-2">
+      <lucide-icon name="clipboard-list" size="14" aria-hidden="true"></lucide-icon>
+      <span>Follow-Up Status</span>
+      @if (total() > 0) {
+        <span
+          class="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+          >{{ total() }}</span
+        >
+      }
+    </div>
+    @if (!loading() && !loadError()) {
+      <button
+        type="button"
+        class="text-[11px] font-medium text-amber-700 hover:underline"
+        (click)="reload()"
+        aria-label="Refresh follow-ups"
+      >
+        Refresh
+      </button>
+    }
+  </header>
+
+  <div class="p-3 md:p-4">
+    @if (loadError(); as err) {
+      <p class="text-sm text-red-500">{{ err }}</p>
+    } @else if (loading() && tasks().length === 0) {
+      <div class="space-y-2">
+        @for (_ of skeletonRows; track $index) {
+          <div class="h-10 animate-pulse rounded-md bg-surface-2"></div>
+        }
+      </div>
+    } @else if (tasks().length === 0) {
+      <p class="text-sm text-muted">
+        No follow-ups scheduled. Use <strong class="text-default">Update Status</strong> to schedule
+        one.
+      </p>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-left text-[11px] font-semibold uppercase tracking-wider text-muted">
+            <tr>
+              <th class="pb-2 pr-3">Due</th>
+              <th class="pb-2 pr-3">Type</th>
+              <th class="pb-2 pr-3">Title</th>
+              <th class="pb-2 pr-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-subtle">
+            @for (t of tasks(); track t.id) {
+              @let due = dueLabel(t);
+              @let meta = typeMeta(t);
+              @let overdue = isOverdue(t);
+              @let rowErr = rowErrorFor(t.id);
+              @let mut = isRowMutating(t.id);
+              <tr class="align-top">
+                <td class="py-2 pr-3">
+                  @if (rescheduling() === t.id) {
+                    <div class="flex flex-col gap-1.5">
+                      <input
+                        type="datetime-local"
+                        [value]="rescheduleDraft()"
+                        (input)="onRescheduleInput($any($event.target).value)"
+                        class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+                      <div class="flex items-center gap-1">
+                        <button
+                          type="button"
+                          class="inline-flex items-center rounded-md bg-accent px-2 py-1 text-[11px] font-medium text-white hover:brightness-95 disabled:opacity-50"
+                          [disabled]="mut"
+                          (click)="saveReschedule(t)"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          class="inline-flex items-center rounded-md border border-subtle bg-surface px-2 py-1 text-[11px] font-medium text-default hover:bg-surface-2"
+                          (click)="cancelReschedule()"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  } @else {
+                    <div class="flex flex-col leading-tight">
+                      <span class="text-xs font-medium text-default">{{ due.absolute }}</span>
+                      @if (due.relative) {
+                        <span
+                          class="text-[11px]"
+                          [class.text-red-500]="overdue"
+                          [class.text-muted]="!overdue"
+                        >
+                          {{ due.relative }}
+                        </span>
+                      }
+                    </div>
+                  }
+                </td>
+                <td class="py-2 pr-3">
+                  <span
+                    class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-default ring-1 border-subtle"
+                  >
+                    <lucide-icon [name]="meta.icon" size="12" aria-hidden="true"></lucide-icon>
+                    {{ meta.label }}
+                  </span>
+                </td>
+                <td class="py-2 pr-3 text-default">
+                  <div class="line-clamp-2">{{ t.title }}</div>
+                  @if (rowErr) {
+                    <p class="mt-1 text-[11px] text-red-500">{{ rowErr }}</p>
+                  }
+                </td>
+                <td class="py-2 pr-3 text-right">
+                  @if (rescheduling() !== t.id) {
+                    <div class="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-[11px] font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                        [disabled]="mut"
+                        (click)="startReschedule(t)"
+                        aria-label="Reschedule follow-up"
+                      >
+                        <lucide-icon
+                          name="calendar-clock"
+                          size="12"
+                          aria-hidden="true"
+                        ></lucide-icon>
+                        Reschedule
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded-md bg-emerald-600/90 px-2 py-1 text-[11px] font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                        [disabled]="mut"
+                        (click)="markDone(t)"
+                        aria-label="Mark done"
+                      >
+                        @if (mut) {
+                          <lucide-icon
+                            name="loader-2"
+                            size="12"
+                            class="animate-spin"
+                            aria-hidden="true"
+                          ></lucide-icon>
+                        } @else {
+                          <lucide-icon name="check" size="12" aria-hidden="true"></lucide-icon>
+                        }
+                        Done
+                      </button>
+                    </div>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (hasMore()) {
+        <div class="mt-3 flex justify-center">
+          <button
+            type="button"
+            class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+            [disabled]="loading()"
+            (click)="loadMore()"
+          >
+            @if (loading()) {
+              Loading…
+            } @else {
+              Load more
+            }
+          </button>
+        </div>
+      }
+    }
+  </div>
+</section>

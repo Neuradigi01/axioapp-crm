@@ -141,22 +141,6 @@
             Submit to WhatsApp for approval
           </button>
         }
-        @if (showRefreshExternalButton()) {
-          <button
-            type="button"
-            (click)="refreshExternalStatus()"
-            [disabled]="transitioning() !== null"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
-            title="Re-check WhatsApp for the live status — same call the hourly sweep makes."
-          >
-            @if (transitioning() === 'sync_external') {
-              <lucide-icon name="loader-2" size="12" class="animate-spin" />
-            } @else {
-              <lucide-icon name="refresh-cw" size="12" />
-            }
-            Refresh status
-          </button>
-        }
         @if (showResubmitButton()) {
           <button
             type="button"
@@ -313,10 +297,9 @@
       >
         <strong>Awaiting WhatsApp review.</strong>
         You can't edit while Meta is reviewing — changing the body now would break the pending
-        submission. Click
-        <strong>Refresh status</strong>
-        to re-check Meta (usually 5–30 minutes for Utility templates, up to 24 h for Marketing). If
-        Meta rejects, you'll get options to fix and resubmit.
+        submission. Meta usually responds within 5–30 minutes for Utility templates, up to 24 h for
+        Marketing. This page updates automatically — no need to refresh. If Meta rejects, you'll get
+        options to fix and resubmit.
       </div>
     } @else if (lockKind() === 'internal_pending') {
       <div
@@ -364,7 +347,7 @@
         @if (rejectionReason(); as reason) {
           Reason: <span class="italic">{{ reason }}</span>
         } @else {
-          No reason was supplied by Meta. Click Refresh status to re-check.
+          No reason was supplied by Meta.
         }
         <div class="mt-1 text-xs text-red-400">
           Click <strong>Resubmit</strong> to reset to draft, fix the issue, and submit again.

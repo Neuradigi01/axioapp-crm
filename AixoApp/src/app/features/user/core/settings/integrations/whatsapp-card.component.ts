@@ -52,6 +52,7 @@
  */
 import { CommonModule, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -83,6 +84,7 @@ import {
 import { EmbeddedSignupCancelled, WhatsAppFbSdkService } from './whatsapp-fb-sdk.service';
 import { PhoneHealthCardComponent } from '../../whatsapp/phone-health/phone-health-card.component';
 import { WhatsAppNumbersService } from '../../whatsapp/shared/whatsapp-numbers.service';
+import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
 
 interface WhatsAppConnectForm {
   phone_id: FormControl<string>;
@@ -103,6 +105,7 @@ interface WhatsAppConnectForm {
     LucideAngularModule,
     ReactiveFormsModule,
     PhoneHealthCardComponent,
+    ConfirmDialogComponent,
   ],
   templateUrl: './whatsapp-card.component.html',
 })
@@ -117,6 +120,18 @@ export class WhatsAppCardComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly fbSdk = inject(WhatsAppFbSdkService);
   private readonly numbersService = inject(WhatsAppNumbersService);
+  private readonly snackBar = inject(MatSnackBar);
+
+  /** Small toast helper — mirrors the chatbot builder's pattern.
+   *  Top-right so it doesn't cover the modal footer / buttons. */
+  private notify(message: string, kind: 'ok' | 'error' = 'ok'): void {
+    this.snackBar.open(message, 'OK', {
+      duration: 3500,
+      horizontalPosition: 'right',
+      verticalPosition: 'top',
+      panelClass: kind === 'error' ? ['snack-error'] : ['snack-ok'],
+    });
+  }
 
   /** Step 27b — every connected WhatsApp phone for this org. The
    *  card renders a per-row list when there are 2+. The default
@@ -335,6 +350,7 @@ export class WhatsAppCardComponent implements OnInit {
           });
       });
 
+      this.notify('WhatsApp connected successfully.');
       this.changed.emit();
     } catch (err) {
       if (err instanceof EmbeddedSignupCancelled) {
@@ -371,6 +387,7 @@ export class WhatsAppCardComponent implements OnInit {
           this.connecting.set(false);
           this.formExpanded.set(false);
           this.form.patchValue({ access_token: '' });
+          this.notify('WhatsApp connected successfully.');
           this.changed.emit();
         },
         error: (err: HttpErrorResponse) => {
@@ -390,11 +407,13 @@ export class WhatsAppCardComponent implements OnInit {
       .subscribe({
         next: () => {
           this.testing.set(false);
+          this.notify('Meta confirmed the connection is healthy.');
           this.changed.emit();
         },
         error: (err: HttpErrorResponse) => {
           this.testing.set(false);
           this.inlineError.set(extractApiError(err));
+          this.notify('Meta rejected the test — see error above.', 'error');
           // Parent refresh anyway — backend flipped status to `error`
           // and persisted `last_error`, so the card needs the new
           // projection to render the red banner correctly.
@@ -403,16 +422,28 @@ export class WhatsAppCardComponent implements OnInit {
       });
   }
 
+  /** Themed disconnect-confirm dialog visibility. Replaces the browser's
+   *  native `confirm()` (ugly grey alert branded with the localhost
+   *  origin) with the app's `ConfirmDialogComponent`. */
+  protected readonly disconnectConfirmOpen = signal(false);
+  protected readonly disconnectConfirmError = signal<string | null>(null);
+
   disconnect(): void {
     if (this.disconnecting()) return;
-    if (
-      !confirm(
-        'Disconnect WhatsApp? Campaigns will stop sending until you reconnect. The phone_id / waba_id will be remembered so you can paste a fresh token to reconnect later.',
-      )
-    ) {
-      return;
-    }
+    this.disconnectConfirmError.set(null);
+    this.disconnectConfirmOpen.set(true);
+  }
+
+  closeDisconnectConfirm(): void {
+    if (this.disconnecting()) return;
+    this.disconnectConfirmOpen.set(false);
+    this.disconnectConfirmError.set(null);
+  }
+
+  confirmDisconnect(): void {
+    if (this.disconnecting()) return;
     this.inlineError.set(null);
+    this.disconnectConfirmError.set(null);
     this.disconnecting.set(true);
     this.api
       .disconnectWhatsApp()
@@ -420,11 +451,15 @@ export class WhatsAppCardComponent implements OnInit {
       .subscribe({
         next: () => {
           this.disconnecting.set(false);
+          this.disconnectConfirmOpen.set(false);
+          this.notify('WhatsApp disconnected. Campaigns will pause until you reconnect.');
           this.changed.emit();
         },
         error: (err: HttpErrorResponse) => {
           this.disconnecting.set(false);
-          this.inlineError.set(extractApiError(err));
+          const msg = extractApiError(err);
+          this.disconnectConfirmError.set(msg);
+          this.notify('Could not disconnect — see dialog for details.', 'error');
         },
       });
   }

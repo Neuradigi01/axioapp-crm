@@ -10,8 +10,23 @@ import { buildHttpParams } from '../shared/services/query-builder';
  * `api/src/app/core/activities/models.py`. Keep these in sync — adding
  * a new value here without the backend enum picking it up will not
  * make the new value safe to send.
+ *
+ * All 9 backend enum values are listed so the timeline component can
+ * render every row the API returns — a missing value silently blows
+ * up the `<lucide-icon>` binding on that row AND (worse) halts the
+ * `@for` render for every row after it, which is why "Add note just
+ * refreshed" until this list matched the backend.
  */
-export type ActivityType = 'note' | 'call' | 'email' | 'whatsapp' | 'status_change' | 'task';
+export type ActivityType =
+  | 'note'
+  | 'call'
+  | 'email'
+  | 'whatsapp'
+  | 'status_change'
+  | 'task'
+  | 'reassign'
+  | 'convert'
+  | 'reschedule';
 
 export interface Activity {
   id: string;

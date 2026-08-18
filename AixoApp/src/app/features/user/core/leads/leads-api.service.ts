@@ -72,7 +72,12 @@ export interface Lead {
   [key: string]: unknown;
 }
 
-export type LeadSortKey = 'created_at' | 'last_activity_at' | 'lead_score' | 'contact_name';
+export type LeadSortKey =
+  | 'created_at'
+  | 'last_activity_at'
+  | 'lead_score'
+  | 'contact_name'
+  | 'next_follow_up_due';
 export type SortOrder = 'asc' | 'desc';
 
 /**
@@ -85,6 +90,10 @@ export type SortOrder = 'asc' | 'desc';
 export interface LeadListResponse {
   items: Lead[];
   total: number | null;
+  /** Tenant-wide count ignoring every filter. Non-null only when the
+   * caller passes `with_unfiltered_total=true`. Used by the Leads
+   * Center header to render `(filtered/total)`. */
+  unfiltered_total: number | null;
   page: number;
   size: number;
   next_cursor: string | null;
@@ -129,6 +138,54 @@ export type LeadUpdate = Partial<{
   close_date: string | null;
   won_reason: string | null;
 }>;
+
+/** Narrow contact-basics patch surface exposed by the log-update
+ * endpoint. Backend rejects any extra field (Pydantic
+ * ``extra=forbid``), so the type stays strictly to the three fields
+ * sir's screenshot exposes. */
+export interface FollowUpContactBasics {
+  full_name?: string;
+  phone?: string;
+  email?: string;
+}
+
+/** Follow-up task payload written to ``tbl_tasks`` when the modal
+ * schedules a next-touch. Persists as an open task with
+ * ``related_entity_type='lead'`` so the dashboard's Today's Follow-ups
+ * widget picks it up unchanged. */
+export interface NextFollowUpSpec {
+  due_at: string;
+  followup_type: 'call' | 'whatsapp' | 'email' | 'document' | 'meeting' | 'other';
+}
+
+/** Payload for ``POST /leads/{id}/log-update``. Mirrors the backend
+ * ``LogUpdateRequest`` shape one-for-one. ``if_current_stage`` is the
+ * optimistic-lock guard captured when the modal opened. */
+export interface LogUpdateRequest {
+  if_current_stage: string;
+  contact_basics?: FollowUpContactBasics | null;
+  pipeline_stage?: string | null;
+  source?: LeadSource | null;
+  remarks: string;
+  next_follow_up?: NextFollowUpSpec | null;
+  /** Owner change — supply BOTH `set_assigned_to=true` AND the target
+   *  `assigned_to_id` (nullable, `null` clears the owner). Omit the
+   *  sentinel to leave owner untouched. Backend writes a `reassign`
+   *  activity in the same atomic transaction. Requires
+   *  `leads.reassign`. */
+  assigned_to_id?: string | null;
+  set_assigned_to?: boolean;
+  lost_reason?: string | null;
+  lost_reason_other?: string | null;
+}
+
+/** Response body from ``POST /leads/{id}/log-update``. Carries the
+ * refreshed lead + the created task id (or null when the payload had
+ * no ``next_follow_up`` block). */
+export interface LogUpdateResponse {
+  lead: Lead;
+  next_follow_up_task_id: string | null;
+}
 
 /** Header-strip roll-up rendered above the kanban / list view (F23).
  *  Values are strings because Pydantic serialises Decimal as a string
@@ -209,6 +266,13 @@ export interface LeadListQuery {
    * "no activity > N days" filter. */
   last_activity_lt?: string;
   last_activity_gt?: string;
+  /** Inclusive date range on ``created_at`` (Step 2 backend surface).
+   * Accepts a YYYY-MM-DD string; the backend UTC-anchors both bounds. */
+  created_from?: string;
+  created_to?: string;
+  /** Case-insensitive substring match against any `note` activity on
+   * the lead. Capped at 64 chars server-side. */
+  remarks_contains?: string;
   sort?: LeadSortKey;
   order?: SortOrder;
   /** Offset mode (legacy). When `cursor` is set, page is ignored. */
@@ -223,6 +287,10 @@ export interface LeadListQuery {
   /** Skip the COUNT(*). The list page passes `true` on first page so
    * the footer can show "X of N"; subsequent pages pass `false`. */
   with_total?: boolean;
+  /** Opt-in for the tenant-wide unfiltered count. Cheap extra COUNT(*)
+   * behind the ORM's tenant filter — only worth requesting when the
+   * response consumer is rendering `(filtered/total)`. */
+  with_unfiltered_total?: boolean;
   customFilters?: Record<string, string>;
   /** Advanced filter DSL (see `shared/filter-dsl.types`). Service
    * JSON-stringifies it into the `filter` query param. */
@@ -302,6 +370,16 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
       close_date: extras?.close_date ?? null,
       won_reason: extras?.won_reason ?? null,
     });
+  }
+
+  /** Update-Status modal write path. Atomic on the backend: contact
+   *  patch + stage move + source change + note activity + follow-up
+   *  task all commit together or roll back together. See
+   *  ``tasks/leads-update-status-flow/step-1-backend-log-update-endpoint.md``
+   *  for the contract; the modal that calls this lives in
+   *  ``update-status-modal.component.ts``. */
+  logUpdate(id: string, payload: LogUpdateRequest): Observable<LogUpdateResponse> {
+    return this.http.post<LogUpdateResponse>(`${this.base}/${id}/log-update`, payload);
   }
 
   /** F4 — Bulk move-stage. Moves every id to the same `to_stage`;

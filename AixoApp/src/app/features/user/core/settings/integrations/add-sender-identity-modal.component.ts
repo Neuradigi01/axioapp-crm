@@ -33,11 +33,15 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { commonValidators } from '../../shared/validators';
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../shared/forms/mobile-select.component';
 import { EmailAccountsApiService } from '../../services/email-accounts-api.service';
 import {
   CreateSmtpSenderPayload,
@@ -62,7 +66,7 @@ interface SmtpFormShape {
   selector: 'app-add-sender-identity-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, ReactiveFormsModule],
+  imports: [LucideAngularModule, ReactiveFormsModule, MobileSelectComponent],
   templateUrl: './add-sender-identity-modal.component.html',
 })
 export class AddSenderIdentityModalComponent {
@@ -73,6 +77,12 @@ export class AddSenderIdentityModalComponent {
 
   readonly cancelled = output<void>();
   readonly smtpCreated = output<{ sender: SmtpSender; from: string }>();
+
+  protected readonly tlsModeOptions: ReadonlyArray<MobileSelectOption> = [
+    { value: 'starttls', label: 'STARTTLS (port 587, recommended)' },
+    { value: 'tls', label: 'Implicit TLS (port 465)' },
+    { value: 'none', label: 'None (localhost relay only)' },
+  ];
 
   protected readonly activeTab = signal<Tab>('smtp');
   protected readonly redirecting = signal<'gmail' | 'microsoft' | null>(null);
@@ -115,7 +125,10 @@ export class AddSenderIdentityModalComponent {
     }),
   });
 
-  protected readonly isSmtpValid = computed(() => this.form.valid);
+  private readonly formStatus = toSignal(this.form.statusChanges, {
+    initialValue: this.form.status,
+  });
+  protected readonly isSmtpValid = computed(() => this.formStatus() === 'VALID');
 
   selectTab(tab: Tab): void {
     if (this.submitting() || this.redirecting() !== null) return;

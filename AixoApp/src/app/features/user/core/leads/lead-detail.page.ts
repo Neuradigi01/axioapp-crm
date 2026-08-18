@@ -34,6 +34,8 @@ import { Contact, ContactsApiService } from '../contacts/contacts-api.service';
 import { PipelineStage, PipelinesApiService } from '../pipelines/pipelines-api.service';
 import { Lead, LeadCreate, LeadUpdate, LeadsApiService } from './leads-api.service';
 import { LeadFormModalComponent } from './lead-form-modal.component';
+import { LeadFollowUpsPanelComponent } from './lead-follow-ups-panel.component';
+import { UpdateStatusModalComponent } from './update-status-modal.component';
 import {
   LostReasonConfirm,
   LostReasonModalComponent,
@@ -86,6 +88,8 @@ const STAGE_TONES: Record<string, { bg: string; text: string; ring: string }> = 
     MailLinkDirective,
     LostReasonModalComponent,
     WonCaptureModalComponent,
+    UpdateStatusModalComponent,
+    LeadFollowUpsPanelComponent,
   ],
   templateUrl: './lead-detail.page.html',
 })
@@ -107,6 +111,11 @@ export class LeadDetailPageComponent implements OnInit {
   readonly deleteOpen = signal(false);
   readonly deleteSubmitting = signal(false);
   readonly deleteError = signal<string | null>(null);
+
+  /** Update-Status quick-action modal (sir's screenshot). Additive
+   *  alongside Edit / Delete — the full authoring modal keeps its
+   *  own state above. */
+  readonly updateStatusOpen = signal(false);
 
   readonly canReassign = computed(() => this.auth.hasPermission('leads.reassign'));
 
@@ -130,6 +139,11 @@ export class LeadDetailPageComponent implements OnInit {
   readonly activeTab = signal<DetailTab>('overview');
 
   protected readonly timeline = viewChild(ActivityTimelineComponent);
+  /** Overview-tab follow-ups panel. Ref used to prepend the newly-
+   *  created task after the Update Status modal returns without a
+   *  full refetch. Optional because the Overview tab may not be the
+   *  active tab when the modal saves. */
+  protected readonly followUpsPanel = viewChild(LeadFollowUpsPanelComponent);
 
   readonly editingLead = signal<Lead | null>(null);
   readonly modalOpen = computed(() => this.editingLead() !== null);
@@ -230,6 +244,43 @@ export class LeadDetailPageComponent implements OnInit {
   protected openEdit(): void {
     const l = this.lead();
     if (l) this.editingLead.set(l);
+  }
+
+  protected openUpdateStatus(): void {
+    // Guard against opening before the lead + pipeline stages settled;
+    // the modal's `input.required<Lead>()` would throw at construction
+    // time. The button is disabled in that state too.
+    if (this.lead() && this.pipelineStages().length > 0) {
+      this.updateStatusOpen.set(true);
+    }
+  }
+
+  protected closeUpdateStatus(): void {
+    this.updateStatusOpen.set(false);
+  }
+
+  /** Handler for the Update-Status modal's `saved` output. Refreshes
+   *  the lead signal so the header pills reflect the new stage /
+   *  status / source instantly, reloads the Activities timeline, and
+   *  when a follow-up task was created reloads the Follow-Ups panel
+   *  so the new row appears without a page refresh. */
+  protected onUpdateStatusSaved(event: {
+    lead: Lead;
+    next_follow_up_task_id: string | null;
+  }): void {
+    this.lead.set(event.lead);
+    this.updateStatusOpen.set(false);
+    // Timeline picks up the new `note` + `status_change` activities on
+    // the next fetch; force a reload so reps see them without a full
+    // page refresh.
+    this.timeline()?.reload();
+    // Overview-tab follow-ups panel (if mounted) reloads to pick up
+    // the just-created task. We reload rather than `prepend()` because
+    // the log-update response ships only the task id, not the full
+    // Task row — one round-trip is cheaper than adding a get-by-id.
+    if (event.next_follow_up_task_id !== null) {
+      this.followUpsPanel()?.reload();
+    }
   }
 
   protected closeModal(): void {

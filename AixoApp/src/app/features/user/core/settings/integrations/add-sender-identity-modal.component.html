@@ -149,10 +149,25 @@
                   placeholder="hello@yourshop.com"
                   formControlName="from_address"
                 />
-                <span class="mt-1 block text-xs text-muted">
-                  We'll send a 6-digit verification code to this address so you can confirm you own
-                  it.
-                </span>
+                @if (
+                  form.controls.from_address.touched && form.controls.from_address.invalid;
+                  as _invalid
+                ) {
+                  <p class="mt-1 text-xs text-red-500">
+                    @if (form.controls.from_address.errors?.['required']) {
+                      From address is required.
+                    } @else if (form.controls.from_address.errors?.['maxlength']) {
+                      Must be 254 characters or fewer.
+                    } @else {
+                      Enter a valid email address.
+                    }
+                  </p>
+                } @else {
+                  <span class="mt-1 block text-xs text-muted">
+                    We'll send a 6-digit verification code to this address so you can confirm you
+                    own it.
+                  </span>
+                }
               </label>
 
               <label class="block sm:col-span-2">
@@ -164,9 +179,22 @@
                   placeholder="Your Shop Sales"
                   formControlName="display_name"
                 />
-                <span class="mt-1 block text-xs text-muted">
-                  Recipients see this name next to your From address.
-                </span>
+                @if (
+                  form.controls.display_name.touched && form.controls.display_name.invalid;
+                  as _invalid
+                ) {
+                  <p class="mt-1 text-xs text-red-500">
+                    @if (form.controls.display_name.errors?.['maxlength']) {
+                      Must be 128 characters or fewer.
+                    } @else {
+                      Use letters and spaces only (no digits or special characters).
+                    }
+                  </p>
+                } @else {
+                  <span class="mt-1 block text-xs text-muted">
+                    Recipients see this name next to your From address.
+                  </span>
+                }
               </label>
 
               <label class="block">
@@ -180,6 +208,17 @@
                   placeholder="smtp.gmail.com"
                   formControlName="smtp_host"
                 />
+                @if (form.controls.smtp_host.touched && form.controls.smtp_host.invalid) {
+                  <p class="mt-1 text-xs text-red-500">
+                    @if (form.controls.smtp_host.errors?.['required']) {
+                      SMTP host is required.
+                    } @else if (form.controls.smtp_host.errors?.['maxlength']) {
+                      Must be 253 characters or fewer.
+                    } @else {
+                      Enter a valid hostname (e.g. smtp.gmail.com).
+                    }
+                  </p>
+                }
               </label>
 
               <label class="block">
@@ -194,6 +233,15 @@
                   placeholder="587"
                   formControlName="smtp_port"
                 />
+                @if (form.controls.smtp_port.touched && form.controls.smtp_port.invalid) {
+                  <p class="mt-1 text-xs text-red-500">
+                    @if (form.controls.smtp_port.errors?.['required']) {
+                      Port is required.
+                    } @else {
+                      Port must be between 1 and 65535.
+                    }
+                  </p>
+                }
               </label>
 
               <label class="block sm:col-span-2">
@@ -207,6 +255,15 @@
                   placeholder="hello@yourshop.com"
                   formControlName="smtp_username"
                 />
+                @if (form.controls.smtp_username.touched && form.controls.smtp_username.invalid) {
+                  <p class="mt-1 text-xs text-red-500">
+                    @if (form.controls.smtp_username.errors?.['required']) {
+                      Username is required.
+                    } @else {
+                      Must be 254 characters or fewer.
+                    }
+                  </p>
+                }
               </label>
 
               <label class="block sm:col-span-2">
@@ -234,22 +291,29 @@
                     ></lucide-icon>
                   </button>
                 </div>
-                <span class="mt-1 block text-xs text-muted">
-                  Stored encrypted (Fernet). We never render it back to the UI once saved.
-                </span>
+                @if (form.controls.smtp_password.touched && form.controls.smtp_password.invalid) {
+                  <p class="mt-1 text-xs text-red-500">
+                    @if (form.controls.smtp_password.errors?.['required']) {
+                      Password is required.
+                    } @else {
+                      Must be 4096 characters or fewer.
+                    }
+                  </p>
+                } @else {
+                  <span class="mt-1 block text-xs text-muted">
+                    Stored encrypted (Fernet). We never render it back to the UI once saved.
+                  </span>
+                }
               </label>
 
-              <label class="block sm:col-span-2">
+              <div class="block sm:col-span-2">
                 <span class="text-xs font-medium text-default">TLS mode</span>
-                <select
-                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                <crm-mobile-select
+                  class="mt-1 block"
+                  [options]="tlsModeOptions"
                   formControlName="tls_mode"
-                >
-                  <option value="starttls">STARTTLS (port 587, recommended)</option>
-                  <option value="tls">Implicit TLS (port 465)</option>
-                  <option value="none">None (localhost relay only)</option>
-                </select>
-              </label>
+                />
+              </div>
             </div>
 
             <div class="flex items-center justify-end gap-2 pt-2">
