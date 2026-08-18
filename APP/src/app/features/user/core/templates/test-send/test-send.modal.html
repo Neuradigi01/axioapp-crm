@@ -8,18 +8,17 @@
     <div class="space-y-3 px-5 py-4">
       @if (template().channel === 'whatsapp') {
         <div
-          class="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-snug text-amber-500"
+          class="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400"
         >
-          <p class="flex items-start gap-1.5 font-medium">
-            <lucide-icon name="alert-triangle" size="12" class="mt-0.5 shrink-0" />
-            <span>Not a real template preview.</span>
-          </p>
-          <p class="mt-1">
-            Test send ships the body as a plain WhatsApp text — headers, footers, buttons and media
-            aren't included. It only lands if the recipient has messaged your WhatsApp number in the
-            last 24 hours (Meta's session rule). Customers only see the fully-formatted template
-            once it's approved by Meta.
-          </p>
+          <lucide-icon name="alert-triangle" size="12" class="mt-0.5 shrink-0" />
+          <div class="min-w-0 flex-1 space-y-1 leading-snug">
+            <p class="font-semibold">Not a real template preview.</p>
+            <p>
+              Sends the body as plain WhatsApp text — headers, footers, buttons and media aren't
+              included, and it only lands if the recipient messaged your WhatsApp number in the last
+              24 hours (Meta session rule).
+            </p>
+          </div>
         </div>
       }
       <label class="block">

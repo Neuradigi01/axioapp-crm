@@ -353,21 +353,7 @@ export class TemplateEditorPageComponent {
   });
   protected readonly showTestSendButton = computed(() => this.template() !== null);
   protected readonly showVersionsButton = computed(() => this.template() !== null);
-  /** Warn operators before they Test send: WhatsApp goes out as a plain
-   *  session text (not the approved template), so it only lands when
-   *  Meta's 24-hour session window is open and doesn't preview the
-   *  real header/footer/buttons customers will see. */
-  protected readonly testSendTooltip = computed(() => {
-    const t = this.template();
-    if (t !== null && t.channel === 'whatsapp') {
-      return (
-        'WhatsApp: sends the body as a plain session text — headers, footers, ' +
-        "buttons and media aren't included, and the recipient must have messaged " +
-        'your WhatsApp number in the last 24 hours. Not a preview of the approved template.'
-      );
-    }
-    return 'Send a sample of this template to a recipient of your choice.';
-  });
+  protected readonly isWhatsAppTemplate = computed(() => this.template()?.channel === 'whatsapp');
   /** Step 9 — Submit-to-Meta is visible only on WhatsApp templates that
    *  are published (or approved internally) AND whose external status
    *  is either n_a (never submitted) or rejected (resubmission).
