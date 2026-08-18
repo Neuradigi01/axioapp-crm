@@ -268,11 +268,13 @@ async def send_email(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Email account not found for this org.",
         )
-    if account.user_id != sender_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=("You can only send through your own connected email account."),
-        )
+    # Org-shared mailbox model: any rep in the org can send through
+    # the account connected in Settings → Integrations. RLS on the
+    # session already scopes ``get_account`` to the caller's org, so
+    # cross-tenant sends are blocked at the DAL boundary. The persisted
+    # Message row carries ``sender_user_id`` (who clicked Send) for
+    # audit — the OAuth account row's ``user_id`` is just "which
+    # human's OAuth grant we're using", NOT "who authored the message".
     if account.sync_state == EmailAccountSyncState.disconnected:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

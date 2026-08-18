@@ -54,7 +54,6 @@ from src.app.core.conversations.models import (
 )
 from src.app.core.conversations.registry import resolve
 from src.app.core.conversations.schemas import ConversationPatch
-from src.app.core.email import service as email_service
 from src.app.core.email.models import EmailAccountSyncState
 from src.app.core.events import bus as events_bus
 from src.app.core.events.event_catalog import WHATSAPP_MESSAGE_RECEIVED
@@ -139,9 +138,22 @@ async def list_messages(
             await _da.get_message_by_id(session, before_id),
             entity="message",
         )
-    return await _da.list_messages_for_conversation(
+    messages = await _da.list_messages_for_conversation(
         session, conversation_id, limit=limit, before_id=before_id
     )
+    # Enrich every message with sender_display_name so the note bubble
+    # + outbound-message avatar tooltip render authoritatively even
+    # for former org members (staffById on the frontend hides inactive
+    # users). Single batched lookup — no N+1.
+    sender_ids: set[uuid.UUID] = {m.sender_user_id for m in messages if m.sender_user_id}
+    if sender_ids:
+        name_map = await _da.get_user_display_names_bulk(session, user_uuids=sender_ids)
+        for m in messages:
+            if m.sender_user_id is not None:
+                # Stash on the ORM instance; MessageOut.model_validate
+                # picks it up via the new sender_display_name field.
+                m.sender_display_name = name_map.get(m.sender_user_id)  # type: ignore[attr-defined]
+    return messages
 
 
 # --- writes ----------------------------------------------------------------
@@ -183,51 +195,48 @@ async def send_email_reply(
             detail="Email conversation has no linked contact — cannot reply.",
         )
 
-    # Default account: first sendable mailbox connected by the sending
-    # user. `sync_state=live` reflects INBOUND backfill completeness —
-    # outbound send only needs valid OAuth tokens, which are present in
-    # `pending` (just connected, backfill pending) and `backfilling`
-    # (backfill in progress) too. Requiring `live` here made freshly-
-    # connected accounts unable to reply until the Celery backfill
-    # worker finished, which is a workflow bug (and breaks entirely
-    # when Celery isn't running in dev). Excluded states:
-    #   - error         → tokens rejected by the provider; user must
-    #                     reconnect before we can send anything.
-    #   - disconnected  → user clicked Disconnect; tokens are nulled.
+    # Default account: the org's SHARED connected mailbox from
+    # Settings → Integrations → Email Sender. Every rep (Owner /
+    # Admin / Employee / custom role) sends replies through the same
+    # organisation-scoped mailbox — mirrors how Zoho Desk / Freshdesk
+    # handle team inboxes and removes the per-rep OAuth burden. The
+    # persisted Message still records ``sender_user_id`` = who clicked
+    # Send (author attribution stays intact); only the OAuth account
+    # used for the actual SMTP hop is org-scoped.
+    #
+    # ``sync_state`` gating deliberately mirrors ``resolve_org_sender``
+    # in ``shared/email/org_sender.py``: any non-``disconnected`` row
+    # with a live refresh_token can send, because sync_state reflects
+    # INBOUND backfill completeness — irrelevant to outbound send.
+    # (See project_email_sender_stuck_syncing_fix memory.)
     if account_id is None:
-        accounts = await email_service.list_accounts(session, user_id=user_id)
-        sendable = [
-            a
-            for a in accounts
-            if a.sync_state
-            not in (
-                EmailAccountSyncState.error,
-                EmailAccountSyncState.disconnected,
+        from sqlalchemy import select as _select
+
+        from src.app.core.email.models import EmailAccount
+
+        oauth = (
+            await session.execute(
+                _select(EmailAccount)
+                .where(
+                    EmailAccount.org_id == conv.org_id,
+                    EmailAccount.sync_state != EmailAccountSyncState.disconnected,
+                    EmailAccount.refresh_token_enc.is_not(None),
+                )
+                .order_by(EmailAccount.connected_at.asc())
+                .limit(1)
             )
-        ]
-        if not sendable:
-            # Distinguish "no account at all" from "account exists but
-            # tokens are broken" — the fix path is different for each.
-            if not accounts:
-                detail = (
-                    "You have no connected email account. "
-                    "Connect one in Settings → Email Accounts to reply from the inbox."
-                )
-            else:
-                detail = (
-                    "Your connected email account can't send right now "
-                    "(tokens rejected or account disconnected). "
-                    "Reconnect it in Settings → Email Accounts."
-                )
+        ).scalar_one_or_none()
+        if oauth is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=detail,
+                detail=(
+                    "This organisation has no connected email account. "
+                    "Owner or Admin must connect one in Settings → "
+                    "Integrations → Email Sender before anyone can reply "
+                    "to email conversations."
+                ),
             )
-        # Prefer a `live` account when the user has several — the
-        # freshest inbox surface — otherwise fall back to whatever
-        # sendable account we have.
-        live = [a for a in sendable if a.sync_state == EmailAccountSyncState.live]
-        account_id = (live[0] if live else sendable[0]).id
+        account_id = oauth.id
 
     # Auto-thread on the newest inbound message so Gmail / Outlook
     # collapse the reply into the customer's original thread. Single
