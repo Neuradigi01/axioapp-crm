@@ -125,11 +125,13 @@ _CONTACT_VARS: tuple[VariableDef, ...] = (
 )
 
 _ORG_VARS: tuple[VariableDef, ...] = (
+    # Only ``name`` + ``support_email`` are wired by real publishers
+    # today (``support_email`` on ``lead.status_changed``). Phone /
+    # address / website exist on tbl_organizations but no publisher
+    # emits them into the trigger payload, so exposing them in the
+    # picker would silently render empty.
     VariableDef("org.name", "Organisation name"),
     VariableDef("org.support_email", "Support email"),
-    VariableDef("org.support_phone", "Support phone"),
-    VariableDef("org.address", "Organisation address"),
-    VariableDef("org.website", "Organisation website"),
 )
 
 _SENDER_VARS: tuple[VariableDef, ...] = (
@@ -148,17 +150,18 @@ _LEAD_VARS: tuple[VariableDef, ...] = (
 )
 
 _USER_VARS: tuple[VariableDef, ...] = (
-    # Used by `user.signed_up` / `user.invited` / `user.password_reset`
-    # events from the future automation-engine track.
+    # Populated by ``lead.assigned`` (owner snapshot). ``user.role`` was
+    # never emitted by any publisher — dropped so the picker doesn't
+    # advertise an empty variable.
     VariableDef("user.full_name", "User full name"),
     VariableDef("user.email", "User email"),
-    VariableDef("user.role", "User role"),
 )
 
 _APPOINTMENT_VARS: tuple[VariableDef, ...] = (
+    # ``tbl_appointments`` has no notes column — dropped from the
+    # picker. Add back if/when the model + publisher gain a notes field.
     VariableDef("appointment.scheduled_at", "Appointment date/time", type=VariableType.date),
     VariableDef("appointment.location", "Appointment location"),
-    VariableDef("appointment.notes", "Appointment notes"),
 )
 
 _QUOTE_VARS: tuple[VariableDef, ...] = (
@@ -170,11 +173,14 @@ _QUOTE_VARS: tuple[VariableDef, ...] = (
 )
 
 _INVOICE_VARS: tuple[VariableDef, ...] = (
+    # ``tbl_invoices`` has no ``due_date`` column (see
+    # ``billing/data_access.py`` — overdue windows are derived from
+    # ``issued_at``) and no ``pdf_url`` column. Both dropped from the
+    # picker until Stripe hosted-invoice URL is threaded through the
+    # publisher payload.
     VariableDef("invoice.id", "Invoice ID"),
     VariableDef("invoice.total_amount", "Invoice total", type=VariableType.currency),
     VariableDef("invoice.currency", "Invoice currency"),
-    VariableDef("invoice.due_date", "Due date", type=VariableType.date),
-    VariableDef("invoice.pdf_url", "Invoice PDF link", type=VariableType.url),
 )
 
 _TASK_VARS: tuple[VariableDef, ...] = (

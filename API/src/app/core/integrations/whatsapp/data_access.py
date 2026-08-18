@@ -57,8 +57,31 @@ async def get_by_meta_template_id(
     return result.scalar_one_or_none()
 
 
+async def get_by_integration_name_lang(
+    session: AsyncSession,
+    *,
+    integration_id: uuid.UUID,
+    name: str,
+    language: str,
+) -> WhatsAppTemplate | None:
+    """Lookup by the natural key that backs
+    ``uq_whatsapp_templates_integration_name_lang``. Used by
+    ``ensure_wa_extension_row`` to adopt an existing orphan row (Meta
+    sync creates rows with ``message_template_id=NULL``) instead of
+    tripping the unique constraint on an INSERT."""
+    result = await session.execute(
+        select(WhatsAppTemplate).where(
+            WhatsAppTemplate.integration_id == integration_id,
+            WhatsAppTemplate.name == name,
+            WhatsAppTemplate.language == language,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
 __all__ = [
     "get_by_id",
+    "get_by_integration_name_lang",
     "get_by_message_template_id",
     "get_by_meta_template_id",
 ]

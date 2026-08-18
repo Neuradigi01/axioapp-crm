@@ -455,9 +455,15 @@ async def _build_handler_context(session: AsyncSession, run: WorkflowRun) -> dic
             await session.execute(_select(Contact).where(Contact.id == run.contact_id))
         ).scalar_one_or_none()
         if contact is not None:
+            # Contact stores only ``full_name``; split it so templates
+            # using ``{{contact.first_name}}`` / ``{{contact.last_name}}``
+            # resolve. Mirrors ``diagnostics.synthesise_payload_for_event``.
+            _name_parts = (contact.full_name or "").split(" ", 1)
             contact_dict = {
                 "id": str(contact.id),
                 "full_name": contact.full_name,
+                "first_name": _name_parts[0] or None,
+                "last_name": _name_parts[1] if len(_name_parts) > 1 else None,
                 "email": contact.email,
                 "phone": contact.phone,
             }

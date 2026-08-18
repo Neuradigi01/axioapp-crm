@@ -267,9 +267,7 @@ async def _upsert_wa_extension(
 
     existing = (
         await session.execute(
-            _select(WhatsAppTemplate).where(
-                WhatsAppTemplate.message_template_id == template.id
-            )
+            _select(WhatsAppTemplate).where(WhatsAppTemplate.message_template_id == template.id)
         )
     ).scalar_one_or_none()
 
@@ -312,9 +310,7 @@ async def _upsert_wa_extension(
     await session.flush()
 
 
-async def _load_wa_extension(
-    session: AsyncSession, *, template: MessageTemplate
-) -> None:
+async def _load_wa_extension(session: AsyncSession, *, template: MessageTemplate) -> None:
     """Attach a ``whatsapp`` attribute to the template row containing
     the extension's header / footer / buttons. Null on non-WA rows or
     when no extension exists. The router's ``TemplateRead.model_validate``
@@ -334,9 +330,7 @@ async def _load_wa_extension(
 
     row = (
         await session.execute(
-            _select(WhatsAppTemplate).where(
-                WhatsAppTemplate.message_template_id == template.id
-            )
+            _select(WhatsAppTemplate).where(WhatsAppTemplate.message_template_id == template.id)
         )
     ).scalar_one_or_none()
 
@@ -458,10 +452,7 @@ async def create_template(
     # ``Submit to Meta`` flow has the header / footer / buttons ready
     # to send verbatim. Only touched on WA channel + when the payload
     # actually carries values.
-    if (
-        payload.channel == ConversationChannel.whatsapp
-        and payload.whatsapp is not None
-    ):
+    if payload.channel == ConversationChannel.whatsapp and payload.whatsapp is not None:
         await _upsert_wa_extension(session, template=template, payload=payload.whatsapp)
     await session.commit()
     await session.refresh(template)
@@ -560,8 +551,11 @@ async def update_template(
         payload.body_text is None
         and payload.body_html is not None
         and template.body_html is not None
-        and (template.body_text_fallback_auto if payload.body_text_fallback_auto is None
-             else payload.body_text_fallback_auto)
+        and (
+            template.body_text_fallback_auto
+            if payload.body_text_fallback_auto is None
+            else payload.body_text_fallback_auto
+        )
     ):
         # HTML was edited without an explicit text override — auto-derive
         # the plain-text fallback so dispatch's multipart branch has a
@@ -594,10 +588,7 @@ async def update_template(
     # ``changed`` above because the operator may only be editing WA
     # fields (footer / buttons) without touching the body.
     wa_touched = False
-    if (
-        template.channel == ConversationChannel.whatsapp
-        and payload.whatsapp is not None
-    ):
+    if template.channel == ConversationChannel.whatsapp and payload.whatsapp is not None:
         await _upsert_wa_extension(session, template=template, payload=payload.whatsapp)
         wa_touched = True
 
@@ -751,9 +742,7 @@ async def ensure_wa_extension_row(
 
     integration = (
         await session.execute(
-            _select(Integration).where(
-                Integration.provider == IntegrationProvider.whatsapp
-            )
+            _select(Integration).where(Integration.provider == IntegrationProvider.whatsapp)
         )
     ).scalar_one_or_none()
     if integration is None:
@@ -761,6 +750,29 @@ async def ensure_wa_extension_row(
             "Connect WhatsApp in Settings → Integrations before submitting "
             "or sending this template."
         )
+
+    # An orphan WA row can already exist for this (integration, name,
+    # language) — the Meta template sync writes rows without a
+    # ``message_template_id`` because it can't know which central row
+    # (if any) they belong to. Adopt it into the central row instead of
+    # inserting a duplicate that would trip
+    # ``uq_whatsapp_templates_integration_name_lang``.
+    orphan = await wa_da.get_by_integration_name_lang(
+        session,
+        integration_id=integration.id,
+        name=template.name,
+        language=template.language,
+    )
+    if orphan is not None:
+        orphan.message_template_id = template.id
+        await session.flush()
+        logger.info(
+            "wa extension adopted orphan row %s for central template %s (org=%s)",
+            orphan.id,
+            template.id,
+            template.org_id,
+        )
+        return orphan
 
     body = template.body_text or ""
     components: list[dict[str, Any]] = [{"type": "BODY", "text": body}]

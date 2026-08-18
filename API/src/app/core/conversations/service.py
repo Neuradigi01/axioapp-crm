@@ -409,9 +409,7 @@ async def send_outbound(
     except Exception:  # noqa: BLE001
         import logging
 
-        logging.getLogger(__name__).exception(
-            "chatbots.human_takeover_failed conv=%s", conv.id
-        )
+        logging.getLogger(__name__).exception("chatbots.human_takeover_failed conv=%s", conv.id)
     return msg
 
 
@@ -463,14 +461,10 @@ async def send_template_message(
     # Meta send. Legacy callers that still pass a WA extension row
     # id (``tbl_whatsapp_templates.id``) are handled by the fallback
     # branch so existing bookmarks / integrations don't break.
-    central = await _templates_da.get_template(
-        session, org_id=conv.org_id, template_id=template_id
-    )
+    central = await _templates_da.get_template(session, org_id=conv.org_id, template_id=template_id)
     if central is not None:
         if central.channel != ConversationChannel.whatsapp:
-            raise ValueError(
-                "Only WhatsApp templates can be sent through this endpoint."
-            )
+            raise ValueError("Only WhatsApp templates can be sent through this endpoint.")
         if central.external_status != TemplateExternalStatus.approved:
             raise ValueError(
                 "Only APPROVED templates can be sent — this template is not approved yet."
@@ -499,7 +493,17 @@ async def send_template_message(
     # Without this resolution the send hits Meta with 0 params and
     # gets a #132000 "number of localizable_params does not match"
     # 400 — the same fix `campaigns/service.py` applies for shots.
-    named_body = extract_named_body(template.body_components)
+    #
+    # Source of truth for the named body is the central template's
+    # ``body_text``: WA extension rows created by the Meta sync only
+    # carry the positional body and have ``body_components=NULL``,
+    # so extracting from the extension alone misses the named form
+    # even when the central row still has ``{{contact.first_name}}``.
+    named_body: str | None = None
+    if central is not None and central.body_text:
+        named_body = central.body_text
+    if not named_body:
+        named_body = extract_named_body(template.body_components)
     contact_data: dict[str, Any] | None = None
     org_data: dict[str, Any] | None = None
     if named_body:
@@ -527,9 +531,7 @@ async def send_template_message(
                 "name": org.name or "",
                 "support_email": getattr(org, "support_email", "") or "",
             }
-    auto_variables = resolve_named_body_to_positional_params(
-        named_body, contact_data, org_data
-    )
+    auto_variables = resolve_named_body_to_positional_params(named_body, contact_data, org_data)
 
     # Convert string-keyed operator variables (from the inline picker's
     # `{{n}}` inputs) to int-keyed. Operator entries override any
@@ -549,8 +551,7 @@ async def send_template_message(
     expected = max(int(template.variable_count or 0), len(auto_variables))
     if len(parsed_variables) < expected:
         raise ValueError(
-            f"Template expects {expected} variable(s) "
-            f"but got {len(parsed_variables)}."
+            f"Template expects {expected} variable(s) but got {len(parsed_variables)}."
         )
 
     resolved_phone_id = send_from_phone_id or getattr(conv, "received_via_phone_id", None)
@@ -1098,9 +1099,7 @@ async def _publish_inbound_message_received(
             event_type,
             {
                 "conversation_id": str(conversation.id),
-                "contact_id": (
-                    str(conversation.contact_id) if conversation.contact_id else None
-                ),
+                "contact_id": (str(conversation.contact_id) if conversation.contact_id else None),
                 "message_id": str(message.id),
                 "text": text,
                 "channel": conversation.channel.value,
@@ -1264,8 +1263,7 @@ async def start_conversation(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Manual new conversations aren't supported on the "
-                f"{channel.value} channel yet."
+                f"Manual new conversations aren't supported on the {channel.value} channel yet."
             ),
         )
 
