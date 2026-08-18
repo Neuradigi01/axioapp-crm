@@ -42,6 +42,7 @@ import {
   ReassignConfirm,
   ReassignModalComponent,
 } from '../shared/reassign-modal/reassign-modal.component';
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
@@ -144,6 +145,7 @@ class LeadsListState extends ListPageState<Lead> {}
     ColumnCustomizationMenuComponent,
     AdvancedFilterModalComponent,
     MobileSelectComponent,
+    MobileDateTimeComponent,
   ],
   providers: [LeadsListState],
   templateUrl: './leads.page.html',
