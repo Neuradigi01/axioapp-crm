@@ -49,6 +49,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
+import { AiProvidersCardComponent } from './ai-providers-card.component';
 import { DlqListComponent } from './dlq-list.component';
 import { EmailSenderCardComponent } from './email-sender-card.component';
 import { FieldMappingEditorComponent } from './field-mapping-editor.component';
@@ -89,6 +90,7 @@ type CallbackStatus =
     IntegrationStatusComponent,
     DlqListComponent,
     FieldMappingEditorComponent,
+    AiProvidersCardComponent,
     LucideAngularModule,
   ],
   templateUrl: './integrations-page.component.html',
@@ -126,10 +128,21 @@ export class IntegrationsPageComponent {
     this.auth.currentPermissions().includes('email.accounts.admin'),
   );
 
+  /** True when the caller may see the AI Providers card
+   *  (tasks/ai-assistants Step 1). Billing-sensitive surface — an
+   *  insider with a stored key can drain the org's OpenAI account,
+   *  so Owner + Admin default; custom roles need the key explicitly. */
+  protected readonly canManageAiProviders = computed(() =>
+    this.auth.currentPermissions().includes('ai_providers.manage'),
+  );
+
   /** Any org-scoped card visible → drives the empty-state banner
    *  Employees see when only the Calendar card is on the page. */
   protected readonly hasAnyOrgCard = computed(
-    () => this.canManageOrgIntegrations() || this.canManageEmailSenders(),
+    () =>
+      this.canManageOrgIntegrations() ||
+      this.canManageEmailSenders() ||
+      this.canManageAiProviders(),
   );
 
   // --- top-level signals --------------------------------------------
@@ -326,6 +339,22 @@ export class IntegrationsPageComponent {
         status: 'not_connected',
         statusLabel: 'Manage below',
         anchor: 'card-email-sender',
+      });
+    }
+    if (this.canManageAiProviders()) {
+      tiles.push({
+        id: 'ai_providers',
+        label: 'AI Providers',
+        type: 'BYOK',
+        description:
+          'Bring your own OpenAI API key. Powers AI Assistants and future in-app AI features.',
+        letter: null,
+        icon: 'sparkles',
+        iconBg: 'bg-emerald-500',
+        iconText: 'text-white',
+        status: 'not_connected',
+        statusLabel: 'Manage below',
+        anchor: 'card-ai-providers',
       });
     }
     return tiles;
