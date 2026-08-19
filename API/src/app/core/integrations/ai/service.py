@@ -283,24 +283,11 @@ async def reassign_provider_key(
             detail={"reason": "from_and_to_are_the_same_key"},
         )
 
-    try:
-        rowcount = await _da.reassign_key_references(
-            db,
-            from_key_id=payload.from_key_id,
-            to_key_id=payload.to_key_id,
-        )
-    except NotImplementedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail={
-                "reason": "reassign_deferred_to_step_5",
-                "message": (
-                    "Assistants table lands in tasks/ai-assistants Step 5. "
-                    "Until then, reassign is a no-op."
-                ),
-            },
-        ) from exc
-
+    rowcount = await _da.reassign_key_references(
+        db,
+        from_key_id=payload.from_key_id,
+        to_key_id=payload.to_key_id,
+    )
     await db.commit()
     return rowcount
 

@@ -121,45 +121,48 @@ async def delete_key(db: AsyncSession, key_id: uuid.UUID) -> None:
 
 
 async def count_assistants_by_key_id(
-    db: AsyncSession,  # noqa: ARG001  — kept for signature parity with Step 5
-    key_id: uuid.UUID,  # noqa: ARG001
+    db: AsyncSession,
+    key_id: uuid.UUID,
 ) -> int:
-    """STUB — replaced in Step 5 when ``core.ai_assistants.models``
-    lands ``tbl_ai_assistants.key_id``. Returns 0 today so DELETE
-    always succeeds in the empty-assistants world of Steps 1-4.
+    """Delegates to the AI Assistants module's DAL (Step 5).
 
-    Step 5 rewrites this function body to:
-        stmt = select(func.count()).select_from(AiAssistant).where(
-            AiAssistant.key_id == key_id
-        )
-        result = await db.execute(stmt)
-        return result.scalar_one()
+    Cross-module DAL→DAL is allowed per CLAUDE.md when the target is
+    a plain read/write with no business rules at stake. The
+    ``TenantScoped`` auto-filter in :mod:`src.app.shared.orm` scopes
+    the query by the caller's request-context ``org_id`` so a caller
+    from org A never counts assistants owned by org B.
     """
-    return 0
+    # Local import — the ai_assistants module didn't exist at Step 1
+    # module-load time, and even now the import is inside the function
+    # so no import-cycle risk if this file is re-used pre-Step-5 (e.g.
+    # a bare tests import).
+    from src.app.core.ai_assistants import data_access as _ai_da
+
+    return await _ai_da.count_assistants_by_key_id(db, key_id)
 
 
 async def reassign_key_references(
-    db: AsyncSession,  # noqa: ARG001
+    db: AsyncSession,
     *,
-    from_key_id: uuid.UUID,  # noqa: ARG001
-    to_key_id: uuid.UUID,  # noqa: ARG001
+    from_key_id: uuid.UUID,
+    to_key_id: uuid.UUID,
 ) -> int:
-    """STUB — replaced in Step 5. Step 5's body:
-        stmt = update(AiAssistant).where(
-            AiAssistant.key_id == from_key_id
-        ).values(key_id=to_key_id)
-        result = await db.execute(stmt)
-        return result.rowcount
+    """Delegates to :mod:`core.ai_assistants.data_access` — bulk
+    UPDATE of ``tbl_ai_assistants.key_id`` from one key to another.
+    Caller (Step 1's ``service.reassign_provider_key``) owns the
+    transaction; this staging returns the row count.
 
-    Raises ``NotImplementedError`` in Step 1 — the reassign endpoint
-    is exposed by the router but the service refuses the call until
-    Step 5 wires the assistants table. Dev can still test the
-    endpoint's cross-org guard + validation flow; the actual UPDATE
-    is deferred.
+    ``TenantScoped`` auto-filter narrows the WHERE to the caller's
+    org. Step 1's service layer additionally validates that both
+    keys belong to the caller's org via
+    :func:`get_key_by_id` calls before invoking this.
     """
-    raise NotImplementedError(
-        "reassign_key_references is stubbed until tasks/ai-assistants "
-        "Step 5 introduces tbl_ai_assistants.key_id"
+    from src.app.core.ai_assistants import data_access as _ai_da
+
+    return await _ai_da.reassign_assistant_key_ids(
+        db,
+        from_key_id=from_key_id,
+        to_key_id=to_key_id,
     )
 
 

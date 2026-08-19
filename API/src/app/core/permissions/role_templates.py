@@ -184,6 +184,12 @@ _CORE_ADMIN_KEYS: list[str] = [
     # like `email.accounts.admin`). Employee does NOT — a stored
     # OpenAI key can be used to drain the org's OpenAI budget.
     "ai_providers.manage",
+    # tasks/ai-assistants Step 5 — Assistant CRUD (create / update /
+    # archive / delete + knowledge upload + prompt editing). Admin
+    # holds both keys; Employee gets `view` only (below in
+    # _CORE_EMPLOYEE_KEYS) so the sidebar entry renders read-only.
+    "ai_assistants.view",
+    "ai_assistants.manage",
 ]
 
 
@@ -261,6 +267,11 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     # sidebar entry as read-only (list, get, version history, save-
     # target picker). Mutation, publish, and archive stay Owner/Admin.
     "chatbots.view",
+    # tasks/ai-assistants Step 5 — Employee sees the AI Assistants
+    # sidebar entry + analytics + conversation history as read-only.
+    # Mutation, knowledge upload, embed-key issuance stay Owner/Admin
+    # unless the Owner explicitly grants `.manage` on a custom role.
+    "ai_assistants.view",
 ]
 
 

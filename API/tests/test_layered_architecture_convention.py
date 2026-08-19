@@ -176,6 +176,14 @@ _TRANSACTION_EXCEPTIONS: dict[str, str] = {
     "core/chatbots/nodes/connect_flow.py": "Connect-Flow handler commits after target-bot start",
     "core/chatbots/signed_reply_urls.py": "Signed-URL nonce sign/verify/consume (own txn)",
     "core/chatbots/reply_router.py": "Public reply URL router (unauthenticated webhook-style, own txn)",
+    # --- AI Assistants module helpers (Steps 9 + 10). Runtime is the
+    # chat orchestrator invoked from both the SSE public router and
+    # the Celery cost-reconcile task; ingest is the Celery task that
+    # chunks + embeds + upserts knowledge. Both open their own tx
+    # per outbox pattern (Step 9 pre-inserts cost row, updates on
+    # LLM completion; Step 10 heartbeats mid-ingest).
+    "core/ai_assistants/runtime.py": "Chat runtime (own txn — cost outbox + SSE lifecycle)",
+    "core/ai_assistants/ingest.py": "Celery knowledge ingest (own txn — heartbeat + chunk upserts)",
     # --- Pack billing module — router-only PDF generation shell, completion deferred
     "packs/furniture/modules/billing/router.py": "Pack billing PDF stub (Phase 4 follow-up)",
 }
@@ -328,6 +336,9 @@ _HELPER_CRUD_EXCEPTIONS: dict[str, str] = {
     "core/chatbots/channel_bridge.py": "Bot-outbound sender (Message insert + conv update)",
     "core/chatbots/signed_reply_urls.py": "Signed-URL nonce sign/verify/consume (own session)",
     "core/chatbots/reply_router.py": "Public reply URL router (unauthenticated webhook-style)",
+    # --- AI Assistants module helpers (Steps 9 + 10)
+    "core/ai_assistants/runtime.py": "Chat runtime (retrieve + LLM stream + cost outbox)",
+    "core/ai_assistants/ingest.py": "Celery knowledge ingest (chunk + embed + upsert)",
 }
 
 

@@ -40,6 +40,14 @@ import src.app.core.chatbots.module  # noqa: F401
 # autogenerate sweep run.
 import src.app.core.integrations.ai.models  # noqa: F401
 
+# tasks/ai-assistants Step 5 — side-effect import so the 5 assistant
+# tables (tbl_ai_assistants, tbl_ai_assistant_knowledge/_chunks/
+# _message_meta/_instruction_audit) register with `Base.metadata`.
+import src.app.core.ai_assistants.models  # noqa: F401
+
+# tasks/ai-assistants Step 5 — MODULE descriptor for the sidebar.
+import src.app.core.ai_assistants.module  # noqa: F401
+
 # Import the pack's billing __init__ so its PDF renderer registers
 # itself with `core.billing.pdf_registry` at startup.
 import src.app.packs.furniture.modules.billing  # noqa: F401
