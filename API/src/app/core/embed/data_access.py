@@ -27,6 +27,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
+import sqlalchemy as sa
 from sqlalchemy import delete, func, select
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -81,6 +82,38 @@ async def list_embed_keys_by_prefix_unrevoked(session: AsyncSession, prefix: str
     )
 
 
+async def list_embed_keys_by_prefix_live(
+    session: AsyncSession,
+    *,
+    prefix: str,
+    now: datetime,
+) -> list[EmbedKey]:
+    """Like :func:`list_embed_keys_by_prefix_unrevoked` but includes
+    rows whose ``revoked_at`` is set AS LONG AS ``grace_expires_at``
+    hasn't elapsed yet. The public AI-assistants router uses this so
+    a rotate-with-grace key keeps working for embedded snippets on
+    external sites while the operator swaps in the new one.
+    """
+    return list(
+        (
+            await session.execute(
+                select(EmbedKey).where(
+                    EmbedKey.prefix == prefix,
+                    sa.or_(
+                        EmbedKey.revoked_at.is_(None),
+                        sa.and_(
+                            EmbedKey.grace_expires_at.isnot(None),
+                            EmbedKey.grace_expires_at > now,
+                        ),
+                    ),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
 async def update_embed_key_last_used(
     session: AsyncSession,
     *,
@@ -102,6 +135,92 @@ async def update_embed_key_last_used(
 def insert_embed_key(session: AsyncSession, key: EmbedKey) -> None:
     """Register an already-constructed EmbedKey for INSERT."""
     session.add(key)
+
+
+# --- AI-assistant scoped helpers (Step 14) --------------------------------
+
+
+async def list_embed_keys_for_resource(
+    session: AsyncSession,
+    *,
+    resource_type: str,
+    resource_id: uuid.UUID,
+) -> list[EmbedKey]:
+    """List keys scoped to one (resource_type, resource_id). Used by
+    the operator UI's per-assistant Embed panel. Newest first, live +
+    revoked both included."""
+    rows = (
+        (
+            await session.execute(
+                select(EmbedKey)
+                .where(EmbedKey.resource_type == resource_type)
+                .where(EmbedKey.resource_id == resource_id)
+                .order_by(EmbedKey.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows)
+
+
+async def set_grace_expiry(
+    session: AsyncSession,
+    *,
+    key_id: uuid.UUID,
+    revoked_at: datetime,
+    revoked_by: uuid.UUID,
+    grace_expires_at: datetime | None,
+) -> None:
+    """Set both ``revoked_at`` and ``grace_expires_at`` in one UPDATE
+    so the rotate flow can't leave a key in a half-revoked state.
+    ``grace_expires_at=None`` = immediate revoke."""
+    from sqlalchemy import update as sql_update
+
+    await session.execute(
+        sql_update(EmbedKey)
+        .where(EmbedKey.id == key_id)
+        .values(
+            revoked_at=revoked_at,
+            revoked_by=revoked_by,
+            grace_expires_at=grace_expires_at,
+        )
+    )
+
+
+async def list_grace_expired(
+    session: AsyncSession,
+    *,
+    now: datetime,
+    limit: int = 500,
+) -> list[EmbedKey]:
+    """Rows whose grace window has elapsed. Consumed by Step 17's
+    sweeper which finalises the hard revoke (clears
+    ``grace_expires_at`` so subsequent scans skip them). Bypasses
+    tenant filter — the sweeper is cross-org by design."""
+    rows = (
+        (
+            await session.execute(
+                select(EmbedKey)
+                .where(EmbedKey.grace_expires_at.isnot(None))
+                .where(EmbedKey.grace_expires_at <= now)
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows)
+
+
+async def clear_grace_expiry(session: AsyncSession, key_id: uuid.UUID) -> None:
+    """Zero out ``grace_expires_at`` after the sweeper has finalised
+    a rotated key. Caller commits."""
+    from sqlalchemy import update as sql_update
+
+    await session.execute(
+        sql_update(EmbedKey).where(EmbedKey.id == key_id).values(grace_expires_at=None)
+    )
 
 
 # --- Widget config ------------------------------------------------------
@@ -286,10 +405,15 @@ __all__ = [
     "insert_submission_log",
     "insert_widget_config",
     "list_custom_field_defs_by_keys",
+    "clear_grace_expiry",
     "list_custom_fields_for_widget_entities",
     "list_embed_keys",
+    "list_embed_keys_by_prefix_live",
     "list_embed_keys_by_prefix_unrevoked",
+    "list_embed_keys_for_resource",
+    "list_grace_expired",
     "list_submission_logs_query",
+    "set_grace_expiry",
     "submission_daily_outcome_buckets",
     "submission_outcome_totals",
     "update_embed_key_last_used",

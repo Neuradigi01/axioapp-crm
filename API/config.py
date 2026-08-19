@@ -179,6 +179,15 @@ INTEGRATIONS_ENCRYPTION_KEY = os.getenv("INTEGRATIONS_ENCRYPTION_KEY", "")
 # once an org actually stores a key.
 AI_PROVIDER_KEY_KEK = os.getenv("AI_PROVIDER_KEY_KEK", "")
 
+# Cloudflare Turnstile — server-side site secret. Verifies the
+# ``cf-turnstile-response`` token the widget submits on the first
+# message per session (Step 14). Empty = dev mode: only the
+# documented always-pass bypass tokens
+# (``1x0000000000000000000000000000000AA``) are accepted, no
+# network round-trip. Get a production secret from
+# https://dash.cloudflare.com/?to=/:account/turnstile.
+TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY", "")
+
 # Fernet key for Real Estate pack's public property-link tokens
 # (`packs/real_estate/modules/property/link_token.py`). Generate via
 #   docker exec crm-api-1 python -c \

@@ -41,6 +41,7 @@ from src.app.core.embed.config_service import (
 )
 from src.app.core.embed.models import EmbedSubmissionOutcome
 from src.app.core.embed.schemas import (
+    AiAssistantEmbedKeyIssue,
     AvailableCustomField,
     EmbedKeyIssue,
     EmbedKeyIssueResponse,
@@ -57,7 +58,16 @@ from src.app.core.embed.schemas import (
     WidgetConfigRead,
     WidgetConfigUpdate,
 )
-from src.app.core.embed.service import find_by_plain_key, issue, list_keys, revoke
+from src.app.core.embed.service import (
+    RESOURCE_TYPE_AI_ASSISTANT,
+    find_by_plain_key,
+    issue,
+    list_keys,
+    list_keys_for_resource,
+    revoke,
+    revoke_now,
+    rotate,
+)
 from src.app.core.embed.submissions import submit as submit_widget_submission
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
@@ -121,6 +131,123 @@ async def revoke_embed_key_endpoint(
         actor_id=user.legacy_uuid,
         key_id=key_id,
     )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Admin: AI-assistant scoped keys (Step 14) ------------------------
+
+
+# NOTE: uses the SAME ``settings.integrations.embed.manage`` permission
+# as lead-form keys — one gate covers both channel types so operators
+# don't need a second permission grant to issue an AI-assistant key.
+
+
+@router.post(
+    "/ai-assistants/{assistant_id}/keys",
+    response_model=EmbedKeyIssueResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def issue_ai_assistant_embed_key(
+    assistant_id: uuid.UUID,
+    payload: AiAssistantEmbedKeyIssue,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("settings.integrations.embed.manage")),
+) -> EmbedKeyIssueResponse:
+    """Issue an embed key scoped to one AI assistant. Plaintext
+    ``secret`` appears in the response ONCE — the operator must copy
+    it before navigating away."""
+    row, plain = await issue(
+        db,
+        org_id=user.org_id,
+        actor_id=user.legacy_uuid,
+        name=payload.name,
+        resource_type=RESOURCE_TYPE_AI_ASSISTANT,
+        resource_id=assistant_id,
+        allowed_origins=payload.allowed_origins,
+        rate_limit_per_hour=payload.rate_limit_per_hour,
+    )
+    return EmbedKeyIssueResponse(
+        id=row.id,
+        name=row.name,
+        prefix=row.prefix,
+        secret=plain,
+        created_at=row.created_at,
+    )
+
+
+@router.get(
+    "/ai-assistants/{assistant_id}/keys",
+    response_model=list[EmbedKeyRead],
+)
+async def list_ai_assistant_embed_keys(
+    assistant_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("settings.integrations.embed.manage")),
+) -> list[EmbedKeyRead]:
+    """List embed keys bound to one AI assistant. Never returns
+    plaintext."""
+    rows = await list_keys_for_resource(
+        db,
+        resource_type=RESOURCE_TYPE_AI_ASSISTANT,
+        resource_id=assistant_id,
+    )
+    return [EmbedKeyRead.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/keys/{key_id}/rotate",
+    response_model=EmbedKeyIssueResponse,
+)
+async def rotate_embed_key_endpoint(
+    key_id: uuid.UUID,
+    grace_days: int = Query(default=0, ge=0, le=7),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("settings.integrations.embed.manage")),
+) -> EmbedKeyIssueResponse:
+    """Rotate: issues a fresh key with the same resource binding +
+    revokes the old one. Default is immediate revoke
+    (``grace_days=0``); pass ``?grace_days=<1..7>`` to keep the old
+    key live during the swap."""
+    new_row, plain = await rotate(
+        db,
+        org_id=user.org_id,
+        actor_id=user.legacy_uuid,
+        key_id=key_id,
+        grace_days=grace_days,
+    )
+    return EmbedKeyIssueResponse(
+        id=new_row.id,
+        name=new_row.name,
+        prefix=new_row.prefix,
+        secret=plain,
+        created_at=new_row.created_at,
+    )
+
+
+@router.post(
+    "/keys/{key_id}/revoke-now",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def revoke_now_embed_key_endpoint(
+    key_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("settings.integrations.embed.manage")),
+) -> Response:
+    """Hard-revoke immediately AND close every in-flight SSE stream
+    for this key. Use this when a key has leaked and must stop
+    working RIGHT NOW rather than after the client's cached
+    connection times out."""
+    await revoke_now(
+        db,
+        org_id=user.org_id,
+        actor_id=user.legacy_uuid,
+        key_id=key_id,
+    )
+    # Cancel any in-flight streams. In-memory registry — single
+    # worker in v1 (documented risk in the step spec).
+    from src.app.core.ai_assistants.sse_registry import registry as _sse_registry
+
+    _sse_registry.cancel_by_embed_key(key_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

@@ -156,6 +156,7 @@ class ChatRuntime:
         session_token: str,
         is_public: bool,
         is_disconnected: Callable[[], bool] | None = None,
+        embed_key_id: uuid.UUID | None = None,
     ) -> None:
         self._db = db
         self._org_id = org_id
@@ -163,7 +164,28 @@ class ChatRuntime:
         self._user_message = user_message
         self._session_token = session_token
         self._is_public = is_public
-        self._is_disconnected = is_disconnected or (lambda: False)
+        # Step 14 — public router passes its embed_key_id so
+        # revoke-now can walk the SseStreamRegistry + cancel this
+        # stream mid-flight. Preview flows leave it None.
+        self._embed_key_id = embed_key_id
+        _client_disconnect = is_disconnected or (lambda: False)
+        if embed_key_id is not None:
+            # Wrap the ASGI disconnect check with a registry poll so
+            # an operator revoke-now closes this stream on the next
+            # tick without the runtime needing to know about revoke.
+            from src.app.core.ai_assistants.sse_registry import registry as _sse_registry
+
+            def _combined() -> bool:
+                if _client_disconnect():
+                    return True
+                return _sse_registry.is_cancelled(
+                    embed_key_id=embed_key_id,
+                    session_token=session_token,
+                )
+
+            self._is_disconnected = _combined
+        else:
+            self._is_disconnected = _client_disconnect
 
         self._assistant: AiAssistant | None = None
         self._conversation_id: uuid.UUID | None = None
@@ -171,6 +193,24 @@ class ChatRuntime:
         self._retrieved_chunk_ids: list[uuid.UUID] = []
 
     # --- Guards ------------------------------------------------------
+
+    def _disconnect_reason(self) -> str:
+        """Distinguish an operator revoke from a client disconnect.
+        The public router registers the stream in
+        :mod:`~core.ai_assistants.sse_registry`; a matching
+        ``cancel_by_embed_key`` flip is the revoke signal. Anything
+        else is a plain client disconnect."""
+        if self._embed_key_id is not None:
+            from src.app.core.ai_assistants.sse_registry import (
+                registry as _sse_registry,
+            )
+
+            if _sse_registry.is_cancelled(
+                embed_key_id=self._embed_key_id,
+                session_token=self._session_token,
+            ):
+                return "embed_key_revoked"
+        return "client_disconnect"
 
     async def _load_assistant(self) -> AiAssistant:
         row = await _da.get_assistant_by_id(self._db, self._assistant_id)
@@ -258,6 +298,33 @@ class ChatRuntime:
     # --- Main entrypoint --------------------------------------------
 
     async def stream_reply(self) -> AsyncIterator[RuntimeChunk]:
+        # Step 14 — register in the SSE registry so revoke-now can
+        # cancel this stream mid-flight. Deregistration happens in
+        # the finally block below. Registry is a no-op no-cost dict
+        # write when embed_key_id is None (preview flow).
+        if self._embed_key_id is not None:
+            from src.app.core.ai_assistants.sse_registry import registry as _sse_registry
+
+            _sse_registry.register(
+                embed_key_id=self._embed_key_id,
+                session_token=self._session_token,
+            )
+
+        try:
+            async for chunk in self._stream_reply_impl():
+                yield chunk
+        finally:
+            if self._embed_key_id is not None:
+                from src.app.core.ai_assistants.sse_registry import (
+                    registry as _sse_registry,
+                )
+
+                _sse_registry.deregister(
+                    embed_key_id=self._embed_key_id,
+                    session_token=self._session_token,
+                )
+
+    async def _stream_reply_impl(self) -> AsyncIterator[RuntimeChunk]:
         assistant = await self._load_assistant()
 
         # Draft assistants only accept preview traffic — a public
@@ -357,15 +424,19 @@ class ChatRuntime:
                 if chunks_since_disconnect_check >= _DISCONNECT_CHECK_EVERY_N_CHUNKS:
                     chunks_since_disconnect_check = 0
                     if self._is_disconnected():
-                        # Client abandoned the stream — stop billing.
+                        # Distinguish operator revoke from a client
+                        # disconnect so the widget can surface a
+                        # useful message ("this bot was disabled")
+                        # rather than "you disconnected".
+                        reason_code = self._disconnect_reason()
                         assert self._assistant_message_id is not None
                         await _da.update_message_meta_failed(
                             self._db,
                             message_id=self._assistant_message_id,
-                            provider_error="client_disconnect",
+                            provider_error=reason_code,
                         )
                         await self._db.commit()
-                        yield RuntimeChunk(type="error", reason="client_disconnect")
+                        yield RuntimeChunk(type="error", reason=reason_code)
                         yield RuntimeChunk(
                             type="done",
                             total_tokens=(final_usage.total_tokens if final_usage else 0),

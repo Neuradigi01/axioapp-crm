@@ -1,7 +1,7 @@
 # Step 14 — Embed keys extension + public router + rate limit + CAPTCHA + immediate-revoke
 
 **Goal:** Ship the public-facing surface. Extend existing `tbl_embed_keys` with `resource_type='ai_assistant'`. Mount `public_router.py` under a distinct URL prefix. Pin-test blocks stray JWT usage in public router. Redis-backed per-key + per-org rate limit (fail-closed). First-message Turnstile CAPTCHA. Immediate-revoke path alongside opt-in 7-day grace. Origin-header allow-list as advisory. No widget bundle yet (Step 15).
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 5 (`tbl_embed_keys` schema extension), Step 9 (chat runtime), existing `core/embed/rate_limit.py` infra.
 
 ---

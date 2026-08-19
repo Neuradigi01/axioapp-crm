@@ -49,6 +49,11 @@ class EmbedKeyRead(ORMModel):
     last_used_ip: str | None
     revoked_at: datetime | None
     revoked_by: uuid.UUID | None
+    grace_expires_at: datetime | None = None
+    resource_type: str = "lead_form"
+    resource_id: uuid.UUID | None = None
+    allowed_origins: list[str] = Field(default_factory=list)
+    rate_limit_per_hour: int = 300
     created_at: datetime
 
 
@@ -62,6 +67,36 @@ class EmbedKeyIssueResponse(ORMModel):
     prefix: str
     secret: str
     created_at: datetime
+
+
+class AiAssistantEmbedKeyIssue(BaseModel):
+    """Body for ``POST /embed/ai-assistants/{id}/keys`` (Step 14).
+
+    ``allowed_origins`` is an origin allow-list (advisory — real
+    defence is the fail-closed rate limiter + budget cap + Turnstile).
+    ``rate_limit_per_hour`` overrides the 300-req/hour default per
+    key; capped at 5000 so a runaway config can't nullify the org
+    aggregate cap.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str | None = Field(default=None, max_length=128)
+    allowed_origins: list[str] = Field(default_factory=list, max_length=32)
+    rate_limit_per_hour: int | None = Field(default=None, ge=1, le=5000)
+
+    @field_validator("allowed_origins")
+    @classmethod
+    def _origins_shape(cls, v: list[str]) -> list[str]:
+        out: list[str] = []
+        for raw in v:
+            trimmed = raw.strip().lower()
+            if len(trimmed) < 1 or len(trimmed) > 253:
+                raise ValueError("origin length must be 1..253 chars")
+            if not (trimmed.startswith("http://") or trimmed.startswith("https://")):
+                raise ValueError("origin must start with http:// or https://")
+            out.append(trimmed)
+        return out
 
 
 class SubmissionAttribution(BaseModel):

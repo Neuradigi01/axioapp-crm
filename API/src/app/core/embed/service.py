@@ -34,7 +34,8 @@ import logging
 import secrets
 import string
 import uuid
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 from fastapi import HTTPException, status
@@ -44,6 +45,19 @@ from src.app.core import audit
 from src.app.core.embed import data_access as _da
 from src.app.core.embed.models import EmbedKey
 from src.app.shared.db import async_session
+
+# Resource-type discriminator values for tbl_embed_keys.resource_type.
+# CHECK constraint at DB-level (migration 0201) enforces membership.
+RESOURCE_TYPE_LEAD_FORM = "lead_form"
+RESOURCE_TYPE_AI_ASSISTANT = "ai_assistant"
+_ALLOWED_RESOURCE_TYPES = frozenset(
+    {RESOURCE_TYPE_LEAD_FORM, RESOURCE_TYPE_AI_ASSISTANT}
+)
+
+# Grace-period cap: rotate?grace_days=7 is the outer bound so an
+# operator can't accidentally leave a rotated-but-still-live key
+# floating around indefinitely.
+_MAX_GRACE_DAYS = 7
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +106,30 @@ async def issue(
     org_id: uuid.UUID,
     actor_id: uuid.UUID,
     name: str | None = None,
+    resource_type: str = RESOURCE_TYPE_LEAD_FORM,
+    resource_id: uuid.UUID | None = None,
+    allowed_origins: list[str] | None = None,
+    rate_limit_per_hour: int | None = None,
 ) -> tuple[EmbedKey, str]:
-    """Generate + persist a new key. Returns (row, plaintext)."""
+    """Generate + persist a new key. Returns (row, plaintext).
+
+    ``resource_type`` / ``resource_id`` bind the key to a specific
+    resource — ``ai_assistant`` keys carry the assistant id so the
+    public router can resolve the target assistant from just the
+    bearer token. ``allowed_origins`` is an advisory ``Origin``-
+    header allow-list; ``rate_limit_per_hour`` overrides the per-key
+    default (300)."""
+    if resource_type not in _ALLOWED_RESOURCE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "invalid_resource_type", "value": resource_type},
+        )
+    if resource_type == RESOURCE_TYPE_AI_ASSISTANT and resource_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "resource_id_required_for_ai_assistant"},
+        )
+
     plain = _generate_plain_key()
     prefix = plain[:_PREFIX_DISPLAY_LEN]
     hashed = _hash_key(plain)
@@ -104,6 +140,10 @@ async def issue(
         prefix=prefix,
         hash=hashed,
         created_by=actor_id,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        allowed_origins=list(allowed_origins or []),
+        rate_limit_per_hour=(rate_limit_per_hour if rate_limit_per_hour is not None else 300),
     )
     _da.insert_embed_key(session, row)
     await session.commit()
@@ -117,6 +157,8 @@ async def issue(
             "key_id": str(row.id),
             "name": row.name,
             "prefix": row.prefix,
+            "resource_type": row.resource_type,
+            "resource_id": str(row.resource_id) if row.resource_id else None,
         },
     )
     return row, plain
@@ -198,4 +240,245 @@ async def find_by_plain_key(plain: str, *, ip: str | None = None) -> EmbedKey | 
         return match
 
 
-__all__ = ["find_by_plain_key", "issue", "list_keys", "revoke"]
+# --- AI-assistant public path (Step 14) ---------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedEmbedKey:
+    """The subset of :class:`EmbedKey` the public router needs. Kept
+    as a plain dataclass so we don't ferry a live ORM instance across
+    the request lifecycle (the session that loaded it closes before
+    the router handler runs)."""
+
+    key_id: uuid.UUID
+    org_id: uuid.UUID
+    resource_type: str
+    resource_id: uuid.UUID | None
+    allowed_origins: tuple[str, ...]
+    rate_limit_per_hour: int
+    prefix: str
+
+
+async def resolve_embed_key(plain: str, *, ip: str | None = None) -> ResolvedEmbedKey | None:
+    """Grace-aware lookup for the AI-assistants public router.
+
+    Accepts keys that are:
+      * live (``revoked_at IS NULL``), OR
+      * within a rotate-with-grace window (``revoked_at`` set but
+        ``grace_expires_at > now()``).
+
+    Returns ``None`` on no-match. Callers translate ``None`` to a
+    401 with an identical body so an attacker can't distinguish
+    "wrong key" from "revoked past grace".
+    """
+    if not plain or not plain.startswith(_KEY_PREFIX):
+        return None
+    prefix = plain[:_PREFIX_DISPLAY_LEN]
+    if len(prefix) != _PREFIX_DISPLAY_LEN:
+        return None
+
+    now = datetime.now(UTC)
+    async with async_session() as session:
+        rows = await _da.list_embed_keys_by_prefix_live(
+            session, prefix=prefix, now=now
+        )
+        match: EmbedKey | None = None
+        for candidate in rows:
+            if _verify_key(plain, candidate.hash):
+                match = candidate
+                break
+
+        if match is None:
+            return None
+
+        matched_id = match.id
+        # Snapshot the fields we need BEFORE the session closes.
+        snapshot = ResolvedEmbedKey(
+            key_id=match.id,
+            org_id=match.org_id,
+            resource_type=match.resource_type,
+            resource_id=match.resource_id,
+            allowed_origins=tuple(match.allowed_origins or ()),
+            rate_limit_per_hour=int(match.rate_limit_per_hour or 300),
+            prefix=match.prefix,
+        )
+
+        try:
+            await _da.update_embed_key_last_used(
+                session,
+                key_id=matched_id,
+                when=now,
+                ip_hash=_hash_ip(ip),
+            )
+            await session.commit()
+        except Exception:
+            logger.exception("embed.last_used_update failed for key %s", matched_id)
+
+        return snapshot
+
+
+def assert_ai_assistant_key(resolved: ResolvedEmbedKey | None) -> ResolvedEmbedKey:
+    """Guard for the AI-assistants public router. Raises 401 with a
+    stable ``invalid_key`` reason if the resolved key isn't scoped
+    to an AI assistant (wrong resource_type, or resource_id nulled
+    out by a bad admin edit). Same error body as an unknown key —
+    no side channel."""
+    if resolved is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"reason": "invalid_key"},
+        )
+    if (
+        resolved.resource_type != RESOURCE_TYPE_AI_ASSISTANT
+        or resolved.resource_id is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"reason": "invalid_key"},
+        )
+    return resolved
+
+
+async def rotate(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    actor_id: uuid.UUID,
+    key_id: uuid.UUID,
+    grace_days: int = 0,
+) -> tuple[EmbedKey, str]:
+    """Issue a fresh key with the same ``(resource_type, resource_id,
+    allowed_origins, rate_limit_per_hour, name)`` as the target + set
+    the old key's ``revoked_at`` (with optional grace window). Returns
+    the NEW row + plaintext.
+
+    ``grace_days`` in ``[0, 7]``:
+      * ``0`` → immediate revoke (default).
+      * ``>0`` → old key stays live for that many days so the operator
+        can swap the new key into their site without downtime.
+    """
+    if grace_days < 0 or grace_days > _MAX_GRACE_DAYS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "reason": "grace_days_out_of_range",
+                "min": 0,
+                "max": _MAX_GRACE_DAYS,
+            },
+        )
+
+    old = await _da.get_embed_key_by_id(session, key_id)
+    if old is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="embed key not found"
+        )
+    if old.revoked_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"reason": "already_revoked"},
+        )
+
+    new_row, plain = await issue(
+        session,
+        org_id=org_id,
+        actor_id=actor_id,
+        name=old.name,
+        resource_type=old.resource_type,
+        resource_id=old.resource_id,
+        allowed_origins=list(old.allowed_origins or []),
+        rate_limit_per_hour=old.rate_limit_per_hour,
+    )
+
+    now = datetime.now(UTC)
+    grace_expires_at = now + timedelta(days=grace_days) if grace_days > 0 else None
+    await _da.set_grace_expiry(
+        session,
+        key_id=key_id,
+        revoked_at=now,
+        revoked_by=actor_id,
+        grace_expires_at=grace_expires_at,
+    )
+    await session.commit()
+
+    await audit.log(
+        "embed.key.rotated",
+        entity_type="embed_key",
+        entity_id=old.id,
+        after={
+            "old_key_id": str(old.id),
+            "new_key_id": str(new_row.id),
+            "grace_days": grace_days,
+        },
+    )
+    return new_row, plain
+
+
+async def revoke_now(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,  # noqa: ARG001 — tenant filter enforces scope on the DAL read
+    actor_id: uuid.UUID,
+    key_id: uuid.UUID,
+) -> EmbedKey:
+    """Hard revoke: ``revoked_at=now()`` + ``grace_expires_at=NULL``
+    so the sweeper doesn't try to re-close a key that never had a
+    grace window. Idempotent — a re-revoke updates the timestamp
+    without emitting a second audit event.
+
+    In-flight SSE streams for this key are closed by the public
+    router (which reads :mod:`~core.ai_assistants.sse_registry`) —
+    kept out of this service so the DAL layer doesn't grow a
+    dependency on the AI-assistants module."""
+    row = await _da.get_embed_key_by_id(session, key_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="embed key not found"
+        )
+    already_revoked = row.revoked_at is not None
+    now = datetime.now(UTC)
+    await _da.set_grace_expiry(
+        session,
+        key_id=key_id,
+        revoked_at=now,
+        revoked_by=actor_id,
+        grace_expires_at=None,
+    )
+    await session.commit()
+    await session.refresh(row)
+    if not already_revoked:
+        await audit.log(
+            "embed.key.revoked_now",
+            entity_type="embed_key",
+            entity_id=row.id,
+            after={"key_id": str(row.id), "prefix": row.prefix},
+        )
+    return row
+
+
+async def list_keys_for_resource(
+    session: AsyncSession,
+    *,
+    resource_type: str,
+    resource_id: uuid.UUID,
+) -> list[EmbedKey]:
+    """List keys bound to one resource. Used by the operator UI's
+    per-assistant embed panel."""
+    return await _da.list_embed_keys_for_resource(
+        session, resource_type=resource_type, resource_id=resource_id
+    )
+
+
+__all__ = [
+    "RESOURCE_TYPE_AI_ASSISTANT",
+    "RESOURCE_TYPE_LEAD_FORM",
+    "ResolvedEmbedKey",
+    "assert_ai_assistant_key",
+    "find_by_plain_key",
+    "issue",
+    "list_keys",
+    "list_keys_for_resource",
+    "resolve_embed_key",
+    "revoke",
+    "revoke_now",
+    "rotate",
+]

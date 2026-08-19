@@ -17,8 +17,8 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CHAR, DateTime, Enum, String, Text, text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import CHAR, DateTime, Enum, Integer, String, Text, text
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.app.shared.db import Base
@@ -45,15 +45,61 @@ class EmbedKey(Base, TenantScoped):
     last_used_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    # Grace window for rotate-with-grace: the key stays live until
+    # this timestamp so operators can swap embed snippets on their
+    # site without downtime. Set when :func:`~core.embed.service.rotate`
+    # is called with ``grace_days>0``; Step 17's sweeper hard-revokes
+    # rows past this timestamp. ``NULL`` = no grace (default).
+    grace_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=text("now()"),
     )
+    # Step 5 (migration ``0201_ai_assistants_schema``) added these
+    # two columns so the key table serves both the lead-form widget
+    # and the AI-assistants public router. CHECK constraint at
+    # DB-level restricts ``resource_type`` to a known set.
+    resource_type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=text("'lead_form'"),
+    )
+    resource_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    # Origin allow-list — advisory: real defence is the rate limit +
+    # budget cap + Turnstile. Empty array = no origin check (widget
+    # snippet can be embedded on any domain). Bounded to 32 entries
+    # per the schema.
+    allowed_origins: Mapped[list[str]] = mapped_column(
+        ARRAY(String),
+        nullable=False,
+        server_default=text("'{}'::text[]"),
+    )
+    rate_limit_per_hour: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("300"),
+    )
 
     @property
     def is_revoked(self) -> bool:
+        """Hard-revoked (revoked_at set + grace elapsed OR never
+        granted). Callers on the public path use :func:`is_live` to
+        include the grace window."""
         return self.revoked_at is not None
+
+    def is_live(self, *, now: datetime) -> bool:
+        """True if this key still accepts traffic. Grace window keeps
+        the key live for ``grace_expires_at`` seconds after revoke."""
+        if self.revoked_at is None:
+            return True
+        if self.grace_expires_at is not None and self.grace_expires_at > now:
+            return True
+        return False
 
 
 class WidgetConfig(Base, TenantScoped):
