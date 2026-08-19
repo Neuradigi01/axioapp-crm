@@ -153,6 +153,21 @@ async def _delete_orphan_org(org_id: uuid.UUID) -> int:
 
     from src.app.shared.db import async_session
 
+    # Step 17 — before DB cascade: cancel Celery tasks + close SSE streams.
+    # These must happen before the org's rows are deleted so they can
+    # query for the org's resources. After we return, the calling code
+    # will delete storage directories.
+    try:
+        # Cancel in-flight SSE streams for this org (AI conversations).
+        # In single-process, this reaches all streams; multi-worker needs
+        # Redis pub/sub bridge (deferred to v2).
+        from src.app.core.ai_assistants.sse_registry import registry
+
+        stream_count = registry.cancel_by_org(org_id)
+        logger.info("_delete_orphan_org org=%s sse_cancelled=%d", org_id, stream_count)
+    except Exception:
+        logger.exception("_delete_orphan_org sse_cancel_failed org=%s", org_id)
+
     async with async_session() as session:
         # Capture the members' user_member_ids before we drop the
         # membership rows, so we can check downstream whether they
@@ -220,7 +235,38 @@ async def _delete_orphan_org(org_id: uuid.UUID) -> int:
                 )
                 users_dropped += 1
 
+        # Step 17 — log to GDPR deletion audit table. Record the org deletion
+        # with a hash-based summary (no PII stored).
+        try:
+            from src.app.core.ai_assistants.models import GdprDeletionLog
+
+            log = GdprDeletionLog(
+                org_id=org_id,
+                entity_type="organization",
+                entity_count=1,
+                id_hash_sha256=None,  # Single org, no ID list to hash
+                deletion_reason="org_orphan_pending_deleted",
+            )
+            session.add(log)
+        except Exception:
+            logger.exception("_delete_orphan_org gdpr_log_failed org=%s", org_id)
+
         await session.commit()
+
+        # Step 17 — after DB cascade: delete storage directories for this org.
+        try:
+            from src.app.shared.storage import get_storage
+
+            storage = get_storage()
+            prefix = f"{org_id}/ai_assistants"
+            count = storage.delete_directory(prefix)
+            logger.info(
+                "_delete_orphan_org org=%s storage_deleted=%d",
+                org_id,
+                count,
+            )
+        except Exception:
+            logger.exception("_delete_orphan_org storage_delete_failed org=%s", org_id)
 
     return users_dropped
 

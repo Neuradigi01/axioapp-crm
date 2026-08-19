@@ -45,6 +45,8 @@ _ALLOWED_DOMAIN_MAX_LEN = 253  # RFC 1035 hostname cap
 _FALLBACK_MSG_MAX = 2000
 _RETRY_ATTEMPTS_MAX = 5
 _BUDGET_MAX = Decimal("9999.9999")
+_RETENTION_DAYS_MIN = 1
+_RETENTION_DAYS_MAX = 400  # Hard cap; org default 90
 
 
 # --- Create ---------------------------------------------------------------
@@ -89,6 +91,11 @@ class AiAssistantCreate(BaseModel):
     lead_capture_mode: LeadCaptureMode = LeadCaptureMode.off
     lead_capture_turn_n: int = Field(default=3, ge=1, le=20)
     lead_capture_message: str | None = Field(default=None, max_length=500)
+    retention_days: int | None = Field(
+        default=None,
+        ge=_RETENTION_DAYS_MIN,
+        le=_RETENTION_DAYS_MAX,
+    )
 
 
 # --- Update ---------------------------------------------------------------
@@ -131,6 +138,11 @@ class AiAssistantUpdate(BaseModel):
     lead_capture_mode: LeadCaptureMode | None = None
     lead_capture_turn_n: int | None = Field(default=None, ge=1, le=20)
     lead_capture_message: str | None = Field(default=None, max_length=500)
+    retention_days: int | None = Field(
+        default=None,
+        ge=_RETENTION_DAYS_MIN,
+        le=_RETENTION_DAYS_MAX,
+    )
 
 
 # --- Read -----------------------------------------------------------------
@@ -159,6 +171,7 @@ class AiAssistantRead(BaseModel):
     lead_capture_mode: LeadCaptureMode
     lead_capture_turn_n: int
     lead_capture_message: str | None
+    retention_days: int | None
     version: int
     created_by_user_id: uuid.UUID | None
     interface_config: dict[str, Any]

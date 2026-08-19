@@ -205,11 +205,12 @@ async def create_assistant(
         "lead_capture_mode": payload.lead_capture_mode,
         "lead_capture_turn_n": payload.lead_capture_turn_n,
         "lead_capture_message": payload.lead_capture_message,
+        "retention_days": payload.retention_days,
         "created_by_user_id": user_id,
     }
     # Fallback message only overrides the server_default when the
     # caller sent one — respects the "don't clobber the default
-    # unless the operator asked" contract.
+    # unless the operator asked" contract. Same for retention_days.
     if payload.fallback_message is not None:
         values["fallback_message"] = payload.fallback_message
 

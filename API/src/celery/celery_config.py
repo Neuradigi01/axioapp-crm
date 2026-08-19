@@ -258,4 +258,31 @@ beat_schedule = {
         "task": "src.app.core.workflows.tasks.sweep_orphan_schedules_weekly",
         "schedule": crontab(hour=3, minute=0, day_of_week="sun"),
     },
+    # tasks/ai-assistants Step 17 — janitor beat tasks for retention,
+    # reaping, grace expiry, and cost reconciliation. Offset each task to
+    # stagger DB load across the hour and minimize contention.
+    "ai-retention-cleanup": {
+        "task": "src.app.core.ai_assistants.tasks.retention_cleanup",
+        "schedule": crontab(hour="*/6", minute=5),
+    },
+    "ai-reap-stuck-ingest": {
+        "task": "src.app.core.ai_assistants.tasks.reap_stuck_ingest",
+        "schedule": 300.0,  # every 5 minutes
+    },
+    "ai-cleanup-orphan-chunks": {
+        "task": "src.app.core.ai_assistants.tasks.cleanup_orphan_chunks",
+        "schedule": crontab(minute=15),
+    },
+    "ai-expire-embed-key-grace": {
+        "task": "src.app.core.ai_assistants.tasks.expire_embed_key_grace",
+        "schedule": crontab(minute=25),
+    },
+    "ai-reconcile-cost-outbox": {
+        "task": "src.app.core.ai_assistants.tasks.reconcile_cost_outbox",
+        "schedule": 300.0,  # every 5 minutes
+    },
+    "ai-janitor-heartbeat": {
+        "task": "src.app.core.ai_assistants.tasks.janitor_heartbeat",
+        "schedule": 60.0,  # every 1 minute
+    },
 }

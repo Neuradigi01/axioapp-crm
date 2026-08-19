@@ -52,6 +52,7 @@ import { FurnitureAuthService } from '../../auth/auth.service';
 import { AiProvidersCardComponent } from './ai-providers-card.component';
 import { DlqListComponent } from './dlq-list.component';
 import { EmailSenderCardComponent } from './email-sender-card.component';
+import { RetentionCardComponent } from './retention-card.component';
 import { FieldMappingEditorComponent } from './field-mapping-editor.component';
 import { GoogleCalendarCardComponent } from './google-calendar-card.component';
 import { GoogleCardComponent } from './google-card.component';
@@ -91,6 +92,7 @@ type CallbackStatus =
     DlqListComponent,
     FieldMappingEditorComponent,
     AiProvidersCardComponent,
+    RetentionCardComponent,
     LucideAngularModule,
   ],
   templateUrl: './integrations-page.component.html',

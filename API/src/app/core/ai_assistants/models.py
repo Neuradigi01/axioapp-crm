@@ -269,6 +269,15 @@ class AiAssistant(Base, TenantScoped):
         Text,
         nullable=True,
     )
+    # Step 17 — retention policy. How many days to keep messages for
+    # this assistant before retention_cleanup deletes them. Nullable on
+    # INSERT for legacy rows; defaults to 90. Capped to 400 at write time
+    # by schema validator. Per-assistant override of org-level default.
+    retention_days: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        server_default=sql_text("90"),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -522,6 +531,58 @@ class AiAssistantInstructionAudit(Base, TenantScoped):
     )
 
 
+class JanitorHeartbeat(Base):
+    """Global (no org_id) monitor state for Celery beat tasks
+    (Step 17). One row per task type: retention_cleanup, reap_stuck_ingest,
+    etc. Health endpoint queries this to report task status + last_run_at
+    to external monitoring (Prometheus, etc.). Upserted by each task on
+    completion.
+    """
+
+    __tablename__ = "tbl_janitor_heartbeats"
+
+    name: Mapped[str] = mapped_column(String(120), primary_key=True, nullable=False)
+    last_run_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+    last_run_status: Mapped[str] = mapped_column(Text, nullable=False)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class GdprDeletionLog(Base, TenantScoped):
+    """Audit trail for GDPR SAR compliance (Step 17). Records what entity
+    type was deleted, how many rows, when, and reason. Stores a hash of
+    sorted deleted IDs (not PII content) for verifiability without
+    exposing sensitive data in logs.
+    """
+
+    __tablename__ = "tbl_gdpr_deletion_log"
+    __table_args__ = (
+        Index(
+            "ix_gdpr_deletion_log_org_deleted",
+            "org_id",
+            "deleted_at",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    entity_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    entity_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    id_hash_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    deletion_reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    deleted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+
+
 __all__ = [
     "AiAssistant",
     "AiAssistantChunk",
@@ -531,6 +592,8 @@ __all__ = [
     "AiAssistantStatus",
     "ChunkStatus",
     "CostStatus",
+    "GdprDeletionLog",
+    "JanitorHeartbeat",
     "KnowledgeSourceType",
     "KnowledgeStatus",
     "LeadCaptureMode",

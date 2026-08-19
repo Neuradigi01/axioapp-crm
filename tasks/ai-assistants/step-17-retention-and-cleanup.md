@@ -1,7 +1,7 @@
 # Step 17 — Retention + reapers + janitor heartbeat
 
 **Goal:** Close the loop — the janitor set that keeps the system tidy. Retention of AI conversations (configurable, default 90d, hard cap 400d). Reaper for stuck ingest tasks (no heartbeat > 15 min). Orphan chunk cleanup. Embed-key grace expiry. Cost outbox reconciliation. Janitor heartbeat table with monitoring alert. GDPR SAR deletion log. Also verify org-delete cascade end-to-end.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** All prior steps (this is the closing janitor).
 
 ---
