@@ -216,16 +216,211 @@ async def reassign_assistant_key_ids(
     return int(result.rowcount or 0)
 
 
+# --- Runtime helpers (Step 9) -------------------------------------------
+
+
+async def retrieve_chunks_for_assistant(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    assistant_id: uuid.UUID,
+    query_embedding: list[float],
+    top_k: int = 5,
+) -> list[dict[str, Any]]:
+    """HNSW top-K retrieval scoped to a single assistant's knowledge.
+
+    Joins ``tbl_ai_assistant_chunks`` with ``tbl_ai_assistant_knowledge``
+    so only chunks whose parent knowledge row has ``status='ready'``
+    are returned (mid-ingest chunks are never retrieved). Additional
+    filter on ``chunks.status='ready'`` guards against Step 10's
+    soft-delete path.
+
+    Sets the RLS session variable first so the tenant-isolation
+    policy fires; belt+braces with the explicit ``WHERE org_id`` in
+    the query.
+    """
+    await db.execute(
+        text("SELECT set_config('app.current_org_id', :o, true)"),
+        {"o": str(org_id)},
+    )
+    vec_literal = "[" + ",".join(f"{float(x):.7f}" for x in query_embedding) + "]"
+    stmt = text(
+        """
+        SELECT c.id AS chunk_id,
+               c.text,
+               c.token_count,
+               c.knowledge_id,
+               1 - (c.embedding <=> (:q)::vector) AS score
+        FROM tbl_ai_assistant_chunks c
+        JOIN tbl_ai_assistant_knowledge k ON c.knowledge_id = k.id
+        WHERE c.org_id = :org_id
+          AND k.assistant_id = :assistant_id
+          AND c.status = 'ready'
+          AND k.status = 'ready'
+        ORDER BY c.embedding <=> (:q)::vector
+        LIMIT :k
+        """
+    )
+    result = await db.execute(
+        stmt,
+        {
+            "org_id": str(org_id),
+            "assistant_id": str(assistant_id),
+            "q": vec_literal,
+            "k": int(top_k),
+        },
+    )
+    return [dict(r) for r in result.mappings().all()]
+
+
+async def create_ai_widget_conversation(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    external_id: str,
+) -> uuid.UUID:
+    """INSERT a fresh conversation with ``channel='ai_widget'``.
+    Returns the new conversation id. Caller commits."""
+    from src.app.core.conversations.models import Conversation, ConversationChannel
+
+    conv = Conversation(
+        org_id=org_id,
+        channel=ConversationChannel.ai_widget,
+        external_id=external_id,
+    )
+    db.add(conv)
+    await db.flush()
+    return conv.id
+
+
+async def insert_user_message(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    text_body: str,
+) -> uuid.UUID:
+    """INSERT the inbound (user-typed) message. Returns its id."""
+    from src.app.core.conversations.models import Message, MessageDirection
+
+    msg = Message(
+        org_id=org_id,
+        conversation_id=conversation_id,
+        direction=MessageDirection.in_,
+        text=text_body,
+    )
+    db.add(msg)
+    await db.flush()
+    return msg.id
+
+
+async def insert_assistant_message(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    text_body: str,
+) -> uuid.UUID:
+    """INSERT the outbound (assistant-generated) message. Returns id."""
+    from src.app.core.conversations.models import Message, MessageDirection
+
+    msg = Message(
+        org_id=org_id,
+        conversation_id=conversation_id,
+        direction=MessageDirection.out,
+        text=text_body,
+    )
+    db.add(msg)
+    await db.flush()
+    return msg.id
+
+
+async def insert_message_meta_pending(
+    db: AsyncSession,
+    *,
+    message_id: uuid.UUID,
+    org_id: uuid.UUID,
+    assistant_id: uuid.UUID,
+    model: str,
+) -> None:
+    """Outbox INSERT — ``cost_status='pending_llm_confirm'`` pre-LLM-call.
+    Step 17's reconcile job catches rows still pending > 5 min."""
+    from src.app.core.ai_assistants.models import AiAssistantMessageMeta, CostStatus
+
+    row = AiAssistantMessageMeta(
+        message_id=message_id,
+        org_id=org_id,
+        assistant_id=assistant_id,
+        model=model,
+        cost_status=CostStatus.pending_llm_confirm,
+    )
+    db.add(row)
+    await db.flush()
+
+
+async def update_message_meta_confirmed(
+    db: AsyncSession,
+    *,
+    message_id: uuid.UUID,
+    prompt_tokens: int,
+    completion_tokens: int,
+    total_tokens: int,
+    cost_usd: Any,
+    retrieved_chunk_ids: list[uuid.UUID],
+) -> None:
+    from src.app.core.ai_assistants.models import AiAssistantMessageMeta, CostStatus
+
+    stmt = (
+        update(AiAssistantMessageMeta)
+        .where(AiAssistantMessageMeta.message_id == message_id)
+        .values(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            cost_usd=cost_usd,
+            cost_status=CostStatus.confirmed,
+            retrieved_chunk_ids=retrieved_chunk_ids,
+        )
+    )
+    await db.execute(stmt)
+
+
+async def update_message_meta_failed(
+    db: AsyncSession,
+    *,
+    message_id: uuid.UUID,
+    provider_error: str,
+) -> None:
+    from src.app.core.ai_assistants.models import AiAssistantMessageMeta, CostStatus
+
+    stmt = (
+        update(AiAssistantMessageMeta)
+        .where(AiAssistantMessageMeta.message_id == message_id)
+        .values(
+            cost_status=CostStatus.failed,
+            provider_error=provider_error,
+        )
+    )
+    await db.execute(stmt)
+
+
 __all__ = [
     "count_assistants",
     "count_assistants_by_key_id",
+    "create_ai_widget_conversation",
     "delete_assistant",
     "get_assistant_by_id",
     "get_assistant_row_no_org_filter",
     "get_provider_key_by_id",
     "insert_assistant",
+    "insert_assistant_message",
     "insert_instruction_audit",
+    "insert_message_meta_pending",
+    "insert_user_message",
     "list_assistants",
     "reassign_assistant_key_ids",
+    "retrieve_chunks_for_assistant",
     "set_assistant_status",
+    "update_message_meta_confirmed",
+    "update_message_meta_failed",
 ]

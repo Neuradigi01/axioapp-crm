@@ -25,7 +25,7 @@ import inspect
 import src.app.core.ai_assistants.models  # noqa: F401,E402 — metadata registration
 
 
-def test_router_has_six_endpoints() -> None:
+def test_router_has_seven_endpoints() -> None:
     from src.app.core.ai_assistants.router import router
 
     endpoints = {(tuple(sorted(r.methods)), r.path) for r in router.routes if hasattr(r, "methods")}
@@ -36,6 +36,8 @@ def test_router_has_six_endpoints() -> None:
         (("PATCH",), "/ai-assistants/{assistant_id}"),
         (("POST",), "/ai-assistants/{assistant_id}/archive"),
         (("DELETE",), "/ai-assistants/{assistant_id}"),
+        # tasks/ai-assistants Step 9 — operator preview SSE.
+        (("POST",), "/ai-assistants/{assistant_id}/preview"),
     }
     assert endpoints == expected, f"router shape drift: {endpoints ^ expected}"
 
@@ -97,13 +99,23 @@ def test_gets_require_view_permission() -> None:
 
 
 def test_mutations_require_manage_permission() -> None:
+    """Every state-mutating endpoint (create / update / archive /
+    delete) requires ``ai_assistants.manage``. The POST ``/preview``
+    endpoint is a read-only interactive tool (streams a reply without
+    persisting operator intent) and gates on ``.view`` instead —
+    kept out of the mutation set explicitly."""
     from src.app.core.ai_assistants.router import router
 
     mutation_verbs = {"POST", "PATCH", "DELETE"}
+    # The preview endpoint POSTs to trigger a one-shot chat turn but
+    # doesn't mutate assistant state; view is the correct gate.
+    _READ_ONLY_POSTS = {"/ai-assistants/{assistant_id}/preview"}
     for route in router.routes:
         if not hasattr(route, "methods"):
             continue
         if not (route.methods & mutation_verbs):
+            continue
+        if route.path in _READ_ONLY_POSTS:
             continue
         keys = _dependency_permission_keys(route)
         assert "ai_assistants.manage" in keys, (

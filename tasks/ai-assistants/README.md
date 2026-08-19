@@ -157,7 +157,7 @@ widget/                       ← EXTENDED (not duplicated)
 | 6 | [Assistant CRUD service + router (guards, OCC, mass-assignment-safe)](step-6-assistant-crud-and-router.md) | **COMPLETED** | ~1 day |
 | 7 | [Frontend list page + editor shell with 4 empty tabs + live preview](step-7-list-and-editor-shell.md) | **COMPLETED** | ~1.5 days |
 | 8 | [AI Instructions tab + assistant-behaviour controls + audit log](step-8-instructions-tab.md) | **COMPLETED** | ~1 day |
-| 9 | [Chat runtime — retrieve + structured envelope + stream + cost outbox](step-9-chat-runtime-streaming.md) | Pending | ~2 days |
+| 9 | [Chat runtime — retrieve + structured envelope + stream + cost outbox](step-9-chat-runtime-streaming.md) | **COMPLETED** | ~2 days |
 | 10 | [Knowledge Source backend — file + custom text + URL + Celery ingest](step-10-knowledge-source-backend.md) | Pending | ~2 days |
 | 11 | [Knowledge Source tab UI](step-11-knowledge-source-tab-ui.md) | Pending | ~1 day |
 | 12 | [Assistant Interface tab UI](step-12-assistant-interface-tab.md) | Pending | ~0.5 days |

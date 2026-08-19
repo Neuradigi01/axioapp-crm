@@ -29,40 +29,87 @@
     </button>
   </div>
 
-  <!-- Body -->
-  <div class="min-h-[220px] space-y-3 px-4 py-4" [style.background-color]="styling().bg">
-    @for (msg of iface().initial_messages; track $index) {
-      <div class="flex justify-start">
-        <div
-          class="max-w-[85%] rounded-lg px-3 py-2 text-sm shadow-sm"
-          [style.background-color]="styling().bubble_bg"
-          [style.color]="styling().bubble_text"
-        >
-          {{ msg }}
-          <div class="mt-1 text-right text-[10px] opacity-60">10:33 AM</div>
+  <!-- Body — initial-message bubbles + live chat turns -->
+  <div class="min-h-[260px] space-y-3 px-4 py-4" [style.background-color]="styling().bg">
+    @if (messages().length === 0) {
+      @for (msg of iface().initial_messages; track $index) {
+        <div class="flex justify-start">
+          <div
+            class="max-w-[85%] rounded-lg px-3 py-2 text-sm shadow-sm"
+            [style.background-color]="styling().bubble_bg"
+            [style.color]="styling().bubble_text"
+          >
+            {{ msg }}
+            <div class="mt-1 text-right text-[10px] opacity-60">10:33 AM</div>
+          </div>
         </div>
-      </div>
+      }
+    } @else {
+      @for (m of messages(); track $index) {
+        <div
+          class="flex"
+          [class.justify-end]="m.role === 'user'"
+          [class.justify-start]="m.role === 'assistant'"
+        >
+          <div
+            class="max-w-[85%] rounded-lg px-3 py-2 text-sm shadow-sm"
+            [style.background-color]="m.role === 'user' ? styling().cta_bg : styling().bubble_bg"
+            [style.color]="m.role === 'user' ? '#FFFFFF' : styling().bubble_text"
+          >
+            @if (m.text) {
+              {{ m.text }}
+            }
+            @if (m.streaming && !m.text) {
+              <span class="inline-flex items-center gap-1 opacity-70">
+                <lucide-icon name="loader-2" size="12" class="animate-spin"></lucide-icon>
+                <span class="text-xs">thinking…</span>
+              </span>
+            }
+            @if (m.errorReason) {
+              <div class="mt-1 text-[10px] text-red-500">{{ m.errorReason }}</div>
+            }
+          </div>
+        </div>
+      }
     }
   </div>
 
-  <!-- Mock CTA row -->
-  <div class="flex gap-2 px-4 pb-3" [style.background-color]="styling().bg">
-    <button
-      type="button"
-      class="flex-1 rounded-md px-3 py-2 text-xs font-semibold text-white opacity-90"
-      [style.background-color]="styling().cta_bg"
-      disabled
-    >
-      Start Chat
-    </button>
-    <button
-      type="button"
-      class="flex-1 rounded-md px-3 py-2 text-xs font-semibold text-white opacity-90"
-      [style.background-color]="styling().cta_bg"
-      disabled
-    >
-      Scan QR
-    </button>
+  <!-- Chat input row -->
+  <div class="border-t border-black/5 px-3 py-2" [style.background-color]="styling().bg">
+    <div class="flex items-center gap-2">
+      <input
+        type="text"
+        class="flex-1 rounded-md border border-black/10 bg-white px-3 py-1.5 text-sm text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+        placeholder="Type a message…"
+        [value]="input()"
+        [disabled]="streaming()"
+        (input)="onInput($event)"
+        (keydown)="onInputKey($event)"
+      />
+      <button
+        type="button"
+        class="inline-flex h-8 items-center justify-center gap-1 rounded-md px-3 text-xs font-semibold text-white disabled:opacity-40"
+        [style.background-color]="styling().cta_bg"
+        [disabled]="!canSend()"
+        (click)="send()"
+      >
+        @if (streaming()) {
+          <lucide-icon name="loader-2" size="12" class="animate-spin"></lucide-icon>
+        } @else {
+          Send
+        }
+      </button>
+    </div>
+    @if (messages().length > 0) {
+      <button
+        type="button"
+        class="mt-1 text-[10px] text-muted hover:underline"
+        [disabled]="streaming()"
+        (click)="clearChat()"
+      >
+        Clear chat
+      </button>
+    }
   </div>
 
   <!-- Footer -->
