@@ -46,3 +46,12 @@ google-re2>=1.1; sys_platform != "win32"
 # exception hierarchy changed around 1.0; anything from 1.50+ is
 # congruent with our error map).
 openai>=1.50,<2.0
+
+# tasks/ai-assistants Step 4 — pgvector Python client (SQLAlchemy Vector
+# column type + adapter shims) and OpenAI's tiktoken tokenizer for the
+# ~800-token chunker. tiktoken caches its BPE files under
+# ~/.cache/tiktoken; the container base image is stateless so first
+# use inside the chunker warms the cache on cold-boot (small overhead,
+# ~500KB one-time download).
+pgvector>=0.3,<1.0
+tiktoken>=0.8,<1.0
