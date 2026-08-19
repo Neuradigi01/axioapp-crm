@@ -380,6 +380,18 @@ export const userRoutes: Routes = [
           import('./core/chatbots/builder/builder.page').then((m) => m.ChatbotBuilderPageComponent),
       },
       {
+        // tasks/ai-assistants Step 7 — list + editor. Uses lazy
+        // child-route loading so the whole feature module (routes
+        // + 4 tab placeholders + preview + modal) is code-split
+        // out of the main bundle. Individual routes gate on
+        // `ai_assistants.view` inside the child routes file; write
+        // actions inside the editor are gated at the API on
+        // `ai_assistants.manage`.
+        path: 'ai-assistants',
+        loadChildren: () =>
+          import('./core/ai-assistants/ai-assistants.routes').then((m) => m.AI_ASSISTANTS_ROUTES),
+      },
+      {
         // tasks/workflows Step 16 — gallery of 15 default workflow
         // templates. Read-gated; the "Use this template" CTA inside
         // the page needs `workflows.clone` server-side, but the

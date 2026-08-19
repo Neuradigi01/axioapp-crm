@@ -1,0 +1,172 @@
+<div class="flex h-[calc(100vh-4rem)] flex-col">
+  <!-- Header bar -->
+  <header
+    class="flex items-center justify-between gap-3 border-b border-subtle bg-surface px-4 py-3 md:px-6"
+  >
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        class="rounded-md p-1.5 text-muted hover:bg-surface-2"
+        (click)="back()"
+        aria-label="Back to list"
+      >
+        <lucide-icon name="chevron-left" size="16" aria-hidden="true"></lucide-icon>
+      </button>
+      @if (nameEditing()) {
+        <input
+          type="text"
+          class="rounded-lg border border-accent bg-surface px-2 py-1 text-sm font-semibold text-default focus:outline-none focus:ring-1 focus:ring-accent"
+          [value]="nameDraft()"
+          (input)="onNameInput($event)"
+          (blur)="commitNameEdit()"
+          (keydown)="onNameKeydown($event)"
+          #nameInput
+          autofocus
+        />
+      } @else {
+        <button
+          type="button"
+          class="rounded-md px-2 py-1 text-sm font-semibold text-default hover:bg-surface-2"
+          (click)="beginNameEdit()"
+          [attr.title]="'Click to rename'"
+        >
+          {{ formState.displayName() }}
+        </button>
+      }
+      @if (formState.status(); as st) {
+        <span
+          class="rounded-full px-2 py-0.5 text-[10px] font-medium ring-1"
+          [class.bg-surface-2]="st === 'draft'"
+          [class.text-muted]="st === 'draft'"
+          [class.ring-subtle]="st === 'draft'"
+          [class.bg-emerald-500\/10]="st === 'active'"
+          [class.text-emerald-400]="st === 'active'"
+          [class.ring-emerald-500\/20]="st === 'active'"
+          [class.text-faint]="st === 'archived'"
+        >
+          {{ st }}
+        </span>
+      }
+      @if (formState.dirty()) {
+        <span class="text-xs text-amber-400">Unsaved changes</span>
+      } @else if (savedAt()) {
+        <span class="text-xs text-emerald-400">Saved</span>
+      }
+    </div>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-muted disabled:opacity-40"
+        disabled
+        [attr.title]="'Available in a future step'"
+      >
+        <lucide-icon name="code" size="14" aria-hidden="true"></lucide-icon>
+        Embed
+      </button>
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 disabled:opacity-40"
+        (click)="save()"
+        [disabled]="!canSave()"
+      >
+        @if (saving()) {
+          <lucide-icon
+            name="loader-2"
+            size="14"
+            class="animate-spin"
+            aria-hidden="true"
+          ></lucide-icon>
+          Saving…
+        } @else {
+          <lucide-icon name="save" size="14" aria-hidden="true"></lucide-icon>
+          Save AI Assistant
+        }
+      </button>
+    </div>
+  </header>
+
+  @if (saveError(); as err) {
+    <div class="border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-xs text-red-300">
+      {{ err }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="flex flex-1 items-center justify-center">
+      <p class="flex items-center gap-2 text-sm text-muted">
+        <lucide-icon
+          name="loader-2"
+          size="14"
+          class="animate-spin"
+          aria-hidden="true"
+        ></lucide-icon>
+        Loading assistant…
+      </p>
+    </div>
+  } @else if (loadError(); as err) {
+    <div class="flex flex-1 items-center justify-center px-6">
+      <div
+        class="max-w-md rounded-md border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300"
+      >
+        {{ err }}
+      </div>
+    </div>
+  } @else {
+    <div class="flex flex-1 min-h-0">
+      <!-- Left pane: tabs + tab content -->
+      <div class="flex w-3/5 flex-col border-r border-subtle">
+        <!-- Tab strip -->
+        <div class="flex items-center gap-0 border-b border-subtle bg-surface px-4">
+          @for (t of tabs; track t.id) {
+            <button
+              type="button"
+              class="relative px-3 py-3 text-sm font-medium transition"
+              [class.text-default]="activeTab() === t.id"
+              [class.text-muted]="activeTab() !== t.id"
+              [class.hover:text-default]="activeTab() !== t.id"
+              (click)="setActiveTab(t.id)"
+            >
+              {{ t.label }}
+              @if (activeTab() === t.id) {
+                <span
+                  class="absolute inset-x-2 -bottom-px h-0.5 rounded-t bg-accent"
+                  aria-hidden="true"
+                ></span>
+              }
+            </button>
+          }
+        </div>
+
+        <!-- Tab body -->
+        <div class="flex-1 overflow-y-auto bg-surface-2/40 p-4 md:p-6">
+          @switch (activeTab()) {
+            @case ('instructions') {
+              <app-ai-assistant-instructions-tab></app-ai-assistant-instructions-tab>
+            }
+            @case ('knowledge') {
+              <app-ai-assistant-knowledge-source-tab></app-ai-assistant-knowledge-source-tab>
+            }
+            @case ('interface') {
+              <app-ai-assistant-interface-tab></app-ai-assistant-interface-tab>
+            }
+            @case ('styling') {
+              <app-ai-assistant-styling-tab></app-ai-assistant-styling-tab>
+            }
+          }
+        </div>
+      </div>
+
+      <!-- Right pane: live preview -->
+      <div class="flex w-2/5 flex-col bg-surface-2/60">
+        <div class="flex items-center justify-between border-b border-subtle bg-surface px-4 py-2">
+          <span class="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">
+            Preview
+          </span>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4">
+          <app-ai-assistant-preview></app-ai-assistant-preview>
+        </div>
+      </div>
+    </div>
+  }
+</div>
