@@ -5,7 +5,14 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../../../environments/environment';
 import { buildHttpParams } from '../shared/services/query-builder';
 
-export type ConversationChannel = 'whatsapp' | 'instagram' | 'facebook' | 'web' | 'sms' | 'email';
+export type ConversationChannel =
+  | 'whatsapp'
+  | 'instagram'
+  | 'facebook'
+  | 'web'
+  | 'sms'
+  | 'email'
+  | 'ai_widget';
 
 export type ConversationStatus = 'open' | 'snoozed' | 'closed';
 

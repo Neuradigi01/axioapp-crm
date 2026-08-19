@@ -25,7 +25,7 @@ interface ChannelBadgeStyle {
   dot: string;
   /** Accent hue used when the pill is unselected (icon + dot). Selected
    * pills use the same hue as a filled background — see `channelPillClass`. */
-  hue: 'emerald' | 'fuchsia' | 'blue' | 'zinc' | 'violet' | 'sky';
+  hue: 'emerald' | 'fuchsia' | 'blue' | 'zinc' | 'violet' | 'sky' | 'amber';
 }
 
 /**
@@ -69,23 +69,33 @@ const CHANNEL_STYLES: Record<ConversationChannel, ChannelBadgeStyle> = {
     dot: 'bg-sky-500',
     hue: 'sky',
   },
+  ai_widget: {
+    label: 'AI Widget',
+    bg: 'bg-amber-500/10 text-amber-400 ring-amber-500/20',
+    dot: 'bg-amber-500',
+    hue: 'amber',
+  },
 };
 
 interface ChannelPillOption {
   value: ConversationChannel | '';
   label: string;
-  hue: 'emerald' | 'fuchsia' | 'blue' | 'zinc' | 'violet' | 'sky' | 'accent';
+  hue: 'emerald' | 'fuchsia' | 'blue' | 'zinc' | 'violet' | 'sky' | 'amber' | 'accent';
 }
 
-// v1 ships with WhatsApp + Email only. Messenger / Instagram / SMS /
-// Web adapters exist in the backend but aren't wired for live ingest,
-// so surfacing their chips would just show empty result sets and
-// mislead users. Un-comment each entry as its ingest pipeline goes
-// live (order here also drives the on-screen chip order).
+// v1 ships with WhatsApp + Email + AI Widget only. Messenger /
+// Instagram / SMS / Web adapters exist in the backend but aren't
+// wired for live ingest, so surfacing their chips would just show
+// empty result sets and mislead users. Un-comment each entry as its
+// ingest pipeline goes live (order here also drives the on-screen
+// chip order).
 const CHANNEL_PILL_OPTIONS: ChannelPillOption[] = [
   { value: '', label: 'All messengers', hue: 'accent' },
   { value: 'whatsapp', label: 'WhatsApp', hue: 'emerald' },
   { value: 'email', label: 'Email', hue: 'violet' },
+  // tasks/ai-assistants Step 16 — AI-assistant chat widget
+  // conversations show up in the shared inbox.
+  { value: 'ai_widget', label: 'AI Widget', hue: 'amber' },
   // { value: 'facebook', label: 'Messenger', hue: 'blue' },
   // { value: 'instagram', label: 'Instagram', hue: 'fuchsia' },
   // { value: 'sms', label: 'SMS', hue: 'zinc' },
@@ -103,6 +113,7 @@ const PILL_ACTIVE_OUTLINE: Record<ChannelPillOption['hue'], string> = {
   zinc: 'bg-zinc-500/10 text-zinc-200 ring-zinc-400',
   violet: 'bg-violet-500/10 text-violet-300 ring-violet-500',
   sky: 'bg-sky-500/10 text-sky-300 ring-sky-500',
+  amber: 'bg-amber-500/10 text-amber-300 ring-amber-500',
 };
 
 /** Solid brand-colour background for the small circular icon badge that
@@ -115,6 +126,7 @@ const PILL_BADGE_BG: Record<ChannelPillOption['hue'], string> = {
   zinc: 'bg-zinc-500',
   violet: 'bg-violet-500',
   sky: 'bg-sky-500',
+  amber: 'bg-amber-500',
 };
 
 type AssigneeMode = 'all' | 'mine' | 'unassigned' | 'specific';

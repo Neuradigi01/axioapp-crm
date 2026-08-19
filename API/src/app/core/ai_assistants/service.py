@@ -47,7 +47,18 @@ from src.app.shared.storage import get_storage
 # with the effective config (Attacker review H8: insider prompt
 # injection via ``instructions`` must show up in an audit trail).
 _AUDITED_FIELDS: frozenset[str] = frozenset(
-    {"instructions", "model", "temperature", "allowed_domains", "output_sanitizer_enabled"}
+    {
+        "instructions",
+        "model",
+        "temperature",
+        "allowed_domains",
+        "output_sanitizer_enabled",
+        # Step 16 — lead-capture config changes are audited so an
+        # operator can trace when auto-lead-capture flipped on.
+        "lead_capture_mode",
+        "lead_capture_turn_n",
+        "lead_capture_message",
+    }
 )
 
 _ENTITY = "assistant"
@@ -187,6 +198,13 @@ async def create_assistant(
         "allowed_domains": list(payload.allowed_domains),
         "output_sanitizer_enabled": payload.output_sanitizer_enabled,
         "budget_cap_override_usd": payload.budget_cap_override_usd,
+        # Step 16 — lead-capture config. Defaults are DB-level so
+        # existing callers that don't send these still get the
+        # ``off`` / ``3`` server defaults; passing the Pydantic
+        # defaults through keeps the API contract explicit.
+        "lead_capture_mode": payload.lead_capture_mode,
+        "lead_capture_turn_n": payload.lead_capture_turn_n,
+        "lead_capture_message": payload.lead_capture_message,
         "created_by_user_id": user_id,
     }
     # Fallback message only overrides the server_default when the
@@ -884,6 +902,48 @@ def _url_to_key(url: str) -> str | None:
     return url[len(prefix) :]
 
 
+# --- Analytics (Step 16) --------------------------------------------------
+
+
+async def get_analytics(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    assistant_id: uuid.UUID,
+    window_days: int = 30,
+) -> dict[str, Any]:
+    """Aggregate KPIs + top-questions for one assistant. Read-only —
+    no commit. Fires the timing-safe 404 guard first so a wrong-org
+    caller sees the same 404 as a nonexistent id."""
+    from decimal import Decimal
+
+    # Bound the window at both ends so an operator hitting the URL
+    # with ``?window_days=99999`` doesn't scan the whole table.
+    window_days = max(1, min(365, int(window_days)))
+
+    await get_assistant(db, org_id=org_id, assistant_id=assistant_id)
+
+    message_count, total_cost = await _da.analytics_message_and_cost(
+        db,
+        org_id=org_id,
+        assistant_id=assistant_id,
+        window_days=window_days,
+    )
+    top = await _da.analytics_top_questions(
+        db,
+        org_id=org_id,
+        assistant_id=assistant_id,
+        window_days=window_days,
+        limit=20,
+    )
+    return {
+        "window_days": window_days,
+        "message_count": message_count,
+        "total_cost_usd": Decimal(total_cost),
+        "top_questions": top,
+    }
+
+
 __all__ = [
     "archive_assistant",
     "cancel_knowledge",
@@ -894,6 +954,7 @@ __all__ = [
     "delete_assistant",
     "delete_knowledge",
     "delete_profile_picture",
+    "get_analytics",
     "get_assistant",
     "list_assistants",
     "list_knowledge",

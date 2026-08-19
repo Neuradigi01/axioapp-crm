@@ -1,7 +1,7 @@
 # Step 16 — Inbox integration + analytics + auto-lead capture
 
 **Goal:** Surface AI-assistant conversations inside the existing inbox (`channel='ai_widget'`) so operators can read them, add notes, and take over conversations from the human-handoff surface. Ship a small per-assistant analytics panel (messages, cost, top questions grouped by `LOWER(TRIM(msg))`). Auto-detect emails in user messages and create/link a lead, or prompt for email at a configurable turn N.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 9 (runtime writes to `tbl_conversations`), Step 5 (`tbl_ai_assistant_message_meta`), existing `core/leads/` for lead ingestion.
 
 ---

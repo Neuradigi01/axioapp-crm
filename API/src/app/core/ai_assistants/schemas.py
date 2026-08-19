@@ -26,6 +26,7 @@ from src.app.core.ai_assistants.models import (
     AiAssistantStatus,
     KnowledgeSourceType,
     KnowledgeStatus,
+    LeadCaptureMode,
 )
 
 # --- Bounded field constraints -------------------------------------------
@@ -85,6 +86,9 @@ class AiAssistantCreate(BaseModel):
         ge=Decimal("0"),
         le=_BUDGET_MAX,
     )
+    lead_capture_mode: LeadCaptureMode = LeadCaptureMode.off
+    lead_capture_turn_n: int = Field(default=3, ge=1, le=20)
+    lead_capture_message: str | None = Field(default=None, max_length=500)
 
 
 # --- Update ---------------------------------------------------------------
@@ -124,6 +128,9 @@ class AiAssistantUpdate(BaseModel):
         ge=Decimal("0"),
         le=_BUDGET_MAX,
     )
+    lead_capture_mode: LeadCaptureMode | None = None
+    lead_capture_turn_n: int | None = Field(default=None, ge=1, le=20)
+    lead_capture_message: str | None = Field(default=None, max_length=500)
 
 
 # --- Read -----------------------------------------------------------------
@@ -149,6 +156,9 @@ class AiAssistantRead(BaseModel):
     allowed_domains: list[str]
     output_sanitizer_enabled: bool
     budget_cap_override_usd: Decimal | None
+    lead_capture_mode: LeadCaptureMode
+    lead_capture_turn_n: int
+    lead_capture_message: str | None
     version: int
     created_by_user_id: uuid.UUID | None
     interface_config: dict[str, Any]
@@ -234,7 +244,34 @@ class KnowledgeCreateResponse(BaseModel):
     knowledge: KnowledgeRead
 
 
+# --- Analytics (Step 16) --------------------------------------------------
+
+
+class TopQuestionRow(BaseModel):
+    """One entry in the "top questions" list. ``normalized`` is
+    ``LOWER(TRIM(text))`` so "Hi" and "hi " collapse together."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    normalized: str
+    count: int
+
+
+class AiAssistantAnalytics(BaseModel):
+    """Payload for ``GET /ai-assistants/{id}/analytics``. Trimmed to
+    the fields the Analytics page renders today; ROI-style rollups
+    (bounce rate, human takeover count) are follow-up work."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    window_days: int
+    message_count: int
+    total_cost_usd: Decimal
+    top_questions: list[TopQuestionRow]
+
+
 __all__ = [
+    "AiAssistantAnalytics",
     "AiAssistantCreate",
     "AiAssistantListItem",
     "AiAssistantRead",
@@ -243,4 +280,5 @@ __all__ = [
     "KnowledgeCreateText",
     "KnowledgeCreateUrl",
     "KnowledgeRead",
+    "TopQuestionRow",
 ]

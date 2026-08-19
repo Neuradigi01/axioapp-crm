@@ -216,4 +216,27 @@ export class InstructionsTabComponent {
     if (!Number.isFinite(num) || num < 0) return;
     this.formState.patch({ budget_cap_override_usd: num });
   }
+
+  // --- Lead capture (Step 16) ---------------------------------------
+
+  protected onLeadCaptureModeChange(event: Event): void {
+    const raw = (event.target as HTMLSelectElement).value;
+    // Restrict to the three legal values. Any other value would be
+    // a UI drift and gets ignored client-side (backend enforces
+    // via ENUM CHECK anyway).
+    if (raw === 'off' || raw === 'detect_email' || raw === 'ask_at_turn') {
+      this.formState.patch({ lead_capture_mode: raw });
+    }
+  }
+
+  protected onLeadCaptureTurnInput(event: Event): void {
+    const raw = Number((event.target as HTMLInputElement).value);
+    const clamped = Number.isFinite(raw) ? Math.min(20, Math.max(1, Math.round(raw))) : 3;
+    this.formState.patch({ lead_capture_turn_n: clamped });
+  }
+
+  protected onLeadCaptureMessageInput(event: Event): void {
+    const value = (event.target as HTMLTextAreaElement).value;
+    this.formState.patch({ lead_capture_message: value || null });
+  }
 }

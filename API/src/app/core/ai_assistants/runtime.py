@@ -103,11 +103,15 @@ def _build_messages(
     assistant: AiAssistant,
     user_message: str,
     retrieved_chunks: list[dict],
+    lead_capture_ask: str | None = None,
 ) -> list[dict]:
     """Assemble the ``messages`` payload for the LLM.
 
     Order matters:
       * system prompt (verbatim, no wrapping — Attacker C4 defence)
+      * OPTIONAL Step-16 lead-capture ask injected as a second
+        system message so the model weaves the ask into its reply
+        without disturbing the operator's instructions.
       * knowledge-base envelope (only when non-empty) as a
         ``role='user'`` message with ``name='knowledge_base'`` and a
         JSON body. Structured envelope, not string delimiters — the
@@ -117,6 +121,21 @@ def _build_messages(
     messages: list[dict] = []
     if assistant.instructions:
         messages.append({"role": "system", "content": assistant.instructions})
+    if lead_capture_ask:
+        # Second system message rather than concatenating so an
+        # audit-log reader can see the ask separately from the
+        # operator's baseline prompt.
+        messages.append(
+            {
+                "role": "system",
+                "content": (
+                    "In your next reply, alongside answering the user's "
+                    "question, naturally ask for their email address so we "
+                    "can follow up. Phrase it as: "
+                    f'"{lead_capture_ask}"'
+                ),
+            }
+        )
     if retrieved_chunks:
         envelope = {
             "sources": [
@@ -249,6 +268,26 @@ class ChatRuntime:
             text_body=self._user_message,
         )
 
+    async def _count_user_turns(self) -> int:
+        """How many user-direction messages are on this conversation
+        including the freshly-persisted current one. Used by the
+        turn-N lead-capture ask trigger in Step 16."""
+        from sqlalchemy import text as _sql_text
+
+        assert self._conversation_id is not None
+        result = await self._db.execute(
+            _sql_text(
+                """
+                SELECT COUNT(*)
+                FROM tbl_messages
+                WHERE conversation_id = :conv_id
+                  AND direction = 'in'
+                """
+            ),
+            {"conv_id": str(self._conversation_id)},
+        )
+        return int(result.scalar_one() or 0)
+
     async def _persist_assistant_reply_and_meta_pending(self, model: str) -> None:
         """Persist the empty assistant message row + the pending
         meta row so the outbox is initialised BEFORE the LLM call.
@@ -356,6 +395,24 @@ class ChatRuntime:
         await self._create_conversation()
         await self._persist_user_turn()
 
+        # 3b. Step 16 — auto-lead-capture. Runs BEFORE the LLM call
+        # so a fresh Contact linkage lands on the conversation row
+        # before any Analytics query fires; also so a bad email
+        # regex hit surfaces in a way the operator can see quickly.
+        # Fail-soft — helper swallows its own exceptions so a lead-
+        # pipeline hiccup never blocks the chat reply.
+        current_turn = await self._count_user_turns()
+        await _capture_lead_if_matched(
+            self._db,
+            assistant=assistant,
+            conversation_id=self._conversation_id,
+            user_message=self._user_message,
+        )
+        # Decide whether this turn triggers the ``ask_at_turn`` prompt
+        # injection. Runtime bumps ``current_turn`` per user message;
+        # the ask fires exactly once when the turn count matches.
+        ask_message = _resolve_ask_message(assistant, current_turn=current_turn)
+
         # 4. Embed the user message for retrieval. If embed fails,
         # fall back to prompt-only (retrieval is best-effort — we
         # never let a knowledge-store hiccup block the assistant).
@@ -390,6 +447,7 @@ class ChatRuntime:
             assistant=assistant,
             user_message=self._user_message,
             retrieved_chunks=retrieved,
+            lead_capture_ask=ask_message,
         )
 
         # 6. Insert the outbox meta row + empty assistant message
@@ -514,6 +572,54 @@ class ChatRuntime:
         )
         _ = finish_reason  # captured for observability; not surfaced in v1.
         _ = datetime.now(UTC)  # keep import used
+
+
+# --- Step 16 — lead-capture helpers (module-level so tests can
+# monkey-patch _capture_lead_if_matched without touching the class).
+
+
+async def _capture_lead_if_matched(
+    db: AsyncSession,
+    *,
+    assistant: AiAssistant,
+    conversation_id: uuid.UUID | None,
+    user_message: str,
+) -> None:
+    """Delegate to :mod:`.lead_capture` and swallow any exception —
+    lead capture is a nice-to-have; a hiccup in the lead pipeline
+    should NEVER break the chat reply the visitor is waiting for."""
+    if conversation_id is None:
+        return
+    from src.app.core.ai_assistants.lead_capture import capture_lead_from_message
+
+    try:
+        await capture_lead_from_message(
+            db,
+            assistant=assistant,
+            conversation_id=conversation_id,
+            user_message=user_message,
+        )
+    except Exception:  # pragma: no cover — fail-soft catch-all
+        logger.exception(
+            "ai_assistants.runtime lead_capture_crashed assistant=%s conv=%s",
+            assistant.id,
+            conversation_id,
+        )
+
+
+def _resolve_ask_message(
+    assistant: AiAssistant, *, current_turn: int
+) -> str | None:
+    """Return the ask-at-turn injection text when this turn matches
+    the assistant's configured trigger turn; ``None`` otherwise."""
+    from src.app.core.ai_assistants.lead_capture import (
+        ask_message_for,
+        should_ask_at_turn,
+    )
+
+    if not should_ask_at_turn(assistant, current_turn=current_turn):
+        return None
+    return ask_message_for(assistant)
 
 
 async def reply_once(

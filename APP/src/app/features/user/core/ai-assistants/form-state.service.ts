@@ -19,7 +19,11 @@
  */
 import { Injectable, computed, signal } from '@angular/core';
 
-import { AiAssistant, AiAssistantUpdatePayload } from './ai-assistants-api.service';
+import {
+  AiAssistant,
+  AiAssistantUpdatePayload,
+  LeadCaptureMode,
+} from './ai-assistants-api.service';
 
 /** Field-by-field editor state. All fields present so tabs can bind
  *  unconditionally; ``null`` means "not set" (defaults render in
@@ -37,6 +41,9 @@ export interface AssistantFormState {
   allowed_domains: string[];
   output_sanitizer_enabled: boolean;
   budget_cap_override_usd: number | null;
+  lead_capture_mode: LeadCaptureMode;
+  lead_capture_turn_n: number;
+  lead_capture_message: string | null;
   interface_config: Record<string, unknown>;
   styling_config: Record<string, unknown>;
 }
@@ -54,6 +61,9 @@ const _EMPTY_STATE: AssistantFormState = {
   allowed_domains: [],
   output_sanitizer_enabled: true,
   budget_cap_override_usd: null,
+  lead_capture_mode: 'off',
+  lead_capture_turn_n: 3,
+  lead_capture_message: null,
   interface_config: {},
   styling_config: {},
 };
@@ -95,6 +105,9 @@ export class AssistantFormStateService {
       output_sanitizer_enabled: row.output_sanitizer_enabled,
       budget_cap_override_usd:
         row.budget_cap_override_usd === null ? null : Number(row.budget_cap_override_usd),
+      lead_capture_mode: row.lead_capture_mode,
+      lead_capture_turn_n: row.lead_capture_turn_n,
+      lead_capture_message: row.lead_capture_message,
       interface_config: { ...row.interface_config },
       styling_config: { ...row.styling_config },
     });
@@ -182,6 +195,9 @@ export class AssistantFormStateService {
       allowed_domains: s.allowed_domains,
       output_sanitizer_enabled: s.output_sanitizer_enabled,
       budget_cap_override_usd: s.budget_cap_override_usd,
+      lead_capture_mode: s.lead_capture_mode,
+      lead_capture_turn_n: s.lead_capture_turn_n,
+      lead_capture_message: s.lead_capture_message,
     };
   }
 

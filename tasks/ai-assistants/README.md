@@ -164,7 +164,7 @@ widget/                       ← EXTENDED (not duplicated)
 | 13 | [Styling tab UI + live-preview binding](step-13-styling-tab.md) | **COMPLETED** | ~1 day |
 | 14 | [Embed keys extension + public router + rate limit + CAPTCHA + immediate-revoke](step-14-embed-keys-and-public-router.md) | **COMPLETED** | ~1.5 days |
 | 15 | [Widget extension (form-or-chat) + snippet modal](step-15-widget-and-snippet.md) | **COMPLETED** | ~1.5 days |
-| 16 | [Inbox integration + analytics + auto-lead capture](step-16-conversations-analytics-lead-capture.md) | Pending | ~1.5 days |
+| 16 | [Inbox integration + analytics + auto-lead capture](step-16-conversations-analytics-lead-capture.md) | **COMPLETED** | ~1.5 days |
 | 17 | [Retention + reapers + janitor heartbeat](step-17-retention-and-cleanup.md) | Pending | ~1 day |
 
 **Total: 17 steps, ~19 days.**

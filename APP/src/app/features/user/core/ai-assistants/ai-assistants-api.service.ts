@@ -20,6 +20,8 @@ import {
 
 export type AiAssistantStatus = 'draft' | 'active' | 'archived';
 
+export type LeadCaptureMode = 'off' | 'detect_email' | 'ask_at_turn';
+
 /** Full assistant read shape (matches ``AiAssistantRead``). */
 export interface AiAssistant {
   id: string;
@@ -37,6 +39,9 @@ export interface AiAssistant {
   allowed_domains: string[];
   output_sanitizer_enabled: boolean;
   budget_cap_override_usd: string | null;
+  lead_capture_mode: LeadCaptureMode;
+  lead_capture_turn_n: number;
+  lead_capture_message: string | null;
   version: number;
   created_by_user_id: string | null;
   interface_config: Record<string, unknown>;
@@ -80,6 +85,9 @@ export interface AiAssistantCreatePayload {
   allowed_domains?: string[];
   output_sanitizer_enabled?: boolean;
   budget_cap_override_usd?: number | string | null;
+  lead_capture_mode?: LeadCaptureMode;
+  lead_capture_turn_n?: number;
+  lead_capture_message?: string | null;
 }
 
 /** Update payload — ``version`` REQUIRED for optimistic-concurrency;
@@ -99,6 +107,9 @@ export interface AiAssistantUpdatePayload {
   allowed_domains?: string[];
   output_sanitizer_enabled?: boolean;
   budget_cap_override_usd?: number | string | null;
+  lead_capture_mode?: LeadCaptureMode;
+  lead_capture_turn_n?: number;
+  lead_capture_message?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -269,6 +280,19 @@ export class AiAssistantsApiService {
     return this.http.post<void>(`${environment.apiBaseUrl}/embed/keys/${keyId}/revoke-now`, {});
   }
 
+  // --- Analytics (Step 16) ------------------------------------------
+
+  /** Message count + cost + top-20 questions for one assistant over
+   *  ``windowDays`` (default 30). */
+  getAnalytics(
+    assistantId: string,
+    windowDays: number = 30,
+  ): Observable<AiAssistantAnalyticsResponse> {
+    return this.http.get<AiAssistantAnalyticsResponse>(`${this.base}/${assistantId}/analytics`, {
+      params: new HttpParams().set('window_days', String(windowDays)),
+    });
+  }
+
   // --- Profile picture (Step 13) ------------------------------------
 
   /** Upload the header profile picture. PNG / JPEG / WebP, < 2 MB.
@@ -324,6 +348,20 @@ export interface EmbedKeyIssuePayload {
   name?: string | null;
   allowed_origins?: string[];
   rate_limit_per_hour?: number | null;
+}
+
+// --- Analytics (Step 16) ---------------------------------------------
+
+export interface TopQuestionRow {
+  normalized: string;
+  count: number;
+}
+
+export interface AiAssistantAnalyticsResponse {
+  window_days: number;
+  message_count: number;
+  total_cost_usd: string;
+  top_questions: TopQuestionRow[];
 }
 
 // --- Knowledge shapes (mirror ``schemas.py``) ----------------------

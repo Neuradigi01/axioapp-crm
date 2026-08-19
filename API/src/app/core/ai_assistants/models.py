@@ -116,6 +116,33 @@ cost_status_enum = ENUM(
 )
 
 
+class LeadCaptureMode(str, enum.Enum):
+    """Step 16 — how (and whether) the runtime captures leads from
+    an anonymous visitor mid-conversation.
+
+    * ``off`` — no capture. Historical default; conversation stays
+      anonymous unless the operator manually links it.
+    * ``detect_email`` — every user message is regex-scanned for an
+      email; on match, upsert a lead + attach it to the conversation.
+    * ``ask_at_turn`` — at conversation turn N the runtime injects
+      a system-side prompt asking for the visitor's email; the model
+      weaves the ask into its reply. On the visitor's next message
+      the runtime scans for an email (same as ``detect_email``).
+    """
+
+    off = "off"
+    detect_email = "detect_email"
+    ask_at_turn = "ask_at_turn"
+
+
+lead_capture_mode_enum = ENUM(
+    LeadCaptureMode,
+    name="ai_assistant_lead_capture_mode",
+    create_type=False,
+    values_callable=lambda cls: [e.value for e in cls],
+)
+
+
 # --- Models ---------------------------------------------------------------
 
 
@@ -223,6 +250,24 @@ class AiAssistant(Base, TenantScoped):
         JSONB,
         nullable=False,
         server_default=sql_text("'{}'::jsonb"),
+    )
+    # Step 16 — auto-lead-capture config. Nullable / defaulted so
+    # every pre-Step-16 assistant survives the ALTER without a
+    # backfill. Runtime enforces ``mode`` semantics; the columns
+    # are otherwise dumb config.
+    lead_capture_mode: Mapped[LeadCaptureMode] = mapped_column(
+        lead_capture_mode_enum,
+        nullable=False,
+        server_default=sql_text("'off'"),
+    )
+    lead_capture_turn_n: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=sql_text("3"),
+    )
+    lead_capture_message: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -488,9 +533,11 @@ __all__ = [
     "CostStatus",
     "KnowledgeSourceType",
     "KnowledgeStatus",
+    "LeadCaptureMode",
     "ai_assistant_status_enum",
     "chunk_status_enum",
     "cost_status_enum",
     "knowledge_source_type_enum",
     "knowledge_status_enum",
+    "lead_capture_mode_enum",
 ]

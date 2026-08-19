@@ -25,6 +25,15 @@ export const AI_ASSISTANTS_ROUTES: Routes = [
     canActivate: [permissionGuard('ai_assistants.view')],
     loadComponent: () => import('./ai-assistants.page').then((m) => m.AiAssistantsPage),
   },
+  // tasks/ai-assistants Step 16 — per-assistant analytics.
+  // Sits BEFORE the ``:id`` editor route so the more-specific
+  // ``:id/analytics`` path wins routing.
+  {
+    path: ':id/analytics',
+    canActivate: [permissionGuard('ai_assistants.view')],
+    loadComponent: () =>
+      import('./analytics/analytics.page').then((m) => m.AiAssistantAnalyticsPage),
+  },
   {
     path: ':id',
     canActivate: [permissionGuard('ai_assistants.view')],

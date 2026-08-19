@@ -652,7 +652,104 @@ async def unset_assistant_styling_key(
     await db.execute(stmt, {"id": str(assistant_id), "key": key})
 
 
+# --- Analytics (Step 16) --------------------------------------------------
+
+
+async def analytics_message_and_cost(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    assistant_id: uuid.UUID,
+    window_days: int,
+) -> tuple[int, str]:
+    """SUM + COUNT over ``tbl_ai_assistant_message_meta`` filtered by
+    ``(org_id, assistant_id, created_at > now() - :window)``. Returns
+    ``(message_count, total_cost_usd_str)`` so callers can decide
+    whether to render "$0.00" or "no data yet"."""
+    stmt = text(
+        """
+        SELECT COUNT(*)                     AS n,
+               COALESCE(SUM(cost_usd), 0)   AS total
+        FROM tbl_ai_assistant_message_meta
+        WHERE org_id = :org_id
+          AND assistant_id = :assistant_id
+          AND created_at > now() - make_interval(days => :window)
+        """
+    )
+    result = await db.execute(
+        stmt,
+        {
+            "org_id": str(org_id),
+            "assistant_id": str(assistant_id),
+            "window": int(window_days),
+        },
+    )
+    row = result.first()
+    if row is None:
+        return 0, "0"
+    return int(row.n or 0), str(row.total or 0)
+
+
+async def analytics_top_questions(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    assistant_id: uuid.UUID,
+    window_days: int,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Top ``limit`` normalised inbound messages (``LOWER(TRIM(text))``)
+    across conversations that had at least one AI-generated reply for
+    this assistant.
+
+    The join is: message_meta -> messages (assistant replies)
+    -> conversation_id -> user messages on the same conversation.
+    We deliberately DON'T rely on ``tbl_conversations.metadata`` (no
+    such column exists) — instead the message_meta table is the
+    authoritative ``(assistant_id, message_id)`` link so joining
+    through it stays index-supported.
+    """
+    stmt = text(
+        """
+        WITH assistant_convs AS (
+          SELECT DISTINCT m_asst.conversation_id
+          FROM tbl_ai_assistant_message_meta mm
+          JOIN tbl_messages m_asst ON m_asst.id = mm.message_id
+          WHERE mm.org_id = :org_id
+            AND mm.assistant_id = :assistant_id
+            AND mm.created_at > now() - make_interval(days => :window)
+        )
+        SELECT LOWER(TRIM(m.text)) AS normalized,
+               COUNT(*)            AS n
+        FROM tbl_messages m
+        JOIN assistant_convs ac ON ac.conversation_id = m.conversation_id
+        WHERE m.direction = 'in'
+          AND m.text IS NOT NULL
+          AND length(trim(m.text)) > 0
+          AND m.created_at > now() - make_interval(days => :window)
+        GROUP BY LOWER(TRIM(m.text))
+        ORDER BY COUNT(*) DESC, LOWER(TRIM(m.text)) ASC
+        LIMIT :limit
+        """
+    )
+    result = await db.execute(
+        stmt,
+        {
+            "org_id": str(org_id),
+            "assistant_id": str(assistant_id),
+            "window": int(window_days),
+            "limit": int(limit),
+        },
+    )
+    return [
+        {"normalized": str(r.normalized), "count": int(r.n)}
+        for r in result.all()
+    ]
+
+
 __all__ = [
+    "analytics_message_and_cost",
+    "analytics_top_questions",
     "count_assistants",
     "count_assistants_by_key_id",
     "create_ai_widget_conversation",

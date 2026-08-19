@@ -1,0 +1,96 @@
+<div class="mx-auto max-w-5xl px-4 py-6 md:px-6">
+  <header class="mb-6 flex items-center gap-3">
+    @if (assistantId(); as id) {
+      <a
+        [routerLink]="['/user/ai-assistants', id]"
+        class="rounded-md p-1.5 text-muted hover:bg-surface-2"
+        aria-label="Back to editor"
+      >
+        <lucide-icon name="chevron-left" size="16" aria-hidden="true"></lucide-icon>
+      </a>
+    }
+    <div class="flex-1">
+      <h2 class="text-lg font-semibold text-default">Assistant Analytics</h2>
+      <p class="text-xs text-muted">Rolling {{ windowDays() }}-day window.</p>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <p class="flex items-center gap-2 text-sm text-muted">
+      <lucide-icon name="loader-2" size="14" class="animate-spin" aria-hidden="true"></lucide-icon>
+      Loading analytics…
+    </p>
+  } @else if (error(); as e) {
+    <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
+      {{ e }}
+    </div>
+  } @else if (data(); as d) {
+    <!-- KPI cards -->
+    <section class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div class="rounded-lg border border-subtle bg-surface p-4">
+        <div class="text-[10px] font-medium uppercase tracking-wide text-muted">
+          Messages ({{ d.window_days }}d)
+        </div>
+        <div class="mt-2 text-2xl font-semibold text-default">
+          {{ d.message_count | number }}
+        </div>
+        <p class="mt-1 text-xs text-muted">
+          Assistant replies sent — each one counts once even if the visitor got a streaming
+          response.
+        </p>
+      </div>
+
+      <div class="rounded-lg border border-subtle bg-surface p-4">
+        <div class="text-[10px] font-medium uppercase tracking-wide text-muted">
+          Total cost ({{ d.window_days }}d)
+        </div>
+        <div class="mt-2 text-2xl font-semibold text-default">
+          {{ costUsdDisplay() }}
+        </div>
+        <p class="mt-1 text-xs text-muted">
+          Provider-reported spend for this assistant — never estimated. Compared to your org's
+          OpenAI billing dashboard for the same window.
+        </p>
+      </div>
+    </section>
+
+    <!-- Top questions -->
+    <section class="mt-6 space-y-3">
+      <h3 class="text-sm font-semibold text-default">Top questions</h3>
+      @if (hasTopQuestions()) {
+        <div class="overflow-hidden rounded-lg border border-subtle">
+          <table class="min-w-full text-left text-xs">
+            <thead class="bg-surface-2/60 text-[10px] uppercase tracking-wide text-muted">
+              <tr>
+                <th class="px-3 py-2 font-medium">Question (normalised)</th>
+                <th class="px-3 py-2 text-right font-medium">Count</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-subtle bg-surface">
+              @for (q of d.top_questions; track q.normalized) {
+                <tr>
+                  <td class="max-w-[560px] truncate px-3 py-2 text-default" [title]="q.normalized">
+                    {{ q.normalized }}
+                  </td>
+                  <td class="px-3 py-2 text-right font-mono text-default">
+                    {{ q.count | number }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs text-muted">
+          Questions are grouped by lower-cased, trimmed text — "Hi" and "hi " count together. Top 20
+          shown.
+        </p>
+      } @else {
+        <div class="rounded-2xl border border-dashed border-subtle bg-surface-2/40 p-6 text-center">
+          <p class="text-sm text-muted">
+            No visitor questions yet in the last {{ d.window_days }} days.
+          </p>
+        </div>
+      }
+    </section>
+  }
+</div>

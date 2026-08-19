@@ -30,6 +30,7 @@ from src.app.core.ai_assistants.models import AiAssistantStatus
 from src.app.core.ai_assistants.permissions import PERM_MANAGE, PERM_VIEW
 from src.app.core.ai_assistants.runtime import ChatRuntime, RuntimeChunk
 from src.app.core.ai_assistants.schemas import (
+    AiAssistantAnalytics,
     AiAssistantCreate,
     AiAssistantListItem,
     AiAssistantRead,
@@ -569,6 +570,32 @@ async def delete_profile_picture_endpoint(
         assistant_id=assistant_id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Analytics (Step 16) ------------------------------------------------
+
+
+@router.get(
+    "/{assistant_id}/analytics",
+    response_model=AiAssistantAnalytics,
+)
+async def get_analytics_endpoint(
+    assistant_id: uuid.UUID,
+    window_days: int = Query(default=30, ge=1, le=365),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_VIEW)),
+) -> AiAssistantAnalytics:
+    """Message count + total cost + top-20 questions for one
+    assistant over ``window_days`` (default 30). Timing-safe 404
+    on wrong-org / nonexistent ids via the shared ``get_assistant``
+    pre-check."""
+    payload = await ai_service.get_analytics(
+        db,
+        org_id=_caller_org_id(),
+        assistant_id=assistant_id,
+        window_days=window_days,
+    )
+    return AiAssistantAnalytics.model_validate(payload)
 
 
 __all__ = ["router"]
