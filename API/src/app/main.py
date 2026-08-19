@@ -48,6 +48,15 @@ import src.app.core.ai_assistants.models  # noqa: F401
 # tasks/ai-assistants Step 5 — MODULE descriptor for the sidebar.
 import src.app.core.ai_assistants.module  # noqa: F401
 
+# tasks/ai-assistants Step 10 — Celery task registration so the
+# knowledge-upload endpoints can dispatch ``ingest_knowledge`` even
+# when the caller runs inside the FastAPI process (task-eager mode
+# in dev). Production discovers the same module via the worker's
+# autodiscover list — but importing here means the router's
+# ``ingest_knowledge.delay(...)`` compiles without ever touching
+# the Celery import.
+import src.app.core.ai_assistants.tasks  # noqa: F401
+
 # Import the pack's billing __init__ so its PDF renderer registers
 # itself with `core.billing.pdf_registry` at startup.
 import src.app.packs.furniture.modules.billing  # noqa: F401

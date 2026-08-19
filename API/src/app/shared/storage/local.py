@@ -39,6 +39,12 @@ class LocalStorage(StorageBackend):
         key = path.lstrip("/")
         return StoredFileRef(path=key, url=self.url(key))
 
+    def get(self, path: str) -> bytes:
+        target = self._resolve_safe(path)
+        if not target.is_file():
+            raise FileNotFoundError(f"no blob at {path!r}")
+        return target.read_bytes()
+
     def url(self, path: str) -> str:
         return f"{self.URL_PREFIX}/{path.lstrip('/')}"
 

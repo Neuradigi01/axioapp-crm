@@ -1,7 +1,7 @@
 # Step 10 — Knowledge Source backend — file + custom text + URL + Celery ingest
 
 **Goal:** Ship backend endpoints and Celery pipeline for all three knowledge source types (file, custom text, URL). File uploads are magic-byte-sniffed and stored at `{knowledge_id}.bin` (never client filename). URL fetches reject RFC1918 IPs per hop. Ingest task chunks + embeds + upserts through `shared/vector/`, writes a heartbeat every 30s. Content-hash dedup rejects re-uploads. Cancellation and replace flows supported. Retrieval query already wired in Step 9 will start returning real results once knowledge is ingested.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Steps 2 (LLMClient.embed), 4 (VectorStore + chunker), 5 (tables), 9 (runtime uses retrieved chunks).
 
 ---

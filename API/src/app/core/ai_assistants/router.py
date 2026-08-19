@@ -17,11 +17,10 @@ no ``org_id`` in URL paths or request bodies.
 
 from __future__ import annotations
 
+import json
 import uuid
 
-import json
-
-from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,6 +34,10 @@ from src.app.core.ai_assistants.schemas import (
     AiAssistantListItem,
     AiAssistantRead,
     AiAssistantUpdate,
+    KnowledgeCreateResponse,
+    KnowledgeCreateText,
+    KnowledgeCreateUrl,
+    KnowledgeRead,
 )
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.users.models import User
@@ -302,6 +305,205 @@ def _chunk_to_json(chunk: RuntimeChunk) -> dict:
         out["total_tokens"] = chunk.total_tokens
         out["cost_usd"] = str(chunk.cost_usd) if chunk.cost_usd is not None else "0"
     return out
+
+
+# --- Knowledge (Step 10) --------------------------------------------------
+#
+# Five new endpoints — every knowledge mutation needs
+# ``ai_assistants.manage`` (uploading knowledge changes the model's
+# behaviour); the list read needs ``ai_assistants.view``.
+#
+# ``multipart/form-data`` is used for the file upload endpoint; JSON
+# for text + url. Reason: browsers can't set custom headers on a
+# form-encoded upload, and file bytes shouldn't sit in JSON as
+# base64 (2× overhead + memory pressure).
+
+# Cap the multipart upload at the same 90 MB the validation layer
+# enforces. Router doesn't trust it — validate_upload() re-checks —
+# but a client that submits a 500 MB body eats an entire request
+# worker before we can reject it, so surface the cap here first.
+_MAX_UPLOAD_BYTES = 90 * 1024 * 1024
+
+
+@router.post(
+    "/{assistant_id}/knowledge/file",
+    response_model=KnowledgeCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_knowledge_from_file_endpoint(
+    assistant_id: uuid.UUID,
+    file: UploadFile = File(..., description="PDF or UTF-8 text, ≤ 90 MB"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_MANAGE)),
+) -> KnowledgeCreateResponse:
+    """Upload a file as a knowledge source. Router does no magic-byte
+    check itself — the service delegates to
+    :func:`~core.ai_assistants.file_upload.validate_upload` which
+    sniffs, size-checks, name-checks, and hashes in one pass."""
+    data = await file.read()
+    # Fast reject before we chase deeper checks — validate_upload
+    # will also enforce this, but stopping here saves an allocation
+    # on obviously-oversize uploads.
+    if len(data) > _MAX_UPLOAD_BYTES:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail={"reason": "file_too_large"},
+        )
+    row, duplicate = await ai_service.create_knowledge_from_file(
+        db,
+        org_id=_caller_org_id(),
+        assistant_id=assistant_id,
+        filename=file.filename or "upload.bin",
+        data=data,
+    )
+    return KnowledgeCreateResponse(
+        duplicate=duplicate,
+        knowledge=KnowledgeRead.model_validate(row),
+    )
+
+
+@router.post(
+    "/{assistant_id}/knowledge/text",
+    response_model=KnowledgeCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_knowledge_from_text_endpoint(
+    assistant_id: uuid.UUID,
+    payload: KnowledgeCreateText,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_MANAGE)),
+) -> KnowledgeCreateResponse:
+    row, duplicate = await ai_service.create_knowledge_from_text(
+        db,
+        org_id=_caller_org_id(),
+        assistant_id=assistant_id,
+        payload=payload,
+    )
+    return KnowledgeCreateResponse(
+        duplicate=duplicate,
+        knowledge=KnowledgeRead.model_validate(row),
+    )
+
+
+@router.post(
+    "/{assistant_id}/knowledge/url",
+    response_model=KnowledgeCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_knowledge_from_url_endpoint(
+    assistant_id: uuid.UUID,
+    payload: KnowledgeCreateUrl,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_MANAGE)),
+) -> KnowledgeCreateResponse:
+    """URL scheme + IP-literal + DNS-resolves-public are checked
+    up-front so a private-range URL 422s BEFORE the row is inserted.
+    Per-hop redirect validation happens again inside the ingest
+    task's fetch (belt+braces)."""
+    row, duplicate = await ai_service.create_knowledge_from_url(
+        db,
+        org_id=_caller_org_id(),
+        assistant_id=assistant_id,
+        payload=payload,
+    )
+    return KnowledgeCreateResponse(
+        duplicate=duplicate,
+        knowledge=KnowledgeRead.model_validate(row),
+    )
+
+
+@router.get(
+    "/{assistant_id}/knowledge",
+    response_model=list[KnowledgeRead],
+)
+async def list_knowledge_endpoint(
+    assistant_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_VIEW)),
+) -> list[KnowledgeRead]:
+    rows = await ai_service.list_knowledge(
+        db,
+        org_id=_caller_org_id(),
+        assistant_id=assistant_id,
+    )
+    return [KnowledgeRead.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/{assistant_id}/knowledge/{knowledge_id}/cancel",
+    response_model=KnowledgeRead,
+)
+async def cancel_knowledge_endpoint(
+    assistant_id: uuid.UUID,
+    knowledge_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_MANAGE)),
+) -> KnowledgeRead:
+    row = await ai_service.cancel_knowledge(
+        db,
+        org_id=_caller_org_id(),
+        assistant_id=assistant_id,
+        knowledge_id=knowledge_id,
+    )
+    return KnowledgeRead.model_validate(row)
+
+
+@router.delete(
+    "/{assistant_id}/knowledge/{knowledge_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_knowledge_endpoint(
+    assistant_id: uuid.UUID,
+    knowledge_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_MANAGE)),
+) -> Response:
+    await ai_service.delete_knowledge(
+        db,
+        org_id=_caller_org_id(),
+        assistant_id=assistant_id,
+        knowledge_id=knowledge_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{assistant_id}/knowledge/{knowledge_id}/replace",
+    response_model=KnowledgeCreateResponse,
+)
+async def replace_knowledge_endpoint(
+    assistant_id: uuid.UUID,
+    knowledge_id: uuid.UUID,
+    file: UploadFile = File(..., description="Replacement file, ≤ 90 MB"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_MANAGE)),
+) -> KnowledgeCreateResponse:
+    """Ingest a new upload + retire the old row atomically. v1 chunks
+    remain retrievable throughout — a mid-replace ``preview`` call
+    still gets the pre-replace answers so the operator never sees a
+    "no context" gap."""
+    data = await file.read()
+    if len(data) > _MAX_UPLOAD_BYTES:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail={"reason": "file_too_large"},
+        )
+    row, duplicate = await ai_service.replace_knowledge_from_file(
+        db,
+        org_id=_caller_org_id(),
+        assistant_id=assistant_id,
+        knowledge_id=knowledge_id,
+        filename=file.filename or "upload.bin",
+        data=data,
+    )
+    return KnowledgeCreateResponse(
+        duplicate=duplicate,
+        knowledge=KnowledgeRead.model_validate(row),
+    )
 
 
 __all__ = ["router"]

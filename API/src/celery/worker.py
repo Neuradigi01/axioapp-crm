@@ -79,6 +79,12 @@ celery.autodiscover_tasks(
         # this entry the beat scheduler can't find ``sweep_orphan_
         # pending_orgs`` and the orphan rows accumulate.
         "src.app.core.tenants.tasks",
+        # tasks/ai-assistants Step 10 — knowledge ingest pipeline
+        # (file / text / url → chunk → embed → upsert). One task:
+        # ingest_knowledge, dispatched from the knowledge-upload
+        # endpoints. Without this entry the worker can't find the
+        # task name and every upload stays stuck at status='pending'.
+        "src.app.core.ai_assistants.tasks",
     ]
 )
 

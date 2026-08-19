@@ -44,6 +44,18 @@ class StorageBackend(ABC):
         """
 
     @abstractmethod
+    def get(self, path: str) -> bytes:
+        """Read + return the raw bytes at `path`.
+
+        Raises `FileNotFoundError` on miss. Same path-traversal guard
+        as `put` — a `path` that resolves outside the backend root is
+        rejected before touching the filesystem. Used by the AI
+        Assistants knowledge-ingest task (Step 10) to re-read an
+        uploaded blob for parsing without keeping the request body
+        in memory across the HTTP → Celery hand-off.
+        """
+
+    @abstractmethod
     def url(self, path: str) -> str:
         """Public, server-relative URL for the object at `path`."""
 

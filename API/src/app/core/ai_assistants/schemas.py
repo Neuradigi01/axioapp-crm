@@ -22,7 +22,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.app.core.ai_assistants.models import AiAssistantStatus
+from src.app.core.ai_assistants.models import (
+    AiAssistantStatus,
+    KnowledgeSourceType,
+    KnowledgeStatus,
+)
 
 # --- Bounded field constraints -------------------------------------------
 # Sourced from the migration; keep in sync with the DB CHECKs.
@@ -169,9 +173,74 @@ class AiAssistantListItem(BaseModel):
     version: int
 
 
+# --- Knowledge (Step 10) --------------------------------------------------
+
+# Bounds sourced from the same file_upload / ingest constants — keep
+# in sync with :mod:`~core.ai_assistants.file_upload` +
+# :mod:`~core.ai_assistants.ingest`.
+_KNOWLEDGE_TITLE_MAX = 500  # matches original_filename column length
+_KNOWLEDGE_BODY_MAX = 20 * 1024 * 1024  # 20 MB decoded-text cap
+_KNOWLEDGE_URL_MAX = 4096
+
+
+class KnowledgeCreateText(BaseModel):
+    """Operator POSTs a typed-in knowledge blob."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(..., min_length=1, max_length=_KNOWLEDGE_TITLE_MAX)
+    body_text: str = Field(..., min_length=1, max_length=_KNOWLEDGE_BODY_MAX)
+
+
+class KnowledgeCreateUrl(BaseModel):
+    """Operator pastes a URL to ingest. SSRF checks fire at the
+    service layer (before the row is inserted), so a private-IP URL
+    gets a 422 without leaving a half-baked row behind."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(..., min_length=1, max_length=_KNOWLEDGE_TITLE_MAX)
+    url: str = Field(..., min_length=1, max_length=_KNOWLEDGE_URL_MAX)
+
+
+class KnowledgeRead(BaseModel):
+    """Full knowledge row as surfaced on the list + poll endpoints."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    assistant_id: uuid.UUID
+    source_type: KnowledgeSourceType
+    original_filename: str | None
+    url: str | None
+    mime_type: str | None
+    size_bytes: int | None
+    status: KnowledgeStatus
+    status_message: str | None
+    progress_pct: int
+    chunk_count: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class KnowledgeCreateResponse(BaseModel):
+    """Wraps :class:`KnowledgeRead` with a ``duplicate`` flag so the
+    operator UI can render "we already had this file" vs "started
+    fresh ingest" without a second call."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    duplicate: bool
+    knowledge: KnowledgeRead
+
+
 __all__ = [
     "AiAssistantCreate",
     "AiAssistantListItem",
     "AiAssistantRead",
     "AiAssistantUpdate",
+    "KnowledgeCreateResponse",
+    "KnowledgeCreateText",
+    "KnowledgeCreateUrl",
+    "KnowledgeRead",
 ]

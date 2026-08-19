@@ -27,10 +27,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.ai_assistants.models import (
     AiAssistant,
     AiAssistantInstructionAudit,
+    AiAssistantKnowledge,
     AiAssistantStatus,
+    KnowledgeSourceType,
+    KnowledgeStatus,
 )
 from src.app.core.integrations.ai.models import AiProviderKey
-
 
 # --- Read helpers --------------------------------------------------------
 
@@ -404,23 +406,225 @@ async def update_message_meta_failed(
     await db.execute(stmt)
 
 
+# --- Knowledge helpers (Step 10) -----------------------------------------
+
+
+async def insert_knowledge(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    assistant_id: uuid.UUID,
+    source_type: KnowledgeSourceType,
+    content_hash: bytes,
+    original_filename: str | None = None,
+    body_text: str | None = None,
+    url: str | None = None,
+    mime_type: str | None = None,
+    size_bytes: int | None = None,
+) -> AiAssistantKnowledge:
+    """Stage a new knowledge row in ``status='pending'``. The service
+    layer follows with ``db.flush()`` to surface unique-index
+    violations (dedup returns the pre-existing row), then commits +
+    dispatches the Celery ingest task."""
+    row = AiAssistantKnowledge(
+        org_id=org_id,
+        assistant_id=assistant_id,
+        source_type=source_type,
+        content_hash=content_hash,
+        original_filename=original_filename,
+        body_text=body_text,
+        url=url,
+        mime_type=mime_type,
+        size_bytes=size_bytes,
+        status=KnowledgeStatus.pending,
+    )
+    db.add(row)
+    return row
+
+
+async def get_knowledge_by_id(
+    db: AsyncSession,
+    knowledge_id: uuid.UUID,
+) -> AiAssistantKnowledge | None:
+    """RLS + TenantScoped filter — only returns rows in the caller's
+    org. Used by the operator router. Ingest task uses the
+    ``_no_org_filter`` variant because it runs without a request
+    context."""
+    stmt = select(AiAssistantKnowledge).where(AiAssistantKnowledge.id == knowledge_id)
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def get_knowledge_by_id_no_org_filter(
+    db: AsyncSession,
+    knowledge_id: uuid.UUID,
+) -> AiAssistantKnowledge | None:
+    """Bypass TenantScoped — used by the Celery ingest task which
+    runs without a request context. RLS still fires because the
+    ingest sets ``app.current_org_id`` before this call."""
+    result = await db.execute(
+        text(
+            """
+            SELECT id, org_id, assistant_id, source_type, original_filename,
+                   body_text, url, content_hash, mime_type, size_bytes,
+                   status, status_message, progress_pct, heartbeat_at,
+                   chunk_count, created_at, updated_at
+            FROM tbl_ai_assistant_knowledge
+            WHERE id = :id
+            LIMIT 1
+            """
+        ),
+        {"id": str(knowledge_id)},
+    )
+    row = result.first()
+    if row is None:
+        return None
+    # Hydrate as an ORM object so callers can access fields via
+    # attribute lookups. We build the ORM instance directly (no
+    # merge) — the mapper won't identity-map it, which is what we
+    # want inside a fresh task session.
+    return AiAssistantKnowledge(
+        id=row.id,
+        org_id=row.org_id,
+        assistant_id=row.assistant_id,
+        source_type=KnowledgeSourceType(row.source_type),
+        original_filename=row.original_filename,
+        body_text=row.body_text,
+        url=row.url,
+        content_hash=bytes(row.content_hash),
+        mime_type=row.mime_type,
+        size_bytes=row.size_bytes,
+        status=KnowledgeStatus(row.status),
+        status_message=row.status_message,
+        progress_pct=row.progress_pct,
+        heartbeat_at=row.heartbeat_at,
+        chunk_count=row.chunk_count,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+async def get_knowledge_by_hash(
+    db: AsyncSession,
+    *,
+    assistant_id: uuid.UUID,
+    content_hash: bytes,
+) -> AiAssistantKnowledge | None:
+    """Look up by ``(assistant_id, content_hash)`` — the unique
+    constraint dedups here. Returns the existing row so the router
+    can return it verbatim instead of double-ingesting."""
+    stmt = (
+        select(AiAssistantKnowledge)
+        .where(AiAssistantKnowledge.assistant_id == assistant_id)
+        .where(AiAssistantKnowledge.content_hash == content_hash)
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def list_knowledge_by_assistant(
+    db: AsyncSession,
+    *,
+    assistant_id: uuid.UUID,
+) -> list[AiAssistantKnowledge]:
+    """Ordered by ``created_at DESC`` so newest uploads render first
+    in the operator UI."""
+    stmt = (
+        select(AiAssistantKnowledge)
+        .where(AiAssistantKnowledge.assistant_id == assistant_id)
+        .order_by(AiAssistantKnowledge.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def set_status(
+    db: AsyncSession,
+    *,
+    knowledge_id: uuid.UUID,
+    status: KnowledgeStatus,
+    message: str | None = None,
+    chunk_count: int | None = None,
+    progress_pct: int | None = None,
+    clear_heartbeat: bool = False,
+) -> None:
+    """Bulk-update helper used by the ingest task's status
+    transitions. Only touches the columns the caller asked for."""
+    values: dict[str, Any] = {
+        "status": status,
+        "status_message": message,
+    }
+    if chunk_count is not None:
+        values["chunk_count"] = chunk_count
+    if progress_pct is not None:
+        values["progress_pct"] = progress_pct
+    if clear_heartbeat:
+        values["heartbeat_at"] = None
+    stmt = (
+        update(AiAssistantKnowledge)
+        .where(AiAssistantKnowledge.id == knowledge_id)
+        .values(**values)
+    )
+    await db.execute(stmt)
+
+
+async def heartbeat_pulse(
+    db: AsyncSession,
+    *,
+    knowledge_id: uuid.UUID,
+    progress_pct: int | None = None,
+) -> None:
+    """Bump ``heartbeat_at=now()`` + optionally ``progress_pct``.
+    Called by the ingest task at least every 30s so the Step 17
+    stuck-ingest reaper can tell "in-flight" from "worker crashed"."""
+    values: dict[str, Any] = {"heartbeat_at": func.now()}
+    if progress_pct is not None:
+        values["progress_pct"] = progress_pct
+    stmt = (
+        update(AiAssistantKnowledge)
+        .where(AiAssistantKnowledge.id == knowledge_id)
+        .values(**values)
+    )
+    await db.execute(stmt)
+
+
+async def delete_knowledge_row(
+    db: AsyncSession,
+    knowledge_id: uuid.UUID,
+) -> None:
+    """Hard-delete the knowledge row. FK CASCADE removes chunks."""
+    stmt = select(AiAssistantKnowledge).where(AiAssistantKnowledge.id == knowledge_id)
+    result = await db.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row is not None:
+        await db.delete(row)
+
+
 __all__ = [
     "count_assistants",
     "count_assistants_by_key_id",
     "create_ai_widget_conversation",
     "delete_assistant",
+    "delete_knowledge_row",
     "get_assistant_by_id",
     "get_assistant_row_no_org_filter",
+    "get_knowledge_by_hash",
+    "get_knowledge_by_id",
+    "get_knowledge_by_id_no_org_filter",
     "get_provider_key_by_id",
+    "heartbeat_pulse",
     "insert_assistant",
     "insert_assistant_message",
     "insert_instruction_audit",
+    "insert_knowledge",
     "insert_message_meta_pending",
     "insert_user_message",
     "list_assistants",
+    "list_knowledge_by_assistant",
     "reassign_assistant_key_ids",
     "retrieve_chunks_for_assistant",
     "set_assistant_status",
+    "set_status",
     "update_message_meta_confirmed",
     "update_message_meta_failed",
 ]

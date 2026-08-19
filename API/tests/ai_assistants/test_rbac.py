@@ -25,7 +25,7 @@ import inspect
 import src.app.core.ai_assistants.models  # noqa: F401,E402 — metadata registration
 
 
-def test_router_has_seven_endpoints() -> None:
+def test_router_has_expected_endpoints() -> None:
     from src.app.core.ai_assistants.router import router
 
     endpoints = {(tuple(sorted(r.methods)), r.path) for r in router.routes if hasattr(r, "methods")}
@@ -38,6 +38,14 @@ def test_router_has_seven_endpoints() -> None:
         (("DELETE",), "/ai-assistants/{assistant_id}"),
         # tasks/ai-assistants Step 9 — operator preview SSE.
         (("POST",), "/ai-assistants/{assistant_id}/preview"),
+        # tasks/ai-assistants Step 10 — knowledge source ingest (5 endpoints).
+        (("POST",), "/ai-assistants/{assistant_id}/knowledge/file"),
+        (("POST",), "/ai-assistants/{assistant_id}/knowledge/text"),
+        (("POST",), "/ai-assistants/{assistant_id}/knowledge/url"),
+        (("GET",), "/ai-assistants/{assistant_id}/knowledge"),
+        (("POST",), "/ai-assistants/{assistant_id}/knowledge/{knowledge_id}/cancel"),
+        (("DELETE",), "/ai-assistants/{assistant_id}/knowledge/{knowledge_id}"),
+        (("POST",), "/ai-assistants/{assistant_id}/knowledge/{knowledge_id}/replace"),
     }
     assert endpoints == expected, f"router shape drift: {endpoints ^ expected}"
 
