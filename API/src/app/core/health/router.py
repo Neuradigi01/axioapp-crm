@@ -1,10 +1,10 @@
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import APIRouter, Depends
 
 from src.app.core.ai_assistants.models import JanitorHeartbeat
-from src.app.shared.db import get_session
+from src.app.shared.db import get_db
 
 router = APIRouter(tags=["Health"])
 
@@ -15,7 +15,7 @@ async def health() -> dict:
 
 
 @router.get("/health/janitor")
-async def health_janitor(session: AsyncSession = Depends(get_session)) -> dict:
+async def health_janitor(session: AsyncSession = Depends(get_db)) -> dict:
     """Return the janitor heartbeat status. External monitoring (Prometheus,
     etc.) checks if any task's ``last_run_at`` is older than 48 hours and
     alerts if the heartbeat stops."""

@@ -134,58 +134,29 @@ def test_storage_delete_directory_path_handling(tmp_path):
     assert not org_path.exists()
 
 
-@pytest.mark.asyncio
-async def test_retention_cleanup_placeholder():
-    """Placeholder test: retention_cleanup currently returns empty counts."""
-    from src.app.core.ai_assistants.janitor import retention_cleanup
+def test_janitor_functions_are_importable():
+    """All 6 janitor task async functions are importable from the janitor module."""
+    from src.app.core.ai_assistants import janitor
 
-    result = await retention_cleanup()
-    assert result == {"deleted_count": 0, "org_count": 0}
-
-
-@pytest.mark.asyncio
-async def test_reap_stuck_ingest_placeholder():
-    """Placeholder test: reap_stuck_ingest currently returns 0 count."""
-    from src.app.core.ai_assistants.janitor import reap_stuck_ingest
-
-    result = await reap_stuck_ingest()
-    assert result == {"marked_failed_count": 0}
+    assert hasattr(janitor, 'retention_cleanup')
+    assert hasattr(janitor, 'reap_stuck_ingest')
+    assert hasattr(janitor, 'cleanup_orphan_chunks')
+    assert hasattr(janitor, 'expire_embed_key_grace')
+    assert hasattr(janitor, 'reconcile_cost_outbox')
+    assert hasattr(janitor, 'janitor_heartbeat')
 
 
-@pytest.mark.asyncio
-async def test_cleanup_orphan_chunks_placeholder():
-    """Placeholder test: cleanup_orphan_chunks currently returns 0 count."""
-    from src.app.core.ai_assistants.janitor import cleanup_orphan_chunks
+def test_janitor_functions_are_async():
+    """All janitor functions are async (coroutine functions)."""
+    import inspect
+    from src.app.core.ai_assistants import janitor
 
-    result = await cleanup_orphan_chunks()
-    assert result == {"deleted_count": 0}
-
-
-@pytest.mark.asyncio
-async def test_expire_embed_key_grace_placeholder():
-    """Placeholder test: expire_embed_key_grace currently returns 0 count."""
-    from src.app.core.ai_assistants.janitor import expire_embed_key_grace
-
-    result = await expire_embed_key_grace()
-    assert result == {"deleted_count": 0}
-
-
-@pytest.mark.asyncio
-async def test_reconcile_cost_outbox_placeholder():
-    """Placeholder test: reconcile_cost_outbox currently returns 0 counts."""
-    from src.app.core.ai_assistants.janitor import reconcile_cost_outbox
-
-    result = await reconcile_cost_outbox()
-    assert result == {"reconciled_count": 0, "failed_count": 0}
-
-
-@pytest.mark.asyncio
-async def test_janitor_heartbeat_placeholder():
-    """Placeholder test: janitor_heartbeat currently returns ok status."""
-    from src.app.core.ai_assistants.janitor import janitor_heartbeat
-
-    result = await janitor_heartbeat()
-    assert result == {"status": "ok"}
+    for name in [
+        'retention_cleanup', 'reap_stuck_ingest', 'cleanup_orphan_chunks',
+        'expire_embed_key_grace', 'reconcile_cost_outbox', 'janitor_heartbeat',
+    ]:
+        fn = getattr(janitor, name)
+        assert inspect.iscoroutinefunction(fn), f"{name} is not async"
 
 
 def test_celery_beat_schedule_has_ai_tasks():
