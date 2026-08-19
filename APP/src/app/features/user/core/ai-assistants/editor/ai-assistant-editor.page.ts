@@ -36,6 +36,7 @@ import { switchMap } from 'rxjs';
 import { extractApiError } from '@core/services/api-error.util';
 import { AiAssistantsApiService } from '../ai-assistants-api.service';
 import { AssistantFormStateService } from '../form-state.service';
+import { EmbedSnippetModalComponent } from './embed/embed-snippet-modal.component';
 import { AssistantPreviewComponent } from './preview/assistant-preview.component';
 import { AssistantInterfaceTabComponent } from './tabs/assistant-interface-tab.component';
 import { InstructionsTabComponent } from './tabs/instructions-tab.component';
@@ -65,6 +66,7 @@ const TABS: TabDescriptor[] = [
     FormsModule,
     LucideAngularModule,
     AssistantPreviewComponent,
+    EmbedSnippetModalComponent,
     InstructionsTabComponent,
     KnowledgeSourceTabComponent,
     AssistantInterfaceTabComponent,
@@ -88,6 +90,20 @@ export class AiAssistantEditorPage {
   protected readonly savedAt = signal<number | null>(null);
   protected readonly nameEditing = signal(false);
   protected readonly nameDraft = signal('');
+  /** Step 15 — controls the visibility of the embed snippet modal.
+   *  Opened from the header's Embed button; the modal handles its
+   *  own load / issue / rotate / revoke lifecycle. */
+  protected readonly embedModalOpen = signal(false);
+
+  protected openEmbedModal(): void {
+    if (this.formState.assistantId()) {
+      this.embedModalOpen.set(true);
+    }
+  }
+
+  protected closeEmbedModal(): void {
+    this.embedModalOpen.set(false);
+  }
 
   protected readonly canSave = computed(
     () => this.formState.loaded() && this.formState.dirty() && !this.saving(),

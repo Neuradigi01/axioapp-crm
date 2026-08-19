@@ -232,6 +232,43 @@ export class AiAssistantsApiService {
     return this.http.request<KnowledgeCreateResponse>(req);
   }
 
+  // --- Embed keys (Step 15) --------------------------------------------
+
+  /** List embed keys bound to one assistant. Never returns plaintext. */
+  listEmbedKeys(assistantId: string): Observable<EmbedKeyRow[]> {
+    return this.http.get<EmbedKeyRow[]>(
+      `${environment.apiBaseUrl}/embed/ai-assistants/${assistantId}/keys`,
+    );
+  }
+
+  /** Issue a new embed key. The ``secret`` on the returned envelope
+   *  appears ONCE — surface it in the snippet modal + let the
+   *  operator copy before navigating away. */
+  issueEmbedKey(
+    assistantId: string,
+    payload: EmbedKeyIssuePayload,
+  ): Observable<EmbedKeyIssueResponse> {
+    return this.http.post<EmbedKeyIssueResponse>(
+      `${environment.apiBaseUrl}/embed/ai-assistants/${assistantId}/keys`,
+      payload,
+    );
+  }
+
+  /** Rotate: issues a fresh key + revokes the old one (with optional
+   *  grace window in days). */
+  rotateEmbedKey(keyId: string, graceDays: number = 0): Observable<EmbedKeyIssueResponse> {
+    return this.http.post<EmbedKeyIssueResponse>(
+      `${environment.apiBaseUrl}/embed/keys/${keyId}/rotate`,
+      {},
+      { params: new HttpParams().set('grace_days', String(graceDays)) },
+    );
+  }
+
+  /** Hard-revoke + close every in-flight SSE stream for this key. */
+  revokeEmbedKeyNow(keyId: string): Observable<void> {
+    return this.http.post<void>(`${environment.apiBaseUrl}/embed/keys/${keyId}/revoke-now`, {});
+  }
+
   // --- Profile picture (Step 13) ------------------------------------
 
   /** Upload the header profile picture. PNG / JPEG / WebP, < 2 MB.
@@ -255,6 +292,38 @@ export class AiAssistantsApiService {
 
 export interface ProfilePictureResponse {
   url: string;
+}
+
+// --- Embed key shapes (Step 15) --------------------------------------
+
+export interface EmbedKeyRow {
+  id: string;
+  org_id: string;
+  name: string | null;
+  prefix: string;
+  resource_type: string;
+  resource_id: string | null;
+  allowed_origins: string[];
+  rate_limit_per_hour: number;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  grace_expires_at: string | null;
+  created_at: string;
+}
+
+export interface EmbedKeyIssueResponse {
+  id: string;
+  name: string | null;
+  prefix: string;
+  /** Plaintext key — appears ONCE. Never re-fetched. */
+  secret: string;
+  created_at: string;
+}
+
+export interface EmbedKeyIssuePayload {
+  name?: string | null;
+  allowed_origins?: string[];
+  rate_limit_per_hour?: number | null;
 }
 
 // --- Knowledge shapes (mirror ``schemas.py``) ----------------------

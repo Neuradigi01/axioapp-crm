@@ -97,6 +97,45 @@ export interface InitConfig {
   mountId: string;
 }
 
+// --- AI Assistant chat mode (Step 15) -----------------------------------
+
+/**
+ * Response shape from `GET /api/v1/public/ai-assistants/assistant`.
+ * The public endpoint returns only the widget-safe subset — never the
+ * assistant's `instructions`, `key_id`, or audit rows.
+ */
+export interface AiAssistantMeta {
+  id: string;
+  name: string;
+  interface_config: Record<string, unknown>;
+  styling_config: Record<string, unknown>;
+}
+
+/**
+ * Response shape from `POST /api/v1/public/ai-assistants/session/init`.
+ * The `session_token` is opaque — the widget passes it back on every
+ * subsequent `/message` call so the backend groups turns into one
+ * conversation.
+ */
+export interface SessionInitResponse {
+  session_token: string;
+  requires_captcha: boolean;
+}
+
+/**
+ * One SSE event yielded by `/api/v1/public/ai-assistants/message`.
+ * The runtime emits three kinds: `token` (incremental delta), `error`
+ * (mid-stream failure), and `done` (terminal chunk with usage +
+ * cost). Matches the backend's `RuntimeChunk` wire shape.
+ */
+export interface AiStreamEvent {
+  type: "token" | "error" | "done";
+  delta?: string;
+  reason?: string;
+  total_tokens?: number;
+  cost_usd?: string;
+}
+
 /**
  * Captured at render time, sent with every submission. All fields
  * optional — visitors arriving via direct traffic have nothing to

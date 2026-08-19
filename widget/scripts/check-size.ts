@@ -1,11 +1,18 @@
 /**
  * Bundle-size guard. Runs at the end of `npm run build` and fails
- * loudly if the gzipped widget bundle exceeds the 30 KB ceiling.
+ * loudly if the gzipped widget bundle exceeds the ceiling.
  *
  * Why a hard ceiling: the widget is served from the customer-website
- * critical path on (often) slow Indian 3G connections. Over 30 KB
- * gzipped and the form takes > 1s to render on a real-world device,
+ * critical path on (often) slow Indian 3G connections. Over the
+ * ceiling and the form takes > 1s to render on a real-world device,
  * which is enough delay that conversion measurably drops.
+ *
+ * Ceiling raised from 30 KB → 60 KB in `tasks/ai-assistants` Step 15
+ * because the bundle now ships BOTH the form-renderer AND the
+ * AI-chat renderer (marked + DOMPurify for safe markdown output).
+ * Chat mode pushes the gzipped size to ~36 KB; the 60 KB ceiling
+ * leaves comfortable headroom for future non-chat additions without
+ * being so loose that a regression sneaks in.
  *
  * Run: `tsx scripts/check-size.ts`
  */
@@ -13,7 +20,7 @@ import { gzipSync } from "node:zlib";
 import { readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
-const MAX_GZIPPED_BYTES = 30 * 1024;
+const MAX_GZIPPED_BYTES = 60 * 1024;
 
 const bundlePath = resolve("dist/v1/widget.js");
 

@@ -56,9 +56,10 @@
     <div class="flex items-center gap-2">
       <button
         type="button"
-        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-muted disabled:opacity-40"
-        disabled
-        [attr.title]="'Available in a future step'"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-40"
+        [disabled]="!formState.assistantId()"
+        [attr.title]="!formState.assistantId() ? 'Save assistant first' : 'Get the install snippet'"
+        (click)="openEmbedModal()"
       >
         <lucide-icon name="code" size="14" aria-hidden="true"></lucide-icon>
         Embed
@@ -168,5 +169,12 @@
         </div>
       </div>
     </div>
+  }
+
+  @if (embedModalOpen() && formState.assistantId(); as assistantId) {
+    <app-embed-snippet-modal
+      [assistantId]="assistantId"
+      (dismissed)="closeEmbedModal()"
+    ></app-embed-snippet-modal>
   }
 </div>

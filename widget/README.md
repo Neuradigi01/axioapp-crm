@@ -14,13 +14,32 @@ Standalone JavaScript bundle that customers paste onto their own websites with a
 
 The script tag's `data-key` is the customer's per-org API key, issued from Settings → Embed Widget. The widget loader (Step 6) auto-runs `init()` from those data attributes — customers never write JS.
 
+## Two modes: lead-form and AI chat (Step 15)
+
+The same bundle renders **either** a lead-capture form OR an AI-assistant chat widget — dispatched at runtime by the embed key's `resource_type`:
+
+| Key type | What renders | Endpoint the widget calls first |
+|---|---|---|
+| `resource_type='lead_form'` (default) | Lead form | `GET /api/v1/embed/config/public` |
+| `resource_type='ai_assistant'` | Chat widget with `interface_config` + `styling_config` | `GET /api/v1/public/ai-assistants/assistant` |
+
+Dispatch: `init()` tries `GET /public/ai-assistants/assistant` first with the bearer key. A 200 response means the key is scoped to an AI assistant → the chat renderer takes over. A 401 (or any other error) falls through to the existing form-renderer path. Customers embed one snippet regardless of which channel type the operator eventually issues.
+
+### Chat mode wire
+
+- **Session token** — persisted in `localStorage` under `crm_ai_session_<embed-key-prefix>` so a page reload keeps the conversation identifier. Namespaced per key so two assistants on the same domain don't collide.
+- **CAPTCHA** — first message per session posts a Cloudflare Turnstile token. Subsequent messages within the server's 5-min TTL skip the check.
+- **Streaming** — `fetch()` + `ReadableStream` (never `EventSource`) so the bearer key travels in the `Authorization` header instead of the URL query string.
+- **Markdown safety** — assistant replies pass through `marked` (GFM + line breaks) then `DOMPurify.sanitize()` with `<script>` / `<iframe>` / event handlers forbidden. Links get `target="_blank" rel="noopener noreferrer nofollow"`.
+
+
 ## Tech decisions
 
 | Choice | Why |
 |---|---|
 | Vanilla TypeScript, no framework | Bundle size: ~5–8 KB gzipped for the renderer. Angular Elements bottoms out at ~90 KB — too heavy for the customer-website critical path. |
 | Single ES module at `dist/v1/widget.js` | One HTTP request, no chunk-splitting plumbing on the customer's CSP. |
-| 30 KB gzipped ceiling (enforced) | Slow Indian 3G connections lose conversion past ~1s render. `scripts/check-size.ts` fails the build above the ceiling. |
+| 60 KB gzipped ceiling (enforced) | Slow Indian 3G connections lose conversion past ~1s render. `scripts/check-size.ts` fails the build above the ceiling. Raised from 30 KB in Step 15 (chat mode ships `marked` + DOMPurify). |
 | `/v1/` in the served path | Major-version pinning. Breaking changes ship at `/v2/widget.js` without disturbing existing customer installs. |
 | Independent build pipeline (separate `package.json`) | Widget rarely changes; isolating from the Angular monorepo means frontend churn doesn't force widget rebuilds. |
 

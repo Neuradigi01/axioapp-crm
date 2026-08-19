@@ -1,7 +1,7 @@
 # Step 15 — Widget extension (form-or-chat) + snippet modal
 
 **Goal:** Extend the existing `widget/` bundle to render an AI-chat interface when the embed key's `resource_type='ai_assistant'`. SSE via `fetch()` + `ReadableStream` (embed key stays in Authorization header, never URL). DOMPurify-sanitised markdown. localStorage session token for end-user identity. Copy-paste snippet modal in the editor.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 14 (public router + embed keys), Step 13 (styling + interface configs available for widget consumption).
 
 ---

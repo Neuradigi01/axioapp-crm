@@ -18,8 +18,9 @@
  *   5. Attribution captured ONCE at render time; included with every
  *      submission for the lifetime of this render.
  */
-import { ApiError, getConfig, submitLead } from "./api";
+import { ApiError, getAssistantMeta, getConfig, submitLead } from "./api";
 import { captureAttribution } from "./attribution";
+import { initChatWidget } from "./chat";
 import {
   renderError,
   renderForm,
@@ -93,6 +94,30 @@ export async function init(config: InitConfig): Promise<void> {
 
   renderLoading(mount);
   const attribution = captureAttribution();
+
+  // AI-assistant dispatch: the public /assistant endpoint is
+  // ai-assistant-scoped — a 200 response means this key is bound to
+  // an assistant + we should render the chat widget instead of the
+  // form. Any other response (401, 404, 5xx, network error) falls
+  // through to the existing form-renderer path. This deliberately
+  // has one extra roundtrip on lead-form keys — well worth it for
+  // one unified install snippet across both channel types.
+  try {
+    const meta = await getAssistantMeta(config.key, config.host);
+    // Bearer key resolved to an ai_assistant resource → chat mode.
+    await initChatWidget(mount, config);
+    void meta; // captured so the compiler doesn't drop the call
+    return;
+  } catch (err) {
+    // 401 = wrong resource type (this is a lead-form key). Anything
+    // else = network / server error; the form path also fails but
+    // has its own more forgiving fallback config.
+    if (!(err instanceof ApiError)) {
+      // Non-API error (CORS / network) — try the form path anyway.
+      // The form path has its own fallback config for backend
+      // outages so it degrades better than the chat path.
+    }
+  }
 
   let widgetConfig: WidgetConfig;
   try {

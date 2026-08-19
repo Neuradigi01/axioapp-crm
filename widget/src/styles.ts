@@ -165,6 +165,153 @@ const CSS = `
 }
 `;
 
+/**
+ * AI-assistant chat widget CSS (``tasks/ai-assistants`` Step 15).
+ *
+ * Colour tokens are applied inline per-element from the assistant's
+ * ``styling_config`` so we don't ship 8 CSS variable declarations
+ * that a host site might trip over. Layout + spacing come from this
+ * stylesheet.
+ */
+const CHAT_CSS = `
+.crm-ai-chat {
+  display: flex;
+  flex-direction: column;
+  max-width: 380px;
+  min-height: 500px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.crm-ai-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.crm-ai-avatar {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  overflow: hidden;
+}
+.crm-ai-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.crm-ai-title { flex: 1 1 auto; min-width: 0; }
+.crm-ai-heading {
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crm-ai-sub {
+  opacity: 0.85;
+  font-size: 12px;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crm-ai-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  overflow-y: auto;
+  min-height: 260px;
+}
+.crm-ai-bubble-wrap {
+  display: flex;
+}
+.crm-ai-bubble-wrap.crm-ai-bubble-user { justify-content: flex-end; }
+.crm-ai-bubble-wrap.crm-ai-bubble-assistant { justify-content: flex-start; }
+.crm-ai-bubble {
+  max-width: 82%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+.crm-ai-bubble p { margin: 0 0 6px 0; }
+.crm-ai-bubble p:last-child { margin-bottom: 0; }
+.crm-ai-bubble a { text-decoration: underline; }
+.crm-ai-bubble code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.06);
+  font-size: 13px;
+}
+.crm-ai-bubble pre {
+  padding: 8px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.06);
+  overflow-x: auto;
+  font-size: 12px;
+  margin: 6px 0;
+}
+.crm-ai-bubble ul, .crm-ai-bubble ol {
+  padding-left: 20px;
+  margin: 6px 0;
+}
+.crm-ai-composer {
+  border-top: 1px solid rgba(0,0,0,0.06);
+  padding: 10px 12px;
+}
+.crm-ai-captcha { margin-bottom: 8px; }
+.crm-ai-captcha:empty { display: none; }
+.crm-ai-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.crm-ai-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.crm-ai-input:focus {
+  outline: 2px solid rgba(0,0,0,0.15);
+  outline-offset: -1px;
+}
+.crm-ai-send {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.crm-ai-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.crm-ai-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  font-size: 11px;
+}
+.crm-ai-footer a { text-decoration: none; }
+.crm-ai-footer a:hover { text-decoration: underline; }
+`;
+
 const TAG_MARKER = "data-furnicrm";
 
 export function injectStyles(): void {
@@ -172,7 +319,7 @@ export function injectStyles(): void {
   if (document.querySelector(`style[${TAG_MARKER}]`)) return;
   const tag = document.createElement("style");
   tag.setAttribute(TAG_MARKER, "");
-  tag.textContent = CSS;
+  tag.textContent = CSS + CHAT_CSS;
   document.head.appendChild(tag);
 }
 
