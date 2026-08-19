@@ -160,7 +160,7 @@ widget/                       ← EXTENDED (not duplicated)
 | 9 | [Chat runtime — retrieve + structured envelope + stream + cost outbox](step-9-chat-runtime-streaming.md) | **COMPLETED** | ~2 days |
 | 10 | [Knowledge Source backend — file + custom text + URL + Celery ingest](step-10-knowledge-source-backend.md) | **COMPLETED** | ~2 days |
 | 11 | [Knowledge Source tab UI](step-11-knowledge-source-tab-ui.md) | **COMPLETED** | ~1 day |
-| 12 | [Assistant Interface tab UI](step-12-assistant-interface-tab.md) | Pending | ~0.5 days |
+| 12 | [Assistant Interface tab UI](step-12-assistant-interface-tab.md) | **COMPLETED** | ~0.5 days |
 | 13 | [Styling tab UI + live-preview binding](step-13-styling-tab.md) | Pending | ~1 day |
 | 14 | [Embed keys extension + public router + rate limit + CAPTCHA + immediate-revoke](step-14-embed-keys-and-public-router.md) | Pending | ~1.5 days |
 | 15 | [Widget extension (form-or-chat) + snippet modal](step-15-widget-and-snippet.md) | Pending | ~1.5 days |

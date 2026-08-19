@@ -113,6 +113,19 @@ export class AssistantFormStateService {
     this._dirty.set(true);
   }
 
+  /** Merge one or more keys into ``interface_config`` without
+   *  clobbering the whole JSONB blob. Step 12's Interface tab uses
+   *  this so each field-level ``onXInput`` handler stays a one-liner
+   *  and doesn't accidentally drop sibling keys (initial_messages,
+   *  show_powered_by, etc.). Step 13 uses the styling twin. */
+  patchInterfaceConfig(delta: Record<string, unknown>): void {
+    this._state.update((current) => ({
+      ...current,
+      interface_config: { ...current.interface_config, ...delta },
+    }));
+    this._dirty.set(true);
+  }
+
   /** Called after a successful PATCH round-trip. Re-hydrates from
    *  the server response (which carries the new ``version``) and
    *  clears the dirty flag so the Save button disables again. */

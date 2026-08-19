@@ -1,7 +1,7 @@
 # Step 12 — Assistant Interface tab UI
 
 **Goal:** Ship the Assistant Interface tab. Fields per Pabbly reference: Header display heading, subheading, initial messages (up to 2 chat bubbles), "Powered by" toggle, footer text + link. All writes flow through the Step 7 form-state signal; the preview pane re-renders live. Persist under `assistant.interface_config` JSONB (already added in Step 5).
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 7 (editor shell + form-state), Step 5 (`interface_config` column).
 
 ---
