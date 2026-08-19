@@ -886,7 +886,15 @@ export class CreateCampaignModalComponent {
     }
     this.audiencePreviewLoading.set(true);
     return this.contactsApi
-      .list({ q, source, tag, page: 1, size: this.AUDIENCE_PREVIEW_LIMIT })
+      .list({
+        q,
+        // Audience-filter mode is single-value per column here; the
+        // multi-value contacts API takes arrays, so wrap.
+        source: source ? [source] : undefined,
+        tag: tag ? [tag] : undefined,
+        page: 1,
+        size: this.AUDIENCE_PREVIEW_LIMIT,
+      })
       .pipe(
         switchMap((resp) => of(resp.items)),
         catchError(() => of<ContactListItem[]>([])),

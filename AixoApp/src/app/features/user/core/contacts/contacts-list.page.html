@@ -60,9 +60,10 @@
     </div>
   </header>
 
-  <!-- Filters — AIXO chip row: search grows, filter chips are compact and wrap -->
-  <div class="mb-4 flex flex-wrap items-center gap-2 md:mb-5">
-    <div class="relative min-w-[140px] flex-1">
+  <!-- Search — the only above-table filter. Source / Owner / Tags
+       moved to their column headers as `app-column-filter` popovers. -->
+  <div class="mb-4 md:mb-5">
+    <div class="relative">
       <label for="contacts_q" class="sr-only">Search</label>
       <lucide-icon
         name="search"
@@ -74,36 +75,6 @@
         [formControl]="searchControl"
         placeholder="Search contacts…"
         class="input pl-9"
-      />
-    </div>
-
-    <!-- Source filter — crm-mobile-select instead of native <select>
-         so the picker renders in-DOM. Native <select> options render
-         with the OS's default white/light theme, which reads as
-         low-contrast washed-out text against the dark app UI. -->
-    <div class="min-w-[9rem]">
-      <crm-mobile-select
-        [options]="sourceSelectOptions()"
-        [value]="sourceControl.value"
-        (valueChange)="sourceControl.setValue($event)"
-      />
-    </div>
-
-    <!-- Tags filter — same story as Source above. -->
-    <div class="min-w-[9rem]">
-      <crm-mobile-select
-        [options]="tagSelectOptions()"
-        [value]="tagControl.value"
-        (valueChange)="tagControl.setValue($event)"
-      />
-    </div>
-
-    <!-- Owner filter — same crm-mobile-select pattern. -->
-    <div class="min-w-[10rem] flex-1 basis-[calc(50%-0.25rem)] sm:flex-none sm:basis-auto">
-      <crm-mobile-select
-        [options]="assigneeSelectOptions()"
-        [value]="assigneeControl.value"
-        (valueChange)="assigneeControl.setValue($event)"
       />
     </div>
   </div>
@@ -177,21 +148,34 @@
               scope="col"
               class="w-[12%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
             >
-              <span class="sm:hidden">Src</span>
-              <span class="hidden sm:inline">Source</span>
+              <app-column-filter
+                label="Source"
+                [options]="sourceOptions()"
+                [value]="sourceFilter()"
+                (valueChange)="onColumnFilterChange('source', $event)"
+              />
             </th>
             <th
               scope="col"
               class="w-[10%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
             >
-              <lucide-icon name="user" class="inline h-3 w-3 sm:hidden" aria-label="Owner" />
-              <span class="hidden sm:inline">Owner</span>
+              <app-column-filter
+                label="Owner"
+                [options]="assigneeOptions()"
+                [value]="assigneeFilter()"
+                (valueChange)="onColumnFilterChange('assignee', $event)"
+              />
             </th>
             <th
               scope="col"
               class="hidden px-4 py-2.5 text-left text-[11px] font-semibold tracking-[.06em] text-faint uppercase md:table-cell md:px-6"
             >
-              Tags
+              <app-column-filter
+                label="Tags"
+                [options]="tagOptions()"
+                [value]="tagFilter()"
+                (valueChange)="onColumnFilterChange('tag', $event)"
+              />
             </th>
             <th
               scope="col"

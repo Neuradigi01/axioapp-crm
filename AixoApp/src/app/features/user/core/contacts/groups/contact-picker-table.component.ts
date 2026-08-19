@@ -281,14 +281,17 @@ export class ContactPickerTableComponent {
       });
   }
 
-  private _currentQuery(): { q?: string; source?: string; tag?: string } {
-    const out: { q?: string; source?: string; tag?: string } = {};
+  private _currentQuery(): { q?: string; source?: string[]; tag?: string[] } {
+    const out: { q?: string; source?: string[]; tag?: string[] } = {};
     const q = this.nameCtrl.value.trim();
     const source = this.sourceCtrl.value.trim();
     const tag = this.tagCtrl.value.trim();
     if (q) out.q = q;
-    if (source) out.source = source;
-    if (tag) out.tag = tag;
+    // Source/tag inputs are single-value here (this picker is used
+    // by the group-builder and only supports one at a time); wrap
+    // into an array so the API's multi-value contract is satisfied.
+    if (source) out.source = [source];
+    if (tag) out.tag = [tag];
     return out;
   }
 }

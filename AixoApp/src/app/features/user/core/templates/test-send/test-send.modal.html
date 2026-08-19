@@ -6,6 +6,21 @@
     </header>
 
     <div class="space-y-3 px-5 py-4">
+      @if (template().channel === 'whatsapp') {
+        <div
+          class="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400"
+        >
+          <lucide-icon name="alert-triangle" size="12" class="mt-0.5 shrink-0" />
+          <div class="min-w-0 flex-1 space-y-1 leading-snug">
+            <p class="font-semibold">Not a real template preview.</p>
+            <p>
+              Sends the body as plain WhatsApp text — headers, footers, buttons and media aren't
+              included, and it only lands if the recipient messaged your WhatsApp number in the last
+              24 hours (Meta session rule).
+            </p>
+          </div>
+        </div>
+      }
       <label class="block">
         <span class="text-xs font-medium text-default">{{ channelLabel() }}</span>
         <input
@@ -51,18 +66,20 @@
 
       @if (result(); as r) {
         <div
-          class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400"
+          class="min-w-0 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400"
         >
           <p class="font-medium">
             <lucide-icon name="check" size="12" class="mr-1 inline" />
             Sent
           </p>
           <p class="mt-0.5">
-            Recipient: <code class="font-mono">{{ r.sent_to }}</code>
+            Recipient:
+            <code class="break-all font-mono">{{ r.sent_to }}</code>
           </p>
           @if (r.channel_message_id) {
             <p class="mt-0.5">
-              Provider ID: <code class="font-mono">{{ r.channel_message_id }}</code>
+              Provider ID:
+              <code class="break-all font-mono">{{ r.channel_message_id }}</code>
             </p>
           }
           <p class="mt-1 text-[10px] text-emerald-400">

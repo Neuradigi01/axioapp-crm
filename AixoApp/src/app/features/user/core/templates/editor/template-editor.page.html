@@ -56,10 +56,17 @@
           <button
             type="button"
             (click)="openTestSendModal()"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+            [class]="
+              isWhatsAppTemplate()
+                ? 'inline-flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/20'
+                : 'inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2'
+            "
           >
             <lucide-icon name="send" size="12" />
             Test send
+            @if (isWhatsAppTemplate()) {
+              <lucide-icon name="alert-triangle" size="12" />
+            }
           </button>
         }
         @if (showSubmitForApprovalButton()) {

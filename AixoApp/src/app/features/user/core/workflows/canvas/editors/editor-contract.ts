@@ -268,6 +268,10 @@ export interface EventTypeOption {
   waitable: boolean;
 }
 
+// Keep in sync with `API/src/app/core/events/event_catalog.py` — the
+// backend graph validator refuses trigger nodes whose event_type is
+// not declared there. Options that don't match a real publisher have
+// been removed rather than shipped as broken picks.
 export const EVENT_TYPES: readonly EventTypeOption[] = [
   // Lead lifecycle
   {
@@ -283,7 +287,7 @@ export const EVENT_TYPES: readonly EventTypeOption[] = [
     waitable: false,
   },
   {
-    type: 'lead.stage_changed',
+    type: 'lead.status_changed',
     label: 'Lead stage changed',
     description: 'Pipeline stage moved.',
     waitable: false,
@@ -291,13 +295,13 @@ export const EVENT_TYPES: readonly EventTypeOption[] = [
   {
     type: 'lead.converted',
     label: 'Lead converted',
-    description: 'Lead flipped to status=converted.',
+    description: 'Lead moved to a won pipeline stage.',
     waitable: false,
   },
   {
     type: 'lead.lost',
     label: 'Lead lost',
-    description: 'Lead flipped to status=lost.',
+    description: 'Lead moved to a lost pipeline stage.',
     waitable: false,
   },
 
@@ -329,7 +333,7 @@ export const EVENT_TYPES: readonly EventTypeOption[] = [
 
   // Appointments / tasks
   {
-    type: 'appointment.created',
+    type: 'appointment.booked',
     label: 'Appointment created',
     description: 'New appointment scheduled.',
     waitable: false,
@@ -341,7 +345,7 @@ export const EVENT_TYPES: readonly EventTypeOption[] = [
     waitable: true,
   },
   {
-    type: 'appointment.no_show',
+    type: 'appointment.missed',
     label: 'Appointment no-show',
     description: 'Rep marked it no-show.',
     waitable: true,
@@ -361,12 +365,6 @@ export const EVENT_TYPES: readonly EventTypeOption[] = [
 
   // Conversations
   {
-    type: 'email.delivered',
-    label: 'Email delivered',
-    description: 'Email accepted by the recipient MTA.',
-    waitable: true,
-  },
-  {
     type: 'email.opened',
     label: 'Email opened',
     description: 'Pixel beacon fired.',
@@ -381,7 +379,7 @@ export const EVENT_TYPES: readonly EventTypeOption[] = [
   {
     type: 'email.bounced',
     label: 'Email bounced',
-    description: 'Hard / soft bounce from the MTA.',
+    description: 'Hard / soft bounce reported by the email provider.',
     waitable: true,
   },
   {
@@ -393,47 +391,18 @@ export const EVENT_TYPES: readonly EventTypeOption[] = [
   {
     type: 'whatsapp.message_received',
     label: 'WhatsApp message received',
-    description: 'Inbound WA message.',
+    description: 'Inbound WA message from a contact.',
     waitable: true,
   },
   {
     type: 'whatsapp.message_read',
     label: 'WhatsApp message read',
-    description: 'Recipient opened the message.',
-    waitable: true,
-  },
-  {
-    type: 'sms.delivered',
-    label: 'SMS delivered',
-    description: 'Carrier confirmed delivery.',
-    waitable: true,
-  },
-  {
-    type: 'sms.replied',
-    label: 'SMS replied',
-    description: 'Contact replied to a sent SMS.',
+    description:
+      "Recipient opened a WA message (only fires if they haven't disabled read receipts).",
     waitable: true,
   },
 
   // Billing
-  {
-    type: 'quote.sent',
-    label: 'Quote sent',
-    description: 'Quote emailed to the contact.',
-    waitable: false,
-  },
-  {
-    type: 'quote.viewed',
-    label: 'Quote viewed',
-    description: 'Contact opened the quote.',
-    waitable: true,
-  },
-  {
-    type: 'quote.accepted',
-    label: 'Quote accepted',
-    description: 'Contact accepted the quote.',
-    waitable: true,
-  },
   { type: 'invoice.sent', label: 'Invoice sent', description: 'Invoice issued.', waitable: false },
   { type: 'invoice.paid', label: 'Invoice paid', description: 'Payment received.', waitable: true },
 ];

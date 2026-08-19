@@ -36,7 +36,6 @@ import {
   UrlFilterStateDirective,
 } from '../shared/directives/url-filter-state.directive';
 import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
-import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import {
   ReassignConfirm,
@@ -44,6 +43,8 @@ import {
 } from '../shared/reassign-modal/reassign-modal.component';
 import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
+import { ColumnFilterComponent } from '../shared/table-filters/column-filter.component';
+import type { ColumnFilterOption } from '../shared/table-filters/column-filter.types';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
 
@@ -69,7 +70,7 @@ class ContactsListState extends ListPageState<ContactListItem> {}
     MailLinkDirective,
     UrlFilterStateDirective,
     OptInChipComponent,
-    MobileSelectComponent,
+    ColumnFilterComponent,
   ],
   providers: [ContactsListState],
   templateUrl: './contacts-list.page.html',
@@ -86,10 +87,17 @@ export class ContactsListPageComponent {
   protected readonly state = inject(ContactsListState);
 
   readonly searchControl = new FormControl('', { nonNullable: true });
-  readonly sourceControl = new FormControl('', { nonNullable: true });
-  readonly tagControl = new FormControl('', { nonNullable: true });
-  /** Assignee filter. Empty = all, `'me'` resolves to current user, or a user UUID. */
-  readonly assigneeControl = new FormControl<string>('', { nonNullable: true });
+
+  /** Column-header filter state — one signal per filterable column.
+   *  Held as `string[]` (not `Set`) so URL persistence can `.join(',')`
+   *  round-trip cleanly and the API service can serialize repeated
+   *  params via `buildHttpParams`. `[]` means no filter on the column. */
+  readonly sourceFilter = signal<string[]>([]);
+  readonly tagFilter = signal<string[]>([]);
+  /** Owner UUIDs. The current user's own UUID is offered as an option
+   *  labelled "Me" so the previous "assignee=me" behaviour is preserved
+   *  without a magic string. */
+  readonly assigneeFilter = signal<string[]>([]);
 
   /** Sort state. Defaults to ``last_activity_at desc`` so contacts the
    *  operator just touched (via a fresh lead / new contact / edit)
@@ -115,24 +123,17 @@ export class ContactsListPageComponent {
     this.searchControl.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
     { initialValue: '' },
   );
-  private readonly sourceFilter = toSignal(
-    this.sourceControl.valueChanges.pipe(distinctUntilChanged()),
-    { initialValue: '' },
-  );
-  private readonly tagFilter = toSignal(this.tagControl.valueChanges.pipe(distinctUntilChanged()), {
-    initialValue: '',
-  });
 
-  /** Distinct source options for the filter dropdown. Contacts store
-   *  `source` as free-form text — some rows use raw enum keys
-   *  ("google_ads"), others use pretty labels ("Google Ads"), and
-   *  casing varies ("facebook" vs "Facebook Ads"). Collapse to one
-   *  canonical entry per lowercase key so the dropdown doesn't show
-   *  the same source twice. `value` is the original raw string of the
-   *  first occurrence (what the backend filter matches on); `label`
-   *  is the display-only prettified version. */
-  readonly sourceOptions = computed<{ value: string; label: string }[]>(() => {
-    const byKey = new Map<string, { value: string; label: string }>();
+  /** Distinct source options for the column-header filter popover.
+   *  Contacts store `source` as free-form text — some rows use raw
+   *  enum keys ("google_ads"), others use pretty labels ("Google Ads"),
+   *  and casing varies ("facebook" vs "Facebook Ads"). Collapse to
+   *  one canonical entry per lowercase key so the popover doesn't
+   *  show the same source twice. `value` is the original raw string
+   *  of the first occurrence (what the backend filter matches on);
+   *  `label` is the display-only prettified version. */
+  readonly sourceOptions = computed<ColumnFilterOption[]>(() => {
+    const byKey = new Map<string, ColumnFilterOption>();
     for (const item of this.state.items()) {
       if (!item.source) continue;
       const key = item.source.trim().toLowerCase();
@@ -152,34 +153,31 @@ export class ContactsListPageComponent {
     return trimmed.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
-  readonly tagOptions = computed(() => {
+  readonly tagOptions = computed<ColumnFilterOption[]>(() => {
     const set = new Set<string>();
     for (const item of this.state.items()) {
       for (const t of item.tags) set.add(t);
     }
-    return [...set].sort();
+    return [...set].sort().map((t) => ({ value: t, label: t }));
   });
 
-  /** `crm-mobile-select` shape for the Source filter (sentinel "Source"
-   *  first, then dedup'd + prettified entries from `sourceOptions`). */
-  readonly sourceSelectOptions = computed<{ value: string; label: string }[]>(() => [
-    { value: '', label: 'Source' },
-    ...this.sourceOptions(),
-  ]);
-
-  /** `crm-mobile-select` shape for the Tags filter. */
-  readonly tagSelectOptions = computed<{ value: string; label: string }[]>(() => [
-    { value: '', label: 'Tags' },
-    ...this.tagOptions().map((t) => ({ value: t, label: t })),
-  ]);
-
-  /** `crm-mobile-select` shape for the Owner filter (sentinel "Owner"
-   *  + "Me" + one entry per active org user). */
-  readonly assigneeSelectOptions = computed<{ value: string; label: string }[]>(() => [
-    { value: '', label: 'Owner' },
-    { value: 'me', label: 'Me' },
-    ...this.users().map((u) => ({ value: u.id, label: u.full_name })),
-  ]);
+  /** Owner options for the Owner column popover — every active org
+   *  user, with the current user pinned first as "Me" so the previous
+   *  "quick-filter to my rows" affordance is still one click away. */
+  readonly assigneeOptions = computed<ColumnFilterOption[]>(() => {
+    const me = this.auth.currentUserId();
+    const rows = this.users();
+    const out: ColumnFilterOption[] = [];
+    if (me) {
+      const meUser = rows.find((u) => u.id === me);
+      out.push({ value: me, label: meUser ? `Me (${meUser.full_name})` : 'Me' });
+    }
+    for (const u of rows) {
+      if (u.id === me) continue;
+      out.push({ value: u.id, label: u.full_name });
+    }
+    return out;
+  });
 
   // --- Multi-select + bulk actions -------------------------------------------
 
@@ -190,7 +188,12 @@ export class ContactsListPageComponent {
 
   /** URL ↔ filter state map. Wires every filter signal / FormControl to a
    * query-param key so refresh / share / browser-back preserve the view.
-   * `replaceUrl: true` keeps history clean while typing in the search box. */
+   * `replaceUrl: true` keeps history clean while typing in the search box.
+   *
+   * Column filters serialize as comma-separated values on the URL
+   * (`?source=Website,Walk-in`) so the shape stays a single string per
+   * key — matches every other UrlFilterEntry contract and keeps
+   * shared URLs compact. */
   readonly urlState: UrlFilterStateConfig = {
     q: {
       read: () => this.searchControl.value,
@@ -198,18 +201,18 @@ export class ContactsListPageComponent {
       queryKey: 'q',
     },
     source: {
-      read: () => this.sourceControl.value,
-      write: (v) => this.sourceControl.setValue(v),
+      read: () => this.sourceFilter().join(','),
+      write: (v) => this.sourceFilter.set(this.parseCsvFilter(v)),
       queryKey: 'source',
     },
     tag: {
-      read: () => this.tagControl.value,
-      write: (v) => this.tagControl.setValue(v),
+      read: () => this.tagFilter().join(','),
+      write: (v) => this.tagFilter.set(this.parseCsvFilter(v)),
       queryKey: 'tag',
     },
     assignee: {
-      read: () => this.assigneeControl.value,
-      write: (v) => this.assigneeControl.setValue(v),
+      read: () => this.assigneeFilter().join(','),
+      write: (v) => this.assigneeFilter.set(this.parseCsvFilter(v)),
       queryKey: 'assignee',
     },
     sort: {
@@ -280,21 +283,12 @@ export class ContactsListPageComponent {
     // Initial load — runs after the effect below subscribes to the filter signals.
     this.reload();
 
-    // Reactive: any filter change resets to page 1 and re-fetches.
+    // Reactive: search box change resets to page 1 and re-fetches.
+    // Column-header filters call `onColumnFilterChange` directly so
+    // they follow the same reset-and-reload path without a separate
+    // valueChanges pipeline.
     this.searchControl.valueChanges
       .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        this.state.page.set(1);
-        this.reload();
-      });
-    this.sourceControl.valueChanges
-      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        this.state.page.set(1);
-        this.reload();
-      });
-    this.tagControl.valueChanges
-      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
         this.state.page.set(1);
         this.reload();
@@ -314,13 +308,32 @@ export class ContactsListPageComponent {
         });
       }
     });
+  }
 
-    this.assigneeControl.valueChanges
-      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        this.state.page.set(1);
-        this.reload();
-      });
+  /** Column-filter popover callback — write the new selection, reset
+   *  to page 1, refetch. Used by every filterable header. */
+  protected onColumnFilterChange(target: 'source' | 'tag' | 'assignee', values: string[]): void {
+    if (target === 'source') this.sourceFilter.set(values);
+    else if (target === 'tag') this.tagFilter.set(values);
+    else this.assigneeFilter.set(values);
+    this.state.page.set(1);
+    this.reload();
+  }
+
+  /** Parse a comma-separated URL filter value ("Website,Walk-in") into
+   *  a de-duped `string[]`. Trims each part; drops empties. Symmetric
+   *  with `read: () => filter.join(',')` in `urlState`. */
+  private parseCsvFilter(raw: string): string[] {
+    if (!raw) return [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const part of raw.split(',')) {
+      const trimmed = part.trim();
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      out.push(trimmed);
+    }
+    return out;
   }
 
   /** Click a sortable header. Same key → flip order; new key → reset to a
@@ -337,14 +350,10 @@ export class ContactsListPageComponent {
     this.reload();
   }
 
-  /** Resolve the assignee filter to a UUID. `'me'` reads the current user
-   * id from `FurnitureAuthService` (populated by `/users/me`). Empty
-   * string means "no filter". */
-  private resolveAssignee(): string | undefined {
-    const raw = this.assigneeControl.value;
-    if (!raw) return undefined;
-    if (raw === 'me') return this.auth.currentUserId() ?? undefined;
-    return raw;
+  /** Owner UUIDs to send with the list / export call. `[]` → skip. */
+  private resolveAssignee(): string[] | undefined {
+    const raw = this.assigneeFilter();
+    return raw.length > 0 ? raw : undefined;
   }
 
   /** Display label for the Owner column. Tries the cached users
@@ -357,11 +366,13 @@ export class ContactsListPageComponent {
   protected reload(): void {
     this.state.loading.set(true);
     this.state.loadError.set(null);
+    const sources = this.sourceFilter();
+    const tags = this.tagFilter();
     this.api
       .list({
         q: this.q() || undefined,
-        source: this.sourceFilter() || undefined,
-        tag: this.tagFilter() || undefined,
+        source: sources.length > 0 ? sources : undefined,
+        tag: tags.length > 0 ? tags : undefined,
         assigned_to_id: this.resolveAssignee(),
         sort: this.sortKey(),
         order: this.sortOrder(),
@@ -425,11 +436,13 @@ export class ContactsListPageComponent {
   protected onExportCsv(): void {
     if (this.exporting()) return;
     this.exporting.set(true);
+    const sources = this.sourceFilter();
+    const tags = this.tagFilter();
     this.api
       .exportCsv({
         q: this.q() || undefined,
-        source: this.sourceFilter() || undefined,
-        tag: this.tagFilter() || undefined,
+        source: sources.length > 0 ? sources : undefined,
+        tag: tags.length > 0 ? tags : undefined,
         assigned_to_id: this.resolveAssignee(),
         // Passthrough any `custom.<key>=<value>` params already present
         // on the URL so the export mirrors the on-screen filter set.

@@ -353,6 +353,7 @@ export class TemplateEditorPageComponent {
   });
   protected readonly showTestSendButton = computed(() => this.template() !== null);
   protected readonly showVersionsButton = computed(() => this.template() !== null);
+  protected readonly isWhatsAppTemplate = computed(() => this.template()?.channel === 'whatsapp');
   /** Step 9 — Submit-to-Meta is visible only on WhatsApp templates that
    *  are published (or approved internally) AND whose external status
    *  is either n_a (never submitted) or rejected (resubmission).
