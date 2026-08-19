@@ -156,6 +156,29 @@ WHATSAPP_WEB_INBOUND_HMAC_SECRET = os.getenv(
 # clear RuntimeError at startup if the key is missing or malformed.
 INTEGRATIONS_ENCRYPTION_KEY = os.getenv("INTEGRATIONS_ENCRYPTION_KEY", "")
 
+# AI Assistants — BYOK provider-key store (tasks/ai-assistants Step 1).
+# AES-GCM Key Encryption Key for encrypting per-org OpenAI (and future
+# Anthropic/Google/OpenRouter) API keys at rest in
+# ``tbl_ai_provider_keys``. The AAD binding is
+# ``f"{org_id}:{key_id}:{key_version}"`` so a copy of one row's
+# ciphertext into another row's ``encrypted_key`` column fails to
+# decrypt — protects against DB-level tampering.
+#
+# MUST be distinct from every other secret in this file. A startup
+# pin-test (``tests/test_ai_provider_kek_isolation.py``) refuses to
+# start the app if this equals ``INTEGRATIONS_ENCRYPTION_KEY``,
+# ``JWT_SECRET_KEY``, or ``FERNET_KEY``.
+#
+# Generate a fresh 32-byte key (base64-url-safe encoded) with:
+#   python -c "import secrets, base64; \
+#     print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
+# Store in secrets.enc.env via `run secrets-edit` — never in
+# config.env. Lose the key = every org must re-enter their OpenAI
+# API key. The service module lazily fails on first use when the
+# env var is missing, so this is optional at boot and only required
+# once an org actually stores a key.
+AI_PROVIDER_KEY_KEK = os.getenv("AI_PROVIDER_KEY_KEK", "")
+
 # Fernet key for Real Estate pack's public property-link tokens
 # (`packs/real_estate/modules/property/link_token.py`). Generate via
 #   docker exec crm-api-1 python -c \

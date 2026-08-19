@@ -178,6 +178,12 @@ _CORE_ADMIN_KEYS: list[str] = [
     "chatbots.edit",
     "chatbots.publish",
     "chatbots.delete",
+    # tasks/ai-assistants Step 1 — BYOK OpenAI provider-key store +
+    # per-org daily/monthly USD budget cap. Admin gets the key
+    # (billing-sensitive but Admin already holds billing surfaces
+    # like `email.accounts.admin`). Employee does NOT — a stored
+    # OpenAI key can be used to drain the org's OpenAI budget.
+    "ai_providers.manage",
 ]
 
 

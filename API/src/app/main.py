@@ -34,6 +34,12 @@ import src.app.core.workflows.module  # noqa: F401
 # tasks/chatbot-builder Step 3 — chatbots MODULE descriptor.
 import src.app.core.chatbots.module  # noqa: F401
 
+# tasks/ai-assistants Step 1 — side-effect import so the two BYOK
+# tables (tbl_ai_provider_keys, tbl_org_ai_cost_budget) register with
+# `Base.metadata` before the FastAPI app's tables-create + Alembic
+# autogenerate sweep run.
+import src.app.core.integrations.ai.models  # noqa: F401
+
 # Import the pack's billing __init__ so its PDF renderer registers
 # itself with `core.billing.pdf_registry` at startup.
 import src.app.packs.furniture.modules.billing  # noqa: F401
@@ -72,6 +78,7 @@ from src.app.core.embed.router import (
     router as embed_keys_router,
 )
 from src.app.core.health.router import router as health_router
+from src.app.core.integrations.ai.router import router as integrations_ai_router
 from src.app.core.integrations.router import router as integrations_router
 from src.app.core.integrations.whatsapp.automation_router import (
     ai_settings_router as whatsapp_ai_settings_router,
@@ -347,6 +354,12 @@ app.include_router(chatbots_reply_router)
 # router (100 req/min/IP).
 app.include_router(email_tracking_router, prefix="/api/v1")
 app.include_router(integrations_router, prefix="/api/v1")
+# tasks/ai-assistants Step 1 — BYOK OpenAI provider-key store +
+# per-org daily/monthly USD budget cap. Sub-module of
+# ``core/integrations/`` so future AI-provider consumers (workflow AI
+# nodes, chatbot AI steps, campaign-copy assist) pick a stored key
+# by id via ``shared.llm.factory(...)``. Gated on ``ai_providers.manage``.
+app.include_router(integrations_ai_router, prefix="/api/v1")
 app.include_router(whatsapp_templates_router, prefix="/api/v1/integrations")
 app.include_router(whatsapp_automation_router, prefix="/api/v1/integrations")
 app.include_router(whatsapp_assignment_router, prefix="/api/v1/integrations")
