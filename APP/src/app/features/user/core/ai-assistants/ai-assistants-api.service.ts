@@ -8,7 +8,7 @@
  * and the ``retry.interceptor`` guards against transient network
  * failures on idempotent verbs.
  */
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpEvent, HttpParams, HttpRequest } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 
@@ -162,6 +162,120 @@ export class AiAssistantsApiService {
       })
       .pipe(map((resp) => resp.items));
   }
+
+  // --- Knowledge source (Step 10 backend / Step 11 UI) ------------
+
+  listKnowledge(assistantId: string): Observable<AiAssistantKnowledgeRow[]> {
+    return this.http.get<AiAssistantKnowledgeRow[]>(`${this.base}/${assistantId}/knowledge`);
+  }
+
+  /** File upload with per-chunk progress. Consumers ``subscribe`` and
+   *  branch on ``event.type``: ``UploadProgress`` events surface the
+   *  0-100% XHR upload metric; the terminal ``Response`` event carries
+   *  the created row + dedup flag. */
+  uploadKnowledgeFile(
+    assistantId: string,
+    file: File,
+  ): Observable<HttpEvent<KnowledgeCreateResponse>> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    const req = new HttpRequest('POST', `${this.base}/${assistantId}/knowledge/file`, form, {
+      reportProgress: true,
+    });
+    return this.http.request<KnowledgeCreateResponse>(req);
+  }
+
+  addKnowledgeText(
+    assistantId: string,
+    payload: KnowledgeTextPayload,
+  ): Observable<KnowledgeCreateResponse> {
+    return this.http.post<KnowledgeCreateResponse>(
+      `${this.base}/${assistantId}/knowledge/text`,
+      payload,
+    );
+  }
+
+  addKnowledgeUrl(
+    assistantId: string,
+    payload: KnowledgeUrlPayload,
+  ): Observable<KnowledgeCreateResponse> {
+    return this.http.post<KnowledgeCreateResponse>(
+      `${this.base}/${assistantId}/knowledge/url`,
+      payload,
+    );
+  }
+
+  cancelKnowledge(assistantId: string, knowledgeId: string): Observable<AiAssistantKnowledgeRow> {
+    return this.http.post<AiAssistantKnowledgeRow>(
+      `${this.base}/${assistantId}/knowledge/${knowledgeId}/cancel`,
+      {},
+    );
+  }
+
+  deleteKnowledge(assistantId: string, knowledgeId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${assistantId}/knowledge/${knowledgeId}`);
+  }
+
+  replaceKnowledgeFile(
+    assistantId: string,
+    knowledgeId: string,
+    file: File,
+  ): Observable<HttpEvent<KnowledgeCreateResponse>> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    const req = new HttpRequest(
+      'POST',
+      `${this.base}/${assistantId}/knowledge/${knowledgeId}/replace`,
+      form,
+      { reportProgress: true },
+    );
+    return this.http.request<KnowledgeCreateResponse>(req);
+  }
+}
+
+// --- Knowledge shapes (mirror ``schemas.py``) ----------------------
+
+export type KnowledgeSourceType = 'file' | 'text' | 'url';
+
+export type KnowledgeStatus =
+  | 'pending'
+  | 'processing'
+  | 'ready'
+  | 'failed_no_text'
+  | 'failed_stuck'
+  | 'failed_ingest'
+  | 'pending_delete'
+  | 'pending_cancel';
+
+export interface AiAssistantKnowledgeRow {
+  id: string;
+  assistant_id: string;
+  source_type: KnowledgeSourceType;
+  original_filename: string | null;
+  url: string | null;
+  mime_type: string | null;
+  size_bytes: number | null;
+  status: KnowledgeStatus;
+  status_message: string | null;
+  progress_pct: number;
+  chunk_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeCreateResponse {
+  duplicate: boolean;
+  knowledge: AiAssistantKnowledgeRow;
+}
+
+export interface KnowledgeTextPayload {
+  title: string;
+  body_text: string;
+}
+
+export interface KnowledgeUrlPayload {
+  title: string;
+  url: string;
 }
 
 /** Trimmed shape from ``GET /templates`` — only the fields the

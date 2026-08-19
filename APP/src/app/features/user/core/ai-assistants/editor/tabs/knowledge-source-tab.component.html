@@ -1,13 +1,59 @@
-<div class="mx-auto max-w-2xl">
-  <div class="rounded-2xl border border-dashed border-subtle bg-surface p-8 text-center">
-    <span
-      class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20"
+<div class="mx-auto max-w-2xl space-y-6">
+  @if (formState.assistantId(); as assistantId) {
+    <!-- Segmented control -->
+    <div
+      class="inline-flex rounded-lg border border-subtle bg-surface p-0.5 text-xs font-medium"
+      role="tablist"
+      aria-label="Knowledge source type"
     >
-      <lucide-icon name="upload-cloud" size="20" class="text-emerald-400"></lucide-icon>
-    </span>
-    <h2 class="mt-4 text-lg font-semibold text-default">Knowledge Source</h2>
-    <p class="mt-1 text-sm text-muted">
-      File upload, custom text, and URL ingest land in Steps 10 (backend) and 11 (UI).
-    </p>
-  </div>
+      @for (p of panels; track p.id) {
+        <button
+          type="button"
+          role="tab"
+          class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 transition"
+          [class.bg-surface-2]="activePanel() === p.id"
+          [class.text-default]="activePanel() === p.id"
+          [class.text-muted]="activePanel() !== p.id"
+          [class.hover:text-default]="activePanel() !== p.id"
+          [attr.aria-selected]="activePanel() === p.id"
+          (click)="setPanel(p.id)"
+        >
+          <lucide-icon [name]="p.icon" size="14" aria-hidden="true"></lucide-icon>
+          {{ p.label }}
+        </button>
+      }
+    </div>
+
+    <!-- Active input panel -->
+    @switch (activePanel()) {
+      @case ('file') {
+        <app-knowledge-upload-file-panel
+          [assistantId]="assistantId"
+          (created)="onCreated()"
+        ></app-knowledge-upload-file-panel>
+      }
+      @case ('text') {
+        <app-knowledge-custom-data-panel
+          [assistantId]="assistantId"
+          (created)="onCreated()"
+        ></app-knowledge-custom-data-panel>
+      }
+      @case ('url') {
+        <app-knowledge-url-panel
+          [assistantId]="assistantId"
+          (created)="onCreated()"
+        ></app-knowledge-url-panel>
+      }
+    }
+
+    <div class="border-t border-subtle"></div>
+
+    <!-- Sources list -->
+    <app-knowledge-sources-list
+      [assistantId]="assistantId"
+      [refreshTick]="listRefreshTick()"
+    ></app-knowledge-sources-list>
+  } @else {
+    <p class="text-sm text-muted">Save this assistant first to add knowledge sources.</p>
+  }
 </div>

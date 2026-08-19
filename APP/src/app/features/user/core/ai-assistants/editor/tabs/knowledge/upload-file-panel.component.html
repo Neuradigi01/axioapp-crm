@@ -1,0 +1,71 @@
+<div class="space-y-3">
+  <label
+    class="block rounded-2xl border-2 border-dashed bg-surface p-8 text-center transition"
+    [class.border-subtle]="!dragActive()"
+    [class.border-accent]="dragActive()"
+    [class.bg-surface-2\/60]="dragActive()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (drop)="onDrop($event)"
+  >
+    <span
+      class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20"
+    >
+      <lucide-icon
+        name="upload-cloud"
+        size="20"
+        class="text-emerald-400"
+        aria-hidden="true"
+      ></lucide-icon>
+    </span>
+    <p class="mt-4 text-sm font-medium text-default">Choose a file or drag it here.</p>
+    <p class="mt-1 text-xs text-muted">
+      Size &lt; 90 MB. Accepted formats: .txt (preferred) or .pdf. Scanned-image PDFs are limited to
+      about 10 pages of extractable text.
+    </p>
+    <input
+      type="file"
+      class="sr-only"
+      [attr.accept]="acceptAttr"
+      [disabled]="uploading()"
+      (change)="onFilePicked($event)"
+    />
+    <span
+      class="mt-4 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-subtle bg-surface-2 px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2/70"
+    >
+      Browse files
+    </span>
+  </label>
+
+  @if (uploading()) {
+    <div class="space-y-1">
+      <div class="flex items-center justify-between text-xs text-muted">
+        <span class="inline-flex items-center gap-1.5">
+          <lucide-icon
+            name="loader-2"
+            size="12"
+            class="animate-spin"
+            aria-hidden="true"
+          ></lucide-icon>
+          Uploading…
+        </span>
+        <span class="font-mono text-default">{{ progress() }}%</span>
+      </div>
+      <div class="h-1.5 w-full rounded-full bg-surface-2">
+        <div class="h-1.5 rounded-full bg-accent transition-all" [style.width.%]="progress()"></div>
+      </div>
+    </div>
+  }
+
+  @if (error(); as e) {
+    <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300">
+      {{ e }}
+    </div>
+  }
+
+  @if (notice(); as msg) {
+    <div class="rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400">
+      {{ msg }}
+    </div>
+  }
+</div>

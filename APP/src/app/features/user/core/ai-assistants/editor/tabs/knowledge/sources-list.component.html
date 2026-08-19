@@ -1,0 +1,151 @@
+<section class="space-y-3">
+  <h3 class="text-sm font-semibold text-default">Knowledge Sources</h3>
+
+  @if (loading()) {
+    <p class="flex items-center gap-2 text-xs text-muted">
+      <lucide-icon name="loader-2" size="12" class="animate-spin" aria-hidden="true"></lucide-icon>
+      Loading sources…
+    </p>
+  } @else if (error(); as e) {
+    <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300">
+      {{ e }}
+    </div>
+  } @else if (isEmpty()) {
+    <div class="rounded-2xl border border-dashed border-subtle bg-surface-2/40 p-6 text-center">
+      <p class="text-sm text-muted">
+        No knowledge sources yet. Add one above to teach your assistant.
+      </p>
+    </div>
+  } @else {
+    @if (actionError(); as ae) {
+      <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300">
+        {{ ae }}
+      </div>
+    }
+    <div class="overflow-hidden rounded-lg border border-subtle">
+      <table class="min-w-full text-left text-xs">
+        <thead class="bg-surface-2/60 text-[10px] uppercase tracking-wide text-muted">
+          <tr>
+            <th class="px-3 py-2 font-medium">Source / Updated</th>
+            <th class="px-3 py-2 font-medium">Name / Vector ID</th>
+            <th class="px-3 py-2 font-medium">Status</th>
+            <th class="px-3 py-2 text-right font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-subtle bg-surface">
+          @for (row of rows(); track row.id) {
+            <tr>
+              <td class="px-3 py-2 align-top">
+                <div class="flex items-start gap-2">
+                  <span
+                    class="mt-0.5 flex h-6 w-6 items-center justify-center rounded-md bg-surface-2 text-muted"
+                  >
+                    <lucide-icon [name]="iconFor(row)" size="12" aria-hidden="true"></lucide-icon>
+                  </span>
+                  <div>
+                    <div class="text-[11px] font-medium capitalize text-default">
+                      {{ row.source_type }}
+                    </div>
+                    <div class="text-[10px] text-faint">
+                      {{ row.updated_at | date: 'medium' }}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-3 py-2 align-top">
+                <div class="max-w-[240px] truncate text-default" [title]="displayName(row)">
+                  {{ displayName(row) }}
+                </div>
+                <div class="font-mono text-[10px] text-faint">{{ shortId(row) }}</div>
+              </td>
+              <td class="px-3 py-2 align-top">
+                <div class="flex flex-col gap-1">
+                  <span
+                    class="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1"
+                    [ngClass]="pillClasses(row.status)"
+                  >
+                    {{ statusLabel(row.status) }}
+                  </span>
+                  @if (row.status === 'processing' || row.status === 'pending') {
+                    <div class="w-32">
+                      <div class="h-1 rounded-full bg-surface-2">
+                        <div
+                          class="h-1 rounded-full bg-amber-400 transition-all"
+                          [style.width.%]="row.progress_pct"
+                        ></div>
+                      </div>
+                      <span class="mt-0.5 block text-[10px] text-muted">
+                        {{ row.progress_pct }}%
+                      </span>
+                    </div>
+                  }
+                  @if (row.status_message && row.status !== 'ready') {
+                    <span class="text-[10px] text-faint">{{ row.status_message }}</span>
+                  }
+                </div>
+              </td>
+              <td class="px-3 py-2 align-top text-right">
+                <div class="inline-flex items-center gap-1">
+                  @if (row.status === 'processing') {
+                    <button
+                      type="button"
+                      class="rounded-md border border-subtle bg-surface p-1.5 text-muted hover:text-default"
+                      [title]="'Cancel ingest'"
+                      (click)="onCancel(row)"
+                    >
+                      <lucide-icon name="x" size="12" aria-hidden="true"></lucide-icon>
+                    </button>
+                  }
+                  @if (row.status === 'ready' && row.source_type === 'file') {
+                    <button
+                      type="button"
+                      class="rounded-md border border-subtle bg-surface p-1.5 text-muted hover:text-default"
+                      [title]="'Replace file'"
+                      (click)="onReplaceRequest(row)"
+                    >
+                      <lucide-icon name="refresh-cw" size="12" aria-hidden="true"></lucide-icon>
+                    </button>
+                  }
+                  <button
+                    type="button"
+                    class="rounded-md border border-subtle bg-surface p-1.5 text-red-400 hover:bg-red-500/10"
+                    [title]="'Delete source'"
+                    (click)="onDeleteRequest(row)"
+                  >
+                    <lucide-icon name="trash-2" size="12" aria-hidden="true"></lucide-icon>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  @if (deleteTarget(); as target) {
+    <app-confirm-dialog
+      [title]="'Delete this knowledge source?'"
+      [body]="
+        'Removing ' +
+        displayName(target) +
+        ' will delete its embedded chunks. The AI Assistant will stop citing it immediately.'
+      "
+      [confirmLabel]="'Delete'"
+      [cancelLabel]="'Cancel'"
+      [danger]="true"
+      [submitting]="deleting()"
+      (confirm)="onDeleteConfirm()"
+      (cancel)="onDeleteCancel()"
+    ></app-confirm-dialog>
+  }
+
+  @if (replaceTarget(); as target) {
+    <app-knowledge-replace-modal
+      [assistantId]="assistantId"
+      [knowledge]="target"
+      (replaced)="onReplaced()"
+      (dismissed)="onReplaceClose()"
+    ></app-knowledge-replace-modal>
+  }
+</section>

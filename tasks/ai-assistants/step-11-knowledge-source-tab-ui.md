@@ -1,7 +1,7 @@
 # Step 11 — Knowledge Source tab UI
 
 **Goal:** Ship the Knowledge Source tab UI. Three sub-tabs / segments: **Upload File**, **Custom Data**, **URL**. Sources list below with status pill + progress bar + vector-id + updated timestamp + Delete / Cancel / Replace actions. Match existing pages visually — no new patterns.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 10 (backend endpoints).
 
 ---
