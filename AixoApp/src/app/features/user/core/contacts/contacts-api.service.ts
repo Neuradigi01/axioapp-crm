@@ -139,10 +139,14 @@ export interface ContactDuplicateMatch {
 
 export interface ContactListQuery {
   q?: string;
-  source?: string;
-  tag?: string;
-  /** Owner UUID. Pass undefined to skip the filter. */
-  assigned_to_id?: string | null;
+  /** Source values to include. Serialized as repeated `?source=X&source=Y`
+   *  params (see `buildHttpParams`). Empty / undefined skips the filter.
+   *  Multi-value backs the column-header filter popover on the list page. */
+  source?: string[];
+  /** Tags to include (OR-set). Same repeated-param shape as `source`. */
+  tag?: string[];
+  /** Owner UUIDs to include (OR-set). Same repeated-param shape as `source`. */
+  assigned_to_id?: string[];
   sort?: ContactSortKey;
   order?: SortOrder;
   page?: number;

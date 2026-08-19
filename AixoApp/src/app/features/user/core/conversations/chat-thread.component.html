@@ -198,7 +198,7 @@
                 <lucide-icon name="sticky-note" size="10" />
                 Internal note
                 <span class="font-normal text-amber-600">
-                  · {{ staffNameFor(m.sender_user_id) }} ·
+                  · {{ m.sender_display_name || staffNameFor(m.sender_user_id) }} ·
                   {{ formatTime(m.sent_at || m.created_at) }}
                 </span>
               </p>
