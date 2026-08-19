@@ -54,6 +54,17 @@ class ConversationChannel(str, enum.Enum):
     # registered adapter raises ``PushNotConfigured`` on send until a
     # provider (Firebase / OneSignal / APNS) is wired.
     push = "push"
+    # tasks/ai-assistants Step 5 — AI-widget conversations (end-user
+    # chats with an AI Assistant via the embeddable widget). Reuses
+    # tbl_conversations + tbl_messages so the shared inbox + human
+    # takeover work for free.
+    ai_widget = "ai_widget"
+    # tasks/ai-assistants Step 8 — instruction-preset templates
+    # ("AI Agent", "Customer Support Agent", ...) surfaced in the
+    # Instructions tab's dropdown. Not a transport channel; the
+    # value discriminates preset templates from send templates in
+    # `tbl_message_templates`.
+    ai_prompt = "ai_prompt"
 
 
 class ConversationStatus(str, enum.Enum):

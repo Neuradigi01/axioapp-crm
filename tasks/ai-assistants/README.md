@@ -156,7 +156,7 @@ widget/                       ← EXTENDED (not duplicated)
 | 5 | [AI Assistants schema + models + permissions + module registration](step-5-ai-assistants-schema-and-models.md) | **COMPLETED** | ~1 day |
 | 6 | [Assistant CRUD service + router (guards, OCC, mass-assignment-safe)](step-6-assistant-crud-and-router.md) | **COMPLETED** | ~1 day |
 | 7 | [Frontend list page + editor shell with 4 empty tabs + live preview](step-7-list-and-editor-shell.md) | **COMPLETED** | ~1.5 days |
-| 8 | [AI Instructions tab + assistant-behaviour controls + audit log](step-8-instructions-tab.md) | Pending | ~1 day |
+| 8 | [AI Instructions tab + assistant-behaviour controls + audit log](step-8-instructions-tab.md) | **COMPLETED** | ~1 day |
 | 9 | [Chat runtime — retrieve + structured envelope + stream + cost outbox](step-9-chat-runtime-streaming.md) | Pending | ~2 days |
 | 10 | [Knowledge Source backend — file + custom text + URL + Celery ingest](step-10-knowledge-source-backend.md) | Pending | ~2 days |
 | 11 | [Knowledge Source tab UI](step-11-knowledge-source-tab-ui.md) | Pending | ~1 day |

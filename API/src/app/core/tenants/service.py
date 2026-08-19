@@ -114,6 +114,24 @@ async def create_organization(
             "tenants.create_organization chatbot_seed_failed org=%s", org.id
         )
 
+    # tasks/ai-assistants Step 8 — install the 6 AI-prompt preset
+    # templates (AI Agent / Customer Support Agent / Sales Agent /
+    # Language Tutor / Coding Expert / Life Coach) as published
+    # rows so the Instructions tab's Preset dropdown has content
+    # on first editor load. Soft-fail: a broken preset row never
+    # blocks org creation; backfill migration
+    # 0204_bf_ai_prompt_templates cleans up any misses on deploy.
+    try:
+        from src.app.core.templates.seeds import seed_ai_prompt_presets
+
+        await seed_ai_prompt_presets(session, org_id=org.id)
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "tenants.create_organization ai_prompt_seed_failed org=%s", org.id
+        )
+
     return org
 
 

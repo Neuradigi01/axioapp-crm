@@ -10,7 +10,7 @@
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import {
@@ -149,4 +149,34 @@ export class AiAssistantsApiService {
   listProviderKeys(): Observable<AiProviderKey[]> {
     return this.providers.list();
   }
+
+  /** Step 8 — instruction-preset templates that populate the
+   *  Instructions tab dropdown. Seeded per-org at signup +
+   *  backfill migration ``0204_bf_ai_prompt_templates``. Returns
+   *  the envelope's ``items`` array directly so callers don't
+   *  care about the wrapping shape. */
+  listAiPromptPresets(): Observable<AiPromptPresetRow[]> {
+    return this.http
+      .get<AiPromptPresetListResponse>(`${environment.apiBaseUrl}/templates`, {
+        params: new HttpParams().set('channel', 'ai_prompt').set('limit', '50'),
+      })
+      .pipe(map((resp) => resp.items));
+  }
+}
+
+/** Trimmed shape from ``GET /templates`` — only the fields the
+ *  Instructions tab actually reads. Matches the subset the
+ *  templates router returns for ``channel=ai_prompt``. */
+export interface AiPromptPresetRow {
+  id: string;
+  name: string;
+  body_text: string;
+}
+
+/** ``GET /templates`` returns a paginated envelope. */
+interface AiPromptPresetListResponse {
+  items: AiPromptPresetRow[];
+  total: number;
+  limit: number;
+  offset: number;
 }
