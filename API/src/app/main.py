@@ -86,6 +86,7 @@ from src.app.core.embed.router import (
     router as embed_keys_router,
 )
 from src.app.core.health.router import router as health_router
+from src.app.core.ai_assistants.router import router as ai_assistants_router
 from src.app.core.integrations.ai.router import router as integrations_ai_router
 from src.app.core.integrations.router import router as integrations_router
 from src.app.core.integrations.whatsapp.automation_router import (
@@ -368,6 +369,11 @@ app.include_router(integrations_router, prefix="/api/v1")
 # nodes, chatbot AI steps, campaign-copy assist) pick a stored key
 # by id via ``shared.llm.factory(...)``. Gated on ``ai_providers.manage``.
 app.include_router(integrations_ai_router, prefix="/api/v1")
+# tasks/ai-assistants Step 6 — assistant CRUD (list / get / create /
+# update / archive / delete) under /api/v1/ai-assistants. Timing-safe
+# 404 + OCC via version_id_col + cross-org key_id guard +
+# instruction-audit on every high-signal field change.
+app.include_router(ai_assistants_router, prefix="/api/v1")
 app.include_router(whatsapp_templates_router, prefix="/api/v1/integrations")
 app.include_router(whatsapp_automation_router, prefix="/api/v1/integrations")
 app.include_router(whatsapp_assignment_router, prefix="/api/v1/integrations")

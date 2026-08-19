@@ -154,7 +154,7 @@ widget/                       ← EXTENDED (not duplicated)
 | 3 | [Settings → Integrations "AI Providers" section UI](step-3-ai-providers-settings-ui.md) | **COMPLETED** | ~0.5 days |
 | 4 | [pgvector extension + `shared/vector/` + HNSW composite + chunker](step-4-pgvector-and-vector-layer.md) | **COMPLETED** | ~0.5 days |
 | 5 | [AI Assistants schema + models + permissions + module registration](step-5-ai-assistants-schema-and-models.md) | **COMPLETED** | ~1 day |
-| 6 | [Assistant CRUD service + router (guards, OCC, mass-assignment-safe)](step-6-assistant-crud-and-router.md) | Pending | ~1 day |
+| 6 | [Assistant CRUD service + router (guards, OCC, mass-assignment-safe)](step-6-assistant-crud-and-router.md) | **COMPLETED** | ~1 day |
 | 7 | [Frontend list page + editor shell with 4 empty tabs + live preview](step-7-list-and-editor-shell.md) | Pending | ~1.5 days |
 | 8 | [AI Instructions tab + assistant-behaviour controls + audit log](step-8-instructions-tab.md) | Pending | ~1 day |
 | 9 | [Chat runtime — retrieve + structured envelope + stream + cost outbox](step-9-chat-runtime-streaming.md) | Pending | ~2 days |

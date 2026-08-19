@@ -136,7 +136,6 @@ class AiAssistant(Base, TenantScoped):
             "status",
         ),
     )
-    __mapper_args__ = {"version_id_col": None}  # set below after column declaration
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -191,13 +190,23 @@ class AiAssistant(Base, TenantScoped):
         Numeric(10, 4),
         nullable=True,
     )
-    # Optimistic-concurrency version — SQLAlchemy manages the ++ on
-    # every UPDATE (see __mapper_args__ below).
+    # Optimistic-concurrency version. Referenced by ``__mapper_args__``
+    # below via ``version_id_col`` — SQLAlchemy's default
+    # ``version_id_generator`` (integer increment) auto-bumps on every
+    # UPDATE and adds ``AND version = :current`` to the WHERE clause;
+    # a stale caller raises StaleDataError which the service
+    # translates to HTTP 409. ``server_default=1`` covers INSERT.
     version: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         server_default=sql_text("1"),
     )
+
+    # Declared here — inside the class body — so SQLAlchemy's mapper
+    # constructor picks up the version_id_col reference at
+    # class-definition time. Reassigning __mapper_args__ AFTER the
+    # class body is a no-op (the mapper is already built).
+    __mapper_args__ = {"version_id_col": version}  # type: ignore[dict-item]
     # Plain UUID (no FK) — matches the workflows/chatbots convention.
     # The users table is `users` (legacy, pre-rename); avoiding a
     # hard FK keeps this module decoupled from the rename timeline.
@@ -225,16 +234,6 @@ class AiAssistant(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("now()"),
     )
-
-
-# Wire optimistic-concurrency after the column is declared so the
-# mapper picks it up. Setting ``version_id_col`` on __mapper_args__
-# at class scope is fine, but SQLAlchemy requires the attribute
-# reference, not the string — patch it here.
-AiAssistant.__mapper_args__ = {
-    "version_id_col": AiAssistant.__table__.c.version,
-    "version_id_generator": False,  # server_default handles initial value
-}
 
 
 class AiAssistantKnowledge(Base, TenantScoped):

@@ -106,14 +106,20 @@ def test_all_models_are_tenant_scoped() -> None:
 
 
 def test_ai_assistant_has_optimistic_concurrency_wired() -> None:
-    """``__mapper_args__.version_id_col`` set to the version column so
-    SQLAlchemy manages the ++ on every UPDATE (Step 6 relies on this
-    to raise ``StaleDataError`` for the 409 path)."""
+    """``__mapper_args__.version_id_col`` set to the version column
+    so SQLAlchemy manages the ++ on every UPDATE (Step 6 relies on
+    this to raise StaleDataError → 409). Reads through the mapper
+    itself rather than ``__mapper_args__`` because SQLAlchemy
+    resolves the reference at mapper-construction time (post
+    class-body), so the mapper is the source of truth."""
     from src.app.core.ai_assistants.models import AiAssistant
 
-    mapper_args = AiAssistant.__mapper_args__
-    assert mapper_args.get("version_id_col") is AiAssistant.__table__.c.version
-    assert mapper_args.get("version_id_generator") is False
+    mapper = AiAssistant.__mapper__
+    assert mapper.version_id_col is AiAssistant.__table__.c.version
+    # Default generator (integer increment) — NOT False (which would
+    # mean "server-generated", i.e. no client-side bump).
+    assert mapper.version_id_generator is not False
+    assert callable(mapper.version_id_generator)
 
 
 def test_message_meta_pk_is_message_id() -> None:
