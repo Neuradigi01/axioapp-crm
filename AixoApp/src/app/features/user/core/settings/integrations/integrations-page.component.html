@@ -96,8 +96,9 @@
       @if (!hasAnyOrgCard()) {
         <div class="rounded-md border border-subtle bg-surface-2 px-3 py-2 text-xs text-muted">
           Connect your Google Calendar below to receive appointment reminders on your calendar. More
-          integrations (Google Ads, Meta Ads, WhatsApp, Email) are managed by your Owner or Admin —
-          ask them to grant the relevant permission on your role if you need access.
+          integrations (Google Ads, Meta Ads, WhatsApp, Email, AI Providers) are managed by your
+          Owner or Admin — ask them to grant the relevant permission on your role if you need
+          access.
         </div>
       }
 
@@ -237,6 +238,12 @@
       @if (canManageEmailSenders() && expandedConnector() === 'email') {
         <div id="card-email-sender">
           <app-email-sender-card></app-email-sender-card>
+        </div>
+      }
+
+      @if (canManageAiProviders() && expandedConnector() === 'ai_providers') {
+        <div id="card-ai-providers">
+          <app-ai-providers-card></app-ai-providers-card>
         </div>
       }
 
