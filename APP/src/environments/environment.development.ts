@@ -6,8 +6,3 @@ export const environment = {
   // uncaught errors and rejections are visible without opening DevTools.
   enableDebugConsole: true,
 };
-
-
-
-
-
