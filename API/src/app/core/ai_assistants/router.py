@@ -506,4 +506,69 @@ async def replace_knowledge_endpoint(
     )
 
 
+# --- Profile picture (Step 13) ------------------------------------------
+
+# 2 MB matches the ``file_upload._MAX_IMAGE_BYTES`` cap.
+_MAX_PROFILE_PICTURE_BYTES = 2 * 1024 * 1024
+
+
+class _ProfilePictureResponse(BaseModel):
+    """Wraps the served URL so the frontend can render the new image
+    without a re-fetch of the assistant row."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str = Field(..., min_length=1, max_length=2000)
+
+
+@router.post(
+    "/{assistant_id}/profile-picture",
+    response_model=_ProfilePictureResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_profile_picture_endpoint(
+    assistant_id: uuid.UUID,
+    file: UploadFile = File(..., description="PNG / JPEG / WebP, < 2 MB"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_MANAGE)),
+) -> _ProfilePictureResponse:
+    """Upload the header profile picture. Rejects SVG explicitly
+    (SVG can carry ``<script>`` payloads that a browser would execute
+    if the image is opened directly). Persists the served URL onto
+    ``styling_config.header_profile_picture_url`` via ``jsonb_set``."""
+    data = await file.read()
+    if len(data) > _MAX_PROFILE_PICTURE_BYTES:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail={"reason": "image_too_large"},
+        )
+    result = await ai_service.upload_profile_picture(
+        db,
+        org_id=_caller_org_id(),
+        assistant_id=assistant_id,
+        filename=file.filename or "avatar.png",
+        data=data,
+    )
+    return _ProfilePictureResponse(url=result["url"])
+
+
+@router.delete(
+    "/{assistant_id}/profile-picture",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_profile_picture_endpoint(
+    assistant_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_MANAGE)),
+) -> Response:
+    await ai_service.delete_profile_picture(
+        db,
+        org_id=_caller_org_id(),
+        assistant_id=assistant_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 __all__ = ["router"]

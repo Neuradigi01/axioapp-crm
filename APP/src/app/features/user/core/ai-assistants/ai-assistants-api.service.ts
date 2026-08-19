@@ -231,6 +231,30 @@ export class AiAssistantsApiService {
     );
     return this.http.request<KnowledgeCreateResponse>(req);
   }
+
+  // --- Profile picture (Step 13) ------------------------------------
+
+  /** Upload the header profile picture. PNG / JPEG / WebP, < 2 MB.
+   *  Backend refuses SVG explicitly. Returns the served URL — the
+   *  caller writes it onto ``styling_config.header_profile_picture_url``
+   *  in the local form-state store so the preview renders it
+   *  without a re-fetch. */
+  uploadProfilePicture(assistantId: string, file: File): Observable<ProfilePictureResponse> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return this.http.post<ProfilePictureResponse>(
+      `${this.base}/${assistantId}/profile-picture`,
+      form,
+    );
+  }
+
+  deleteProfilePicture(assistantId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${assistantId}/profile-picture`);
+  }
+}
+
+export interface ProfilePictureResponse {
+  url: string;
 }
 
 // --- Knowledge shapes (mirror ``schemas.py``) ----------------------

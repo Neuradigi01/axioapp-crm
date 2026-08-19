@@ -55,6 +55,27 @@ _WIN_RESERVED = frozenset(
 
 _MAX_UPLOAD_BYTES: int = 90 * 1024 * 1024
 
+# Step 13 — header profile picture. Raster-only whitelist: SVG is
+# refused because it can carry ``<script>`` payloads that a browser
+# would execute when the image is opened directly. 2 MB cap because
+# a chat-widget avatar never needs more.
+ALLOWED_IMAGE_MIMES: frozenset[str] = frozenset(
+    {
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+    }
+)
+_MAX_IMAGE_BYTES: int = 2 * 1024 * 1024
+
+# Extension → sniffed MIME. Used at upload time to derive the on-
+# disk suffix once we've decided the file is a valid image.
+_IMAGE_MIME_EXT: dict[str, str] = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+}
+
 # Illegal-character regex for filenames — bounded to what any
 # file system will accept without escape. Newlines / tabs / control
 # chars refused. Path separators refused (we never use the filename
@@ -169,4 +190,75 @@ def validate_upload(
     )
 
 
-__all__ = ["ALLOWED_MIMES", "FileValidationError", "ValidatedUpload", "validate_upload"]
+@dataclass(frozen=True, slots=True)
+class ValidatedImage:
+    """Structured payload from :func:`validate_image_upload`.
+
+    The router uses ``sniffed_mime`` for the ``Content-Type`` header
+    and ``extension`` to derive the on-disk filename suffix. The
+    original name is kept for display purposes only — never used as
+    a path component (Case §12)."""
+
+    original_filename: str
+    sniffed_mime: str
+    extension: str
+    size_bytes: int
+    content_hash: bytes
+
+
+def validate_image_upload(
+    *,
+    filename: str,
+    data: bytes,
+) -> ValidatedImage:
+    """Same checks as :func:`validate_upload` but scoped to header
+    profile-picture uploads (Step 13):
+
+      * Size cap 2 MB (avatars only).
+      * Filename hygiene + Windows-reserved-name check.
+      * Magic-byte sniff MUST match one of ``ALLOWED_IMAGE_MIMES``.
+        A ``.png`` extension is NOT trusted — the sniffed type is
+        what we act on. **SVG is deliberately refused** because it
+        can carry ``<script>`` payloads a browser would execute if
+        the image is ever opened directly.
+    """
+    if len(data) == 0:
+        raise FileValidationError("uploaded image is empty", reason="empty_file")
+    if len(data) > _MAX_IMAGE_BYTES:
+        raise FileValidationError(
+            f"image exceeds {_MAX_IMAGE_BYTES // (1024 * 1024)} MB",
+            reason="image_too_large",
+        )
+
+    _check_filename_illegal_chars(filename)
+    _check_windows_reserved(filename)
+
+    guess = filetype.guess(data)
+    if guess is None or guess.mime not in ALLOWED_IMAGE_MIMES:
+        raise FileValidationError(
+            (
+                f"image type {(guess.mime if guess else 'unknown')!r} not allowed; "
+                "PNG, JPEG, and WebP only (SVG is refused because it can carry scripts)"
+            ),
+            reason="unsupported_image_mime",
+        )
+
+    content_hash = hashlib.sha256(data).digest()
+    return ValidatedImage(
+        original_filename=filename,
+        sniffed_mime=guess.mime,
+        extension=_IMAGE_MIME_EXT[guess.mime],
+        size_bytes=len(data),
+        content_hash=content_hash,
+    )
+
+
+__all__ = [
+    "ALLOWED_IMAGE_MIMES",
+    "ALLOWED_MIMES",
+    "FileValidationError",
+    "ValidatedImage",
+    "ValidatedUpload",
+    "validate_image_upload",
+    "validate_upload",
+]

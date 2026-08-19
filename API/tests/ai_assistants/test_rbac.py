@@ -46,6 +46,9 @@ def test_router_has_expected_endpoints() -> None:
         (("POST",), "/ai-assistants/{assistant_id}/knowledge/{knowledge_id}/cancel"),
         (("DELETE",), "/ai-assistants/{assistant_id}/knowledge/{knowledge_id}"),
         (("POST",), "/ai-assistants/{assistant_id}/knowledge/{knowledge_id}/replace"),
+        # tasks/ai-assistants Step 13 — header profile picture.
+        (("POST",), "/ai-assistants/{assistant_id}/profile-picture"),
+        (("DELETE",), "/ai-assistants/{assistant_id}/profile-picture"),
     }
     assert endpoints == expected, f"router shape drift: {endpoints ^ expected}"
 

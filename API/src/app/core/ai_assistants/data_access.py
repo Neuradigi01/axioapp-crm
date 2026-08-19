@@ -600,6 +600,58 @@ async def delete_knowledge_row(
         await db.delete(row)
 
 
+# --- Styling-config helpers (Step 13) -----------------------------------
+
+
+async def set_assistant_styling_key(
+    db: AsyncSession,
+    *,
+    assistant_id: uuid.UUID,
+    key: str,
+    value: Any,
+) -> None:
+    """Merge one key into ``styling_config`` JSONB in-place — Postgres
+    ``jsonb_set`` so we don't clobber sibling keys and don't need to
+    round-trip the whole blob through the ORM. Bypasses OCC on
+    purpose: profile-picture URL is an out-of-band asset the operator
+    might upload while the editor is dirty on other fields.
+    """
+    stmt = text(
+        """
+        UPDATE tbl_ai_assistants
+        SET styling_config = jsonb_set(
+            COALESCE(styling_config, '{}'::jsonb),
+            ARRAY[:key],
+            to_jsonb(cast(:value AS text)),
+            true
+        )
+        WHERE id = :id
+        """
+    )
+    await db.execute(
+        stmt,
+        {"id": str(assistant_id), "key": key, "value": str(value)},
+    )
+
+
+async def unset_assistant_styling_key(
+    db: AsyncSession,
+    *,
+    assistant_id: uuid.UUID,
+    key: str,
+) -> None:
+    """Delete one key from ``styling_config`` (JSONB `-` operator).
+    Idempotent — deleting a missing key is a no-op."""
+    stmt = text(
+        """
+        UPDATE tbl_ai_assistants
+        SET styling_config = COALESCE(styling_config, '{}'::jsonb) - :key
+        WHERE id = :id
+        """
+    )
+    await db.execute(stmt, {"id": str(assistant_id), "key": key})
+
+
 __all__ = [
     "count_assistants",
     "count_assistants_by_key_id",
@@ -624,7 +676,9 @@ __all__ = [
     "reassign_assistant_key_ids",
     "retrieve_chunks_for_assistant",
     "set_assistant_status",
+    "set_assistant_styling_key",
     "set_status",
+    "unset_assistant_styling_key",
     "update_message_meta_confirmed",
     "update_message_meta_failed",
 ]

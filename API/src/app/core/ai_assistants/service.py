@@ -20,7 +20,9 @@ from sqlalchemy.orm.exc import StaleDataError
 from src.app.core.ai_assistants import data_access as _da
 from src.app.core.ai_assistants.file_upload import (
     FileValidationError,
+    ValidatedImage,
     ValidatedUpload,
+    validate_image_upload,
     validate_upload,
 )
 from src.app.core.ai_assistants.models import (
@@ -752,6 +754,136 @@ async def replace_knowledge_from_file(
     return row, duplicate
 
 
+# --- Profile picture (Step 13) ------------------------------------------
+
+
+def _profile_picture_key(
+    org_id: uuid.UUID,
+    assistant_id: uuid.UUID,
+    *,
+    ext: str,
+    ts_ms: int,
+) -> str:
+    """Versioned filename ``{ts_ms}.{ext}`` so a replaced picture
+    never hits a stale CDN / browser cache. Path is always
+    ``{org_id}/ai_assistants/{assistant_id}/profile/...`` — the client
+    filename is never used as a path component (Case §12).
+    """
+    return f"{org_id}/ai_assistants/{assistant_id}/profile/{ts_ms}.{ext}"
+
+
+async def upload_profile_picture(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    assistant_id: uuid.UUID,
+    filename: str,
+    data: bytes,
+) -> dict[str, str]:
+    """Validate + store the image + write the served URL into the
+    assistant's ``styling_config``. Returns the URL so the frontend
+    can render it immediately without a re-fetch.
+
+    Replaces the previous picture atomically-enough: we write the new
+    file first, update the DB, then best-effort delete the old file
+    (a leftover blob is harmless — a manual sweep can reclaim it).
+    """
+    import time
+
+    row = await get_assistant(db, org_id=org_id, assistant_id=assistant_id)
+
+    try:
+        validated: ValidatedImage = validate_image_upload(filename=filename, data=data)
+    except FileValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"reason": exc.reason, "message": str(exc)},
+        ) from exc
+
+    ts_ms = int(time.time() * 1000)
+    key = _profile_picture_key(
+        org_id, assistant_id, ext=validated.extension, ts_ms=ts_ms
+    )
+    try:
+        storage = get_storage()
+        ref = storage.put(key, data, content_type=validated.sniffed_mime)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"reason": "storage_write_failed"},
+        ) from exc
+
+    # Capture the prior URL BEFORE the update so the best-effort
+    # cleanup step below can find it.
+    prior_url = (row.styling_config or {}).get("header_profile_picture_url")
+
+    # Persist the URL onto the JSONB blob via a targeted jsonb_set so
+    # sibling styling keys (theme mode, colours) survive.
+    await _da.set_assistant_styling_key(
+        db,
+        assistant_id=assistant_id,
+        key="header_profile_picture_url",
+        value=ref.url,
+    )
+    await db.commit()
+    # Refresh the ORM instance so any downstream read in the same
+    # session picks up the freshly-set JSONB value (the raw UPDATE
+    # bypasses the mapped attribute).
+    await db.refresh(row)
+
+    # Best-effort delete of the prior blob so we don't accumulate
+    # storage. Ignore failures — the DB is now authoritative and the
+    # orphan is inert.
+    if isinstance(prior_url, str) and prior_url != ref.url:
+        prior_key = _url_to_key(prior_url)
+        if prior_key:
+            try:
+                get_storage().delete(prior_key)
+            except Exception:
+                pass
+
+    return {"url": ref.url}
+
+
+async def delete_profile_picture(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    assistant_id: uuid.UUID,
+) -> None:
+    """Idempotent — removes the URL from styling_config and best-
+    effort deletes the file. A missing URL just returns 204."""
+    row = await get_assistant(db, org_id=org_id, assistant_id=assistant_id)
+    current_url = (row.styling_config or {}).get("header_profile_picture_url")
+    await _da.unset_assistant_styling_key(
+        db,
+        assistant_id=assistant_id,
+        key="header_profile_picture_url",
+    )
+    await db.commit()
+    # Refresh so a subsequent read in the same session sees the
+    # unset key (raw UPDATE bypasses the mapped attribute).
+    await db.refresh(row)
+    if isinstance(current_url, str):
+        current_key = _url_to_key(current_url)
+        if current_key:
+            try:
+                get_storage().delete(current_key)
+            except Exception:
+                pass
+
+
+def _url_to_key(url: str) -> str | None:
+    """Reverse the ``LocalStorage.url()`` mapping: ``/files/{key}``
+    → ``key``. Returns ``None`` for anything that doesn't match the
+    expected prefix (defensive against a hand-edited styling_config).
+    """
+    prefix = "/files/"
+    if not url.startswith(prefix):
+        return None
+    return url[len(prefix) :]
+
+
 __all__ = [
     "archive_assistant",
     "cancel_knowledge",
@@ -761,11 +893,13 @@ __all__ = [
     "create_knowledge_from_url",
     "delete_assistant",
     "delete_knowledge",
+    "delete_profile_picture",
     "get_assistant",
     "list_assistants",
     "list_knowledge",
     "replace_knowledge_from_file",
     "update_assistant",
+    "upload_profile_picture",
 ]
 
 

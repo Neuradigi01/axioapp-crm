@@ -1,7 +1,7 @@
 # Step 13 — Styling tab UI + live-preview binding
 
 **Goal:** Ship the Styling tab. Theme mode, assistant shape, 8 colour tokens, header profile picture upload. All fields bind to `styling_config` JSONB; preview re-renders live. Colour inputs use a shared colour-picker component (or a small native picker + hex text input) matching existing patterns.
-**Status:** Pending
+**Status:** COMPLETED
 **Depends on:** Step 7 (editor shell + form-state), Step 5 (`styling_config` column), Step 10 (file upload endpoint for profile picture).
 
 ---

@@ -126,6 +126,31 @@ export class AssistantFormStateService {
     this._dirty.set(true);
   }
 
+  /** Styling twin of :meth:`patchInterfaceConfig`. Step 13's tab uses
+   *  this for every colour swatch / theme dropdown so a change to
+   *  one key doesn't wipe the sibling colours. Profile picture URL
+   *  writes bypass the form-state (backend persists via jsonb_set
+   *  out-of-band) — this helper is only for editor-driven fields. */
+  patchStylingConfig(delta: Record<string, unknown>): void {
+    this._state.update((current) => ({
+      ...current,
+      styling_config: { ...current.styling_config, ...delta },
+    }));
+    this._dirty.set(true);
+  }
+
+  /** Silent write: update the styling_config in-store WITHOUT
+   *  flipping the dirty flag. Used by the profile-picture upload
+   *  flow — the backend already persisted the URL via a targeted
+   *  jsonb_set, so the operator hasn't actually made an unsaved
+   *  edit to any editor-managed field. */
+  setStylingConfigSilently(delta: Record<string, unknown>): void {
+    this._state.update((current) => ({
+      ...current,
+      styling_config: { ...current.styling_config, ...delta },
+    }));
+  }
+
   /** Called after a successful PATCH round-trip. Re-hydrates from
    *  the server response (which carries the new ``version``) and
    *  clears the dirty flag so the Save button disables again. */

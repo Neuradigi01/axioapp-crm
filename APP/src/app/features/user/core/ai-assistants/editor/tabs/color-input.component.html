@@ -1,0 +1,37 @@
+<div>
+  @if (label) {
+    <label [attr.for]="id" class="block text-xs font-medium uppercase tracking-wide text-muted">
+      {{ label }}
+    </label>
+  }
+  <div class="mt-1 flex items-center gap-2">
+    <label
+      class="relative flex h-8 w-8 cursor-pointer overflow-hidden rounded-lg border border-subtle"
+      [style.background-color]="swatchColor()"
+      [attr.aria-label]="'Open colour picker'"
+    >
+      <input
+        type="color"
+        class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        [value]="swatchColor()"
+        (input)="onSwatchInput($event)"
+      />
+    </label>
+    <input
+      type="text"
+      [id]="id"
+      class="block w-full rounded-lg border bg-surface px-3 py-1.5 font-mono text-sm text-default focus:outline-none focus:ring-1"
+      [class.border-subtle]="draftValid()"
+      [class.focus:ring-accent]="draftValid()"
+      [class.border-red-500\/40]="!draftValid()"
+      [class.focus:ring-red-500\/40]="!draftValid()"
+      [value]="draft()"
+      (input)="onTextInput($event)"
+      maxlength="9"
+      placeholder="#RRGGBB"
+    />
+  </div>
+  @if (helpText) {
+    <p class="mt-1 text-xs text-muted">{{ helpText }}</p>
+  }
+</div>
