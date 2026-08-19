@@ -39,3 +39,10 @@ croniter>=2.0,<3.0
 # a C++ toolchain isn't available). Container base is Linux where
 # the wheel resolves cleanly.
 google-re2>=1.1; sys_platform != "win32"
+
+# tasks/ai-assistants Step 2 — OpenAI SDK for the LLM adapter under
+# shared/llm/openai.py. Pinned to >=1.50,<2.0 so the exception-mapping
+# in shared/llm/errors.py stays stable across minor releases (the SDK's
+# exception hierarchy changed around 1.0; anything from 1.50+ is
+# congruent with our error map).
+openai>=1.50,<2.0

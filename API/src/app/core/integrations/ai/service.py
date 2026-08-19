@@ -195,10 +195,10 @@ async def test_provider_key(
     """Ping the provider with the stored key. Updates ``test_status``
     + ``test_last_at`` + ``test_last_error``. Rate-limited per user.
 
-    In Step 1 the actual provider probe is a stub returning success
-    for any well-formed OpenAI key (starts with ``sk-``) — Step 2's
-    ``shared.llm.factory('openai', key_id).probe()`` replaces this
-    stub.
+    Delegates the actual probe to
+    :func:`src.app.shared.llm.factory` — the adapter's ``probe()``
+    hits the provider's cheapest endpoint (OpenAI: ``models.list``)
+    to verify auth without spending completion tokens.
     """
     _check_test_rate_limit(user_id)
 
@@ -206,17 +206,19 @@ async def test_provider_key(
     if row is None or row.org_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
-    # Step 1 stub — the shared/llm factory doesn't exist yet.
-    # Decrypt to prove the key round-trips through AAD, then apply a
-    # shape check that matches OpenAI's key format.
-    plaintext = await get_decrypted_key(db, org_id=org_id, key_id=key_id)
+    # Local import — avoid a module-load cycle: factory imports the
+    # openai adapter which imports back into this service module.
+    from src.app.shared.llm import factory as llm_factory
+
     tested_at = datetime.now(UTC)
-    if plaintext.startswith(("sk-", "sk_")):
+    client = llm_factory(row.provider.value, db=db, org_id=org_id, key_id=key_id)
+    probe = await client.probe()
+    if probe.ok:
         result_status = AiProviderTestStatus.success.value
         error: str | None = None
     else:
         result_status = AiProviderTestStatus.failed.value
-        error = "malformed_openai_key"
+        error = probe.detail or "provider_probe_failed"
 
     await _da.mark_test_result(
         db,

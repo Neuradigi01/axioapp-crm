@@ -2,6 +2,11 @@ debugpy
 pytest
 pytest-asyncio
 
+# tasks/ai-assistants Step 2 — HTTPX request mocker for LLM adapter
+# tests. Stubs the OpenAI endpoint without hitting the network so tests
+# stay fast and offline. Pinned loosely; API surface is stable.
+respx>=0.21,<1.0
+
 # Code-quality tooling — pinned so the container and CI install identical
 # versions (this file is the pip "lockfile" for dev tools; CLAUDE.md uses pip,
 # not uv). Bump deliberately, never float.

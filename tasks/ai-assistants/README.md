@@ -150,7 +150,7 @@ widget/                       ← EXTENDED (not duplicated)
 | # | Title | Status | Effort |
 |---|---|---|---|
 | 1 | [BYOK provider-key store — `core/integrations/ai/`](step-1-byok-provider-keys.md) | **COMPLETED** | ~1 day |
-| 2 | [LLM client interface + OpenAI adapter (`shared/llm/`)](step-2-llm-client-openai-adapter.md) | Pending | ~1 day |
+| 2 | [LLM client interface + OpenAI adapter (`shared/llm/`)](step-2-llm-client-openai-adapter.md) | **COMPLETED** | ~1 day |
 | 3 | [Settings → Integrations "AI Providers" section UI](step-3-ai-providers-settings-ui.md) | Pending | ~0.5 days |
 | 4 | [pgvector extension + `shared/vector/` + HNSW composite + chunker](step-4-pgvector-and-vector-layer.md) | Pending | ~0.5 days |
 | 5 | [AI Assistants schema + models + permissions + module registration](step-5-ai-assistants-schema-and-models.md) | Pending | ~1 day |
