@@ -448,6 +448,43 @@ async def delete_tag_assignment(
 # --- Mention validation (cross-module read) -----------------------------
 
 
+async def get_user_display_names_bulk(
+    session: AsyncSession,
+    *,
+    user_uuids: Iterable[uuid.UUID],
+) -> dict[uuid.UUID, str]:
+    """Resolve a set of user UUIDs to display names in one query.
+
+    Deliberately NOT org-scoped and NOT filtered by ``is_active``: the
+    caller (``list_messages``) enriches historical note/message rows so
+    the bubble still shows "Ajay Gogane" for a rep who has since been
+    removed from the org — otherwise the frontend's active-only
+    ``staffById`` map would drop back to "Unknown user".
+
+    Falls back to email when both name parts are blank.
+    """
+    uuids = list(user_uuids)
+    if not uuids:
+        return {}
+    rows = (
+        await session.execute(
+            select(
+                User.legacy_uuid,
+                UserInfo.first_name,
+                UserInfo.last_name,
+                UserInfo.email,
+            )
+            .join(UserInfo, UserInfo.member_id == User.id)
+            .where(User.legacy_uuid.in_(uuids))
+        )
+    ).all()
+    out: dict[uuid.UUID, str] = {}
+    for user_uuid, first, last, email in rows:
+        name = f"{(first or '').strip()} {(last or '').strip()}".strip()
+        out[user_uuid] = name or email
+    return out
+
+
 async def list_active_members_with_names(
     session: AsyncSession,
     *,
@@ -497,6 +534,7 @@ __all__ = [
     "get_message_by_id",
     "get_tag_assignment",
     "get_tag_by_id",
+    "get_user_display_names_bulk",
     "insert_conversation",
     "insert_message",
     "insert_tag",
