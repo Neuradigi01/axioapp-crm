@@ -146,6 +146,10 @@ export class AiAssistantsApiService {
     return this.http.patch<AiAssistant>(`${this.base}/${id}`, payload);
   }
 
+  activate(id: string): Observable<AiAssistant> {
+    return this.http.post<AiAssistant>(`${this.base}/${id}/activate`, {});
+  }
+
   archive(id: string): Observable<void> {
     return this.http.post<void>(`${this.base}/${id}/archive`, {});
   }

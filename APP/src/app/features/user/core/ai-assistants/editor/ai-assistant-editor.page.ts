@@ -90,6 +90,7 @@ export class AiAssistantEditorPage {
   protected readonly saving = signal(false);
   protected readonly saveError = signal<string | null>(null);
   protected readonly savedAt = signal<number | null>(null);
+  protected readonly publishing = signal(false);
   protected readonly nameEditing = signal(false);
   protected readonly nameDraft = signal('');
   /** Step 15 — controls the visibility of the embed snippet modal.
@@ -110,6 +111,30 @@ export class AiAssistantEditorPage {
   protected readonly canSave = computed(
     () => this.formState.loaded() && this.formState.dirty() && !this.saving(),
   );
+
+  // Publish requires: assistant loaded, no unsaved changes (publishing
+  // pushes the DB row live — pending edits would silently ship or, worse,
+  // never ship), and not currently mid-flight. Kept as its own computed
+  // so the button tooltip can explain WHICH gate is blocking.
+  protected readonly canPublish = computed(
+    () =>
+      this.formState.loaded() && !this.formState.dirty() && !this.publishing() && !this.saving(),
+  );
+
+  protected readonly publishBlockedReason = computed<string | null>(() => {
+    if (!this.formState.loaded()) return 'Loading…';
+    if (this.formState.dirty()) return 'Save your changes before publishing.';
+    if (this.publishing() || this.saving()) return null;
+    return 'Publish this assistant so the embed widget can serve it.';
+  });
+
+  protected readonly embedBlockedReason = computed<string | null>(() => {
+    if (!this.formState.assistantId()) return 'Save assistant first';
+    if (this.formState.status() !== 'active') {
+      return 'Publish the assistant first — the embed widget only serves active assistants.';
+    }
+    return 'Get the install snippet';
+  });
 
   constructor() {
     // Load whenever the :id in the route changes (covers back/forward
@@ -205,6 +230,27 @@ export class AiAssistantEditorPage {
           const message = extractApiError(err) ?? 'Save failed.';
           this.saveError.set(message);
           this.showToast(message);
+        },
+      });
+  }
+
+  protected publish(): void {
+    if (!this.canPublish()) return;
+    const id = this.formState.assistantId();
+    if (!id) return;
+    this.publishing.set(true);
+    this.api
+      .activate(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (row) => {
+          this.publishing.set(false);
+          this.formState.load(row);
+          this.showToast('Assistant published — embed widget is live.');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.publishing.set(false);
+          this.showToast(extractApiError(err) ?? 'Publish failed.');
         },
       });
   }

@@ -325,6 +325,32 @@ async def archive_assistant(
     await db.commit()
 
 
+async def activate_assistant(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    assistant_id: uuid.UUID,
+) -> AiAssistant:
+    """Draft/archived → active. Publishing gate: the public embed
+    endpoint (``public_router.py``) only serves ``active`` assistants,
+    so this is what makes an assistant reachable off a website widget.
+
+    Idempotent — flipping an already-active row is a no-op. Version_id_col
+    NOT incremented (state transition, not a user edit; skipping the bump
+    avoids racing operator edits). Returns the refreshed row so the
+    caller can update UI without a second GET."""
+    row = await get_assistant(db, org_id=org_id, assistant_id=assistant_id)
+    if row.status != AiAssistantStatus.active:
+        await _da.set_assistant_status(
+            db,
+            assistant_id=assistant_id,
+            status=AiAssistantStatus.active,
+        )
+        await db.commit()
+        await db.refresh(row)
+    return row
+
+
 async def delete_assistant(
     db: AsyncSession,
     *,
@@ -946,6 +972,7 @@ async def get_analytics(
 
 
 __all__ = [
+    "activate_assistant",
     "archive_assistant",
     "cancel_knowledge",
     "create_assistant",

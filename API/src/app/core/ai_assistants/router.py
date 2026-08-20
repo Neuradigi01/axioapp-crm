@@ -1,11 +1,13 @@
 """HTTP routes for the AI Assistants module.
 
-Mounted at ``/api/v1/ai-assistants`` by ``main.py``. Six endpoints:
+Mounted at ``/api/v1/ai-assistants`` by ``main.py``. Seven endpoints:
 
   * ``GET  /``               list (paginated).
   * ``GET  /{id}``           read (timing-safe 404).
   * ``POST /``               create.
   * ``PATCH /{id}``          update (OCC via ``version``).
+  * ``POST /{id}/activate``  publish (status → ``active`` — required
+    for the public embed widget to serve requests).
   * ``POST /{id}/archive``   archive (soft — status → ``archived``).
   * ``DELETE /{id}``         hard-delete (requires ``?confirm=true``).
 
@@ -154,6 +156,26 @@ async def update_assistant_endpoint(
         user_id=_user_id(user),
         assistant_id=assistant_id,
         payload=payload,
+    )
+    return AiAssistantRead.model_validate(row)
+
+
+# --- Activate (publish) --------------------------------------------------
+
+
+@router.post(
+    "/{assistant_id}/activate",
+    response_model=AiAssistantRead,
+)
+async def activate_assistant_endpoint(
+    assistant_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_MANAGE)),
+) -> AiAssistantRead:
+    row = await ai_service.activate_assistant(
+        db,
+        org_id=_caller_org_id(),
+        assistant_id=assistant_id,
     )
     return AiAssistantRead.model_validate(row)
 
