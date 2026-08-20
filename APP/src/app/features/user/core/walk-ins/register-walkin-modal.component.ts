@@ -94,7 +94,10 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
   }
 
   protected readonly form = this.fb.group({
-    phone: this.fb.control('', {
+    // Prefill `+` so the country-code affordance is visible from open;
+    // `onSubmit` treats a lone `+` as empty (which the required
+    // validator catches). The phoneValidator enforces `+<code><digits>`.
+    phone: this.fb.control('+', {
       nonNullable: true,
       validators: [Validators.required, commonValidators.phone(), Validators.maxLength(32)],
     }),
@@ -234,6 +237,26 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
       .subscribe((value) => this.phoneInput$.next(value));
   }
 
+  /** Re-seed the `+` prefix on focus if it was cleared. */
+  protected ensurePhonePrefix(): void {
+    const value = this.form.controls.phone.value ?? '';
+    if (!value.startsWith('+')) {
+      this.form.controls.phone.setValue('+' + value.replace(/^\+*/, ''));
+    }
+  }
+
+  /** Block Backspace / Delete when it would erase the leading `+`. */
+  protected onPhoneKeydown(event: KeyboardEvent): void {
+    const input = event.target as HTMLInputElement;
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? 0;
+    if (event.key === 'Backspace' && start <= 1 && end <= 1) {
+      event.preventDefault();
+    } else if (event.key === 'Delete' && start === 0 && end === 0) {
+      event.preventDefault();
+    }
+  }
+
   protected onCustomValueChange(v: FormValue): void {
     this.customValue.set(v);
   }
@@ -253,6 +276,12 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
   }
 
   protected onSubmit(): void {
+    // A lone `+` (from the country-code prefill) counts as "no phone
+    // entered" — clear it so `Validators.required` fires instead of
+    // sending `+` to the backend.
+    if ((this.form.controls.phone.value ?? '').trim() === '+') {
+      this.form.controls.phone.setValue('');
+    }
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;

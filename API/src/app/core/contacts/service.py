@@ -165,11 +165,28 @@ async def get_contact(session: AsyncSession, contact_id: uuid.UUID) -> Contact |
     return await data_access.get_contact(session, contact_id)
 
 
+def _to_e164(phone: str) -> str:
+    """Prefix `+` to a phone that lacks it.
+
+    WhatsApp Cloud API sends inbound `from` as `919876543210` (no `+`),
+    while contacts persist the full E.164 (`+919876543210`) since the
+    validator switched to storing the country code. Callers looking
+    up contacts from external channel payloads route through this so
+    the exact-match on `Contact.phone` still hits.
+    """
+    trimmed = (phone or "").strip()
+    if not trimmed:
+        return trimmed
+    return trimmed if trimmed.startswith("+") else "+" + trimmed
+
+
 async def get_contact_by_phone(session: AsyncSession, phone: str) -> Contact | None:
     """Public lookup-by-phone wrapper. Used by inbound
     conversation routing and walk-in reception to resolve an
-    incoming number to a contact."""
-    return await data_access.get_contact_by_phone(session, phone)
+    incoming number to a contact. The lookup normalises to E.164
+    (`+<country><digits>`) so a bare `919876543210` from a Meta
+    webhook still matches a stored `+919876543210`."""
+    return await data_access.get_contact_by_phone(session, _to_e164(phone))
 
 
 async def get_or_create_placeholder_contact(
@@ -198,6 +215,10 @@ async def get_or_create_placeholder_contact(
         raise ValueError("external_id is required")
 
     if channel == "whatsapp":
+        # WhatsApp `from` arrives without the leading `+`; contacts
+        # persist E.164 (`+919876543210`), so normalise before both
+        # the lookup and the new-row insert.
+        normalised = _to_e164(normalised)
         existing = await data_access.get_contact_by_phone(session, normalised)
         if existing is not None and existing.org_id == org_id:
             return existing

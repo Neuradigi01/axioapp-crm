@@ -1642,13 +1642,17 @@ async def _resolve_or_create_contact_by_phone(
     the phone string is empty."""
     if not phone:
         return None
-    existing = await contacts_service.get_contact_by_phone(session, phone)
+    # Contacts persist in E.164 (`+919876543210`) — inbound WhatsApp
+    # sends `919876543210` (no `+`). Normalise once so both the lookup
+    # and the placeholder insert land on the canonical form.
+    normalised = phone if phone.startswith("+") else "+" + phone
+    existing = await contacts_service.get_contact_by_phone(session, normalised)
     if existing is not None:
         return existing.id
     contact = Contact(
         org_id=org_id,
-        full_name=phone,
-        phone=phone,
+        full_name=normalised,
+        phone=normalised,
         source="whatsapp",
     )
     contacts_service.insert_contact(session, contact)

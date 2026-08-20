@@ -10,7 +10,7 @@ import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 export const REASON = {
   requiredMissing: 'required field missing',
   invalidEmail: 'invalid email format',
-  invalidPhone: 'phone must be a 10-digit Indian mobile number (with optional +91)',
+  invalidPhone: 'phone must include country code (e.g. +919876543210)',
   invalidName: 'name contains disallowed characters',
   nameTooShort: 'name must be at least 2 characters',
   nameTooLong: 'name must be at most 100 characters',
@@ -43,7 +43,7 @@ export const REASON = {
  */
 export const NAME_RE_SRC = "^[A-Za-zÀ-ÿ' .\\-]{2,100}$";
 export const EMAIL_RE_SRC = '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$';
-export const PHONE_RE_SRC = '^(?:\\+?91)?[6-9][0-9]{9}$';
+export const PHONE_RE_SRC = '^\\+[1-9][0-9]{7,14}$';
 export const URL_RE_SRC = '^https?://[^\\s]+$';
 
 const NAME_RE = new RegExp(NAME_RE_SRC);
@@ -135,11 +135,13 @@ export function emailValidator(control: AbstractControl): ValidationErrors | nul
 }
 
 /**
- * Indian-mobile phone check. Strips space/dash/paren separators first
- * (so `+91 98765-43210` is accepted), then matches the same regex the
- * backend uses in `src/app/shared/validators.py`: optional `+91`
- * prefix, then a 10-digit mobile starting with 6/7/8/9. Landlines and
- * non-Indian numbers are rejected.
+ * E.164 phone check with **mandatory country code**. Strips space /
+ * dash / paren separators first (so `+91 98765-43210` is accepted),
+ * then matches `^\+[1-9]\d{7,14}$`: a leading `+`, a non-zero
+ * country-code digit, then 7–14 more digits (E.164 max is 15 digits
+ * after the `+`). Mirrors the backend rule in
+ * `src/app/shared/validators.py` so both sides accept the same
+ * international format.
  *
  * Empty input short-circuits to `null`; `Validators.required` owns
  * the required-ness gate.

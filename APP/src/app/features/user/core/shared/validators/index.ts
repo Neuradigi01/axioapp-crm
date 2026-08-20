@@ -31,12 +31,13 @@ import type { StandardFieldRendered } from '../../standard-fields/types';
  * so the format check lives in one place
  * (`app/src/app/shared/validators/custom-validators.ts`).
  *
- * Mirrors the backend rule in `src/app/shared/validators.py`: optional
- * `+91` prefix, then a 10-digit Indian mobile starting with 6/7/8/9.
- * Callers using this direct regex must strip space/dash/paren
- * separators from the input first.
+ * Mirrors the backend rule in `src/app/shared/validators.py`: full
+ * E.164 with a mandatory `+<country code>` prefix, then 7–14 digits
+ * of subscriber number (15 max total after the `+`). Callers using
+ * this direct regex must strip space/dash/paren separators from the
+ * input first.
  */
-export const PHONE_RE = /^(?:\+?91)?[6-9][0-9]{9}$/;
+export const PHONE_RE = /^\+[1-9][0-9]{7,14}$/;
 
 /**
  * Cross-modal validator vocabulary. Wraps Angular's `Validators.*` so

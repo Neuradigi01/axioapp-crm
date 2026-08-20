@@ -93,9 +93,31 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
    * the lead's `contact_id`. */
   readonly contactBasics = this.fb.group({
     full_name: this.fb.control<string>('', { nonNullable: true }),
-    phone: this.fb.control<string>('', { nonNullable: true }),
+    // Prefill `+` so the country-code affordance is visible from open;
+    // `resolveContactThenEmit` treats a lone `+` as "no phone entered".
+    phone: this.fb.control<string>('+', { nonNullable: true }),
     email: this.fb.control<string>('', { nonNullable: true }),
   });
+
+  /** Re-seed the `+` prefix on focus if it was cleared. */
+  protected ensurePhonePrefix(): void {
+    const value = this.contactBasics.controls.phone.value ?? '';
+    if (!value.startsWith('+')) {
+      this.contactBasics.controls.phone.setValue('+' + value.replace(/^\+*/, ''));
+    }
+  }
+
+  /** Block Backspace / Delete when it would erase the leading `+`. */
+  protected onPhoneKeydown(event: KeyboardEvent): void {
+    const input = event.target as HTMLInputElement;
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? 0;
+    if (event.key === 'Backspace' && start <= 1 && end <= 1) {
+      event.preventDefault();
+    } else if (event.key === 'Delete' && start === 0 && end === 0) {
+      event.preventDefault();
+    }
+  }
 
   readonly standard = this.fb.group({
     pipeline_stage: this.fb.control<string>('', { nonNullable: true }),
@@ -247,7 +269,9 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
   private resolveContactThenEmit(): void {
     const basics = this.contactBasics.getRawValue();
     const full_name = basics.full_name.trim();
-    const phone = basics.phone.trim() || null;
+    const phoneTrimmed = basics.phone.trim();
+    // A lone `+` (from the country-code prefill) means no phone entered.
+    const phone = phoneTrimmed === '' || phoneTrimmed === '+' ? null : phoneTrimmed;
     const email = basics.email.trim() || null;
 
     this._submitting.set(true);

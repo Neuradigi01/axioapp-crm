@@ -102,12 +102,37 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
       '',
       [commonValidators.required, commonValidators.name, commonValidators.maxLength(255)],
     ],
-    phone: ['', [commonValidators.phone(), commonValidators.maxLength(32)]],
+    phone: ['+', [commonValidators.phone(), commonValidators.maxLength(32)]],
     email: ['', [commonValidators.email, commonValidators.maxLength(254)]],
     source: ['', [commonValidators.maxLength(64)]],
     tags_csv: ['', [commonValidators.maxLength(1000)]],
     assigned_to_id: [''],
   });
+
+  /** Ensure the phone control always begins with `+` so the user sees
+   * the country-code affordance from the moment the field is focused.
+   * Called on `(focus)`; if the value has been cleared, we re-seed the
+   * `+`. Payload build in `onSubmit` treats a lone `+` as empty. */
+  protected ensurePhonePrefix(): void {
+    const value = this.standard.controls.phone.value ?? '';
+    if (!value.startsWith('+')) {
+      this.standard.controls.phone.setValue('+' + value.replace(/^\+*/, ''));
+    }
+  }
+
+  /** Block Backspace / Delete when it would erase the leading `+`.
+   * The customer can freely edit digits after `+`, but the country-code
+   * prefix stays put. */
+  protected onPhoneKeydown(event: KeyboardEvent): void {
+    const input = event.target as HTMLInputElement;
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? 0;
+    if (event.key === 'Backspace' && start <= 1 && end <= 1) {
+      event.preventDefault();
+    } else if (event.key === 'Delete' && start === 0 && end === 0) {
+      event.preventDefault();
+    }
+  }
 
   /** Override-driven validators on the standard FormGroup.
    *
@@ -221,9 +246,13 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
     this._submitError.set(null);
 
     const raw = this.standard.getRawValue();
+    const phoneRaw = (raw.phone ?? '').trim();
+    // A lone `+` (from the country-code prefill) means the user left
+    // the field empty — send null, not `+`.
+    const phone = phoneRaw === '' || phoneRaw === '+' ? null : phoneRaw;
     const payload: ContactCreate = {
       full_name: raw.full_name!.trim(),
-      phone: nullableTrim(raw.phone),
+      phone,
       email: nullableTrim(raw.email),
       source: nullableTrim(raw.source),
       tags: this.parseTags(raw.tags_csv),
@@ -239,9 +268,15 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
   }
 
   private resetForm(contact: Contact): void {
+    // Show a stored phone as-is; missing / blank falls back to the `+`
+    // affordance so the customer still sees the country-code prompt in
+    // edit mode. Legacy rows that were persisted without `+` (bare
+    // digits from before the E.164 migration) are surfaced as-is —
+    // the validator will flag them so the user re-enters properly.
+    const storedPhone = contact.phone ?? '';
     this.standard.reset({
       full_name: contact.full_name,
-      phone: contact.phone ?? '',
+      phone: storedPhone === '' ? '+' : storedPhone,
       email: contact.email ?? '',
       source: contact.source ?? '',
       tags_csv: contact.tags.join(', '),

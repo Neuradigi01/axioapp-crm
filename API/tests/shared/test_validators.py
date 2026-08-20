@@ -106,14 +106,12 @@ def test_validate_email_rejects_too_long() -> None:
 @pytest.mark.parametrize(
     "value,expected",
     [
-        ("9876543210", "9876543210"),          # bare 10-digit mobile
-        ("+91 98765 43210", "9876543210"),     # +91 prefix, spaces
-        ("91-9876543210", "9876543210"),       # 91 prefix, dash
-        ("+919876543210", "9876543210"),       # +91 no separators
-        ("(987) 654-3210", "9876543210"),      # US-style separators, still Indian
-        ("6234567890", "6234567890"),          # mobile starting with 6
-        ("7234567890", "7234567890"),          # 7
-        ("8234567890", "8234567890"),          # 8
+        ("+919876543210", "+919876543210"),        # India, +91 no separators
+        ("+91 98765 43210", "+919876543210"),      # India, +91 with spaces
+        ("+91-98765-43210", "+919876543210"),      # India, +91 with dashes
+        ("+1 415 555 0132", "+14155550132"),       # USA
+        ("+44 20 7946 0958", "+442079460958"),     # UK landline (still valid E.164)
+        ("+15551234567", "+15551234567"),          # USA compact
     ],
 )
 def test_validate_phone_accepts_and_strips(value: str, expected: str) -> None:
@@ -124,12 +122,13 @@ def test_validate_phone_accepts_and_strips(value: str, expected: str) -> None:
     "value",
     [
         "abc",                    # non-digits
-        "1234567",                # too short
-        "5234567890",             # starts with 5 — not an Indian mobile prefix
-        "0987654321",             # leading zero
-        "12345678901",            # 11 digits, no valid prefix
-        "+1 415 555 0132",        # US number
-        "020-79460958",           # Delhi landline (0 prefix, 11 digits total)
+        "9876543210",             # bare 10-digit — no country code
+        "919876543210",           # 12 digits, no leading +
+        "+0987654321",            # country code cannot start with 0
+        "+",                      # lone + (placeholder from the form)
+        "+123",                   # too short (need 8+ digits after +)
+        "+1234567890123456",      # too long (max 15 digits after +)
+        "1234567",                # too short & no +
         "",                       # empty
     ],
 )
@@ -292,15 +291,18 @@ def _extract_frontend_source(name: str) -> str:
             [
                 # Phone samples are POST-strip — the strip step is the same on
                 # both sides, so testing the compiled regex is enough.
-                ("9876543210", True),          # bare 10-digit mobile
-                ("+919876543210", True),       # +91 prefix
-                ("919876543210", True),        # 91 prefix
-                ("6234567890", True),          # first digit 6
+                # Country code is mandatory — both regexes require a leading `+`.
+                ("+919876543210", True),       # India
+                ("+14155550132", True),        # USA
+                ("+442079460958", True),       # UK
+                ("+15551234567", True),        # USA compact
+                ("9876543210", False),         # bare 10-digit, no country code
+                ("919876543210", False),       # missing leading +
+                ("+0987654321", False),        # country code cannot start with 0
+                ("+", False),                  # lone + (form placeholder)
+                ("+123", False),               # too short
+                ("+1234567890123456", False),  # too long (>15 digits)
                 ("abc", False),
-                ("5234567890", False),         # starts with 5 — not an Indian mobile
-                ("+14155550132", False),       # US number
-                ("1234567", False),            # too short
-                ("12345678901", False),        # 11 digits
             ],
         ),
         (

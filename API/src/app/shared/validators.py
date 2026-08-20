@@ -10,7 +10,7 @@ Rule matrix (locked in tasks/application-updates/step-1-shared-validators.md):
 
 - name     letters / spaces / . - '        2–100 chars, trimmed
 - email    RFC-lite, must have @ and .     max 254, lowercased on return
-- phone    E.164-ish: optional +, 8–15 digits after stripping () - space
+- phone    E.164 with mandatory `+<code>`  8–15 digits after `+`, separators stripped
 - password 8–128 chars with upper, lower, digit, special
 - url      http(s):// only                  max 2048, non-empty host
 
@@ -32,7 +32,7 @@ from urllib.parse import urlparse
 
 REASON_REQUIRED_MISSING = "required field missing"
 REASON_INVALID_EMAIL = "invalid email format"
-REASON_INVALID_PHONE = "phone must be a 10-digit Indian mobile number (with optional +91)"
+REASON_INVALID_PHONE = "phone must include country code (e.g. +919876543210)"
 REASON_INVALID_NAME = "name contains disallowed characters"
 REASON_WEAK_PASSWORD = "password must be 8–128 chars with upper, lower, digit, and special"
 REASON_INVALID_URL = "invalid URL"
@@ -44,7 +44,10 @@ REASON_INVALID_URL = "invalid URL"
 
 NAME_RE = re.compile(r"^[A-Za-zÀ-ÿ' .\-]{2,100}$")
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-PHONE_RE = re.compile(r"^(?:\+?91)?([6-9][0-9]{9})$")
+# E.164 with mandatory country code: leading `+`, a non-zero
+# country-code digit, then 7–14 more digits (15 max total after `+`).
+# The customer supplies the country code — no auto-prepend anywhere.
+PHONE_RE = re.compile(r"^\+[1-9][0-9]{7,14}$")
 URL_RE = re.compile(r"^https?://[^\s]+$")
 
 _PHONE_SEPARATORS_RE = re.compile(r"[\s()\-]")
@@ -97,18 +100,18 @@ def validate_email(value: str) -> str:
 
 
 def validate_phone(value: str) -> str:
-    """Return the 10-digit Indian mobile number, stripping separators + optional +91.
+    """Return the E.164 phone (`+<country code><subscriber>`), stripping
+    space / dash / paren separators from the input first.
 
-    A rep entering ``+91 98765 43210`` and another entering ``9876543210``
-    both persist as ``9876543210`` — that gives WhatsApp / SMS / dedup a
-    single canonical form to work against. Non-Indian numbers and
-    landlines are rejected (first digit must be 6, 7, 8, or 9).
+    The country code is **mandatory** — a bare 10-digit input is
+    rejected. `+91 98765-43210`, `+919876543210`, and `+15551234567`
+    all persist as their canonical `+<digits>` form so WhatsApp / SMS
+    / dedup have one wire-ready value to work against.
     """
     stripped = _PHONE_SEPARATORS_RE.sub("", value or "")
-    match = PHONE_RE.match(stripped)
-    if match is None:
+    if not PHONE_RE.match(stripped):
         raise ValidationError(REASON_INVALID_PHONE, value=value)
-    return match.group(1)
+    return stripped
 
 
 def validate_password_strength(value: str) -> None:
