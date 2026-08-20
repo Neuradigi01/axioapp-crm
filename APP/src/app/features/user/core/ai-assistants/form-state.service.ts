@@ -21,6 +21,7 @@ import { Injectable, computed, signal } from '@angular/core';
 
 import {
   AiAssistant,
+  AiAssistantChannel,
   AiAssistantUpdatePayload,
   LeadCaptureMode,
 } from './ai-assistants-api.service';
@@ -46,6 +47,7 @@ export interface AssistantFormState {
   lead_capture_message: string | null;
   interface_config: Record<string, unknown>;
   styling_config: Record<string, unknown>;
+  bound_channels: AiAssistantChannel[];
 }
 
 const _EMPTY_STATE: AssistantFormState = {
@@ -66,6 +68,7 @@ const _EMPTY_STATE: AssistantFormState = {
   lead_capture_message: null,
   interface_config: {},
   styling_config: {},
+  bound_channels: [],
 };
 
 @Injectable()
@@ -110,6 +113,7 @@ export class AssistantFormStateService {
       lead_capture_message: row.lead_capture_message,
       interface_config: { ...row.interface_config },
       styling_config: { ...row.styling_config },
+      bound_channels: [...(row.bound_channels ?? [])],
     });
     this._version.set(row.version);
     this._assistantId.set(row.id);
@@ -200,6 +204,7 @@ export class AssistantFormStateService {
       lead_capture_message: s.lead_capture_message,
       interface_config: s.interface_config,
       styling_config: s.styling_config,
+      bound_channels: s.bound_channels,
     };
   }
 

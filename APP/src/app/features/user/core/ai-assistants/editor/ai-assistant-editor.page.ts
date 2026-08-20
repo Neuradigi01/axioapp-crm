@@ -46,6 +46,24 @@ import { StylingTabComponent } from './tabs/styling-tab.component';
 
 type TabId = 'instructions' | 'knowledge' | 'interface' | 'styling';
 
+// User-visible channel labels, keyed on the AiAssistantChannel enum
+// values. Used by the channel-conflict 409 toast in ``save()`` so the
+// message reads "WhatsApp is already handled by …" instead of the raw
+// enum string. Falls back to the raw key for unknown channels (safe
+// against future channels shipping frontend-first).
+function _channelLabel(key: string): string {
+  switch (key) {
+    case 'ai_widget':
+      return 'Website widget';
+    case 'whatsapp':
+      return 'WhatsApp';
+    case 'email':
+      return 'Email';
+    default:
+      return key;
+  }
+}
+
 interface TabDescriptor {
   id: TabId;
   label: string;
@@ -227,11 +245,31 @@ export class AiAssistantEditorPage {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          const message = extractApiError(err) ?? 'Save failed.';
+          const message = this._friendlyErrorMessage(err);
           this.saveError.set(message);
           this.showToast(message);
         },
       });
+  }
+
+  // Translate structured backend errors into copy an operator can act
+  // on. The omnichannel Step 2 channel-conflict 409 carries the other
+  // assistant's name in its detail body — surface it inline rather than
+  // showing a generic "Save failed."
+  private _friendlyErrorMessage(err: HttpErrorResponse): string {
+    const detail = err.error?.detail;
+    if (
+      err.status === 409 &&
+      detail &&
+      typeof detail === 'object' &&
+      detail.reason === 'channel_already_bound'
+    ) {
+      const ch = String(detail.channel ?? 'that channel');
+      const chLabel = _channelLabel(ch);
+      const other = String(detail.other_assistant_name ?? 'another assistant');
+      return `${chLabel} is already handled by '${other}'. Unbind it there first.`;
+    }
+    return extractApiError(err) ?? 'Save failed.';
   }
 
   protected publish(): void {

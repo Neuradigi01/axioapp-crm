@@ -1,7 +1,7 @@
 # Step 2 — Channel binding UI in the Assistant editor
 
 **Goal:** Add a compact "Channels" section to the AI Instructions tab (or a new "Deployment" section — Step 2's plan phase decides) with three checkboxes: **Website widget**, **WhatsApp**, **Email**. Values wire through the shared `AssistantFormStateService` and ship on the existing Save. On 409 `channel_already_bound`, show a clear inline error with a link to the other assistant.
-**Status:** Pending
+**Status:** COMPLETED — new **Deployment** section landed in the AI Instructions tab (below AI Configuration, above Advanced). Three checkboxes with descriptions; toggle handler patches `bound_channels` into the shared form-state store; existing Save flow ships the new field via the extended `AiAssistantUpdatePayload`. Added `AiAssistantChannel` union type to the API service. Editor page's `save()` now maps the backend's 409 `channel_already_bound` detail into a specific toast: *"WhatsApp is already handled by 'CRM ASSISTANT'. Unbind it there first."*. `tsc --noEmit` green; prettier clean.
 **Depends on:** Step 1 (backend column + PATCH support).
 
 ---

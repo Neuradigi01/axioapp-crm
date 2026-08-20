@@ -22,6 +22,12 @@ export type AiAssistantStatus = 'draft' | 'active' | 'archived';
 
 export type LeadCaptureMode = 'off' | 'detect_email' | 'ask_at_turn';
 
+/** Channels an assistant is bound to auto-answer on. Matches the
+ *  backend ``AiAssistantChannel`` enum in
+ *  ``core/ai_assistants/models.py`` — new channels ship here first,
+ *  then the JSONB storage accepts them without a migration. */
+export type AiAssistantChannel = 'ai_widget' | 'whatsapp' | 'email';
+
 /** Full assistant read shape (matches ``AiAssistantRead``). */
 export interface AiAssistant {
   id: string;
@@ -46,6 +52,7 @@ export interface AiAssistant {
   created_by_user_id: string | null;
   interface_config: Record<string, unknown>;
   styling_config: Record<string, unknown>;
+  bound_channels: AiAssistantChannel[];
   created_at: string;
   updated_at: string;
 }
@@ -112,6 +119,7 @@ export interface AiAssistantUpdatePayload {
   lead_capture_message?: string | null;
   interface_config?: Record<string, unknown>;
   styling_config?: Record<string, unknown>;
+  bound_channels?: AiAssistantChannel[];
 }
 
 @Injectable({ providedIn: 'root' })

@@ -35,7 +35,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { AiProviderKey } from '../../../settings/integrations/ai-providers-api.service';
-import { AiAssistantsApiService } from '../../ai-assistants-api.service';
+import { AiAssistantChannel, AiAssistantsApiService } from '../../ai-assistants-api.service';
 import { AssistantFormStateService } from '../../form-state.service';
 import { CUSTOM_PROMPT_ID, InstructionPreset } from '../../instructions-presets';
 
@@ -215,6 +215,49 @@ export class InstructionsTabComponent {
     const num = Number(raw);
     if (!Number.isFinite(num) || num < 0) return;
     this.formState.patch({ budget_cap_override_usd: num });
+  }
+
+  // --- Deployment channels (omnichannel Step 2) ---------------------
+
+  /** The three channels we v1 support. Order matches the checkbox
+   *  section order in the template. Instagram / Messenger / SMS ship
+   *  in a later track. */
+  protected readonly channels: readonly {
+    key: AiAssistantChannel;
+    label: string;
+    description: string;
+  }[] = [
+    {
+      key: 'ai_widget',
+      label: 'Website widget',
+      description: 'Answer visitors on your website via the embed snippet.',
+    },
+    {
+      key: 'whatsapp',
+      label: 'WhatsApp',
+      description: 'Answer inbound messages on your WhatsApp Business number.',
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      description: 'Auto-reply to emails sent to your connected mailbox.',
+    },
+  ];
+
+  /** Compute-friendly membership check so the template can drive the
+   *  ``[checked]`` binding without a method call in the change-detection
+   *  hot-path. */
+  protected isChannelBound(channel: AiAssistantChannel): boolean {
+    return this.formState.formState().bound_channels.includes(channel);
+  }
+
+  protected onChannelToggle(channel: AiAssistantChannel, event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    const current = this.formState.formState().bound_channels;
+    const next = checked
+      ? Array.from(new Set([...current, channel]))
+      : current.filter((c) => c !== channel);
+    this.formState.patch({ bound_channels: next });
   }
 
   // --- Lead capture (Step 16) ---------------------------------------
