@@ -30,6 +30,7 @@ import { toObservable } from '@angular/core/rxjs-interop';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { LucideAngularModule } from 'lucide-angular';
 import { switchMap } from 'rxjs';
 
@@ -79,6 +80,7 @@ export class AiAssistantEditorPage {
   private readonly router = inject(Router);
   private readonly api = inject(AiAssistantsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly snackBar = inject(MatSnackBar);
   protected readonly formState = inject(AssistantFormStateService);
 
   protected readonly tabs = TABS;
@@ -196,11 +198,22 @@ export class AiAssistantEditorPage {
           this.saving.set(false);
           this.formState.applySaveResponse(row);
           this.savedAt.set(Date.now());
+          this.showToast('Assistant saved.');
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.saveError.set(extractApiError(err) ?? 'Save failed.');
+          const message = extractApiError(err) ?? 'Save failed.';
+          this.saveError.set(message);
+          this.showToast(message);
         },
       });
+  }
+
+  private showToast(message: string): void {
+    this.snackBar.open(message, 'OK', {
+      duration: 3000,
+      horizontalPosition: 'right',
+      verticalPosition: 'top',
+    });
   }
 }
