@@ -81,13 +81,16 @@ from src.app.core.conversations.service import (
     mark_conversation_read,
     mark_conversation_unread,
     patch_conversation,
+    pause_ai,
     react_to_message,
     receive_webhook,
+    resume_ai,
     send_email_reply,
     send_outbound,
     send_template_message,
     start_conversation,
 )
+from src.app.core.permissions.service import role_has_permission
 from src.app.core.conversations.tags_service import (
     assign_tag,
     bulk_tags_for_conversations,
@@ -295,9 +298,7 @@ async def list_older_messages_endpoint(
     # Existence check so a bad ``before_id`` returns 404 rather than
     # silently walking the whole thread as if no anchor was supplied.
     await get_conversation(db, conversation_id)
-    msgs = await list_messages(
-        db, conversation_id, limit=capped_limit, before_id=before_id
-    )
+    msgs = await list_messages(db, conversation_id, limit=capped_limit, before_id=before_id)
     return [MessageOut.model_validate(m) for m in msgs]
 
 
@@ -447,10 +448,7 @@ async def send_template_message_endpoint(
     except WhatsAppSendError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=(
-                "Meta refused this template send. "
-                f"Details: {str(exc)[:400]}"
-            ),
+            detail=(f"Meta refused this template send. Details: {str(exc)[:400]}"),
         ) from exc
     return MessageOut.model_validate(msg)
 
@@ -658,6 +656,57 @@ async def patch_endpoint(
     _user: User = Depends(require_permissions("conversations.write")),
 ) -> ConversationOut:
     conv = await patch_conversation(db, conversation_id=conversation_id, payload=payload)
+    return ConversationOut.model_validate(conv)
+
+
+# --- AI takeover (omnichannel Step 3) ------------------------------------
+
+
+@router.post(
+    "/{conversation_id}/pause-ai",
+    response_model=ConversationOut,
+    summary="Human takes over — pause AI on this conversation.",
+)
+async def pause_ai_endpoint(
+    conversation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> ConversationOut:
+    """First-come-first-serve takeover. Body-less POST — the CAS is
+    idempotent per row: the first caller wins with 200; concurrent
+    callers get 409 ``already_taken_over`` naming the winner so the
+    UI can render *"Alice just took this over."* and refresh the
+    inbox. A system marker message is inserted into the thread to
+    record the handoff for the transcript."""
+    conv = await pause_ai(
+        db,
+        conversation_id=conversation_id,
+        actor_user_id=user.legacy_uuid,
+    )
+    return ConversationOut.model_validate(conv)
+
+
+@router.post(
+    "/{conversation_id}/resume-ai",
+    response_model=ConversationOut,
+    summary="Hand this conversation back to the AI.",
+)
+async def resume_ai_endpoint(
+    conversation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> ConversationOut:
+    """Symmetric of :func:`pause_ai_endpoint`. Only the current holder
+    OR an admin (``settings.conversations.manage``) can resume; other
+    callers get 403 ``not_holder``. Calling on an already-unpaused
+    conversation returns 409 ``not_paused``."""
+    caller_is_admin = await role_has_permission(db, user.role_id, "settings.conversations.manage")
+    conv = await resume_ai(
+        db,
+        conversation_id=conversation_id,
+        actor_user_id=user.legacy_uuid,
+        caller_is_admin=caller_is_admin,
+    )
     return ConversationOut.model_validate(conv)
 
 

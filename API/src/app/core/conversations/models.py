@@ -142,6 +142,26 @@ class Conversation(Base, TenantScoped):
     ai_handling: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sql_text("false")
     )
+    # tasks/ai-assistants-omnichannel Step 3 — human took over from
+    # AI. ``ai_paused=true`` gates the omnichannel dispatch's AI call
+    # so a manual takeover silences AI on the thread until an operator
+    # explicitly clicks Return to AI. First-come-first-serve semantics
+    # are enforced at the service layer via a compare-and-set UPDATE on
+    # this flag; ``ai_paused_by_user_id`` records the winner + ``_at``
+    # the timestamp. No FK on the user column — matches the legacy
+    # ``ai_paused_by_user_id`` = ``tbl_user_login.legacy_uuid`` mapping
+    # used by every audit column in the codebase.
+    ai_paused: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("false")
+    )
+    ai_paused_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+    ai_paused_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # whatsapp-platform-upgrade Step 15 — timestamp of the most recent
     # *customer-driven* message in this conversation. Used to compute
@@ -182,9 +202,7 @@ class Conversation(Base, TenantScoped):
     # ``mute_hours`` is > 0. While this is a future timestamp the
     # trigger matcher refuses to fire any bot on this conversation
     # (records a ``bot_muted`` diagnostic and returns). NULL = no mute.
-    bot_muted_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    bot_muted_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

@@ -1629,7 +1629,165 @@ def _snapshot(c: Conversation) -> dict[str, Any]:
         "assigned_to_id": str(c.assigned_to_id) if c.assigned_to_id else None,
         "status": c.status.value,
         "ai_handling": c.ai_handling,
+        "ai_paused": c.ai_paused,
     }
+
+
+# --- AI pause / resume (omnichannel Step 3) -------------------------------
+
+
+async def _display_name_for(
+    session: AsyncSession,
+    user_uuid: uuid.UUID | None,
+) -> str | None:
+    """Resolve one ``tbl_user_login.legacy_uuid`` to a display name.
+    ``None`` when the row can't be found — the calling toast falls back
+    to a generic label ("another user"). Reuses the bulk helper the
+    thread-message enricher already exposes so we don't invent a new
+    query."""
+    if user_uuid is None:
+        return None
+    names = await _da.get_user_display_names_bulk(session, user_uuids=[user_uuid])
+    return names.get(user_uuid)
+
+
+def _insert_takeover_system_message(
+    session: AsyncSession,
+    *,
+    conv: Conversation,
+    holder_name: str | None,
+    event: str,
+    now: datetime,
+) -> None:
+    """Append a marker message so the thread transcript records the
+    handoff. ``event`` is ``"ai_paused"`` or ``"ai_resumed"``; the
+    payload carries the event key so the frontend can render a
+    distinct system-message row (centred, muted, no bubble). No
+    channel-adapter send happens — this is transcript-only."""
+    who = holder_name or "A team member"
+    if event == "ai_paused":
+        body = f"— {who} took over from AI —"
+    else:
+        body = f"— {who} returned this conversation to AI —"
+    msg = Message(
+        org_id=conv.org_id,
+        conversation_id=conv.id,
+        direction=MessageDirection.out,
+        sender_user_id=None,
+        text=body,
+        attachments=[],
+        payload={"author": "system", "event": event},
+        sent_at=now,
+    )
+    _da.insert_message(session, msg)
+    conv.last_message_at = now
+
+
+async def pause_ai(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+) -> Conversation:
+    """First-come-first-serve human takeover. Compare-and-set on
+    ``ai_paused=false``; if the CAS misses, look up the current holder
+    and raise 409 with their name so the loser's UI can render the
+    ``"Alice just took this over."`` toast.
+
+    Also inserts a system marker message ("— Alice took over from
+    AI —") into the thread so the transcript records the handoff.
+    """
+    conv = await get_conversation(session, conversation_id)
+    before = _snapshot(conv)
+    now = datetime.now(UTC)
+    won = await _da.pause_conversation_ai_cas(
+        session,
+        conversation_id=conv.id,
+        actor_user_id=actor_user_id,
+        now=now,
+    )
+    if not won:
+        holder_uuid, paused_at = await _da.get_conversation_ai_pause_holder(
+            session, conversation_id
+        )
+        holder_name = await _display_name_for(session, holder_uuid)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "reason": "already_taken_over",
+                "holder_user_id": str(holder_uuid) if holder_uuid else None,
+                "holder_name": holder_name,
+                "paused_at": paused_at.isoformat() if paused_at else None,
+            },
+        )
+    actor_name = await _display_name_for(session, actor_user_id)
+    _insert_takeover_system_message(
+        session,
+        conv=conv,
+        holder_name=actor_name,
+        event="ai_paused",
+        now=now,
+    )
+    await session.commit()
+    await session.refresh(conv)
+    await audit.log(
+        "conversations.ai_paused",
+        entity_type="conversation",
+        entity_id=conv.id,
+        before=before,
+        after=_snapshot(conv),
+    )
+    return conv
+
+
+async def resume_ai(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+    caller_is_admin: bool,
+) -> Conversation:
+    """Return control back to AI. Only the current holder OR an
+    admin (``settings.conversations.manage`` permission — router-side
+    check) can resume; non-holder / non-admin gets 403. Losing the
+    CAS (row wasn't paused) surfaces as 409 ``not_paused``."""
+    conv = await get_conversation(session, conversation_id)
+    before = _snapshot(conv)
+    if not conv.ai_paused:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"reason": "not_paused"},
+        )
+    if conv.ai_paused_by_user_id != actor_user_id and not caller_is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": "not_holder"},
+        )
+    now = datetime.now(UTC)
+    won = await _da.resume_conversation_ai_cas(session, conversation_id=conv.id)
+    if not won:  # pragma: no cover — CAS race after the ai_paused read
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"reason": "not_paused"},
+        )
+    actor_name = await _display_name_for(session, actor_user_id)
+    _insert_takeover_system_message(
+        session,
+        conv=conv,
+        holder_name=actor_name,
+        event="ai_resumed",
+        now=now,
+    )
+    await session.commit()
+    await session.refresh(conv)
+    await audit.log(
+        "conversations.ai_resumed",
+        entity_type="conversation",
+        entity_id=conv.id,
+        before=before,
+        after=_snapshot(conv),
+    )
+    return conv
 
 
 __all__ = [
@@ -1637,8 +1795,10 @@ __all__ = [
     "list_conversations",
     "list_messages",
     "patch_conversation",
+    "pause_ai",
     "react_to_message",
     "receive_webhook",
+    "resume_ai",
     "send_outbound",
     "start_conversation",
 ]

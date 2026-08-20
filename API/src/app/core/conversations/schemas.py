@@ -350,6 +350,12 @@ class ConversationOut(ORMModel):
     assigned_to_id: uuid.UUID | None
     status: ConversationStatus
     ai_handling: bool
+    # tasks/ai-assistants-omnichannel Step 3 — human-takeover state.
+    # ``ai_paused=false`` = AI is (or would be) auto-answering; ``true``
+    # = a human took over and AI is silent on this thread until Resume.
+    ai_paused: bool = False
+    ai_paused_by_user_id: uuid.UUID | None = None
+    ai_paused_at: datetime | None = None
     last_message_at: datetime | None
     unread_count: int
     created_at: datetime

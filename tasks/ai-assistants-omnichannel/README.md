@@ -140,7 +140,7 @@ Steps 2 + 3 are parallelizable if two people work — but for solo execution, in
 |---|---|---|---|---|
 | 1 | [step-1-bound-channels-model.md](step-1-bound-channels-model.md) | ~45 min | ✅ COMPLETED | — |
 | 2 | [step-2-channel-binding-ui.md](step-2-channel-binding-ui.md) | ~45 min | ✅ COMPLETED | Step 1 |
-| 3 | [step-3-ai-paused-endpoints.md](step-3-ai-paused-endpoints.md) | ~1 hr | Pending | — |
+| 3 | [step-3-ai-paused-endpoints.md](step-3-ai-paused-endpoints.md) | ~1 hr | ✅ COMPLETED | — |
 | 4 | [step-4-takeover-ui.md](step-4-takeover-ui.md) | ~1 hr | Pending | Step 3 |
 | 5 | [step-5-inbound-dispatch.md](step-5-inbound-dispatch.md) | ~2 hr | Pending | Steps 1 + 3 |
 | 6 | [step-6-email-guardrails.md](step-6-email-guardrails.md) | ~1 hr | Pending | Step 5 |

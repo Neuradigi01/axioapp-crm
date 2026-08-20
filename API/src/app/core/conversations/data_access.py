@@ -31,9 +31,10 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import and_, delete, func, select
+from sqlalchemy import and_, delete, func, select, update
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -133,6 +134,83 @@ async def find_conversation_for_channel_external(
 def insert_conversation(session: AsyncSession, conversation: Conversation) -> None:
     """Register an already-constructed Conversation for INSERT."""
     session.add(conversation)
+
+
+# --- AI pause / resume compare-and-set (Step 3) --------------------------
+
+
+async def pause_conversation_ai_cas(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+    now: datetime,
+) -> bool:
+    """Single-statement CAS: flip ``ai_paused=false`` → ``true`` only if
+    the row is currently unpaused. Returns True iff the update took
+    effect. Callers translate False to a 409 with the current holder's
+    details (fetched via :func:`get_conversation_ai_pause_holder`).
+
+    Not committed by this function — the service owns the transaction
+    boundary."""
+    stmt = (
+        update(Conversation)
+        .where(
+            Conversation.id == conversation_id,
+            Conversation.ai_paused.is_(False),
+        )
+        .values(
+            ai_paused=True,
+            ai_paused_by_user_id=actor_user_id,
+            ai_paused_at=now,
+        )
+    )
+    result = await session.execute(stmt)
+    return (result.rowcount or 0) > 0
+
+
+async def resume_conversation_ai_cas(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+) -> bool:
+    """Symmetric of :func:`pause_conversation_ai_cas`. Only takes
+    effect when the row is currently paused; returns False when the
+    caller lost the race or the conversation was never paused."""
+    stmt = (
+        update(Conversation)
+        .where(
+            Conversation.id == conversation_id,
+            Conversation.ai_paused.is_(True),
+        )
+        .values(
+            ai_paused=False,
+            ai_paused_by_user_id=None,
+            ai_paused_at=None,
+        )
+    )
+    result = await session.execute(stmt)
+    return (result.rowcount or 0) > 0
+
+
+async def get_conversation_ai_pause_holder(
+    session: AsyncSession,
+    conversation_id: uuid.UUID,
+) -> tuple[uuid.UUID | None, datetime | None]:
+    """Read the current ``(ai_paused_by_user_id, ai_paused_at)`` tuple
+    on a conversation. Used by the service's 409-on-race path to build
+    the ``holder_user_id`` + ``holder_name`` fields the frontend toasts.
+    Returns ``(None, None)`` on a wrong-org / missing row (RLS + auto
+    filter keep the query scoped)."""
+    result = await session.execute(
+        select(Conversation.ai_paused_by_user_id, Conversation.ai_paused_at).where(
+            Conversation.id == conversation_id
+        )
+    )
+    row = result.first()
+    if row is None:
+        return None, None
+    return row[0], row[1]
 
 
 # --- Messages -----------------------------------------------------------
@@ -534,6 +612,7 @@ __all__ = [
     "get_message_by_id",
     "get_tag_assignment",
     "get_tag_by_id",
+    "get_conversation_ai_pause_holder",
     "get_user_display_names_bulk",
     "insert_conversation",
     "insert_message",
@@ -544,4 +623,6 @@ __all__ = [
     "list_messages_for_conversation",
     "list_tag_chips_for_conversation",
     "list_tags_with_usage",
+    "pause_conversation_ai_cas",
+    "resume_conversation_ai_cas",
 ]
