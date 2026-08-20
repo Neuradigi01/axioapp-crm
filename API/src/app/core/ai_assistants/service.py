@@ -259,6 +259,30 @@ async def update_assistant(
     if payload.key_id is not None and payload.key_id != row.key_id:
         await _validate_key_belongs_to_org(db, key_id=payload.key_id)
 
+    # tasks/ai-assistants-omnichannel Step 1 — channel-conflict
+    # pre-flight. Only fires for channels being NEWLY bound (not
+    # already on this assistant), so re-saving without changing the
+    # binding is a no-op. Rejects if another active assistant in the
+    # same org already owns any of the newly-added channels.
+    if payload.bound_channels is not None:
+        current_set = set(row.bound_channels or [])
+        new_channels = [c.value for c in payload.bound_channels]
+        newly_added = [ch for ch in new_channels if ch not in current_set]
+        for ch in newly_added:
+            other = await _da.find_active_assistant_bound_to_channel(
+                db, channel=ch, exclude_assistant_id=row.id
+            )
+            if other is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "reason": "channel_already_bound",
+                        "channel": ch,
+                        "other_assistant_id": str(other.id),
+                        "other_assistant_name": other.name,
+                    },
+                )
+
     # SQLAlchemy's version_id_col machinery reads the mapped
     # `version` attribute and enforces WHERE version = :current on
     # UPDATE. Setting the attribute to the payload's version simulates
@@ -420,9 +444,7 @@ async def _resolve_knowledge_or_404(
 ) -> AiAssistantKnowledge:
     """Timing-safe: the assistant lookup is the primary 404 branch;
     the knowledge lookup falls back to the same 404 detail."""
-    await _resolve_assistant_or_404(
-        db, org_id=org_id, assistant_id=assistant_id
-    )
+    await _resolve_assistant_or_404(db, org_id=org_id, assistant_id=assistant_id)
     row = await _da.get_knowledge_by_id(db, knowledge_id)
     if row is None or row.assistant_id != assistant_id:
         raise _knowledge_not_found()
@@ -437,9 +459,7 @@ async def _return_existing_or_none(
 ) -> AiAssistantKnowledge | None:
     """Dedup lookup — the caller returns the existing row (with
     ``duplicate=true``) instead of creating a new one."""
-    return await _da.get_knowledge_by_hash(
-        db, assistant_id=assistant_id, content_hash=content_hash
-    )
+    return await _da.get_knowledge_by_hash(db, assistant_id=assistant_id, content_hash=content_hash)
 
 
 # --- File source ---------------------------------------------------------
@@ -460,9 +480,7 @@ async def create_knowledge_from_file(
     (``duplicate=False``). Dedup key: SHA-256 of file bytes scoped
     to ``(assistant_id, content_hash)``.
     """
-    await _resolve_assistant_or_404(
-        db, org_id=org_id, assistant_id=assistant_id
-    )
+    await _resolve_assistant_or_404(db, org_id=org_id, assistant_id=assistant_id)
     try:
         validated: ValidatedUpload = validate_upload(filename=filename, data=data)
     except FileValidationError as exc:
@@ -535,9 +553,7 @@ async def create_knowledge_from_text(
     """Same dedup contract as the file path — the hash is computed
     from the body bytes so re-typing the same paragraph returns the
     prior row."""
-    await _resolve_assistant_or_404(
-        db, org_id=org_id, assistant_id=assistant_id
-    )
+    await _resolve_assistant_or_404(db, org_id=org_id, assistant_id=assistant_id)
     body_bytes = payload.body_text.encode("utf-8")
     content_hash = hashlib.sha256(body_bytes).digest()
 
@@ -593,9 +609,7 @@ async def create_knowledge_from_url(
     SHA-256 of the URL string itself — re-adding the same URL
     returns the same row, and Step 17's refresh flow re-embeds
     against the same id."""
-    await _resolve_assistant_or_404(
-        db, org_id=org_id, assistant_id=assistant_id
-    )
+    await _resolve_assistant_or_404(db, org_id=org_id, assistant_id=assistant_id)
     # Fast reject before DB work. safe_fetch's internal _validate_url
     # is not exported; we call it via a fetch-with-tiny-timeout to
     # reuse the exact same check. Actually — call the fetch itself
@@ -668,9 +682,7 @@ async def list_knowledge(
     org_id: uuid.UUID,
     assistant_id: uuid.UUID,
 ) -> list[AiAssistantKnowledge]:
-    await _resolve_assistant_or_404(
-        db, org_id=org_id, assistant_id=assistant_id
-    )
+    await _resolve_assistant_or_404(db, org_id=org_id, assistant_id=assistant_id)
     return await _da.list_knowledge_by_assistant(db, assistant_id=assistant_id)
 
 
@@ -705,9 +717,7 @@ async def cancel_knowledge(
         )
     if row.status == KnowledgeStatus.pending_cancel:
         return row
-    await _da.set_status(
-        db, knowledge_id=knowledge_id, status=KnowledgeStatus.pending_cancel
-    )
+    await _da.set_status(db, knowledge_id=knowledge_id, status=KnowledgeStatus.pending_cancel)
     await db.commit()
     await db.refresh(row)
     return row
@@ -733,9 +743,7 @@ async def delete_knowledge(
         knowledge_id=knowledge_id,
     )
     if row.status == KnowledgeStatus.processing:
-        await _da.set_status(
-            db, knowledge_id=knowledge_id, status=KnowledgeStatus.pending_delete
-        )
+        await _da.set_status(db, knowledge_id=knowledge_id, status=KnowledgeStatus.pending_delete)
         await db.commit()
         return
 
@@ -846,9 +854,7 @@ async def upload_profile_picture(
         ) from exc
 
     ts_ms = int(time.time() * 1000)
-    key = _profile_picture_key(
-        org_id, assistant_id, ext=validated.extension, ts_ms=ts_ms
-    )
+    key = _profile_picture_key(org_id, assistant_id, ext=validated.extension, ts_ms=ts_ms)
     try:
         storage = get_storage()
         ref = storage.put(key, data, content_type=validated.sniffed_mime)

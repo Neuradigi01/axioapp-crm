@@ -23,6 +23,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.core.ai_assistants.models import (
+    AiAssistantChannel,
     AiAssistantStatus,
     KnowledgeSourceType,
     KnowledgeStatus,
@@ -152,6 +153,11 @@ class AiAssistantUpdate(BaseModel):
     # colour or text slot.
     interface_config: dict[str, Any] | None = None
     styling_config: dict[str, Any] | None = None
+    # tasks/ai-assistants-omnichannel Step 1 — channels this assistant
+    # should auto-answer on. Pydantic enum validation rejects unknown
+    # channel keys; service enforces "at most one active assistant per
+    # (org, channel)" at update time.
+    bound_channels: list[AiAssistantChannel] | None = None
 
 
 # --- Read -----------------------------------------------------------------
@@ -185,6 +191,7 @@ class AiAssistantRead(BaseModel):
     created_by_user_id: uuid.UUID | None
     interface_config: dict[str, Any]
     styling_config: dict[str, Any]
+    bound_channels: list[AiAssistantChannel]
     created_at: datetime
     updated_at: datetime
 

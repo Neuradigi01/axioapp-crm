@@ -62,15 +62,40 @@ async def get_assistant_row_no_org_filter(
     on either branch.
     """
     result = await db.execute(
-        text(
-            "SELECT id, org_id FROM tbl_ai_assistants WHERE id = :id LIMIT 1"
-        ),
+        text("SELECT id, org_id FROM tbl_ai_assistants WHERE id = :id LIMIT 1"),
         {"id": str(assistant_id)},
     )
     row = result.first()
     if row is None:
         return None
     return uuid.UUID(str(row[0])), uuid.UUID(str(row[1]))
+
+
+async def find_active_assistant_bound_to_channel(
+    db: AsyncSession,
+    *,
+    channel: str,
+    exclude_assistant_id: uuid.UUID | None = None,
+) -> AiAssistant | None:
+    """Return the active assistant in the caller's org whose
+    ``bound_channels`` array contains ``channel``, or ``None``.
+
+    Used by the service's channel-conflict pre-flight (Step 1) and by
+    the inbound dispatch (Step 5). ``exclude_assistant_id`` lets the
+    conflict check skip the row being edited so re-saving without
+    changing channels doesn't self-conflict. TenantScoped RLS filter
+    keeps the query org-scoped."""
+    stmt = select(AiAssistant).where(
+        AiAssistant.status == AiAssistantStatus.active,
+        # JSONB ``?`` operator: element-exists in top-level array.
+        # Uses the GIN index created in migration 0209.
+        AiAssistant.bound_channels.op("?")(channel),
+    )
+    if exclude_assistant_id is not None:
+        stmt = stmt.where(AiAssistant.id != exclude_assistant_id)
+    stmt = stmt.limit(1)
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 async def list_assistants(
@@ -179,11 +204,7 @@ async def set_assistant_status(
     goes through raw UPDATE so we don't collide with the
     ``version_id_col`` on the model (archive isn't user-edit).
     """
-    stmt = (
-        update(AiAssistant)
-        .where(AiAssistant.id == assistant_id)
-        .values(status=status)
-    )
+    stmt = update(AiAssistant).where(AiAssistant.id == assistant_id).values(status=status)
     await db.execute(stmt)
 
 
@@ -209,11 +230,7 @@ async def reassign_assistant_key_ids(
 ) -> int:
     """Bulk UPDATE of every assistant's ``key_id`` from one key to
     another. TenantScoped auto-filter narrows to caller's org."""
-    stmt = (
-        update(AiAssistant)
-        .where(AiAssistant.key_id == from_key_id)
-        .values(key_id=to_key_id)
-    )
+    stmt = update(AiAssistant).where(AiAssistant.key_id == from_key_id).values(key_id=to_key_id)
     result = await db.execute(stmt)
     return int(result.rowcount or 0)
 
@@ -561,9 +578,7 @@ async def set_status(
     if clear_heartbeat:
         values["heartbeat_at"] = None
     stmt = (
-        update(AiAssistantKnowledge)
-        .where(AiAssistantKnowledge.id == knowledge_id)
-        .values(**values)
+        update(AiAssistantKnowledge).where(AiAssistantKnowledge.id == knowledge_id).values(**values)
     )
     await db.execute(stmt)
 
@@ -581,9 +596,7 @@ async def heartbeat_pulse(
     if progress_pct is not None:
         values["progress_pct"] = progress_pct
     stmt = (
-        update(AiAssistantKnowledge)
-        .where(AiAssistantKnowledge.id == knowledge_id)
-        .values(**values)
+        update(AiAssistantKnowledge).where(AiAssistantKnowledge.id == knowledge_id).values(**values)
     )
     await db.execute(stmt)
 
@@ -741,10 +754,7 @@ async def analytics_top_questions(
             "limit": int(limit),
         },
     )
-    return [
-        {"normalized": str(r.normalized), "count": int(r.n)}
-        for r in result.all()
-    ]
+    return [{"normalized": str(r.normalized), "count": int(r.n)} for r in result.all()]
 
 
 __all__ = [
@@ -755,6 +765,7 @@ __all__ = [
     "create_ai_widget_conversation",
     "delete_assistant",
     "delete_knowledge_row",
+    "find_active_assistant_bound_to_channel",
     "get_assistant_by_id",
     "get_assistant_row_no_org_filter",
     "get_knowledge_by_hash",

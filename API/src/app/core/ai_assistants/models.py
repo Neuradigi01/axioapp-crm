@@ -55,6 +55,19 @@ ai_assistant_status_enum = ENUM(
 )
 
 
+class AiAssistantChannel(str, enum.Enum):
+    """Channels an assistant can auto-answer on. Storage lives in
+    ``tbl_ai_assistants.bound_channels`` (JSONB array), NOT a Postgres
+    ENUM — that way new channels (``instagram`` / ``facebook`` / ``sms``)
+    can be added here without a migration. Values overlap with
+    :class:`~core.conversations.models.ConversationChannel` keys so the
+    inbound-dispatch lookup is a straight string match."""
+
+    ai_widget = "ai_widget"
+    whatsapp = "whatsapp"
+    email = "email"
+
+
 class KnowledgeSourceType(str, enum.Enum):
     file = "file"
     text = "text"
@@ -250,6 +263,17 @@ class AiAssistant(Base, TenantScoped):
         JSONB,
         nullable=False,
         server_default=sql_text("'{}'::jsonb"),
+    )
+    # tasks/ai-assistants-omnichannel Step 1 — which channels this
+    # assistant should auto-answer on. Empty list = widget-only publish
+    # (default; matches pre-omnichannel behaviour). Uniqueness across
+    # active assistants in the same org is enforced at the service
+    # layer (a Postgres CHECK on a JSONB array is awkward). Values are
+    # ``AiAssistantChannel`` enum keys.
+    bound_channels: Mapped[list[str]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sql_text("'[]'::jsonb"),
     )
     # Step 16 — auto-lead-capture config. Nullable / defaulted so
     # every pre-Step-16 assistant survives the ALTER without a
