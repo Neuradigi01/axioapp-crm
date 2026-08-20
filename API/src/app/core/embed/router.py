@@ -156,13 +156,6 @@ async def issue_ai_assistant_embed_key(
     """Issue an embed key scoped to one AI assistant. Plaintext
     ``secret`` appears in the response ONCE — the operator must copy
     it before navigating away."""
-    import logging as _lg
-
-    _lg.getLogger("ai_assistants.embed.debug").warning(
-        "AI_WIDGET_DEBUG issue_ai_assistant_endpoint HIT assistant_id=%s org_id=%s",
-        assistant_id,
-        user.org_id,
-    )
     row, plain = await issue(
         db,
         org_id=user.org_id,
