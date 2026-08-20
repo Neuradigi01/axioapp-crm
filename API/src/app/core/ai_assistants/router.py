@@ -61,10 +61,11 @@ def _caller_org_id() -> uuid.UUID:
 
 
 def _user_id(user: User) -> uuid.UUID | None:
-    """Extract the user's id. Kept as a helper so a future
-    ``created_by`` cross-reference (e.g. staff-portal PIN user vs
-    admin JWT user) can diverge here without touching every endpoint."""
-    return getattr(user, "id", None)
+    """Extract the user's UUID identity. ``tbl_user_login`` has an
+    integer PK (legacy auth heritage) plus a ``legacy_uuid`` UUID
+    column; audit trails across the CRM key off the UUID (matches
+    ``leads``, ``activities``, ``appointments``, ``dashboard``)."""
+    return getattr(user, "legacy_uuid", None)
 
 
 # --- List ----------------------------------------------------------------

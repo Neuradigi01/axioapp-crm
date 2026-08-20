@@ -15,10 +15,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   computed,
   inject,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -61,6 +63,12 @@ export class CreateAssistantModalComponent {
     }),
   });
 
+  // Refs to raw DOM inputs so we can force-sync live values into the
+  // reactive form controls at submit time. Reactive forms can lag behind
+  // the DOM on browser autofill, IME composition, or certain paste paths.
+  private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
+  private readonly keySelect = viewChild<ElementRef<HTMLSelectElement>>('keySelect');
+
   protected readonly hasKeys = computed(() => this.keys().length > 0);
   protected readonly canSave = computed(() => this.form.valid && !this.saving() && this.hasKeys());
 
@@ -92,7 +100,32 @@ export class CreateAssistantModalComponent {
   }
 
   protected save(): void {
-    if (!this.canSave()) return;
+    if (this.saving()) return;
+
+    // Sync live DOM values into the reactive form before validating —
+    // browser autofill / paste don't always fire the events Angular's
+    // formControlName listens for.
+    const nameEl = this.nameInput()?.nativeElement;
+    if (nameEl && this.form.controls.name.value !== nameEl.value) {
+      this.form.controls.name.setValue(nameEl.value);
+      this.form.controls.name.markAsDirty();
+    }
+    const keyEl = this.keySelect()?.nativeElement;
+    if (keyEl && this.form.controls.key_id.value !== keyEl.value) {
+      this.form.controls.key_id.setValue(keyEl.value);
+      this.form.controls.key_id.markAsDirty();
+    }
+
+    if (!this.hasKeys()) {
+      this.saveError.set('Add an OpenAI key in Settings → Integrations first.');
+      return;
+    }
+    if (!this.form.valid) {
+      this.form.markAllAsTouched();
+      this.saveError.set('Enter a name and pick an OpenAI key.');
+      return;
+    }
+
     this.saving.set(true);
     this.saveError.set(null);
     const raw = this.form.getRawValue();
