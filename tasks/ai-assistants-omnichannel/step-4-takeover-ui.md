@@ -1,7 +1,7 @@
 # Step 4 — "Take Over" / "Return to AI" UI in the Conversations inbox
 
 **Goal:** Add the AI-status pill + Take Over / Return to AI buttons to the conversation detail. Add a live AI-status column to the conversation list. Everything reactive to the WebSocket `conversation.updated` events emitted by Step 3.
-**Status:** Pending
+**Status:** COMPLETED — takeover banner lives in `chat-thread.component.html` above the message scroll, two colour states (emerald "🤖 AI is handling · Take Over" / amber "✋ {holder} is handling · Return to AI"). Two new outputs on the thread component (`takeoverAi`, `resumeAiOut`); the page wires them to `onTakeoverAi()` / `onResumeAi()` which call the Step 3 endpoints. Race 409 → toast *"{holder} just took this over."* + local reload; 403 `not_holder` on resume → toast explaining only the holder or admin can return. Confirmation dialog on Return-to-AI (native `window.confirm`). MatSnackBar toasts across success / error / race. Conversation list row gained a live indicator: 🤖 AI handled (violet) or ✋ Human took over (amber). AI Assistants API service gained `pauseAi(id)` / `resumeAi(id)`. `Conversation` TS interface extended with `ai_paused` / `ai_paused_by_user_id` / `ai_paused_at`. **WebSocket live-refresh deferred** (see Step 3 report) — the clicker's own tab flips instantly via the endpoint response, other tabs see the change on inbox refresh; the `_reloadDetail(id)` call after each success also pulls the newly-inserted system marker message into the thread. `tsc --noEmit` green; prettier clean.
 **Depends on:** Step 3 (endpoints + WebSocket events).
 
 ---

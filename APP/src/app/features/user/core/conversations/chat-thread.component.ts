@@ -71,6 +71,17 @@ export class ChatThreadComponent implements AfterViewChecked {
 
   @Output() readonly toggleAi = new EventEmitter<boolean>();
 
+  /** tasks/ai-assistants-omnichannel Step 4 — user clicked the Take
+   *  Over button on the AI-status banner. The page owns the POST +
+   *  optimistic-flip semantics. Emitted only when ``ai_paused === false``
+   *  is visible in the banner. */
+  @Output() readonly takeoverAi = new EventEmitter<void>();
+
+  /** Step 4 — user clicked Return to AI (banner in the paused state).
+   *  Confirmation dialog lives on the page side so this stays a bare
+   *  emit — one click, one event. */
+  @Output() readonly resumeAiOut = new EventEmitter<void>();
+
   /** Fires when the user clicks the assignee pill. The page parent owns
    * the modal + PATCH. We emit a bare event because the parent already
    * knows which conversation is selected via `selectedConversation()`. */
@@ -211,6 +222,33 @@ export class ChatThreadComponent implements AfterViewChecked {
 
   protected toggle(): void {
     this.toggleAi.emit(!this.conversation.ai_handling);
+  }
+
+  // --- AI takeover banner (omnichannel Step 4) ---------------------
+
+  /** Show the takeover banner when either the assistant is running
+   *  (``ai_handling``) OR a human has already paused it. Pure human
+   *  threads have neither and don't render the banner at all. */
+  protected showTakeoverBanner(): boolean {
+    return !!this.conversation.ai_handling || !!this.conversation.ai_paused;
+  }
+
+  /** Display name of whoever currently holds the paused conversation.
+   *  Reuses the ``staffById`` map the header already consumes; falls
+   *  back to a generic label so historical / soft-deleted holders
+   *  never render as an empty string. */
+  protected pausedHolderName(): string {
+    const holderId = this.conversation.ai_paused_by_user_id;
+    if (!holderId) return 'A team member';
+    return this.staffById.get(holderId)?.full_name ?? 'A team member';
+  }
+
+  protected onTakeoverClick(): void {
+    this.takeoverAi.emit();
+  }
+
+  protected onResumeClick(): void {
+    this.resumeAiOut.emit();
   }
 
   /** Two-letter initials for a staff member referenced by user id.

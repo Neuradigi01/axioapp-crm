@@ -173,6 +173,39 @@
     </div>
   }
 
+  <!-- AI takeover banner (omnichannel Step 4) -->
+  @if (showTakeoverBanner()) {
+    @if (conversation.ai_paused) {
+      <div
+        class="flex items-center justify-between gap-3 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-400"
+      >
+        <span>
+          ✋ <strong>{{ pausedHolderName() }}</strong> is handling this conversation. AI is paused.
+        </span>
+        <button
+          type="button"
+          class="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/20"
+          (click)="onResumeClick()"
+        >
+          Return to AI
+        </button>
+      </div>
+    } @else {
+      <div
+        class="flex items-center justify-between gap-3 border-b border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs text-emerald-400"
+      >
+        <span> 🤖 AI is handling this conversation. </span>
+        <button
+          type="button"
+          class="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20"
+          (click)="onTakeoverClick()"
+        >
+          Take Over
+        </button>
+      </div>
+    }
+  }
+
   <!-- Messages -->
   <div #scrollHost class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-surface-2 px-4 py-4">
     @if (loading) {

@@ -164,8 +164,14 @@
                 </div>
                 <p class="mt-0.5 truncate text-[11.5px] text-muted">
                   <span class="capitalize">{{ c.status }}</span>
-                  @if (c.ai_handling) {
-                    <span class="text-violet-400"> · AI handled </span>
+                  @if (c.ai_paused) {
+                    <span class="text-amber-400" title="A team member took over from AI">
+                      · ✋ Human took over
+                    </span>
+                  } @else if (c.ai_handling) {
+                    <span class="text-violet-400" title="AI is handling this conversation">
+                      · 🤖 AI handled
+                    </span>
                   }
                 </p>
                 @if (c.tags && c.tags.length > 0) {

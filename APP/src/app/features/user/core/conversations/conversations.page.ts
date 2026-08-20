@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { LucideAngularModule } from 'lucide-angular';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -85,6 +86,7 @@ export class ConversationsPageComponent {
   private readonly contactsApi = inject(ContactsApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly snackBar = inject(MatSnackBar);
 
   /** Step 27b — handle to the compose-bar so we can read its
    *  current Send-From selection on send. The picker self-hides
@@ -775,6 +777,87 @@ export class ConversationsPageComponent {
           this.sendError.set(extractApiError(err) ?? 'Could not update AI handling.');
         },
       });
+  }
+
+  // --- AI takeover (omnichannel Step 4) ------------------------------
+
+  protected onTakeoverAi(): void {
+    const id = this.selectedId();
+    if (!id) return;
+    this.api
+      .pauseAi(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
+          this._showToast('You took over from AI. Reload the thread to see the system message.');
+          // Reload the thread so the freshly-inserted system marker
+          // ("— {you} took over from AI —") lands in the UI without
+          // needing a full page refresh.
+          this._reloadDetail(id);
+        },
+        error: (err: HttpErrorResponse) => {
+          if (err.status === 409) {
+            const detail = err.error?.detail;
+            const holder =
+              (detail && typeof detail === 'object' && detail.holder_name) || 'Another user';
+            this._showToast(`${holder} just took this over.`);
+            // Refresh so our local state matches the winner's.
+            this._reloadDetail(id);
+          } else {
+            this._showToast(extractApiError(err) ?? 'Could not take over.');
+          }
+        },
+      });
+  }
+
+  protected onResumeAi(): void {
+    const id = this.selectedId();
+    if (!id) return;
+    if (!window.confirm('Return this conversation to AI? The AI will handle future messages.')) {
+      return;
+    }
+    this.api
+      .resumeAi(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
+          this._showToast('Returned to AI.');
+          this._reloadDetail(id);
+        },
+        error: (err: HttpErrorResponse) => {
+          const detail = err.error?.detail;
+          if (err.status === 403 && detail?.reason === 'not_holder') {
+            this._showToast('Only the person who took over (or an admin) can return this to AI.');
+          } else {
+            this._showToast(extractApiError(err) ?? 'Could not return to AI.');
+          }
+        },
+      });
+  }
+
+  private _reloadDetail(id: string): void {
+    this.api
+      .detail(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (fresh) => this.detail.set(fresh),
+        error: () => {
+          /* silent — the takeover succeeded; the thread just won't
+             re-render the system message until manual refresh. */
+        },
+      });
+  }
+
+  private _showToast(message: string): void {
+    this.snackBar.open(message, 'OK', {
+      duration: 3000,
+      horizontalPosition: 'right',
+      verticalPosition: 'top',
+    });
   }
 
   /**

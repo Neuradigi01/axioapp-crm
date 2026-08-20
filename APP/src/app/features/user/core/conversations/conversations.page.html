@@ -159,6 +159,8 @@
           [loading]="threadLoading()"
           [staffById]="staffById()"
           (toggleAi)="onToggleAi($event)"
+          (takeoverAi)="onTakeoverAi()"
+          (resumeAiOut)="onResumeAi()"
           (reassign)="openReassign()"
           (replyTo)="onReplyTo($event)"
           (react)="onReact($event)"
