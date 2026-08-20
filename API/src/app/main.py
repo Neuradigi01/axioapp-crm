@@ -300,6 +300,16 @@ _STORAGE_DIR = "./storage"
 os.makedirs(_STORAGE_DIR, exist_ok=True)
 app.mount("/files", StaticFiles(directory=_STORAGE_DIR), name="files")
 
+# Public chat widget bundle — served as-is to any origin so a customer's
+# ``<script src=".../widget/v1/widget.js">`` tag works cross-origin. Built
+# by ``../widget`` (Vite) into ``../widget/dist/v1/widget.js``; docker-compose
+# mounts that folder into the container at ``/app/widget``. In production a
+# CDN in front of the API absorbs the traffic; the FastAPI mount is the
+# dev + fallback path.
+_WIDGET_DIR = "./widget"
+if os.path.isdir(_WIDGET_DIR):
+    app.mount("/widget", StaticFiles(directory=_WIDGET_DIR), name="widget")
+
 app.include_router(legacy_router)
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")

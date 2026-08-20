@@ -6,7 +6,14 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Library build — one ES module at `dist/v1/widget.js`.
+ * Library build — one IIFE bundle at `dist/v1/widget.js`.
+ *
+ * IIFE (immediately-invoked function expression) is the correct format
+ * for a drop-in `<script src=".../widget.js">` snippet: it self-executes,
+ * leaks nothing to the global scope, and works in a plain classic
+ * `<script>` tag without requiring the customer to add `type="module"`.
+ * (An ESM build fails with `Uncaught SyntaxError: Unexpected token
+ * 'export'` when loaded as a classic script.)
  *
  * The `/v1/` segment in the output path is intentional: the customer-
  * facing install snippet pins the major version (`/v1/widget.js`) so
@@ -71,11 +78,14 @@ export default defineConfig({
   build: {
     lib: {
       // Loader is the bundle's entry — it auto-discovers the
-      // <script> tag on customer pages and calls `init()`. The
-      // loader re-exports `init` + types so manual integrations
-      // can still `import { init } from "/v1/widget.js"`.
+      // <script> tag on customer pages and calls `init()`.
       entry: "src/loader.ts",
-      formats: ["es"],
+      // IIFE so the bundle drops into any `<script>` tag on a
+      // customer's site without requiring `type="module"`. The
+      // `name` gates what the wrapper exposes on `window`; we
+      // keep it namespaced but no one is expected to reach for it.
+      formats: ["iife"],
+      name: "CrmAiAssistantWidget",
       fileName: () => "v1/widget.js",
     },
     outDir: "dist",

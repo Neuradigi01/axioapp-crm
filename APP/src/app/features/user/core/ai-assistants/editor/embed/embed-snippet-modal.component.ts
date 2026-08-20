@@ -19,6 +19,7 @@ import {
   DestroyRef,
   EventEmitter,
   Input,
+  OnInit,
   Output,
   computed,
   inject,
@@ -44,6 +45,17 @@ function _widgetHost(): string {
   return `${base}/widget`;
 }
 
+/** The API base URL that the widget must hit for session-init +
+ *  message streaming (the ``data-host`` snippet attribute). Defaults
+ *  to the CRM instance's own API host — snippets copied out of THIS
+ *  instance route back to THIS instance's public endpoints. Without
+ *  this, the widget falls back to the ``DEFAULT_HOST`` hard-coded in
+ *  ``widget/src/loader.ts`` (production furnicrm.app) and 404s on any
+ *  self-hosted / dev / staging deployment. */
+function _apiHost(): string {
+  return environment.apiBaseUrl.replace(/\/api\/v1\/?$/, '');
+}
+
 @Component({
   selector: 'app-embed-snippet-modal',
   standalone: true,
@@ -51,7 +63,7 @@ function _widgetHost(): string {
   imports: [CommonModule, LucideAngularModule],
   templateUrl: './embed-snippet-modal.component.html',
 })
-export class EmbedSnippetModalComponent {
+export class EmbedSnippetModalComponent implements OnInit {
   private readonly api = inject(AiAssistantsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -68,6 +80,7 @@ export class EmbedSnippetModalComponent {
   protected readonly copyState = signal<'idle' | 'copied'>('idle');
 
   protected readonly widgetHost = _widgetHost();
+  protected readonly apiHost = _apiHost();
 
   /** The most-recent live key — used to build the default snippet. */
   protected readonly primaryKey = computed<EmbedKeyRow | null>(() => {
@@ -89,12 +102,17 @@ export class EmbedSnippetModalComponent {
 <script
   src="${this.widgetHost}/v1/widget.js"
   data-key="${keyStr}"
+  data-host="${this.apiHost}"
   data-mount="crm-ai-assistant"
   defer
 ></script>`;
   });
 
-  constructor() {
+  // Fetch keys in ngOnInit, NOT the constructor — Angular sets
+  // ``@Input`` values after construction but before ngOnInit, so
+  // ``this.assistantId`` is ``undefined`` inside the constructor and the
+  // URL template literal would resolve to ``/embed/ai-assistants/undefined/keys``.
+  ngOnInit(): void {
     this.refresh();
   }
 

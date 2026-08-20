@@ -110,6 +110,8 @@ export interface AiAssistantUpdatePayload {
   lead_capture_mode?: LeadCaptureMode;
   lead_capture_turn_n?: number;
   lead_capture_message?: string | null;
+  interface_config?: Record<string, unknown>;
+  styling_config?: Record<string, unknown>;
 }
 
 @Injectable({ providedIn: 'root' })

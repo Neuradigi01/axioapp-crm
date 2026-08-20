@@ -198,6 +198,8 @@ export class AssistantFormStateService {
       lead_capture_mode: s.lead_capture_mode,
       lead_capture_turn_n: s.lead_capture_turn_n,
       lead_capture_message: s.lead_capture_message,
+      interface_config: s.interface_config,
+      styling_config: s.styling_config,
     };
   }
 

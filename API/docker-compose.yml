@@ -35,6 +35,9 @@ services:
       - ./static:/app/static
       - ./logs:/app/logs
       - ./storage:/app/storage
+      # Public chat widget bundle (built by ../widget with Vite). Served
+      # read-only via the FastAPI /widget static mount in main.py.
+      - ../widget/dist:/app/widget:ro
     env_file:
       - config.env
     environment:

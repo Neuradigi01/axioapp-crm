@@ -143,6 +143,15 @@ class AiAssistantUpdate(BaseModel):
         ge=_RETENTION_DAYS_MIN,
         le=_RETENTION_DAYS_MAX,
     )
+    # JSONB blobs owned by the Assistant Interface + Styling tabs. Sent
+    # as full replacement (frontend holds the merged copy in its signal
+    # store, patches keys as the operator edits, then ships the whole
+    # object on Save). ``dict[str, Any]`` intentionally permissive — the
+    # widget renderer defends against unknown keys, and locking a rigid
+    # shape here would force a schema bump every time the UI adds a new
+    # colour or text slot.
+    interface_config: dict[str, Any] | None = None
+    styling_config: dict[str, Any] | None = None
 
 
 # --- Read -----------------------------------------------------------------
