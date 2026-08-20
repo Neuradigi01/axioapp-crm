@@ -226,11 +226,20 @@ export class ChatThreadComponent implements AfterViewChecked {
 
   // --- AI takeover banner (omnichannel Step 4) ---------------------
 
-  /** Show the takeover banner when either the assistant is running
-   *  (``ai_handling``) OR a human has already paused it. Pure human
-   *  threads have neither and don't render the banner at all. */
+  /** Show the takeover banner on every channel that CAN carry AI —
+   *  widget conversations always can; WhatsApp / Email do when the
+   *  org has an assistant bound to that channel. Rather than
+   *  round-tripping the bind check on every render, we show the
+   *  banner on all three AI-capable channels + defer the "actually
+   *  paused / running" state to the server (a click always resolves
+   *  to a real conversation update on the backend). Pure non-AI
+   *  channels (sms / instagram / facebook / push) keep a clean
+   *  human-only UI. */
   protected showTakeoverBanner(): boolean {
-    return !!this.conversation.ai_handling || !!this.conversation.ai_paused;
+    if (this.conversation.ai_paused) return true;
+    if (this.conversation.ai_handling) return true;
+    const ch = this.conversation.channel;
+    return ch === 'ai_widget' || ch === 'whatsapp' || ch === 'email';
   }
 
   /** Display name of whoever currently holds the paused conversation.
