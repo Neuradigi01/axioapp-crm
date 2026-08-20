@@ -176,6 +176,7 @@ class ChatRuntime:
         is_public: bool,
         is_disconnected: Callable[[], bool] | None = None,
         embed_key_id: uuid.UUID | None = None,
+        existing_conversation_id: uuid.UUID | None = None,
     ) -> None:
         self._db = db
         self._org_id = org_id
@@ -183,6 +184,12 @@ class ChatRuntime:
         self._user_message = user_message
         self._session_token = session_token
         self._is_public = is_public
+        # tasks/ai-assistants-omnichannel Step 5b — when the caller
+        # already owns a live conversation (WhatsApp inbound, future
+        # Email inbound), pass its id here and the runtime reuses it
+        # instead of minting a fresh ai_widget conversation. Widget
+        # path keeps ``None`` and the legacy create-fresh behaviour.
+        self._existing_conversation_id = existing_conversation_id
         # Step 14 — public router passes its embed_key_id so
         # revoke-now can walk the SseStreamRegistry + cancel this
         # stream mid-flight. Preview flows leave it None.
@@ -249,7 +256,16 @@ class ChatRuntime:
         """Preview + public both create a fresh conversation per
         call in v1. Persistence continuity (100-turn cap, session
         reuse across page loads) lands in Step 14 for public,
-        Step 16 for the inbox surface."""
+        Step 16 for the inbox surface.
+
+        tasks/ai-assistants-omnichannel Step 5b — when the caller
+        supplied ``existing_conversation_id``, reuse it instead of
+        creating a new ``ai_widget`` conversation. Used by WhatsApp
+        (and future Email) inbound where the conversation already
+        exists in the shared inbox."""
+        if self._existing_conversation_id is not None:
+            self._conversation_id = self._existing_conversation_id
+            return self._existing_conversation_id
         external_id = f"{'preview' if not self._is_public else 'widget'}:{self._session_token}"
         cid = await _da.create_ai_widget_conversation(
             self._db,
@@ -437,7 +453,8 @@ class ChatRuntime:
             )
 
         self._retrieved_chunk_ids = [
-            uuid.UUID(str(c["chunk_id"])) for c in retrieved
+            uuid.UUID(str(c["chunk_id"]))
+            for c in retrieved
             if float(c.get("score", 0)) >= _SIMILARITY_THRESHOLD
         ]
 
@@ -541,9 +558,7 @@ class ChatRuntime:
         from sqlalchemy import update as _update
 
         stmt = (
-            _update(Message)
-            .where(Message.id == self._assistant_message_id)
-            .values(text=full_reply)
+            _update(Message).where(Message.id == self._assistant_message_id).values(text=full_reply)
         )
         await self._db.execute(stmt)
         await _da.update_message_meta_confirmed(
@@ -607,9 +622,7 @@ async def _capture_lead_if_matched(
         )
 
 
-def _resolve_ask_message(
-    assistant: AiAssistant, *, current_turn: int
-) -> str | None:
+def _resolve_ask_message(assistant: AiAssistant, *, current_turn: int) -> str | None:
     """Return the ask-at-turn injection text when this turn matches
     the assistant's configured trigger turn; ``None`` otherwise."""
     from src.app.core.ai_assistants.lead_capture import (

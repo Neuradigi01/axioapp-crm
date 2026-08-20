@@ -95,16 +95,34 @@ async def route_whatsapp_inbound(
         channel=AiAssistantChannel.whatsapp.value,
     )
 
-    if bound is None and not conversation.ai_handling:
+    if bound is not None:
+        # Step 5b — new-style BYOK path. The bound assistant's own
+        # prompt / knowledge base / model choice answers the message,
+        # via the shared ``ChatRuntime``. Legacy delegate only kicks
+        # in when the org hasn't bound an assistant to WhatsApp yet.
+        try:
+            await _run_byok_whatsapp_reply(
+                session,
+                conversation=conversation,
+                assistant_id=bound.id,
+                inbound_text=inbound_text or "",
+            )
+        except Exception:  # pragma: no cover — defensive
+            logger.exception(
+                "ai_dispatch.whatsapp byok failed conv=%s assistant=%s",
+                conversation.id,
+                bound.id,
+            )
+        return
+
+    if not conversation.ai_handling:
         # Neither the new-style binding nor the legacy per-conversation
         # flag is set — this is a human-only conversation for this org.
         return
 
-    # Delegate to the existing WhatsApp AI handler. It internally
-    # loads org-level config, handles low-confidence escalation, and
-    # sends the reply via the WhatsApp adapter. Step 5b replaces this
-    # with a unified ChatRuntime call once the runtime accepts a
-    # ``ChannelContext`` (deferred to keep Step 5's diff reviewable).
+    # Legacy fallback — org still on the pre-omnichannel `ai_handling`
+    # flag, no bound assistant. Delegates to the org-level generic
+    # AI handler. Retire once every org migrates to a bound assistant.
     try:
         from src.app.core.integrations.whatsapp.ai_handler import (
             dispatch_ai_response,
@@ -117,9 +135,95 @@ async def route_whatsapp_inbound(
         )
     except Exception:  # pragma: no cover — defensive
         logger.exception(
-            "ai_dispatch.whatsapp delegate failed conv=%s",
+            "ai_dispatch.whatsapp legacy delegate failed conv=%s",
             conversation.id,
         )
+
+
+async def _run_byok_whatsapp_reply(
+    session,  # AsyncSession — type import lives at module top
+    *,
+    conversation: Conversation,
+    assistant_id,  # uuid.UUID
+    inbound_text: str,
+) -> None:
+    """Run the BYOK ``ChatRuntime`` against the given assistant + the
+    live WhatsApp conversation, drain the streamed reply, and send it
+    via the existing WhatsApp adapter. Step 5b.
+
+    Keeps the runtime's transport-agnostic contract: the runtime just
+    yields token chunks; this function collects them and hands the
+    full text to the WhatsApp adapter. Same pattern will apply to
+    Email in a follow-up (email's outbound adapter takes a full body
+    string, not a stream)."""
+    from datetime import UTC, datetime
+
+    from src.app.core.ai_assistants.runtime import ChatRuntime
+    from src.app.core.conversations.adapters.whatsapp import (
+        WhatsAppNotConnected,
+        resolve_whatsapp_adapter,
+    )
+    from src.app.core.conversations.models import (
+        Message,
+        MessageDirection,
+    )
+
+    runtime = ChatRuntime(
+        db=session,
+        org_id=conversation.org_id,
+        assistant_id=assistant_id,
+        user_message=inbound_text,
+        session_token=f"wa:{conversation.id}",
+        is_public=True,
+        existing_conversation_id=conversation.id,
+    )
+
+    full_reply: list[str] = []
+    async for chunk in runtime.stream_reply():
+        if chunk.type == "token" and chunk.delta:
+            full_reply.append(chunk.delta)
+    text = "".join(full_reply).strip()
+    if not text:
+        # Runtime already persisted a fallback message + committed —
+        # nothing left to send. Silent.
+        return
+
+    try:
+        adapter = await resolve_whatsapp_adapter(session)
+    except WhatsAppNotConnected:
+        logger.info(
+            "ai_dispatch.whatsapp byok skipped conv=%s reason=wa_not_connected",
+            conversation.id,
+        )
+        return
+
+    ref = await adapter.send(
+        org_id=conversation.org_id,
+        external_id=conversation.external_id,
+        text=text,
+        attachments=[],
+    )
+    now = datetime.now(UTC)
+    sent_at = ref.sent_at or now
+    outbound = Message(
+        org_id=conversation.org_id,
+        conversation_id=conversation.id,
+        direction=MessageDirection.out,
+        sender_user_id=None,
+        text=text,
+        attachments=[],
+        channel_message_id=ref.channel_message_id,
+        payload={
+            "author": "ai",
+            "assistant_id": str(assistant_id),
+            "adapter_ref": ref.channel_message_id,
+            "source": "byok_whatsapp",
+        },
+        sent_at=sent_at,
+    )
+    session.add(outbound)
+    conversation.last_message_at = sent_at
+    await session.commit()
 
 
 async def route_email_inbound(
