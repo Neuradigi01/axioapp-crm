@@ -69,7 +69,16 @@ async def route_whatsapp_inbound(
     # Refresh: caller may not have re-read after the inbound INSERT.
     await session.refresh(conversation)
 
+    logger.warning(
+        "ai_dispatch.whatsapp entered conv=%s org=%s paused=%s handling=%s",
+        conversation.id,
+        conversation.org_id,
+        conversation.ai_paused,
+        conversation.ai_handling,
+    )
+
     if conversation.ai_paused:
+        logger.warning("ai_dispatch.whatsapp skipped conv=%s reason=paused", conversation.id)
         return
 
     if handover.matches(inbound_text):
@@ -94,6 +103,10 @@ async def route_whatsapp_inbound(
         session,
         channel=AiAssistantChannel.whatsapp.value,
     )
+    logger.warning(
+        "ai_dispatch.whatsapp bound_assistant=%s",
+        bound.id if bound is not None else None,
+    )
 
     if bound is not None:
         # Step 5b — new-style BYOK path. The bound assistant's own
@@ -101,11 +114,21 @@ async def route_whatsapp_inbound(
         # via the shared ``ChatRuntime``. Legacy delegate only kicks
         # in when the org hasn't bound an assistant to WhatsApp yet.
         try:
+            logger.warning(
+                "ai_dispatch.whatsapp byok invoking conv=%s assistant=%s",
+                conversation.id,
+                bound.id,
+            )
             await _run_byok_whatsapp_reply(
                 session,
                 conversation=conversation,
                 assistant_id=bound.id,
                 inbound_text=inbound_text or "",
+            )
+            logger.warning(
+                "ai_dispatch.whatsapp byok completed conv=%s assistant=%s",
+                conversation.id,
+                bound.id,
             )
         except Exception:  # pragma: no cover — defensive
             logger.exception(
