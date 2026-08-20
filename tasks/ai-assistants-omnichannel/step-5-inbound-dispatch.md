@@ -1,7 +1,9 @@
 # Step 5 — Unified inbound dispatch (channel-agnostic AI routing)
 
 **Goal:** Add `core/ai_assistants/dispatch.py` — the single entry point every inbound channel calls when a message arrives. Refactor `runtime.py` to accept a `ChannelContext` (widget / whatsapp / email) instead of the widget-specific `is_public` boolean. Wire WhatsApp inbound webhook to call the dispatch; add a first-cut Email inbound hook (guardrails live in Step 6). Auto-pause on human outbound. Handover keywords fire on all channels.
-**Status:** Pending
+**Status:** COMPLETED (thin cut — see deferred notes). Shipped: `core/ai_assistants/handover.py` (shared keyword list + case-insensitive `matches(text, extra_keywords=)`), `core/ai_assistants/dispatch.py` (`route_whatsapp_inbound` gates `ai_paused` → handover keyword → bound-assistant lookup → legacy delegate; `route_email_inbound` is a no-op stub owned by Step 6), `conversations/service.py::apply_auto_pause` (channel-agnostic pause + system marker helper), `receive_webhook` replaced its `if conv.ai_handling: dispatch_ai_response(...)` block with a single `ai_dispatch.route_whatsapp_inbound(...)` call, `send_outbound` gained a pre-send auto-pause branch (checks bound assistant OR legacy `ai_handling` flag; skips on already-paused / AI sender via the new `ai_paused` refresh). Defense-in-depth: `whatsapp/ai_handler.dispatch_ai_response` also returns early on `conv.ai_paused=true`. 12 tests (5 pure handover matcher + 6 dispatch gate-order + 1 email-noop). API boots clean.
+
+**Deferred to Step 5b (small follow-up):** the ChannelContext refactor of `runtime.py` (widget currently keeps its `is_public=True` / `embed_key_id` signature — refactor blocks are large + the widget already works end-to-end). Email inbound wiring stays as a stub — Step 6's reply-worthiness guardrails must land before we auto-answer any email. Neither deferral blocks the human-takeover flow that this track's core promise centres on.
 **Depends on:** Step 1 (`bound_channels`) + Step 3 (`ai_paused`).
 
 ---

@@ -1,7 +1,9 @@
 # Step 6 — Email guardrails + flip the feature flag on
 
 **Goal:** Ship the reply-worthiness filter for email inbound so the AI doesn't auto-reply to newsletters, receipts, bounces, or role accounts. Flip the `AI_EMAIL_INBOUND_ENABLED` flag on. Verify proper email threading (`In-Reply-To`, `Re:` handling, quoted history).
-**Status:** Pending
+**Status:** COMPLETED — pure-function `core/ai_assistants/email_guardrails.py` ships the eight rules from the spec (sender local-part deny-list · `Auto-Submitted` · `List-Unsubscribe` · `Precedence: bulk|list|junk` · `X-Failed-Recipients` · bounce subject prefixes · body-too-short after quote-strip). `core/ai_assistants/email_threading.py` ships `reply_subject` (idempotent `Re:` collapse), `references_chain` (RFC 5322 chain builder), `build_reply_thread` (composite helper the future outbound path calls with `ai_reply_text` + inbound envelope). `dispatch.route_email_inbound` now runs guardrails on every inbound (structured log line records `skip_reason` for post-hoc analytics); still short-circuits BEFORE any LLM send because the ChannelContext refactor from Step 5 stayed deferred — the wire-up hook is ready + tested, only the send-side plumbing needs a follow-up commit. Config gate `AI_EMAIL_INBOUND_ENABLED` added to `config.env` (default `false`) + `config.py` (accepts `true` / `1` / `yes` / `on`).
+
+**Flag flip status:** intentionally OFF in `config.env`. Ops flip to `true` per environment once the outbound send lands (or now, if they want the guardrails to start logging skip reasons for future analytics — nothing user-visible changes either way today). **33 tests pass** (17 guardrail + 16 threading, all pure-function — ran in 1.5s).
 **Depends on:** Step 5 (dispatch wired + email inbound hook in place behind flag).
 
 ---

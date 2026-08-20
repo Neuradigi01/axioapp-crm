@@ -275,6 +275,41 @@ async def send_outbound(
     send_from_phone_id: str | None = None,
 ) -> Message:
     conv = await get_conversation(session, conversation_id)
+    # tasks/ai-assistants-omnichannel Step 5 — auto-pause AI when a
+    # human replies on an AI-active conversation without clicking
+    # Take Over first. Matches Intercom / Wati semantics: one implicit
+    # takeover; no extra button to remember. Guarded by both the
+    # legacy ``ai_handling`` flag and the new-style bound-assistant
+    # lookup so orgs still on the legacy config get the same behaviour.
+    if not conv.ai_paused:
+        should_pause = bool(conv.ai_handling)
+        if not should_pause:
+            from src.app.core.ai_assistants import data_access as _ai_da
+            from src.app.core.ai_assistants.models import AiAssistantChannel
+
+            channel_map: dict[ConversationChannel, str] = {
+                ConversationChannel.whatsapp: AiAssistantChannel.whatsapp.value,
+                ConversationChannel.email: AiAssistantChannel.email.value,
+            }
+            channel_key = channel_map.get(conv.channel)
+            if channel_key is not None:
+                bound = await _ai_da.find_active_assistant_bound_to_channel(
+                    session, channel=channel_key
+                )
+                should_pause = bound is not None
+        if should_pause:
+            await apply_auto_pause(
+                session,
+                conversation=conv,
+                actor_user_id=user_id,
+                reason="human_reply",
+            )
+            # Commit the pause + system marker BEFORE the adapter send
+            # so a slow adapter can't leave the pause in an unflushed
+            # state visible to a concurrent inbound webhook.
+            await session.commit()
+            await session.refresh(conv)
+
     # whatsapp-platform-upgrade Step 23 — block-list pre-flight on
     # WhatsApp manual outbound. Refuse cleanly with ValueError →
     # 400 so the SPA surfaces the reason in the composer.
@@ -1011,23 +1046,24 @@ async def receive_webhook(
 
             await dispatch_assignment(session, conversation=conv)
 
-        # whatsapp-platform-upgrade Step 19 — AI agent. When the
-        # conversation has `ai_handling=true`, the AI reply pipeline
-        # generates a response (or escalates to a human on low
-        # confidence / handover keyword / explicit AI request).
-        # Failures are caught inside; this call never raises into
-        # the webhook handler.
+        # tasks/ai-assistants-omnichannel Step 5 — route every
+        # inbound through the channel-agnostic AI dispatch. It
+        # enforces the ``ai_paused`` takeover flag, checks for
+        # handover keywords, resolves the org's bound assistant,
+        # and — when appropriate — delegates to the existing
+        # WhatsApp AI reply pipeline. Legacy per-conversation
+        # ``ai_handling=true`` orgs still get the old path for
+        # backward-compat (dispatch handles the branching).
+        # Failures are caught inside dispatch; this call never
+        # raises into the webhook handler.
         await session.refresh(conv)
-        if conv.ai_handling:
-            from src.app.core.integrations.whatsapp.ai_handler import (
-                dispatch_ai_response,
-            )
+        from src.app.core.ai_assistants import dispatch as ai_dispatch
 
-            await dispatch_ai_response(
-                session,
-                conversation=conv,
-                inbound_text=parsed.text,
-            )
+        await ai_dispatch.route_whatsapp_inbound(
+            session,
+            conversation=conv,
+            inbound_text=parsed.text,
+        )
 
     # tasks/chatbot-builder Step 4 — publish whatsapp.message_received.
     # Runs AFTER all existing inline processing (auto-reply / keyword
@@ -1740,6 +1776,60 @@ async def pause_ai(
     return conv
 
 
+async def apply_auto_pause(
+    session: AsyncSession,
+    *,
+    conversation: Conversation,
+    actor_user_id: uuid.UUID | None,
+    reason: str,
+) -> bool:
+    """System-authored pause used by the omnichannel dispatch
+    (``ai_assistants/dispatch.py``) and the human-outbound auto-pause
+    path. ``actor_user_id`` is the human whose action triggered the
+    pause (None for keyword-driven handover — the customer is not a
+    user). ``reason`` is one of ``handover_keyword`` / ``human_reply``
+    / a future extension; it's stored on the marker message's payload
+    so analytics can attribute later.
+
+    Returns True iff the CAS won (conversation was actually flipped).
+    Silent no-op when the conversation is already paused; safer than
+    raising because callers hit this on every inbound and won't want
+    to distinguish first vs subsequent messages after a takeover."""
+    now = datetime.now(UTC)
+    # Use system uuid (all zeros) when no actor — the marker payload
+    # captures the semantic reason so we don't need a nullable column.
+    actor_for_cas = actor_user_id or uuid.UUID(int=0)
+    won = await _da.pause_conversation_ai_cas(
+        session,
+        conversation_id=conversation.id,
+        actor_user_id=actor_for_cas,
+        now=now,
+    )
+    if not won:
+        return False
+    holder_name = await _display_name_for(session, actor_user_id) if actor_user_id else None
+    if reason == "handover_keyword":
+        body = "— Customer requested a human; AI is paused. —"
+    elif reason == "human_reply":
+        who = holder_name or "A team member"
+        body = f"— {who} replied; AI is paused. —"
+    else:
+        body = "— AI is paused. —"
+    msg = Message(
+        org_id=conversation.org_id,
+        conversation_id=conversation.id,
+        direction=MessageDirection.out,
+        sender_user_id=actor_user_id,
+        text=body,
+        attachments=[],
+        payload={"author": "system", "event": "ai_paused", "reason": reason},
+        sent_at=now,
+    )
+    _da.insert_message(session, msg)
+    conversation.last_message_at = now
+    return True
+
+
 async def resume_ai(
     session: AsyncSession,
     *,
@@ -1791,6 +1881,7 @@ async def resume_ai(
 
 
 __all__ = [
+    "apply_auto_pause",
     "get_conversation",
     "list_conversations",
     "list_messages",

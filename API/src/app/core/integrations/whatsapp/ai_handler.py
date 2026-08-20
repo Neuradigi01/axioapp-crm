@@ -170,6 +170,14 @@ async def dispatch_ai_response(
     if not inbound_text:
         return None
 
+    # tasks/ai-assistants-omnichannel Step 5 — defense in depth. The
+    # new dispatch (``core/ai_assistants/dispatch.py``) already gates
+    # on ``ai_paused`` before delegating here, but any code that calls
+    # this handler directly (tests / future callers) must respect the
+    # takeover flag too.
+    if getattr(conversation, "ai_paused", False):
+        return None
+
     # Load org-wide settings — system prompt, handover keywords,
     # confidence threshold. RLS-scoped via `get_active_config`.
     try:

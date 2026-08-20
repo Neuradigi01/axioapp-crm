@@ -128,24 +128,18 @@ WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
 # /sessions/{id}/send-text, /sessions/{id}/download-media). Default
 # is the docker-compose service name on the project network; local
 # dev override via `http://localhost:4000`.
-WHATSAPP_WEB_SIDECAR_URL = os.getenv(
-    "WHATSAPP_WEB_SIDECAR_URL", "http://whatsapp-web-sidecar:4000"
-)
+WHATSAPP_WEB_SIDECAR_URL = os.getenv("WHATSAPP_WEB_SIDECAR_URL", "http://whatsapp-web-sidecar:4000")
 # Outbound HMAC secret — used by the FastAPI client to sign every
 # request to the sidecar. MUST match the sidecar's
 # `SIDECAR_HMAC_SECRET`. Generate with:
 #   python -c "import secrets; print(secrets.token_hex(32))"
 # Stored in secrets.enc.env, NOT here.
-WHATSAPP_WEB_SIDECAR_HMAC_SECRET = os.getenv(
-    "WHATSAPP_WEB_SIDECAR_HMAC_SECRET", ""
-)
+WHATSAPP_WEB_SIDECAR_HMAC_SECRET = os.getenv("WHATSAPP_WEB_SIDECAR_HMAC_SECRET", "")
 # Inbound HMAC secret — used by the FastAPI events receiver
 # (Step 6) to verify the sidecar's signature on every event POST.
 # MUST match the sidecar's `FASTAPI_HMAC_SECRET`. Stored in
 # secrets.enc.env, NOT here.
-WHATSAPP_WEB_INBOUND_HMAC_SECRET = os.getenv(
-    "WHATSAPP_WEB_INBOUND_HMAC_SECRET", ""
-)
+WHATSAPP_WEB_INBOUND_HMAC_SECRET = os.getenv("WHATSAPP_WEB_INBOUND_HMAC_SECRET", "")
 
 # Ad integrations (Google Ads + Meta Ads) — OAuth-token encryption.
 # Fernet key — 32 url-safe-base64-encoded bytes. Generate with:
@@ -178,6 +172,17 @@ INTEGRATIONS_ENCRYPTION_KEY = os.getenv("INTEGRATIONS_ENCRYPTION_KEY", "")
 # env var is missing, so this is optional at boot and only required
 # once an org actually stores a key.
 AI_PROVIDER_KEY_KEK = os.getenv("AI_PROVIDER_KEY_KEK", "")
+
+# tasks/ai-assistants-omnichannel Step 6 — email inbound → AI dispatch
+# gate. Default OFF; ops flip per environment. The dispatch function
+# short-circuits when this is falsy so orgs without a bound email
+# assistant see no behaviour change.
+AI_EMAIL_INBOUND_ENABLED = os.getenv("AI_EMAIL_INBOUND_ENABLED", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 # Cloudflare Turnstile — server-side site secret. Verifies the
 # ``cf-turnstile-response`` token the widget submits on the first
@@ -256,9 +261,7 @@ MICROSOFT_GRAPH_REDIRECT_URI = os.getenv(
 # subscription creation with a non-public URL). For dev, tunnel via
 # ngrok and set this to the public ngrok URL. Leave empty to disable
 # subscriptions; sync falls back to Step 4's 60-second poll.
-MICROSOFT_GRAPH_WEBHOOK_URL = os.getenv(
-    "MICROSOFT_GRAPH_WEBHOOK_URL", ""
-)
+MICROSOFT_GRAPH_WEBHOOK_URL = os.getenv("MICROSOFT_GRAPH_WEBHOOK_URL", "")
 
 # Developer Token — separate from OAuth, attached to Google Ads
 # Manager (MCC) account. See Stage 4 of the manual checklist.
