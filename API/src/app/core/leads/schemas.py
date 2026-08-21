@@ -208,7 +208,13 @@ class LogUpdateRequest(BaseModel):
     contact_basics: FollowUpContactBasics | None = None
     pipeline_stage: str | None = Field(default=None, min_length=1, max_length=64)
     source: LeadSource | None = None
-    remarks: str = Field(min_length=1, max_length=2000)
+    # Remarks used to be required (min_length=1). Now optional — the
+    # modal was blocked when a rep only wanted to fix a name / phone /
+    # source / status / follow-up without typing a note. When empty,
+    # the service skips the auto-note activity (stage / owner /
+    # follow-up already write their own dedicated activity rows, so
+    # the timeline stays complete).
+    remarks: str = Field(default="", max_length=2000)
     next_follow_up: NextFollowUpSpec | None = None
     # Owner change — when supplied AND different from the lead's
     # current owner, the service updates `assigned_to_id` inside the

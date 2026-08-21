@@ -163,9 +163,9 @@
           </label>
 
           <label class="block sm:col-span-2">
-            <span class="text-xs font-medium text-default"
-              >Remarks <span class="text-red-500">*</span></span
-            >
+            <span class="text-xs font-medium text-default">
+              Remarks <span class="font-normal text-faint">(optional)</span>
+            </span>
             <textarea
               rows="3"
               class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -173,16 +173,11 @@
               placeholder="What just happened? (call outcome, next step, blocker…)"
             ></textarea>
             @if (form.controls.remarks.touched && form.controls.remarks.invalid) {
-              <p class="mt-1 text-xs text-red-500">
-                @if (form.controls.remarks.errors?.['required']) {
-                  Remarks are required.
-                } @else {
-                  Must be 2000 characters or fewer.
-                }
-              </p>
+              <p class="mt-1 text-xs text-red-500">Must be 2000 characters or fewer.</p>
             } @else {
               <span class="mt-1 block text-xs text-muted">
-                Saved as a note on the timeline. Everyone in your org can read it.
+                Saved as a note on the timeline when you type something. Leave blank if you're only
+                editing fields.
               </span>
             }
           </label>

@@ -1994,25 +1994,31 @@ async def log_update_for_lead(
             user_id=actor_id,
         )
 
-    # 6. Always: note activity carrying the remarks text. Rides the
-    #    same session so a downstream failure below rolls it back.
-    await activities.record_in_session(
-        session,
-        org_id=org_id,
-        entity_type=_LEAD_ENTITY,
-        entity_id=lead_id,
-        type=ActivityType.note,
-        payload={"text": payload.remarks},
-        user_id=actor_id,
-    )
+    # 6. Note activity carrying the remarks text — only when the rep
+    #    actually typed something. Stage / owner / follow-up already
+    #    write their own dedicated activity rows, so the timeline stays
+    #    complete even when the auto-note is skipped for a pure
+    #    field-edit save.
+    remarks_text = (payload.remarks or "").strip()
+    if remarks_text:
+        await activities.record_in_session(
+            session,
+            org_id=org_id,
+            entity_type=_LEAD_ENTITY,
+            entity_id=lead_id,
+            type=ActivityType.note,
+            payload={"text": remarks_text},
+            user_id=actor_id,
+        )
 
     # 7. Optional next-follow-up task.
     next_task_id: uuid.UUID | None = None
     if payload.next_follow_up is not None:
         # Truncate remarks in the title so the dashboard follow-up
         # widget renders one clean line — full remarks live in the
-        # note activity written above.
-        title = f"Follow up: {payload.remarks[:80]}"
+        # note activity written above. Falls back to a neutral
+        # "Follow up" label when the rep didn't type anything.
+        title = f"Follow up: {remarks_text[:80]}" if remarks_text else "Follow up"
         task = Task(
             org_id=org_id,
             title=title,
