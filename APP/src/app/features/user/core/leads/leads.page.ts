@@ -344,15 +344,6 @@ export class LeadsPageComponent {
 
   // --- Existing state -----------------------------------------------------
 
-  private readonly q = toSignal(
-    this.searchControl.valueChanges.pipe(debounceTime(200), distinctUntilChanged()),
-    { initialValue: '' },
-  );
-  private readonly sourceFilter = toSignal(
-    this.sourceControl.valueChanges.pipe(distinctUntilChanged()),
-    { initialValue: '' },
-  );
-
   readonly contactsById = signal<Record<string, ContactSummary>>({});
 
   /** Source dropdown options. Contacts store `source` as free-form
@@ -688,9 +679,14 @@ export class LeadsPageComponent {
    * (it fetches the union across all stages at the server cap, the
    * same way it did before Step 6). */
   protected buildQuery(): LeadListQuery {
+    // Read `q` + `source` directly from their FormControls (not from
+    // the debounced signals) so a manual "Search" click while typing is
+    // in-flight uses the operator's current input instead of the last
+    // debounced snapshot. The auto-refetch path still runs through the
+    // debounced signals — this only closes the manual-search race.
     const base: LeadListQuery = {
-      q: this.q() || undefined,
-      source: this.sourceFilter() || undefined,
+      q: this.searchControl.value.trim() || undefined,
+      source: this.sourceControl.value || undefined,
       status: (this.statusControl.value as LeadStatus) || undefined,
       assigned_to: this.resolveAssignee(),
       unassigned_only: this.assigneeControl.value === 'unassigned' ? true : undefined,

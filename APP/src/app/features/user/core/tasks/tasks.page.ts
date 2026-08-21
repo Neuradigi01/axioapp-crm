@@ -49,7 +49,7 @@ import { TaskAssignee, TaskFormModalComponent } from './task-form-modal.componen
 class TasksListState extends ListPageState<Task> {}
 
 type Scope = 'all' | 'mine';
-type Chip = 'all' | 'mine' | 'overdue' | 'today' | 'done';
+type Chip = 'all' | 'mine' | 'overdue' | 'today' | 'done' | 'missed';
 
 interface ChipDef {
   key: Chip;
@@ -222,6 +222,7 @@ export class TasksPageComponent {
     base.push({ key: 'overdue', label: 'Overdue' });
     base.push({ key: 'today', label: 'Due today' });
     base.push({ key: 'done', label: 'Done' });
+    base.push({ key: 'missed', label: 'Missed' });
     return base;
   });
 
@@ -347,6 +348,14 @@ export class TasksPageComponent {
         break;
       case 'done':
         this.status.set('done');
+        this.dueFilter.set(undefined);
+        break;
+      case 'missed':
+        // Missed = the operator hit the "Mark as missed" button. It's
+        // a terminal status like `done`, but tracked separately so
+        // "why wasn't this followed up?" reviews can find them without
+        // wading through completed work.
+        this.status.set('missed');
         this.dueFilter.set(undefined);
         break;
     }
@@ -716,6 +725,19 @@ export class TasksPageComponent {
         this.state.total.set(res.total);
         this.state.loading.set(false);
         this.chipBusy.set(null);
+        // If the edit modal is open on a task that just got refreshed
+        // (e.g. inline snooze/mark-missed while the modal is up, or a
+        // row action fired between "click +1w" and "click title"),
+        // re-seed `editingTask` with the fresh row so the modal's due
+        // / status / assignee reflect the latest server state instead
+        // of the click-time snapshot.
+        const editing = this.editingTask();
+        if (editing) {
+          const refreshed = res.items.find((r) => r.id === editing.id);
+          if (refreshed && refreshed !== editing) {
+            this.editingTask.set(refreshed);
+          }
+        }
       },
       error: (err: HttpErrorResponse) => {
         this.state.items.set([]);
