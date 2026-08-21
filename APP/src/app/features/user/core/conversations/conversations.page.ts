@@ -986,6 +986,15 @@ export class ConversationsPageComponent {
     // Same treatment for the thread refresh — only fire when the
     // incoming notification is for the currently-open conversation, and
     // coalesce successive events for the same id.
+    //
+    // Uses ``_reloadDetail`` (silent refetch) rather than ``loadDetail``
+    // — ``loadDetail`` toggles ``threadLoading=true`` which unmounts the
+    // message list, replaces it with a "Loading thread…" placeholder,
+    // and on remount the scroll position collapses to the top of the
+    // rebuilt DOM. That flashed the thread back to older messages on
+    // every WS-triggered refresh. Silent refetch keeps the bubbles
+    // painted, appends the new one, and the chat-thread's own
+    // ngAfterViewChecked scroll-to-bottom lands smoothly at the newest.
     if (incomingId && incomingId === this.selectedId()) {
       if (this.pendingDetailReload !== null) {
         clearTimeout(this.pendingDetailReload.timer);
@@ -994,7 +1003,7 @@ export class ConversationsPageComponent {
       const timer = setTimeout(() => {
         this.pendingDetailReload = null;
         // Guard against a thread switch during the debounce window.
-        if (this.selectedId() === id) this.loadDetail(id);
+        if (this.selectedId() === id) this._reloadDetail(id);
       }, ConversationsPageComponent.RELOAD_DEBOUNCE_MS);
       this.pendingDetailReload = { id, timer };
     }
