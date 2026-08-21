@@ -25,6 +25,10 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { AssistantFormStateService } from '../../form-state.service';
 
 const HEADING_MAX = 120;
@@ -68,7 +72,7 @@ function _stringList(cfg: Record<string, unknown>, key: string, fallback: string
   selector: 'app-ai-assistant-interface-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, MobileSelectComponent],
   templateUrl: './assistant-interface-tab.component.html',
 })
 export class AssistantInterfaceTabComponent {
@@ -166,8 +170,12 @@ export class AssistantInterfaceTabComponent {
     this.formState.patchInterfaceConfig({ initial_messages: next });
   }
 
-  protected onPoweredByChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
+  protected readonly poweredByOptions: readonly MobileSelectOption[] = [
+    { value: 'enabled', label: 'Enable' },
+    { value: 'disabled', label: 'Disable' },
+  ];
+
+  protected onPoweredByChange(value: string): void {
     this.formState.patchInterfaceConfig({ show_powered_by: value === 'enabled' });
   }
 

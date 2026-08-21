@@ -126,15 +126,13 @@
       >
         Display the “⚡ Powered by CRM” label
       </label>
-      <select
-        id="iface-powered-by"
-        class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-        [value]="showPoweredBy() ? 'enabled' : 'disabled'"
-        (change)="onPoweredByChange($event)"
-      >
-        <option value="enabled">Enable</option>
-        <option value="disabled">Disable</option>
-      </select>
+      <div class="mt-1">
+        <crm-mobile-select
+          [options]="poweredByOptions"
+          [value]="showPoweredBy() ? 'enabled' : 'disabled'"
+          (valueChange)="onPoweredByChange($event)"
+        />
+      </div>
       <p class="mt-1 text-xs text-muted">
         Shown in the footer bar next to the footer link. Disable to hide.
       </p>

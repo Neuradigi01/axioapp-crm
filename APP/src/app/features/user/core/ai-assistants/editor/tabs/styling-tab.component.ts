@@ -28,6 +28,10 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { AiAssistantsApiService } from '../../ai-assistants-api.service';
 import { AssistantFormStateService } from '../../form-state.service';
 import { ColorInputComponent } from './color-input.component';
@@ -80,7 +84,7 @@ const COLOR_FIELDS: readonly ColorField[] = [
   selector: 'app-ai-assistant-styling-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, LucideAngularModule, ColorInputComponent],
+  imports: [CommonModule, LucideAngularModule, ColorInputComponent, MobileSelectComponent],
   templateUrl: './styling-tab.component.html',
 })
 export class StylingTabComponent {
@@ -102,13 +106,24 @@ export class StylingTabComponent {
     _str(this.formState.formState().styling_config, 'assistant_shape', DEFAULTS.assistant_shape),
   );
 
-  protected onThemeChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
+  // Options for the shared crm-mobile-select. Same component used by
+  // appointments / contacts / leads so the styling-tab pickers match
+  // the rest of the CRM instead of using OS-native <select> chrome.
+  protected readonly themeOptions: readonly MobileSelectOption[] = [
+    { value: 'light', label: 'Light' },
+    { value: 'dark', label: 'Dark' },
+  ];
+
+  protected readonly shapeOptions: readonly MobileSelectOption[] = [
+    { value: 'circle', label: 'Circle' },
+    { value: 'square', label: 'Square' },
+  ];
+
+  protected onThemeChange(value: string): void {
     this.formState.patchStylingConfig({ theme_mode: value });
   }
 
-  protected onShapeChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
+  protected onShapeChange(value: string): void {
     this.formState.patchStylingConfig({ assistant_shape: value });
   }
 

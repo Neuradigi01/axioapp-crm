@@ -10,15 +10,13 @@
       >
         Theme Mode
       </label>
-      <select
-        id="styling-theme"
-        class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-        [value]="themeMode()"
-        (change)="onThemeChange($event)"
-      >
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-      </select>
+      <div class="mt-1">
+        <crm-mobile-select
+          [options]="themeOptions"
+          [value]="themeMode()"
+          (valueChange)="onThemeChange($event)"
+        />
+      </div>
       <p class="mt-1 text-xs text-muted">Base palette the widget renders under.</p>
     </div>
 
@@ -29,15 +27,13 @@
       >
         Assistant Shape
       </label>
-      <select
-        id="styling-shape"
-        class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-        [value]="assistantShape()"
-        (change)="onShapeChange($event)"
-      >
-        <option value="circle">Circle</option>
-        <option value="square">Square</option>
-      </select>
+      <div class="mt-1">
+        <crm-mobile-select
+          [options]="shapeOptions"
+          [value]="assistantShape()"
+          (valueChange)="onShapeChange($event)"
+        />
+      </div>
       <p class="mt-1 text-xs text-muted">Select the shape of the assistant icon.</p>
     </div>
   </section>

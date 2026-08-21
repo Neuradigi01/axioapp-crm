@@ -27,6 +27,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import { AiProviderKey } from '../settings/integrations/ai-providers-api.service';
 import { AiAssistant, AiAssistantsApiService } from './ai-assistants-api.service';
 
@@ -89,7 +90,7 @@ Accuracy is more important than always providing an answer. If in doubt, say you
   selector: 'app-create-assistant-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, LucideAngularModule],
+  imports: [ReactiveFormsModule, LucideAngularModule, MobileSelectComponent],
   templateUrl: './create-assistant-modal.component.html',
 })
 export class CreateAssistantModalComponent {
@@ -118,14 +119,26 @@ export class CreateAssistantModalComponent {
     }),
   });
 
-  // Refs to raw DOM inputs so we can force-sync live values into the
-  // reactive form controls at submit time. Reactive forms can lag behind
-  // the DOM on browser autofill, IME composition, or certain paste paths.
+  // Ref to the name input so we can force-sync live values into the
+  // reactive form control at submit time. Browser autofill / paste
+  // don't always fire the events Angular's ``formControlName`` listens
+  // for on native inputs. The key picker is now the shared
+  // ``crm-mobile-select`` (a custom component, not a native OS input)
+  // so no equivalent autofill sync is needed there.
   private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
-  private readonly keySelect = viewChild<ElementRef<HTMLSelectElement>>('keySelect');
 
   protected readonly hasKeys = computed(() => this.keys().length > 0);
   protected readonly canSave = computed(() => this.form.valid && !this.saving() && this.hasKeys());
+
+  // Options for the shared crm-mobile-select — matches the styling of
+  // the "Assigned to" picker in the appointments modal and every other
+  // dropdown across the CRM.
+  protected readonly keyOptions = computed<readonly MobileSelectOption[]>(() =>
+    this.keys().map((k) => ({
+      value: k.id,
+      label: `${k.label} — sk-…${k.last4}`,
+    })),
+  );
 
   constructor() {
     // Load provider keys — filter to non-revoked so the user can't
@@ -157,18 +170,15 @@ export class CreateAssistantModalComponent {
   protected save(): void {
     if (this.saving()) return;
 
-    // Sync live DOM values into the reactive form before validating —
+    // Sync the name input into the form control before validating —
     // browser autofill / paste don't always fire the events Angular's
-    // formControlName listens for.
+    // formControlName listens for on native <input>. Key picker is the
+    // shared crm-mobile-select (a component, not an OS input) so its
+    // value flows through ControlValueAccessor without needing a DOM sync.
     const nameEl = this.nameInput()?.nativeElement;
     if (nameEl && this.form.controls.name.value !== nameEl.value) {
       this.form.controls.name.setValue(nameEl.value);
       this.form.controls.name.markAsDirty();
-    }
-    const keyEl = this.keySelect()?.nativeElement;
-    if (keyEl && this.form.controls.key_id.value !== keyEl.value) {
-      this.form.controls.key_id.setValue(keyEl.value);
-      this.form.controls.key_id.markAsDirty();
     }
 
     if (!this.hasKeys()) {
