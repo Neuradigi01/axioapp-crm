@@ -64,6 +64,7 @@ export interface AiAssistantListItem {
   status: AiAssistantStatus;
   model: string;
   key_id: string;
+  bound_channels: AiAssistantChannel[];
   created_at: string;
   updated_at: string;
   version: number;

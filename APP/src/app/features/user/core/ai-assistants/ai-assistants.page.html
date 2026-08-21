@@ -135,6 +135,19 @@
                   </span>
                 </div>
                 <p class="mt-0.5 truncate text-xs text-muted">Model: {{ a.model }}</p>
+                @if (a.bound_channels?.length) {
+                  <div class="mt-2 flex flex-wrap items-center gap-1">
+                    @for (ch of a.bound_channels; track ch) {
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 ring-emerald-500/20"
+                        [title]="'Auto-answers on ' + channelLabel(ch)"
+                      >
+                        <lucide-icon [name]="channelIcon(ch)" class="h-3 w-3" aria-hidden="true" />
+                        {{ channelLabel(ch) }}
+                      </span>
+                    }
+                  </div>
+                }
               </div>
               @if (canManage()) {
                 <div class="relative">
@@ -203,4 +216,17 @@
     (created)="onCreated($event)"
     (closed)="onCreateClosed()"
   ></app-create-assistant-modal>
+}
+
+@if (pendingDelete(); as row) {
+  <app-confirm-dialog
+    [title]="'Delete &quot;' + row.name + '&quot;?'"
+    [body]="'Its knowledge sources and chat history will also be removed. This cannot be undone.'"
+    [confirmLabel]="'Delete'"
+    [cancelLabel]="'Cancel'"
+    [danger]="true"
+    [submitting]="actionInFlight() === row.id"
+    (confirm)="confirmDelete()"
+    (cancel)="cancelDelete()"
+  />
 }

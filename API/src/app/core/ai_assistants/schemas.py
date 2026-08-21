@@ -198,7 +198,12 @@ class AiAssistantRead(BaseModel):
 
 class AiAssistantListItem(BaseModel):
     """Trimmed shape for the list view. No prompts / configs to keep
-    the payload small when an org has many assistants."""
+    the payload small when an org has many assistants.
+
+    ``bound_channels`` is surfaced here so the list-card UI can render
+    "WhatsApp" / "Email" pills without an N+1 detail fetch per row —
+    the JSONB column is tiny (< 100 bytes) and the operator can spot
+    at-a-glance which assistant handles which channel."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -207,6 +212,7 @@ class AiAssistantListItem(BaseModel):
     status: AiAssistantStatus
     model: str
     key_id: uuid.UUID
+    bound_channels: list[AiAssistantChannel]
     created_at: datetime
     updated_at: datetime
     version: int

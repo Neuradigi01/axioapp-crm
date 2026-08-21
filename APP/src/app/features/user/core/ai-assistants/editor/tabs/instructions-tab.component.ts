@@ -219,19 +219,17 @@ export class InstructionsTabComponent {
 
   // --- Deployment channels (omnichannel Step 2) ---------------------
 
-  /** The three channels we v1 support. Order matches the checkbox
-   *  section order in the template. Instagram / Messenger / SMS ship
-   *  in a later track. */
+  /** Channels the operator can bind an assistant to. ``ai_widget``
+   *  removed from new bindings — legacy assistants that already have
+   *  it stay valid (the backend enum still accepts it), but the
+   *  checkbox is hidden so the customer-facing surface stays focused
+   *  on WhatsApp + Email. Instagram / Messenger / SMS land in a later
+   *  track. */
   protected readonly channels: readonly {
     key: AiAssistantChannel;
     label: string;
     description: string;
   }[] = [
-    {
-      key: 'ai_widget',
-      label: 'Website widget',
-      description: 'Answer visitors on your website via the embed snippet.',
-    },
     {
       key: 'whatsapp',
       label: 'WhatsApp',

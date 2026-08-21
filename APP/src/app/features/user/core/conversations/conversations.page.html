@@ -200,3 +200,16 @@
     </section>
   </div>
 </div>
+
+@if (pendingAiConfirm(); as pending) {
+  <app-confirm-dialog
+    [title]="aiConfirmTitle()"
+    [body]="aiConfirmBody()"
+    [confirmLabel]="aiConfirmLabel()"
+    [cancelLabel]="'Cancel'"
+    [danger]="pending.kind === 'takeover'"
+    [submitting]="aiConfirmSubmitting()"
+    (confirm)="confirmAiAction()"
+    (cancel)="cancelAiConfirm()"
+  />
+}

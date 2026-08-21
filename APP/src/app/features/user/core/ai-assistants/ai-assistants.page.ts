@@ -35,6 +35,7 @@ import {
   AiAssistantStatus,
   AiAssistantsApiService,
 } from './ai-assistants-api.service';
+import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { CreateAssistantModalComponent } from './create-assistant-modal.component';
 
 interface StatusPill {
@@ -60,7 +61,7 @@ const STATUS_BADGE: Record<AiAssistantStatus, { label: string; cls: string }> = 
   selector: 'app-ai-assistants-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, RouterLink, CreateAssistantModalComponent],
+  imports: [LucideAngularModule, RouterLink, CreateAssistantModalComponent, ConfirmDialogComponent],
   templateUrl: './ai-assistants.page.html',
 })
 export class AiAssistantsPage {
@@ -78,6 +79,11 @@ export class AiAssistantsPage {
   protected readonly search = signal('');
   protected readonly modalOpen = signal(false);
   protected readonly kebabOpenId = signal<string | null>(null);
+  // Row selected for delete via the kebab menu. When set, the shared
+  // ConfirmDialogComponent renders — replaces the browser ``confirm()``
+  // popup so the destructive-action prompt matches the rest of the UI
+  // (title / body / red button / submitting state / inline error).
+  protected readonly pendingDelete = signal<AiAssistantListItem | null>(null);
   protected readonly actionInFlight = signal<string | null>(null);
 
   protected readonly statusPills = STATUS_PILLS;
@@ -206,26 +212,75 @@ export class AiAssistantsPage {
 
   protected delete(row: AiAssistantListItem): void {
     if (!this.canManage() || this.actionInFlight()) return;
-    if (!confirm(`Delete "${row.name}"? Knowledge sources and chat history are removed.`)) return;
-    this.actionInFlight.set(row.id);
+    // Open the styled confirm dialog rather than fire the browser's
+    // native ``confirm()`` — the dialog is the same one used across
+    // contacts / leads / walk-ins so the destructive-prompt UX stays
+    // consistent (and doesn't look like a system alert from the OS).
     this.kebabOpenId.set(null);
+    this.pendingDelete.set(row);
+  }
+
+  protected cancelDelete(): void {
+    if (this.actionInFlight()) return;
+    this.pendingDelete.set(null);
+  }
+
+  protected confirmDelete(): void {
+    const row = this.pendingDelete();
+    if (!row) return;
+    this.actionInFlight.set(row.id);
+    this.loadError.set(null);
     this.api
       .delete(row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
           this.actionInFlight.set(null);
+          this.pendingDelete.set(null);
           this.items.update((rows) => rows.filter((r) => r.id !== row.id));
           this.total.update((n) => Math.max(0, n - 1));
         },
         error: (err: HttpErrorResponse) => {
           this.actionInFlight.set(null);
           this.loadError.set(extractApiError(err) ?? 'Delete failed.');
+          this.pendingDelete.set(null);
         },
       });
   }
 
   protected statusBadge(status: AiAssistantStatus) {
     return STATUS_BADGE[status];
+  }
+
+  // Small pretty-name + icon helpers for the "which channels does this
+  // assistant handle?" pills on each card. Keep in sync with the
+  // Deployment checkbox labels in ``instructions-tab.component.ts`` so
+  // an operator sees the same wording in both places. ``ai_widget``
+  // stays supported for legacy rows but isn't offered as a new binding
+  // choice (removed from Deployment in the omnichannel Step 2 tidy-up).
+  protected channelLabel(ch: string): string {
+    switch (ch) {
+      case 'whatsapp':
+        return 'WhatsApp';
+      case 'email':
+        return 'Email';
+      case 'ai_widget':
+        return 'Website widget';
+      default:
+        return ch;
+    }
+  }
+
+  protected channelIcon(ch: string): string {
+    switch (ch) {
+      case 'whatsapp':
+        return 'message-circle';
+      case 'email':
+        return 'mail';
+      case 'ai_widget':
+        return 'globe';
+      default:
+        return 'circle';
+    }
   }
 }

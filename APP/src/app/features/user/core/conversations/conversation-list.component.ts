@@ -83,19 +83,20 @@ interface ChannelPillOption {
   hue: 'emerald' | 'fuchsia' | 'blue' | 'zinc' | 'violet' | 'sky' | 'amber' | 'accent';
 }
 
-// v1 ships with WhatsApp + Email + AI Widget only. Messenger /
-// Instagram / SMS / Web adapters exist in the backend but aren't
-// wired for live ingest, so surfacing their chips would just show
-// empty result sets and mislead users. Un-comment each entry as its
-// ingest pipeline goes live (order here also drives the on-screen
-// chip order).
+// v1 ships with WhatsApp + Email chips only. Messenger / Instagram /
+// SMS / Web adapters exist in the backend but aren't wired for live
+// ingest, so surfacing their chips would just show empty result sets
+// and mislead users. Un-comment each entry as its ingest pipeline goes
+// live (order here also drives the on-screen chip order).
+//
+// The ``ai_widget`` chip is intentionally omitted alongside those —
+// legacy widget conversations still render in the ``All messengers``
+// view (backend enum untouched), we just don't surface a dedicated
+// filter chip while the widget stays a background surface.
 const CHANNEL_PILL_OPTIONS: ChannelPillOption[] = [
   { value: '', label: 'All messengers', hue: 'accent' },
   { value: 'whatsapp', label: 'WhatsApp', hue: 'emerald' },
   { value: 'email', label: 'Email', hue: 'violet' },
-  // tasks/ai-assistants Step 16 — AI-assistant chat widget
-  // conversations show up in the shared inbox.
-  { value: 'ai_widget', label: 'AI Widget', hue: 'amber' },
   // { value: 'facebook', label: 'Messenger', hue: 'blue' },
   // { value: 'instagram', label: 'Instagram', hue: 'fuchsia' },
   // { value: 'sms', label: 'SMS', hue: 'zinc' },

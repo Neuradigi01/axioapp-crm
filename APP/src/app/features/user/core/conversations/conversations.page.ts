@@ -16,6 +16,7 @@ import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import { ContactsApiService } from '../contacts/contacts-api.service';
+import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 
 import {
@@ -75,6 +76,7 @@ import { extractApiError } from '@core/services/api-error.util';
     LucideAngularModule,
     MobileSelectComponent,
     WhatsAppTemplatePickerComponent,
+    ConfirmDialogComponent,
   ],
   templateUrl: './conversations.page.html',
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -212,6 +214,17 @@ export class ConversationsPageComponent {
     id: string;
     timer: ReturnType<typeof setTimeout>;
   } | null = null;
+
+  /** AI take-over / return-to-AI confirmations. When set, the shared
+   *  ConfirmDialogComponent renders — replaces the native ``confirm()``
+   *  popups so the destructive-prompt UX matches the rest of the CRM
+   *  (styled card, red button, submitting spinner). ``kind`` drives
+   *  which title / body / verb the dialog shows. */
+  protected readonly pendingAiConfirm = signal<{
+    kind: 'takeover' | 'resume';
+    conversationId: string;
+  } | null>(null);
+  protected readonly aiConfirmSubmitting = signal(false);
 
   constructor() {
     // Seed the filter from the persisted assignee BEFORE the first
@@ -784,6 +797,55 @@ export class ConversationsPageComponent {
   protected onTakeoverAi(): void {
     const id = this.selectedId();
     if (!id) return;
+    // Open the styled confirm dialog. Take-over is a claim of
+    // responsibility for the thread (AI stops answering, this user
+    // owns it) — worth a one-tap "yes I meant to do that" rather than
+    // silently firing on click.
+    this.pendingAiConfirm.set({ kind: 'takeover', conversationId: id });
+  }
+
+  protected onResumeAi(): void {
+    const id = this.selectedId();
+    if (!id) return;
+    this.pendingAiConfirm.set({ kind: 'resume', conversationId: id });
+  }
+
+  protected cancelAiConfirm(): void {
+    if (this.aiConfirmSubmitting()) return;
+    this.pendingAiConfirm.set(null);
+  }
+
+  protected confirmAiAction(): void {
+    const pending = this.pendingAiConfirm();
+    if (!pending) return;
+    this.aiConfirmSubmitting.set(true);
+    if (pending.kind === 'takeover') {
+      this._runTakeover(pending.conversationId);
+    } else {
+      this._runResume(pending.conversationId);
+    }
+  }
+
+  // Copy driving the shared ConfirmDialog — computed getters so the
+  // template can read the right title/body/verb per pending kind
+  // without a big @switch on the caller side.
+  protected aiConfirmTitle(): string {
+    return this.pendingAiConfirm()?.kind === 'takeover'
+      ? 'Take over from AI?'
+      : 'Return this conversation to AI?';
+  }
+
+  protected aiConfirmBody(): string {
+    return this.pendingAiConfirm()?.kind === 'takeover'
+      ? 'AI will stop answering on this thread. You (and anyone you assign) will handle future messages until you hand it back.'
+      : 'AI will handle future messages on this thread. Only the person who took over — or an admin — can do this.';
+  }
+
+  protected aiConfirmLabel(): string {
+    return this.pendingAiConfirm()?.kind === 'takeover' ? 'Take over' : 'Return to AI';
+  }
+
+  private _runTakeover(id: string): void {
     this.api
       .pauseAi(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -796,8 +858,12 @@ export class ConversationsPageComponent {
           // ("— {you} took over from AI —") lands in the UI without
           // needing a full page refresh.
           this._reloadDetail(id);
+          this.aiConfirmSubmitting.set(false);
+          this.pendingAiConfirm.set(null);
         },
         error: (err: HttpErrorResponse) => {
+          this.aiConfirmSubmitting.set(false);
+          this.pendingAiConfirm.set(null);
           if (err.status === 409) {
             const detail = err.error?.detail;
             const holder =
@@ -812,12 +878,7 @@ export class ConversationsPageComponent {
       });
   }
 
-  protected onResumeAi(): void {
-    const id = this.selectedId();
-    if (!id) return;
-    if (!window.confirm('Return this conversation to AI? The AI will handle future messages.')) {
-      return;
-    }
+  private _runResume(id: string): void {
     this.api
       .resumeAi(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -827,8 +888,12 @@ export class ConversationsPageComponent {
           this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
           this._showToast('Returned to AI.');
           this._reloadDetail(id);
+          this.aiConfirmSubmitting.set(false);
+          this.pendingAiConfirm.set(null);
         },
         error: (err: HttpErrorResponse) => {
+          this.aiConfirmSubmitting.set(false);
+          this.pendingAiConfirm.set(null);
           const detail = err.error?.detail;
           if (err.status === 403 && detail?.reason === 'not_holder') {
             this._showToast('Only the person who took over (or an admin) can return this to AI.');
