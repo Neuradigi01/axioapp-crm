@@ -11,15 +11,26 @@
           type="button"
           role="tab"
           class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 transition"
-          [class.bg-surface-2]="activePanel() === p.id"
-          [class.text-default]="activePanel() === p.id"
-          [class.text-muted]="activePanel() !== p.id"
-          [class.hover:text-default]="activePanel() !== p.id"
-          [attr.aria-selected]="activePanel() === p.id"
+          [class.bg-surface-2]="activePanel() === p.id && !p.comingSoon"
+          [class.text-default]="activePanel() === p.id && !p.comingSoon"
+          [class.text-muted]="activePanel() !== p.id || p.comingSoon"
+          [class.hover:text-default]="activePanel() !== p.id && !p.comingSoon"
+          [class.cursor-not-allowed]="p.comingSoon"
+          [class.opacity-60]="p.comingSoon"
+          [attr.aria-selected]="activePanel() === p.id && !p.comingSoon"
+          [attr.aria-disabled]="p.comingSoon ? 'true' : null"
+          [disabled]="p.comingSoon"
           (click)="setPanel(p.id)"
         >
           <lucide-icon [name]="p.icon" size="14" aria-hidden="true"></lucide-icon>
           {{ p.label }}
+          @if (p.comingSoon) {
+            <span
+              class="ml-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-400"
+            >
+              Coming soon
+            </span>
+          }
         </button>
       }
     </div>

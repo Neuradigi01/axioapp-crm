@@ -27,12 +27,18 @@ interface PanelDescriptor {
   id: PanelId;
   label: string;
   icon: string;
+  // Rendered as a disabled "Coming Soon" pill on the segmented
+  // control — the backend endpoint stays wired (SSRF-safe fetch +
+  // Celery ingest ship today) but the UI is gated until HTML
+  // extraction handles JS-rendered SPAs and anti-bot pages
+  // reliably enough for customer knowledge bases.
+  comingSoon?: boolean;
 }
 
 const PANELS: readonly PanelDescriptor[] = [
   { id: 'file', label: 'Upload File', icon: 'upload-cloud' },
   { id: 'text', label: 'Custom Data', icon: 'file-text' },
-  { id: 'url', label: 'URL', icon: 'link' },
+  { id: 'url', label: 'URL', icon: 'link', comingSoon: true },
 ];
 
 @Component({
@@ -62,6 +68,8 @@ export class KnowledgeSourceTabComponent {
   protected readonly listRefreshTick = signal(0);
 
   protected setPanel(id: PanelId): void {
+    const panel = this.panels.find((p) => p.id === id);
+    if (panel?.comingSoon) return;
     this.activePanel.set(id);
   }
 
