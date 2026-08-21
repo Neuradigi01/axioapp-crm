@@ -757,11 +757,11 @@ export class LeadsPageComponent {
     this.reload();
   }
 
-  /** Leads Center toolbar Search button. Auto-refetch already fires
-   *  on every filter change (see the `valueChanges` subscriptions in
-   *  the constructor); this handler exists so sir's screenshot Search
-   *  button has something to bind to and gives the rep a visible
-   *  "refresh with current filters" affordance. */
+  /** Enter-key affordance for the Data Search + Remarks text inputs.
+   *  Every filter auto-refetches on `valueChanges` (see subscriptions
+   *  in the constructor); this handler exists so pressing Enter fires
+   *  the reload immediately, bypassing the 200ms/300ms debounce. The
+   *  visible Search button was removed — filters just work on change. */
   protected onToolbarSearch(): void {
     this.resetCursorAndReload();
   }
