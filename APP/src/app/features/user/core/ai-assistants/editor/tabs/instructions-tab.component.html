@@ -20,16 +20,13 @@
         >
           Instruction Type
         </label>
-        <select
-          id="instruction-type"
-          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          [value]="selectedPresetId()"
-          (change)="onPresetChange($event)"
-        >
-          @for (p of presets(); track p.id) {
-            <option [value]="p.id">{{ p.label }}</option>
-          }
-        </select>
+        <div class="mt-1">
+          <crm-mobile-select
+            [options]="presetOptions()"
+            [value]="selectedPresetId()"
+            (valueChange)="onPresetChange($event)"
+          />
+        </div>
         <p class="mt-1 text-xs text-muted">
           Pick a starter prompt — the textarea below is populated with the preset body. Edit freely;
           later edits to the preset library don't affect this assistant.
@@ -97,16 +94,13 @@
           OpenAI Key
         </label>
         @if (hasUsableKey()) {
-          <select
-            id="key-select"
-            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-            [value]="formState.formState().key_id"
-            (change)="onKeyChange($event)"
-          >
-            @for (k of usableKeys(); track k.id) {
-              <option [value]="k.id">{{ k.label }} — sk-…{{ k.last4 }}</option>
-            }
-          </select>
+          <div class="mt-1">
+            <crm-mobile-select
+              [options]="keyOptions()"
+              [value]="formState.formState().key_id"
+              (valueChange)="onKeyChange($event)"
+            />
+          </div>
         } @else {
           <div
             class="mt-1 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400"
@@ -127,17 +121,13 @@
         >
           Model
         </label>
-        <select
-          id="model-select"
-          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40"
-          [value]="formState.formState().model"
-          (change)="onModelChange($event)"
-          [disabled]="!hasUsableKey()"
-        >
-          @for (m of models; track m) {
-            <option [value]="m">{{ m }}</option>
-          }
-        </select>
+        <div class="mt-1" [class.opacity-40]="!hasUsableKey()">
+          <crm-mobile-select
+            [options]="modelOptions"
+            [value]="formState.formState().model"
+            (valueChange)="onModelChange($event)"
+          />
+        </div>
         <p class="mt-1 text-xs text-muted">
           Cheaper models mean lower cost per message; larger models handle nuance better.
         </p>
@@ -354,16 +344,13 @@
         >
           Auto-lead capture
         </label>
-        <select
-          id="lead-capture-mode"
-          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          [value]="formState.formState().lead_capture_mode"
-          (change)="onLeadCaptureModeChange($event)"
-        >
-          <option value="off">Off — never auto-create leads</option>
-          <option value="detect_email">Detect email in visitor messages</option>
-          <option value="ask_at_turn">Ask for email at a specific turn</option>
-        </select>
+        <div class="mt-1">
+          <crm-mobile-select
+            [options]="leadCaptureOptions"
+            [value]="formState.formState().lead_capture_mode"
+            (valueChange)="onLeadCaptureModeChange($event)"
+          />
+        </div>
         <p class="mt-1 text-xs text-muted">
           When set, an email address in a visitor's message (or their reply to the ask) becomes a
           lead with source "AI Assistant" and links the conversation to the new contact.

@@ -34,6 +34,10 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { AiProviderKey } from '../../../settings/integrations/ai-providers-api.service';
 import { AiAssistantChannel, AiAssistantsApiService } from '../../ai-assistants-api.service';
 import { AssistantFormStateService } from '../../form-state.service';
@@ -47,7 +51,7 @@ const OPENAI_MODELS: readonly string[] = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'
   selector: 'app-ai-assistant-instructions-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, LucideAngularModule, RouterLink],
+  imports: [CommonModule, FormsModule, LucideAngularModule, RouterLink, MobileSelectComponent],
   templateUrl: './instructions-tab.component.html',
 })
 export class InstructionsTabComponent {
@@ -108,8 +112,15 @@ export class InstructionsTabComponent {
 
   // --- Prompt section -----------------------------------------------
 
-  protected onPresetChange(event: Event): void {
-    const id = (event.target as HTMLSelectElement).value;
+  // Options fed to ``crm-mobile-select`` — same shared component used
+  // by the appointments / contacts / leads pickers so the dropdown UX
+  // matches the rest of the app instead of the OS-native ``<select>``
+  // popup styling.
+  protected readonly presetOptions = computed<readonly MobileSelectOption[]>(() =>
+    this.presets().map((p) => ({ value: p.id, label: p.label })),
+  );
+
+  protected onPresetChange(id: string): void {
     this.selectedPresetId.set(id);
     if (id === CUSTOM_PROMPT_ID) return;
     const preset = this.presets().find((p) => p.id === id);
@@ -133,13 +144,23 @@ export class InstructionsTabComponent {
     this.formState.patch({ temperature: clamped });
   }
 
-  protected onKeyChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
+  protected readonly keyOptions = computed<readonly MobileSelectOption[]>(() =>
+    this.usableKeys().map((k) => ({
+      value: k.id,
+      label: `${k.label} — sk-…${k.last4}`,
+    })),
+  );
+
+  protected onKeyChange(value: string): void {
     this.formState.patch({ key_id: value });
   }
 
-  protected onModelChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
+  protected readonly modelOptions: readonly MobileSelectOption[] = OPENAI_MODELS.map((m) => ({
+    value: m,
+    label: m,
+  }));
+
+  protected onModelChange(value: string): void {
     this.formState.patch({ model: value });
   }
 
@@ -260,8 +281,13 @@ export class InstructionsTabComponent {
 
   // --- Lead capture (Step 16) ---------------------------------------
 
-  protected onLeadCaptureModeChange(event: Event): void {
-    const raw = (event.target as HTMLSelectElement).value;
+  protected readonly leadCaptureOptions: readonly MobileSelectOption[] = [
+    { value: 'off', label: 'Off — never auto-create leads' },
+    { value: 'detect_email', label: 'Detect email in visitor messages' },
+    { value: 'ask_at_turn', label: 'Ask for email at a specific turn' },
+  ];
+
+  protected onLeadCaptureModeChange(raw: string): void {
     // Restrict to the three legal values. Any other value would be
     // a UI drift and gets ignored client-side (backend enforces
     // via ENUM CHECK anyway).
