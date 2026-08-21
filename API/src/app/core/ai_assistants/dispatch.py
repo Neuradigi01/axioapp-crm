@@ -248,6 +248,30 @@ async def _run_byok_whatsapp_reply(
     conversation.last_message_at = sent_at
     await session.commit()
 
+    # Push a WS event so any assignee currently viewing the thread sees
+    # the AI's reply live — without this, the operator has to switch
+    # tabs (which force-reloads the detail) before the outbound bubble
+    # appears. Same shape as ``conversations/service.py::receive_webhook``
+    # uses for inbound events so the frontend's ``onIncomingNotification``
+    # matches on ``payload.conversation_id`` uniformly. Best-effort:
+    # ``notify`` never raises, and no assignee → skip silently (the
+    # conversation is still human-unowned; no one to push to).
+    if conversation.assigned_to_id is not None:
+        from src.app.core.notifications.service import notify
+
+        await notify(
+            org_id=conversation.org_id,
+            user_id=conversation.assigned_to_id,
+            type="conversation.message",
+            title=f"AI replied on {conversation.channel.value}",
+            body=text[:160] or None,
+            payload={
+                "conversation_id": str(conversation.id),
+                "channel": conversation.channel.value,
+                "author": "ai",
+            },
+        )
+
 
 async def route_email_inbound(
     session: AsyncSession,
