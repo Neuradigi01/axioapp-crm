@@ -199,14 +199,59 @@ export class ConversationListComponent {
     return CHANNEL_STYLES[channel];
   }
 
-  /** Row display name: contact name when hydrated, else the raw
-   *  channel-specific id (phone / email / handle). */
+  /** Row display name.
+   *
+   * Priority:
+   *   1. Real contact name when the contact has a human-typed name
+   *      (not a placeholder auto-generated at inbound intake).
+   *   2. "Unknown contact" fallback for placeholders whose full_name
+   *      is just the phone (E.164) / email / matches the external_id.
+   *      Those get created by ``ensure_placeholder_contact`` / the
+   *      webhook resolver when an unknown number sends inbound, and
+   *      surfacing them as "+919876543210" makes the inbox read like
+   *      a raw phone list instead of a contact list.
+   *   3. Raw ``external_id`` when there's no linked contact at all.
+   */
   protected rowName(c: Conversation): string {
     if (c.contact_id) {
       const contact = this.contactsById[c.contact_id];
-      if (contact) return contact.full_name;
+      if (contact) {
+        const name = (contact.full_name ?? '').trim();
+        if (name && !this.looksLikePlaceholderName(name, c.external_id)) {
+          return name;
+        }
+        return 'Unknown contact';
+      }
     }
     return c.external_id;
+  }
+
+  /** Secondary line under the display name — surfaces the raw
+   *  channel-specific id (phone / email) whenever the primary label
+   *  falls back to "Unknown contact" so the operator still sees the
+   *  channel handle they need to identify the customer. Empty
+   *  otherwise (avoids visual noise for named contacts). */
+  protected rowHandle(c: Conversation): string {
+    const name = this.rowName(c);
+    if (name === 'Unknown contact' || name === c.external_id) return '';
+    return c.external_id;
+  }
+
+  /** Heuristic for auto-generated placeholder names. Backend used to
+   *  seed ``full_name = external_id`` (raw phone/email) or
+   *  ``"Contact 3042"`` (last-4-digit stub) for unknown inbounds;
+   *  new inbounds land as ``"Unknown WhatsApp contact"`` after the
+   *  service-side rename, but old rows persist until edited. Any of
+   *  those shapes → we treat the "name" as no name. */
+  private looksLikePlaceholderName(name: string, externalId: string): boolean {
+    if (name === externalId) return true;
+    // Bare or +-prefixed E.164 numeric string.
+    if (/^\+?\d{8,15}$/.test(name)) return true;
+    // Email-shape.
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(name)) return name === externalId;
+    // "Contact 3042" last-4-digit stub from the chatbot placeholder path.
+    if (/^Contact \d{4}$/.test(name)) return true;
+    return false;
   }
 
   protected setChannelFilter(value: ConversationChannel | ''): void {

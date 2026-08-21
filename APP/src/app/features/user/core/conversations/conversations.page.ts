@@ -199,6 +199,32 @@ export class ConversationsPageComponent {
     return this.items().find((c) => c.id === id) ?? null;
   });
 
+  /** View-only gate for the compose bar. Mirrors the backend
+   * `ensure_can_write_conversation` rule so the operator sees the
+   * disabled state instead of hitting a 403 after they try to send:
+   *   - Owner / Admin (`conversations.assign_others`) → always true.
+   *   - Chat unassigned → true (any employee can jump in and claim).
+   *   - Caller is the current assignee → true.
+   *   - Otherwise → false; compose-bar hides and an inline banner
+   *     tells the operator who owns the chat + who can transfer it. */
+  protected readonly canInteractWithSelected = computed(() => {
+    const conv = this.selectedConversation();
+    if (!conv) return false;
+    if (this.auth.hasPermission('conversations.assign_others')) return true;
+    const owner = conv.assigned_to_id ?? null;
+    if (owner === null) return true;
+    return owner === this.auth.currentUserId();
+  });
+
+  /** Display name of the current assignee — used in the view-only
+   * banner ("Assigned to Ganesh Test · view-only"). */
+  protected readonly selectedAssigneeName = computed<string | null>(() => {
+    const conv = this.selectedConversation();
+    const owner = conv?.assigned_to_id;
+    if (!owner) return null;
+    return this.staffById().get(owner)?.full_name ?? 'another user';
+  });
+
   /** Last notification fingerprint we've already reacted to — guards
    * against re-running the refresh loop when the signal re-emits with
    * the same head element. */

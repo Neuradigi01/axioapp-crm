@@ -58,6 +58,7 @@ from src.app.core.email.models import EmailAccountSyncState
 from src.app.core.events import bus as events_bus
 from src.app.core.events.event_catalog import WHATSAPP_MESSAGE_RECEIVED
 from src.app.core.notifications.service import notify
+from src.app.core.permissions.service import role_has_permission
 from src.app.shared.db.queries import ensure_found
 
 # Channels whose `external_id` is a phone number; the webhook intake
@@ -114,6 +115,93 @@ async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
     return ensure_found(
         await _da.get_conversation_by_id(session, conversation_id),
         entity="conversation",
+    )
+
+
+# --- access gates ---------------------------------------------------------
+
+
+async def _caller_can_assign_others(session: AsyncSession, caller_role_id: uuid.UUID) -> bool:
+    """Owner + Admin default. Employees don't hold this key, so they
+    can only act on their own chat or an unassigned one."""
+    return await role_has_permission(session, caller_role_id, "conversations.assign_others")
+
+
+async def ensure_can_write_conversation(
+    session: AsyncSession,
+    *,
+    conv: Conversation,
+    caller_user_id: uuid.UUID,
+    caller_role_id: uuid.UUID,
+) -> None:
+    """Guard for reply / react / tag / mark-read / close / take-over-AI.
+
+    Read paths (list + detail) stay org-wide via `conversations.read`
+    — this gate is only for state-changing operations. Rules:
+
+    * Chat unassigned (``assigned_to_id IS NULL``) → any writer with
+      ``conversations.write`` passes (the compose bar auto-take-over
+      flow relies on this).
+    * Caller is the current assignee → passes.
+    * Caller has ``conversations.assign_others`` (Owner / Admin) →
+      passes regardless of assignment.
+    * Otherwise → 403 with a helpful message so the frontend can
+      render the view-only banner instead of a generic error.
+    """
+    if conv.assigned_to_id is None:
+        return
+    if conv.assigned_to_id == caller_user_id:
+        return
+    if await _caller_can_assign_others(session, caller_role_id):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=(
+            "This conversation is assigned to another user. "
+            "Ask an Owner or Admin to reassign it before you can act on it."
+        ),
+    )
+
+
+async def ensure_can_assign_conversation(
+    session: AsyncSession,
+    *,
+    conv: Conversation,
+    caller_user_id: uuid.UUID,
+    caller_role_id: uuid.UUID,
+    new_assignee_id: uuid.UUID | None,
+) -> None:
+    """Guard for `PATCH /{id}` when the payload touches
+    ``assigned_to_id``. Three allowed transitions:
+
+    * **Owner / Admin** (holds ``conversations.assign_others``) →
+      any transition, including reassigning across users and
+      unassigning.
+    * **Self-take-over** — chat is currently unassigned and the
+      caller is setting the assignee to themselves.
+    * **Owner-side transfer** — the current assignee is transferring
+      *their own* chat to another user (or unassigning it). The
+      transfer target can be anyone.
+
+    Every other transition (reassigning someone else's chat,
+    stealing another user's chat, setting the assignee to a third
+    party from an unassigned state without being Owner/Admin) → 403.
+    """
+    if await _caller_can_assign_others(session, caller_role_id):
+        return
+    # Self-take-over of an orphan chat.
+    if conv.assigned_to_id is None and new_assignee_id == caller_user_id:
+        return
+    # Current assignee transferring their own chat (or handing it back
+    # to unassigned). New assignee can be any user or None.
+    if conv.assigned_to_id == caller_user_id:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=(
+            "Only the current assignee, an Owner, or an Admin can change "
+            "who this conversation is assigned to."
+        ),
     )
 
 
@@ -260,6 +348,15 @@ async def send_email_reply(
         in_reply_to_message_id=last_inbound.id if last_inbound else None,
         conversation_id=conversation_id,
     )
+    # Ownership handshake — email reply on an *unassigned* thread
+    # implicitly claims it for the sender. Same rationale as
+    # ``send_outbound`` (WhatsApp) and ``pause_ai``. Re-fetch since
+    # ``send_email`` opens its own transaction; the write here is a
+    # separate small commit — cheap and keeps the auto-claim local.
+    conv_refreshed = await get_conversation(session, conversation_id)
+    if conv_refreshed.assigned_to_id is None:
+        conv_refreshed.assigned_to_id = user_id
+        await session.commit()
     return result.message
 
 
@@ -396,6 +493,13 @@ async def send_outbound(
     )
     _da.insert_message(session, msg)
     conv.last_message_at = sent_at
+    # Ownership handshake: an outbound send on an *unassigned* chat is
+    # the operator implicitly claiming the thread — same "any employee
+    # can jump in on an orphan" flow as `pause_ai`. Already-assigned
+    # chats keep their owner (the write-access gate at the router has
+    # already authorised the sender).
+    if conv.assigned_to_id is None:
+        conv.assigned_to_id = user_id
     await session.commit()
     await session.refresh(msg)
     await session.refresh(conv)
@@ -648,6 +752,10 @@ async def send_template_message(
     )
     _da.insert_message(session, msg)
     conv.last_message_at = sent_at
+    # Ownership handshake — template send on an unassigned chat also
+    # claims the thread for the sender. See `send_outbound` above.
+    if conv.assigned_to_id is None:
+        conv.assigned_to_id = user_id
     await session.commit()
     await session.refresh(msg)
     await session.refresh(conv)
@@ -1464,8 +1572,31 @@ async def patch_conversation(
     *,
     conversation_id: uuid.UUID,
     payload: ConversationPatch,
+    caller_user_id: uuid.UUID,
+    caller_role_id: uuid.UUID,
 ) -> Conversation:
     conv = await get_conversation(session, conversation_id)
+
+    # Assignment change hits its own rule set (self-take-over allowed,
+    # own-chat transfer allowed, everything else Owner/Admin). Other
+    # fields (status, ai_handling) fall back to the generic write gate
+    # — the assignee or an admin can flip them; a bystander can't.
+    if payload.assigned_to_id is not None:
+        await ensure_can_assign_conversation(
+            session,
+            conv=conv,
+            caller_user_id=caller_user_id,
+            caller_role_id=caller_role_id,
+            new_assignee_id=payload.assigned_to_id,
+        )
+    if payload.status is not None or payload.ai_handling is not None:
+        await ensure_can_write_conversation(
+            session,
+            conv=conv,
+            caller_user_id=caller_user_id,
+            caller_role_id=caller_role_id,
+        )
+
     before = _snapshot(conv)
     changed = False
     if payload.assigned_to_id is not None:
@@ -1649,9 +1780,15 @@ async def _resolve_or_create_contact_by_phone(
     existing = await contacts_service.get_contact_by_phone(session, normalised)
     if existing is not None:
         return existing.id
+    # Placeholder rows used to seed `full_name = phone`, so every
+    # inbound from a new number rendered in the inbox as a raw phone
+    # number instead of a name. Now they land as `"Unknown WhatsApp
+    # contact"` and the frontend list surfaces the phone as a
+    # secondary line — reads as a contact list instead of a phone
+    # list. Operators edit the contact page to give them a real name.
     contact = Contact(
         org_id=org_id,
-        full_name=normalised,
+        full_name="Unknown WhatsApp contact",
         phone=normalised,
         source="whatsapp",
     )
@@ -1760,6 +1897,15 @@ async def pause_ai(
                 "paused_at": paused_at.isoformat() if paused_at else None,
             },
         )
+    # Ownership handshake: taking over from AI on an *unassigned* chat
+    # implicitly self-assigns the actor. Preserves the existing
+    # assignment when the chat already had a human owner (Owner/Admin
+    # jumping in on someone else's thread doesn't steal it — the
+    # ``ensure_can_write_conversation`` router gate has already
+    # authorised them; keeping the assignee stable avoids surprise
+    # notification re-routing).
+    if conv.assigned_to_id is None:
+        conv.assigned_to_id = actor_user_id
     actor_name = await _display_name_for(session, actor_user_id)
     _insert_takeover_system_message(
         session,

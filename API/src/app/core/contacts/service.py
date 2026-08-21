@@ -225,7 +225,11 @@ async def get_or_create_placeholder_contact(
         contact = Contact(
             org_id=org_id,
             phone=normalised,
-            full_name=f"Contact {normalised[-4:]}",
+            # Was `f"Contact {normalised[-4:]}"`, which surfaced in the
+            # inbox as "Contact 3042" — unhelpful. New rows land as
+            # `"Unknown WhatsApp contact"` and the frontend list
+            # renders the phone number as a secondary line.
+            full_name="Unknown WhatsApp contact",
             source="chatbot_placeholder",
             is_placeholder=True,
         )

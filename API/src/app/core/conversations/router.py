@@ -75,6 +75,7 @@ from src.app.core.conversations.schemas import (
     TagUpdate,
 )
 from src.app.core.conversations.service import (
+    ensure_can_write_conversation,
     get_conversation,
     list_conversations,
     list_messages,
@@ -108,6 +109,36 @@ from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
+
+
+async def _require_conversation_write_access(
+    conversation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> uuid.UUID:
+    """Reused by every write endpoint that operates on a specific
+    conversation: reply, react, tag, mark-read, close, take-over-AI.
+
+    Enforces the new ownership model — a chat assigned to another
+    user is view-only for anyone who isn't the assignee or an
+    Owner/Admin (``conversations.assign_others``). Unassigned chats
+    stay open to any writer so the "any employee can jump in" flow
+    still works.
+
+    Returns the resolved conversation id so the endpoint can pass it
+    down to the service without a second lookup (the service function
+    still `get_conversation`s internally — the double-fetch cost is
+    negligible next to the network round-trip and keeps the service
+    contract clean).
+    """
+    conv = await get_conversation(db, conversation_id)
+    await ensure_can_write_conversation(
+        db,
+        conv=conv,
+        caller_user_id=user.legacy_uuid,
+        caller_role_id=user.role_id,
+    )
+    return conv.id
 
 
 @router.get("", response_model=ConversationListResponse)
@@ -311,6 +342,7 @@ async def assign_tag_endpoint(
     payload: AssignTagRequest,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
 ) -> list[dict[str, Any]]:
     """Attach an existing tag to a conversation. Idempotent — a
     re-assignment is a no-op. Returns the post-assignment tag list
@@ -333,6 +365,7 @@ async def unassign_tag_endpoint(
     tag_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
 ) -> list[dict[str, Any]]:
     return await unassign_tag(
         db,
@@ -352,6 +385,7 @@ async def send_message_endpoint(
     payload: MessageSendPayload,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
 ) -> MessageOut:
     # Must carry at least one of the three payloads — the schema relaxed
     # `text` to optional to allow interactive-only sends, so re-check at
@@ -391,6 +425,7 @@ async def send_template_message_endpoint(
     payload: SendTemplatePayload,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
 ) -> MessageOut:
     """Send an approved WhatsApp template message inside an existing
     conversation. Powers the inbox composer's inline template picker
@@ -463,6 +498,7 @@ async def email_reply_endpoint(
     payload: EmailReplyPayload,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
 ) -> MessageOut:
     """Reply to an email conversation from the unified inbox
     (Intercom-style). The generic ``/messages`` send guards email
@@ -496,6 +532,7 @@ async def post_note_endpoint(
     payload: NoteCreate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
 ) -> MessageOut:
     """Post an internal-only note to the conversation
     (whatsapp-platform-upgrade Step 13).
@@ -524,6 +561,7 @@ async def react_endpoint(
     payload: ReactionRequest,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
 ) -> MessageOut:
     """React to a message with a single emoji (Step 7).
 
@@ -556,6 +594,7 @@ async def send_media_message_endpoint(
     caption: str | None = Form(default=None, max_length=MAX_CAPTION_LENGTH),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
 ) -> MessageOut:
     """Outbound media message for WhatsApp conversations (Step 5 of
     whatsapp-platform-upgrade).
@@ -653,9 +692,15 @@ async def patch_endpoint(
     conversation_id: uuid.UUID,
     payload: ConversationPatch,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("conversations.write")),
+    user: User = Depends(require_permissions("conversations.write")),
 ) -> ConversationOut:
-    conv = await patch_conversation(db, conversation_id=conversation_id, payload=payload)
+    conv = await patch_conversation(
+        db,
+        conversation_id=conversation_id,
+        payload=payload,
+        caller_user_id=user.legacy_uuid,
+        caller_role_id=user.role_id,
+    )
     return ConversationOut.model_validate(conv)
 
 
@@ -671,6 +716,7 @@ async def pause_ai_endpoint(
     conversation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
 ) -> ConversationOut:
     """First-come-first-serve takeover. Body-less POST — the CAS is
     idempotent per row: the first caller wins with 200; concurrent
@@ -695,6 +741,7 @@ async def resume_ai_endpoint(
     conversation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
 ) -> ConversationOut:
     """Symmetric of :func:`pause_ai_endpoint`. Only the current holder
     OR an admin (``settings.conversations.manage``) can resume; other
@@ -719,6 +766,7 @@ async def mark_read_endpoint(
     conversation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
 ) -> ConversationOut:
     """Zero ``unread_count`` on the conversation. Idempotent — hitting
     this on an already-read conversation is a no-op (no audit spam).
@@ -740,6 +788,7 @@ async def mark_unread_endpoint(
     conversation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
 ) -> ConversationOut:
     """Set ``unread_count = 1`` if it's currently 0. Matches Gmail /
     Slack / Intercom — the badge signals "something to see" without
@@ -849,7 +898,7 @@ async def patch_ai_handling_endpoint(
     conversation_id: uuid.UUID,
     payload: dict[str, Any],
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("conversations.write")),
+    user: User = Depends(require_permissions("conversations.write")),
 ) -> ConversationOut:
     """Dedicated toggle for the AI-handling flag
     (whatsapp-platform-upgrade Step 19).
@@ -868,6 +917,8 @@ async def patch_ai_handling_endpoint(
         db,
         conversation_id=conversation_id,
         payload=ConversationPatch(ai_handling=raw),
+        caller_user_id=user.legacy_uuid,
+        caller_role_id=user.role_id,
     )
     return ConversationOut.model_validate(conv)
 

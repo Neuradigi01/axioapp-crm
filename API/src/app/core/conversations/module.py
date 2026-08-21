@@ -24,6 +24,14 @@ MODULE = ModuleDescriptor(
         # manage key. Owner + Admin get it; Employee does not by
         # default (they assign existing tags but don't manage the set).
         "settings.conversations.manage",
+        # Cross-user assignment gate. Owner + Admin only. Employees
+        # can still self-assign an *unassigned* chat, and the current
+        # assignee can transfer their own chat — see
+        # `service._ensure_assign_allowed`. Without this key, calls
+        # that touch a chat owned by someone else (reply / react /
+        # tag / close / take-over-AI / reassign) return 403; reads
+        # remain org-wide by design (`conversations.read`).
+        "conversations.assign_others",
     ],
     section="My Work",
 )

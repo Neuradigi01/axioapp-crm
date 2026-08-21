@@ -163,9 +163,42 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
     this.tagsChanged.emit(tags);
   }
 
-  /** Permission gate for the reassign click target — same key the
-   * backend enforces on `PATCH /api/v1/conversations/{id}`. */
-  protected readonly canReassign = computed(() => this.auth.hasPermission('conversations.write'));
+  /** Permission gate for the reassign click target. Mirrors the
+   * backend rule in `service.ensure_can_assign_conversation`:
+   *   - Owner / Admin (`conversations.assign_others`) can always
+   *     reassign.
+   *   - The current assignee can transfer their own chat.
+   *   - Everyone else (including Employees viewing an unassigned
+   *     chat) can only be assigned *to* themselves via take-over from
+   *     AI / send-outbound implicit claim; the assignee dropdown
+   *     stays hidden. */
+  protected readonly canReassign = computed(() => {
+    if (this.auth.hasPermission('conversations.assign_others')) return true;
+    const me = this.auth.currentUserId();
+    return !!me && this.conversation?.assigned_to_id === me;
+  });
+
+  /** Write gate for reply / react / tag / mark-read / take-over-AI on
+   * the current thread. Mirrors the backend
+   * `ensure_can_write_conversation` rule: passes if the chat is
+   * unassigned (any employee can jump in), if the caller IS the
+   * assignee, or if the caller is Owner/Admin. When false, the
+   * template renders the thread in view-only mode (compose bar
+   * disabled, reply/react/tag hidden, small banner explains why). */
+  protected readonly canInteract = computed(() => {
+    if (this.auth.hasPermission('conversations.assign_others')) return true;
+    const owner = this.conversation?.assigned_to_id ?? null;
+    if (owner === null) return true;
+    const me = this.auth.currentUserId();
+    return !!me && owner === me;
+  });
+
+  /** Name of the current assignee — used by the view-only banner. */
+  protected readonly assigneeDisplayName = computed<string | null>(() => {
+    const owner = this.conversation?.assigned_to_id;
+    if (!owner) return null;
+    return this.staffById.get(owner)?.full_name ?? 'another user';
+  });
 
   @ViewChild('scrollHost') protected scrollHost?: ElementRef<HTMLDivElement>;
 

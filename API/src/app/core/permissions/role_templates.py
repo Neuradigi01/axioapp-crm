@@ -79,6 +79,12 @@ _CORE_ADMIN_KEYS: list[str] = [
     "conversations.write",
     # whatsapp-platform-upgrade Step 14 — tag CRUD. Owner + Admin only.
     "settings.conversations.manage",
+    # Cross-user assignment gate. Owner + Admin only. Employees can
+    # self-assign an *unassigned* chat, and the current assignee can
+    # transfer their own chat to any other user, but reassigning
+    # someone else's chat or writing to a chat owned by someone else
+    # requires this key.
+    "conversations.assign_others",
     "calls.read",
     "calls.write",
     "calls.outcomes.manage",
