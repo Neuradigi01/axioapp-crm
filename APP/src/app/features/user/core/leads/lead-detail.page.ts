@@ -293,6 +293,10 @@ export class LeadDetailPageComponent implements OnInit {
     create?: LeadCreate;
     update?: LeadUpdate;
     moveStageTo?: string;
+    // The modal also emits contact-side hints on create; this page is
+    // edit-only so we accept-and-ignore them for structural typing.
+    contactAction?: 'created' | 'matched';
+    contactName?: string;
   }): void {
     const l = this.lead();
     if (!event.update || !l) return;

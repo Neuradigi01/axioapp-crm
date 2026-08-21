@@ -11,6 +11,7 @@ import {
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -160,6 +161,7 @@ export class LeadsPageComponent {
   private readonly usersDir = inject(UsersDirectoryService);
   private readonly columnPrefs = inject(ColumnPrefsService);
   private readonly savedViewsApi = inject(SavedViewsApiService);
+  private readonly snackBar = inject(MatSnackBar);
 
   protected readonly state = inject(LeadsListState);
 
@@ -1484,9 +1486,11 @@ export class LeadsPageComponent {
     create?: LeadCreate;
     update?: LeadUpdate;
     moveStageTo?: string;
+    contactAction?: 'created' | 'matched';
+    contactName?: string;
   }): void {
     if (event.create) {
-      this.submitCreate(event.create);
+      this.submitCreate(event.create, event.contactAction, event.contactName);
     } else if (event.update) {
       const existing = this.editingLead();
       if (existing) this.submitUpdate(existing.id, event.update, event.moveStageTo);
@@ -1501,7 +1505,11 @@ export class LeadsPageComponent {
     return status;
   }
 
-  private submitCreate(payload: LeadCreate): void {
+  private submitCreate(
+    payload: LeadCreate,
+    contactAction?: 'created' | 'matched',
+    contactName?: string,
+  ): void {
     this.submitting.set(true);
     this.formError.set(null);
     this.mergedNotice.set(null);
@@ -1523,8 +1531,13 @@ export class LeadsPageComponent {
             // shown." Now the modal closes and a prominent info banner
             // pops at the top of the leads page with a jump button so
             // the outcome is unmistakable and immediately actionable.
-            const contactName = this.contactsById()[payload.contact_id]?.full_name ?? null;
-            this.mergedNotice.set({ leadId: lead.id, contactName });
+            const banner = this.contactsById()[payload.contact_id]?.full_name ?? null;
+            this.mergedNotice.set({ leadId: lead.id, contactName: banner });
+          } else {
+            // Fresh lead. Confirm both sides of the create — the lead
+            // AND its linked contact — so the operator sees that a new
+            // contact was written for them (previously silent).
+            this.showLeadCreatedToast(contactAction, contactName);
           }
           this.reload();
         },
@@ -1533,6 +1546,34 @@ export class LeadsPageComponent {
           this.formError.set(extractApiError(err) ?? 'Could not create lead.');
         },
       });
+  }
+
+  /** Post-create success toast. Wording depends on whether the linked
+   * contact was created fresh alongside the lead, or resolved to an
+   * existing contact via the dedup check on phone/email. Falls back to
+   * a plain "Lead created" when the modal didn't report which happened
+   * (e.g. future callers that skip the contact-resolution step). */
+  private showLeadCreatedToast(
+    contactAction: 'created' | 'matched' | undefined,
+    contactName: string | undefined,
+  ): void {
+    let message: string;
+    if (contactAction === 'created') {
+      message = contactName
+        ? `Lead created successfully. New contact “${contactName}” was also created and linked.`
+        : 'Lead created successfully. A new contact was also created and linked.';
+    } else if (contactAction === 'matched') {
+      message = contactName
+        ? `Lead created successfully. Linked to existing contact “${contactName}”.`
+        : 'Lead created successfully. Linked to an existing contact.';
+    } else {
+      message = 'Lead created successfully.';
+    }
+    this.snackBar.open(message, 'OK', {
+      duration: 4000,
+      horizontalPosition: 'right',
+      verticalPosition: 'top',
+    });
   }
 
   private submitUpdate(id: string, payload: LeadUpdate, moveStageTo?: string): void {

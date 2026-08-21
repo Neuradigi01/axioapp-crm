@@ -69,6 +69,16 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
     create?: LeadCreate;
     update?: LeadUpdate;
     moveStageTo?: string;
+    /** In create mode: whether the linked contact was newly created for
+     * this lead, or an existing contact was matched (by phone / email).
+     * Absent for update mode. The parent uses this to word the success
+     * toast ("Lead created — new contact also created" vs "Lead created,
+     * linked to existing contact"). */
+    contactAction?: 'created' | 'matched';
+    /** In create mode with `contactAction === 'created'`: the newly
+     * written contact's display name, so the toast can say WHICH contact
+     * was created without a second hydrate call from the parent. */
+    contactName?: string;
   }>();
 
   protected readonly _lead = signal<Lead | null>(null);
@@ -284,10 +294,28 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
             const patch: Record<string, string> = {};
             if (!match.phone && phone) patch['phone'] = phone;
             if (!match.email && email) patch['email'] = email;
-            if (Object.keys(patch).length === 0) return of(match.id);
-            return this.contactsApi.update(match.id, patch).pipe(map((c) => c.id));
+            if (Object.keys(patch).length === 0) {
+              return of({
+                id: match.id,
+                action: 'matched' as const,
+                name: match.full_name,
+              });
+            }
+            return this.contactsApi.update(match.id, patch).pipe(
+              map((c) => ({
+                id: c.id,
+                action: 'matched' as const,
+                name: c.full_name,
+              })),
+            );
           }
-          return this.contactsApi.createStub({ full_name, phone, email }).pipe(map((c) => c.id));
+          return this.contactsApi.createStub({ full_name, phone, email }).pipe(
+            map((c) => ({
+              id: c.id,
+              action: 'created' as const,
+              name: c.full_name,
+            })),
+          );
         }),
         catchError((err: HttpErrorResponse) => {
           this._submitting.set(false);
@@ -296,18 +324,22 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
         }),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((contactId) => {
+      .subscribe((resolved) => {
         this._submitting.set(false);
-        if (!contactId) return;
+        if (!resolved) return;
         const raw = this.standard.getRawValue();
         const payload: LeadCreate = {
-          contact_id: contactId,
+          contact_id: resolved.id,
           pipeline_stage: raw.pipeline_stage || null,
           budget: nullableTrim(raw.budget),
           expected_close_date: nullableTrim(raw.expected_close_date),
           custom_data: this.customValue() as Record<string, unknown>,
         };
-        this.save.emit({ create: payload });
+        this.save.emit({
+          create: payload,
+          contactAction: resolved.action,
+          contactName: resolved.name,
+        });
       });
   }
 
