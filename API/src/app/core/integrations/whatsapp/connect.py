@@ -548,6 +548,13 @@ async def find_org_by_phone_id(
     `phone_id` IS the routing key. Returns None if no org has this
     phone connected (webhook receiver translates to 404 → integration
     DLQ for forensics).
+
+    Excludes torn-down integrations (``disconnected_at IS NOT NULL``):
+    Meta reassigns sandbox phone numbers across orgs, so the same
+    ``phone_id`` can legitimately have both a stale disconnected row
+    and a live one. Ordering by ``connected_at DESC`` keeps the
+    lookup deterministic if two live rows ever coexist (should not
+    happen, but defence-in-depth for the routing path).
     """
     from sqlalchemy import text as sql_text
 
@@ -568,6 +575,8 @@ async def find_org_by_phone_id(
         FROM tbl_whatsapp_account_configs c
         JOIN tbl_integrations i ON i.id = c.integration_id
         WHERE c.phone_id = :phone_id
+          AND i.disconnected_at IS NULL
+        ORDER BY i.connected_at DESC NULLS LAST
         LIMIT 1
         """
     )
@@ -630,7 +639,10 @@ async def find_org_by_waba_id(
         """
         SELECT c.phone_id
         FROM tbl_whatsapp_account_configs c
+        JOIN tbl_integrations i ON i.id = c.integration_id
         WHERE c.waba_id = :waba_id
+          AND i.disconnected_at IS NULL
+        ORDER BY i.connected_at DESC NULLS LAST
         LIMIT 1
         """
     )
@@ -660,7 +672,10 @@ async def find_org_by_verify_token(
         """
         SELECT c.phone_id
         FROM tbl_whatsapp_account_configs c
+        JOIN tbl_integrations i ON i.id = c.integration_id
         WHERE c.verify_token = :vt
+          AND i.disconnected_at IS NULL
+        ORDER BY i.connected_at DESC NULLS LAST
         LIMIT 1
         """
     )
