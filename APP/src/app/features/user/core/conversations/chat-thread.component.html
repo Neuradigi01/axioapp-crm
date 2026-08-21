@@ -442,19 +442,19 @@
               }
               <p
                 [class]="
-                  'mt-1 flex items-center justify-end gap-1 text-[10px] ' +
-                  (m.direction === 'out' ? 'text-faint' : 'text-muted')
+                  'mt-1.5 flex flex-wrap items-center justify-end gap-1.5 text-[11px] ' +
+                  (m.direction === 'out' ? 'text-white/80' : 'text-muted')
                 "
               >
                 @if (m.direction === 'out' && m.is_ai) {
                   <span
-                    class="mr-1 inline-flex items-center gap-0.5 rounded-full bg-violet-500/30 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-100 ring-1 ring-violet-300/40"
+                    class="inline-flex items-center gap-0.5 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white ring-1 ring-white/30"
                     title="AI-generated reply"
                   >
                     🤖 AI
                   </span>
                 }
-                <span>{{ formatTime(m.sent_at || m.created_at) }}</span>
+                <span class="whitespace-nowrap">{{ formatTime(m.sent_at || m.created_at) }}</span>
                 @if (m.direction === 'out') {
                   @switch (tickState(m)) {
                     @case ('read') {

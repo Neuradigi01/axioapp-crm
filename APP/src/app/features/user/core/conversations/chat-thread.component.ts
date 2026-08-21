@@ -5,7 +5,9 @@ import {
   ElementRef,
   EventEmitter,
   Input,
+  OnChanges,
   Output,
+  SimpleChanges,
   ViewChild,
   computed,
   inject,
@@ -61,7 +63,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
   templateUrl: './chat-thread.component.html',
   host: { class: 'flex min-h-0 flex-1 flex-col' },
 })
-export class ChatThreadComponent implements AfterViewChecked {
+export class ChatThreadComponent implements AfterViewChecked, OnChanges {
   private readonly auth = inject(FurnitureAuthService);
 
   @Input({ required: true }) conversation!: Conversation;
@@ -168,6 +170,22 @@ export class ChatThreadComponent implements AfterViewChecked {
   @ViewChild('scrollHost') protected scrollHost?: ElementRef<HTMLDivElement>;
 
   private lastMessageCount = 0;
+  // Tracked separately from the count so that switching between two
+  // conversations that happen to have the same message count still
+  // fires a scroll-to-bottom (count would look unchanged otherwise —
+  // the operator would land halfway up the new thread and have to
+  // scroll down manually to see the newest bubble).
+  private lastConversationId: string | null = null;
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['conversation'] && this.conversation?.id !== this.lastConversationId) {
+      this.lastConversationId = this.conversation?.id ?? null;
+      // Force the next ngAfterViewChecked to treat this as a "first
+      // render" — count comparison will always see a change and scroll
+      // to bottom on the freshly-loaded thread.
+      this.lastMessageCount = -1;
+    }
+  }
 
   ngAfterViewChecked(): void {
     const count = this.detail?.messages.length ?? 0;
