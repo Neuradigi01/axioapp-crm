@@ -42,9 +42,9 @@ import { AiAssistant, AiAssistantsApiService } from './ai-assistants-api.service
  * obvious place to start typing their own instructions without deleting
  * the safety rules by accident.
  */
-const DEFAULT_ASSISTANT_INSTRUCTIONS = `# --- CORE CRM DEFAULT RULES — KEEP THIS SECTION ---
-# These rules keep your assistant honest and prevent it from inventing
-# information. Only delete this section if you know what you're doing.
+const DEFAULT_ASSISTANT_INSTRUCTIONS = `# --- CRM RULES (RECOMMENDED) ---
+# These are helpful defaults to keep your assistant accurate and honest.
+# You can edit or extend them anytime to fit your business.
 
 ## Knowledge Usage
 - Use the connected knowledge sources as the primary source of truth.
