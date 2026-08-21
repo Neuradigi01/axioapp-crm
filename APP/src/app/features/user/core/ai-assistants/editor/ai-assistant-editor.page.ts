@@ -256,17 +256,35 @@ export class AiAssistantEditorPage {
   // on. The omnichannel Step 2 channel-conflict 409 carries the other
   // assistant's name in its detail body — surface it inline rather than
   // showing a generic "Save failed."
+  //
+  // The API's custom HTTPException handler (main.py) flattens a dict
+  // ``detail`` into the response body itself — so a 409 arrives as
+  // ``{reason, channel, ...}`` on ``err.error`` directly, not nested
+  // under ``.detail``. Check both shapes so a future revert to the
+  // FastAPI-standard envelope wouldn't silently regress this path.
   private _friendlyErrorMessage(err: HttpErrorResponse): string {
-    const detail = err.error?.detail;
+    const body = err.error;
+    const structured =
+      body && typeof body === 'object'
+        ? (body as { detail?: unknown; reason?: unknown }).detail &&
+          typeof (body as { detail?: unknown }).detail === 'object'
+          ? (body as { detail: Record<string, unknown> }).detail
+          : (body as Record<string, unknown>)
+        : null;
     if (
       err.status === 409 &&
-      detail &&
-      typeof detail === 'object' &&
-      detail.reason === 'channel_already_bound'
+      structured &&
+      typeof structured === 'object' &&
+      (structured as { reason?: unknown }).reason === 'channel_already_bound'
     ) {
-      const ch = String(detail.channel ?? 'that channel');
+      const s = structured as {
+        channel?: unknown;
+        other_assistant_name?: unknown;
+      };
+      const ch = typeof s.channel === 'string' ? s.channel : 'that channel';
       const chLabel = _channelLabel(ch);
-      const other = String(detail.other_assistant_name ?? 'another assistant');
+      const other =
+        typeof s.other_assistant_name === 'string' ? s.other_assistant_name : 'another assistant';
       return `${chLabel} is already handled by '${other}'. Unbind it there first.`;
     }
     return extractApiError(err) ?? 'Save failed.';
