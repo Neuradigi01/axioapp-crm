@@ -5,7 +5,14 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../../../environments/environment';
 import { buildHttpParams } from '../shared/services/query-builder';
 
-export type ConversationChannel = 'whatsapp' | 'instagram' | 'facebook' | 'web' | 'sms' | 'email';
+export type ConversationChannel =
+  | 'whatsapp'
+  | 'instagram'
+  | 'facebook'
+  | 'web'
+  | 'sms'
+  | 'email'
+  | 'ai_widget';
 
 export type ConversationStatus = 'open' | 'snoozed' | 'closed';
 
@@ -84,6 +91,14 @@ export interface Conversation {
   assigned_to_id: string | null;
   status: ConversationStatus;
   ai_handling: boolean;
+  /** tasks/ai-assistants-omnichannel Step 3 — human-takeover state.
+   *  ``ai_paused=true`` means a human clicked Take Over and the AI is
+   *  silent on this thread until Return to AI. First-come-first-serve
+   *  via a backend compare-and-set on `POST /conversations/{id}/pause-ai`.
+   */
+  ai_paused?: boolean;
+  ai_paused_by_user_id?: string | null;
+  ai_paused_at?: string | null;
   last_message_at: string | null;
   unread_count: number;
   created_at: string;
@@ -397,6 +412,22 @@ export class ConversationsApiService {
 
   patch(id: string, payload: ConversationPatch): Observable<Conversation> {
     return this.http.patch<Conversation>(`${this.base}/${id}`, payload);
+  }
+
+  // --- AI takeover (omnichannel Step 4) ------------------------------
+
+  /** Human takes over — pause AI on this conversation.
+   *  409 ``already_taken_over`` on race (loser gets holder details in
+   *  the body); 200 with the updated Conversation on win. */
+  pauseAi(id: string): Observable<Conversation> {
+    return this.http.post<Conversation>(`${this.base}/${id}/pause-ai`, {});
+  }
+
+  /** Return this conversation to AI. Holder-or-admin only server-side;
+   *  403 ``not_holder`` when a non-holder without
+   *  ``settings.conversations.manage`` calls it. */
+  resumeAi(id: string): Observable<Conversation> {
+    return this.http.post<Conversation>(`${this.base}/${id}/resume-ai`, {});
   }
 
   // --- Tags (whatsapp-platform-upgrade Step 14) -----------------------

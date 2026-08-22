@@ -19,7 +19,12 @@
  */
 import { Injectable, computed, signal } from '@angular/core';
 
-import { AiAssistant, AiAssistantUpdatePayload } from './ai-assistants-api.service';
+import {
+  AiAssistant,
+  AiAssistantChannel,
+  AiAssistantUpdatePayload,
+  LeadCaptureMode,
+} from './ai-assistants-api.service';
 
 /** Field-by-field editor state. All fields present so tabs can bind
  *  unconditionally; ``null`` means "not set" (defaults render in
@@ -37,8 +42,12 @@ export interface AssistantFormState {
   allowed_domains: string[];
   output_sanitizer_enabled: boolean;
   budget_cap_override_usd: number | null;
+  lead_capture_mode: LeadCaptureMode;
+  lead_capture_turn_n: number;
+  lead_capture_message: string | null;
   interface_config: Record<string, unknown>;
   styling_config: Record<string, unknown>;
+  bound_channels: AiAssistantChannel[];
 }
 
 const _EMPTY_STATE: AssistantFormState = {
@@ -54,8 +63,12 @@ const _EMPTY_STATE: AssistantFormState = {
   allowed_domains: [],
   output_sanitizer_enabled: true,
   budget_cap_override_usd: null,
+  lead_capture_mode: 'off',
+  lead_capture_turn_n: 3,
+  lead_capture_message: null,
   interface_config: {},
   styling_config: {},
+  bound_channels: [],
 };
 
 @Injectable()
@@ -95,8 +108,12 @@ export class AssistantFormStateService {
       output_sanitizer_enabled: row.output_sanitizer_enabled,
       budget_cap_override_usd:
         row.budget_cap_override_usd === null ? null : Number(row.budget_cap_override_usd),
+      lead_capture_mode: row.lead_capture_mode,
+      lead_capture_turn_n: row.lead_capture_turn_n,
+      lead_capture_message: row.lead_capture_message,
       interface_config: { ...row.interface_config },
       styling_config: { ...row.styling_config },
+      bound_channels: [...(row.bound_channels ?? [])],
     });
     this._version.set(row.version);
     this._assistantId.set(row.id);
@@ -111,6 +128,44 @@ export class AssistantFormStateService {
   patch(delta: Partial<AssistantFormState>): void {
     this._state.update((current) => ({ ...current, ...delta }));
     this._dirty.set(true);
+  }
+
+  /** Merge one or more keys into ``interface_config`` without
+   *  clobbering the whole JSONB blob. Step 12's Interface tab uses
+   *  this so each field-level ``onXInput`` handler stays a one-liner
+   *  and doesn't accidentally drop sibling keys (initial_messages,
+   *  show_powered_by, etc.). Step 13 uses the styling twin. */
+  patchInterfaceConfig(delta: Record<string, unknown>): void {
+    this._state.update((current) => ({
+      ...current,
+      interface_config: { ...current.interface_config, ...delta },
+    }));
+    this._dirty.set(true);
+  }
+
+  /** Styling twin of :meth:`patchInterfaceConfig`. Step 13's tab uses
+   *  this for every colour swatch / theme dropdown so a change to
+   *  one key doesn't wipe the sibling colours. Profile picture URL
+   *  writes bypass the form-state (backend persists via jsonb_set
+   *  out-of-band) — this helper is only for editor-driven fields. */
+  patchStylingConfig(delta: Record<string, unknown>): void {
+    this._state.update((current) => ({
+      ...current,
+      styling_config: { ...current.styling_config, ...delta },
+    }));
+    this._dirty.set(true);
+  }
+
+  /** Silent write: update the styling_config in-store WITHOUT
+   *  flipping the dirty flag. Used by the profile-picture upload
+   *  flow — the backend already persisted the URL via a targeted
+   *  jsonb_set, so the operator hasn't actually made an unsaved
+   *  edit to any editor-managed field. */
+  setStylingConfigSilently(delta: Record<string, unknown>): void {
+    this._state.update((current) => ({
+      ...current,
+      styling_config: { ...current.styling_config, ...delta },
+    }));
   }
 
   /** Called after a successful PATCH round-trip. Re-hydrates from
@@ -144,6 +199,12 @@ export class AssistantFormStateService {
       allowed_domains: s.allowed_domains,
       output_sanitizer_enabled: s.output_sanitizer_enabled,
       budget_cap_override_usd: s.budget_cap_override_usd,
+      lead_capture_mode: s.lead_capture_mode,
+      lead_capture_turn_n: s.lead_capture_turn_n,
+      lead_capture_message: s.lead_capture_message,
+      interface_config: s.interface_config,
+      styling_config: s.styling_config,
+      bound_channels: s.bound_channels,
     };
   }
 

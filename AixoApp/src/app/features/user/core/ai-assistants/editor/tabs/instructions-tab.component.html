@@ -20,16 +20,13 @@
         >
           Instruction Type
         </label>
-        <select
-          id="instruction-type"
-          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          [value]="selectedPresetId()"
-          (change)="onPresetChange($event)"
-        >
-          @for (p of presets(); track p.id) {
-            <option [value]="p.id">{{ p.label }}</option>
-          }
-        </select>
+        <div class="mt-1">
+          <crm-mobile-select
+            [options]="presetOptions()"
+            [value]="selectedPresetId()"
+            (valueChange)="onPresetChange($event)"
+          />
+        </div>
         <p class="mt-1 text-xs text-muted">
           Pick a starter prompt — the textarea below is populated with the preset body. Edit freely;
           later edits to the preset library don't affect this assistant.
@@ -41,7 +38,7 @@
           for="instruction-prompt"
           class="block text-xs font-medium uppercase tracking-wide text-muted"
         >
-          Prompt
+          Prompt <span class="text-red-500">*</span>
         </label>
         <textarea
           id="instruction-prompt"
@@ -97,16 +94,13 @@
           OpenAI Key
         </label>
         @if (hasUsableKey()) {
-          <select
-            id="key-select"
-            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-            [value]="formState.formState().key_id"
-            (change)="onKeyChange($event)"
-          >
-            @for (k of usableKeys(); track k.id) {
-              <option [value]="k.id">{{ k.label }} — sk-…{{ k.last4 }}</option>
-            }
-          </select>
+          <div class="mt-1">
+            <crm-mobile-select
+              [options]="keyOptions()"
+              [value]="formState.formState().key_id"
+              (valueChange)="onKeyChange($event)"
+            />
+          </div>
         } @else {
           <div
             class="mt-1 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400"
@@ -127,20 +121,50 @@
         >
           Model
         </label>
-        <select
-          id="model-select"
-          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40"
-          [value]="formState.formState().model"
-          (change)="onModelChange($event)"
-          [disabled]="!hasUsableKey()"
-        >
-          @for (m of models; track m) {
-            <option [value]="m">{{ m }}</option>
-          }
-        </select>
+        <div class="mt-1" [class.opacity-40]="!hasUsableKey()">
+          <crm-mobile-select
+            [options]="modelOptions"
+            [value]="formState.formState().model"
+            (valueChange)="onModelChange($event)"
+          />
+        </div>
         <p class="mt-1 text-xs text-muted">
           Cheaper models mean lower cost per message; larger models handle nuance better.
         </p>
+      </div>
+    </section>
+
+    <div class="border-t border-subtle"></div>
+
+    <!-- ===================================================== -->
+    <!-- Deployment (omnichannel Step 2)                       -->
+    <!-- ===================================================== -->
+    <section class="space-y-3">
+      <div>
+        <h3 class="text-sm font-semibold text-default">Deployment</h3>
+        <p class="mt-1 text-xs text-muted">
+          Pick which channels this assistant should auto-answer on. Employees can take over any
+          conversation at any time.
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        @for (ch of channels; track ch.key) {
+          <label
+            class="flex cursor-pointer items-start gap-3 rounded-lg border border-subtle bg-surface px-3 py-2 hover:bg-surface-2"
+          >
+            <input
+              type="checkbox"
+              class="mt-0.5 h-4 w-4 rounded border-subtle text-accent focus:ring-accent"
+              [checked]="isChannelBound(ch.key)"
+              (change)="onChannelToggle(ch.key, $event)"
+            />
+            <span class="flex-1">
+              <span class="block text-sm font-medium text-default">{{ ch.label }}</span>
+              <span class="block text-xs text-muted">{{ ch.description }}</span>
+            </span>
+          </label>
+        }
       </div>
     </section>
 
@@ -311,6 +335,74 @@
           from Settings → Integrations → AI Providers.
         </p>
       </div>
+
+      <!-- Lead capture (Step 16) -->
+      <div class="border-t border-subtle pt-4">
+        <label
+          for="lead-capture-mode"
+          class="block text-xs font-medium uppercase tracking-wide text-muted"
+        >
+          Auto-lead capture
+        </label>
+        <div class="mt-1">
+          <crm-mobile-select
+            [options]="leadCaptureOptions"
+            [value]="formState.formState().lead_capture_mode"
+            (valueChange)="onLeadCaptureModeChange($event)"
+          />
+        </div>
+        <p class="mt-1 text-xs text-muted">
+          When set, an email address in a visitor's message (or their reply to the ask) becomes a
+          lead with source "AI Assistant" and links the conversation to the new contact.
+        </p>
+      </div>
+
+      @if (formState.formState().lead_capture_mode === 'ask_at_turn') {
+        <div>
+          <label
+            for="lead-capture-turn"
+            class="block text-xs font-medium uppercase tracking-wide text-muted"
+          >
+            Ask at turn number
+          </label>
+          <input
+            id="lead-capture-turn"
+            type="number"
+            min="1"
+            max="20"
+            step="1"
+            class="mt-1 block w-32 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            [value]="formState.formState().lead_capture_turn_n"
+            (input)="onLeadCaptureTurnInput($event)"
+          />
+          <p class="mt-1 text-xs text-muted">
+            Which visitor turn triggers the ask. Turn 3 = after two prior visitor messages.
+          </p>
+        </div>
+
+        <div>
+          <label
+            for="lead-capture-message"
+            class="block text-xs font-medium uppercase tracking-wide text-muted"
+          >
+            Ask phrasing
+            <span class="ml-1 font-normal normal-case text-faint">optional</span>
+          </label>
+          <textarea
+            id="lead-capture-message"
+            rows="2"
+            maxlength="500"
+            placeholder="By the way — if you'd like us to follow up personally, could you share your email address? (Optional.)"
+            class="mt-1 block w-full resize-y rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            [value]="formState.formState().lead_capture_message ?? ''"
+            (input)="onLeadCaptureMessageInput($event)"
+          ></textarea>
+          <p class="mt-1 text-xs text-muted">
+            Leave blank to use the default phrasing. The model weaves this into its reply, so avoid
+            hard commands — a friendly ask converts better.
+          </p>
+        </div>
+      }
     </section>
   }
 </div>

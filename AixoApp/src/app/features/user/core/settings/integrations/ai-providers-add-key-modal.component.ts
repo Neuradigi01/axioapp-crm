@@ -23,11 +23,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   computed,
   inject,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
+import { AutofillEvent, TextFieldModule } from '@angular/cdk/text-field';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
@@ -45,7 +48,7 @@ interface ProviderOption {
   selector: 'app-ai-providers-add-key-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, LucideAngularModule],
+  imports: [ReactiveFormsModule, TextFieldModule, LucideAngularModule],
   templateUrl: './ai-providers-add-key-modal.component.html',
 })
 export class AiProvidersAddKeyModalComponent {
@@ -81,6 +84,13 @@ export class AiProvidersAddKeyModalComponent {
   protected readonly submitError = signal<string | null>(null);
   protected readonly duplicateInfo = signal<{ last4: string } | null>(null);
 
+  // Ref to the raw <input> so we can read the live DOM value at submit
+  // time — the reactive form control can lag behind on browser autofill
+  // or paste on `type="password"` fields.
+  private readonly apiKeyInput = viewChild<ElementRef<HTMLInputElement>>('apiKeyInput');
+
+  // Dim styling only — the button is always clickable so we can sync
+  // the DOM value and surface a validation message on click if empty.
   protected readonly canSave = computed(
     () => this.form.valid && !this.saving() && this.savedKey() === null,
   );
@@ -89,8 +99,42 @@ export class AiProvidersAddKeyModalComponent {
     this.showApiKey.update((v) => !v);
   }
 
+  // Chromium does not fire `input` when it autofills a `type="password"`
+  // field, so the reactive form control stays empty and Save + test stays
+  // disabled even though dots are visible. `cdkAutofill` from Angular CDK
+  // detects the autofill and lets us push the DOM value into the control.
+  protected onApiKeyAutofill(event: AutofillEvent): void {
+    if (!event.isAutofilled) return;
+    const input = event.target as HTMLInputElement;
+    const control = this.form.controls.api_key;
+    if (control.value !== input.value) {
+      control.setValue(input.value);
+      control.markAsDirty();
+    }
+  }
+
   protected save(): void {
-    if (!this.canSave()) return;
+    if (this.saving() || this.savedKey() !== null) return;
+
+    // Belt-and-suspenders: force-sync the live DOM value into the reactive
+    // form control before validating. Chromium/Safari don't always fire
+    // `input` on autofill or programmatic paste into `type="password"`,
+    // which would otherwise leave the control empty and validation failing.
+    const inputEl = this.apiKeyInput()?.nativeElement;
+    if (inputEl) {
+      const control = this.form.controls.api_key;
+      if (control.value !== inputEl.value) {
+        control.setValue(inputEl.value);
+        control.markAsDirty();
+      }
+    }
+
+    if (!this.form.valid) {
+      this.form.markAllAsTouched();
+      this.submitError.set('Enter your OpenAI API key (min. 8 characters).');
+      return;
+    }
+
     this.saving.set(true);
     this.submitError.set(null);
     this.duplicateInfo.set(null);

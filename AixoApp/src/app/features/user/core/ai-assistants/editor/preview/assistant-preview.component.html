@@ -8,13 +8,23 @@
     [style.background-color]="styling().assistant_bg"
     [style.color]="styling().assistant_text"
   >
-    <span
-      class="flex h-9 w-9 shrink-0 items-center justify-center bg-white/20 ring-1 ring-white/30"
-      [class.rounded-full]="styling().assistant_shape === 'circle'"
-      [class.rounded-md]="styling().assistant_shape === 'square'"
-    >
-      <lucide-icon name="sparkles" size="16" aria-hidden="true"></lucide-icon>
-    </span>
+    @if (styling().header_profile_picture_url; as picUrl) {
+      <img
+        [src]="picUrl"
+        alt=""
+        class="h-9 w-9 shrink-0 object-cover ring-1 ring-white/30"
+        [class.rounded-full]="styling().assistant_shape === 'circle'"
+        [class.rounded-md]="styling().assistant_shape === 'square'"
+      />
+    } @else {
+      <span
+        class="flex h-9 w-9 shrink-0 items-center justify-center bg-white/20 ring-1 ring-white/30"
+        [class.rounded-full]="styling().assistant_shape === 'circle'"
+        [class.rounded-md]="styling().assistant_shape === 'square'"
+      >
+        <lucide-icon name="sparkles" size="16" aria-hidden="true"></lucide-icon>
+      </span>
+    }
     <div class="min-w-0 flex-1">
       <h4 class="truncate text-sm font-semibold">{{ iface().header_heading }}</h4>
       <p class="mt-0.5 truncate text-xs opacity-90">{{ iface().header_subheading }}</p>

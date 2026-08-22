@@ -247,6 +247,13 @@
         </div>
       }
 
+      <!-- Step 17: Retention configuration card. Shows org-level default
+           retention-days for AI conversations. Read-only in v1; future
+           steps will add a settings endpoint to edit this value. -->
+      @if (canManageAiProviders()) {
+        <app-retention-card></app-retention-card>
+      }
+
       <!-- Compact DLQ summary card (Step 7) — kept as a quick-access
          link to expand the inline table even when the status banner
          isn't showing. Hidden for roles without the org-integrations

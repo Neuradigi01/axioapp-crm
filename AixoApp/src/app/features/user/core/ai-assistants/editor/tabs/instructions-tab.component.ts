@@ -34,8 +34,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { AiProviderKey } from '../../../settings/integrations/ai-providers-api.service';
-import { AiAssistantsApiService } from '../../ai-assistants-api.service';
+import { AiAssistantChannel, AiAssistantsApiService } from '../../ai-assistants-api.service';
 import { AssistantFormStateService } from '../../form-state.service';
 import { CUSTOM_PROMPT_ID, InstructionPreset } from '../../instructions-presets';
 
@@ -47,7 +51,7 @@ const OPENAI_MODELS: readonly string[] = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'
   selector: 'app-ai-assistant-instructions-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, LucideAngularModule, RouterLink],
+  imports: [CommonModule, FormsModule, LucideAngularModule, RouterLink, MobileSelectComponent],
   templateUrl: './instructions-tab.component.html',
 })
 export class InstructionsTabComponent {
@@ -108,8 +112,15 @@ export class InstructionsTabComponent {
 
   // --- Prompt section -----------------------------------------------
 
-  protected onPresetChange(event: Event): void {
-    const id = (event.target as HTMLSelectElement).value;
+  // Options fed to ``crm-mobile-select`` — same shared component used
+  // by the appointments / contacts / leads pickers so the dropdown UX
+  // matches the rest of the app instead of the OS-native ``<select>``
+  // popup styling.
+  protected readonly presetOptions = computed<readonly MobileSelectOption[]>(() =>
+    this.presets().map((p) => ({ value: p.id, label: p.label })),
+  );
+
+  protected onPresetChange(id: string): void {
     this.selectedPresetId.set(id);
     if (id === CUSTOM_PROMPT_ID) return;
     const preset = this.presets().find((p) => p.id === id);
@@ -133,13 +144,23 @@ export class InstructionsTabComponent {
     this.formState.patch({ temperature: clamped });
   }
 
-  protected onKeyChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
+  protected readonly keyOptions = computed<readonly MobileSelectOption[]>(() =>
+    this.usableKeys().map((k) => ({
+      value: k.id,
+      label: `${k.label} — sk-…${k.last4}`,
+    })),
+  );
+
+  protected onKeyChange(value: string): void {
     this.formState.patch({ key_id: value });
   }
 
-  protected onModelChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
+  protected readonly modelOptions: readonly MobileSelectOption[] = OPENAI_MODELS.map((m) => ({
+    value: m,
+    label: m,
+  }));
+
+  protected onModelChange(value: string): void {
     this.formState.patch({ model: value });
   }
 
@@ -215,5 +236,74 @@ export class InstructionsTabComponent {
     const num = Number(raw);
     if (!Number.isFinite(num) || num < 0) return;
     this.formState.patch({ budget_cap_override_usd: num });
+  }
+
+  // --- Deployment channels (omnichannel Step 2) ---------------------
+
+  /** Channels the operator can bind an assistant to. ``ai_widget``
+   *  removed from new bindings — legacy assistants that already have
+   *  it stay valid (the backend enum still accepts it), but the
+   *  checkbox is hidden so the customer-facing surface stays focused
+   *  on WhatsApp + Email. Instagram / Messenger / SMS land in a later
+   *  track. */
+  protected readonly channels: readonly {
+    key: AiAssistantChannel;
+    label: string;
+    description: string;
+  }[] = [
+    {
+      key: 'whatsapp',
+      label: 'WhatsApp',
+      description: 'Answer inbound messages on your WhatsApp Business number.',
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      description: 'Auto-reply to emails sent to your connected mailbox.',
+    },
+  ];
+
+  /** Compute-friendly membership check so the template can drive the
+   *  ``[checked]`` binding without a method call in the change-detection
+   *  hot-path. */
+  protected isChannelBound(channel: AiAssistantChannel): boolean {
+    return this.formState.formState().bound_channels.includes(channel);
+  }
+
+  protected onChannelToggle(channel: AiAssistantChannel, event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    const current = this.formState.formState().bound_channels;
+    const next = checked
+      ? Array.from(new Set([...current, channel]))
+      : current.filter((c) => c !== channel);
+    this.formState.patch({ bound_channels: next });
+  }
+
+  // --- Lead capture (Step 16) ---------------------------------------
+
+  protected readonly leadCaptureOptions: readonly MobileSelectOption[] = [
+    { value: 'off', label: 'Off — never auto-create leads' },
+    { value: 'detect_email', label: 'Detect email in visitor messages' },
+    { value: 'ask_at_turn', label: 'Ask for email at a specific turn' },
+  ];
+
+  protected onLeadCaptureModeChange(raw: string): void {
+    // Restrict to the three legal values. Any other value would be
+    // a UI drift and gets ignored client-side (backend enforces
+    // via ENUM CHECK anyway).
+    if (raw === 'off' || raw === 'detect_email' || raw === 'ask_at_turn') {
+      this.formState.patch({ lead_capture_mode: raw });
+    }
+  }
+
+  protected onLeadCaptureTurnInput(event: Event): void {
+    const raw = Number((event.target as HTMLInputElement).value);
+    const clamped = Number.isFinite(raw) ? Math.min(20, Math.max(1, Math.round(raw))) : 3;
+    this.formState.patch({ lead_capture_turn_n: clamped });
+  }
+
+  protected onLeadCaptureMessageInput(event: Event): void {
+    const value = (event.target as HTMLTextAreaElement).value;
+    this.formState.patch({ lead_capture_message: value || null });
   }
 }

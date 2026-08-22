@@ -10,11 +10,13 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { LucideAngularModule } from 'lucide-angular';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import { ContactsApiService } from '../contacts/contacts-api.service';
+import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 
 import {
@@ -74,6 +76,7 @@ import { extractApiError } from '@core/services/api-error.util';
     LucideAngularModule,
     MobileSelectComponent,
     WhatsAppTemplatePickerComponent,
+    ConfirmDialogComponent,
   ],
   templateUrl: './conversations.page.html',
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -85,6 +88,7 @@ export class ConversationsPageComponent {
   private readonly contactsApi = inject(ContactsApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly snackBar = inject(MatSnackBar);
 
   /** Step 27b — handle to the compose-bar so we can read its
    *  current Send-From selection on send. The picker self-hides
@@ -195,6 +199,32 @@ export class ConversationsPageComponent {
     return this.items().find((c) => c.id === id) ?? null;
   });
 
+  /** View-only gate for the compose bar. Mirrors the backend
+   * `ensure_can_write_conversation` rule so the operator sees the
+   * disabled state instead of hitting a 403 after they try to send:
+   *   - Owner / Admin (`conversations.assign_others`) → always true.
+   *   - Chat unassigned → true (any employee can jump in and claim).
+   *   - Caller is the current assignee → true.
+   *   - Otherwise → false; compose-bar hides and an inline banner
+   *     tells the operator who owns the chat + who can transfer it. */
+  protected readonly canInteractWithSelected = computed(() => {
+    const conv = this.selectedConversation();
+    if (!conv) return false;
+    if (this.auth.hasPermission('conversations.assign_others')) return true;
+    const owner = conv.assigned_to_id ?? null;
+    if (owner === null) return true;
+    return owner === this.auth.currentUserId();
+  });
+
+  /** Display name of the current assignee — used in the view-only
+   * banner ("Assigned to Ganesh Test · view-only"). */
+  protected readonly selectedAssigneeName = computed<string | null>(() => {
+    const conv = this.selectedConversation();
+    const owner = conv?.assigned_to_id;
+    if (!owner) return null;
+    return this.staffById().get(owner)?.full_name ?? 'another user';
+  });
+
   /** Last notification fingerprint we've already reacted to — guards
    * against re-running the refresh loop when the signal re-emits with
    * the same head element. */
@@ -210,6 +240,17 @@ export class ConversationsPageComponent {
     id: string;
     timer: ReturnType<typeof setTimeout>;
   } | null = null;
+
+  /** AI take-over / return-to-AI confirmations. When set, the shared
+   *  ConfirmDialogComponent renders — replaces the native ``confirm()``
+   *  popups so the destructive-prompt UX matches the rest of the CRM
+   *  (styled card, red button, submitting spinner). ``kind`` drives
+   *  which title / body / verb the dialog shows. */
+  protected readonly pendingAiConfirm = signal<{
+    kind: 'takeover' | 'resume';
+    conversationId: string;
+  } | null>(null);
+  protected readonly aiConfirmSubmitting = signal(false);
 
   constructor() {
     // Seed the filter from the persisted assignee BEFORE the first
@@ -777,6 +818,139 @@ export class ConversationsPageComponent {
       });
   }
 
+  // --- AI takeover (omnichannel Step 4) ------------------------------
+
+  protected onTakeoverAi(): void {
+    const id = this.selectedId();
+    if (!id) return;
+    // Open the styled confirm dialog. Take-over is a claim of
+    // responsibility for the thread (AI stops answering, this user
+    // owns it) — worth a one-tap "yes I meant to do that" rather than
+    // silently firing on click.
+    this.pendingAiConfirm.set({ kind: 'takeover', conversationId: id });
+  }
+
+  protected onResumeAi(): void {
+    const id = this.selectedId();
+    if (!id) return;
+    this.pendingAiConfirm.set({ kind: 'resume', conversationId: id });
+  }
+
+  protected cancelAiConfirm(): void {
+    if (this.aiConfirmSubmitting()) return;
+    this.pendingAiConfirm.set(null);
+  }
+
+  protected confirmAiAction(): void {
+    const pending = this.pendingAiConfirm();
+    if (!pending) return;
+    this.aiConfirmSubmitting.set(true);
+    if (pending.kind === 'takeover') {
+      this._runTakeover(pending.conversationId);
+    } else {
+      this._runResume(pending.conversationId);
+    }
+  }
+
+  // Copy driving the shared ConfirmDialog — computed getters so the
+  // template can read the right title/body/verb per pending kind
+  // without a big @switch on the caller side.
+  protected aiConfirmTitle(): string {
+    return this.pendingAiConfirm()?.kind === 'takeover'
+      ? 'Take over from AI?'
+      : 'Return this conversation to AI?';
+  }
+
+  protected aiConfirmBody(): string {
+    return this.pendingAiConfirm()?.kind === 'takeover'
+      ? 'AI will stop answering on this thread. You (and anyone you assign) will handle future messages until you hand it back.'
+      : 'AI will handle future messages on this thread. Only the person who took over — or an admin — can do this.';
+  }
+
+  protected aiConfirmLabel(): string {
+    return this.pendingAiConfirm()?.kind === 'takeover' ? 'Take over' : 'Return to AI';
+  }
+
+  private _runTakeover(id: string): void {
+    this.api
+      .pauseAi(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
+          this._showToast('You took over from AI. Reload the thread to see the system message.');
+          // Reload the thread so the freshly-inserted system marker
+          // ("— {you} took over from AI —") lands in the UI without
+          // needing a full page refresh.
+          this._reloadDetail(id);
+          this.aiConfirmSubmitting.set(false);
+          this.pendingAiConfirm.set(null);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.aiConfirmSubmitting.set(false);
+          this.pendingAiConfirm.set(null);
+          if (err.status === 409) {
+            const detail = err.error?.detail;
+            const holder =
+              (detail && typeof detail === 'object' && detail.holder_name) || 'Another user';
+            this._showToast(`${holder} just took this over.`);
+            // Refresh so our local state matches the winner's.
+            this._reloadDetail(id);
+          } else {
+            this._showToast(extractApiError(err) ?? 'Could not take over.');
+          }
+        },
+      });
+  }
+
+  private _runResume(id: string): void {
+    this.api
+      .resumeAi(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
+          this._showToast('Returned to AI.');
+          this._reloadDetail(id);
+          this.aiConfirmSubmitting.set(false);
+          this.pendingAiConfirm.set(null);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.aiConfirmSubmitting.set(false);
+          this.pendingAiConfirm.set(null);
+          const detail = err.error?.detail;
+          if (err.status === 403 && detail?.reason === 'not_holder') {
+            this._showToast('Only the person who took over (or an admin) can return this to AI.');
+          } else {
+            this._showToast(extractApiError(err) ?? 'Could not return to AI.');
+          }
+        },
+      });
+  }
+
+  private _reloadDetail(id: string): void {
+    this.api
+      .detail(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (fresh) => this.detail.set(fresh),
+        error: () => {
+          /* silent — the takeover succeeded; the thread just won't
+             re-render the system message until manual refresh. */
+        },
+      });
+  }
+
+  private _showToast(message: string): void {
+    this.snackBar.open(message, 'OK', {
+      duration: 3000,
+      horizontalPosition: 'right',
+      verticalPosition: 'top',
+    });
+  }
+
   /**
    * J.16 fix — header status pill emitted a new choice. PATCH,
    * update both the list-row and thread detail on success so the
@@ -903,6 +1077,15 @@ export class ConversationsPageComponent {
     // Same treatment for the thread refresh — only fire when the
     // incoming notification is for the currently-open conversation, and
     // coalesce successive events for the same id.
+    //
+    // Uses ``_reloadDetail`` (silent refetch) rather than ``loadDetail``
+    // — ``loadDetail`` toggles ``threadLoading=true`` which unmounts the
+    // message list, replaces it with a "Loading thread…" placeholder,
+    // and on remount the scroll position collapses to the top of the
+    // rebuilt DOM. That flashed the thread back to older messages on
+    // every WS-triggered refresh. Silent refetch keeps the bubbles
+    // painted, appends the new one, and the chat-thread's own
+    // ngAfterViewChecked scroll-to-bottom lands smoothly at the newest.
     if (incomingId && incomingId === this.selectedId()) {
       if (this.pendingDetailReload !== null) {
         clearTimeout(this.pendingDetailReload.timer);
@@ -911,7 +1094,7 @@ export class ConversationsPageComponent {
       const timer = setTimeout(() => {
         this.pendingDetailReload = null;
         // Guard against a thread switch during the debounce window.
-        if (this.selectedId() === id) this.loadDetail(id);
+        if (this.selectedId() === id) this._reloadDetail(id);
       }, ConversationsPageComponent.RELOAD_DEBOUNCE_MS);
       this.pendingDetailReload = { id, timer };
     }

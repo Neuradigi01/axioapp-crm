@@ -10,7 +10,7 @@ import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 export const REASON = {
   requiredMissing: 'required field missing',
   invalidEmail: 'invalid email format',
-  invalidPhone: 'phone must be 8–15 digits, optionally starting with + (E.164 format)',
+  invalidPhone: 'phone must include country code (e.g. +919876543210)',
   invalidName: 'name contains disallowed characters',
   nameTooShort: 'name must be at least 2 characters',
   nameTooLong: 'name must be at most 100 characters',
@@ -43,7 +43,7 @@ export const REASON = {
  */
 export const NAME_RE_SRC = "^[A-Za-zÀ-ÿ' .\\-]{2,100}$";
 export const EMAIL_RE_SRC = '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$';
-export const PHONE_RE_SRC = '^\\+?[0-9]{8,15}$';
+export const PHONE_RE_SRC = '^\\+[1-9][0-9]{7,14}$';
 export const URL_RE_SRC = '^https?://[^\\s]+$';
 
 const NAME_RE = new RegExp(NAME_RE_SRC);
@@ -62,12 +62,11 @@ const PASSWORD_MIN = 8;
 const PASSWORD_MAX = 128;
 
 /**
- * E.164 phone validator (international format).
- *
- * Legacy helper — kept exported for the one or two call sites that
- * still normalise phones before storage. The validator itself no
- * longer strips: input must be strict per E.164 (optional `+` then
- * 8–15 digits, nothing else).
+ * Strip visual separators (space, dash, parens) so a value like
+ * `+91 98765-43210` normalises to `+919876543210` before regex match.
+ * Mirror of the backend's `_PHONE_SEPARATORS_RE.sub("", value)` so a
+ * paste from any source formats to the same canonical digits either
+ * side of the wire.
  */
 export function stripPhoneSeparators(raw: string): string {
   return raw.replace(/[\s()-]/g, '');
@@ -136,11 +135,13 @@ export function emailValidator(control: AbstractControl): ValidationErrors | nul
 }
 
 /**
- * E.164 international phone check. Strict: optional leading `+`,
- * then 8–15 digits, and nothing else — no spaces, hyphens, parens,
- * dots, or letters. Callers that want to accept pretty-printed input
- * (e.g. `+1 (555) 123-4567`) should normalise via
- * `stripPhoneSeparators` before setting the control's value.
+ * E.164 phone check with **mandatory country code**. Strips space /
+ * dash / paren separators first (so `+91 98765-43210` is accepted),
+ * then matches `^\+[1-9]\d{7,14}$`: a leading `+`, a non-zero
+ * country-code digit, then 7–14 more digits (E.164 max is 15 digits
+ * after the `+`). Mirrors the backend rule in
+ * `src/app/shared/validators.py` so both sides accept the same
+ * international format.
  *
  * Empty input short-circuits to `null`; `Validators.required` owns
  * the required-ness gate.
@@ -148,7 +149,8 @@ export function emailValidator(control: AbstractControl): ValidationErrors | nul
 export function phoneValidator(control: AbstractControl): ValidationErrors | null {
   const raw = control.value;
   if (isEmpty(raw)) return null;
-  return PHONE_RE.test(String(raw)) ? null : { phoneInvalid: REASON.invalidPhone };
+  const stripped = stripPhoneSeparators(String(raw));
+  return PHONE_RE.test(stripped) ? null : { phoneInvalid: REASON.invalidPhone };
 }
 
 /**

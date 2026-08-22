@@ -138,9 +138,14 @@
               </span>
               <div class="min-w-0 flex-1">
                 <div class="flex items-center justify-between gap-2">
-                  <p class="truncate text-[13px] font-semibold text-default">
-                    {{ rowName(c) }}
-                  </p>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-[13px] font-semibold text-default">
+                      {{ rowName(c) }}
+                    </p>
+                    @if (rowHandle(c); as handle) {
+                      <p class="truncate font-mono text-[10.5px] text-faint">{{ handle }}</p>
+                    }
+                  </div>
                   <div class="flex shrink-0 items-center gap-1.5">
                     <span class="font-mono text-[10.5px] text-faint">
                       {{ formatTime(c.last_message_at) }}
@@ -164,8 +169,14 @@
                 </div>
                 <p class="mt-0.5 truncate text-[11.5px] text-muted">
                   <span class="capitalize">{{ c.status }}</span>
-                  @if (c.ai_handling) {
-                    <span class="text-violet-400"> · AI handled </span>
+                  @if (c.ai_paused) {
+                    <span class="text-amber-400" title="A team member took over from AI">
+                      · ✋ Human took over
+                    </span>
+                  } @else if (c.ai_handling) {
+                    <span class="text-violet-400" title="AI is handling this conversation">
+                      · 🤖 AI handled
+                    </span>
                   }
                 </p>
                 @if (c.tags && c.tags.length > 0) {

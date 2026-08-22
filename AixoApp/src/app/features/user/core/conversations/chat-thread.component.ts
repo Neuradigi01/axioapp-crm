@@ -5,7 +5,9 @@ import {
   ElementRef,
   EventEmitter,
   Input,
+  OnChanges,
   Output,
+  SimpleChanges,
   ViewChild,
   computed,
   inject,
@@ -61,7 +63,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
   templateUrl: './chat-thread.component.html',
   host: { class: 'flex min-h-0 flex-1 flex-col' },
 })
-export class ChatThreadComponent implements AfterViewChecked {
+export class ChatThreadComponent implements AfterViewChecked, OnChanges {
   private readonly auth = inject(FurnitureAuthService);
 
   @Input({ required: true }) conversation!: Conversation;
@@ -70,6 +72,17 @@ export class ChatThreadComponent implements AfterViewChecked {
   @Input() staffById: Map<string, StaffListItem> = new Map();
 
   @Output() readonly toggleAi = new EventEmitter<boolean>();
+
+  /** tasks/ai-assistants-omnichannel Step 4 — user clicked the Take
+   *  Over button on the AI-status banner. The page owns the POST +
+   *  optimistic-flip semantics. Emitted only when ``ai_paused === false``
+   *  is visible in the banner. */
+  @Output() readonly takeoverAi = new EventEmitter<void>();
+
+  /** Step 4 — user clicked Return to AI (banner in the paused state).
+   *  Confirmation dialog lives on the page side so this stays a bare
+   *  emit — one click, one event. */
+  @Output() readonly resumeAiOut = new EventEmitter<void>();
 
   /** Fires when the user clicks the assignee pill. The page parent owns
    * the modal + PATCH. We emit a bare event because the parent already
@@ -150,13 +163,62 @@ export class ChatThreadComponent implements AfterViewChecked {
     this.tagsChanged.emit(tags);
   }
 
-  /** Permission gate for the reassign click target — same key the
-   * backend enforces on `PATCH /api/v1/conversations/{id}`. */
-  protected readonly canReassign = computed(() => this.auth.hasPermission('conversations.write'));
+  /** Permission gate for the reassign click target. Mirrors the
+   * backend rule in `service.ensure_can_assign_conversation`:
+   *   - Owner / Admin (`conversations.assign_others`) can always
+   *     reassign.
+   *   - The current assignee can transfer their own chat.
+   *   - Everyone else (including Employees viewing an unassigned
+   *     chat) can only be assigned *to* themselves via take-over from
+   *     AI / send-outbound implicit claim; the assignee dropdown
+   *     stays hidden. */
+  protected readonly canReassign = computed(() => {
+    if (this.auth.hasPermission('conversations.assign_others')) return true;
+    const me = this.auth.currentUserId();
+    return !!me && this.conversation?.assigned_to_id === me;
+  });
+
+  /** Write gate for reply / react / tag / mark-read / take-over-AI on
+   * the current thread. Mirrors the backend
+   * `ensure_can_write_conversation` rule: passes if the chat is
+   * unassigned (any employee can jump in), if the caller IS the
+   * assignee, or if the caller is Owner/Admin. When false, the
+   * template renders the thread in view-only mode (compose bar
+   * disabled, reply/react/tag hidden, small banner explains why). */
+  protected readonly canInteract = computed(() => {
+    if (this.auth.hasPermission('conversations.assign_others')) return true;
+    const owner = this.conversation?.assigned_to_id ?? null;
+    if (owner === null) return true;
+    const me = this.auth.currentUserId();
+    return !!me && owner === me;
+  });
+
+  /** Name of the current assignee — used by the view-only banner. */
+  protected readonly assigneeDisplayName = computed<string | null>(() => {
+    const owner = this.conversation?.assigned_to_id;
+    if (!owner) return null;
+    return this.staffById.get(owner)?.full_name ?? 'another user';
+  });
 
   @ViewChild('scrollHost') protected scrollHost?: ElementRef<HTMLDivElement>;
 
   private lastMessageCount = 0;
+  // Tracked separately from the count so that switching between two
+  // conversations that happen to have the same message count still
+  // fires a scroll-to-bottom (count would look unchanged otherwise —
+  // the operator would land halfway up the new thread and have to
+  // scroll down manually to see the newest bubble).
+  private lastConversationId: string | null = null;
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['conversation'] && this.conversation?.id !== this.lastConversationId) {
+      this.lastConversationId = this.conversation?.id ?? null;
+      // Force the next ngAfterViewChecked to treat this as a "first
+      // render" — count comparison will always see a change and scroll
+      // to bottom on the freshly-loaded thread.
+      this.lastMessageCount = -1;
+    }
+  }
 
   ngAfterViewChecked(): void {
     const count = this.detail?.messages.length ?? 0;
@@ -211,6 +273,42 @@ export class ChatThreadComponent implements AfterViewChecked {
 
   protected toggle(): void {
     this.toggleAi.emit(!this.conversation.ai_handling);
+  }
+
+  // --- AI takeover banner (omnichannel Step 4) ---------------------
+
+  /** Show the takeover banner on every channel that CAN carry AI —
+   *  widget conversations always can; WhatsApp / Email do when the
+   *  org has an assistant bound to that channel. Rather than
+   *  round-tripping the bind check on every render, we show the
+   *  banner on all three AI-capable channels + defer the "actually
+   *  paused / running" state to the server (a click always resolves
+   *  to a real conversation update on the backend). Pure non-AI
+   *  channels (sms / instagram / facebook / push) keep a clean
+   *  human-only UI. */
+  protected showTakeoverBanner(): boolean {
+    if (this.conversation.ai_paused) return true;
+    if (this.conversation.ai_handling) return true;
+    const ch = this.conversation.channel;
+    return ch === 'ai_widget' || ch === 'whatsapp' || ch === 'email';
+  }
+
+  /** Display name of whoever currently holds the paused conversation.
+   *  Reuses the ``staffById`` map the header already consumes; falls
+   *  back to a generic label so historical / soft-deleted holders
+   *  never render as an empty string. */
+  protected pausedHolderName(): string {
+    const holderId = this.conversation.ai_paused_by_user_id;
+    if (!holderId) return 'A team member';
+    return this.staffById.get(holderId)?.full_name ?? 'A team member';
+  }
+
+  protected onTakeoverClick(): void {
+    this.takeoverAi.emit();
+  }
+
+  protected onResumeClick(): void {
+    this.resumeAiOut.emit();
   }
 
   /** Two-letter initials for a staff member referenced by user id.

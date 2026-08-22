@@ -18,7 +18,10 @@ import { extractApiError } from '@core/services/api-error.util';
 import { TemplateRead, TemplateTestSendRead, TemplatesApiService } from '../templates-api.service';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const PHONE_RE = /^\d{8,15}$/;
+// E.164 with mandatory country code — must be `+<code><digits>`,
+// matches the shared backend / form validator so what the operator
+// types here matches what a contact record accepts.
+const PHONE_RE = /^\+[1-9]\d{7,14}$/;
 
 /**
  * Test-send modal — wraps the Step-5 endpoint.
@@ -75,7 +78,7 @@ export class TestSendModalComponent {
         return 'you@example.com';
       case 'whatsapp':
       case 'sms':
-        return '+91 98765 43210';
+        return '+919876543210';
       default:
         return 'channel-handle';
     }
@@ -86,7 +89,9 @@ export class TestSendModalComponent {
     if (!v) return false;
     if (this.template().channel === 'email') return EMAIL_RE.test(v);
     if (this.template().channel === 'whatsapp' || this.template().channel === 'sms') {
-      const cleaned = v.replace(/[\s+-]/g, '');
+      // Strip visual separators but keep the leading `+` — the country
+      // code is mandatory.
+      const cleaned = v.replace(/[\s()-]/g, '');
       return PHONE_RE.test(cleaned);
     }
     return v.length > 0;

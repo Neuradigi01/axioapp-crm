@@ -203,9 +203,16 @@ export class UpdateStatusModalComponent {
       validators: [Validators.required, Validators.maxLength(64)],
     }),
     assigned_to_id: this.fb.control<string>('', { nonNullable: true }),
+    // Remarks used to be `Validators.required`, which meant the
+    // Update Profile button stayed disabled whenever the rep edited
+    // anything OTHER than Owner (Owner-change auto-fills a
+    // "Reassigned from A to B." remark, satisfying the validator by
+    // side-effect). Making it optional lets a rep edit contact /
+    // stage / source / status / follow-up without also having to
+    // type an explanation. Length cap stays (matches the backend).
     remarks: this.fb.control<string>('', {
       nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(REMARKS_MAX)],
+      validators: [Validators.maxLength(REMARKS_MAX)],
     }),
     next_follow_up_at: this.fb.control<string>('', {
       nonNullable: true,
@@ -226,8 +233,25 @@ export class UpdateStatusModalComponent {
     initialValue: this.form.status,
   });
   protected readonly isFormValid = computed(() => this.formStatus() === 'VALID');
+  // Bridge `form.dirty` into a signal — plain `form.dirty` isn't
+  // reactive on its own, so gate the button off the same
+  // `valueChanges` stream that flips the dirty flag.
+  private readonly formValue = toSignal(this.form.valueChanges, {
+    initialValue: this.form.getRawValue(),
+  });
+  protected readonly isFormDirty = computed<boolean>(() => {
+    // Touch the value signal so this computed re-runs on any input.
+    // The form's own `dirty` flag is what we're actually reading —
+    // `formValue()` is discarded, it just wakes the tracker.
+    void this.formValue();
+    return this.form.dirty;
+  });
   protected readonly submitDisabled = computed(
-    () => this.submitting() || !this.isFormValid() || this.stageDriftedTo() !== null,
+    () =>
+      this.submitting() ||
+      !this.isFormValid() ||
+      !this.isFormDirty() ||
+      this.stageDriftedTo() !== null,
   );
 
   /** Captured on open. Sent as ``if_current_stage`` so the backend

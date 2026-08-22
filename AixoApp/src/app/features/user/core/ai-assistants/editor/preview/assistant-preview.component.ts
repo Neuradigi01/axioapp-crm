@@ -53,6 +53,9 @@ interface StylingDefaults {
   bubble_text: string;
   footer_bg: string;
   footer_text: string;
+  /** Widget-header profile picture URL. ``null`` renders the
+   *  fallback sparkles icon (Step 13). */
+  header_profile_picture_url: string | null;
 }
 
 const _INTERFACE_DEFAULTS: InterfaceDefaults = {
@@ -75,11 +78,20 @@ const _STYLING_DEFAULTS: StylingDefaults = {
   bubble_text: '#1C252E',
   footer_bg: '#FFFFFF',
   footer_text: '#637381',
+  header_profile_picture_url: null,
 };
 
 function _readString(config: Record<string, unknown>, key: string, fallback: string): string {
   const v = config[key];
   return typeof v === 'string' && v.length > 0 ? v : fallback;
+}
+
+/** Like ``_readString`` but permits a nullable field. Empty strings
+ *  collapse to ``null`` so the template's ``@if`` renders the
+ *  fallback icon instead of an ``<img src="">``. */
+function _readStringOrNull(config: Record<string, unknown>, key: string): string | null {
+  const v = config[key];
+  return typeof v === 'string' && v.length > 0 ? v : null;
 }
 
 function _readStringList(
@@ -161,6 +173,7 @@ export class AssistantPreviewComponent {
       bubble_text: _readString(cfg, 'bubble_text', _STYLING_DEFAULTS.bubble_text),
       footer_bg: _readString(cfg, 'footer_bg', _STYLING_DEFAULTS.footer_bg),
       footer_text: _readString(cfg, 'footer_text', _STYLING_DEFAULTS.footer_text),
+      header_profile_picture_url: _readStringOrNull(cfg, 'header_profile_picture_url'),
     };
   });
 

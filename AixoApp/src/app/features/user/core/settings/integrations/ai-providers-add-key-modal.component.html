@@ -85,7 +85,10 @@
           </label>
           <div class="relative mt-1">
             <input
+              #apiKeyInput
               id="add-key-secret"
+              cdkAutofill
+              (cdkAutofill)="onApiKeyAutofill($event)"
               [type]="showApiKey() ? 'text' : 'password'"
               formControlName="api_key"
               autocomplete="off"
@@ -138,7 +141,7 @@
           <button
             type="submit"
             class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 disabled:opacity-40"
-            [disabled]="!canSave()"
+            [disabled]="saving() || savedKey() !== null"
           >
             @if (saving()) {
               <lucide-icon

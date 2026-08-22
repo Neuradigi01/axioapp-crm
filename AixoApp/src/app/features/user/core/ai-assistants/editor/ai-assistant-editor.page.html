@@ -54,11 +54,34 @@
       }
     </div>
     <div class="flex items-center gap-2">
+      @if (formState.status() !== 'active') {
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40"
+          [disabled]="!canPublish()"
+          [attr.title]="publishBlockedReason()"
+          (click)="publish()"
+        >
+          @if (publishing()) {
+            <lucide-icon
+              name="loader-2"
+              size="14"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+            Publishing…
+          } @else {
+            <lucide-icon name="rocket" size="14" aria-hidden="true"></lucide-icon>
+            Publish
+          }
+        </button>
+      }
       <button
         type="button"
-        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-muted disabled:opacity-40"
-        disabled
-        [attr.title]="'Available in a future step'"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-40"
+        [disabled]="!formState.assistantId() || formState.status() !== 'active'"
+        [attr.title]="embedBlockedReason()"
+        (click)="openEmbedModal()"
       >
         <lucide-icon name="code" size="14" aria-hidden="true"></lucide-icon>
         Embed
@@ -168,5 +191,12 @@
         </div>
       </div>
     </div>
+  }
+
+  @if (embedModalOpen() && formState.assistantId(); as assistantId) {
+    <app-embed-snippet-modal
+      [assistantId]="assistantId"
+      (dismissed)="closeEmbedModal()"
+    ></app-embed-snippet-modal>
   }
 </div>

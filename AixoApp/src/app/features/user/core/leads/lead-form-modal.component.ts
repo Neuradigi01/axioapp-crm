@@ -69,6 +69,16 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
     create?: LeadCreate;
     update?: LeadUpdate;
     moveStageTo?: string;
+    /** In create mode: whether the linked contact was newly created for
+     * this lead, or an existing contact was matched (by phone / email).
+     * Absent for update mode. The parent uses this to word the success
+     * toast ("Lead created — new contact also created" vs "Lead created,
+     * linked to existing contact"). */
+    contactAction?: 'created' | 'matched';
+    /** In create mode with `contactAction === 'created'`: the newly
+     * written contact's display name, so the toast can say WHICH contact
+     * was created without a second hydrate call from the parent. */
+    contactName?: string;
   }>();
 
   protected readonly _lead = signal<Lead | null>(null);
@@ -93,9 +103,31 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
    * the lead's `contact_id`. */
   readonly contactBasics = this.fb.group({
     full_name: this.fb.control<string>('', { nonNullable: true }),
-    phone: this.fb.control<string>('', { nonNullable: true }),
+    // Prefill `+` so the country-code affordance is visible from open;
+    // `resolveContactThenEmit` treats a lone `+` as "no phone entered".
+    phone: this.fb.control<string>('+', { nonNullable: true }),
     email: this.fb.control<string>('', { nonNullable: true }),
   });
+
+  /** Re-seed the `+` prefix on focus if it was cleared. */
+  protected ensurePhonePrefix(): void {
+    const value = this.contactBasics.controls.phone.value ?? '';
+    if (!value.startsWith('+')) {
+      this.contactBasics.controls.phone.setValue('+' + value.replace(/^\+*/, ''));
+    }
+  }
+
+  /** Block Backspace / Delete when it would erase the leading `+`. */
+  protected onPhoneKeydown(event: KeyboardEvent): void {
+    const input = event.target as HTMLInputElement;
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? 0;
+    if (event.key === 'Backspace' && start <= 1 && end <= 1) {
+      event.preventDefault();
+    } else if (event.key === 'Delete' && start === 0 && end === 0) {
+      event.preventDefault();
+    }
+  }
 
   readonly standard = this.fb.group({
     pipeline_stage: this.fb.control<string>('', { nonNullable: true }),
@@ -247,7 +279,9 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
   private resolveContactThenEmit(): void {
     const basics = this.contactBasics.getRawValue();
     const full_name = basics.full_name.trim();
-    const phone = basics.phone.trim() || null;
+    const phoneTrimmed = basics.phone.trim();
+    // A lone `+` (from the country-code prefill) means no phone entered.
+    const phone = phoneTrimmed === '' || phoneTrimmed === '+' ? null : phoneTrimmed;
     const email = basics.email.trim() || null;
 
     this._submitting.set(true);
@@ -260,10 +294,28 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
             const patch: Record<string, string> = {};
             if (!match.phone && phone) patch['phone'] = phone;
             if (!match.email && email) patch['email'] = email;
-            if (Object.keys(patch).length === 0) return of(match.id);
-            return this.contactsApi.update(match.id, patch).pipe(map((c) => c.id));
+            if (Object.keys(patch).length === 0) {
+              return of({
+                id: match.id,
+                action: 'matched' as const,
+                name: match.full_name,
+              });
+            }
+            return this.contactsApi.update(match.id, patch).pipe(
+              map((c) => ({
+                id: c.id,
+                action: 'matched' as const,
+                name: c.full_name,
+              })),
+            );
           }
-          return this.contactsApi.createStub({ full_name, phone, email }).pipe(map((c) => c.id));
+          return this.contactsApi.createStub({ full_name, phone, email }).pipe(
+            map((c) => ({
+              id: c.id,
+              action: 'created' as const,
+              name: c.full_name,
+            })),
+          );
         }),
         catchError((err: HttpErrorResponse) => {
           this._submitting.set(false);
@@ -272,18 +324,22 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
         }),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((contactId) => {
+      .subscribe((resolved) => {
         this._submitting.set(false);
-        if (!contactId) return;
+        if (!resolved) return;
         const raw = this.standard.getRawValue();
         const payload: LeadCreate = {
-          contact_id: contactId,
+          contact_id: resolved.id,
           pipeline_stage: raw.pipeline_stage || null,
           budget: nullableTrim(raw.budget),
           expected_close_date: nullableTrim(raw.expected_close_date),
           custom_data: this.customValue() as Record<string, unknown>,
         };
-        this.save.emit({ create: payload });
+        this.save.emit({
+          create: payload,
+          contactAction: resolved.action,
+          contactName: resolved.name,
+        });
       });
   }
 

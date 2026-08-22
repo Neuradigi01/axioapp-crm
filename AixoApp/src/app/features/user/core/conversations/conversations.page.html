@@ -159,29 +159,48 @@
           [loading]="threadLoading()"
           [staffById]="staffById()"
           (toggleAi)="onToggleAi($event)"
+          (takeoverAi)="onTakeoverAi()"
+          (resumeAiOut)="onResumeAi()"
           (reassign)="openReassign()"
           (replyTo)="onReplyTo($event)"
           (react)="onReact($event)"
           (tagsChanged)="onTagsChanged($event)"
           (statusChange)="onStatusChange($event)"
         />
-        <app-compose-bar
-          #composeBar
-          [aiHandling]="conv.ai_handling"
-          [channel]="conv.channel"
-          [contactId]="conv.contact_id"
-          [replyingTo]="replyingTo()"
-          [staff]="staffList()"
-          [outOfSession]="isOutOfSession()"
-          [receivedViaPhoneId]="$any(conv).received_via_phone_id ?? null"
-          (send)="onSendText($event)"
-          (sendMedia)="onSendMedia($event)"
-          (sendNote)="onSendNote($event)"
-          (sendLocation)="onSendLocation($event)"
-          (openInteractive)="openInteractive()"
-          (toggleAi)="onToggleAi($event)"
-          (clearReply)="onClearReply()"
-        />
+        @if (canInteractWithSelected()) {
+          <app-compose-bar
+            #composeBar
+            [aiHandling]="conv.ai_handling"
+            [channel]="conv.channel"
+            [contactId]="conv.contact_id"
+            [replyingTo]="replyingTo()"
+            [staff]="staffList()"
+            [outOfSession]="isOutOfSession()"
+            [receivedViaPhoneId]="$any(conv).received_via_phone_id ?? null"
+            (send)="onSendText($event)"
+            (sendMedia)="onSendMedia($event)"
+            (sendNote)="onSendNote($event)"
+            (sendLocation)="onSendLocation($event)"
+            (openInteractive)="openInteractive()"
+            (toggleAi)="onToggleAi($event)"
+            (clearReply)="onClearReply()"
+          />
+        } @else {
+          <!-- View-only banner: chat is assigned to another user and
+               the viewer isn't Owner/Admin. Backend enforces the same
+               rule via `ensure_can_write_conversation`; this is the
+               UX affordance so the operator doesn't waste a click. -->
+          <div
+            class="flex items-center justify-center gap-2 border-t border-subtle bg-surface-2 px-4 py-3 text-xs text-muted"
+          >
+            <lucide-icon name="alert-triangle" class="h-3.5 w-3.5 text-amber-500" />
+            <span>
+              Assigned to
+              <span class="font-medium text-default">{{ selectedAssigneeName() }}</span>
+              — view-only. Ask an Owner or Admin to reassign it before you can reply.
+            </span>
+          </div>
+        }
         <app-interactive-builder
           [open]="interactiveOpen()"
           (cancel)="closeInteractive()"
@@ -198,3 +217,16 @@
     </section>
   </div>
 </div>
+
+@if (pendingAiConfirm(); as pending) {
+  <app-confirm-dialog
+    [title]="aiConfirmTitle()"
+    [body]="aiConfirmBody()"
+    [confirmLabel]="aiConfirmLabel()"
+    [cancelLabel]="'Cancel'"
+    [danger]="pending.kind === 'takeover'"
+    [submitting]="aiConfirmSubmitting()"
+    (confirm)="confirmAiAction()"
+    (cancel)="cancelAiConfirm()"
+  />
+}

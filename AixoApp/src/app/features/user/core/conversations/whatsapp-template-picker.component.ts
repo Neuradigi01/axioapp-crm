@@ -187,10 +187,12 @@ export class WhatsAppTemplatePickerComponent {
     // Reset variable inputs on switch — otherwise a slot value from
     // the previous template's index N would bleed into the new one.
     this.variableValues.set({});
-    if (t.variable_count === 0) {
-      // No variables — send straight through.
-      this.send();
-    }
+    // Always drop into the preview panel — even for zero-variable
+    // templates. Previously we auto-sent when the template had no
+    // `{{n}}` slots, which meant a single click on a template row
+    // fired an outbound WhatsApp message to the customer with no
+    // confirmation step. The operator now always sees the preview +
+    // an explicit "Send template" button before the send goes out.
   }
 
   protected clearSelection(): void {
