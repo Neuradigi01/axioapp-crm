@@ -1165,16 +1165,34 @@ async def receive_webhook(
         # Failures are caught inside dispatch; this call never
         # raises into the webhook handler.
         #
-        # Precedence guard: if a chatbot will fire on this inbound
-        # (matching keyword / first-message trigger), skip the
-        # org-level AI dispatch. Otherwise both would answer —
-        # the bound assistant here PLUS an ``AI Assistant`` node
-        # inside the bot flow — resulting in a double reply. The
-        # bot takes precedence because it's the more specific
-        # config (an operator explicitly wired a flow for these
-        # messages); if the bot's flow later hands over via the
-        # ``AI Assistant`` node, that node calls the runtime itself.
-        if not bot_will_handle:
+        # Precedence guard: skip the org-level AI dispatch when a
+        # chatbot will already handle this inbound. Two paths to
+        # detect that:
+        #
+        #   1. ``bot_will_handle`` — a NEW trigger (keyword /
+        #      first-message) matches. The trigger matcher will
+        #      start a fresh bot run against this inbound.
+        #   2. An EXISTING parked bot run on this conversation is
+        #      waiting for the next inbound (``park_key=('reply', ...)``).
+        #      The matcher will wake it via ``resume_run``, which
+        #      re-enters the parked node's handler with the fresh
+        #      ``last_inbound_text``. For an ``AI Assistant`` node,
+        #      that resume calls ``reply_once`` and sends a reply —
+        #      so firing AI dispatch here too would double-reply.
+        #
+        # Skip AI dispatch in either case. The bot takes precedence
+        # because it's the more specific config (an operator
+        # explicitly wired a flow for these messages).
+        skip_ai_dispatch = bot_will_handle
+        if not skip_ai_dispatch:
+            from src.app.core.chatbots import data_access as _chatbot_dal
+
+            parked_runs = await _chatbot_dal.list_parked_runs_for_conversation(
+                session, conversation_id=conv.id
+            )
+            skip_ai_dispatch = bool(parked_runs)
+
+        if not skip_ai_dispatch:
             await session.refresh(conv)
             from src.app.core.ai_assistants import dispatch as ai_dispatch
 
