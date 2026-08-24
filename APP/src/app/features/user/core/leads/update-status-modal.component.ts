@@ -184,13 +184,22 @@ export class UpdateStatusModalComponent {
    *  wouldn't re-evaluate on user input because `form.valid` isn't a
    *  signal. `toSignal(statusChanges)` bridges it. */
   protected readonly form: FormGroup<FormShape> = this.fb.group<FormShape>({
+    // Contact name + phone match the standalone Contact / Lead / Walk-in
+    // forms — same `commonValidators.name` (letters + `. - '` only,
+    // 2–100 chars) and `commonValidators.phone` (E.164 with mandatory
+    // country code) so an operator can't type `Test Mail Contact @##`
+    // or `+91… 3453464564` (two numbers separated by a space) and hit
+    // the backend's opaque 4xx. The validators short-circuit on empty
+    // strings — leaving the fields untouched is still valid (this modal
+    // treats contact-basics edits as optional; only changed values are
+    // patched, see `submit()` below).
     contact_full_name: this.fb.control<string>('', {
       nonNullable: true,
-      validators: [Validators.maxLength(255)],
+      validators: [commonValidators.name, Validators.maxLength(255)],
     }),
     contact_phone: this.fb.control<string>('', {
       nonNullable: true,
-      validators: [Validators.maxLength(32)],
+      validators: [commonValidators.phone(), Validators.maxLength(32)],
     }),
     contact_email: this.fb.control<string>('', {
       nonNullable: true,
