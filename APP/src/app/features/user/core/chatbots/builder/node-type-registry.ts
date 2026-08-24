@@ -514,9 +514,9 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
   },
   {
     type: 'single_ai_message', label: 'AI Message', icon: 'bot',
-    category: 'ai', paletteTab: 'actions', outputs: 'labeled', beta: true,
+    category: 'ai', paletteTab: 'actions', outputs: 'labeled',
     labels: ['sent', 'error'],
-    hint: 'One-shot LLM reply (requires AI provider setup).',
+    hint: 'One AI-generated reply. Bot advances to the next node afterwards — connect to End Bot if you want the bot to stop here.',
     defaultConfig: {
       system_prompt: 'You are a helpful assistant.',
       user_prompt_template: '{{run.last_inbound_text}}',
