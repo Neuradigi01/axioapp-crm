@@ -513,6 +513,14 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
       source: query.source,
       last_activity_lt: query.last_activity_lt,
       last_activity_gt: query.last_activity_gt,
+      // Leads Center toolbar filters. These were being built in
+      // `leads.page.ts:buildQuery` but silently dropped here — the
+      // date-range and remarks-note filters never reached the
+      // backend. Result: the Date (from) / Between (to) pickers
+      // rendered but the list ignored them.
+      created_from: query.created_from,
+      created_to: query.created_to,
+      remarks_contains: query.remarks_contains,
       sort: query.sort,
       order: query.order,
       page: query.page,
@@ -520,6 +528,7 @@ export class LeadsApiService extends BaseCrudApiService<Lead, LeadCreate, LeadUp
       cursor: query.cursor,
       limit: query.limit,
       with_total: query.with_total,
+      with_unfiltered_total: query.with_unfiltered_total,
       filter:
         query.filter && !isEmptyFilter(query.filter) ? JSON.stringify(query.filter) : undefined,
       ...prefixCustomFilters(query.customFilters),

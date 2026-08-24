@@ -209,6 +209,56 @@ export class LeadsPageComponent {
   readonly createdFromControl = new FormControl<string>('', { nonNullable: true });
   readonly createdToControl = new FormControl<string>('', { nonNullable: true });
 
+  /** Today (local, `YYYY-MM-DD`) — cap on both date pickers so nobody
+   *  can filter by a future creation date. Computed once on
+   *  construct; midnight drift is a non-issue for the session
+   *  because the leads page reloads on stale filters. */
+  protected readonly todayIso = ((): string => {
+    const d = new Date();
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  })();
+
+  /** Reactive mirrors of the two date controls so the template's
+   *  cross-bindings (`[min]`, `[max]`) recompute whenever the pair
+   *  changes. `toSignal` wakes CD; the raw `FormControl.value` on its
+   *  own is not reactive. */
+  private readonly createdFromValue = toSignal(this.createdFromControl.valueChanges, {
+    initialValue: this.createdFromControl.value,
+  });
+  private readonly createdToValue = toSignal(this.createdToControl.valueChanges, {
+    initialValue: this.createdToControl.value,
+  });
+
+  /** Bound to the FROM picker's `[max]`. Upper bound is either the
+   *  currently-selected TO (so the calendar refuses picks after it)
+   *  or today (nobody can filter by a future creation date). */
+  protected readonly dateFromMax = computed<string>(
+    () => (this.createdToValue() || '').trim() || this.todayIso,
+  );
+
+  /** Bound to the TO picker's `[min]`. Lower bound is the currently-
+   *  selected FROM so the calendar refuses picks earlier than it. */
+  protected readonly dateToMin = computed<string>(() => (this.createdFromValue() || '').trim());
+
+  /** Human-readable error message when the two dates are in the wrong
+   *  order — surfaced under the date row and consulted by the reload
+   *  gate so an invalid range never hits the backend. */
+  protected readonly dateRangeError = computed<string | null>(() => {
+    const from = (this.createdFromValue() || '').trim();
+    const to = (this.createdToValue() || '').trim();
+    if (from && to && from > to) {
+      return '"Date (from)" must be on or before "Between (to)".';
+    }
+    if (from && from > this.todayIso) {
+      return '"Date (from)" cannot be in the future.';
+    }
+    if (to && to > this.todayIso) {
+      return '"Between (to)" cannot be in the future.';
+    }
+    return null;
+  });
+
   /** Visibility scope: which leads to show before any other filter.
    * Junior reps default to "mine" and don't see the toggle; managers
    * default to "team"; admin/owner default to "all". */
@@ -634,12 +684,17 @@ export class LeadsPageComponent {
     this.statusControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.resetCursorAndReload());
+    // Created-date pair: debounce so a rapid FROM-then-TO pick fires
+    // ONE reload with both dates set, not two. Guard on
+    // `dateRangeError()` so an invalid range (FROM > TO, or either
+    // date in the future) never hits the backend — the inline error
+    // banner surfaces the problem instead.
     this.createdFromControl.valueChanges
-      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.resetCursorAndReload());
+      .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.maybeReloadOnDateChange());
     this.createdToControl.valueChanges
-      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.resetCursorAndReload());
+      .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.maybeReloadOnDateChange());
     this.remarksControl.valueChanges
       .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.resetCursorAndReload());
@@ -755,6 +810,15 @@ export class LeadsPageComponent {
     this.cursorHistory.set([]);
     this.totalCount.set(null);
     this.reload();
+  }
+
+  /** Date-pair-specific reload gate. Skips the fetch entirely when
+   *  `dateRangeError()` is set so the operator's inline error banner
+   *  is the only visible feedback (no wasted round-trip, no empty
+   *  list flicker). */
+  private maybeReloadOnDateChange(): void {
+    if (this.dateRangeError() !== null) return;
+    this.resetCursorAndReload();
   }
 
   /** Enter-key affordance for the Data Search + Remarks text inputs.

@@ -293,6 +293,7 @@
           <crm-mobile-datetime
             mode="date"
             [formControl]="createdFromControl"
+            [max]="dateFromMax()"
             placeholder="Pick a date"
           />
         </div>
@@ -305,6 +306,8 @@
           <crm-mobile-datetime
             mode="date"
             [formControl]="createdToControl"
+            [min]="dateToMin()"
+            [max]="todayIso"
             placeholder="Pick a date"
           />
         </div>
@@ -354,6 +357,18 @@
         />
       </div>
     </div>
+
+    <!-- Cross-field validation for the Date (from) / Between (to) pair.
+         Shown when FROM > TO or either date is in the future; the auto-
+         refetch is gated on the same computed so no request goes out
+         while the range is invalid. -->
+    @if (dateRangeError(); as err) {
+      <p
+        class="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
+      >
+        {{ err }}
+      </p>
+    }
 
     <!-- Row 2: Remarks · User · Order Type · Reset · Search -->
     <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
