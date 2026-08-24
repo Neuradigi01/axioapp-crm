@@ -70,7 +70,13 @@ from src.app.core.chatbots.engine import (
 from src.app.core.chatbots.nodes import _shared
 
 _NODE_TYPE = "assign_ai_assistant"
-_DEFAULT_MAX_TURNS = 8
+# Default is 0 = "unlimited turns" — once the bot hands over to the
+# AI, the AI keeps answering every subsequent inbound until a human
+# takes over (which cancels the parked run via
+# ``cancel_parked_runs_for_conversation``). Operators can set an
+# explicit positive N to force the flow back to scripted mode after
+# N customer messages.
+_DEFAULT_MAX_TURNS = 0
 
 
 async def _pick_assistant_id(
@@ -187,13 +193,20 @@ async def _run_ai_turn_and_send(
 
 def _park_or_exit(
     *,
+    max_turns: int,
     turns_left: int,
     conversation_id,
     context_patch: dict,
 ) -> NodeResult:
     """Turn accounting: park for the next inbound while turns remain,
-    otherwise fire the ``handed_off`` port so the flow advances."""
-    if turns_left <= 0:
+    otherwise fire the ``handed_off`` port so the flow advances.
+
+    ``max_turns == 0`` is the "unlimited" convention — the node just
+    parks forever (until a human takes over, which cancels the parked
+    run). We still track ``turns_remaining`` in context for observability
+    even in unlimited mode; the exit check just never triggers."""
+    unlimited = max_turns <= 0
+    if not unlimited and turns_left <= 0:
         return NodeResult(
             next_edge_label="handed_off",
             context_patch={
@@ -210,7 +223,10 @@ def _park_or_exit(
             **context_patch,
             "ai_assistant_turns_remaining": turns_left,
         },
-        output={"turns_remaining": turns_left},
+        output={
+            "turns_remaining": turns_left,
+            "unlimited": unlimited,
+        },
     )
 
 
@@ -234,6 +250,7 @@ async def handle(ctx: NodeExecutionContext) -> NodeResult:
                 output={"reason": f"bad ai_assistant_id in ctx: {assistant_id_raw!r}"},
             )
 
+        max_turns = int(ctx_data.get("ai_assistant_max_turns", _DEFAULT_MAX_TURNS))
         turns_left = int(ctx_data.get("ai_assistant_turns_remaining", 0))
         user_text = str(ctx_data.get("last_inbound_text") or "")
 
@@ -259,8 +276,13 @@ async def handle(ctx: NodeExecutionContext) -> NodeResult:
                         output={"reason": f"ai_runtime_error: {exc}"},
                     )
 
+        # Only decrement in "limited turns" mode. In unlimited mode we
+        # leave the counter alone so the observability output stays
+        # meaningful (it just reads as "still 0 remaining, unlimited").
+        next_turns_left = turns_left if max_turns <= 0 else turns_left - 1
         return _park_or_exit(
-            turns_left=turns_left - 1,
+            max_turns=max_turns,
+            turns_left=next_turns_left,
             conversation_id=ctx.run.conversation_id,
             context_patch=_shared.clear_resume_flag(),
         )
@@ -299,7 +321,11 @@ async def handle(ctx: NodeExecutionContext) -> NodeResult:
             },
         )
 
-    max_turns = max(1, int(cfg.get("max_turns", _DEFAULT_MAX_TURNS)))
+    # ``max_turns`` clamps to non-negative — negatives coerce to 0 =
+    # unlimited so bad config never silently exits the flow after one
+    # turn. ``max_turns > 0`` means "N-turn cap"; ``max_turns == 0``
+    # means "unlimited (until human takeover)".
+    max_turns = max(0, int(cfg.get("max_turns", _DEFAULT_MAX_TURNS)))
     turns_left = max_turns
     context_patch: dict = {
         "ai_assistant_id": str(assistant_id),
@@ -323,7 +349,9 @@ async def handle(ctx: NodeExecutionContext) -> NodeResult:
                     assistant_id=assistant_id,
                     user_text=user_text,
                 )
-                turns_left = max_turns - 1
+                # Only decrement in "limited turns" mode.
+                if max_turns > 0:
+                    turns_left = max_turns - 1
             except Exception as exc:  # noqa: BLE001
                 return NodeResult(
                     next_edge_label="error",
@@ -332,6 +360,7 @@ async def handle(ctx: NodeExecutionContext) -> NodeResult:
                 )
 
     return _park_or_exit(
+        max_turns=max_turns,
         turns_left=turns_left,
         conversation_id=ctx.run.conversation_id,
         context_patch=context_patch,

@@ -540,17 +540,18 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
     type: 'assign_ai_assistant', label: 'AI Assistant', icon: 'bot',
     category: 'ai', paletteTab: 'actions', outputs: 'labeled',
     labels: ['handed_off', 'error'],
-    hint: 'Hand the conversation to an AI Assistant for up to N turns.',
+    hint: 'Hand the conversation to an AI Assistant. AI keeps answering until a human takes over (or max turns is reached).',
     defaultConfig: {
       assistant_id: '',
-      max_turns: 8,
+      max_turns: 0,
     },
     configSchema: [
       { key: 'assistant_id', label: 'Assistant ID', type: 'text',
         placeholder: 'Leave blank for the org\'s first active assistant',
         help: 'UUID of the AI Assistant to use (from /user/ai-assistants). Leave blank to auto-pick the org\'s first active assistant.' },
-      { key: 'max_turns', label: 'Max turns before handoff', type: 'number', min: 1, max: 50, step: 1,
-        help: 'AI answers up to this many customer messages, then the flow advances via the "handed_off" port.' },
+      { key: 'max_turns', label: 'Max turns (0 = unlimited)', type: 'number', min: 0, max: 100, step: 1,
+        placeholder: '0',
+        help: '0 = AI stays on until a human takes over (recommended). Set a positive N to force the bot back to scripted mode after N customer messages.' },
     ],
   },
 ] as const;
