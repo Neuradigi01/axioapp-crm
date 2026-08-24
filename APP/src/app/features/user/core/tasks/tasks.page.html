@@ -613,6 +613,45 @@
   />
 }
 
+<!-- Row-action confirms — Snooze +1d / Snooze +1w / Mark missed.
+     Prevents a single click on the icon strip from silently
+     shifting the customer's follow-up date or closing the task. -->
+@if (snoozingTomorrowTask(); as t) {
+  <app-confirm-dialog
+    [title]="'Snooze “' + t.title + '” to tomorrow 9 am?'"
+    [body]="'This changes the due date to tomorrow at 9 am. You can adjust it again from the edit modal.'"
+    [confirmLabel]="'Snooze +1 day'"
+    [danger]="false"
+    [submitting]="togglingId() === t.id"
+    (confirm)="confirmSnoozeTomorrow()"
+    (cancel)="closeSnoozeTomorrow()"
+  />
+}
+
+@if (snoozingWeekTask(); as t) {
+  <app-confirm-dialog
+    [title]="'Snooze “' + t.title + '” by one week?'"
+    [body]="'This pushes the due date 7 days from the current due (or from now if there is no due yet).'"
+    [confirmLabel]="'Snooze +1 week'"
+    [danger]="false"
+    [submitting]="togglingId() === t.id"
+    (confirm)="confirmSnoozeWeek()"
+    (cancel)="closeSnoozeWeek()"
+  />
+}
+
+@if (missingTask(); as t) {
+  <app-confirm-dialog
+    [title]="'Mark “' + t.title + '” as missed?'"
+    [body]="'Missed is a terminal status — the task drops out of the open list. You cannot undo this from the row; the task stays visible under the Missed tab.'"
+    [confirmLabel]="'Mark missed'"
+    [danger]="true"
+    [submitting]="togglingId() === t.id"
+    (confirm)="confirmMarkMissed()"
+    (cancel)="closeMarkMissed()"
+  />
+}
+
 <!-- T15 — Save view modal. Small; reuses the same
      confirm-dialog pattern with an inline input. -->
 @if (saveViewOpen()) {
