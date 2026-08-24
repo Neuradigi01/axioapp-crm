@@ -57,7 +57,7 @@ async def list_walk_ins_paginated(
     session: AsyncSession,
     *,
     status_filter: WalkInStatus | None = None,
-    assigned_to: uuid.UUID | None = None,
+    assigned_to: list[uuid.UUID] | None = None,
     open_only: bool = False,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -68,6 +68,10 @@ async def list_walk_ins_paginated(
 ) -> tuple[list[WalkIn], int]:
     """Filtered paginated list.
 
+    ``assigned_to`` is multi-value — a row matches when its owner is
+    in the given list (OR-set). Backs the column-header Owner popover
+    on the list page. ``None`` / empty means no filter.
+
     ``open_only=True`` → rows with no ``time_out`` (currently
     in-store); ``date_from`` / ``date_to`` window the ``time_in``
     column; ``last_activity_at`` ordering appends ``NULLS LAST`` so
@@ -75,8 +79,8 @@ async def list_walk_ins_paginated(
     filters: list[Any] = []
     if status_filter is not None:
         filters.append(WalkIn.status == status_filter)
-    if assigned_to is not None:
-        filters.append(WalkIn.assigned_to_id == assigned_to)
+    if assigned_to:
+        filters.append(WalkIn.assigned_to_id.in_(assigned_to))
     if open_only:
         filters.append(WalkIn.time_out.is_(None))
     if date_from is not None:

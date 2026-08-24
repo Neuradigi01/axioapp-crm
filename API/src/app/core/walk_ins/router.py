@@ -65,7 +65,14 @@ router = APIRouter(prefix="/walk-ins", tags=["Walk-ins"])
 @router.get("", response_model=list[WalkInOut])
 async def list_walk_ins_endpoint(
     status_filter: WalkInStatus | None = Query(default=None, alias="status"),
-    assigned_to: uuid.UUID | None = Query(default=None),
+    assigned_to: list[uuid.UUID] | None = Query(
+        default=None,
+        description=(
+            "Filter by owner UUID. Repeat the param "
+            "(`?assigned_to=<uuid>&assigned_to=<uuid>`) to match any of "
+            "several owners — the column-header Owner popover sends this shape."
+        ),
+    ),
     open_only: bool = Query(default=False),
     date_from: datetime | None = Query(default=None),
     date_to: datetime | None = Query(default=None),

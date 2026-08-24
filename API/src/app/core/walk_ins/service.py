@@ -208,7 +208,7 @@ async def list_walk_ins(
     session: AsyncSession,
     *,
     status_filter: WalkInStatus | None = None,
-    assigned_to: uuid.UUID | None = None,
+    assigned_to: list[uuid.UUID] | None = None,
     open_only: bool = False,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -217,7 +217,12 @@ async def list_walk_ins(
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[WalkIn], int]:
-    """Paginated list with filters."""
+    """Paginated list with filters.
+
+    ``assigned_to`` is multi-value — the column-header Owner popover
+    on the walk-ins list lets an operator tick several owners at once;
+    a row matches when its owner is in the list. ``None`` / empty
+    means no filter."""
     return await _da.list_walk_ins_paginated(
         session,
         status_filter=status_filter,
@@ -237,7 +242,7 @@ async def list_walk_ins_visible_to(
     *,
     caller,
     status_filter: WalkInStatus | None = None,
-    assigned_to: uuid.UUID | None = None,
+    assigned_to: list[uuid.UUID] | None = None,
     open_only: bool = False,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -249,14 +254,14 @@ async def list_walk_ins_visible_to(
     """Row-level visibility wrapper.
 
     Callers without `users.read` (employees vs. managers) only see
-    walk-ins assigned to them. Any `assigned_to=<other>` they pass
-    is silently clamped to self. Business rule — moved out of the
-    router so this is the single point of enforcement.
+    walk-ins assigned to them. Any ``assigned_to=<others>`` they pass
+    is silently clamped to ``[self]``. Business rule — moved out of
+    the router so this is the single point of enforcement.
     """
     from src.app.core.permissions.service import role_has_permission
 
     if not await role_has_permission(session, caller.role_id, "users.read"):
-        assigned_to = caller.legacy_uuid
+        assigned_to = [caller.legacy_uuid]
     return await list_walk_ins(
         session,
         status_filter=status_filter,

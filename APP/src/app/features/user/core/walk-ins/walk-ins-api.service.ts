@@ -84,7 +84,11 @@ export interface QuickRegisterResponse {
 
 export interface WalkInListQuery {
   status?: WalkInStatus;
-  assigned_to?: string | null;
+  /** Owner UUIDs to include (OR-set). Serialized as repeated
+   *  `?assigned_to=<uuid>` params (see `buildHttpParams`). Empty /
+   *  undefined skips the filter. Backed by the column-header Owner
+   *  popover on the walk-ins list. */
+  assigned_to?: string[];
   open_only?: boolean;
   date_from?: string;
   date_to?: string;

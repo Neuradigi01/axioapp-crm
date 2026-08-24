@@ -173,18 +173,11 @@
       />
     </div>
 
-    <!-- Owner dropdown — hidden for scoped roles (no users.read). The
-         backend clamps their list to their own rows anyway, so exposing
-         the picker would just yield empty selections. -->
-    @if (canFilterByOwner()) {
-      <div class="min-w-[9rem]">
-        <crm-mobile-select
-          [options]="assigneeSelectOptions()"
-          [value]="assigneeControl.value"
-          (valueChange)="assigneeControl.setValue($event)"
-        />
-      </div>
-    }
+    <!-- Owner filter moved to the OWNER column header
+         (`app-column-filter`). The toolbar owner dropdown was removed
+         to match the contacts-page pattern; scoped roles (no
+         `users.read`) still see the popover trigger but the backend
+         clamps their list to their own rows regardless. -->
   </section>
 
   <!-- Body -->
@@ -242,7 +235,12 @@
               <th
                 class="hidden w-[22%] overflow-hidden px-2 py-2 text-left text-[10px] font-semibold tracking-normal text-muted uppercase sm:table-cell md:w-auto md:px-4 md:py-2.5 md:text-xs md:font-medium md:tracking-wider"
               >
-                Owner
+                <app-column-filter
+                  label="Owner"
+                  [options]="assigneeOptions()"
+                  [value]="assigneeFilter()"
+                  (valueChange)="onOwnerFilterChange($event)"
+                />
               </th>
               <th
                 class="hidden px-4 py-2.5 text-left text-xs font-medium tracking-wider text-muted uppercase md:table-cell"
