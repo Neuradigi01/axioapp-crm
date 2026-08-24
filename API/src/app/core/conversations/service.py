@@ -1164,14 +1164,25 @@ async def receive_webhook(
         # backward-compat (dispatch handles the branching).
         # Failures are caught inside dispatch; this call never
         # raises into the webhook handler.
-        await session.refresh(conv)
-        from src.app.core.ai_assistants import dispatch as ai_dispatch
+        #
+        # Precedence guard: if a chatbot will fire on this inbound
+        # (matching keyword / first-message trigger), skip the
+        # org-level AI dispatch. Otherwise both would answer —
+        # the bound assistant here PLUS an ``AI Assistant`` node
+        # inside the bot flow — resulting in a double reply. The
+        # bot takes precedence because it's the more specific
+        # config (an operator explicitly wired a flow for these
+        # messages); if the bot's flow later hands over via the
+        # ``AI Assistant`` node, that node calls the runtime itself.
+        if not bot_will_handle:
+            await session.refresh(conv)
+            from src.app.core.ai_assistants import dispatch as ai_dispatch
 
-        await ai_dispatch.route_whatsapp_inbound(
-            session,
-            conversation=conv,
-            inbound_text=parsed.text,
-        )
+            await ai_dispatch.route_whatsapp_inbound(
+                session,
+                conversation=conv,
+                inbound_text=parsed.text,
+            )
 
     # tasks/chatbot-builder Step 4 — publish whatsapp.message_received.
     # Runs AFTER all existing inline processing (auto-reply / keyword
