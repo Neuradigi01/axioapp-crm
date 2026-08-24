@@ -168,26 +168,36 @@
                   </button>
                   @if (actionsMenuFor() === row.id) {
                     <div
-                      class="absolute right-6 top-10 z-10 w-44 bg-surface border border-subtle rounded-lg shadow-lg py-1"
+                      class="absolute right-6 top-10 z-10 w-48 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
+                      (click)="$event.stopPropagation()"
                     >
                       <a
                         [routerLink]="['/user/chatbots', row.id, 'edit']"
-                        class="block px-3 py-1.5 text-sm text-default hover:bg-surface-2"
-                        >Edit</a
+                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
                       >
+                        <lucide-icon name="pencil" size="12" aria-hidden="true"></lucide-icon>
+                        Edit
+                      </a>
                       <button
                         type="button"
                         (click)="exportBot(row)"
-                        class="block w-full text-left px-3 py-1.5 text-sm text-default hover:bg-surface-2"
+                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
                       >
+                        <lucide-icon name="download" size="12" aria-hidden="true"></lucide-icon>
                         Export JSON
                       </button>
                       @if (row.status === 'draft' || row.status === 'paused') {
                         <button
                           type="button"
                           (click)="publish(row)"
-                          class="block w-full text-left px-3 py-1.5 text-sm text-emerald-500 hover:bg-emerald-500/10"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
                         >
+                          <lucide-icon
+                            name="play"
+                            size="12"
+                            class="text-emerald-400"
+                            aria-hidden="true"
+                          ></lucide-icon>
                           Publish (make Live)
                         </button>
                       }
@@ -195,18 +205,25 @@
                         <button
                           type="button"
                           (click)="pause(row)"
-                          class="block w-full text-left px-3 py-1.5 text-sm text-sky-500 hover:bg-sky-500/10"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
                         >
+                          <lucide-icon
+                            name="pause-circle"
+                            size="12"
+                            class="text-sky-400"
+                            aria-hidden="true"
+                          ></lucide-icon>
                           Pause
                         </button>
                       }
                       @if (row.status !== 'archived') {
-                        <div class="my-1 border-t border-subtle"></div>
+                        <div class="border-t border-subtle"></div>
                         <button
                           type="button"
                           (click)="archive(row)"
-                          class="block w-full text-left px-3 py-1.5 text-sm text-red-500 hover:bg-red-500/10"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
                         >
+                          <lucide-icon name="archive" size="12" aria-hidden="true"></lucide-icon>
                           Archive
                         </button>
                       }
