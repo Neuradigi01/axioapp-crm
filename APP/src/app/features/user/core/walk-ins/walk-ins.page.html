@@ -663,3 +663,36 @@
     (cancel)="cancelDelete()"
   />
 }
+
+<!-- Row-action confirms — Interested / Follow-up / Left / Re-engage
+     status advances + Check-out. Prevents an accidental click on the
+     row-action strip from silently mutating the walk-in's state. -->
+@if (pendingStatusAdvance(); as pending) {
+  <app-confirm-dialog
+    [title]="'Mark this walk-in as “' + labelForStatus(pending.target) + '”?'"
+    [body]="
+      pending.target === 'left'
+        ? 'This flags the visit as closed with no follow-up. You can re-engage later from the row.'
+        : pending.target === 'converted'
+          ? 'This closes the visit as converted. Use Convert to also spin up a lead.'
+          : 'This updates the visit status. You can move it again from the row.'
+    "
+    [confirmLabel]="'Mark ' + labelForStatus(pending.target)"
+    [danger]="pending.target === 'left'"
+    [submitting]="rowActionSubmitting()"
+    (confirm)="confirmAdvanceStatus()"
+    (cancel)="closeAdvanceStatus()"
+  />
+}
+
+@if (pendingCheckout()) {
+  <app-confirm-dialog
+    [title]="'Check out this walk-in?'"
+    [body]="'Stamps the check-out time and locks the visit duration. The row moves out of the in-store view.'"
+    [confirmLabel]="'Check out'"
+    [danger]="false"
+    [submitting]="rowActionSubmitting()"
+    (confirm)="confirmCheckout()"
+    (cancel)="closeCheckout()"
+  />
+}

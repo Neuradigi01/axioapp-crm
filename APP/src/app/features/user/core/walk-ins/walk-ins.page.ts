@@ -135,6 +135,16 @@ export class WalkInsPageComponent {
   readonly deleteSubmitting = signal(false);
   readonly deleteError = signal<string | null>(null);
 
+  /** Pending status-advance target. Fires from any of the row
+   *  Interested / Follow-up / Left / Re-engage buttons; the confirm
+   *  dialog runs the PATCH after the operator clicks through. */
+  readonly pendingStatusAdvance = signal<{ walkIn: WalkIn; target: WalkInStatus } | null>(null);
+  /** Pending checkout target — same rationale as status-advance. */
+  readonly pendingCheckout = signal<WalkIn | null>(null);
+  /** Shared submitting flag for both row-action confirms. Row-scoped
+   *  progress is tracked separately by the API subscribers below. */
+  readonly rowActionSubmitting = signal(false);
+
   /** Client-side cap on bulk selection so the operator sees a clean
    *  message instead of a 422 from the backend. */
   readonly bulkActionMax = BULK_ACTION_MAX;
@@ -685,7 +695,23 @@ export class WalkInsPageComponent {
    *  single row on success, and on error reverts ONLY that row
    *  (surgical) so concurrent mutations to sibling rows during the
    *  in-flight request aren't blown away by a wholesale rollback. */
+  /** Row-button click → open confirm dialog. The PATCH fires from
+   *  `confirmAdvanceStatus` once the operator clicks through. */
   protected advanceStatus(walkIn: WalkIn, target: WalkInStatus): void {
+    if (this.rowActionSubmitting()) return;
+    this.pendingStatusAdvance.set({ walkIn, target });
+  }
+
+  protected closeAdvanceStatus(): void {
+    this.pendingStatusAdvance.set(null);
+  }
+
+  protected confirmAdvanceStatus(): void {
+    const pending = this.pendingStatusAdvance();
+    if (!pending) return;
+    if (this.rowActionSubmitting()) return;
+    const { walkIn, target } = pending;
+    this.rowActionSubmitting.set(true);
     const beforeRow = { ...walkIn };
     this.state.items.update((rows) =>
       rows.map((w) => (w.id === walkIn.id ? { ...w, status: target } : w)),
@@ -695,16 +721,37 @@ export class WalkInsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
+          this.rowActionSubmitting.set(false);
+          this.pendingStatusAdvance.set(null);
           this.state.items.update((rows) => rows.map((w) => (w.id === updated.id ? updated : w)));
           this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
+          this.rowActionSubmitting.set(false);
+          this.pendingStatusAdvance.set(null);
           this.state.items.update((rows) =>
             rows.map((w) => (w.id === beforeRow.id ? beforeRow : w)),
           );
           this.state.loadError.set(extractApiError(err) ?? 'Could not update walk-in status.');
         },
       });
+  }
+
+  /** Human label for the status-advance confirm dialog title / body.
+   *  Mirrors the button labels in the row action strip. */
+  protected labelForStatus(target: WalkInStatus): string {
+    switch (target) {
+      case 'interested':
+        return 'Interested';
+      case 'follow_up':
+        return 'Follow-up';
+      case 'converted':
+        return 'Converted';
+      case 'left':
+        return 'Left';
+      case 'browsing':
+        return 'Re-engage';
+    }
   }
 
   protected openRegister(): void {
@@ -721,10 +768,25 @@ export class WalkInsPageComponent {
     this.reloadRollup();
   }
 
+  /** Row-button click → open confirm dialog. The POST fires from
+   *  `confirmCheckout` once the operator clicks through. */
   protected onCheckout(walkIn: WalkIn): void {
+    if (this.rowActionSubmitting()) return;
+    this.pendingCheckout.set(walkIn);
+  }
+
+  protected closeCheckout(): void {
+    this.pendingCheckout.set(null);
+  }
+
+  protected confirmCheckout(): void {
+    const walkIn = this.pendingCheckout();
+    if (!walkIn) return;
+    if (this.rowActionSubmitting()) return;
+    this.rowActionSubmitting.set(true);
     // Optimistic: stamp time_out locally to a near-now ISO so the
     // duration column populates immediately. Replaced by server value.
-    // Surgical per-row revert on error (see `advanceStatus`).
+    // Surgical per-row revert on error (see `confirmAdvanceStatus`).
     const optimisticNow = new Date().toISOString();
     const beforeRow = { ...walkIn };
     this.state.items.update((rows) =>
@@ -735,10 +797,14 @@ export class WalkInsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
+          this.rowActionSubmitting.set(false);
+          this.pendingCheckout.set(null);
           this.state.items.update((rows) => rows.map((w) => (w.id === updated.id ? updated : w)));
           this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
+          this.rowActionSubmitting.set(false);
+          this.pendingCheckout.set(null);
           this.state.items.update((rows) =>
             rows.map((w) => (w.id === beforeRow.id ? beforeRow : w)),
           );
