@@ -60,6 +60,18 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
   private readonly contactsApi = inject(ContactsApiService);
   private readonly pipelinesApi = inject(PipelinesApiService);
 
+  /** Today in local `YYYY-MM-DD` shape — bound to `[min]` on the
+   *  expected-close-date picker so the browser also refuses past
+   *  clicks, not just the Angular validator. Recomputed once per
+   *  modal open (via the field getter); the modal is short-lived so
+   *  midnight drift is a non-issue. */
+  protected readonly todayDate = this.toLocalDateInput(new Date());
+
+  private toLocalDateInput(d: Date): string {
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
   @Input() set lead(value: Lead | null) {
     this._lead.set(value);
     if (value !== null) this.resetForm(value);
@@ -167,11 +179,12 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
     this.standard.controls.budget.setValidators(budgetValidators);
     this.standard.controls.budget.updateValueAndValidity({ emitEvent: false });
 
-    // Expected close date is a forward-looking projection — if the lead
-    // is actually closing today the rep clicks Won, they don't set an
-    // expectation. Enforce "tomorrow onward" via `dateFuture` (stricter
-    // than `dateNotPast` which allows today).
-    const closeValidators: ValidatorFn[] = [commonValidators.isoDate, commonValidators.dateFuture];
+    // Expected close date must be today or later — past dates are
+    // never valid on a forward-looking projection. `dateNotPast` (not
+    // `dateFuture`) so an operator forecasting a same-day close can
+    // still pick today; the Won flow doesn't preclude also setting
+    // an expectation for the same date.
+    const closeValidators: ValidatorFn[] = [commonValidators.isoDate, commonValidators.dateNotPast];
     if (closeRow?.is_required) closeValidators.push(commonValidators.required);
     this.standard.controls.expected_close_date.setValidators(closeValidators);
     this.standard.controls.expected_close_date.updateValueAndValidity({

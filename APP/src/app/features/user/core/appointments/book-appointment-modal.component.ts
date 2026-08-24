@@ -171,6 +171,19 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
     validators: [commonValidators.required, commonValidators.dateNotPast],
   });
 
+  /** Now (local, minute precision) in `YYYY-MM-DDTHH:mm` shape — pinned
+   *  to the datetime picker's `[min]` so the browser also refuses
+   *  past clicks. `dateNotPast` is the authoritative gate;
+   *  belt-and-braces prevents paste / dev-tool tampering. */
+  protected readonly scheduledAtMin = (() => {
+    const d = new Date();
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    return (
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+      `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    );
+  })();
+
   /** Assigned user id. Initialised to the current user's id once
    * `/users/me` lands, so solo users see no extra friction. Owner /
    * Admin override by picking another option in the dropdown. */

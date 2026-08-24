@@ -288,8 +288,8 @@
               <p class="mt-1 text-xs text-red-600">
                 @if (form.controls.expected_return_date.errors?.['invalidDate']; as msg) {
                   {{ msg }}
-                } @else if (form.controls.expected_return_date.errors?.['dateMustBeFuture']) {
-                  Expected return date must be tomorrow or later.
+                } @else if (form.controls.expected_return_date.errors?.['dateInPast']) {
+                  Expected return date can't be in the past. Pick today or later.
                 } @else if (form.controls.expected_return_date.errors?.['dateTooFarAhead']) {
                   Expected return date can't be more than a year away.
                 } @else {
@@ -297,7 +297,7 @@
                 }
               </p>
             }
-            <p class="mt-1 text-xs text-muted">Anywhere from tomorrow up to one year from now.</p>
+            <p class="mt-1 text-xs text-muted">Anywhere from today up to one year from now.</p>
           </div>
 
           <!-- W9 — queue arrival time. Reception can stamp this when a

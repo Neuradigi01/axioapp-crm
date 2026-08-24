@@ -12,7 +12,13 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { FormBuilder, ReactiveFormsModule, ValidatorFn } from '@angular/forms';
+import {
+  AbstractControl,
+  FormBuilder,
+  ReactiveFormsModule,
+  ValidationErrors,
+  ValidatorFn,
+} from '@angular/forms';
 import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
@@ -100,6 +106,15 @@ export class TaskFormModalComponent extends BaseFormModalComponent implements On
     return this.api.renderFields();
   }
 
+  /** Edit-mode `due_at` guard: apply `dateNotPast` only after the
+   *  operator has touched the field. Keeps already-overdue tasks
+   *  editable (rep can bump priority / assignee without also having
+   *  to re-date), but the moment they change the date the past-date
+   *  refusal kicks in. Static so `applyStandardValidators` can
+   *  reference it directly without a `.bind(this)` dance. */
+  private readonly _pastDateWhenDirty = (control: AbstractControl): ValidationErrors | null =>
+    control.dirty ? commonValidators.dateNotPast(control) : null;
+
   /** `title` + `priority` stay always-required (registry locks both).
    *  `description` / `due_at` / `assigned_to_id` accept the `required` override. */
   protected applyStandardValidators(map: Record<string, StandardFieldRendered>): void {
@@ -120,12 +135,16 @@ export class TaskFormModalComponent extends BaseFormModalComponent implements On
       this.form.controls[ctrl].updateValueAndValidity({ emitEvent: false });
     };
     setReq('description', [commonValidators.maxLength(2000)], map['description']);
-    // due_at blocks past values on CREATE (no retrospective task-logging
-    // surface). On EDIT we skip the past-date guard so operators can
-    // reassign / re-prioritise an already-overdue task without being
-    // forced to also push the due date forward — the form was rejecting
-    // every save on rows whose due_at had drifted into the past.
-    const dueValidators = this.isEdit() ? [] : [commonValidators.dateNotPast];
+    // due_at rule:
+    //   - CREATE  → strict `dateNotPast` (no retrospective logging).
+    //   - EDIT    → `dateNotPast` but ONLY when the operator has
+    //               actually touched the field. Lets a rep re-prioritise
+    //               or reassign an already-overdue task without also
+    //               being forced to bump the due date; the moment they
+    //               *do* change the date, past values are refused.
+    const dueValidators = this.isEdit()
+      ? [this._pastDateWhenDirty]
+      : [commonValidators.dateNotPast];
     setReq('due_at', dueValidators, map['due_at']);
     setReq('assigned_to_id', [], map['assigned_to_id']);
   }
@@ -151,6 +170,19 @@ export class TaskFormModalComponent extends BaseFormModalComponent implements On
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly followupOptions = FOLLOWUP_OPTIONS;
+
+  /** Now in local `YYYY-MM-DDTHH:mm` shape — bound to the due-date
+   *  picker's `[min]` so the browser refuses past picks alongside the
+   *  Angular validator. Computed once on construct; the modal is
+   *  short-lived so midnight drift is a non-issue. */
+  protected readonly dueAtMin = (() => {
+    const d = new Date();
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    return (
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+      `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    );
+  })();
 
   /** Static option lists shaped for `crm-mobile-select`. */
   protected readonly prioritySelectOptions: ReadonlyArray<{ value: string; label: string }> = [
