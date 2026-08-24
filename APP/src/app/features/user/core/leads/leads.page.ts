@@ -11,7 +11,6 @@ import {
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -57,6 +56,7 @@ import {
   LostReasonModalComponent,
 } from './lost-reason-modal/lost-reason-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 import {
   Lead,
   LeadCreate,
@@ -161,7 +161,7 @@ export class LeadsPageComponent {
   private readonly usersDir = inject(UsersDirectoryService);
   private readonly columnPrefs = inject(ColumnPrefsService);
   private readonly savedViewsApi = inject(SavedViewsApiService);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
 
   protected readonly state = inject(LeadsListState);
 
@@ -1553,23 +1553,17 @@ export class LeadsPageComponent {
     contactAction: 'created' | 'matched' | undefined,
     contactName: string | undefined,
   ): void {
-    let message: string;
+    let subtitle: string | null = null;
     if (contactAction === 'created') {
-      message = contactName
-        ? `Lead created successfully. New contact “${contactName}” was also created and linked.`
-        : 'Lead created successfully. A new contact was also created and linked.';
+      subtitle = contactName
+        ? `New contact “${contactName}” was also created and linked.`
+        : 'A new contact was also created and linked.';
     } else if (contactAction === 'matched') {
-      message = contactName
-        ? `Lead created successfully. Linked to existing contact “${contactName}”.`
-        : 'Lead created successfully. Linked to an existing contact.';
-    } else {
-      message = 'Lead created successfully.';
+      subtitle = contactName
+        ? `Linked to existing contact “${contactName}”.`
+        : 'Linked to an existing contact.';
     }
-    this.snackBar.open(message, 'OK', {
-      duration: 4000,
-      horizontalPosition: 'right',
-      verticalPosition: 'top',
-    });
+    this.toast.success('Lead created', { subtitle, durationMs: 4000 });
   }
 
   private submitUpdate(id: string, payload: LeadUpdate, moveStageTo?: string): void {

@@ -52,7 +52,7 @@
  */
 import { CommonModule, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -120,17 +120,17 @@ export class WhatsAppCardComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly fbSdk = inject(WhatsAppFbSdkService);
   private readonly numbersService = inject(WhatsAppNumbersService);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
 
-  /** Small toast helper — mirrors the chatbot builder's pattern.
-   *  Top-right so it doesn't cover the modal footer / buttons. */
+  /** Small toast helper — routes to the branded `ToastService` so the
+   *  visual (icon + colour + close button) is uniform with the rest
+   *  of the app. `'ok'` maps to success, `'error'` to error. */
   private notify(message: string, kind: 'ok' | 'error' = 'ok'): void {
-    this.snackBar.open(message, 'OK', {
-      duration: 3500,
-      horizontalPosition: 'right',
-      verticalPosition: 'top',
-      panelClass: kind === 'error' ? ['snack-error'] : ['snack-ok'],
-    });
+    if (kind === 'error') {
+      this.toast.error(message, { durationMs: 3500 });
+    } else {
+      this.toast.success(message, { durationMs: 3500 });
+    }
   }
 
   /** Step 27b — every connected WhatsApp phone for this org. The

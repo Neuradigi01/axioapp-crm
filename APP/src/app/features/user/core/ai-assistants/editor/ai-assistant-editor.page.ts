@@ -30,7 +30,7 @@ import { toObservable } from '@angular/core/rxjs-interop';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { LucideAngularModule } from 'lucide-angular';
 import { switchMap } from 'rxjs';
 
@@ -98,7 +98,7 @@ export class AiAssistantEditorPage {
   private readonly router = inject(Router);
   private readonly api = inject(AiAssistantsApiService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
   protected readonly formState = inject(AssistantFormStateService);
 
   protected readonly tabs = TABS;
@@ -241,13 +241,13 @@ export class AiAssistantEditorPage {
           this.saving.set(false);
           this.formState.applySaveResponse(row);
           this.savedAt.set(Date.now());
-          this.showToast('Assistant saved.');
+          this.toast.success('Assistant saved.');
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
           const message = this._friendlyErrorMessage(err);
           this.saveError.set(message);
-          this.showToast(message);
+          this.toast.error(message);
         },
       });
   }
@@ -302,20 +302,14 @@ export class AiAssistantEditorPage {
         next: (row) => {
           this.publishing.set(false);
           this.formState.load(row);
-          this.showToast('Assistant published — embed widget is live.');
+          this.toast.success('Assistant published', {
+            subtitle: 'Embed widget is live.',
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.publishing.set(false);
-          this.showToast(extractApiError(err) ?? 'Publish failed.');
+          this.toast.error(extractApiError(err) ?? 'Publish failed.');
         },
       });
-  }
-
-  private showToast(message: string): void {
-    this.snackBar.open(message, 'OK', {
-      duration: 3000,
-      horizontalPosition: 'right',
-      verticalPosition: 'top',
-    });
   }
 }
