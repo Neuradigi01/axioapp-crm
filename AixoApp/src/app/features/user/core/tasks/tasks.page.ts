@@ -136,6 +136,14 @@ export class TasksPageComponent {
   // Re-opening a done task is silent since the action is safe to undo.
   protected readonly completingTask = signal<Task | null>(null);
 
+  // Row-action confirmations — Snooze +1d / Snooze +1w / Mark missed.
+  // The three used to fire instantly on click; the confirm step
+  // prevents accidental clicks that would shift the customer's
+  // follow-up date or terminally close the task without an undo.
+  protected readonly snoozingTomorrowTask = signal<Task | null>(null);
+  protected readonly snoozingWeekTask = signal<Task | null>(null);
+  protected readonly missingTask = signal<Task | null>(null);
+
   // T15 — saved views for the tasks list.
   private readonly savedViewsApi = inject(SavedViewsApiService);
   protected readonly savedViews = signal<SavedView[]>([]);
@@ -498,9 +506,23 @@ export class TasksPageComponent {
 
   // --- T1: mark missed ----------------------------------------------------
 
+  /** Row-button click → open confirm dialog. The actual PATCH fires
+   *  from `confirmMarkMissed` after the operator clicks through. */
   protected onMarkMissed(task: Task): void {
     if (this.togglingId()) return;
     if (task.status !== 'open') return;
+    this.missingTask.set(task);
+  }
+
+  protected closeMarkMissed(): void {
+    this.missingTask.set(null);
+  }
+
+  protected confirmMarkMissed(): void {
+    const task = this.missingTask();
+    if (!task) return;
+    if (this.togglingId()) return;
+    this.missingTask.set(null);
     this.togglingId.set(task.id);
     this.api
       .markMissed(task.id)
@@ -550,15 +572,28 @@ export class TasksPageComponent {
 
   // --- T9: snooze shortcuts ----------------------------------------------
 
-  /** Reschedule the task's due_at by the given delta (positive minutes
-   *  advance the due, negative rewind). Anchored on the existing due
-   *  if set, otherwise on "now" (typical for tasks with no due yet
-   *  where the operator hits "+1d" to give it one). Fires a PATCH
-   *  and re-fetches on success. */
-  protected snoozeTask(task: Task, deltaMinutes: number): void {
+  /** Row-button click → open the "Snooze +1 week" confirm dialog.
+   *  The PATCH fires from `confirmSnoozeWeek` after the operator
+   *  clicks through. */
+  protected snoozeTask(task: Task, _deltaMinutes: number): void {
     if (this.togglingId()) return;
+    // Signature kept `deltaMinutes` for template-call compatibility;
+    // the +1-week row-button is currently the only caller and it
+    // hard-codes 7 days. The confirm flow reproduces that delta.
+    this.snoozingWeekTask.set(task);
+  }
+
+  protected closeSnoozeWeek(): void {
+    this.snoozingWeekTask.set(null);
+  }
+
+  protected confirmSnoozeWeek(): void {
+    const task = this.snoozingWeekTask();
+    if (!task) return;
+    if (this.togglingId()) return;
+    this.snoozingWeekTask.set(null);
     const anchor = task.due_at ? new Date(task.due_at) : new Date();
-    const next = new Date(anchor.getTime() + deltaMinutes * 60 * 1000);
+    const next = new Date(anchor.getTime() + 7 * 24 * 60 * 60 * 1000);
     this.togglingId.set(task.id);
     this.api
       .update(task.id, { due_at: next.toISOString() })
@@ -575,13 +610,26 @@ export class TasksPageComponent {
       });
   }
 
-  /** Convenience: bump the due to tomorrow 9am (matches how most
-   *  Todoist-style CRMs interpret "Tomorrow"). */
+  /** Row-button click → open the "Snooze to tomorrow 9am" confirm.
+   *  Previously the button reassigned the due date on a single click
+   *  with no undo. */
   protected snoozeToTomorrow(task: Task): void {
+    if (this.togglingId()) return;
+    this.snoozingTomorrowTask.set(task);
+  }
+
+  protected closeSnoozeTomorrow(): void {
+    this.snoozingTomorrowTask.set(null);
+  }
+
+  protected confirmSnoozeTomorrow(): void {
+    const task = this.snoozingTomorrowTask();
+    if (!task) return;
+    if (this.togglingId()) return;
+    this.snoozingTomorrowTask.set(null);
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(9, 0, 0, 0);
-    if (this.togglingId()) return;
     this.togglingId.set(task.id);
     this.api
       .update(task.id, { due_at: tomorrow.toISOString() })
