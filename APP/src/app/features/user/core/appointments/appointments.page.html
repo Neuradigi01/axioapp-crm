@@ -167,7 +167,13 @@
                     <p class="text-sm font-medium" [class]="palette.text">
                       {{ a.title }}
                     </p>
-                    <p class="mt-1 text-[14px] text-muted">
+                    <!-- Secondary + caption text switched off the theme
+                         `text-muted` / `text-default` tokens (designed
+                         for the app's dark surface, invisible on the
+                         card's light pastel bg) to the palette's
+                         hue-shifted body / caption tones. Reads as
+                         "muted within the card" on both palettes. -->
+                    <p class="mt-1 text-[14px]" [class]="palette.textMuted">
                       {{ formatTime(a.scheduled_at) }} · {{ a.duration_min }} min
                     </p>
                   </div>
@@ -178,14 +184,19 @@
                     {{ a.status }}
                   </span>
                 </div>
-                <p class="mt-1.5 text-xs text-default">
-                  <span class="font-medium">{{ contactName(a.contact_id) }}</span>
+                <p class="mt-1.5 text-xs" [class]="palette.textMuted">
+                  <span class="font-medium" [class]="palette.text">{{
+                    contactName(a.contact_id)
+                  }}</span>
                   @if (a.location) {
-                    <span class="text-muted"> · </span>
+                    <span [class]="palette.textFaint"> · </span>
                     <span>{{ a.location }}</span>
                   }
                 </p>
-                <p class="mt-1 inline-flex items-center gap-1 text-[10px] text-muted">
+                <p
+                  class="mt-1 inline-flex items-center gap-1 text-[10px]"
+                  [class]="palette.textFaint"
+                >
                   <lucide-icon name="circle-dot" class="h-3 w-3" />
                   {{ ownerLabel(a.assigned_to_id) }}
                 </p>
