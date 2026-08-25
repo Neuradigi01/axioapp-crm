@@ -4,6 +4,7 @@ import {
   Component,
   DestroyRef,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -85,14 +86,29 @@ export class AuditLogPage {
 
   protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / this.size)));
 
+  /** Guard so the initial fetch fires exactly once — an ``effect``
+   *  that watches ``hasFeature()`` re-runs every time the underlying
+   *  subscription signal ticks (which it does at least twice on hard
+   *  refresh: once with the cached value, once after ``/subscriptions/current``
+   *  resolves). Without this flag we'd double-fire ``reload()`` on
+   *  the second tick. */
+  private initialFetchFired = false;
+
   constructor() {
-    // Only fetch when the plan actually grants the feature — avoids a
-    // burst of 402s on every filter change from a Basic user who
-    // navigates directly to /user/reports/audit-log.
-    if (this.hasFeature()) {
-      this.loadStaff();
-      this.reload();
-    }
+    // Fetch when the feature becomes granted. Hard refresh boots Angular
+    // fresh; the subscription state loads asynchronously, so
+    // ``hasFeature()`` returns ``false`` for a beat, then flips to
+    // ``true`` once ``/subscriptions/current`` resolves. A constructor
+    // one-shot check would miss that flip and leave the table empty
+    // even though the viewer chrome is rendered. Reacting to the
+    // computed signal via ``effect`` handles the race cleanly.
+    effect(() => {
+      if (this.hasFeature() && !this.initialFetchFired) {
+        this.initialFetchFired = true;
+        this.loadStaff();
+        this.reload();
+      }
+    });
   }
 
   protected reload(): void {
