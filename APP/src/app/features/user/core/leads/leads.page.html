@@ -119,17 +119,13 @@
             }
           </div>
         }
-        <select
-          [value]="noActivityFilter()"
-          (change)="setNoActivity($any($event.target).value)"
-          class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-xs text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          aria-label="No activity filter"
-        >
-          <option value="">Any activity</option>
-          <option value="7d">No activity 7d+</option>
-          <option value="14d">No activity 14d+</option>
-          <option value="30d">No activity 30d+</option>
-        </select>
+        <div class="min-w-[10rem]">
+          <crm-mobile-select
+            [options]="noActivityOptions"
+            [value]="noActivityFilter()"
+            (valueChange)="setNoActivity($event)"
+          />
+        </div>
       </div>
       <!-- Right: saved views + advanced filter + columns + export -->
       <div class="flex flex-wrap items-center gap-2">

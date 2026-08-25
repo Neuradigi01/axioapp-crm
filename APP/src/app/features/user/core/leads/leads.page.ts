@@ -471,6 +471,18 @@ export class LeadsPageComponent {
     { value: 'asc', label: 'Ascending' },
   ];
 
+  /** `crm-mobile-select` shape for the "No activity" filter. Was a
+   *  native `<select>` — swapped to the shared picker so the dropdown
+   *  chrome matches the Date-created / Source / Status controls on
+   *  the same row (dark theme, rounded, accent-highlighted active
+   *  option). Values mirror `NoActivityFilter`. */
+  readonly noActivityOptions: ReadonlyArray<{ value: string; label: string }> = [
+    { value: '', label: 'Any activity' },
+    { value: '7d', label: 'No activity 7d+' },
+    { value: '14d', label: 'No activity 14d+' },
+    { value: '30d', label: 'No activity 30d+' },
+  ];
+
   /** Leads Center Remarks filter — matches any note activity text on
    *  the lead. Server caps at 64 chars. */
   readonly remarksControl = new FormControl<string>('', { nonNullable: true });
