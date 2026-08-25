@@ -512,3 +512,14 @@
 @if (dnsModal(); as m) {
   <app-sender-dns-records-modal [domain]="m.domain" [records]="m.records" (closed)="closeDns()" />
 }
+
+@if (pendingConfirm(); as p) {
+  <app-confirm-dialog
+    [title]="p.title"
+    [body]="p.body"
+    [confirmLabel]="p.confirmLabel"
+    [danger]="true"
+    (confirm)="onConfirmPending()"
+    (cancel)="onCancelPending()"
+  />
+}

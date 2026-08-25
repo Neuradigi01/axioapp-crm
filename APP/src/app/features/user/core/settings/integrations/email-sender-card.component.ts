@@ -26,6 +26,7 @@ import { DatePipe } from '@angular/common';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
 import { AddDomainModalComponent } from '../sender-setup/add-domain-modal.component';
 import { DnsRecordsModalComponent } from '../sender-setup/dns-records-modal.component';
 import {
@@ -56,6 +57,7 @@ type Toast = { tone: 'success' | 'error'; message: string };
     VerifySenderCodeModalComponent,
     AddDomainModalComponent,
     DnsRecordsModalComponent,
+    ConfirmDialogComponent,
   ],
   templateUrl: './email-sender-card.component.html',
 })
@@ -73,6 +75,20 @@ export class EmailSenderCardComponent implements OnInit {
 
   protected readonly addModalOpen = signal(false);
   protected readonly verifyModal = signal<{ id: string; from: string } | null>(null);
+
+  /** Pending destructive-action confirm. Replaces the three previous
+   *  `window.confirm` calls (delete SMTP sender / disconnect OAuth
+   *  mailbox / remove domain) with the shared `<app-confirm-dialog>`
+   *  so the messaging and button styling match the rest of the UI
+   *  instead of showing an OS-native browser prompt. `action` is the
+   *  closure that fires the actual API call — captured with its row
+   *  argument at trigger time. `null` means no dialog open. */
+  protected readonly pendingConfirm = signal<{
+    title: string;
+    body: string;
+    confirmLabel: string;
+    action: () => void;
+  } | null>(null);
 
   protected readonly settingDefaultId = signal<string | null>(null);
   protected readonly deletingId = signal<string | null>(null);
@@ -171,10 +187,15 @@ export class EmailSenderCardComponent implements OnInit {
 
   remove(row: UnifiedSender): void {
     if (row.kind !== 'smtp') return;
-    const confirmed = window.confirm(
-      `Delete SMTP sender ${row.from_address}? Automations and workflows that send email will fall back to another verified sender (if any) or skip until you add one back.`,
-    );
-    if (!confirmed) return;
+    this.pendingConfirm.set({
+      title: `Delete SMTP sender ${row.from_address}?`,
+      body: 'Automations and workflows that send email will fall back to another verified sender (if any) or skip until you add one back.',
+      confirmLabel: 'Delete',
+      action: () => this._doRemove(row),
+    });
+  }
+
+  private _doRemove(row: UnifiedSender): void {
     this.deletingId.set(row.id);
     this.rowError.set(null);
     this.api
@@ -231,10 +252,15 @@ export class EmailSenderCardComponent implements OnInit {
   disconnect(row: UnifiedSender): void {
     if (row.kind !== 'gmail' && row.kind !== 'microsoft') return;
     if (this.disconnectingId() !== null) return;
-    const confirmed = window.confirm(
-      `Disconnect ${row.from_address}? Inbox email replies from this mailbox will stop working until you reconnect it. Historical messages are kept.`,
-    );
-    if (!confirmed) return;
+    this.pendingConfirm.set({
+      title: `Disconnect ${row.from_address}?`,
+      body: 'Inbox email replies from this mailbox will stop working until you reconnect it. Historical messages are kept.',
+      confirmLabel: 'Disconnect',
+      action: () => this._doDisconnect(row),
+    });
+  }
+
+  private _doDisconnect(row: UnifiedSender): void {
     this.disconnectingId.set(row.id);
     this.rowError.set(null);
     this.accountsApi
@@ -333,10 +359,15 @@ export class EmailSenderCardComponent implements OnInit {
   }
 
   removeDomain(row: EmailSenderDomain): void {
-    const confirmed = window.confirm(
-      `Remove ${row.domain} from the sender registry? Existing mailboxes on this domain will keep working, but they'll show as un-verified in the campaign wizard.`,
-    );
-    if (!confirmed) return;
+    this.pendingConfirm.set({
+      title: `Remove ${row.domain} from the sender registry?`,
+      body: "Existing mailboxes on this domain will keep working, but they'll show as un-verified in the campaign wizard.",
+      confirmLabel: 'Remove',
+      action: () => this._doRemoveDomain(row),
+    });
+  }
+
+  private _doRemoveDomain(row: EmailSenderDomain): void {
     this.deletingDomainId.set(row.id);
     this.domainsError.set(null);
     this.domainsApi
@@ -353,6 +384,21 @@ export class EmailSenderCardComponent implements OnInit {
           this.domainsError.set(extractApiError(err) ?? 'Could not remove domain.');
         },
       });
+  }
+
+  /** Runs the pending action + closes the dialog. Wired from the
+   *  shared confirm-dialog `(confirm)` output. */
+  protected onConfirmPending(): void {
+    const p = this.pendingConfirm();
+    if (!p) return;
+    this.pendingConfirm.set(null);
+    p.action();
+  }
+
+  /** Dismisses the dialog without running the action. Wired from the
+   *  shared confirm-dialog `(cancel)` output. */
+  protected onCancelPending(): void {
+    this.pendingConfirm.set(null);
   }
 
   // --- render helpers -----------------------------------------
