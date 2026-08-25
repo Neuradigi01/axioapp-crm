@@ -78,8 +78,12 @@ plans:
       conversations.unified_inbox: false
       integrations.whatsapp: false
       integrations.email_imap_smtp: false
-      ads.google_webhook: false
-      ads.meta_webhook: false
+      # Ads lead capture is included even on trial — customers evaluate
+      # the CRM by pointing their Google / Meta ad campaigns at it and
+      # watching leads flow in. Volume is bounded by `caps.leads_per_month`
+      # (50 on trial) so infrastructure cost stays flat regardless.
+      ads.google_webhook: true
+      ads.meta_webhook: true
       calls.recording: false
       campaigns.email: false
       sso.saml: false
@@ -128,8 +132,15 @@ plans:
       conversations.unified_inbox: false
       integrations.whatsapp: false
       integrations.email_imap_smtp: false
-      ads.google_webhook: false
-      ads.meta_webhook: false
+      # Ads lead capture is core to Basic's "Never lose a lead" pitch —
+      # SMBs on entry-tier CRMs live and die by their Google / Meta ad
+      # spend. Blocking the webhook forces manual CSV export from ad
+      # dashboards and hands the customer to WhatsApp-first competitors
+      # (Interakt / Wati / DoubleTick) that bundle capture in the entry
+      # tier. Volume is bounded by ``caps.leads_per_month = 1000`` so
+      # infrastructure cost stays proportional to plan value.
+      ads.google_webhook: true
+      ads.meta_webhook: true
       calls.recording: false
       campaigns.email: false
       sso.saml: false
