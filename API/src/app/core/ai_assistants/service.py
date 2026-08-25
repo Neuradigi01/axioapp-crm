@@ -38,6 +38,7 @@ from src.app.core.ai_assistants.schemas import (
     KnowledgeCreateText,
     KnowledgeCreateUrl,
 )
+from src.app.shared.audit import log_entity_change
 from src.app.shared.http.safe_fetch import UnsafeUrlError, safe_fetch
 from src.app.shared.storage import get_storage
 
@@ -238,6 +239,18 @@ async def create_assistant(
 
     await db.commit()
     await db.refresh(row)
+
+    await log_entity_change(
+        action="ai_assistant.created",
+        entity_type="ai_assistant",
+        entity_id=row.id,
+        after={
+            "name": row.name,
+            "model": row.model,
+            "key_id": str(row.key_id),
+            "status": row.status.value if hasattr(row.status, "value") else str(row.status),
+        },
+    )
     return row
 
 
@@ -328,6 +341,27 @@ async def update_assistant(
 
     await db.commit()
     await db.refresh(row)
+
+    if changes:
+        # High-level "assistant updated" event for the audit viewer.
+        # ``_write_audit_for_changes`` writes to the dedicated
+        # ``tbl_ai_assistant_instruction_audit`` table (prompt-diff
+        # trail); this writes to ``tbl_audit_logs`` so the org-wide
+        # audit viewer catches every assistant edit. ``changes`` is a
+        # dict of ``{field: (old, new)}`` — pass it through in the
+        # audit ``after`` so operators can see what actually flipped,
+        # including channel-binding toggles.
+        await log_entity_change(
+            action="ai_assistant.updated",
+            entity_type="ai_assistant",
+            entity_id=row.id,
+            after={
+                "fields_changed": sorted(changes.keys()),
+                "name": row.name,
+                "status": row.status.value if hasattr(row.status, "value") else str(row.status),
+                "bound_channels": list(row.bound_channels or []),
+            },
+        )
     return row
 
 
@@ -340,13 +374,23 @@ async def archive_assistant(
     """Idempotent — flipping an already-archived row to archived is
     a no-op. Version_id_col NOT incremented (archive isn't a user
     edit; skipping the bump avoids racing operator edits)."""
-    await get_assistant(db, org_id=org_id, assistant_id=assistant_id)
+    row = await get_assistant(db, org_id=org_id, assistant_id=assistant_id)
+    previous_status = (
+        row.status.value if hasattr(row.status, "value") else str(row.status)
+    )
     await _da.set_assistant_status(
         db,
         assistant_id=assistant_id,
         status=AiAssistantStatus.archived,
     )
     await db.commit()
+    await log_entity_change(
+        action="ai_assistant.archived",
+        entity_type="ai_assistant",
+        entity_id=assistant_id,
+        before={"status": previous_status, "name": row.name},
+        after={"status": AiAssistantStatus.archived.value},
+    )
 
 
 async def activate_assistant(
@@ -365,6 +409,9 @@ async def activate_assistant(
     caller can update UI without a second GET."""
     row = await get_assistant(db, org_id=org_id, assistant_id=assistant_id)
     if row.status != AiAssistantStatus.active:
+        previous_status = (
+            row.status.value if hasattr(row.status, "value") else str(row.status)
+        )
         await _da.set_assistant_status(
             db,
             assistant_id=assistant_id,
@@ -372,6 +419,13 @@ async def activate_assistant(
         )
         await db.commit()
         await db.refresh(row)
+        await log_entity_change(
+            action="ai_assistant.activated",
+            entity_type="ai_assistant",
+            entity_id=assistant_id,
+            before={"status": previous_status, "name": row.name},
+            after={"status": AiAssistantStatus.active.value},
+        )
     return row
 
 
@@ -384,9 +438,21 @@ async def delete_assistant(
     """Hard-delete. Cascades knowledge + chunks + audit rows;
     ``tbl_ai_assistant_message_meta.assistant_id`` set NULL to
     preserve cost/audit history (Case §24 in the track README)."""
-    await get_assistant(db, org_id=org_id, assistant_id=assistant_id)
+    row = await get_assistant(db, org_id=org_id, assistant_id=assistant_id)
+    snapshot = {
+        "name": row.name,
+        "model": row.model,
+        "status": row.status.value if hasattr(row.status, "value") else str(row.status),
+        "bound_channels": list(row.bound_channels or []),
+    }
     await _da.delete_assistant(db, assistant_id)
     await db.commit()
+    await log_entity_change(
+        action="ai_assistant.deleted",
+        entity_type="ai_assistant",
+        entity_id=assistant_id,
+        before=snapshot,
+    )
 
 
 # --- Knowledge (Step 10) --------------------------------------------------
@@ -537,6 +603,18 @@ async def create_knowledge_from_file(
     await db.commit()
     await db.refresh(row)
     _dispatch_ingest(row.id)
+
+    await log_entity_change(
+        action="ai_assistant.knowledge.created",
+        entity_type="ai_assistant_knowledge",
+        entity_id=row.id,
+        after={
+            "assistant_id": str(assistant_id),
+            "source_type": "file",
+            "original_filename": validated.original_filename,
+            "size_bytes": validated.size_bytes,
+        },
+    )
     return row, False
 
 
@@ -590,6 +668,18 @@ async def create_knowledge_from_text(
     await db.commit()
     await db.refresh(row)
     _dispatch_ingest(row.id)
+
+    await log_entity_change(
+        action="ai_assistant.knowledge.created",
+        entity_type="ai_assistant_knowledge",
+        entity_id=row.id,
+        after={
+            "assistant_id": str(assistant_id),
+            "source_type": "text",
+            "title": payload.title,
+            "size_bytes": len(body_bytes),
+        },
+    )
     return row, False
 
 
@@ -650,6 +740,18 @@ async def create_knowledge_from_url(
     await db.commit()
     await db.refresh(row)
     _dispatch_ingest(row.id)
+
+    await log_entity_change(
+        action="ai_assistant.knowledge.created",
+        entity_type="ai_assistant_knowledge",
+        entity_id=row.id,
+        after={
+            "assistant_id": str(assistant_id),
+            "source_type": "url",
+            "title": payload.title,
+            "url": payload.url,
+        },
+    )
     return row, False
 
 
@@ -742,9 +844,27 @@ async def delete_knowledge(
         assistant_id=assistant_id,
         knowledge_id=knowledge_id,
     )
+    snapshot = {
+        "assistant_id": str(assistant_id),
+        "source_type": row.source_type.value
+        if hasattr(row.source_type, "value")
+        else str(row.source_type),
+        "original_filename": row.original_filename,
+        "url": row.url,
+        "size_bytes": row.size_bytes,
+    }
     if row.status == KnowledgeStatus.processing:
         await _da.set_status(db, knowledge_id=knowledge_id, status=KnowledgeStatus.pending_delete)
         await db.commit()
+        # Log the pending-delete transition too so operators see the
+        # intent even though the actual row-drop happens later when
+        # the ingest task finishes.
+        await log_entity_change(
+            action="ai_assistant.knowledge.delete_pending",
+            entity_type="ai_assistant_knowledge",
+            entity_id=knowledge_id,
+            before=snapshot,
+        )
         return
 
     await _da.delete_knowledge_row(db, knowledge_id)
@@ -757,6 +877,13 @@ async def delete_knowledge(
             # Non-fatal — the row is gone; a stale blob under
             # storage/ can be reaped by an operator sweep.
             pass
+
+    await log_entity_change(
+        action="ai_assistant.knowledge.deleted",
+        entity_type="ai_assistant_knowledge",
+        entity_id=knowledge_id,
+        before=snapshot,
+    )
 
 
 # --- Replace flow --------------------------------------------------------

@@ -80,9 +80,17 @@ async def set_lead_routing_config(
     Owns the transaction so callers (leads router) don't.
     """
     row = await get_or_create(session, org_id=org_id)
+    previous_config = row.lead_routing_config
     row.lead_routing_config = payload.model_dump()
     await session.commit()
     await session.refresh(row)
+    await audit.log(
+        "settings.lead_routing.updated",
+        entity_type="org_settings",
+        entity_id=row.id,
+        before={"lead_routing_config": previous_config},
+        after={"lead_routing_config": row.lead_routing_config},
+    )
     return row.lead_routing_config
 
 

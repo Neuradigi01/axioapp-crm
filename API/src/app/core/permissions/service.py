@@ -261,6 +261,23 @@ async def install_role_template(
     await session.commit()
     role = result[template_key]
     await session.refresh(role)
+
+    # Audit: templates are org-wide grants of a pre-baked permission
+    # set (Owner, Admin, Employee, Sales Manager, Support Agent), so
+    # a template install is functionally the same as ``roles.created``
+    # for governance purposes — surface it in the audit viewer under
+    # its own action so admins can filter by "who installed which
+    # canned role".
+    await log_entity_change(
+        action="roles.template_installed",
+        entity_type="role",
+        entity_id=role.id,
+        after={
+            "template_key": template_key,
+            "name": role.name,
+            "is_system": role.is_system,
+        },
+    )
     return role
 
 

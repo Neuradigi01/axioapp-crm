@@ -31,6 +31,7 @@ from src.app.core.chatbots.exceptions import (
     ChatbotVersionConflict,
     InvalidGraph,
 )
+from src.app.shared.audit import log_entity_change
 from src.app.core.chatbots.graph import validate_graph_with_db
 from src.app.core.chatbots.trigger_matcher import UnsafeRegex, lint_regex_pattern
 from src.app.core.chatbots.models import Chatbot, ChatbotVersion
@@ -87,6 +88,17 @@ async def create_chatbot_service(
     )
     await session.commit()
     await session.refresh(bot)
+
+    await log_entity_change(
+        action="chatbot.created",
+        entity_type="chatbot",
+        entity_id=bot.id,
+        after={
+            "name": bot.name,
+            "category": bot.category,
+            "status": bot.status,
+        },
+    )
     return bot
 
 
@@ -227,6 +239,20 @@ async def save_chatbot_service(
 
     await session.commit()
     await session.refresh(bot)
+
+    if updates:
+        await log_entity_change(
+            action="chatbot.updated",
+            entity_type="chatbot",
+            entity_id=bot.id,
+            after={
+                "name": bot.name,
+                "version_number": bot.version_number,
+                "fields_changed": sorted(updates.keys()),
+                "graph_changed": graph_changed,
+                "trigger_changed": trigger_changed,
+            },
+        )
     return bot
 
 
@@ -253,6 +279,7 @@ async def publish_chatbot_service(
     for qk in save_targets.collect_save_targets_from_graph(bot.graph):
         await save_targets.validate_save_target(session, org_id=org_id, qualified_key=qk)
 
+    previous_status = bot.status
     await dal.update_chatbot_fields(
         session,
         bot=bot,
@@ -261,6 +288,13 @@ async def publish_chatbot_service(
     )
     await session.commit()
     await session.refresh(bot)
+    await log_entity_change(
+        action="chatbot.published",
+        entity_type="chatbot",
+        entity_id=bot.id,
+        before={"status": previous_status},
+        after={"status": "live", "name": bot.name},
+    )
     return bot
 
 
@@ -274,6 +308,7 @@ async def pause_chatbot_service(
     """Flip status → paused. Existing parked runs continue; new
     matches are blocked."""
     bot = await get_chatbot_service(session, org_id=org_id, chatbot_id=chatbot_id)
+    previous_status = bot.status
     await dal.update_chatbot_fields(
         session,
         bot=bot,
@@ -282,6 +317,13 @@ async def pause_chatbot_service(
     )
     await session.commit()
     await session.refresh(bot)
+    await log_entity_change(
+        action="chatbot.paused",
+        entity_type="chatbot",
+        entity_id=bot.id,
+        before={"status": previous_status},
+        after={"status": "paused", "name": bot.name},
+    )
     return bot
 
 
@@ -295,10 +337,19 @@ async def archive_chatbot_service(
     """Soft-delete. Runtime cancels any parked runs (Step 6 hook);
     the bot disappears from the list page's default view."""
     bot = await get_chatbot_service(session, org_id=org_id, chatbot_id=chatbot_id)
+    snapshot_name = bot.name
+    previous_status = bot.status
     await dal.soft_delete_chatbot(session, bot=bot)
     bot.updated_by_user_id = actor_user_id
     await session.commit()
     await session.refresh(bot)
+    await log_entity_change(
+        action="chatbot.archived",
+        entity_type="chatbot",
+        entity_id=bot.id,
+        before={"status": previous_status, "name": snapshot_name},
+        after={"status": bot.status},
+    )
     return bot
 
 
