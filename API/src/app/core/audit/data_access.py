@@ -60,6 +60,7 @@ async def list_audit_logs_query(
     *,
     action: str | None = None,
     entity_type: str | None = None,
+    user_id: uuid.UUID | None = None,
     from_dt: datetime | None = None,
     to_dt: datetime | None = None,
     page: int = 1,
@@ -72,6 +73,8 @@ async def list_audit_logs_query(
         filters.append(AuditLog.action == action)
     if entity_type:
         filters.append(AuditLog.entity_type == entity_type)
+    if user_id is not None:
+        filters.append(AuditLog.user_id == user_id)
     if from_dt is not None:
         filters.append(AuditLog.created_at >= from_dt)
     if to_dt is not None:
@@ -85,4 +88,46 @@ async def list_audit_logs_query(
     return list(rows), total
 
 
-__all__ = ["insert_audit_log", "list_audit_logs_query"]
+async def iter_audit_logs_for_export(
+    session: AsyncSession,
+    *,
+    action: str | None = None,
+    entity_type: str | None = None,
+    user_id: uuid.UUID | None = None,
+    from_dt: datetime | None = None,
+    to_dt: datetime | None = None,
+    limit: int = 50_000,
+) -> list[AuditLog]:
+    """Bulk read for CSV export. No pagination — returns up to
+    ``limit`` matching rows in one shot so the writer can stream them
+    into a single file. Ordered newest-first, same as the paginated
+    reader, so the export matches what the operator sees in the UI.
+
+    Tenant scoping stays automatic via ``TenantScoped``. The 50k cap
+    is a defence-in-depth guard against an operator who leaves the
+    date range unbounded on an org with years of history — anything
+    above that suggests a compliance-grade export flow (Sprint 3 track,
+    not this one)."""
+    filters = []
+    if action:
+        filters.append(AuditLog.action == action)
+    if entity_type:
+        filters.append(AuditLog.entity_type == entity_type)
+    if user_id is not None:
+        filters.append(AuditLog.user_id == user_id)
+    if from_dt is not None:
+        filters.append(AuditLog.created_at >= from_dt)
+    if to_dt is not None:
+        filters.append(AuditLog.created_at <= to_dt)
+
+    stmt = (
+        select(AuditLog)
+        .where(*filters)
+        .order_by(AuditLog.created_at.desc())
+        .limit(limit)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    return list(rows)
+
+
+__all__ = ["insert_audit_log", "iter_audit_logs_for_export", "list_audit_logs_query"]

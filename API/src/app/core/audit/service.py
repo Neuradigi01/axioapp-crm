@@ -80,6 +80,7 @@ async def list_audit_logs(
     *,
     action: str | None = None,
     entity_type: str | None = None,
+    user_id: uuid.UUID | None = None,
     from_dt: datetime | None = None,
     to_dt: datetime | None = None,
     page: int = 1,
@@ -91,8 +92,34 @@ async def list_audit_logs(
         session,
         action=action,
         entity_type=entity_type,
+        user_id=user_id,
         from_dt=from_dt,
         to_dt=to_dt,
         page=page,
         size=size,
+    )
+
+
+async def export_audit_logs(
+    session: AsyncSession,
+    *,
+    action: str | None = None,
+    entity_type: str | None = None,
+    user_id: uuid.UUID | None = None,
+    from_dt: datetime | None = None,
+    to_dt: datetime | None = None,
+    limit: int = 50_000,
+) -> list[AuditLog]:
+    """Bulk fetch for CSV export. Same filters as ``list_audit_logs``
+    but no pagination — caller streams the whole result set into a
+    single CSV. Capped at ``limit`` rows for safety (huge exports go
+    through the compliance track, not the ad-hoc audit viewer)."""
+    return await _da.iter_audit_logs_for_export(
+        session,
+        action=action,
+        entity_type=entity_type,
+        user_id=user_id,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        limit=limit,
     )
