@@ -128,6 +128,16 @@ async def list_templates(
 
     if channel is not None:
         base = base.where(MessageTemplate.channel == channel)
+    else:
+        # `ai_prompt` is an internal channel used exclusively by the
+        # AI Assistants editor's "Preset" dropdown — the rows are
+        # starter prompts, not sends. Excluding them from the default
+        # list keeps the org's Templates library scoped to real
+        # customer-facing templates (WhatsApp / Email / SMS / Web).
+        # Callers that need them (the AI editor) pass
+        # ``channel=ai_prompt`` explicitly and the branch above kicks
+        # in.
+        base = base.where(MessageTemplate.channel != ConversationChannel.ai_prompt)
     if internal_status is not None:
         base = base.where(MessageTemplate.internal_status == internal_status)
     if external_status is not None:
@@ -158,6 +168,11 @@ async def list_templates(
     )
     if channel is not None:
         listing = listing.where(MessageTemplate.channel == channel)
+    else:
+        # Mirror the count-query exclusion above so listing + total
+        # stay in lockstep (otherwise `total` and `len(items)` diverge
+        # on a page where `ai_prompt` rows would have appeared).
+        listing = listing.where(MessageTemplate.channel != ConversationChannel.ai_prompt)
     if internal_status is not None:
         listing = listing.where(MessageTemplate.internal_status == internal_status)
     if external_status is not None:
