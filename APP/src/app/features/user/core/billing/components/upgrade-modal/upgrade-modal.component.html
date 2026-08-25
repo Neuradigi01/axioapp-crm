@@ -165,6 +165,31 @@
             </p>
           </div>
 
+          <!-- Compare plans — collapsible so the modal stays compact
+               by default. Uses the same reusable table as the billing
+               page so the row/column layout matches everywhere. -->
+          <div class="mt-4">
+            <button
+              type="button"
+              (click)="toggleCompare()"
+              class="flex w-full items-center justify-between rounded-lg border border-subtle bg-surface-2 px-4 py-2.5 text-sm font-medium text-default hover:bg-surface-2/70"
+              [attr.aria-expanded]="compareOpen()"
+            >
+              <span>Compare plans in detail</span>
+              <span class="text-xs text-muted" aria-hidden="true">
+                {{ compareOpen() ? '▲' : '▼' }}
+              </span>
+            </button>
+            @if (compareOpen()) {
+              <div class="mt-3">
+                <crm-plan-compare-table
+                  [plans]="visiblePlans()"
+                  [currentPlanCode]="selectedPlan()"
+                />
+              </div>
+            }
+          </div>
+
           @if (submitError(); as msg) {
             <p
               class="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
