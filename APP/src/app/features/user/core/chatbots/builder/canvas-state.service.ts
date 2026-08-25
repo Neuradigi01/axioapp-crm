@@ -54,8 +54,13 @@ export class CanvasStateService {
   readonly zoom = signal<number>(1);
   /** Palette open / collapsed (session-only). Collapsed shrinks the
    *  left rail to a narrow strip so the operator sees more canvas
-   *  while designing. */
-  readonly paletteCollapsed = signal<boolean>(false);
+   *  while designing. Defaults to collapsed on mobile viewports
+   *  (< md ~ 768 px) so the drawer doesn't cover the canvas on load;
+   *  desktop stays with the palette open. Guarded for SSR / test
+   *  runs where `window` may be undefined. */
+  readonly paletteCollapsed = signal<boolean>(
+    typeof window !== 'undefined' && window.innerWidth < 768,
+  );
   /** Palette width in px (session-only). Drag-resizable via the
    *  handle on the palette's right edge. */
   readonly paletteWidth = signal<number>(280);

@@ -20,8 +20,22 @@
     </div>
   </div>
 } @else {
+  <!-- Backdrop (mobile only). Tapping it collapses the drawer so
+       the operator can get back to the canvas without needing to hit
+       the small chevron. -->
   <div
-    class="relative flex flex-col h-full min-h-0 bg-surface border-r border-subtle flex-shrink-0"
+    class="fixed inset-0 z-30 bg-black/40 md:hidden"
+    (click)="canvas.togglePalette()"
+    aria-hidden="true"
+  ></div>
+  <!-- Mobile (< md): expanded palette floats as an overlay drawer
+       (fixed inset-y-0 left-0 + z-40 + shadow) so it doesn't squeeze
+       the canvas into a strip that's unusable for viewing nodes.
+       Desktop (md+): reverts to the original in-flow resizable
+       sidebar. The inline width from `paletteWidth()` (e.g. 280 px)
+       doubles as a sane drawer width on phones. -->
+  <div
+    class="fixed inset-y-0 left-0 z-40 shadow-2xl md:relative md:inset-auto md:z-auto md:shadow-none flex flex-col h-full min-h-0 bg-surface border-r border-subtle flex-shrink-0"
     [style.width.px]="canvas.paletteWidth()"
   >
     <!-- Tab bar + collapse -->
