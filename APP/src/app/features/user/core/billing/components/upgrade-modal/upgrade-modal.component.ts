@@ -71,10 +71,12 @@ export class UpgradeModalComponent {
 
   // ---- "Compare plans" expandable section --------------------------------
 
-  /** Collapsed by default so the modal stays scannable; a decision-maker
-   *  who wants to double-check what each plan includes can expand it
-   *  without leaving the checkout flow. */
-  protected readonly compareOpen = signal<boolean>(false);
+  /** Expanded by default (Stripe / Linear / Notion pattern) — a customer
+   *  in checkout usually benefits from seeing what's in each plan BEFORE
+   *  they commit. Placed directly under the plan picker so it validates
+   *  their radio choice with full feature/cap detail. Users who already
+   *  know their plan can collapse it in one click. */
+  protected readonly compareOpen = signal<boolean>(true);
 
   protected toggleCompare(): void {
     this.compareOpen.update((v) => !v);
