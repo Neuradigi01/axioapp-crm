@@ -156,4 +156,12 @@ export class AppointmentsApiService extends BaseCrudApiService<
       reason: body.reason ?? null,
     });
   }
+
+  /** Hard-delete every selected appointment regardless of status —
+   *  mirrors the single-row `DELETE /{id}` per row. `deleted` counts
+   *  what actually got removed (ids belonging to another org are
+   *  silently dropped by the backend's org-scoped hydrate). */
+  bulkDelete(ids: string[]): Observable<{ deleted: number }> {
+    return this.http.post<{ deleted: number }>(`${this.base}/bulk-delete`, { ids });
+  }
 }

@@ -981,6 +981,59 @@ async def bulk_cancel_appointments(
     return cancelled, skipped, skipped_by_status
 
 
+async def bulk_delete_appointments(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> int:
+    """Hard-delete every row in `ids` that belongs to this org. Unlike
+    `bulk_cancel_appointments`, there's no state-machine gate — any
+    status is delete-eligible (matches the single-row `DELETE /{id}`).
+
+    Ids belonging to another org are silently dropped by the
+    org-scoped hydrate — same partial-success semantic as the other
+    bulk endpoints.
+
+    For each deleted row:
+      * emit an ``appointments.deleted`` audit entry (mirror single-
+        row delete);
+      * dispatch a calendar-sync task so the Google-side event is
+        removed from the assignee's calendar (mirror single-row
+        delete's Step-4 hook).
+
+    Returns the count actually deleted so the toast can distinguish
+    "deleted 3" from "deleted 3 of 5 (2 not in your org)".
+    """
+    appts = await _da.list_appointments_by_ids_in_org(session, ids=ids, org_id=org_id)
+
+    # Capture (id, assignee, before-snapshot) BEFORE deletion so the
+    # post-commit audit + calendar-sync dispatch has everything it
+    # needs. After `_da.delete_appointment` the row is unreachable.
+    to_delete: list[tuple[uuid.UUID, uuid.UUID | None, dict[str, Any]]] = [
+        (appt.id, appt.assigned_to_id, _snapshot(appt)) for appt in appts
+    ]
+
+    for appt in appts:
+        await _da.delete_appointment(session, appt)
+    await session.commit()
+
+    for appt_id, deleted_assigned_to_id, before_snap in to_delete:
+        await log_entity_change(
+            action="appointments.deleted",
+            entity_type="appointment",
+            entity_id=appt_id,
+            before=before_snap,
+        )
+        # tasks/google-calendar-sync Step 4 — enqueue calendar-sync so
+        # the Google-side event is removed from the assignee's
+        # calendar. The sync task sees the appointment is gone and
+        # hits the "delete the event" branch.
+        await _dispatch_calendar_sync(session, appt_id, deleted_assigned_to_id)
+
+    return len(to_delete)
+
+
 # --- Step-10 event publisher ----------------------------------------------
 
 
@@ -1158,6 +1211,7 @@ async def _publish_appointment_lifecycle_event(
 __all__ = [
     "AppointmentStatus",
     "bulk_cancel_appointments",
+    "bulk_delete_appointments",
     "bulk_reassign_appointments",
     "create_appointment",
     "delete_appointment",

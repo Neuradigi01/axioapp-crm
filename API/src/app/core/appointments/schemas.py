@@ -104,8 +104,26 @@ class AppointmentBulkCancel(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
+class AppointmentBulkDelete(BaseModel):
+    """Bulk hard-delete. No state-machine check — any status is
+    delete-eligible (matches the single-row `DELETE /{id}`). Row cap
+    mirrors bulk-reassign / bulk-cancel."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
 class AppointmentBulkReassignResult(BaseModel):
     reassigned: int
+
+
+class AppointmentBulkDeleteResult(BaseModel):
+    """Number of rows actually deleted (ids not in the caller's org are
+    dropped silently by the DAL's `list_appointments_by_ids_in_org`
+    scope — same partial-success semantic as bulk-cancel)."""
+
+    deleted: int
 
 
 class AppointmentBulkCancelResult(BaseModel):

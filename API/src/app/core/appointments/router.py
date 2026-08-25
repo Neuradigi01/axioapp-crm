@@ -24,6 +24,8 @@ from src.app.core.appointments.models import AppointmentStatus
 from src.app.core.appointments.schemas import (
     AppointmentBulkCancel,
     AppointmentBulkCancelResult,
+    AppointmentBulkDelete,
+    AppointmentBulkDeleteResult,
     AppointmentBulkReassign,
     AppointmentBulkReassignResult,
     AppointmentCreate,
@@ -34,6 +36,7 @@ from src.app.core.appointments.schemas import (
 )
 from src.app.core.appointments.service import (
     bulk_cancel_appointments,
+    bulk_delete_appointments,
     bulk_reassign_appointments,
     create_appointment,
     delete_appointment,
@@ -198,3 +201,21 @@ async def bulk_cancel_appointments_endpoint(
     return AppointmentBulkCancelResult(
         cancelled=cancelled, skipped=skipped, skipped_by_status=skipped_by_status
     )
+
+
+@router.post("/bulk-delete", response_model=AppointmentBulkDeleteResult)
+async def bulk_delete_appointments_endpoint(
+    payload: AppointmentBulkDelete,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("appointments.write")),
+) -> AppointmentBulkDeleteResult:
+    """Hard-delete every selected appointment regardless of status.
+    Mirrors the single-row `DELETE /{id}` per row — audit + calendar
+    sync fire per deleted appointment. Ids not in the caller's org
+    are silently dropped by the org-scoped hydrate."""
+    n = await bulk_delete_appointments(
+        db,
+        ids=payload.ids,
+        org_id=user.org_id,
+    )
+    return AppointmentBulkDeleteResult(deleted=n)
