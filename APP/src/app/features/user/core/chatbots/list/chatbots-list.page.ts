@@ -131,13 +131,13 @@ export class ChatbotsListPageComponent {
     this.createModalOpen.set(false);
   }
 
-  submitCreateBot(name: string): void {
-    const trimmed = name.trim();
-    if (!trimmed) return;
+  submitCreateBot(payload: { name: string; description: string | null }): void {
+    const name = payload.name.trim();
+    if (!name) return;
     this.createSubmitting.set(true);
     this.createError.set(null);
     this.api
-      .create({ name: trimmed, category: 'Custom' })
+      .create({ name, description: payload.description, category: 'Custom' })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (created) => {
