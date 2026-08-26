@@ -34,13 +34,23 @@ from src.app.core.integrations.google_calendar.models import GoogleCalendarToken
 @dataclass(frozen=True, slots=True)
 class CalendarConnectionStatus:
     """Shape the integrations card renders. ``connected=False`` for
-    every other field being null."""
+    every other field being null.
+
+    ``access_token_expires_at`` surfaces the short-lived access
+    token's expiry (Google refreshes it in-place via the refresh
+    token; this field is the *current* access-token deadline). The
+    frontend uses it to render a countdown so an operator sees the
+    session ticking down. Genuine revocations still show up via
+    ``last_error`` — the card should treat that as urgent regardless
+    of the countdown.
+    """
 
     connected: bool
     google_email: str | None
     last_error: str | None
     last_synced_at: datetime | None
     scopes_granted: list[str]
+    access_token_expires_at: datetime | None
 
 
 def build_authorize_url(*, org_id: uuid.UUID, user_id: int) -> str:
@@ -209,6 +219,7 @@ async def get_status(
             last_error=None,
             last_synced_at=None,
             scopes_granted=[],
+            access_token_expires_at=None,
         )
     return CalendarConnectionStatus(
         connected=row.status == "active",
@@ -216,6 +227,7 @@ async def get_status(
         last_error=row.last_error,
         last_synced_at=row.last_synced_at,
         scopes_granted=list(row.scopes_granted or []),
+        access_token_expires_at=row.access_token_expires_at,
     )
 
 

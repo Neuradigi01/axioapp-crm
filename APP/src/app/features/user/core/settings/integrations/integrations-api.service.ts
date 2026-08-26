@@ -636,4 +636,11 @@ export interface GoogleCalendarStatus {
   /** The scopes Google actually granted. Diffed against the requested
    *  set to detect scope downgrades on unusual consent flows. */
   scopes_granted: string[];
+  /** ISO-8601 deadline for the current short-lived access token.
+   *  Google auto-refreshes via the refresh token, so this ticks
+   *  forward silently on healthy accounts. Card uses it to render a
+   *  countdown so an operator sees the session ticking — and, if
+   *  the refresh path is broken (e.g. revoked grant), the countdown
+   *  hitting zero coincides with `last_error` populating. */
+  access_token_expires_at: string | null;
 }

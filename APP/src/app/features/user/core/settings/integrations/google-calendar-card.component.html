@@ -73,6 +73,11 @@
                 Waiting for the first appointment to sync…
               </p>
             }
+            @if (expiryLabel(); as label) {
+              <p class="mt-0.5 text-[11px] text-muted">
+                Session refresh in <span class="font-mono">{{ label }}</span>
+              </p>
+            }
           </div>
           <button
             type="button"
@@ -83,6 +88,41 @@
             Disconnect
           </button>
         </div>
+        @if (authRevoked()) {
+          <!-- Red revocation banner. `authRevoked` fires when
+               `last_error` contains invalid_grant / revoked /
+               unauthorized / insufficient — the pattern that hit
+               the user silently on Aug 14. This is the signal that
+               was missing before. -->
+          <div
+            class="mt-3 flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300"
+          >
+            <lucide-icon
+              name="alert-triangle"
+              size="14"
+              class="mt-px shrink-0 text-red-400"
+              aria-hidden="true"
+            ></lucide-icon>
+            <div class="flex-1">
+              <p class="font-medium text-red-200">Google connection is broken.</p>
+              <p class="mt-0.5">
+                Google reported: <span class="font-mono">{{ s.last_error }}</span>
+              </p>
+              <p class="mt-0.5">
+                Appointments will stop syncing until you reconnect. Revoke the app in your Google
+                Account first, then click Reconnect below to mint a fresh grant.
+              </p>
+              <button
+                type="button"
+                (click)="reconnect()"
+                class="mt-2 inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+              >
+                <lucide-icon name="rotate-cw" size="12" aria-hidden="true"></lucide-icon>
+                Reconnect now
+              </button>
+            </div>
+          </div>
+        }
       } @else if (s.last_error) {
         <!-- Error / reconnect state -->
         <div class="flex items-center justify-between gap-3">

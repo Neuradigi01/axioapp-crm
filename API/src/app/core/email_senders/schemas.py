@@ -55,7 +55,17 @@ class SmtpSenderOut(ORMModel):
 class UnifiedSenderOut(BaseModel):
     """Merged row for the unified sender list — combines verified
     SMTP senders with live OAuth mailboxes so the frontend renders
-    one table regardless of transport."""
+    one table regardless of transport.
+
+    ``token_expires_at`` / ``sync_state`` / ``last_sync_error`` are
+    populated for OAuth rows (gmail / microsoft) and always ``None``
+    for SMTP rows (they authenticate per-connect, no long-lived
+    session). The card uses them to render a countdown banner + a
+    prominent "reconnect required" warning when Google/Microsoft
+    revokes the grant — previously the card was silent about token
+    health until an actual send failed and the operator dug through
+    Celery logs to find the ``invalid_grant`` line.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -65,6 +75,10 @@ class UnifiedSenderOut(BaseModel):
     display_name: str | None
     verified: bool
     is_default: bool
+    # OAuth-only health fields — None for SMTP.
+    token_expires_at: datetime | None = None
+    sync_state: str | None = None
+    last_sync_error: str | None = None
 
 
 __all__ = [

@@ -36,6 +36,15 @@ export interface UnifiedSender {
   display_name: string | null;
   verified: boolean;
   is_default: boolean;
+  /** OAuth-only health fields (`null` for SMTP). Backend
+   *  `UnifiedSenderOut` populates them so the card can render a
+   *  session-refresh countdown + a prominent "reconnect required"
+   *  banner when Google/Microsoft revoke the grant. Silent
+   *  revocations were the reason yesterday's appointment-assigned
+   *  emails failed to land. */
+  token_expires_at?: string | null;
+  sync_state?: string | null;
+  last_sync_error?: string | null;
 }
 
 export interface SmtpSender {
