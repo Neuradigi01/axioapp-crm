@@ -1,7 +1,7 @@
 <div>
   <p class="mb-3 text-sm text-muted">
-    Choose how you'd like to be notified. In-app delivery is live; email is sent when you opt in.
-    Push notifications are coming in a future release.
+    Choose how you'd like to be notified. Every event is enabled by default on both channels —
+    uncheck what you don't want to receive. Push notifications are coming in a future release.
   </p>
 
   @if (loadError(); as err) {
@@ -29,7 +29,7 @@
     <div
       class="rounded-lg border border-dashed border-subtle bg-surface p-5 md:p-8 text-center text-sm text-muted"
     >
-      No preferences saved yet. Defaults: in-app on, email off. Toggle any switch below to override.
+      No notification events registered yet.
     </div>
   } @else {
     <div class="overflow-x-auto rounded-xl border border-subtle bg-surface shadow-sm">
@@ -40,41 +40,52 @@
               Notification
             </th>
             <th
-              class="px-3 py-2 text-center text-xs font-medium uppercase tracking-wide text-muted"
+              class="w-24 px-3 py-2 text-center text-xs font-medium uppercase tracking-wide text-muted"
             >
               In-app
             </th>
             <th
-              class="px-3 py-2 text-center text-xs font-medium uppercase tracking-wide text-muted"
+              class="w-24 px-3 py-2 text-center text-xs font-medium uppercase tracking-wide text-muted"
             >
               Email
             </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-subtle">
-          @for (row of matrix(); track row.type) {
-            <tr>
-              <td class="px-3 py-2 text-default">
-                <div>{{ row.label }}</div>
-                <div class="font-mono text-[11px] text-faint">{{ row.type }}</div>
-              </td>
-              <td class="px-3 py-2 text-center">
-                <input
-                  type="checkbox"
-                  [checked]="row.in_app"
-                  (change)="toggle(row.type, 'in_app', row.in_app)"
-                  class="h-4 w-4 rounded border-subtle text-default focus:ring-accent"
-                />
-              </td>
-              <td class="px-3 py-2 text-center">
-                <input
-                  type="checkbox"
-                  [checked]="row.email"
-                  (change)="toggle(row.type, 'email', row.email)"
-                  class="h-4 w-4 rounded border-subtle text-default focus:ring-accent"
-                />
+          @for (grp of matrix(); track grp.group) {
+            <tr class="bg-surface-2/50">
+              <td
+                colspan="3"
+                class="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted"
+              >
+                {{ grp.group }}
               </td>
             </tr>
+            @for (row of grp.rows; track row.type) {
+              <tr>
+                <td class="px-3 py-2 text-default">
+                  <div class="font-medium">{{ row.label }}</div>
+                  <div class="text-[11px] text-muted">{{ row.description }}</div>
+                  <div class="font-mono text-[10px] text-faint">{{ row.type }}</div>
+                </td>
+                <td class="px-3 py-2 text-center">
+                  <input
+                    type="checkbox"
+                    [checked]="row.in_app"
+                    (change)="toggle(row.type, 'in_app', row.in_app)"
+                    class="h-4 w-4 rounded border-subtle text-default focus:ring-accent"
+                  />
+                </td>
+                <td class="px-3 py-2 text-center">
+                  <input
+                    type="checkbox"
+                    [checked]="row.email"
+                    (change)="toggle(row.type, 'email', row.email)"
+                    class="h-4 w-4 rounded border-subtle text-default focus:ring-accent"
+                  />
+                </td>
+              </tr>
+            }
           }
         </tbody>
       </table>

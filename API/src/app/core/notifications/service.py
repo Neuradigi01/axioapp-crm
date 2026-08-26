@@ -32,6 +32,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.notifications import data_access as _da
+from src.app.core.notifications import event_catalog
 from src.app.core.notifications.manager import manager
 from src.app.core.notifications.models import (
     Notification,
@@ -39,6 +40,7 @@ from src.app.core.notifications.models import (
     NotificationPreference,
 )
 from src.app.core.notifications.schemas import (
+    AvailableNotificationType,
     NotificationOut,
     PreferenceUpdate,
 )
@@ -138,10 +140,15 @@ async def _channel_enabled(
 
 
 async def _email_opted_in(session: AsyncSession, *, user_id: uuid.UUID, type_: str) -> bool:
-    """Email defaults to OFF — only ON if an explicit row says enabled=true.
+    """Email defaults to ON — a user starts opted-in to email delivery
+    for every registered notification type. They can opt out per event
+    from Settings → Notifications.
 
-    Different default from in-app: tenants shouldn't suddenly start
-    receiving emails when a new notification type is introduced.
+    Flipped from OFF → ON on 2026-08-26 to match the "default yes"
+    UI treatment: every checkbox on the Settings page renders as
+    checked when no explicit row exists, and the backend delivery
+    matches that visible state so users receive what the UI implies
+    they will.
     """
     row = await _da.get_preference_enabled(
         session,
@@ -149,7 +156,7 @@ async def _email_opted_in(session: AsyncSession, *, user_id: uuid.UUID, type_: s
         type_=type_,
         channel=NotificationChannel.email,
     )
-    return bool(row) if row is not None else False
+    return bool(row) if row is not None else True
 
 
 async def _send_email_for(notif: NotificationOut, *, to: str) -> None:
@@ -307,9 +314,31 @@ async def update_preferences(
     return await _da.list_preferences_for_user_and_type(session, user_id=user_id, type_=type_)
 
 
+def list_available_notification_types() -> list[AvailableNotificationType]:
+    """Descriptors for every notification event surfaced in the
+    Settings → Notifications preferences UI. Reads the static catalog
+    at ``event_catalog.CATALOG``; the current channel defaults (in-app
+    ON, email ON) come from the same source as the delivery defaults
+    in ``_channel_enabled`` / ``_email_opted_in`` — one number, no
+    drift.
+    """
+    return [
+        AvailableNotificationType(
+            event_type=e.event_type,
+            label=e.label,
+            description=e.description,
+            group=e.group,
+            in_app_default=True,
+            email_default=True,
+        )
+        for e in event_catalog.CATALOG
+    ]
+
+
 __all__ = [
     "NotificationChannel",
     "get_preferences",
+    "list_available_notification_types",
     "list_for_user",
     "mark_all_read",
     "mark_read",
