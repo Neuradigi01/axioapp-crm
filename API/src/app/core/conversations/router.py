@@ -75,6 +75,7 @@ from src.app.core.conversations.schemas import (
     TagUpdate,
 )
 from src.app.core.conversations.service import (
+    bulk_last_message_bodies,
     ensure_can_write_conversation,
     get_conversation,
     list_conversations,
@@ -169,13 +170,17 @@ async def list_endpoint(
         page=page,
         size=size,
     )
-    # Bulk-fetch tags for the rows we're about to return so the chip
-    # row in the list view doesn't N+1.
-    tags_by_conv = await bulk_tags_for_conversations(db, [r.id for r in rows])
+    # Bulk-fetch tags + last-message previews for the rows we're about
+    # to return so the chip row + preview line in the list view don't
+    # N+1 the inbox render.
+    conv_ids = [r.id for r in rows]
+    tags_by_conv = await bulk_tags_for_conversations(db, conv_ids)
+    preview_by_conv = await bulk_last_message_bodies(db, conv_ids)
     items = []
     for r in rows:
         out = ConversationOut.model_validate(r)
         out.tags = tags_by_conv.get(r.id, [])
+        out.last_message_body = preview_by_conv.get(r.id)
         items.append(out)
     return ConversationListResponse(items=items, total=total, page=page, size=size)
 

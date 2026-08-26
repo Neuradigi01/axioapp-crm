@@ -379,6 +379,37 @@ def insert_message(session: AsyncSession, message: Message) -> None:
     session.add(message)
 
 
+async def bulk_last_message_body_for_conversations(
+    session: AsyncSession, conversation_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, str | None]:
+    """Return the latest external (non-internal-note) message body per
+    conversation as a whitespace-collapsed 140-char snippet. Used by the
+    inbox list endpoint to render a preview under each row without a
+    per-row fetch. Missing keys / attachment-only messages return None.
+
+    Uses PostgreSQL ``DISTINCT ON`` so the whole batch resolves in one
+    round-trip regardless of how many conversations are on the page.
+    """
+    if not conversation_ids:
+        return {}
+    stmt = (
+        select(Message.conversation_id, Message.text)
+        .where(Message.conversation_id.in_(conversation_ids))
+        .where(Message.is_internal.is_(False))
+        .distinct(Message.conversation_id)
+        .order_by(Message.conversation_id, Message.created_at.desc())
+    )
+    result = await session.execute(stmt)
+    out: dict[uuid.UUID, str | None] = {}
+    for conv_id, text in result.all():
+        if text is None:
+            out[conv_id] = None
+        else:
+            snippet = " ".join(text.split())
+            out[conv_id] = snippet[:140] if len(snippet) <= 140 else snippet[:139] + "…"
+    return out
+
+
 # --- Tags ---------------------------------------------------------------
 
 
