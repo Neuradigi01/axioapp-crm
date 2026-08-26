@@ -3,13 +3,13 @@
  *
  * Customer install snippet:
  *
- *   <div id="furnicrm-form"></div>
- *   <script src="https://widget.furnicrm.app/v1/widget.js"
+ *   <div id="crm-form"></div>
+ *   <script src="https://crm-api.neuradigi.com/widget/v1/widget.js"
  *           data-key="pk_live_…"
- *           data-host="https://api.furnicrm.app"
- *           data-mount="furnicrm-form"></script>
+ *           data-host="https://crm-api.neuradigi.com"
+ *           data-mount="crm-form"></script>
  *
- * `data-mount` defaults to `"furnicrm-form"` and `data-host` to the
+ * `data-mount` defaults to `"crm-form"` and `data-host` to the
  * production API URL, so the minimum-viable snippet is the first two
  * lines (no `data-host`, no `data-mount`).
  *
@@ -33,8 +33,8 @@ export type {
   WidgetField,
 } from "./types";
 
-const DEFAULT_HOST = "https://api.furnicrm.app";
-const DEFAULT_MOUNT = "furnicrm-form";
+const DEFAULT_HOST = "https://crm-api.neuradigi.com";
+const DEFAULT_MOUNT = "crm-form";
 
 
 function getScriptTag(): HTMLScriptElement | null {
