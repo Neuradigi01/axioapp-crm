@@ -15,15 +15,17 @@ Three operations:
     headers at all (a brand-new thread).
 
   - `normalize_subject(subject)` — strip every `Re:` / `Fwd:` /
-    `Aw:` (German) / `Antwoord:` / `Sv:` / `Re[2]:` style prefix so
-    `Re: Re: Quote for sofa` and `Quote for sofa` collide for the
-    subject-based fallback threading rule.
+    `Aw:` (German) / `Antwoord:` / `Sv:` / `Re[2]:` style prefix.
+    Kept as a public helper for tests + future analytics; no longer
+    drives conversation threading (see note below).
 
 Threading rules the adapter applies (in order):
   1. Any `Message-ID` in `extract_thread_keys` matches a known
      prior `messages.channel_message_id` → same conversation.
-  2. Normalized subject + contact matches an OPEN conversation in
-     the last 30 days → same conversation.
+  2. Else → most recent email conversation for the same contact
+     (mirror of outbound flow). Subject-based splitting was removed
+     on 2026-08-26 to prevent the same email address appearing as
+     multiple rows in the inbox.
   3. Else → new conversation.
 
 Everything in this module is pure (no I/O). Tests drive it directly.
@@ -150,17 +152,8 @@ def normalize_subject(subject: str) -> str:
     return cleaned.lower()
 
 
-def subject_thread_key(subject: str) -> str:
-    """Stable hash-key for the subject-based threading fallback.
-    Currently just `normalize_subject` — kept as a separate name so
-    a future signature upgrade (hash + sender domain etc) doesn't
-    leak through every call site."""
-    return normalize_subject(subject)
-
-
 __all__ = [
     "extract_message_id",
     "extract_thread_keys",
     "normalize_subject",
-    "subject_thread_key",
 ]

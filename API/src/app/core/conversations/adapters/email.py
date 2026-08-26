@@ -36,13 +36,13 @@ import logging
 import os
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from email.message import EmailMessage
 from email.utils import make_msgid, parseaddr
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
@@ -56,7 +56,6 @@ from src.app.core.conversations.adapters import (
 from src.app.core.conversations.adapters.email_threading import (
     extract_message_id,
     extract_thread_keys,
-    subject_thread_key,
 )
 from src.app.core.conversations.models import (
     Conversation,
@@ -91,11 +90,6 @@ from src.app.core.tenants import data_access as tenants_da
 
 logger = logging.getLogger(__name__)
 
-
-# Subject-based threading look-back window. A re-reply more than 30
-# days after the last activity is treated as a new conversation —
-# avoids decade-old "Quote for sofa" threads sucking in new emails.
-_SUBJECT_THREADING_WINDOW = timedelta(days=30)
 
 # Local-part of `Message-ID` for outbound mail. Stays stable across
 # environments so a customer's reply (which echoes the value into
@@ -545,19 +539,24 @@ async def receive_email(account: EmailAccount, matched: dict[str, Any]) -> Messa
 
         # Find existing conversation by:
         #  1. Any thread key (Message-ID / References / In-Reply-To)
-        #     that matches a known prior message.
-        #  2. Failing that, subject + contact within 30 days.
+        #     that matches a known prior message — honours real email-
+        #     client threading so the same reply chain always lands in
+        #     the same conversation regardless of subject drift.
+        #  2. Failing that, the most recent email conversation for this
+        #     contact — matches the outbound flow so a customer with
+        #     multiple different-subject inbounds still shows as ONE
+        #     conversation in the inbox (CRM-inbox model, not Zendesk-
+        #     ticket model). Subject-based splitting was removed on
+        #     2026-08-26 after users repeatedly saw the same email
+        #     address duplicated across rows.
+        #  3. Create a fresh conversation.
         thread_keys = extract_thread_keys(headers)
         conversation = await _find_conversation_by_thread_keys(
             session, account.org_id, thread_keys, contact_id
         )
         if conversation is None:
-            subject = headers.get("subject", "")
-            conversation = await _find_conversation_by_subject(
-                session,
-                org_id=account.org_id,
-                contact_id=contact_id,
-                subject=subject,
+            conversation = await _find_latest_email_conversation_for_contact(
+                session, contact_id=contact_id
             )
         if conversation is None:
             conversation = await _create_email_conversation(
@@ -853,7 +852,9 @@ async def _find_or_create_conversation(
 ) -> Conversation:
     """Outbound find-or-create. Explicit `conversation_id` wins; else
     we reuse the existing email conversation for this contact when
-    one exists, else create a fresh one."""
+    one exists, else create a fresh one. Inbound uses the same
+    per-contact fallback via ``_find_latest_email_conversation_for_contact``
+    so both directions consistently merge into one row per contact."""
     if conversation_id is not None:
         existing = (
             await session.execute(select(Conversation).where(Conversation.id == conversation_id))
@@ -861,15 +862,9 @@ async def _find_or_create_conversation(
         if existing is not None:
             return existing
 
-    existing = (
-        await session.execute(
-            select(Conversation)
-            .where(Conversation.channel == ConversationChannel.email)
-            .where(Conversation.contact_id == contact_id)
-            .order_by(Conversation.last_message_at.desc().nullslast())
-            .limit(1)
-        )
-    ).scalar_one_or_none()
+    existing = await _find_latest_email_conversation_for_contact(
+        session, contact_id=contact_id
+    )
     if existing is not None:
         return existing
 
@@ -879,6 +874,31 @@ async def _find_or_create_conversation(
         contact_id=contact_id,
         contact_email=contact_email,
     )
+
+
+async def _find_latest_email_conversation_for_contact(
+    session: AsyncSession,
+    *,
+    contact_id: uuid.UUID,
+) -> Conversation | None:
+    """Return the most recent email conversation this contact belongs
+    to, regardless of status. Used by BOTH the inbound flow (after
+    thread-key match fails) and the outbound flow (when the caller
+    didn't pin a specific conversation_id) so email delivery for one
+    contact always concentrates in a single row.
+
+    Ordering: ``last_message_at DESC NULLS LAST`` mirrors the inbox
+    list — the conversation the operator was most recently looking at
+    is the same one new email lands on."""
+    return (
+        await session.execute(
+            select(Conversation)
+            .where(Conversation.channel == ConversationChannel.email)
+            .where(Conversation.contact_id == contact_id)
+            .order_by(Conversation.last_message_at.desc().nullslast())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
 
 
 async def _create_email_conversation(
@@ -936,61 +956,6 @@ async def _find_conversation_by_thread_keys(
         .first()
     )
     return convs
-
-
-async def _find_conversation_by_subject(
-    session: AsyncSession,
-    *,
-    org_id: uuid.UUID,
-    contact_id: uuid.UUID,
-    subject: str,
-) -> Conversation | None:
-    """Subject-based fallback. Looks for an OPEN email conversation
-    for the same contact within the last 30 days whose most recent
-    message's `payload.subject` normalises to the same key."""
-    key = subject_thread_key(subject)
-    if not key:
-        return None
-    cutoff = datetime.now(UTC) - _SUBJECT_THREADING_WINDOW
-    candidates = (
-        (
-            await session.execute(
-                select(Conversation)
-                .where(Conversation.channel == ConversationChannel.email)
-                .where(Conversation.contact_id == contact_id)
-                .where(Conversation.status == ConversationStatus.open)
-                .where(
-                    and_(
-                        Conversation.last_message_at.isnot(None),
-                        Conversation.last_message_at >= cutoff,
-                    )
-                )
-                .order_by(Conversation.last_message_at.desc())
-                .limit(10)
-            )
-        )
-        .scalars()
-        .all()
-    )
-
-    for conv in candidates:
-        # Fetch the most recent message in this conversation; check
-        # if its subject normalises to the same key. A small N (one
-        # per conv from the candidate list) keeps this cheap.
-        latest = (
-            await session.execute(
-                select(Message)
-                .where(Message.conversation_id == conv.id)
-                .order_by(Message.created_at.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        if latest is None:
-            continue
-        latest_subject = (latest.payload or {}).get("subject", "")
-        if subject_thread_key(latest_subject) == key:
-            return conv
-    return None
 
 
 async def _exists_by_rfc_id(session: AsyncSession, rfc_id: str) -> bool:
