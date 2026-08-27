@@ -4,7 +4,6 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
-import { AiSettingsTabComponent } from './tabs/ai-settings-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { AutomationSettingsTabComponent } from './tabs/automation-settings-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
@@ -26,7 +25,6 @@ type SettingsTab =
   | 'team'
   | 'roles'
   | 'notifications'
-  | 'ai'
   | 'send-rules'
   | 'custom-fields'
   | 'standard-fields'
@@ -77,7 +75,6 @@ const TABS: ReadonlyArray<TabDef> = [
   // tasks/workflows Step 20 — the Email Sequences tab was absorbed
   // into Workflows. The standalone tab + builder routes redirect to
   // /user/workflows?category=Marketing (see user.routes.ts).
-  { id: 'ai', label: 'AI Settings', group: 'automation', permission: 'settings.write' },
   {
     // tasks/automation-engine Step 13 — quiet hours, frequency cap,
     // DPDP marketing-consent note. Owner / Admin only via
@@ -120,7 +117,6 @@ const TABS: ReadonlyArray<TabDef> = [
     TeamTabComponent,
     RolesTabComponent,
     NotificationsTabComponent,
-    AiSettingsTabComponent,
     AutomationSettingsTabComponent,
     CustomFieldsPageComponent,
     StandardFieldsTabComponent,
