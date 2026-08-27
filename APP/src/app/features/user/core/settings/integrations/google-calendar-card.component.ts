@@ -24,6 +24,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  computed,
   effect,
   inject,
   input,
@@ -61,6 +62,49 @@ export class GoogleCalendarCardComponent {
   protected readonly status = signal<GoogleCalendarStatus | null>(null);
   protected readonly loading = signal<boolean>(true);
   protected readonly inlineError = signal<string | null>(null);
+
+  /** Minutes until the current short-lived access token expires.
+   *  `null` when not connected / no expiry stamp. Google
+   *  auto-refreshes via the refresh token on healthy grants, so
+   *  this ticks forward silently — the countdown only matters if
+   *  the refresh path is broken (revoked grant / disabled app),
+   *  which coincides with `last_error` populating. */
+  protected readonly minutesToExpiry = computed<number | null>(() => {
+    const exp = this.status()?.access_token_expires_at;
+    if (!exp) return null;
+    const t = new Date(exp).getTime();
+    if (isNaN(t)) return null;
+    return Math.round((t - Date.now()) / 60_000);
+  });
+
+  /** Human "10 min" / "2 hr" / "1 day" formatted `minutesToExpiry`.
+   *  Only ever rendered on connected accounts. */
+  protected readonly expiryLabel = computed<string | null>(() => {
+    const m = this.minutesToExpiry();
+    if (m === null) return null;
+    if (m <= 0) return 'expired';
+    if (m < 60) return `${m} min`;
+    const hours = Math.round(m / 60);
+    if (hours < 48) return `${hours} hr`;
+    const days = Math.round(hours / 24);
+    return `${days} day${days === 1 ? '' : 's'}`;
+  });
+
+  /** True iff Google reported an auth-related error (revoked grant,
+   *  invalid_grant, insufficient_scope). Drives the RED reconnect
+   *  banner — this is what would've caught the user's silent Aug 14
+   *  revocation before appointment sync failed. */
+  protected readonly authRevoked = computed<boolean>(() => {
+    const err = this.status()?.last_error?.toLowerCase() ?? '';
+    if (!err) return false;
+    return (
+      err.includes('invalid_grant') ||
+      err.includes('revoked') ||
+      err.includes('unauthorized') ||
+      err.includes('token has been expired') ||
+      err.includes('insufficient')
+    );
+  });
 
   /** Windowed poll — flips to true right before the SPA navigates to
    *  Google's consent screen, false after we get the first status
@@ -126,6 +170,7 @@ export class GoogleCalendarCardComponent {
             last_error: null,
             last_synced_at: null,
             scopes_granted: [],
+            access_token_expires_at: null,
           });
           this.changed.emit();
         },

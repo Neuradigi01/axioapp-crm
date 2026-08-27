@@ -160,6 +160,16 @@ async def get_item(session: AsyncSession, item_id: uuid.UUID) -> InventoryItem:
     return ensure_found(await _da.get_item_by_id(session, item_id), entity="item")
 
 
+async def hydrate_items_by_ids(
+    session: AsyncSession, *, org_id: uuid.UUID, ids: list[uuid.UUID]
+) -> list[InventoryItem]:
+    """Batch fetch inventory items by id list, scoped to the caller's
+    org. Powers the stock-alerts page (and any future consumer) that
+    needs to render item context per row without the N-way ``GET
+    /items/{item_id}`` fan-out."""
+    return await _da.list_items_by_ids_in_org(session, ids=ids, org_id=org_id)
+
+
 async def create_item(
     session: AsyncSession,
     *,
@@ -547,6 +557,7 @@ __all__ = [
     "delete_warehouse",
     "get_item",
     "get_warehouse",
+    "hydrate_items_by_ids",
     "list_alerts",
     "list_items",
     "list_movements",

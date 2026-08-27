@@ -9,7 +9,6 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { forkJoin } from 'rxjs';
 import { extractApiError } from '@core/services/api-error.util';
 
 import { InventoryApiService, InventoryItem, StockAlert } from '../inventory-api.service';
@@ -193,15 +192,22 @@ export class StockAlertsTabComponent {
             this.loading.set(false);
             return;
           }
-          // Hydrate item context per row in parallel.
-          const calls = alerts.map((a) => this.api.getItem(a.item_id));
-          forkJoin(calls)
+          // Batch-hydrate item context in ONE call via
+          // `POST /inventory/items/hydrate` — was fanning out one
+          // `GET /items/{id}` per alert.
+          const ids = [...new Set(alerts.map((a) => a.item_id))];
+          this.api
+            .hydrateByIds(ids)
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
               next: (items) => {
-                const rows: AlertRow[] = alerts.map((alert, idx) => ({
+                const byId = new Map<string, InventoryItem>();
+                for (const it of items) {
+                  byId.set(it.id, it);
+                }
+                const rows: AlertRow[] = alerts.map((alert) => ({
                   alert,
-                  item: items[idx] ?? null,
+                  item: byId.get(alert.item_id) ?? null,
                 }));
                 this.rows.set(rows);
                 this.loading.set(false);

@@ -413,6 +413,44 @@ export class EmailSenderCardComponent implements OnInit {
     return 'bg-surface-2 text-default ring-1 border-subtle';
   }
 
+  /** True iff this OAuth sender's grant is dead — Google/Microsoft
+   *  rejected the refresh token, so the next send will 401. The
+   *  card renders a red "Reconnect needed" pill + the raw error
+   *  when this is true, instead of the misleading green "Connected"
+   *  pill that used to hide the problem until send failed. */
+  protected isOauthRevoked(row: UnifiedSender): boolean {
+    if (row.kind === 'smtp') return false;
+    if (row.sync_state === 'error') return true;
+    const err = (row.last_sync_error ?? '').toLowerCase();
+    if (!err) return false;
+    return (
+      err.includes('invalid_grant') ||
+      err.includes('revoked') ||
+      err.includes('unauthorized') ||
+      err.includes('token has been expired')
+    );
+  }
+
+  /** Human "10 min" / "2 hr" / "1 day" formatted time until the
+   *  short-lived access token expires. `null` on SMTP or when the
+   *  backend didn't populate the field. Google refreshes silently
+   *  on healthy grants so this label just reassures the operator
+   *  that the session is live; if it stops advancing, the row will
+   *  also flip to "Reconnect needed" via `isOauthRevoked`. */
+  protected tokenExpiryLabel(row: UnifiedSender): string | null {
+    if (row.kind === 'smtp') return null;
+    if (!row.token_expires_at) return null;
+    const t = new Date(row.token_expires_at).getTime();
+    if (isNaN(t)) return null;
+    const mins = Math.round((t - Date.now()) / 60_000);
+    if (mins <= 0) return 'expired';
+    if (mins < 60) return `${mins} min`;
+    const hours = Math.round(mins / 60);
+    if (hours < 48) return `${hours} hr`;
+    const days = Math.round(hours / 24);
+    return `${days} day${days === 1 ? '' : 's'}`;
+  }
+
   protected domainState(row: EmailSenderDomain): {
     label: string;
     tone: 'green' | 'amber' | 'zinc';

@@ -164,4 +164,12 @@ export class AppointmentsApiService extends BaseCrudApiService<
   bulkDelete(ids: string[]): Observable<{ deleted: number }> {
     return this.http.post<{ deleted: number }>(`${this.base}/bulk-delete`, { ids });
   }
+
+  /** Batch-fetch appointment rows by id list. Used by list pages that
+   *  render appointment context per row (e.g. the furniture pack's
+   *  field-ops view) so they don't fan out one ``GET /{id}`` per
+   *  appointment. Cap: 200 ids per call (server-side). */
+  hydrateByIds(ids: string[]): Observable<Appointment[]> {
+    return this.http.post<Appointment[]>(`${this.base}/hydrate`, { ids });
+  }
 }

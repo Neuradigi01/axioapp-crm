@@ -50,3 +50,17 @@ class PreferenceUpdate(BaseModel):
 
 class ReadAllResponse(BaseModel):
     marked: int = Field(ge=0)
+
+
+class AvailableNotificationType(BaseModel):
+    """Descriptor for one notification event surfaced in the Settings
+    preferences UI. Frontend renders every entry from
+    ``GET /notification-preferences/available-types`` as a row with
+    in-app + email checkboxes, pre-checked to the defaults below."""
+
+    event_type: str
+    label: str
+    description: str
+    group: str
+    in_app_default: bool
+    email_default: bool

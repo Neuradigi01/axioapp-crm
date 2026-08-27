@@ -39,6 +39,7 @@ from src.app.packs.furniture.modules.inventory.schemas import (
     CoverUploadResponse,
     InventoryItemCreate,
     InventoryItemFullCreate,
+    InventoryItemHydrateRequest,
     InventoryItemListResponse,
     InventoryItemOut,
     InventoryItemUpdate,
@@ -58,6 +59,7 @@ from src.app.packs.furniture.modules.inventory.service import (
     delete_warehouse,
     get_item,
     get_warehouse,
+    hydrate_items_by_ids,
     list_alerts,
     list_items,
     list_movements,
@@ -211,6 +213,23 @@ async def upload_cover_endpoint(
         filename=file.filename,
     )
     return CoverUploadResponse(cover_url=cover_url)
+
+
+@router.post("/items/hydrate", response_model=list[InventoryItemOut])
+async def hydrate_items_endpoint(
+    payload: InventoryItemHydrateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("inventory.read")),
+) -> list[InventoryItemOut]:
+    """Batch-fetch inventory item rows by id list. Replaces the
+    ``N × GET /items/{item_id}`` fan-out from list pages that render
+    item context per row (e.g. stock-alerts).
+
+    Route order matters: declared BEFORE ``/items/{item_id}`` so
+    FastAPI doesn't swallow ``"hydrate"`` as a UUID and 422.
+    """
+    rows = await hydrate_items_by_ids(db, org_id=user.org_id, ids=payload.ids)
+    return [InventoryItemOut.model_validate(r) for r in rows]
 
 
 @router.get("/items/{item_id}", response_model=InventoryItemOut)

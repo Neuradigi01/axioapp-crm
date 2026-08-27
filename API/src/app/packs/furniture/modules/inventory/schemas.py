@@ -72,6 +72,15 @@ class InventoryItemUpdate(BaseModel):
     is_active: bool | None = None
 
 
+class InventoryItemHydrateRequest(BaseModel):
+    """Payload for ``POST /inventory/items/hydrate`` — batch fetch by
+    ids. Powers the stock-alerts page (and any future consumer) that
+    needs to render item context per row without the N-way
+    ``GET /inventory/items/{id}`` fan-out."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
 class InventoryItemOut(TimestampedOrgScopedOut):
     id: uuid.UUID
     catalog_item_id: uuid.UUID | None

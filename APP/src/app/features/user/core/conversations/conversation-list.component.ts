@@ -259,18 +259,47 @@ export class ConversationListComponent {
     this.emit();
   }
 
-  /** Two-letter initials for the staff member that owns this thread,
-   * or `·` if the thread is unassigned. */
-  protected assigneeInitials(userId: string | null): string {
-    if (!userId) return '·';
-    const staff = this.staffById.get(userId);
-    return staff ? staffInitials(staff.full_name) : '?';
+  /** Two-letter initials for the CONTACT the conversation is with —
+   * this is what shows inside the avatar bubble. The assignee's initials
+   * used to render here, which was misleading (customer "Priya" being
+   * handled by staff "Rahul" would show "RA" under the name "Priya").
+   * Standard inbox pattern: DP = contact, assignee shown separately.
+   */
+  protected contactInitials(c: Conversation): string {
+    if (c.contact_id) {
+      const contact = this.contactsById[c.contact_id];
+      if (contact && contact.full_name) {
+        const name = contact.full_name.trim();
+        if (name && !this.looksLikePlaceholderName(name, c.external_id)) {
+          return staffInitials(name);
+        }
+      }
+    }
+    // Fallback for placeholder / unknown contacts: first letter of the
+    // channel handle (phone / email). Better than a raw '?' which reads
+    // as a broken avatar.
+    const handle = c.external_id?.trim() ?? '';
+    if (handle) {
+      const cleaned = handle.replace(/^[+\s]+/, '');
+      if (cleaned) return cleaned[0].toUpperCase();
+    }
+    return '?';
   }
 
-  /** Deterministic colour triple matching the same user id everywhere
-   * else in the UI (leads kanban, appointments calendar, etc.). */
-  protected assigneeColor(userId: string | null): OwnerColor {
-    return ownerColor(userId);
+  /** Deterministic colour triple keyed off the contact id so the same
+   * contact always renders the same avatar tint across the app. Falls
+   * back to a neutral colour when the contact isn't linked yet. */
+  protected contactColor(c: Conversation): OwnerColor {
+    return ownerColor(c.contact_id);
+  }
+
+  /** Display name of the staff member currently assigned to the
+   * conversation. Empty string when unassigned so the template can
+   * render "Unassigned" in a dimmer style. */
+  protected assigneeName(userId: string | null): string {
+    if (!userId) return '';
+    const staff = this.staffById.get(userId);
+    return staff?.full_name ?? '';
   }
 
   protected formatTime(iso: string | null): string {

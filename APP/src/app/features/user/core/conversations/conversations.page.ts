@@ -13,10 +13,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { forkJoin, of } from 'rxjs';
+import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
-import { ContactsApiService } from '../contacts/contacts-api.service';
+import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 
@@ -234,7 +234,7 @@ export class ConversationsPageComponent {
   /** Coalesce bursty WS notifications (10 inbound msgs in one second)
    *  into a single list-reload + at-most-one thread-refresh per window.
    *  Without this every notification fires a full `GET /conversations`
-   *  plus a `hydrateContacts` forkJoin. */
+   *  plus a `hydrateContacts` batch fetch. */
   private static readonly RELOAD_DEBOUNCE_MS = 300;
   private pendingListReloadTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingDetailReload: {
@@ -996,8 +996,12 @@ export class ConversationsPageComponent {
 
   /** Fetch contact rows for any `contact_id` we haven't seen yet, so
    *  the list can show the person's name instead of the raw
-   *  `external_id`. Individual failures are swallowed — a missing
-   *  contact just falls back to the external id in the template. */
+   *  `external_id`. Uses the batch ``POST /contacts/hydrate`` endpoint
+   *  — one request for the whole page instead of one per row (the
+   *  previous ``forkJoin(missing.map(get))`` fanned out 75+ XHRs on
+   *  a full inbox and clogged the network waterfall). Failures are
+   *  swallowed — missing contacts fall back to the external id in
+   *  the template. */
   private hydrateContacts(rows: Conversation[]): void {
     const ids = new Set<string>();
     for (const r of rows) {
@@ -1006,13 +1010,17 @@ export class ConversationsPageComponent {
     const cache = this.contactsById();
     const missing = [...ids].filter((id) => !cache[id]);
     if (missing.length === 0) return;
-    forkJoin(missing.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
-      .pipe(takeUntilDestroyed(this.destroyRef))
+    this.contactsApi
+      .hydrateByIds(missing)
+      .pipe(
+        catchError(() => of([] as ContactListItem[])),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe((results) => {
         this.contactsById.update((current) => {
           const next = { ...current };
           for (const c of results) {
-            if (c) next[c.id] = { id: c.id, full_name: c.full_name };
+            next[c.id] = { id: c.id, full_name: c.full_name };
           }
           return next;
         });

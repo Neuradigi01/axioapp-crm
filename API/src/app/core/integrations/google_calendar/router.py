@@ -213,6 +213,11 @@ async def status_endpoint(
             else None
         ),
         "scopes_granted": status_data.scopes_granted,
+        "access_token_expires_at": (
+            status_data.access_token_expires_at.isoformat()
+            if status_data.access_token_expires_at
+            else None
+        ),
     }
 
 

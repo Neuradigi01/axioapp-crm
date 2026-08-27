@@ -1,6 +1,6 @@
 <div
   [class]="
-    'border-t border-subtle px-4 py-2 transition-colors ' +
+    'border-t border-subtle px-4 py-1.5 transition-colors ' +
     (isNoteMode() ? 'bg-amber-500/10' : 'bg-surface')
   "
   (dragover)="onDragOver($event)"
@@ -237,7 +237,7 @@
        on the right. Horizontal stacking (was vertical) shortens the
        compose bar by ~80px on typical viewports so more of the chat
        thread is visible above. -->
-  <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+  <div class="mt-1.5 flex flex-wrap items-center justify-between gap-2">
     <!-- Mode toggle (Reply / Note) — Step 13. Compact so it sits
          inline with the action buttons. -->
     <div
@@ -303,20 +303,6 @@
       </button>
     </div>
   </div>
-  <p class="mt-2 text-[10px] text-faint">
-    @if (canAttachMedia()) {
-      Enter to send · Shift+Enter for newline · drag a file or click
-      <lucide-icon
-        name="paperclip"
-        size="10"
-        class="inline align-middle"
-        aria-hidden="true"
-      ></lucide-icon>
-      to attach
-    } @else {
-      Enter to send · Shift+Enter for a new line
-    }
-  </p>
 </div>
 
 <!-- Step 28 — outbound location dialog. Lat/lng + optional label/address.

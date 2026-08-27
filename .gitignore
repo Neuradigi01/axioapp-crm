@@ -74,10 +74,19 @@ sidecars/*/storage/
 postgres-data/
 redis-data/
 
-# Widget bundle (already covered by node_modules/ + dist/ above; listed
-# explicitly for discoverability — keep widget/package-lock.json IN tree).
+# Widget bundle. node_modules is always ignored. `dist/` contents are
+# ignored EXCEPT `dist/v1/widget.js` — that gets committed so prod
+# deploys don't need Node to build the widget (docker-compose mounts
+# ../widget/dist into the API container at /app/widget). Source maps
+# and any future files under dist/ stay ignored. The negations override
+# the global `dist/` rule higher in this file.
 widget/node_modules/
-widget/dist/
+!widget/dist/
+!widget/dist/v1/
+widget/dist/*
+!widget/dist/v1/
+widget/dist/v1/*
+!widget/dist/v1/widget.js
 
 # Logs
 logs/

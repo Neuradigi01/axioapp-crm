@@ -168,12 +168,40 @@
                       </span>
                     }
                   } @else {
-                    @if (row.verified) {
+                    @if (isOauthRevoked(row)) {
+                      <!-- Grant is dead — Google/Microsoft rejected
+                           the refresh token. Was previously silent:
+                           the "Connected" pill kept showing green
+                           while sends 401'd in the background. RED
+                           pill + inline error message + a "reconnect
+                           now" hint solve that. -->
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-400 ring-1 border-red-500/30"
+                        [attr.title]="row.last_sync_error ?? 'Google/Microsoft revoked the grant.'"
+                      >
+                        <lucide-icon
+                          name="alert-triangle"
+                          size="10"
+                          aria-hidden="true"
+                        ></lucide-icon>
+                        Reconnect needed
+                      </span>
+                      @if (row.last_sync_error) {
+                        <p class="mt-1 max-w-[260px] font-mono text-[10px] text-red-300">
+                          {{ row.last_sync_error }}
+                        </p>
+                      }
+                    } @else if (row.verified) {
                       <span
                         class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400 ring-1 border-emerald-500/20"
                       >
                         Connected
                       </span>
+                      @if (tokenExpiryLabel(row); as label) {
+                        <p class="mt-1 text-[10px] text-muted">
+                          Session refresh in <span class="font-mono">{{ label }}</span>
+                        </p>
+                      }
                     } @else {
                       <span
                         class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400 ring-1 border-amber-500/20"

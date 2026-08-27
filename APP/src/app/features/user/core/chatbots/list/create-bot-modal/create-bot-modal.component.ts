@@ -17,6 +17,10 @@ import { LucideAngularModule } from 'lucide-angular';
  * "Name your new bot" prompt modal. Replaces the native
  * `window.prompt` on the chatbots list so the create flow uses the
  * same styled surfaces as the rest of the app.
+ *
+ * Emits `{ name, description }` on Create — description is optional
+ * and is trimmed to `null` when blank so the backend stores NULL
+ * rather than an empty string.
  */
 @Component({
   selector: 'app-chatbot-create-modal',
@@ -43,7 +47,10 @@ import { LucideAngularModule } from 'lucide-angular';
           </span>
           <div class="flex-1">
             <h2 id="create-bot-title" class="text-sm font-semibold text-default">Create bot</h2>
-            <p class="text-[11px] text-muted mt-0.5">Give your new bot a name to get started.</p>
+            <p class="text-[11px] text-muted mt-0.5">
+              Give your new bot a name and an optional short description so teammates know what it
+              does at a glance.
+            </p>
           </div>
           <button
             type="button"
@@ -55,24 +62,46 @@ import { LucideAngularModule } from 'lucide-angular';
           </button>
         </header>
 
-        <div class="px-5 py-5 space-y-3">
-          <label
-            for="new-bot-name"
-            class="block text-[11px] font-medium text-muted uppercase tracking-wide"
-          >
-            Bot name
-          </label>
-          <input
-            #nameInput
-            id="new-bot-name"
-            type="text"
-            [ngModel]="name()"
-            (ngModelChange)="name.set($event); error.set(null)"
-            (keydown.enter)="submit()"
-            placeholder="e.g. Welcome Bot"
-            maxlength="120"
-            class="w-full px-3 py-2 text-sm bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent"
-          />
+        <div class="px-5 py-5 space-y-4">
+          <div class="space-y-1.5">
+            <label
+              for="new-bot-name"
+              class="block text-[11px] font-medium text-muted uppercase tracking-wide"
+            >
+              Bot name
+            </label>
+            <input
+              #nameInput
+              id="new-bot-name"
+              type="text"
+              [ngModel]="name()"
+              (ngModelChange)="name.set($event); error.set(null)"
+              (keydown.enter)="submit()"
+              placeholder="e.g. Welcome Bot"
+              maxlength="120"
+              class="w-full px-3 py-2 text-sm bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          <div class="space-y-1.5">
+            <label
+              for="new-bot-description"
+              class="flex items-center justify-between text-[11px] font-medium text-muted uppercase tracking-wide"
+            >
+              <span>Description</span>
+              <span class="normal-case text-faint">Optional</span>
+            </label>
+            <textarea
+              id="new-bot-description"
+              rows="2"
+              [ngModel]="description()"
+              (ngModelChange)="description.set($event)"
+              placeholder="e.g. Handles first-touch replies for pricing enquiries on WhatsApp."
+              maxlength="2000"
+              class="w-full px-3 py-2 text-sm bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent resize-none"
+            ></textarea>
+          </div>
+
           @if (error()) {
             <p class="text-[12px] text-red-500">{{ error() }}</p>
           }
@@ -106,12 +135,16 @@ export class ChatbotCreateModalComponent implements AfterViewInit {
     this.error.set(msg);
   }
 
-  @Output() readonly create = new EventEmitter<string>();
+  @Output() readonly create = new EventEmitter<{
+    name: string;
+    description: string | null;
+  }>();
   @Output() readonly close = new EventEmitter<void>();
 
   @ViewChild('nameInput') private nameInputRef?: ElementRef<HTMLInputElement>;
 
   readonly name = signal<string>('');
+  readonly description = signal<string>('');
   readonly error = signal<string | null>(null);
 
   ngAfterViewInit(): void {
@@ -119,12 +152,16 @@ export class ChatbotCreateModalComponent implements AfterViewInit {
   }
 
   submit(): void {
-    const trimmed = this.name().trim();
-    if (!trimmed) {
+    const trimmedName = this.name().trim();
+    if (!trimmedName) {
       this.error.set('Please enter a name.');
       return;
     }
-    this.create.emit(trimmed);
+    const trimmedDescription = this.description().trim();
+    this.create.emit({
+      name: trimmedName,
+      description: trimmedDescription === '' ? null : trimmedDescription,
+    });
   }
 
   onBackdropClick(evt: MouseEvent): void {

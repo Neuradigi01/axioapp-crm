@@ -303,6 +303,17 @@ async def get_appointment(session: AsyncSession, appointment_id: uuid.UUID) -> A
     return await _da.get_appointment_by_id(session, appointment_id)
 
 
+async def hydrate_appointments_by_ids(
+    session: AsyncSession, *, org_id: uuid.UUID, ids: list[uuid.UUID]
+) -> list[Appointment]:
+    """Batch fetch appointments by id list, scoped to the caller's
+    org. Ids that don't exist in this org are silently dropped (RLS +
+    the DAL's explicit ``org_id`` predicate). Powers pack list pages
+    that need to render appointment context per row (e.g. furniture's
+    field-ops view) without the N-way ``GET /{id}`` fan-out."""
+    return await _da.list_appointments_by_ids_in_org(session, ids=ids, org_id=org_id)
+
+
 async def create_appointment(
     session: AsyncSession,
     *,
@@ -1217,6 +1228,7 @@ __all__ = [
     "delete_appointment",
     "find_conflicts",
     "get_appointment",
+    "hydrate_appointments_by_ids",
     "list_appointments",
     "reassign_appointment",
     "reschedule_appointment",

@@ -118,6 +118,16 @@ async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
     )
 
 
+async def bulk_last_message_bodies(
+    session: AsyncSession, conversation_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, str | None]:
+    """Thin passthrough to the DAL — kept in service so the router
+    doesn't import DAL directly (layered-architecture rule). Returns
+    a whitespace-collapsed 140-char snippet per conversation for the
+    inbox preview line."""
+    return await _da.bulk_last_message_body_for_conversations(session, conversation_ids)
+
+
 # --- access gates ---------------------------------------------------------
 
 

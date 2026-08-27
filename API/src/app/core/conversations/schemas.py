@@ -357,6 +357,14 @@ class ConversationOut(ORMModel):
     ai_paused_by_user_id: uuid.UUID | None = None
     ai_paused_at: datetime | None = None
     last_message_at: datetime | None
+    # Short preview of the most recent external message (whitespace-collapsed
+    # + trimmed to 140 chars server-side). Populated only by the list
+    # endpoint via ``bulk_last_message_body_for_conversations`` so the
+    # inbox row can render a snippet without a per-row fetch; the detail
+    # endpoint leaves this ``None`` (the thread pane loads full messages).
+    # Internal notes are excluded from the preview so the customer-facing
+    # snippet reflects what was actually exchanged externally.
+    last_message_body: str | None = None
     unread_count: int
     created_at: datetime
     # Step 14 — assigned tags as embedded `{id, name, color}` triples.

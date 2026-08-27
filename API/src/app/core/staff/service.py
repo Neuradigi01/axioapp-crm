@@ -217,6 +217,58 @@ async def compute_performance(session: AsyncSession, user_id: uuid.UUID) -> dict
     }
 
 
+async def compute_performance_bulk(
+    session: AsyncSession, user_ids: list[uuid.UUID]
+) -> list[dict[str, Any]]:
+    """Batch version of :func:`compute_performance` for the staff-page
+    list view. Runs exactly TWO SQL queries for the whole list
+    (``GROUP BY assigned_to, status`` for lead counts + ``WHERE user_id IN``
+    for profiles) instead of ``3 × N`` per-user queries.
+
+    Skips the per-user ``_ensure_user_in_scope`` guard — the caller
+    (staff-list page) has already resolved ``user_ids`` from the org's
+    own ``list_staff`` response, so RLS + org filtering is inherited.
+    Callers that need the strict "user exists in this org" 404 should
+    still use the single-user :func:`compute_performance`.
+
+    Output preserves the caller's input order + returns a row per id
+    (unknown ids still get a zeroed dict so the frontend never has
+    a hole in the array).
+    """
+    counts_by_user = await _da.count_leads_grouped_for_users(session, user_ids=user_ids)
+    profiles_by_user = await _da.get_staff_profiles_by_user_ids(session, user_ids=user_ids)
+
+    out: list[dict[str, Any]] = []
+    for user_id in user_ids:
+        by_status = counts_by_user.get(user_id, {})
+        leads_won = int(by_status.get(LeadStatus.won, 0))
+        leads_active = int(by_status.get(LeadStatus.active, 0))
+
+        profile = profiles_by_user.get(user_id)
+        monthly_target = profile.monthly_target if profile is not None else Decimal("0")
+        rating = profile.rating if profile is not None else Decimal("0")
+        commission_rate = profile.commission_rate if profile is not None else Decimal("0")
+
+        sales = Decimal("0")
+        target_progress_pct: float | None = None
+        if monthly_target > 0:
+            target_progress_pct = float(sales / monthly_target * 100)
+
+        out.append(
+            {
+                "user_id": user_id,
+                "leads_converted": leads_won,
+                "leads_active": leads_active,
+                "sales": sales,
+                "monthly_target": monthly_target,
+                "target_progress_pct": target_progress_pct,
+                "rating": rating,
+                "commission_rate": commission_rate,
+            }
+        )
+    return out
+
+
 # --- attendance ---
 
 
@@ -312,6 +364,7 @@ __all__ = [
     "clock_in",
     "clock_out",
     "compute_performance",
+    "compute_performance_bulk",
     "get_profile",
     "list_activities_for",
     "list_attendance",

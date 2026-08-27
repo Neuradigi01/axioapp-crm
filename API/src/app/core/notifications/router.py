@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import get_current_user
 from src.app.core.notifications.schemas import (
+    AvailableNotificationType,
     NotificationOut,
     NotificationPreferenceOut,
     PreferenceUpdate,
@@ -27,6 +28,7 @@ from src.app.core.notifications.schemas import (
 )
 from src.app.core.notifications.service import (
     get_preferences,
+    list_available_notification_types,
     list_for_user,
     mark_all_read,
     mark_read,
@@ -80,6 +82,24 @@ async def list_my_preferences(
 ) -> list[NotificationPreferenceOut]:
     rows = await get_preferences(db, user_id=user.legacy_uuid)
     return [NotificationPreferenceOut.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/notification-preferences/available-types",
+    response_model=list[AvailableNotificationType],
+)
+async def list_available_types(
+    user: User = Depends(get_current_user),
+) -> list[AvailableNotificationType]:
+    """Every notification event surfaced in the Settings preferences UI,
+    with display label, group, and per-channel defaults. The frontend
+    renders one checkbox row per entry (grouped by ``group``) and
+    overlays the user's saved ``NotificationPreference`` rows on top.
+
+    Route order matters: declared BEFORE ``/{type}`` so FastAPI doesn't
+    swallow ``available-types`` as a ``type`` path param.
+    """
+    return list_available_notification_types()
 
 
 @router.patch(

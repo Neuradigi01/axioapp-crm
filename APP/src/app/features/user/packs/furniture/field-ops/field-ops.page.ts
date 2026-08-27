@@ -11,14 +11,14 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
-import { forkJoin, of } from 'rxjs';
+import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import {
   Appointment,
   AppointmentsApiService,
 } from '../../../core/appointments/appointments-api.service';
-import { ContactsApiService } from '../../../core/contacts/contacts-api.service';
+import { ContactListItem, ContactsApiService } from '../../../core/contacts/contacts-api.service';
 import { FieldOpsApiService, FieldVisit } from './field-ops-api.service';
 import { ScheduleVisitModalComponent } from './schedule-visit-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
@@ -201,31 +201,39 @@ export class FieldOpsPageComponent {
   }
 
   private fetchAppointments(ids: string[]): void {
-    forkJoin(ids.map((id) => this.appointmentsApi.get(id).pipe(catchError(() => of(null)))))
-      .pipe(takeUntilDestroyed(this.destroyRef))
+    if (ids.length === 0) return;
+    this.appointmentsApi
+      .hydrateByIds(ids)
+      .pipe(
+        catchError(() => of<Appointment[]>([])),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe((rows) => {
         this.appointmentsById.update((cache) => {
           const next = { ...cache };
-          for (const a of rows) if (a) next[a.id] = a;
+          for (const a of rows) next[a.id] = a;
           return next;
         });
       });
   }
 
   private fetchContacts(ids: string[]): void {
-    forkJoin(ids.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
-      .pipe(takeUntilDestroyed(this.destroyRef))
+    if (ids.length === 0) return;
+    this.contactsApi
+      .hydrateByIds(ids)
+      .pipe(
+        catchError(() => of<ContactListItem[]>([])),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe((rows) => {
         this.contactsById.update((cache) => {
           const next = { ...cache };
           for (const c of rows) {
-            if (c) {
-              next[c.id] = {
-                id: c.id,
-                full_name: c.full_name,
-                phone: c.phone,
-              };
-            }
+            next[c.id] = {
+              id: c.id,
+              full_name: c.full_name,
+              phone: c.phone,
+            };
           }
           return next;
         });

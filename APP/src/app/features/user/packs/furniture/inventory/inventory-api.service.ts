@@ -139,6 +139,14 @@ export class InventoryApiService {
     return this.http.get<InventoryItem>(`${this.base}/items/${id}`);
   }
 
+  /** Batch-fetch inventory item rows by id list. Used by list pages
+   *  that render item context per row (e.g. stock-alerts) so they
+   *  don't fan out one ``GET /items/{id}`` per row. Cap: 200 ids per
+   *  call (server-side). */
+  hydrateByIds(ids: string[]): Observable<InventoryItem[]> {
+    return this.http.post<InventoryItem[]>(`${this.base}/items/hydrate`, { ids });
+  }
+
   /** Atomic create: a catalog row + an inventory row in one transaction. */
   createItemFull(payload: InventoryItemFullCreate): Observable<InventoryItem> {
     return this.http.post<InventoryItem>(`${this.base}/items/full`, payload);

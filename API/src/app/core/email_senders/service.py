@@ -398,6 +398,9 @@ async def list_unified_senders(
         # + stayed silently broken forever when the backfill task got
         # killed mid-run.
         sendable = r.refresh_token_enc is not None
+        sync_state_value = (
+            r.sync_state.value if hasattr(r.sync_state, "value") else str(r.sync_state)
+        )
         merged.append(
             UnifiedSenderOut(
                 kind=provider,  # type: ignore[arg-type]
@@ -409,6 +412,16 @@ async def list_unified_senders(
                 # the resolver falls through to them only when no
                 # verified SMTP sender exists.
                 is_default=False,
+                # Health fields — the frontend card uses these to
+                # render a countdown + a red "reconnect required"
+                # banner. `token_expires_at` is the short-lived
+                # access-token deadline (refreshes in place unless
+                # the grant was revoked); `last_sync_error` +
+                # `sync_state == 'error'` are the "grant is dead"
+                # signals.
+                token_expires_at=r.token_expires_at,
+                sync_state=sync_state_value,
+                last_sync_error=r.last_sync_error,
             )
         )
 
