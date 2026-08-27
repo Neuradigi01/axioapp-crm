@@ -14,7 +14,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { endOfMonth, endOfWeek, format, isSameDay, startOfMonth, startOfWeek } from 'date-fns';
-import { forkJoin, of } from 'rxjs';
+import { of } from 'rxjs';
 import { catchError, distinctUntilChanged } from 'rxjs/operators';
 
 import { ActivatedRoute, Router } from '@angular/router';
@@ -948,25 +948,31 @@ export class AppointmentsPageComponent {
       });
   }
 
+  /** Batch-hydrate contact summaries via ``POST /contacts/hydrate`` —
+   *  one round-trip for the whole page instead of one ``GET /contacts/{id}``
+   *  per appointment row. Failures are swallowed; unhydrated ids just
+   *  render as "—" via ``contactName()``. */
   private hydrateContacts(rows: Appointment[]): void {
     const ids = new Set(rows.map((r) => r.contact_id));
     const cache = this.contactsById();
     const missing = [...ids].filter((id) => !cache[id]);
     if (missing.length === 0) return;
-    forkJoin(missing.map((id) => this.contactsApi.get(id).pipe(catchError(() => of(null)))))
-      .pipe(takeUntilDestroyed(this.destroyRef))
+    this.contactsApi
+      .hydrateByIds(missing)
+      .pipe(
+        catchError(() => of([] as ContactListItem[])),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe((results) => {
         this.contactsById.update((current) => {
           const next = { ...current };
           for (const c of results) {
-            if (c) {
-              next[c.id] = {
-                id: c.id,
-                full_name: c.full_name,
-                phone: c.phone,
-                email: c.email,
-              };
-            }
+            next[c.id] = {
+              id: c.id,
+              full_name: c.full_name,
+              phone: c.phone,
+              email: c.email,
+            };
           }
           return next;
         });
