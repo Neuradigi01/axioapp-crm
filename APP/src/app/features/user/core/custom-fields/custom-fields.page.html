@@ -10,17 +10,14 @@
       </p>
     </div>
     <div class="flex items-center gap-2">
-      <label for="entity-type" class="text-xs text-default">Entity</label>
-      <select
-        id="entity-type"
-        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-        [value]="entityType()"
-        (change)="onEntityChange($any($event.target).value)"
-      >
-        @for (e of entityTypes; track e.value) {
-          <option [value]="e.value">{{ e.label }}</option>
-        }
-      </select>
+      <label class="text-xs text-default">Entity</label>
+      <div class="min-w-[10rem]">
+        <crm-mobile-select
+          [options]="entityTypes"
+          [value]="entityType()"
+          (valueChange)="onEntityChange($event)"
+        />
+      </div>
       <button
         type="button"
         class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"

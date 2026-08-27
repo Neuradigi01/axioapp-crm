@@ -19,6 +19,7 @@ import {
   FieldSource,
 } from './custom-fields-api.service';
 import { FieldFormComponent } from './field-form.component';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
@@ -39,7 +40,7 @@ const ENTITY_TYPES: ReadonlyArray<{ value: string; label: string }> = [
   selector: 'app-custom-fields-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DragDropModule, FieldFormComponent],
+  imports: [DragDropModule, FieldFormComponent, MobileSelectComponent],
   templateUrl: './custom-fields.page.html',
 })
 export class CustomFieldsPageComponent {

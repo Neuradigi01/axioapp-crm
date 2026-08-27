@@ -125,14 +125,7 @@
                   </label>
                   <label class="block text-sm">
                     <span class="mb-1 block text-xs font-medium text-muted">Role</span>
-                    <select
-                      formControlName="role_id"
-                      class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
-                    >
-                      @for (r of roles(); track r.id) {
-                        <option [value]="r.id">{{ r.name }}</option>
-                      }
-                    </select>
+                    <crm-mobile-select [options]="roleSelectOptions()" formControlName="role_id" />
                   </label>
                 </div>
                 <label class="block text-xs text-muted">
@@ -342,15 +335,11 @@
               </label>
               <label class="block text-sm">
                 <span class="mb-1 block text-xs font-medium text-muted">Role</span>
-                <select
+                <crm-mobile-select
+                  [options]="roleSelectOptions()"
+                  placeholder="Choose a role…"
                   formControlName="role_id"
-                  class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                >
-                  <option value="" disabled>Choose a role…</option>
-                  @for (r of roles(); track r.id) {
-                    <option [value]="r.id">{{ r.name }}</option>
-                  }
-                </select>
+                />
                 @if (inviteForm.controls.role_id.touched && inviteForm.controls.role_id.invalid) {
                   <p class="mt-1 text-xs text-red-500">Pick a role for this member.</p>
                 }
@@ -414,15 +403,11 @@
 
           <label class="block text-sm">
             <span class="mb-1 block text-xs font-medium text-muted">New Owner</span>
-            <select
+            <crm-mobile-select
+              [options]="transferTargetOptions()"
+              placeholder="— Select an active member —"
               formControlName="target_user_id"
-              class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
-            >
-              <option value="">— Select an active member —</option>
-              @for (m of transferTargets(); track m.id) {
-                <option [value]="m.id">{{ m.email }} ({{ roleNameOf(m) }})</option>
-              }
-            </select>
+            />
             @if (transferTargets().length === 0) {
               <span class="mt-1 block text-[11px] text-muted">
                 No other active members in this org. Invite someone first.
@@ -432,15 +417,10 @@
 
           <label class="block text-sm">
             <span class="mb-1 block text-xs font-medium text-muted">Your new role</span>
-            <select
+            <crm-mobile-select
+              [options]="demoteRoleSelectOptions()"
               formControlName="demote_to_role_id"
-              class="w-full rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
-            >
-              <option value="">Admin (default)</option>
-              @for (r of demoteRoleOptions(); track r.id) {
-                <option [value]="r.id">{{ r.name }}</option>
-              }
-            </select>
+            />
             <span class="mt-1 block text-[11px] text-muted">
               Leave on default to take the Admin role after transfer.
             </span>
