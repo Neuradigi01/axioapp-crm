@@ -29,6 +29,7 @@ from src.app.core.appointments.schemas import (
     AppointmentBulkReassign,
     AppointmentBulkReassignResult,
     AppointmentCreate,
+    AppointmentHydrateRequest,
     AppointmentOut,
     AppointmentReassign,
     AppointmentReschedule,
@@ -41,6 +42,7 @@ from src.app.core.appointments.service import (
     create_appointment,
     delete_appointment,
     get_appointment,
+    hydrate_appointments_by_ids,
     list_appointments,
     reassign_appointment,
     reschedule_appointment,
@@ -86,6 +88,23 @@ async def create_appointment_endpoint(
         db, org_id=user.org_id, current_user_id=user.legacy_uuid, payload=payload
     )
     return AppointmentOut.model_validate(appt)
+
+
+@router.post("/hydrate", response_model=list[AppointmentOut])
+async def hydrate_appointments_endpoint(
+    payload: AppointmentHydrateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("appointments.read")),
+) -> list[AppointmentOut]:
+    """Batch-fetch appointment rows by id list. Replaces the ``N × GET
+    /{appointment_id}`` fan-out from any list page rendering appointment
+    context per row (e.g. the furniture pack's field-ops view).
+
+    Route order matters: declared BEFORE ``/{appointment_id}`` so
+    FastAPI doesn't swallow ``"hydrate"`` as a UUID and 422.
+    """
+    rows = await hydrate_appointments_by_ids(db, org_id=user.org_id, ids=payload.ids)
+    return [AppointmentOut.model_validate(r) for r in rows]
 
 
 @router.get("/{appointment_id}", response_model=AppointmentOut)

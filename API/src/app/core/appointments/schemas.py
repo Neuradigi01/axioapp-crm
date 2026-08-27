@@ -114,6 +114,15 @@ class AppointmentBulkDelete(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
+class AppointmentHydrateRequest(BaseModel):
+    """Payload for ``POST /appointments/hydrate`` — batch fetch by ids.
+    Powers list pages that need to render appointment summaries against
+    ids referenced from another table (e.g. the furniture pack's
+    field-ops schedule view) without the N-way ``GET /{id}`` fan-out."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
 class AppointmentBulkReassignResult(BaseModel):
     reassigned: int
 

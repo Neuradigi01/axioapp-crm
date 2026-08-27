@@ -75,6 +75,27 @@ async def get_item_by_id(session: AsyncSession, item_id: uuid.UUID) -> Inventory
     ).scalar_one_or_none()
 
 
+async def list_items_by_ids_in_org(
+    session: AsyncSession,
+    *,
+    ids: list[uuid.UUID],
+    org_id: uuid.UUID,
+) -> list[InventoryItem]:
+    """Batched hydrate for list pages rendering item context per row
+    (e.g. the stock-alerts page joining each alert to its item).
+    Empty ``ids`` short-circuits without a round-trip. Explicit
+    ``org_id`` predicate belts the RLS policy — same pattern as
+    ``core.appointments.list_appointments_by_ids_in_org``."""
+    if not ids:
+        return []
+    result = await session.execute(
+        select(InventoryItem).where(
+            InventoryItem.org_id == org_id, InventoryItem.id.in_(ids)
+        )
+    )
+    return list(result.scalars().all())
+
+
 async def list_items_query(
     session: AsyncSession,
     *,
