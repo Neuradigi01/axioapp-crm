@@ -4,17 +4,18 @@ import {
   Component,
   DestroyRef,
   computed,
-  effect,
   inject,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
+import { debounceTime, distinctUntilChanged, skip, switchMap, tap } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import { FurnitureAuthService } from '../../auth/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
 import { ChatbotListItem, ChatbotStatus, ChatbotsApiService } from '../chatbots-api.service';
 import { ChatbotCreateModalComponent } from './create-bot-modal/create-bot-modal.component';
@@ -66,17 +67,21 @@ const STATUS_FILTERS: StatusFilter[] = [
 })
 export class ChatbotsListPageComponent {
   private readonly api = inject(ChatbotsApiService);
+  private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
 
   readonly statusFilters = STATUS_FILTERS;
 
-  readonly loading = signal<boolean>(false);
+  readonly loading = signal<boolean>(true);
   readonly error = signal<string | null>(null);
   readonly rows = signal<ChatbotListItem[]>([]);
   readonly search = signal<string>('');
   readonly selectedStatus = signal<'' | ChatbotStatus>('');
   readonly actionsMenuFor = signal<string | null>(null);
+  /** Which row's mutation is in flight — disables the kebab affordances
+   *  so operators can't double-fire publish / pause / archive. */
+  readonly actionInFlight = signal<string | null>(null);
 
   readonly createModalOpen = signal<boolean>(false);
   readonly createSubmitting = signal<boolean>(false);
@@ -86,6 +91,16 @@ export class ChatbotsListPageComponent {
   readonly archiveSubmitting = signal<boolean>(false);
   readonly archiveError = signal<string | null>(null);
 
+  // Permission gates. Aligned with the backend keys documented in
+  // chatbots-api.service.ts / chatbots/permissions.py:
+  //   chatbots.view    → land on this page (route guard)
+  //   chatbots.edit    → create / patch / pause / import
+  //   chatbots.publish → publish / rollback
+  //   chatbots.delete  → archive
+  readonly canEdit = computed(() => this.auth.currentPermissions().includes('chatbots.edit'));
+  readonly canPublish = computed(() => this.auth.currentPermissions().includes('chatbots.publish'));
+  readonly canDelete = computed(() => this.auth.currentPermissions().includes('chatbots.delete'));
+
   readonly filteredRows = computed(() => {
     const term = this.search().trim().toLowerCase();
     if (!term) return this.rows();
@@ -93,14 +108,50 @@ export class ChatbotsListPageComponent {
   });
 
   readonly hasRows = computed(() => this.filteredRows().length > 0);
-  readonly hasAnyRows = computed(() => this.rows().length > 0);
+  /** Org has zero rows AND no active filter/search → show the big
+   *  "create your first bot" empty state. */
+  readonly emptyState = computed(
+    () =>
+      !this.loading() &&
+      this.rows().length === 0 &&
+      this.selectedStatus() === '' &&
+      !this.search().trim(),
+  );
+  /** Org has rows but the current filter/search produced nothing —
+   *  show a smaller "no matches" panel, NOT the empty-org CTA. */
+  readonly filteredEmpty = computed(() => !this.loading() && !this.hasRows() && !this.emptyState());
 
   constructor() {
-    // Refetch when the status filter changes (search is client-side).
-    effect(() => {
-      const status = this.selectedStatus();
-      this.reload(status);
-    });
+    // Reactive refetch on status change. skip(1) drops toObservable's
+    // initial replay so we don't double-fetch — reload() below owns the
+    // first load. switchMap cancels stale in-flight requests so rapid
+    // pill-clicking always paints the latest server state. Search stays
+    // client-side (already client-filtered from the loaded page).
+    toObservable(this.selectedStatus)
+      .pipe(
+        skip(1),
+        debounceTime(200),
+        distinctUntilChanged(),
+        tap(() => {
+          this.loading.set(true);
+          this.error.set(null);
+        }),
+        switchMap((status) =>
+          this.api.list({ status: status || undefined, limit: PAGE_SIZE, offset: 0 }),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (rows) => {
+          this.rows.set(rows);
+          this.loading.set(false);
+        },
+        error: (err) => {
+          this.error.set(extractApiError(err) ?? 'Failed to load chat bots.');
+          this.loading.set(false);
+        },
+      });
+    this.reload(this.selectedStatus());
   }
 
   private reload(status: '' | ChatbotStatus): void {
@@ -153,28 +204,52 @@ export class ChatbotsListPageComponent {
   }
 
   publish(row: ChatbotListItem): void {
+    if (!this.canPublish() || this.actionInFlight()) return;
     this.actionsMenuFor.set(null);
+    this.actionInFlight.set(row.id);
     this.api
       .publish(row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => this.reload(this.selectedStatus()),
-        error: (err) => this.error.set(extractApiError(err) ?? 'Publish failed.'),
+        next: (updated) => {
+          this.actionInFlight.set(null);
+          // Patch the row in place — a full reload would flash a page
+          // skeleton for a single-row status change and, on a filtered
+          // view, snap the row out from under the operator mid-click.
+          this.rows.update((rows) =>
+            rows.map((r) => (r.id === row.id ? { ...r, status: updated.status } : r)),
+          );
+        },
+        error: (err) => {
+          this.actionInFlight.set(null);
+          this.error.set(extractApiError(err) ?? 'Publish failed.');
+        },
       });
   }
 
   pause(row: ChatbotListItem): void {
+    if (!this.canEdit() || this.actionInFlight()) return;
     this.actionsMenuFor.set(null);
+    this.actionInFlight.set(row.id);
     this.api
       .pause(row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => this.reload(this.selectedStatus()),
-        error: (err) => this.error.set(extractApiError(err) ?? 'Pause failed.'),
+        next: (updated) => {
+          this.actionInFlight.set(null);
+          this.rows.update((rows) =>
+            rows.map((r) => (r.id === row.id ? { ...r, status: updated.status } : r)),
+          );
+        },
+        error: (err) => {
+          this.actionInFlight.set(null);
+          this.error.set(extractApiError(err) ?? 'Pause failed.');
+        },
       });
   }
 
   archive(row: ChatbotListItem): void {
+    if (!this.canDelete() || this.actionInFlight()) return;
     this.actionsMenuFor.set(null);
     this.archiveError.set(null);
     this.archiveTarget.set(row);
@@ -197,7 +272,11 @@ export class ChatbotsListPageComponent {
         next: () => {
           this.archiveSubmitting.set(false);
           this.archiveTarget.set(null);
-          this.reload(this.selectedStatus());
+          // Patch in place; if the operator is filtered to a non-archived
+          // status the row falls off the next reactive refetch anyway.
+          this.rows.update((rows) =>
+            rows.map((r) => (r.id === row.id ? { ...r, status: 'archived' as ChatbotStatus } : r)),
+          );
         },
         error: (err) => {
           this.archiveError.set(extractApiError(err) ?? 'Archive failed.');
@@ -264,8 +343,13 @@ export class ChatbotsListPageComponent {
       });
   }
 
-  toggleActionsMenu(botId: string): void {
-    this.actionsMenuFor.set(this.actionsMenuFor() === botId ? null : botId);
+  toggleActionsMenu(botId: string, event: MouseEvent): void {
+    event.stopPropagation();
+    this.actionsMenuFor.update((cur) => (cur === botId ? null : botId));
+  }
+
+  closeKebab(): void {
+    this.actionsMenuFor.set(null);
   }
 
   triggerSummary(row: ChatbotListItem): string {
