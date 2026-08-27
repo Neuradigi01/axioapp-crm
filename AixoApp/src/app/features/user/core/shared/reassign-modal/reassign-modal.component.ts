@@ -12,6 +12,7 @@ import {
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 
+import { MobileSelectComponent, MobileSelectOption } from '../forms/mobile-select.component';
 import { UsersDirectoryService } from '../services/users-directory.service';
 
 /**
@@ -49,7 +50,7 @@ export interface ReassignConfirm {
   selector: 'app-reassign-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, MobileSelectComponent],
   templateUrl: './reassign-modal.component.html',
 })
 export class ReassignModalComponent {
@@ -114,6 +115,15 @@ export class ReassignModalComponent {
     this.usersDir.list().pipe(takeUntilDestroyed(this.destroyRef)),
     { initialValue: [] },
   );
+
+  /** `crm-mobile-select` option shape — sentinel "Unassigned" first,
+   *  then every active user by full name. Replaces the native
+   *  `<select>` so the dropdown chrome matches every other picker in
+   *  the app (dark theme, accent-highlighted active row). */
+  protected readonly ownerSelectOptions = computed<MobileSelectOption[]>(() => [
+    { value: '', label: '— Unassigned —' },
+    ...this.users().map((u) => ({ value: u.id, label: u.full_name || u.email })),
+  ]);
 
   /** Heading line: "Reassign 1 contact" or "Reassign 12 contacts". */
   protected readonly heading = computed(() => {

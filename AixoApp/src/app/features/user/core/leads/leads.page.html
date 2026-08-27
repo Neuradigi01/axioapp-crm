@@ -119,17 +119,13 @@
             }
           </div>
         }
-        <select
-          [value]="noActivityFilter()"
-          (change)="setNoActivity($any($event.target).value)"
-          class="rounded-full border border-subtle bg-surface px-2.5 py-1 text-xs text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          aria-label="No activity filter"
-        >
-          <option value="">Any activity</option>
-          <option value="7d">No activity 7d+</option>
-          <option value="14d">No activity 14d+</option>
-          <option value="30d">No activity 30d+</option>
-        </select>
+        <div class="min-w-[10rem]">
+          <crm-mobile-select
+            [options]="noActivityOptions"
+            [value]="noActivityFilter()"
+            (valueChange)="setNoActivity($event)"
+          />
+        </div>
       </div>
       <!-- Right: saved views + advanced filter + columns + export -->
       <div class="flex flex-wrap items-center gap-2">
@@ -293,6 +289,7 @@
           <crm-mobile-datetime
             mode="date"
             [formControl]="createdFromControl"
+            [max]="dateFromMax()"
             placeholder="Pick a date"
           />
         </div>
@@ -305,6 +302,8 @@
           <crm-mobile-datetime
             mode="date"
             [formControl]="createdToControl"
+            [min]="dateToMin()"
+            [max]="todayIso"
             placeholder="Pick a date"
           />
         </div>
@@ -354,6 +353,18 @@
         />
       </div>
     </div>
+
+    <!-- Cross-field validation for the Date (from) / Between (to) pair.
+         Shown when FROM > TO or either date is in the future; the auto-
+         refetch is gated on the same computed so no request goes out
+         while the range is invalid. -->
+    @if (dateRangeError(); as err) {
+      <p
+        class="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
+      >
+        {{ err }}
+      </p>
+    }
 
     <!-- Row 2: Remarks · User · Order Type · Reset · Search -->
     <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">

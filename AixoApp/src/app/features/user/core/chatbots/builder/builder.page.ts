@@ -13,7 +13,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
@@ -73,7 +73,7 @@ export class ChatbotBuilderPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
   readonly canvas = inject(CanvasStateService);
 
   readonly loading = signal<boolean>(true);
@@ -709,12 +709,13 @@ export class ChatbotBuilderPageComponent {
     });
   }
 
+  /** Thin wrapper preserved so the four existing call sites don't
+   *  each need to pick a variant — every current caller is a
+   *  positive confirmation (version restored / renamed / saved /
+   *  live). If a new caller needs a warn/error variant, hit
+   *  `this.toast.error(...)` directly. */
   private showToast(message: string): void {
-    this.snackBar.open(message, 'OK', {
-      duration: 3000,
-      horizontalPosition: 'right',
-      verticalPosition: 'top',
-    });
+    this.toast.success(message);
   }
 
   /** Prevent tab close / refresh when unsaved changes are pending —

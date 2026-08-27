@@ -11,6 +11,7 @@ import { BillingApiService } from '../../services/billing-api.service';
 import { SubscriptionStateService } from '../../services/subscription-state.service';
 import { UpgradeModalService } from '../../services/upgrade-modal.service';
 import { BillingCycle, PlanCatalogEntry } from '../../types/subscription.types';
+import { PlanCompareTableComponent } from '../plan-compare-table/plan-compare-table.component';
 
 /** Plan code shown with the "Most popular" ribbon (matches the public
  *  `/pricing` page so messaging is consistent). */
@@ -34,6 +35,7 @@ const POPULAR_PLAN_CODE = 'standard';
 @Component({
   selector: 'crm-upgrade-modal',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [PlanCompareTableComponent],
   templateUrl: './upgrade-modal.component.html',
   styleUrl: './upgrade-modal.component.css',
 })
@@ -66,6 +68,19 @@ export class UpgradeModalComponent {
 
   protected readonly isSubmitting = signal<boolean>(false);
   protected readonly submitError = signal<string | null>(null);
+
+  // ---- "Compare plans" expandable section --------------------------------
+
+  /** Expanded by default (Stripe / Linear / Notion pattern) — a customer
+   *  in checkout usually benefits from seeing what's in each plan BEFORE
+   *  they commit. Placed directly under the plan picker so it validates
+   *  their radio choice with full feature/cap detail. Users who already
+   *  know their plan can collapse it in one click. */
+  protected readonly compareOpen = signal<boolean>(true);
+
+  protected toggleCompare(): void {
+    this.compareOpen.update((v) => !v);
+  }
 
   // ---- Derived view models -----------------------------------------------
 

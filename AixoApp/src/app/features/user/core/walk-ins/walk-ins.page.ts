@@ -8,10 +8,9 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
-import { distinctUntilChanged } from 'rxjs/operators';
 
 /** Backend cap on `POST /walk-ins/bulk-*` id lists. FE guards against
  *  submitting more so operators get a clean toast instead of a 422. */
@@ -36,6 +35,8 @@ import {
 } from '../shared/reassign-modal/reassign-modal.component';
 import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
+import { ColumnFilterComponent } from '../shared/table-filters/column-filter.component';
+import type { ColumnFilterOption } from '../shared/table-filters/column-filter.types';
 import {
   QuickRegisterResponse,
   WalkIn,
@@ -102,6 +103,7 @@ class WalkInsListState extends ListPageState<WalkIn> {}
     WhatsappLinkDirective,
     UrlFilterStateDirective,
     MobileSelectComponent,
+    ColumnFilterComponent,
   ],
   providers: [WalkInsListState],
   templateUrl: './walk-ins.page.html',
@@ -135,6 +137,16 @@ export class WalkInsPageComponent {
   readonly deleteSubmitting = signal(false);
   readonly deleteError = signal<string | null>(null);
 
+  /** Pending status-advance target. Fires from any of the row
+   *  Interested / Follow-up / Left / Re-engage buttons; the confirm
+   *  dialog runs the PATCH after the operator clicks through. */
+  readonly pendingStatusAdvance = signal<{ walkIn: WalkIn; target: WalkInStatus } | null>(null);
+  /** Pending checkout target — same rationale as status-advance. */
+  readonly pendingCheckout = signal<WalkIn | null>(null);
+  /** Shared submitting flag for both row-action confirms. Row-scoped
+   *  progress is tracked separately by the API subscribers below. */
+  readonly rowActionSubmitting = signal(false);
+
   /** Client-side cap on bulk selection so the operator sees a clean
    *  message instead of a 422 from the backend. */
   readonly bulkActionMax = BULK_ACTION_MAX;
@@ -153,8 +165,12 @@ export class WalkInsPageComponent {
   /** Visibility scope: which walk-ins to show before any other filter. */
   readonly scope = signal<'mine' | 'team' | 'all'>(this.defaultScopeForRole());
 
-  /** Owner picker: empty / 'me' / UUID. */
-  readonly assigneeControl = new FormControl<string>('', { nonNullable: true });
+  /** Owner filter — multi-select signal driven by the OWNER column
+   *  header popover. `[]` means no filter. Held as `string[]` (not
+   *  `Set`) so URL persistence can `.join(',')` round-trip cleanly
+   *  and `WalkInsApiService` can serialize repeated params via
+   *  `buildHttpParams`. */
+  readonly assigneeFilter = signal<string[]>([]);
 
   /** User directory for the owner dropdown + ownerLabel lookup. */
   readonly users = toSignal(this.usersDir.list(), { initialValue: [] });
@@ -178,21 +194,23 @@ export class WalkInsPageComponent {
     { value: 'created_at:asc', label: 'Oldest created' },
   ];
 
-  /** `crm-mobile-select` shape for the Owner filter. */
-  readonly assigneeSelectOptions = computed<{ value: string; label: string }[]>(() => [
-    { value: '', label: 'All owners' },
-    { value: 'me', label: 'Me' },
-    ...this.users().map((u) => ({ value: u.id, label: u.full_name })),
-  ]);
-
-  /** Gates the "Owner" filter dropdown. Only users with ``users.read``
-   * see org-wide walk-ins (backend list endpoint clamps everyone else
-   * to their own rows — see ``api/src/app/core/walk_ins/router.py``).
-   * Showing the dropdown to scoped roles is misleading because picking
-   * another owner would return an empty list. */
-  protected readonly canFilterByOwner = computed(() =>
-    this.auth.currentPermissions().includes('users.read'),
-  );
+  /** Owner options for the OWNER column popover — every active org
+   *  user, with the current user pinned first as "Me" so the previous
+   *  "quick-filter to my rows" affordance stays one click away. */
+  readonly assigneeOptions = computed<ColumnFilterOption[]>(() => {
+    const me = this.auth.currentUserId();
+    const rows = this.users();
+    const out: ColumnFilterOption[] = [];
+    if (me) {
+      const meUser = rows.find((u) => u.id === me);
+      out.push({ value: me, label: meUser ? `Me (${meUser.full_name})` : 'Me' });
+    }
+    for (const u of rows) {
+      if (u.id === me) continue;
+      out.push({ value: u.id, label: u.full_name });
+    }
+    return out;
+  });
 
   /** Whether the scope toggle should be visible. Junior staff get the
    * implicit "mine" default with no toggle. */
@@ -245,8 +263,11 @@ export class WalkInsPageComponent {
       defaultValue: 'all',
     },
     assignee: {
-      read: () => this.assigneeControl.value,
-      write: (v) => this.assigneeControl.setValue(v),
+      // Comma-separated on the URL (`?assignee=<uuid>,<uuid>`) so the
+      // shape stays a single string per key — matches contacts and
+      // keeps shared URLs compact.
+      read: () => this.assigneeFilter().join(','),
+      write: (v) => this.assigneeFilter.set(this.parseCsvFilter(v)),
       queryKey: 'assignee',
     },
     date_chip: {
@@ -343,10 +364,28 @@ export class WalkInsPageComponent {
       if (missing.length === 0) return;
       this.fetchContacts(missing);
     });
+  }
 
-    this.assigneeControl.valueChanges
-      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.reload());
+  /** OWNER column popover callback — write the new selection and
+   *  refetch. Mirrors the contacts page pattern. */
+  protected onOwnerFilterChange(values: string[]): void {
+    this.assigneeFilter.set(values);
+    this.reload();
+  }
+
+  /** Parse a comma-separated URL filter value into a de-duped
+   *  `string[]`. Symmetric with `read: () => filter.join(',')`. */
+  private parseCsvFilter(raw: string): string[] {
+    if (!raw) return [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const part of raw.split(',')) {
+      const trimmed = part.trim();
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      out.push(trimmed);
+    }
+    return out;
   }
 
   protected setFilter(f: StatusFilter): void {
@@ -397,23 +436,22 @@ export class WalkInsPageComponent {
     return 'mine';
   }
 
-  /** Resolve the assignee filter to a UUID for the API call.
+  /** Resolve the owner filter to a UUID array for the API call.
    *
    * Priority order:
-   *   1. Owner dropdown pick (specific user or 'me') always wins.
-   *   2. Scope toggle: 'mine' collapses to the caller uuid.
+   *   1. OWNER column-header popover picks always win — sent as-is.
+   *   2. Scope toggle: 'mine' collapses to `[caller uuid]` when no
+   *      column picks are active.
    *   3. 'team' / 'all' clear the filter — backend row-visibility
    *      (list_walk_ins_visible_to) still gates non-privileged
    *      callers to their own book.
    */
-  private resolveAssignee(): string | undefined {
-    const raw = this.assigneeControl.value;
-    if (raw) {
-      if (raw === 'me') return this.auth.currentUserId() ?? undefined;
-      return raw;
-    }
+  private resolveAssignee(): string[] | undefined {
+    const raw = this.assigneeFilter();
+    if (raw.length > 0) return raw;
     if (this.scope() === 'mine') {
-      return this.auth.currentUserId() ?? undefined;
+      const me = this.auth.currentUserId();
+      return me ? [me] : undefined;
     }
     return undefined;
   }
@@ -685,7 +723,23 @@ export class WalkInsPageComponent {
    *  single row on success, and on error reverts ONLY that row
    *  (surgical) so concurrent mutations to sibling rows during the
    *  in-flight request aren't blown away by a wholesale rollback. */
+  /** Row-button click → open confirm dialog. The PATCH fires from
+   *  `confirmAdvanceStatus` once the operator clicks through. */
   protected advanceStatus(walkIn: WalkIn, target: WalkInStatus): void {
+    if (this.rowActionSubmitting()) return;
+    this.pendingStatusAdvance.set({ walkIn, target });
+  }
+
+  protected closeAdvanceStatus(): void {
+    this.pendingStatusAdvance.set(null);
+  }
+
+  protected confirmAdvanceStatus(): void {
+    const pending = this.pendingStatusAdvance();
+    if (!pending) return;
+    if (this.rowActionSubmitting()) return;
+    const { walkIn, target } = pending;
+    this.rowActionSubmitting.set(true);
     const beforeRow = { ...walkIn };
     this.state.items.update((rows) =>
       rows.map((w) => (w.id === walkIn.id ? { ...w, status: target } : w)),
@@ -695,16 +749,37 @@ export class WalkInsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
+          this.rowActionSubmitting.set(false);
+          this.pendingStatusAdvance.set(null);
           this.state.items.update((rows) => rows.map((w) => (w.id === updated.id ? updated : w)));
           this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
+          this.rowActionSubmitting.set(false);
+          this.pendingStatusAdvance.set(null);
           this.state.items.update((rows) =>
             rows.map((w) => (w.id === beforeRow.id ? beforeRow : w)),
           );
           this.state.loadError.set(extractApiError(err) ?? 'Could not update walk-in status.');
         },
       });
+  }
+
+  /** Human label for the status-advance confirm dialog title / body.
+   *  Mirrors the button labels in the row action strip. */
+  protected labelForStatus(target: WalkInStatus): string {
+    switch (target) {
+      case 'interested':
+        return 'Interested';
+      case 'follow_up':
+        return 'Follow-up';
+      case 'converted':
+        return 'Converted';
+      case 'left':
+        return 'Left';
+      case 'browsing':
+        return 'Re-engage';
+    }
   }
 
   protected openRegister(): void {
@@ -721,10 +796,25 @@ export class WalkInsPageComponent {
     this.reloadRollup();
   }
 
+  /** Row-button click → open confirm dialog. The POST fires from
+   *  `confirmCheckout` once the operator clicks through. */
   protected onCheckout(walkIn: WalkIn): void {
+    if (this.rowActionSubmitting()) return;
+    this.pendingCheckout.set(walkIn);
+  }
+
+  protected closeCheckout(): void {
+    this.pendingCheckout.set(null);
+  }
+
+  protected confirmCheckout(): void {
+    const walkIn = this.pendingCheckout();
+    if (!walkIn) return;
+    if (this.rowActionSubmitting()) return;
+    this.rowActionSubmitting.set(true);
     // Optimistic: stamp time_out locally to a near-now ISO so the
     // duration column populates immediately. Replaced by server value.
-    // Surgical per-row revert on error (see `advanceStatus`).
+    // Surgical per-row revert on error (see `confirmAdvanceStatus`).
     const optimisticNow = new Date().toISOString();
     const beforeRow = { ...walkIn };
     this.state.items.update((rows) =>
@@ -735,10 +825,14 @@ export class WalkInsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
+          this.rowActionSubmitting.set(false);
+          this.pendingCheckout.set(null);
           this.state.items.update((rows) => rows.map((w) => (w.id === updated.id ? updated : w)));
           this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
+          this.rowActionSubmitting.set(false);
+          this.pendingCheckout.set(null);
           this.state.items.update((rows) =>
             rows.map((w) => (w.id === beforeRow.id ? beforeRow : w)),
           );

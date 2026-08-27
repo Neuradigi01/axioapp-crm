@@ -11,7 +11,6 @@ import {
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -57,6 +56,7 @@ import {
   LostReasonModalComponent,
 } from './lost-reason-modal/lost-reason-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 import {
   Lead,
   LeadCreate,
@@ -161,7 +161,7 @@ export class LeadsPageComponent {
   private readonly usersDir = inject(UsersDirectoryService);
   private readonly columnPrefs = inject(ColumnPrefsService);
   private readonly savedViewsApi = inject(SavedViewsApiService);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
 
   protected readonly state = inject(LeadsListState);
 
@@ -208,6 +208,56 @@ export class LeadsPageComponent {
    *  server UTC-anchors both bounds. */
   readonly createdFromControl = new FormControl<string>('', { nonNullable: true });
   readonly createdToControl = new FormControl<string>('', { nonNullable: true });
+
+  /** Today (local, `YYYY-MM-DD`) — cap on both date pickers so nobody
+   *  can filter by a future creation date. Computed once on
+   *  construct; midnight drift is a non-issue for the session
+   *  because the leads page reloads on stale filters. */
+  protected readonly todayIso = ((): string => {
+    const d = new Date();
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  })();
+
+  /** Reactive mirrors of the two date controls so the template's
+   *  cross-bindings (`[min]`, `[max]`) recompute whenever the pair
+   *  changes. `toSignal` wakes CD; the raw `FormControl.value` on its
+   *  own is not reactive. */
+  private readonly createdFromValue = toSignal(this.createdFromControl.valueChanges, {
+    initialValue: this.createdFromControl.value,
+  });
+  private readonly createdToValue = toSignal(this.createdToControl.valueChanges, {
+    initialValue: this.createdToControl.value,
+  });
+
+  /** Bound to the FROM picker's `[max]`. Upper bound is either the
+   *  currently-selected TO (so the calendar refuses picks after it)
+   *  or today (nobody can filter by a future creation date). */
+  protected readonly dateFromMax = computed<string>(
+    () => (this.createdToValue() || '').trim() || this.todayIso,
+  );
+
+  /** Bound to the TO picker's `[min]`. Lower bound is the currently-
+   *  selected FROM so the calendar refuses picks earlier than it. */
+  protected readonly dateToMin = computed<string>(() => (this.createdFromValue() || '').trim());
+
+  /** Human-readable error message when the two dates are in the wrong
+   *  order — surfaced under the date row and consulted by the reload
+   *  gate so an invalid range never hits the backend. */
+  protected readonly dateRangeError = computed<string | null>(() => {
+    const from = (this.createdFromValue() || '').trim();
+    const to = (this.createdToValue() || '').trim();
+    if (from && to && from > to) {
+      return '"Date (from)" must be on or before "Between (to)".';
+    }
+    if (from && from > this.todayIso) {
+      return '"Date (from)" cannot be in the future.';
+    }
+    if (to && to > this.todayIso) {
+      return '"Between (to)" cannot be in the future.';
+    }
+    return null;
+  });
 
   /** Visibility scope: which leads to show before any other filter.
    * Junior reps default to "mine" and don't see the toggle; managers
@@ -419,6 +469,18 @@ export class LeadsPageComponent {
   readonly orderOptions: ReadonlyArray<{ value: SortOrder; label: string }> = [
     { value: 'desc', label: 'Descending' },
     { value: 'asc', label: 'Ascending' },
+  ];
+
+  /** `crm-mobile-select` shape for the "No activity" filter. Was a
+   *  native `<select>` — swapped to the shared picker so the dropdown
+   *  chrome matches the Date-created / Source / Status controls on
+   *  the same row (dark theme, rounded, accent-highlighted active
+   *  option). Values mirror `NoActivityFilter`. */
+  readonly noActivityOptions: ReadonlyArray<{ value: string; label: string }> = [
+    { value: '', label: 'Any activity' },
+    { value: '7d', label: 'No activity 7d+' },
+    { value: '14d', label: 'No activity 14d+' },
+    { value: '30d', label: 'No activity 30d+' },
   ];
 
   /** Leads Center Remarks filter — matches any note activity text on
@@ -634,12 +696,17 @@ export class LeadsPageComponent {
     this.statusControl.valueChanges
       .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.resetCursorAndReload());
+    // Created-date pair: debounce so a rapid FROM-then-TO pick fires
+    // ONE reload with both dates set, not two. Guard on
+    // `dateRangeError()` so an invalid range (FROM > TO, or either
+    // date in the future) never hits the backend — the inline error
+    // banner surfaces the problem instead.
     this.createdFromControl.valueChanges
-      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.resetCursorAndReload());
+      .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.maybeReloadOnDateChange());
     this.createdToControl.valueChanges
-      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.resetCursorAndReload());
+      .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.maybeReloadOnDateChange());
     this.remarksControl.valueChanges
       .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.resetCursorAndReload());
@@ -755,6 +822,15 @@ export class LeadsPageComponent {
     this.cursorHistory.set([]);
     this.totalCount.set(null);
     this.reload();
+  }
+
+  /** Date-pair-specific reload gate. Skips the fetch entirely when
+   *  `dateRangeError()` is set so the operator's inline error banner
+   *  is the only visible feedback (no wasted round-trip, no empty
+   *  list flicker). */
+  private maybeReloadOnDateChange(): void {
+    if (this.dateRangeError() !== null) return;
+    this.resetCursorAndReload();
   }
 
   /** Enter-key affordance for the Data Search + Remarks text inputs.
@@ -1553,23 +1629,17 @@ export class LeadsPageComponent {
     contactAction: 'created' | 'matched' | undefined,
     contactName: string | undefined,
   ): void {
-    let message: string;
+    let subtitle: string | null = null;
     if (contactAction === 'created') {
-      message = contactName
-        ? `Lead created successfully. New contact “${contactName}” was also created and linked.`
-        : 'Lead created successfully. A new contact was also created and linked.';
+      subtitle = contactName
+        ? `New contact “${contactName}” was also created and linked.`
+        : 'A new contact was also created and linked.';
     } else if (contactAction === 'matched') {
-      message = contactName
-        ? `Lead created successfully. Linked to existing contact “${contactName}”.`
-        : 'Lead created successfully. Linked to an existing contact.';
-    } else {
-      message = 'Lead created successfully.';
+      subtitle = contactName
+        ? `Linked to existing contact “${contactName}”.`
+        : 'Linked to an existing contact.';
     }
-    this.snackBar.open(message, 'OK', {
-      duration: 4000,
-      horizontalPosition: 'right',
-      verticalPosition: 'top',
-    });
+    this.toast.success('Lead created', { subtitle, durationMs: 4000 });
   }
 
   private submitUpdate(id: string, payload: LeadUpdate, moveStageTo?: string): void {

@@ -103,7 +103,6 @@ const FOLLOWUP_TYPE_OPTIONS: ReadonlyArray<MobileSelectOption> = [
 /** Matching backend validator bounds so users see the same error the
  *  server would return — no round-trip needed for the obvious cases. */
 const REMARKS_MAX = 2000;
-const FOLLOWUP_LOOKBACK_DAYS = 365;
 const FOLLOWUP_LOOKAHEAD_DAYS = 5 * 365;
 
 /** Lost-reason picklist mirrors ``LOST_REASONS`` in
@@ -185,13 +184,22 @@ export class UpdateStatusModalComponent {
    *  wouldn't re-evaluate on user input because `form.valid` isn't a
    *  signal. `toSignal(statusChanges)` bridges it. */
   protected readonly form: FormGroup<FormShape> = this.fb.group<FormShape>({
+    // Contact name + phone match the standalone Contact / Lead / Walk-in
+    // forms — same `commonValidators.name` (letters + `. - '` only,
+    // 2–100 chars) and `commonValidators.phone` (E.164 with mandatory
+    // country code) so an operator can't type `Test Mail Contact @##`
+    // or `+91… 3453464564` (two numbers separated by a space) and hit
+    // the backend's opaque 4xx. The validators short-circuit on empty
+    // strings — leaving the fields untouched is still valid (this modal
+    // treats contact-basics edits as optional; only changed values are
+    // patched, see `submit()` below).
     contact_full_name: this.fb.control<string>('', {
       nonNullable: true,
-      validators: [Validators.maxLength(255)],
+      validators: [commonValidators.name, Validators.maxLength(255)],
     }),
     contact_phone: this.fb.control<string>('', {
       nonNullable: true,
-      validators: [Validators.maxLength(32)],
+      validators: [commonValidators.phone(), Validators.maxLength(32)],
     }),
     contact_email: this.fb.control<string>('', {
       nonNullable: true,
@@ -487,9 +495,16 @@ export class UpdateStatusModalComponent {
       });
   }
 
-  /** Validator: bound `next_follow_up_at` to the same window the
-   *  backend enforces (`now - 1y ≤ v ≤ now + 5y`). Empty passes — the
-   *  form-level required is toggled by the caller, not by this validator.
+  /** Validator: `next_follow_up_at` must be today or later, up to the
+   *  backend's forward ceiling (`FOLLOWUP_LOOKAHEAD_DAYS`). Empty
+   *  passes — the form-level required is toggled by the caller, not
+   *  by this validator. Was previously ±365 d (past allowed); the
+   *  no-past-dates policy rolls this in with the rest of the app.
+   *
+   *  A 5-minute grace on the lower bound covers clock skew so an
+   *  operator selecting "today" doesn't race the clock and get
+   *  spuriously rejected because the render clock ticked past the
+   *  form value.
    *
    *  Typed as `AbstractControl` (not `FormControl<string>`) because
    *  `ValidatorFn` is contravariant in its input — Angular's stricter
@@ -504,12 +519,15 @@ export class UpdateStatusModalComponent {
       return { followUpOutOfRange: 'Enter a valid date & time.' };
     }
     const now = Date.now();
-    const earliest = now - FOLLOWUP_LOOKBACK_DAYS * 86_400_000;
+    const earliest = now - 5 * 60 * 1000; // 5-minute clock-skew grace
     const latest = now + FOLLOWUP_LOOKAHEAD_DAYS * 86_400_000;
     const t = due.getTime();
-    if (t < earliest || t > latest) {
+    if (t < earliest) {
+      return { followUpOutOfRange: "Follow-up can't be in the past. Pick today or later." };
+    }
+    if (t > latest) {
       return {
-        followUpOutOfRange: `Choose a date within ${FOLLOWUP_LOOKBACK_DAYS} days back and ${Math.round(
+        followUpOutOfRange: `Choose a date at most ${Math.round(
           FOLLOWUP_LOOKAHEAD_DAYS / 365,
         )} years ahead.`,
       };
@@ -525,9 +543,20 @@ export class UpdateStatusModalComponent {
     const d = new Date();
     d.setDate(d.getDate() + 1);
     d.setHours(10, 0, 0, 0);
+    return this._toLocalDateTimeInput(d);
+  }
+
+  private _toLocalDateTimeInput(d: Date): string {
     const pad = (n: number): string => n.toString().padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
       d.getHours(),
     )}:${pad(d.getMinutes())}`;
   }
+
+  /** Now (rounded to the current minute) in local
+   *  ``YYYY-MM-DDTHH:mm`` shape — bound to the `[min]` attribute of
+   *  the `<input type="datetime-local">` so browsers also refuse
+   *  past picks. Angular validator is authoritative; this is
+   *  belt-and-braces. */
+  protected readonly followUpMin = this._toLocalDateTimeInput(new Date());
 }

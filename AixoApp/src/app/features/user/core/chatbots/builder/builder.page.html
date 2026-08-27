@@ -1,7 +1,10 @@
 <div class="flex flex-col h-screen bg-app">
-  <!-- Top bar -->
+  <!-- Top bar — wraps on mobile so all actions stay reachable. Button
+       LABELS hide below md (icons stay); the phone header packs three
+       icon buttons + the Save pill in the space desktop uses for the
+       full row. Padding shrinks too. -->
   <header
-    class="flex items-center gap-3 px-4 py-2.5 border-b border-subtle bg-surface flex-shrink-0"
+    class="flex flex-wrap items-center gap-2 md:gap-3 px-2 md:px-4 py-2 md:py-2.5 border-b border-subtle bg-surface flex-shrink-0"
   >
     <a
       routerLink="/user/chatbots"
@@ -54,33 +57,36 @@
       type="button"
       (click)="openStats()"
       [disabled]="!bot()"
-      class="px-3 py-1.5 rounded-md text-xs font-semibold border border-subtle text-default hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors"
+      class="px-2 md:px-3 py-1.5 rounded-md text-xs font-semibold border border-subtle text-default hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors"
       title="Run counts, completion rate, top nodes"
+      aria-label="Stats"
     >
       <lucide-icon name="bar-chart-3" size="12"></lucide-icon>
-      Stats
+      <span class="hidden md:inline">Stats</span>
     </button>
 
     <button
       type="button"
       (click)="openHistory()"
       [disabled]="!bot()"
-      class="px-3 py-1.5 rounded-md text-xs font-semibold border border-subtle text-default hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors"
+      class="px-2 md:px-3 py-1.5 rounded-md text-xs font-semibold border border-subtle text-default hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors"
       title="View past versions and roll back"
+      aria-label="History"
     >
       <lucide-icon name="clock" size="12"></lucide-icon>
-      History
+      <span class="hidden md:inline">History</span>
     </button>
 
     <button
       type="button"
       (click)="openTestModal()"
       [disabled]="!bot() || dirty() || saving()"
-      class="px-3 py-1.5 rounded-md text-xs font-semibold border border-subtle text-default hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors"
+      class="px-2 md:px-3 py-1.5 rounded-md text-xs font-semibold border border-subtle text-default hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors"
       title="Simulate an inbound message — no real sends"
+      aria-label="Test"
     >
       <lucide-icon name="zap" size="12"></lucide-icon>
-      Test
+      <span class="hidden md:inline">Test</span>
     </button>
 
     <button
@@ -88,7 +94,7 @@
       (click)="toggleLive()"
       [disabled]="!bot() || dirty() || saving()"
       [class]="
-        'px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ' +
+        'px-2 md:px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ' +
         (isLive()
           ? 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25'
           : 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25') +
@@ -102,7 +108,7 @@
       type="button"
       (click)="save()"
       [disabled]="!dirty() || saving()"
-      class="px-3.5 py-1.5 bg-accent-soft text-accent hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-md text-xs font-semibold"
+      class="px-3 md:px-3.5 py-1.5 bg-accent-soft text-accent hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-md text-xs font-semibold"
     >
       {{ saving() ? 'Saving…' : 'Save' }}
     </button>
@@ -204,7 +210,7 @@
              a real floating pill against the grid. -->
         <div
           #zoomControls
-          class="fixed z-30 bottom-6 right-6 flex items-center gap-0.5 p-1 bg-surface/90 backdrop-blur border border-subtle rounded-full shadow-xl"
+          class="fixed z-30 bottom-3 right-3 md:bottom-6 md:right-6 flex items-center gap-0.5 p-1 bg-surface/90 backdrop-blur border border-subtle rounded-full shadow-xl"
           (click)="$event.stopPropagation()"
         >
           <button
@@ -716,7 +722,7 @@
 <button
   type="button"
   (click)="openHelp()"
-  class="fixed z-30 bottom-6 left-6 w-11 h-11 rounded-full bg-accent-soft text-accent border border-accent/40 shadow-xl hover:brightness-110 transition-all flex items-center justify-center"
+  class="fixed z-30 bottom-3 left-3 md:bottom-6 md:left-6 w-9 h-9 md:w-11 md:h-11 rounded-full bg-accent-soft text-accent border border-accent/40 shadow-xl hover:brightness-110 transition-all flex items-center justify-center"
   title="How to use the builder"
   aria-label="Help"
 >

@@ -1,7 +1,9 @@
 <div class="flex h-[calc(100vh-4rem)] flex-col">
-  <!-- Header bar -->
+  <!-- Header bar — wraps on mobile so all actions stay reachable
+       instead of overflowing the viewport. Padding + button labels
+       shrink below md; the icons stay so nothing feels ambiguous. -->
   <header
-    class="flex items-center justify-between gap-3 border-b border-subtle bg-surface px-4 py-3 md:px-6"
+    class="flex flex-wrap items-center justify-between gap-2 md:gap-3 border-b border-subtle bg-surface px-3 md:px-6 py-2.5 md:py-3"
   >
     <div class="flex items-center gap-2">
       <button
@@ -69,26 +71,27 @@
               class="animate-spin"
               aria-hidden="true"
             ></lucide-icon>
-            Publishing…
+            <span class="hidden sm:inline">Publishing…</span>
           } @else {
             <lucide-icon name="rocket" size="14" aria-hidden="true"></lucide-icon>
-            Publish
+            <span class="hidden sm:inline">Publish</span>
           }
         </button>
       }
       <button
         type="button"
-        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-40"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2 md:px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-40"
         [disabled]="!formState.assistantId() || formState.status() !== 'active'"
         [attr.title]="embedBlockedReason()"
         (click)="openEmbedModal()"
+        aria-label="Embed"
       >
         <lucide-icon name="code" size="14" aria-hidden="true"></lucide-icon>
-        Embed
+        <span class="hidden sm:inline">Embed</span>
       </button>
       <button
         type="button"
-        class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 disabled:opacity-40"
+        class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 md:px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 disabled:opacity-40"
         (click)="save()"
         [disabled]="!canSave()"
       >
@@ -99,10 +102,12 @@
             class="animate-spin"
             aria-hidden="true"
           ></lucide-icon>
-          Saving…
+          <span class="hidden sm:inline">Saving…</span>
+          <span class="sm:hidden">…</span>
         } @else {
           <lucide-icon name="save" size="14" aria-hidden="true"></lucide-icon>
-          Save AI Assistant
+          <span class="hidden md:inline">Save AI Assistant</span>
+          <span class="md:hidden">Save</span>
         }
       </button>
     </div>
@@ -135,15 +140,22 @@
       </div>
     </div>
   } @else {
-    <div class="flex flex-1 min-h-0">
+    <!-- Body — desktop = side-by-side (tabs 3/5 + preview 2/5); mobile
+         = stacked (tabs first, preview below) so both panes stay
+         usable on a narrow viewport. The 2/5 preview was becoming a
+         floating red widget over the tab content on phones. -->
+    <div class="flex flex-1 min-h-0 flex-col md:flex-row">
       <!-- Left pane: tabs + tab content -->
-      <div class="flex w-3/5 flex-col border-r border-subtle">
-        <!-- Tab strip -->
-        <div class="flex items-center gap-0 border-b border-subtle bg-surface px-4">
+      <div class="flex w-full md:w-3/5 flex-col border-b md:border-b-0 md:border-r border-subtle">
+        <!-- Tab strip — horizontally scrollable on mobile so long
+             labels never wrap or clip. -->
+        <div
+          class="flex items-center gap-0 border-b border-subtle bg-surface px-2 md:px-4 overflow-x-auto no-scrollbar"
+        >
           @for (t of tabs; track t.id) {
             <button
               type="button"
-              class="relative px-3 py-3 text-sm font-medium transition"
+              class="relative shrink-0 px-3 py-3 text-sm font-medium transition whitespace-nowrap"
               [class.text-default]="activeTab() === t.id"
               [class.text-muted]="activeTab() !== t.id"
               [class.hover:text-default]="activeTab() !== t.id"
@@ -179,8 +191,10 @@
         </div>
       </div>
 
-      <!-- Right pane: live preview -->
-      <div class="flex w-2/5 flex-col bg-surface-2/60">
+      <!-- Right pane: live preview. On mobile it drops below the tab
+           pane (min-h so the chat widget has room to breathe); on
+           desktop it sits alongside at 2/5 width. -->
+      <div class="flex w-full md:w-2/5 flex-col bg-surface-2/60 min-h-[420px] md:min-h-0">
         <div class="flex items-center justify-between border-b border-subtle bg-surface px-4 py-2">
           <span class="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">
             Preview
