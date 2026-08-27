@@ -90,6 +90,21 @@
     <div>
       <crm-invoices-table [invoices]="invoices()" [isLoading]="invoicesLoading()" />
     </div>
+
+    <!-- Plan comparison table — always visible so operators can see
+         what's in each plan without opening the upgrade modal. Hides
+         itself if the plans fetch failed (empty plans() signal). -->
+    @if (plans().length > 0) {
+      <section class="space-y-3">
+        <div>
+          <h2 class="text-base font-semibold text-default">What's in each plan</h2>
+          <p class="mt-0.5 text-[13px] text-muted">
+            Compare features side by side. Upgrade anytime from your current plan card.
+          </p>
+        </div>
+        <crm-plan-compare-table [plans]="plans()" [currentPlanCode]="currentPlanCode()" />
+      </section>
+    }
   }
 </div>
 

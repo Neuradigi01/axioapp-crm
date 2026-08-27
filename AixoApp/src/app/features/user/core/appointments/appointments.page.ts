@@ -313,6 +313,16 @@ export class AppointmentsPageComponent {
         danger: true,
         permissionKey: 'appointments.write',
       },
+      // Bulk hard-delete — no state-machine gate on the backend, any
+      // status is delete-eligible (matches the single-row row-menu
+      // Delete). Danger visual + a confirm dialog before firing.
+      {
+        key: 'delete',
+        label: 'Delete',
+        icon: 'trash-2',
+        danger: true,
+        permissionKey: 'appointments.write',
+      },
     ]);
     effect(() => {
       // Track every filter signal so reload runs on any change.
@@ -468,6 +478,7 @@ export class AppointmentsPageComponent {
     this.state.bulkError.set(null);
     if (key === 'reassign') this.state.bulkModal.set('reassign');
     else if (key === 'cancel') this.state.bulkModal.set('cancel');
+    else if (key === 'delete') this.state.bulkModal.set('delete');
   }
 
   protected closeBulkModal(): void {
@@ -525,6 +536,28 @@ export class AppointmentsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.state.bulkSubmitting.set(false);
           this.state.bulkError.set(extractApiError(err) ?? 'Could not cancel appointments.');
+        },
+      });
+  }
+
+  protected onBulkDelete(): void {
+    const ids = [...this.state.selectedIds()];
+    if (ids.length === 0) return;
+    this.state.bulkSubmitting.set(true);
+    this.state.bulkError.set(null);
+    this.api
+      .bulkDelete(ids)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.state.bulkSubmitting.set(false);
+          this.clearSelection();
+          this.closeBulkModal();
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.state.bulkSubmitting.set(false);
+          this.state.bulkError.set(extractApiError(err) ?? 'Could not delete appointments.');
         },
       });
   }

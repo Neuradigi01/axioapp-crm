@@ -74,9 +74,13 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
     const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
     this.waitStartedMin = this.toLocalDateTimeInput(fourHoursAgo);
     this.waitStartedMax = this.toLocalDateTimeInput(now);
-    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    // Return date lower bound is today (not tomorrow) — a customer
+    // saying "I'll be back later today" is a legitimate reception
+    // note. Backend `dateNotPast` on the control mirrors this. Upper
+    // bound stays one year out (anything further is a typo).
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const yearOut = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 365);
-    this.expectedReturnMin = this.toLocalDateInput(tomorrow);
+    this.expectedReturnMin = this.toLocalDateInput(today);
     this.expectedReturnMax = this.toLocalDateInput(yearOut);
   }
 
@@ -136,14 +140,14 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
       ],
     }),
     // W11 — "customer will return by" YYYY-MM-DD. Retention analytics.
-    // "Will return" is forward-looking — today doesn't make sense for
-    // an expected-return promise, so `dateFuture` (tomorrow onward);
-    // cap at one year out (anything further is a typo).
+    // Today is allowed (customer saying "I'll be back later today");
+    // past is refused. Cap at one year out (anything further is a
+    // typo).
     expected_return_date: this.fb.control('', {
       nonNullable: true,
       validators: [
         commonValidators.isoDate,
-        commonValidators.dateFuture,
+        commonValidators.dateNotPast,
         commonValidators.dateWithinFutureDays(365),
       ],
     }),

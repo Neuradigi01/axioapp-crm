@@ -1,10 +1,10 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { EMPTY, catchError, of, switchMap } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 
 /**
  * Redirects legacy `/user/automations/:id` bookmarks to the equivalent
@@ -37,11 +37,11 @@ export class RedirectAutomationComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
 
   private static readonly TOAST_STORAGE_KEY = 'automation-redirect-seen';
-  private static readonly TOAST_COPY =
-    'Automations are now part of Workflows. Redirected to the Workflows page.';
+  private static readonly TOAST_TITLE = 'Automations are now Workflows';
+  private static readonly TOAST_SUBTITLE = 'Redirected to the Workflows page.';
 
   ngOnInit(): void {
     const triggerId = this.route.snapshot.paramMap.get('id');
@@ -85,10 +85,9 @@ export class RedirectAutomationComponent implements OnInit {
       if (localStorage.getItem(RedirectAutomationComponent.TOAST_STORAGE_KEY)) {
         return;
       }
-      this.snackBar.open(RedirectAutomationComponent.TOAST_COPY, 'OK', {
-        duration: 5000,
-        horizontalPosition: 'right',
-        verticalPosition: 'top',
+      this.toast.info(RedirectAutomationComponent.TOAST_TITLE, {
+        subtitle: RedirectAutomationComponent.TOAST_SUBTITLE,
+        durationMs: 5000,
       });
       localStorage.setItem(RedirectAutomationComponent.TOAST_STORAGE_KEY, '1');
     } catch {

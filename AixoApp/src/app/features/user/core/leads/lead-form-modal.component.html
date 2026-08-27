@@ -215,6 +215,7 @@
                 <crm-mobile-datetime
                   mode="date"
                   formControlName="expected_close_date"
+                  [min]="todayDate"
                   placeholder="Pick a date"
                 />
               </div>
@@ -230,16 +231,8 @@
                     as msg
                   ) {
                     {{ msg }}
-                  } @else if (
-                    standard.controls.expected_close_date.errors?.['dateMustBeFuture'];
-                    as msg
-                  ) {
-                    {{ msg }}
-                  } @else if (
-                    standard.controls.expected_close_date.errors?.['dateInPast'];
-                    as msg
-                  ) {
-                    {{ msg }}
+                  } @else if (standard.controls.expected_close_date.errors?.['dateInPast']) {
+                    Expected close date can't be in the past. Pick today or later.
                   } @else {
                     Enter a valid date.
                   }

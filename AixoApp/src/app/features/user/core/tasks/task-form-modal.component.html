@@ -67,8 +67,16 @@
               <span class="text-red-500">*</span>
             }
           </span>
-          <crm-mobile-datetime formControlName="due_at" placeholder="Pick date & time" />
-          @if (stdField('due_at')?.help_text; as help) {
+          <crm-mobile-datetime
+            formControlName="due_at"
+            [min]="dueAtMin"
+            placeholder="Pick date & time"
+          />
+          @if (form.controls.due_at.touched && form.controls.due_at.errors?.['dateInPast']) {
+            <span class="mt-1 block text-xs text-red-500">
+              Due date can't be in the past. Pick today or later.
+            </span>
+          } @else if (stdField('due_at')?.help_text; as help) {
             <span class="mt-1 block text-xs text-muted">{{ help }}</span>
           }
         </label>

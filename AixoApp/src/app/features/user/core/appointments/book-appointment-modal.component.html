@@ -176,11 +176,22 @@
               <div class="mt-1">
                 <crm-mobile-datetime
                   formControlName="scheduled_at"
+                  [min]="scheduledAtMin"
                   placeholder="Pick date & time"
                 />
               </div>
               @if (form.controls.scheduled_at.touched && form.controls.scheduled_at.invalid) {
-                <p class="mt-1 text-xs text-red-600">Pick a date and time.</p>
+                <p class="mt-1 text-xs text-red-600">
+                  @if (form.controls.scheduled_at.errors?.['required']) {
+                    Pick a date and time.
+                  } @else if (form.controls.scheduled_at.errors?.['dateInPast']) {
+                    Appointment can't be in the past. Pick today or later.
+                  } @else if (form.controls.scheduled_at.errors?.['invalidDateTime']; as msg) {
+                    {{ msg }}
+                  } @else {
+                    Pick a valid date and time.
+                  }
+                </p>
               }
               @if (stdField('scheduled_at')?.help_text; as help) {
                 <p class="mt-1 text-xs text-muted">{{ help }}</p>

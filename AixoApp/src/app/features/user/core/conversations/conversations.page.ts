@@ -10,8 +10,9 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { LucideAngularModule } from 'lucide-angular';
+
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
@@ -88,7 +89,7 @@ export class ConversationsPageComponent {
   private readonly contactsApi = inject(ContactsApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
 
   /** Step 27b — handle to the compose-bar so we can read its
    *  current Send-From selection on send. The picker self-hides
@@ -879,7 +880,9 @@ export class ConversationsPageComponent {
         next: (updated) => {
           this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
-          this._showToast('You took over from AI. Reload the thread to see the system message.');
+          this.toast.success('You took over from AI.', {
+            subtitle: 'Reload the thread to see the system message.',
+          });
           // Reload the thread so the freshly-inserted system marker
           // ("— {you} took over from AI —") lands in the UI without
           // needing a full page refresh.
@@ -894,11 +897,11 @@ export class ConversationsPageComponent {
             const detail = err.error?.detail;
             const holder =
               (detail && typeof detail === 'object' && detail.holder_name) || 'Another user';
-            this._showToast(`${holder} just took this over.`);
+            this.toast.info(`${holder} just took this over.`);
             // Refresh so our local state matches the winner's.
             this._reloadDetail(id);
           } else {
-            this._showToast(extractApiError(err) ?? 'Could not take over.');
+            this.toast.error(extractApiError(err) ?? 'Could not take over.');
           }
         },
       });
@@ -912,7 +915,7 @@ export class ConversationsPageComponent {
         next: (updated) => {
           this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
-          this._showToast('Returned to AI.');
+          this.toast.success('Returned to AI.');
           this._reloadDetail(id);
           this.aiConfirmSubmitting.set(false);
           this.pendingAiConfirm.set(null);
@@ -922,9 +925,9 @@ export class ConversationsPageComponent {
           this.pendingAiConfirm.set(null);
           const detail = err.error?.detail;
           if (err.status === 403 && detail?.reason === 'not_holder') {
-            this._showToast('Only the person who took over (or an admin) can return this to AI.');
+            this.toast.warn('Only the person who took over (or an admin) can return this to AI.');
           } else {
-            this._showToast(extractApiError(err) ?? 'Could not return to AI.');
+            this.toast.error(extractApiError(err) ?? 'Could not return to AI.');
           }
         },
       });
@@ -941,14 +944,6 @@ export class ConversationsPageComponent {
              re-render the system message until manual refresh. */
         },
       });
-  }
-
-  private _showToast(message: string): void {
-    this.snackBar.open(message, 'OK', {
-      duration: 3000,
-      horizontalPosition: 'right',
-      verticalPosition: 'top',
-    });
   }
 
   /**

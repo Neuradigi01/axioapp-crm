@@ -593,6 +593,19 @@ export const userRoutes: Routes = [
           ),
       },
       {
+        // audit-log-track Step 1 — Enterprise-only audit trail viewer.
+        // Recording happens on every plan (see `audit.log(...)` calls
+        // across the codebase); this page is the operator-facing viewer,
+        // gated by the `audit.full_log` feature flag in `plans.yaml`
+        // (checked via `FeatureAccessService` inside the component so
+        // lower-plan users see the standard "Upgrade" locked card
+        // rather than a 404).
+        path: 'reports/audit-log',
+        canActivate: [permissionGuard('audit.read')],
+        loadComponent: () =>
+          import('./core/reporting/audit-log/audit-log.page').then((m) => m.AuditLogPage),
+      },
+      {
         path: 'reviews',
         canActivate: [permissionGuard('reviews.read')],
         loadComponent: () =>
