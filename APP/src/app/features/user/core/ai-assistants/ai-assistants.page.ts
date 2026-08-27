@@ -25,7 +25,7 @@ import { toObservable } from '@angular/core/rxjs-interop';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
+import { debounceTime, distinctUntilChanged, skip, switchMap, tap } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../auth/auth.service';
@@ -84,6 +84,11 @@ export class AiAssistantsPage {
   // popup so the destructive-action prompt matches the rest of the UI
   // (title / body / red button / submitting state / inline error).
   protected readonly pendingDelete = signal<AiAssistantListItem | null>(null);
+  // Row selected for archive/unarchive via the kebab menu. Mirrors the
+  // pendingDelete pattern so the confirm dialog reuses the same UX
+  // (styled modal instead of a raw window.confirm or silent fire).
+  protected readonly pendingArchive = signal<AiAssistantListItem | null>(null);
+  protected readonly pendingActivate = signal<AiAssistantListItem | null>(null);
   protected readonly actionInFlight = signal<string | null>(null);
 
   protected readonly statusPills = STATUS_PILLS;
@@ -98,17 +103,26 @@ export class AiAssistantsPage {
   );
 
   constructor() {
-    // Reload whenever the filter pills or search change (debounced
-    // for search only). Uses a single source-of-change signal so
-    // rapid keypresses coalesce into one request.
+    // Reload whenever the filter pills or search change. Uses a single
+    // source-of-change signal so rapid keypresses coalesce into one
+    // request. skip(1) drops toObservable's initial replay so we don't
+    // double-fetch — the explicit reload() below owns the first load
+    // (it fires immediately without a 300ms debounce delay). The tap
+    // flips loading on + clears the stale error banner so filter/search
+    // changes always render fresh state.
     const trigger = computed(() => ({
       status: this.statusFilter(),
       search: this.search().trim(),
     }));
     toObservable(trigger)
       .pipe(
+        skip(1),
         debounceTime(300),
         distinctUntilChanged((a, b) => a.status === b.status && a.search === b.search),
+        tap(() => {
+          this.loading.set(true);
+          this.loadError.set(null);
+        }),
         switchMap(({ status, search }) =>
           this.api.list({
             status: status || undefined,
@@ -129,8 +143,6 @@ export class AiAssistantsPage {
           this.loadError.set(extractApiError(err) ?? 'Could not load assistants.');
         },
       });
-    // Kick off the first fetch — toObservable doesn't emit for the
-    // initial signal value on its own with this pipe shape.
     this.reload();
   }
 
@@ -193,19 +205,78 @@ export class AiAssistantsPage {
 
   protected archive(row: AiAssistantListItem): void {
     if (!this.canManage() || this.actionInFlight()) return;
-    this.actionInFlight.set(row.id);
+    // Ask before flipping status — archive removes the row from the
+    // default filter view and stops the assistant from serving on any
+    // bound channel. Confirm dialog is the same one delete uses, minus
+    // the danger styling.
     this.kebabOpenId.set(null);
+    this.pendingArchive.set(row);
+  }
+
+  protected cancelArchive(): void {
+    if (this.actionInFlight()) return;
+    this.pendingArchive.set(null);
+  }
+
+  protected confirmArchive(): void {
+    const row = this.pendingArchive();
+    if (!row) return;
+    this.actionInFlight.set(row.id);
+    this.loadError.set(null);
     this.api
       .archive(row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
           this.actionInFlight.set(null);
-          this.reload();
+          this.pendingArchive.set(null);
+          // Patch the row in place — full grid reload would flash a
+          // page-wide skeleton for a single-row status change.
+          this.items.update((rows) =>
+            rows.map((r) =>
+              r.id === row.id ? { ...r, status: 'archived' as AiAssistantStatus } : r,
+            ),
+          );
         },
         error: (err: HttpErrorResponse) => {
           this.actionInFlight.set(null);
+          this.pendingArchive.set(null);
           this.loadError.set(extractApiError(err) ?? 'Archive failed.');
+        },
+      });
+  }
+
+  protected activate(row: AiAssistantListItem): void {
+    if (!this.canManage() || this.actionInFlight()) return;
+    this.kebabOpenId.set(null);
+    this.pendingActivate.set(row);
+  }
+
+  protected cancelActivate(): void {
+    if (this.actionInFlight()) return;
+    this.pendingActivate.set(null);
+  }
+
+  protected confirmActivate(): void {
+    const row = this.pendingActivate();
+    if (!row) return;
+    this.actionInFlight.set(row.id);
+    this.loadError.set(null);
+    this.api
+      .activate(row.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.actionInFlight.set(null);
+          this.pendingActivate.set(null);
+          this.items.update((rows) =>
+            rows.map((r) => (r.id === row.id ? { ...r, status: updated.status } : r)),
+          );
+        },
+        error: (err: HttpErrorResponse) => {
+          this.actionInFlight.set(null);
+          this.pendingActivate.set(null);
+          this.loadError.set(extractApiError(err) ?? 'Activate failed.');
         },
       });
   }

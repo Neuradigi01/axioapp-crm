@@ -24,6 +24,7 @@ import {
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
@@ -90,7 +91,7 @@ Accuracy is more important than always providing an answer. If in doubt, say you
   selector: 'app-create-assistant-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, LucideAngularModule, MobileSelectComponent],
+  imports: [ReactiveFormsModule, RouterLink, LucideAngularModule, MobileSelectComponent],
   templateUrl: './create-assistant-modal.component.html',
 })
 export class CreateAssistantModalComponent {
