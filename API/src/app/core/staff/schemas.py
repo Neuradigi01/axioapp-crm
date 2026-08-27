@@ -73,6 +73,14 @@ class ClockOutPayload(BaseModel):
     notes: str | None = None
 
 
+class PerformanceBulkRequest(BaseModel):
+    """Payload for ``POST /staff/performance/bulk``. Caps at 200 ids
+    so a malformed / hostile caller can't run an unbounded aggregation.
+    Realistic ceiling for one org's staff page is < 100."""
+
+    user_ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
 class PerformanceOut(BaseModel):
     """Composed metrics for a staff member.
 

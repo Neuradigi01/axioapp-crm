@@ -27,6 +27,7 @@ from src.app.core.staff.schemas import (
     AttendanceOut,
     ClockInPayload,
     ClockOutPayload,
+    PerformanceBulkRequest,
     PerformanceOut,
     StaffListItem,
     StaffProfileOut,
@@ -40,6 +41,7 @@ from src.app.core.staff.service import (
 )
 from src.app.core.staff.service import (
     compute_performance,
+    compute_performance_bulk,
     list_activities_for,
     list_attendance,
     list_staff,
@@ -102,6 +104,23 @@ async def upsert_profile_endpoint(
 ) -> StaffProfileOut:
     profile = await upsert_profile(db, org_id=user.org_id, user_id=user_id, payload=payload)
     return StaffProfileOut.model_validate(profile)
+
+
+@router.post("/performance/bulk", response_model=list[PerformanceOut])
+async def performance_bulk_endpoint(
+    payload: PerformanceBulkRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("staff.read")),
+) -> list[PerformanceOut]:
+    """Compute performance metrics for a batch of ``user_ids`` in one
+    call. Powers the Staff list page — replaces the ``N × GET /{user_id}/performance``
+    fan-out with two GROUP-BY SQL queries.
+
+    Route order matters: declared BEFORE ``/{user_id}/performance`` so
+    FastAPI doesn't swallow ``"performance"`` as a ``user_id``.
+    """
+    rows = await compute_performance_bulk(db, payload.user_ids)
+    return [PerformanceOut(**r) for r in rows]
 
 
 @router.get("/{user_id}/performance", response_model=PerformanceOut)

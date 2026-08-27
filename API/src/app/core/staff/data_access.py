@@ -219,6 +219,54 @@ async def count_leads_for_user_by_status(
     return int(result.scalar_one() or 0)
 
 
+async def count_leads_grouped_for_users(
+    session: AsyncSession,
+    *,
+    user_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, dict[LeadStatus, int]]:
+    """Bulk-version of ``count_leads_for_user_by_status`` — returns
+    a two-level dict ``{user_id: {status: count}}`` for the whole
+    list in a single ``GROUP BY assigned_to, status`` query. Users
+    with zero leads under a given status simply omit that status
+    key; callers should ``dict.get(status, 0)``.
+
+    Powers ``POST /staff/performance/bulk`` — one SQL round-trip
+    for the whole staff page instead of ``2 × N`` (won + active)
+    per-row lookups.
+    """
+    if not user_ids:
+        return {}
+    stmt = (
+        select(Lead.assigned_to_id, Lead.status, func.count())
+        .where(Lead.assigned_to_id.in_(user_ids))
+        .group_by(Lead.assigned_to_id, Lead.status)
+    )
+    result = await session.execute(stmt)
+    out: dict[uuid.UUID, dict[LeadStatus, int]] = {uid: {} for uid in user_ids}
+    for user_id, status_, count in result.all():
+        if user_id is None:
+            continue
+        out.setdefault(user_id, {})[status_] = int(count or 0)
+    return out
+
+
+async def get_staff_profiles_by_user_ids(
+    session: AsyncSession,
+    *,
+    user_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, StaffProfile]:
+    """Bulk-version of ``get_staff_profile_by_user_id`` — one query
+    with ``WHERE user_id IN (...)`` returning a lookup by user id.
+    Missing keys simply have no profile row (caller falls back to
+    the module's zero-defaults)."""
+    if not user_ids:
+        return {}
+    result = await session.execute(
+        select(StaffProfile).where(StaffProfile.user_id.in_(user_ids))
+    )
+    return {p.user_id: p for p in result.scalars().all()}
+
+
 async def list_activities_for_user(
     session: AsyncSession,
     *,
