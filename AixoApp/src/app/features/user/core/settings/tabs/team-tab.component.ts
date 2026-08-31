@@ -22,6 +22,7 @@ import {
   StaffDeactivateModalComponent,
 } from '../staff/staff-deactivate-modal.component';
 import { StaffWorkloadComponent } from '../staff/staff-workload.component';
+import { MobileSelectComponent } from '../../shared/forms/mobile-select.component';
 import { InvitationRow, InvitationsApiService } from './invitations.service';
 
 interface UserRow {
@@ -61,7 +62,13 @@ interface RoleRow {
   selector: 'app-settings-team-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, ReactiveFormsModule, StaffDeactivateModalComponent, StaffWorkloadComponent],
+  imports: [
+    DatePipe,
+    ReactiveFormsModule,
+    StaffDeactivateModalComponent,
+    StaffWorkloadComponent,
+    MobileSelectComponent,
+  ],
   templateUrl: './team-tab.component.html',
 })
 export class TeamTabComponent {
@@ -139,6 +146,33 @@ export class TeamTabComponent {
   protected readonly demoteRoleOptions = computed(() =>
     this.roles().filter((r) => r.name !== 'Owner'),
   );
+
+  /** `crm-mobile-select`-shaped role list used by the Invite modal +
+   *  row-edit Role dropdown. Placeholder ("Choose a role…") is
+   *  provided by the mobile-select's own `[placeholder]` input; no
+   *  need to synthesize a disabled first option. */
+  protected readonly roleSelectOptions = computed(() =>
+    this.roles().map((r) => ({ value: r.id, label: r.name })),
+  );
+
+  /** `crm-mobile-select`-shaped list for the Transfer-ownership
+   *  target-user picker. Label mirrors the old ``<option>`` format
+   *  ("email (Role)") so the dropdown reads the same. */
+  protected readonly transferTargetOptions = computed(() =>
+    this.transferTargets().map((m) => ({
+      value: m.id,
+      label: `${m.email} (${this.roleNameOf(m)})`,
+    })),
+  );
+
+  /** Options for the "Your new role (after transfer)" picker. First
+   *  entry is the ``value=''`` sentinel that maps to "Admin (default)"
+   *  — matches the original native ``<option value=""...>`` semantics
+   *  the backend expects (empty → assign Admin). */
+  protected readonly demoteRoleSelectOptions = computed(() => [
+    { value: '', label: 'Admin (default)' },
+    ...this.demoteRoleOptions().map((r) => ({ value: r.id, label: r.name })),
+  ]);
 
   /** Org name typed-confirmation gate. */
   protected readonly currentOrgName = computed(() => this.auth.currentOrg()?.name ?? '');

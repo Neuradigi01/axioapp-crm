@@ -100,6 +100,12 @@ export interface Conversation {
   ai_paused_by_user_id?: string | null;
   ai_paused_at?: string | null;
   last_message_at: string | null;
+  /** Short preview of the most recent external message (whitespace-collapsed
+   *  + trimmed to 140 chars server-side). Populated by the list endpoint
+   *  so the inbox row renders a snippet without a per-row fetch; null on
+   *  the detail response and when the conversation has no messages / only
+   *  attachment-only messages / only internal notes. */
+  last_message_body?: string | null;
   unread_count: number;
   created_at: string;
   /** Step 14 — assigned tag chips. Empty array when none / not loaded. */

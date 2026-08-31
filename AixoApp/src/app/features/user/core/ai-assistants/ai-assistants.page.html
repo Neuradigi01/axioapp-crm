@@ -103,7 +103,16 @@
         }
       </div>
     } @else if (items().length === 0) {
-      <p class="text-sm text-muted">No assistants match the current filter.</p>
+      <div
+        class="mx-auto max-w-md rounded-2xl border border-dashed border-subtle bg-surface p-6 text-center"
+      >
+        <span
+          class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface-2 ring-1 ring-subtle"
+        >
+          <lucide-icon name="search" size="16" class="text-muted"></lucide-icon>
+        </span>
+        <p class="mt-3 text-sm text-muted">No assistants match the current filter.</p>
+      </div>
     } @else {
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         @for (a of items(); track a.id) {
@@ -142,7 +151,7 @@
                         class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 ring-emerald-500/20"
                         [title]="'Auto-answers on ' + channelLabel(ch)"
                       >
-                        <lucide-icon [name]="channelIcon(ch)" class="h-3 w-3" aria-hidden="true" />
+                        <lucide-icon [name]="channelIcon(ch)" size="12" aria-hidden="true" />
                         {{ channelLabel(ch) }}
                       </span>
                     }
@@ -161,7 +170,7 @@
                   </button>
                   @if (kebabOpenId() === a.id) {
                     <div
-                      class="absolute right-0 z-10 mt-1 w-40 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
+                      class="absolute right-0 z-50 mt-1 w-40 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
                       (click)="$event.stopPropagation()"
                     >
                       @if (a.status !== 'archived') {
@@ -172,6 +181,15 @@
                         >
                           <lucide-icon name="archive" size="12"></lucide-icon>
                           Archive
+                        </button>
+                      } @else {
+                        <button
+                          type="button"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
+                          (click)="activate(a)"
+                        >
+                          <lucide-icon name="play" size="12"></lucide-icon>
+                          Activate
                         </button>
                       }
                       <button
@@ -189,7 +207,9 @@
             </div>
             <div class="mt-4 flex-1"></div>
             <div class="mt-4 flex items-center justify-between border-t border-subtle pt-3">
-              <span class="text-[11px] text-muted">v{{ a.version }}</span>
+              <span class="text-[11px] text-muted" title="Configuration revision">
+                Rev. {{ a.version }}
+              </span>
               <a
                 [routerLink]="['/user/ai-assistants', a.id]"
                 class="text-xs font-medium text-accent hover:underline"
@@ -206,9 +226,10 @@
 
 @if (kebabOpenId()) {
   <!-- Click-outside catcher so the kebab dropdown closes when the
-       user taps elsewhere. Absolutely positioned overlay that only
-       renders while a kebab is open. -->
-  <div class="fixed inset-0 z-0" (click)="closeKebab()"></div>
+       user taps elsewhere. z-40 keeps it above cards / grid content
+       so a tap on any other card also closes the open kebab, but
+       still below any confirm/create modal (z-50). -->
+  <div class="fixed inset-0 z-40" (click)="closeKebab()"></div>
 }
 
 @if (modalOpen()) {
@@ -228,5 +249,29 @@
     [submitting]="actionInFlight() === row.id"
     (confirm)="confirmDelete()"
     (cancel)="cancelDelete()"
+  />
+}
+
+@if (pendingArchive(); as row) {
+  <app-confirm-dialog
+    [title]="'Archive &quot;' + row.name + '&quot;?'"
+    [body]="'The assistant will stop responding on any bound channel until you activate it again. Knowledge sources and chat history are kept.'"
+    [confirmLabel]="'Archive'"
+    [cancelLabel]="'Cancel'"
+    [submitting]="actionInFlight() === row.id"
+    (confirm)="confirmArchive()"
+    (cancel)="cancelArchive()"
+  />
+}
+
+@if (pendingActivate(); as row) {
+  <app-confirm-dialog
+    [title]="'Activate &quot;' + row.name + '&quot;?'"
+    [body]="'The assistant will start responding on any bound channel immediately using its current configuration.'"
+    [confirmLabel]="'Activate'"
+    [cancelLabel]="'Cancel'"
+    [submitting]="actionInFlight() === row.id"
+    (confirm)="confirmActivate()"
+    (cancel)="cancelActivate()"
   />
 }

@@ -19,19 +19,14 @@
 
     <div class="mb-4 flex items-end gap-3">
       <div>
-        <label class="block text-xs font-medium text-default" for="sft_entity">Entity</label>
-        <select
-          id="sft_entity"
-          class="mt-1 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          [value]="entity()"
-          (change)="onEntityChange($event)"
-        >
-          @for (e of entities(); track e.entity) {
-            <option [value]="e.entity">
-              {{ e.entity }} ({{ e.field_count }} field{{ e.field_count === 1 ? '' : 's' }})
-            </option>
-          }
-        </select>
+        <label class="block text-xs font-medium text-default">Entity</label>
+        <div class="mt-1 min-w-[12rem]">
+          <crm-mobile-select
+            [options]="entitySelectOptions()"
+            [value]="entity()"
+            (valueChange)="onEntityChange($event)"
+          />
+        </div>
       </div>
       <p class="pb-2 text-xs text-muted">
         <span class="font-medium text-default">●</span> overridden &middot;

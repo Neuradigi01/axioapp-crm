@@ -18,6 +18,7 @@ import {
 } from '@angular/forms';
 
 import { commonValidators } from '../shared/validators';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import {
   CustomField,
   CustomFieldCreate,
@@ -48,7 +49,7 @@ function fieldKeyValidator(c: AbstractControl): ValidationErrors | null {
   selector: 'app-field-form',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, MobileSelectComponent],
   templateUrl: './field-form.component.html',
 })
 export class FieldFormComponent {

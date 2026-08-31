@@ -126,7 +126,7 @@ export class EmbedIntegrationsTabComponent {
     const key = this.activeKey();
     if (!key) return '';
     return (
-      '<div id="furnicrm-form"></div>\n' +
+      '<div id="crm-form"></div>\n' +
       `<script src="${environment.embedWidgetHost}/v1/widget.js" ` +
       `data-key="${key.prefix}…"></script>`
     );

@@ -89,7 +89,8 @@
       <ul class="divide-y divide-subtle">
         @for (c of items; track c.id) {
           @let style = channelStyle(c.channel);
-          @let owner = assigneeColor(c.assigned_to_id);
+          @let contactAvatar = contactColor(c);
+          @let ownerName = assigneeName(c.assigned_to_id);
           <li>
             <button
               type="button"
@@ -99,32 +100,23 @@
                 (selectedId === c.id ? 'bg-surface-2' : '')
               "
             >
-              <!-- Avatar with brand-coloured channel badge overlay
-                   (AIXO pattern). The badge is a filled circle with
-                   the platform icon in white — WhatsApp / Instagram /
-                   Messenger / etc. — so the source channel reads at a
-                   glance without a separate chip row. -->
-              <span
-                class="relative shrink-0"
-                [title]="
-                  (c.assigned_to_id
-                    ? (staffById.get(c.assigned_to_id)?.full_name ?? 'Unknown user')
-                    : 'Unassigned') +
-                  ' · ' +
-                  style.label
-                "
-              >
+              <!-- Avatar shows the CONTACT (person messaging you) with
+                   a brand-coloured channel badge overlay. Assigned staff
+                   member is surfaced separately on the status line so
+                   the DP always identifies WHO the conversation is with,
+                   not WHO's handling it. -->
+              <span class="relative shrink-0" [title]="rowName(c) + ' · ' + style.label">
                 <span
                   [class]="
                     'inline-flex h-10 w-10 items-center justify-center rounded-full text-[12px] font-semibold ring-1 ' +
-                    owner.bg +
+                    contactAvatar.bg +
                     ' ' +
-                    owner.text +
+                    contactAvatar.text +
                     ' ' +
-                    owner.ring
+                    contactAvatar.ring
                   "
                 >
-                  {{ assigneeInitials(c.assigned_to_id) }}
+                  {{ contactInitials(c) }}
                 </span>
                 <span
                   [class]="
@@ -138,14 +130,9 @@
               </span>
               <div class="min-w-0 flex-1">
                 <div class="flex items-center justify-between gap-2">
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-[13px] font-semibold text-default">
-                      {{ rowName(c) }}
-                    </p>
-                    @if (rowHandle(c); as handle) {
-                      <p class="truncate font-mono text-[10.5px] text-faint">{{ handle }}</p>
-                    }
-                  </div>
+                  <p class="min-w-0 flex-1 truncate text-[13px] font-semibold text-default">
+                    {{ rowName(c) }}
+                  </p>
                   <div class="flex shrink-0 items-center gap-1.5">
                     <span class="font-mono text-[10.5px] text-faint">
                       {{ formatTime(c.last_message_at) }}
@@ -167,8 +154,37 @@
                     }
                   </div>
                 </div>
+                <!-- Message preview — the single biggest scannability win.
+                     Falls back to the raw channel handle (phone / email)
+                     when the conversation has no external messages yet so
+                     the row still carries identifying info. -->
                 <p class="mt-0.5 truncate text-[11.5px] text-muted">
-                  <span class="capitalize">{{ c.status }}</span>
+                  @if (c.last_message_body) {
+                    {{ c.last_message_body }}
+                  } @else if (rowHandle(c); as handle) {
+                    <span class="font-mono text-faint">{{ handle }}</span>
+                  } @else {
+                    <span class="text-faint italic">No messages yet</span>
+                  }
+                </p>
+                <!-- Meta line: assignee + non-default status + AI state.
+                     "Open" is hidden because it's the default — showing
+                     it on every row is noise. Snoozed / Closed still
+                     render so operators see when a thread is out of the
+                     active queue. -->
+                <p class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted">
+                  <span
+                    [class]="
+                      'inline-flex items-center gap-1 ' +
+                      (ownerName ? 'text-muted' : 'text-faint italic')
+                    "
+                  >
+                    <lucide-icon name="user" class="h-2.5 w-2.5" />
+                    {{ ownerName || 'Unassigned' }}
+                  </span>
+                  @if (c.status !== 'open') {
+                    <span class="capitalize">· {{ c.status }}</span>
+                  }
                   @if (c.ai_paused) {
                     <span class="text-amber-400" title="A team member took over from AI">
                       · ✋ Human took over

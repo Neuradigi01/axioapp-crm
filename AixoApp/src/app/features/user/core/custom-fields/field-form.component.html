@@ -49,16 +49,10 @@
       </div>
 
       <div>
-        <label class="block text-xs font-medium text-default" for="field_type">Type</label>
-        <select
-          id="field_type"
-          formControlName="field_type"
-          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surface-2 disabled:text-muted"
-        >
-          @for (t of fieldTypes; track t.value) {
-            <option [value]="t.value">{{ t.label }}</option>
-          }
-        </select>
+        <label class="block text-xs font-medium text-default">Type</label>
+        <div class="mt-1">
+          <crm-mobile-select [options]="fieldTypes" [formControl]="form.controls.field_type" />
+        </div>
       </div>
 
       @if (needsChoices()) {

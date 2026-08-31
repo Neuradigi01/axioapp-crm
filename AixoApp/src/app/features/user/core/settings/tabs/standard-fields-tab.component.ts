@@ -16,6 +16,7 @@ import { FurnitureAuthService } from '../../auth/auth.service';
 import { StandardFieldsApiService } from '../../standard-fields/standard-fields-api.service';
 import { StandardFieldsSignalsService } from '../../standard-fields/standard-fields-signals.service';
 import type { StandardFieldEntity, StandardFieldRendered } from '../../standard-fields/types';
+import { MobileSelectComponent } from '../../shared/forms/mobile-select.component';
 
 import { StandardFieldEditModalComponent } from './standard-field-edit-modal.component';
 
@@ -33,7 +34,7 @@ import { StandardFieldEditModalComponent } from './standard-field-edit-modal.com
   selector: 'app-settings-standard-fields-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [StandardFieldEditModalComponent],
+  imports: [StandardFieldEditModalComponent, MobileSelectComponent],
   templateUrl: './standard-fields-tab.component.html',
 })
 export class StandardFieldsTabComponent {
@@ -102,8 +103,18 @@ export class StandardFieldsTabComponent {
       });
   }
 
-  protected onEntityChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
+  /** `crm-mobile-select`-shaped options built from the loaded
+   *  `entities()` list. Label carries the field count so the dropdown
+   *  reads the same as the old native `<select>` ("appointment (5
+   *  fields)"). */
+  protected readonly entitySelectOptions = computed(() =>
+    this.entities().map((e) => ({
+      value: e.entity,
+      label: `${e.entity} (${e.field_count} field${e.field_count === 1 ? '' : 's'})`,
+    })),
+  );
+
+  protected onEntityChange(value: string): void {
     this.entity.set(value);
   }
 

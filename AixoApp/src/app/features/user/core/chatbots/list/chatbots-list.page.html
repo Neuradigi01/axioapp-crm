@@ -11,22 +11,29 @@
         Design bot flows for inbound WhatsApp + email conversations.
       </p>
     </div>
-    <label
-      class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-subtle bg-surface text-default text-sm font-medium hover:bg-surface-2 cursor-pointer"
-    >
-      <lucide-icon name="upload" size="16"></lucide-icon>
-      <span class="hidden sm:inline">Import</span>
-      <input type="file" accept="application/json" class="hidden" (change)="onImportFile($event)" />
-    </label>
-    <button
-      type="button"
-      (click)="openCreateModal()"
-      class="inline-flex items-center gap-2 px-3 md:px-3.5 py-2 rounded-lg bg-accent-soft text-accent text-sm font-medium hover:brightness-110"
-    >
-      <lucide-icon name="plus" size="16"></lucide-icon>
-      <span class="hidden sm:inline">New bot</span>
-      <span class="sm:hidden">New</span>
-    </button>
+    @if (canEdit()) {
+      <label
+        class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-subtle bg-surface text-default text-sm font-medium hover:bg-surface-2 cursor-pointer"
+      >
+        <lucide-icon name="upload" size="16"></lucide-icon>
+        <span class="hidden sm:inline">Import</span>
+        <input
+          type="file"
+          accept="application/json"
+          class="hidden"
+          (change)="onImportFile($event)"
+        />
+      </label>
+      <button
+        type="button"
+        (click)="openCreateModal()"
+        class="inline-flex items-center gap-2 px-3 md:px-3.5 py-2 rounded-lg bg-accent-soft text-accent text-sm font-medium hover:brightness-110"
+      >
+        <lucide-icon name="plus" size="16"></lucide-icon>
+        <span class="hidden sm:inline">New bot</span>
+        <span class="sm:hidden">New</span>
+      </button>
+    }
   </header>
 
   <!-- Filter bar — wraps to two rows on mobile; search grows to full
@@ -85,8 +92,8 @@
         <lucide-icon name="loader-2" size="16" class="animate-spin mr-2"></lucide-icon>
         Loading chat bots…
       </div>
-    } @else if (!hasAnyRows()) {
-      <!-- Empty state -->
+    } @else if (emptyState()) {
+      <!-- Truly empty org (no rows, no filter, no search). -->
       <div class="flex flex-col items-center justify-center h-full text-center px-6 py-12">
         <div
           class="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 text-muted"
@@ -98,20 +105,26 @@
           Design bot flows for inbound WhatsApp + email conversations. Trigger on keywords, ask
           questions, and hand off to a human when needed.
         </p>
-        <button
-          type="button"
-          (click)="openCreateModal()"
-          class="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-soft text-accent text-sm font-medium hover:brightness-110"
-        >
-          <lucide-icon name="plus" size="16"></lucide-icon>
-          Create your first bot
-        </button>
+        @if (canEdit()) {
+          <button
+            type="button"
+            (click)="openCreateModal()"
+            class="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-soft text-accent text-sm font-medium hover:brightness-110"
+          >
+            <lucide-icon name="plus" size="16"></lucide-icon>
+            Create your first bot
+          </button>
+        }
       </div>
-    } @else if (!hasRows()) {
-      <div
-        class="flex flex-col items-center justify-center h-full text-center px-6 py-12 text-muted text-sm"
-      >
-        No bots match your search.
+    } @else if (filteredEmpty()) {
+      <!-- Org has bots, but the current filter/search matched none. -->
+      <div class="flex flex-col items-center justify-center h-full text-center px-6 py-12">
+        <div
+          class="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center mb-3 text-muted"
+        >
+          <lucide-icon name="search" size="16"></lucide-icon>
+        </div>
+        <p class="text-sm text-muted">No bots match the current filter.</p>
       </div>
     } @else {
       <!-- Desktop / tablet table (md+). Hidden below md — mobile
@@ -169,7 +182,7 @@
                 <td class="px-6 py-3 relative text-right">
                   <button
                     type="button"
-                    (click)="toggleActionsMenu(row.id)"
+                    (click)="toggleActionsMenu(row.id, $event)"
                     class="p-1.5 rounded hover:bg-surface-2 text-muted"
                     aria-label="Row actions"
                   >
@@ -177,7 +190,7 @@
                   </button>
                   @if (actionsMenuFor() === row.id) {
                     <div
-                      class="absolute right-6 top-10 z-10 w-48 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
+                      class="absolute right-6 top-10 z-50 w-48 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
                       (click)="$event.stopPropagation()"
                     >
                       <a
@@ -195,11 +208,12 @@
                         <lucide-icon name="download" size="12" aria-hidden="true"></lucide-icon>
                         Export JSON
                       </button>
-                      @if (row.status === 'draft' || row.status === 'paused') {
+                      @if (canPublish() && (row.status === 'draft' || row.status === 'paused')) {
                         <button
                           type="button"
+                          [disabled]="actionInFlight() === row.id"
                           (click)="publish(row)"
-                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                         >
                           <lucide-icon
                             name="play"
@@ -210,11 +224,12 @@
                           Publish (make Live)
                         </button>
                       }
-                      @if (row.status === 'live') {
+                      @if (canEdit() && row.status === 'live') {
                         <button
                           type="button"
+                          [disabled]="actionInFlight() === row.id"
                           (click)="pause(row)"
-                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                         >
                           <lucide-icon
                             name="pause-circle"
@@ -225,12 +240,13 @@
                           Pause
                         </button>
                       }
-                      @if (row.status !== 'archived') {
+                      @if (canDelete() && row.status !== 'archived') {
                         <div class="border-t border-subtle"></div>
                         <button
                           type="button"
+                          [disabled]="actionInFlight() === row.id"
                           (click)="archive(row)"
-                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                         >
                           <lucide-icon name="archive" size="12" aria-hidden="true"></lucide-icon>
                           Archive
@@ -294,7 +310,7 @@
               <div class="relative flex-shrink-0">
                 <button
                   type="button"
-                  (click)="toggleActionsMenu(row.id)"
+                  (click)="toggleActionsMenu(row.id, $event)"
                   class="p-2 rounded hover:bg-surface-2 text-muted"
                   aria-label="Row actions"
                 >
@@ -302,7 +318,7 @@
                 </button>
                 @if (actionsMenuFor() === row.id) {
                   <div
-                    class="absolute right-0 top-10 z-10 w-48 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
+                    class="absolute right-0 top-10 z-50 w-48 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
                     (click)="$event.stopPropagation()"
                   >
                     <a
@@ -320,11 +336,12 @@
                       <lucide-icon name="download" size="12" aria-hidden="true"></lucide-icon>
                       Export JSON
                     </button>
-                    @if (row.status === 'draft' || row.status === 'paused') {
+                    @if (canPublish() && (row.status === 'draft' || row.status === 'paused')) {
                       <button
                         type="button"
+                        [disabled]="actionInFlight() === row.id"
                         (click)="publish(row)"
-                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
+                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                       >
                         <lucide-icon
                           name="play"
@@ -332,14 +349,15 @@
                           class="text-emerald-400"
                           aria-hidden="true"
                         ></lucide-icon>
-                        Publish
+                        Publish (make Live)
                       </button>
                     }
-                    @if (row.status === 'live') {
+                    @if (canEdit() && row.status === 'live') {
                       <button
                         type="button"
+                        [disabled]="actionInFlight() === row.id"
                         (click)="pause(row)"
-                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
+                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                       >
                         <lucide-icon
                           name="pause-circle"
@@ -350,12 +368,13 @@
                         Pause
                       </button>
                     }
-                    @if (row.status !== 'archived') {
+                    @if (canDelete() && row.status !== 'archived') {
                       <div class="border-t border-subtle"></div>
                       <button
                         type="button"
+                        [disabled]="actionInFlight() === row.id"
                         (click)="archive(row)"
-                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
+                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                       >
                         <lucide-icon name="archive" size="12" aria-hidden="true"></lucide-icon>
                         Archive
@@ -371,6 +390,14 @@
     }
   </main>
 </div>
+
+@if (actionsMenuFor()) {
+  <!-- Click-outside catcher — closes the kebab dropdown when the user
+       taps elsewhere. z-40 keeps it below the dropdown itself (z-50)
+       and below any confirm/create modal (z-50) so the affordances on
+       those layers still work while a menu is open. -->
+  <div class="fixed inset-0 z-40" (click)="closeKebab()"></div>
+}
 
 @if (createModalOpen()) {
   <app-chatbot-create-modal

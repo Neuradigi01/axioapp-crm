@@ -1,7 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, forkJoin } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import { buildHttpParams } from '../shared/services/query-builder';
@@ -110,6 +109,16 @@ export class StaffApiService {
     return this.http.get<PerformanceOut>(`${this.base}/${userId}/performance`);
   }
 
+  /** Batch-fetch performance for many users in a single request.
+   *  Used by ``loadWithPerformance()`` so the staff list page issues
+   *  one POST instead of one GET per staff row. Capped server-side at
+   *  200 ids per call. */
+  performanceBulk(userIds: string[]): Observable<PerformanceOut[]> {
+    return this.http.post<PerformanceOut[]>(`${this.base}/performance/bulk`, {
+      user_ids: userIds,
+    });
+  }
+
   attendance(userId: string, from?: string, to?: string): Observable<AttendanceOut[]> {
     const params = buildHttpParams({ from, to });
     return this.http.get<AttendanceOut[]>(`${this.base}/${userId}/attendance`, { params });
@@ -134,9 +143,11 @@ export class StaffApiService {
 
   /**
    * Fetches the staff list and joins each row with its performance
-   * payload in parallel. One round-trip per user — acceptable at the
-   * org sizes we target (≤ ~50 staff). If lists grow beyond that we'll
-   * fold this into the list endpoint instead of fanning out client-side.
+   * payload. Uses the ``POST /staff/performance/bulk`` batch endpoint
+   * so the whole page renders with TWO API calls (list + bulk perf)
+   * instead of ``1 + N`` (one GET per staff member). The previous
+   * fan-out multiplied the SQL cost by ``3 × N`` on the backend too —
+   * batch runs a single ``GROUP BY assigned_to, status`` for all users.
    */
   loadWithPerformance(): Observable<StaffWithPerformance[]> {
     return new Observable<StaffWithPerformance[]>((subscriber) => {
@@ -147,11 +158,30 @@ export class StaffApiService {
             subscriber.complete();
             return;
           }
-          const calls = staff.map((s) =>
-            this.performance(s.id).pipe(map((perf) => ({ staff: s, performance: perf }))),
-          );
-          forkJoin(calls).subscribe({
-            next: (rows) => {
+          const ids = staff.map((s) => s.id);
+          this.performanceBulk(ids).subscribe({
+            next: (perfs) => {
+              const perfByUser = new Map<string, PerformanceOut>();
+              for (const p of perfs) {
+                perfByUser.set(p.user_id, p);
+              }
+              const rows: StaffWithPerformance[] = staff.map((s) => ({
+                staff: s,
+                // Backend returns one entry per requested id in input order,
+                // so the lookup below always hits. Guard is defensive.
+                performance:
+                  perfByUser.get(s.id) ??
+                  ({
+                    user_id: s.id,
+                    leads_converted: 0,
+                    leads_active: 0,
+                    sales: '0',
+                    monthly_target: '0',
+                    target_progress_pct: null,
+                    rating: '0',
+                    commission_rate: '0',
+                  } satisfies PerformanceOut),
+              }));
               subscriber.next(rows);
               subscriber.complete();
             },
