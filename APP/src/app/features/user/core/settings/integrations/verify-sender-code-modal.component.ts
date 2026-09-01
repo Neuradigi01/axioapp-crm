@@ -111,6 +111,6 @@ export class VerifySenderCodeModalComponent {
   onBackdropClick(event: MouseEvent): void {
     if (event.target === event.currentTarget && !this.submitting()) {
       this.cancelled.emit();
-    } 
+    }
   }
 }
