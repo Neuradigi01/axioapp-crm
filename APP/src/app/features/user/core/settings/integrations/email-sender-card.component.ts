@@ -14,6 +14,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   OnInit,
@@ -66,6 +67,12 @@ export class EmailSenderCardComponent implements OnInit {
   private readonly accountsApi = inject(EmailAccountsApiService);
   private readonly domainsApi = inject(EmailSenderSetupApiService);
   private readonly destroyRef = inject(DestroyRef);
+  /** Zoneless-mode belt-and-braces: HTTP subscribe callbacks land
+   *  signal writes but the view sometimes doesn't repaint until the
+   *  next user interaction. Explicit `markForCheck()` after every
+   *  async mutation removes the race — same pattern as the fix in
+   *  `lead-follow-ups-panel.component.ts`. */
+  private readonly cdr = inject(ChangeDetectorRef);
 
   protected readonly senders = signal<UnifiedSender[] | null>(null);
   protected readonly loading = signal(false);
@@ -177,10 +184,12 @@ export class EmailSenderCardComponent implements OnInit {
             message: `Default sender set to ${row.from_address}.`,
           });
           this._load();
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.settingDefaultId.set(null);
           this.rowError.set(extractApiError(err) ?? 'Could not set default sender.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -206,10 +215,12 @@ export class EmailSenderCardComponent implements OnInit {
           this.deletingId.set(null);
           this.toast.set({ tone: 'success', message: `Removed ${row.from_address}.` });
           this._load();
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.deletingId.set(null);
           this.rowError.set(extractApiError(err) ?? 'Could not delete sender.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -241,6 +252,7 @@ export class EmailSenderCardComponent implements OnInit {
       error: (err: HttpErrorResponse) => {
         this.reconnectingId.set(null);
         this.rowError.set(extractApiError(err) ?? 'Could not start reconnect.');
+        this.cdr.markForCheck();
       },
     });
   }
@@ -271,10 +283,12 @@ export class EmailSenderCardComponent implements OnInit {
           this.disconnectingId.set(null);
           this.toast.set({ tone: 'success', message: `Disconnected ${row.from_address}.` });
           this._load();
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.disconnectingId.set(null);
           this.rowError.set(extractApiError(err) ?? 'Could not disconnect account.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -311,10 +325,12 @@ export class EmailSenderCardComponent implements OnInit {
           });
           this._loadDomains();
           this._loadDnsForDomain(row.id);
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.creatingDomain.set(false);
           this.domainsError.set(extractApiError(err) ?? 'Could not add domain.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -336,6 +352,7 @@ export class EmailSenderCardComponent implements OnInit {
               : `${result.domain} — DNS records not yet detected. Try again in a few minutes.`,
           });
           this._loadDomains();
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.verifyingDomainId.set(null);
@@ -346,6 +363,7 @@ export class EmailSenderCardComponent implements OnInit {
           } else {
             this.domainsError.set(extractApiError(err) ?? 'Could not verify domain.');
           }
+          this.cdr.markForCheck();
         },
       });
   }
@@ -378,10 +396,12 @@ export class EmailSenderCardComponent implements OnInit {
           this.deletingDomainId.set(null);
           this.toast.set({ tone: 'success', message: `Removed ${row.domain}.` });
           this._loadDomains();
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.deletingDomainId.set(null);
           this.domainsError.set(extractApiError(err) ?? 'Could not remove domain.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -487,10 +507,12 @@ export class EmailSenderCardComponent implements OnInit {
           } else {
             this.domains.set(null);
           }
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load senders.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -504,10 +526,12 @@ export class EmailSenderCardComponent implements OnInit {
         next: (rows) => {
           this.domains.set(rows);
           this.domainsLoading.set(false);
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.domainsLoading.set(false);
           this.domainsError.set(extractApiError(err) ?? 'Could not load domains.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -519,9 +543,11 @@ export class EmailSenderCardComponent implements OnInit {
       .subscribe({
         next: (res) => {
           this.dnsModal.set({ domain: res.domain, records: res.records });
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.domainsError.set(extractApiError(err) ?? 'Could not load DNS records.');
+          this.cdr.markForCheck();
         },
       });
   }

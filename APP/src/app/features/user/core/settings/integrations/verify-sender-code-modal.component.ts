@@ -10,6 +10,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   inject,
@@ -34,6 +35,7 @@ import { EmailSendersApiService, SmtpSender } from './email-senders-api.service'
 export class VerifySenderCodeModalComponent {
   private readonly api = inject(EmailSendersApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   /** ID of the pending SMTP sender row awaiting verification. */
   readonly senderId = input.required<string>();
@@ -68,10 +70,12 @@ export class VerifySenderCodeModalComponent {
         next: (row) => {
           this.submitting.set(false);
           this.verified.emit(row);
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.error.set(extractApiError(err) ?? 'Verification failed. Try again.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -89,10 +93,12 @@ export class VerifySenderCodeModalComponent {
           this.resending.set(false);
           this.info.set(`New code sent to ${this.fromAddress()}. Check your inbox.`);
           this.code.reset('');
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.resending.set(false);
           this.error.set(extractApiError(err) ?? 'Could not resend code.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -105,6 +111,6 @@ export class VerifySenderCodeModalComponent {
   onBackdropClick(event: MouseEvent): void {
     if (event.target === event.currentTarget && !this.submitting()) {
       this.cancelled.emit();
-    }
+    } 
   }
 }
