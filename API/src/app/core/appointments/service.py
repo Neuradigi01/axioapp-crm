@@ -692,23 +692,31 @@ async def reschedule_appointment(
         # don't error on accidental double-submits.
         return appt
 
-    # Conflict re-check at the new slot (only if the appointment is
-    # currently blocking — cancelled/no_show wouldn't collide with
-    # anything because we exclude self via exclude_id).
-    if appt.status not in _NON_BLOCKING_STATUSES:
-        conflicts = await find_conflicts(
-            session,
-            assigned_to_id=appt.assigned_to_id,
-            scheduled_at=scheduled_at,
-            duration_min=appt.duration_min,
-            exclude_id=appt.id,
-        )
-        if conflicts:
-            _raise_conflict_409(conflicts)
+    # Rescheduling a cancelled / no_show appointment implicitly
+    # transitions it back to `scheduled` — matches ALLOWED_TRANSITIONS
+    # (no_show → scheduled, cancelled → scheduled) and the intuitive
+    # meaning of "reschedule": you are rebooking a live slot, not
+    # preserving a terminal outcome against a new date.
+    reactivate = appt.status in _NON_BLOCKING_STATUSES
+
+    # Conflict re-check at the new slot. Runs whenever the appointment
+    # will be blocking after this call (either already scheduled, or
+    # about to be reactivated). Self-collision is avoided via exclude_id.
+    conflicts = await find_conflicts(
+        session,
+        assigned_to_id=appt.assigned_to_id,
+        scheduled_at=scheduled_at,
+        duration_min=appt.duration_min,
+        exclude_id=appt.id,
+    )
+    if conflicts:
+        _raise_conflict_409(conflicts)
 
     before = _snapshot(appt)
     old_at = appt.scheduled_at
     appt.scheduled_at = scheduled_at
+    if reactivate:
+        appt.status = AppointmentStatus.scheduled
     await activities.record_in_session(
         session,
         org_id=org_id,
