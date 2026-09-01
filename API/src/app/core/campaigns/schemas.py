@@ -91,6 +91,14 @@ class CampaignCreate(BaseModel):
     # below; the schema keeps the fields nullable so WhatsApp / SMS / etc
     # campaign creates don't have to send them at all.
     email_account_id: uuid.UUID | None = None
+    # Campaigns v1 follow-up (migration 0213) — alternate sender for
+    # Email campaigns that dispatch via a verified SMTP identity
+    # instead of an OAuth mailbox. Exactly one of email_account_id
+    # or smtp_sender_id must be set for Email campaigns; the
+    # `_email_channel_requires_sender_and_subject` validator below
+    # enforces the invariant and DB CHECK
+    # `ck_campaigns_email_exactly_one_sender` mirrors it.
+    smtp_sender_id: uuid.UUID | None = None
     sender_name: str | None = Field(default=None, min_length=1, max_length=120)
     reply_to: EmailStr | None = None
     subject: str | None = Field(default=None, min_length=1, max_length=998)
@@ -149,25 +157,46 @@ class CampaignCreate(BaseModel):
     @model_validator(mode="after")
     def _email_channel_requires_sender_and_subject(self) -> CampaignCreate:
         """Campaigns v1 Step 03 — Email dispatch has no way to compose
-        a real message without a mailbox, sender name, and subject.
-        Reply-to + preheader stay optional (reply-to falls back to the
-        mailbox address; preheader falls back to the first ~90 chars
-        of the body). WA / SMS / etc campaigns skip the check."""
+        a real message without a sender identity, sender name, and
+        subject. Reply-to + preheader stay optional (reply-to falls
+        back to the mailbox address; preheader falls back to the
+        first ~90 chars of the body). WA / SMS / etc campaigns skip
+        the check.
+
+        Sender identity: exactly one of ``email_account_id`` (OAuth
+        mailbox — Gmail / Microsoft) or ``smtp_sender_id`` (verified
+        SMTP sender) must be set. Zero → 422 "pick a sender"; both →
+        422 "pick only one". Non-Email channels must have both NULL
+        (schema rejects if either is populated) so no ghost sender
+        rows lurk on WhatsApp campaigns.
+        """
         if self.channel != ConversationChannel.email:
+            if self.email_account_id is not None or self.smtp_sender_id is not None:
+                raise ValueError(
+                    "Non-Email campaigns must not carry email_account_id or smtp_sender_id."
+                )
             return self
+        has_oauth = self.email_account_id is not None
+        has_smtp = self.smtp_sender_id is not None
+        if not has_oauth and not has_smtp:
+            raise ValueError(
+                "Email campaigns require a sender identity — pass either "
+                "email_account_id (OAuth mailbox) or smtp_sender_id (verified SMTP)."
+            )
+        if has_oauth and has_smtp:
+            raise ValueError(
+                "Pick only one sender: email_account_id (OAuth) OR smtp_sender_id (SMTP), not both."
+            )
         missing = [
             name
             for name, value in {
-                "email_account_id": self.email_account_id,
                 "sender_name": self.sender_name,
                 "subject": self.subject,
             }.items()
             if not value
         ]
         if missing:
-            raise ValueError(
-                "Email campaigns require: " + ", ".join(missing),
-            )
+            raise ValueError("Email campaigns require: " + ", ".join(missing))
         return self
 
     @model_validator(mode="after")
@@ -204,6 +233,10 @@ class CampaignUpdate(BaseModel):
     # here because the create-time validator already enforced the
     # invariant on the row.
     email_account_id: uuid.UUID | None = None
+    # Migration 0213 — flip a draft Email campaign between an OAuth
+    # mailbox and a verified SMTP sender. update_campaign resolves the
+    # exactly-one invariant against the row + patch as a whole.
+    smtp_sender_id: uuid.UUID | None = None
     sender_name: str | None = Field(default=None, min_length=1, max_length=120)
     reply_to: EmailStr | None = None
     subject: str | None = Field(default=None, min_length=1, max_length=998)
@@ -225,6 +258,9 @@ class CampaignOut(ORMModel):
     # Campaigns v1 Step 03 — Email sender identity + subject + preheader.
     # NULL for non-Email campaigns.
     email_account_id: uuid.UUID | None = None
+    # Migration 0213 — alternate SMTP sender identity. Exactly one of
+    # `email_account_id` / `smtp_sender_id` is populated on Email rows.
+    smtp_sender_id: uuid.UUID | None = None
     sender_name: str | None = None
     reply_to: str | None = None
     subject: str | None = None

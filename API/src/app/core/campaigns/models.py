@@ -146,6 +146,19 @@ class Campaign(Base, TenantScoped):
         nullable=True,
         index=True,
     )
+    # Campaigns v1 follow-up (migration 0213) — an Email campaign can
+    # dispatch either via an OAuth mailbox (``email_account_id``) OR a
+    # verified SMTP sender (``smtp_sender_id``). Exactly one of the two
+    # is set for Email rows; both are NULL for WhatsApp/SMS/etc.
+    # The DB-side CHECK constraint ``ck_campaigns_email_exactly_one_sender``
+    # enforces the invariant; ``schemas.CampaignCreate`` mirrors it
+    # for the API surface.
+    smtp_sender_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_email_smtp_senders.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     sender_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     reply_to: Mapped[str | None] = mapped_column(String(320), nullable=True)
     subject: Mapped[str | None] = mapped_column(String(998), nullable=True)

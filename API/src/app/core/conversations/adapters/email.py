@@ -70,6 +70,7 @@ from src.app.core.email.models import (
     EmailAccountProvider,
     EmailAccountSyncState,
 )
+from src.app.core.email_senders.models import EmailSmtpSender
 from src.app.core.email.tracking import (
     footer as tracking_footer,
 )
@@ -230,7 +231,8 @@ async def send_email(
     *,
     org_id: uuid.UUID,
     sender_user_id: uuid.UUID,
-    account_id: uuid.UUID,
+    account_id: uuid.UUID | None = None,
+    smtp_sender_id: uuid.UUID | None = None,
     contact_id: uuid.UUID,
     subject: str,
     body_text: str,
@@ -238,42 +240,95 @@ async def send_email(
     in_reply_to_message_id: uuid.UUID | None = None,
     conversation_id: uuid.UUID | None = None,
 ) -> SendEmailResult:
-    """Send an email from the rep's connected mailbox.
+    """Send an email from the org's connected sender identity.
 
-    Resolves the sender's `EmailAccount` (must be `sync_state='live'`),
-    looks up the recipient contact, finds-or-creates the conversation,
-    composes a MIME message with proper threading headers, dispatches
-    to Gmail or Microsoft, persists the outbound `Message` row, and
-    logs an activity on the contact.
+    Exactly one of ``account_id`` (OAuth mailbox — Gmail / Microsoft)
+    or ``smtp_sender_id`` (verified SMTP sender, migration 0213) must
+    be supplied. OAuth stays the primary path — reply flows, single-
+    contact sends, and the sequence scheduler all pass ``account_id``.
+    SMTP dispatch is used by the campaigns engine when the operator
+    picks an SMTP sender identity for the campaign row.
 
-    `in_reply_to_message_id` carries the CRM `messages.id` of the
-    message being replied to — we read its `channel_message_id`
-    (RFC Message-ID) to build the `In-Reply-To` + `References`
-    headers. Pass `None` for a fresh thread.
+    Both paths share the compliance + tracking machinery below
+    (contact opt-out check, CAN-SPAM footer, open-pixel injection,
+    click-tracking link rewrite, unsubscribe token). Only the actual
+    provider dispatch (Gmail API / Microsoft Graph vs raw SMTP AUTH)
+    diverges at the end.
 
-    `conversation_id` may be passed when the caller already knows
+    Threading only applies to the OAuth path (Gmail / Microsoft
+    surface RFC-5322 ``Message-Id`` headers we can echo). SMTP sends
+    still generate a Message-ID for the outbound row but don't
+    consume ``in_reply_to_message_id`` — campaign broadcasts don't
+    thread against a prior conversation anyway.
+
+    ``conversation_id`` may be passed when the caller already knows
     which conversation this belongs to (the typical compose path
     from a contact-detail page). When None, we find-or-create one
-    keyed on `(contact_id, channel=email)`.
+    keyed on ``(contact_id, channel=email)``.
     """
-    account = await email_service.get_account(session, account_id=account_id)
-    if account is None:
+    if (account_id is None) == (smtp_sender_id is None):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Email account not found for this org.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "send_email requires exactly one of account_id (OAuth) "
+                "or smtp_sender_id (SMTP)."
+            ),
         )
-    # Org-shared mailbox model: any rep in the org can send through
-    # the account connected in Settings → Integrations. RLS on the
-    # session already scopes ``get_account`` to the caller's org, so
-    # cross-tenant sends are blocked at the DAL boundary. The persisted
-    # Message row carries ``sender_user_id`` (who clicked Send) for
-    # audit — the OAuth account row's ``user_id`` is just "which
-    # human's OAuth grant we're using", NOT "who authored the message".
-    if account.sync_state == EmailAccountSyncState.disconnected:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=("Email account is disconnected — reconnect in Settings → Email Accounts."),
+
+    # Resolve sender identity + normalise to a shared shape the
+    # downstream MIME builder + persist step consume.
+    account: EmailAccount | None = None
+    smtp_sender: EmailSmtpSender | None = None
+    sender_email: str
+    sender_display: str | None
+    sender_provider_label: str
+    if account_id is not None:
+        account = await email_service.get_account(session, account_id=account_id)
+        if account is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Email account not found for this org.",
+            )
+        # Org-shared mailbox model: any rep in the org can send through
+        # the account connected in Settings → Integrations. RLS on the
+        # session already scopes ``get_account`` to the caller's org, so
+        # cross-tenant sends are blocked at the DAL boundary. The persisted
+        # Message row carries ``sender_user_id`` (who clicked Send) for
+        # audit — the OAuth account row's ``user_id`` is just "which
+        # human's OAuth grant we're using", NOT "who authored the message".
+        if account.sync_state == EmailAccountSyncState.disconnected:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Email account is disconnected — reconnect in Settings → Email Accounts."
+                ),
+            )
+        sender_email = account.email_address
+        sender_display = account.display_name
+        sender_provider_label = account.provider.value
+    else:
+        from src.app.core.email_senders import data_access as smtp_da
+
+        assert smtp_sender_id is not None  # noqa: S101 — narrowed above
+        smtp_sender = await smtp_da.get_by_id(
+            session, org_id=org_id, sender_id=smtp_sender_id
         )
+        if smtp_sender is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="SMTP sender not found for this org.",
+            )
+        if smtp_sender.verified_at is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "SMTP sender is not verified — enter the 6-digit code from "
+                    "Integrations → Email Sender first."
+                ),
+            )
+        sender_email = smtp_sender.from_address
+        sender_display = smtp_sender.display_name
+        sender_provider_label = "smtp"
 
     contact = await contacts_da.get_contact(session, contact_id)
     if contact is None or not contact.email:
@@ -362,8 +417,8 @@ async def send_email(
         tracked_body_html = tracking_footer.append(tracked_body_html, footer_html=footer_html)
 
     mime = _build_outbound_mime(
-        from_email=account.email_address,
-        from_name=account.display_name,
+        from_email=sender_email,
+        from_name=sender_display,
         to_email=contact.email,
         to_name=contact.full_name,
         subject=subject,
@@ -376,46 +431,74 @@ async def send_email(
     )
     raw_bytes = mime.as_bytes()
 
-    # Dispatch by provider. Each adapter applies its own daily-cap
-    # check + counter increment (with rollback on failure). We catch
-    # the typed `DailyCapExceeded` and re-raise as our public type
-    # so callers don't have to know which provider raised.
+    # Dispatch by sender kind. OAuth mailboxes go through their
+    # provider-specific send helper (owns the daily-cap counter +
+    # DailyCapExceeded → HardCapExceeded translation). SMTP senders
+    # dispatch via OrgSmtpBackend — no per-account daily cap in v1
+    # (the provider's own quota is the ceiling), so the caps default
+    # to 0 / False for the returned SendEmailResult.
     provider_message_id: str | None = None
-    daily_sent_after = account.daily_sent_count or 0
+    daily_sent_after = 0
     near_soft_cap = False
 
-    if account.provider == EmailAccountProvider.gmail:
-        from src.app.core.email.gmail import send as gmail_send
+    if account is not None:
+        daily_sent_after = account.daily_sent_count or 0
+        if account.provider == EmailAccountProvider.gmail:
+            from src.app.core.email.gmail import send as gmail_send
 
-        try:
-            result = await gmail_send.send(account, session, raw_mime=raw_bytes)
-        except gmail_send.DailyCapExceeded as exc:
-            raise HardCapExceeded(
-                sent=account.daily_sent_count or 0,
-                cap=gmail_send.DEFAULT_HARD_CAP,
-            ) from exc
-        provider_message_id = result.gmail_message_id
-        daily_sent_after = result.daily_sent_after
-        near_soft_cap = result.near_soft_cap
+            try:
+                result = await gmail_send.send(account, session, raw_mime=raw_bytes)
+            except gmail_send.DailyCapExceeded as exc:
+                raise HardCapExceeded(
+                    sent=account.daily_sent_count or 0,
+                    cap=gmail_send.DEFAULT_HARD_CAP,
+                ) from exc
+            provider_message_id = result.gmail_message_id
+            daily_sent_after = result.daily_sent_after
+            near_soft_cap = result.near_soft_cap
 
-    elif account.provider == EmailAccountProvider.microsoft:
-        from src.app.core.email.microsoft import send as ms_send
+        elif account.provider == EmailAccountProvider.microsoft:
+            from src.app.core.email.microsoft import send as ms_send
 
-        try:
-            result = await ms_send.send(account, session, raw_mime=raw_bytes)
-        except ms_send.DailyCapExceeded as exc:
-            raise HardCapExceeded(
-                sent=account.daily_sent_count or 0,
-                cap=ms_send.DEFAULT_HARD_CAP,
-            ) from exc
-        provider_message_id = result.provider_message_id  # None for MS
-        daily_sent_after = result.daily_sent_after
-        near_soft_cap = result.near_soft_cap
+            try:
+                result = await ms_send.send(account, session, raw_mime=raw_bytes)
+            except ms_send.DailyCapExceeded as exc:
+                raise HardCapExceeded(
+                    sent=account.daily_sent_count or 0,
+                    cap=ms_send.DEFAULT_HARD_CAP,
+                ) from exc
+            provider_message_id = result.provider_message_id  # None for MS
+            daily_sent_after = result.daily_sent_after
+            near_soft_cap = result.near_soft_cap
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail=(
+                    f"Email provider {account.provider.value} is not supported in this deploy."
+                ),
+            )
     else:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=(f"Email provider {account.provider.value} is not supported in this deploy."),
+        # SMTP path (migration 0213). Dispatch straight through the raw
+        # SMTP backend — no provider API involved, no OAuth token to
+        # refresh. Fernet-decrypt of the stored password happens inside
+        # OrgSmtpBackend.send(); SMTP-level failures bubble out as
+        # aiosmtplib exceptions which the campaign send-batch catches
+        # + marks the recipient row failed.
+        assert smtp_sender is not None  # noqa: S101 — narrowed above
+        from src.app.shared.email import Email as _Email
+        from src.app.shared.email.org_sender import OrgSmtpBackend as _OrgSmtpBackend
+
+        await _OrgSmtpBackend(sender=smtp_sender).send(
+            _Email(
+                to=contact.email,
+                subject=subject,
+                body_text=body_text,
+                body_html=tracked_body_html,
+            )
         )
+        # SMTP doesn't hand us a provider-side message id — the RFC
+        # Message-Id we minted (own_msg_id_bare) is the threading key.
+        provider_message_id = None
 
     # Persist outbound row. `channel_message_id` is OUR Message-ID
     # (the RFC 5322 token) — the threading detector matches on it
@@ -435,10 +518,10 @@ async def send_email(
         channel_message_id=own_msg_id_bare,
         payload={
             "subject": subject,
-            "from": account.email_address,
+            "from": sender_email,
             "to": contact.email,
             "in_reply_to": parent_msg_id,
-            "provider": account.provider.value,
+            "provider": sender_provider_label,
             "provider_message_id": provider_message_id,
             "body_html_present": body_html is not None,
         },
@@ -462,7 +545,7 @@ async def send_email(
             "preview": body_text[:160],
             "conversation_id": str(conversation.id),
             "message_id": str(msg.id),
-            "account_email": account.email_address,
+            "account_email": sender_email,
         },
         user_id=sender_user_id,
         org_id=org_id,
@@ -476,7 +559,7 @@ async def send_email(
             "to": contact.email,
             "subject": subject,
             "message_id": str(msg.id),
-            "provider": account.provider.value,
+            "provider": sender_provider_label,
             "provider_message_id": provider_message_id,
         },
     )

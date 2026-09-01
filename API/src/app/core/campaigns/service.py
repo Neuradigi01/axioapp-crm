@@ -70,6 +70,7 @@ from src.app.core.conversations.registry import (
 )
 from src.app.core.email import data_access as email_da
 from src.app.core.email.models import EmailAccount, EmailAccountSyncState
+from src.app.core.email_senders.models import EmailSmtpSender
 from src.app.core.integrations.whatsapp.models import WhatsAppTemplate
 from src.app.core.templates.sanitizer import (
     derive_plain_text,
@@ -137,6 +138,38 @@ async def _resolve_email_sender(
             ),
         )
     return account
+
+
+async def _resolve_smtp_sender(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    sender_id: uuid.UUID,
+) -> EmailSmtpSender:
+    """Migration-0213 companion to :func:`_resolve_email_sender` — verify
+    the requested SMTP sender identity exists in this org and has been
+    verified (``verified_at`` stamped). Returns the row so callers can
+    persist ``smtp_sender_id`` on the campaign; raises 400 when the row
+    is missing, cross-org, or still awaiting the 6-digit code from
+    ``core/email_senders/verify_smtp_sender``.
+    """
+    from src.app.core.email_senders import data_access as smtp_da
+
+    sender = await smtp_da.get_by_id(session, org_id=org_id, sender_id=sender_id)
+    if sender is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="SMTP sender not found or belongs to another org.",
+        )
+    if sender.verified_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Selected SMTP sender is not verified — enter the 6-digit code from "
+                "the verification email in Integrations → Email Sender first."
+            ),
+        )
+    return sender
 
 
 async def _check_email_sender_readiness(
@@ -510,16 +543,24 @@ async def create_campaign(
             campaign_channel=payload.channel,
             template_ids=template_ids_to_check,
         )
-    # Campaigns v1 Step 03 — verify the referenced mailbox exists +
-    # is connected. The schema layer already enforced
-    # required-when-Email; here we do the cross-module read + status
+    # Campaigns v1 Step 03 — verify the referenced sender identity
+    # exists + is usable. The schema layer already enforced that
+    # exactly one of email_account_id / smtp_sender_id is set on
+    # Email campaigns; here we do the cross-module read + status
     # gate that only the service layer can own.
-    if payload.channel == ConversationChannel.email and payload.email_account_id is not None:
-        await _resolve_email_sender(
-            session,
-            org_id=org_id,
-            account_id=payload.email_account_id,
-        )
+    if payload.channel == ConversationChannel.email:
+        if payload.email_account_id is not None:
+            await _resolve_email_sender(
+                session,
+                org_id=org_id,
+                account_id=payload.email_account_id,
+            )
+        elif payload.smtp_sender_id is not None:
+            await _resolve_smtp_sender(
+                session,
+                org_id=org_id,
+                sender_id=payload.smtp_sender_id,
+            )
     campaign = Campaign(
         org_id=org_id,
         name=payload.name,
@@ -544,6 +585,7 @@ async def create_campaign(
         # the required-when-Email check, and non-Email payloads simply
         # default these to None).
         email_account_id=payload.email_account_id,
+        smtp_sender_id=payload.smtp_sender_id,
         sender_name=payload.sender_name,
         reply_to=str(payload.reply_to) if payload.reply_to is not None else None,
         subject=payload.subject,
@@ -654,6 +696,23 @@ async def update_campaign(
             account_id=payload.email_account_id,
         )
         campaign.email_account_id = payload.email_account_id
+        # Flipping to an OAuth mailbox clears any prior SMTP sender so
+        # the row keeps satisfying the exactly-one CHECK constraint.
+        campaign.smtp_sender_id = None
+        changed = True
+    if (
+        payload.smtp_sender_id is not None
+        and payload.smtp_sender_id != campaign.smtp_sender_id
+    ):
+        await _resolve_smtp_sender(
+            session,
+            org_id=campaign.org_id,
+            sender_id=payload.smtp_sender_id,
+        )
+        campaign.smtp_sender_id = payload.smtp_sender_id
+        # Flipping to an SMTP sender clears any prior OAuth mailbox so
+        # the row keeps satisfying the exactly-one CHECK constraint.
+        campaign.email_account_id = None
         changed = True
     if payload.sender_name is not None:
         campaign.sender_name = payload.sender_name
@@ -1138,43 +1197,79 @@ async def dispatch_chunk(
     # template's HTML + text land the body when the campaign references
     # one. Both loads are once-per-chunk (not once-per-contact).
     email_account: EmailAccount | None = None
+    email_smtp_sender: EmailSmtpSender | None = None
     email_template_body_html: str | None = None
     email_template_body_text: str | None = None
     email_template_subject: str | None = None
     if campaign.channel == ConversationChannel.email:
-        if campaign.email_account_id is None:
+        # Migration 0213 — exactly one of email_account_id / smtp_sender_id
+        # is set on Email rows (schema + DB CHECK enforce). Resolve the
+        # matching sender once for the chunk instead of per-recipient.
+        if campaign.email_account_id is None and campaign.smtp_sender_id is None:
             for cid in contact_ids:
                 await _mark_message(
                     session,
                     campaign_id=campaign_id,
                     contact_id=cid,
                     new_status=CampaignMessageStatus.failed,
-                    error="email campaign has no sender mailbox",
+                    error="email campaign has no sender identity",
                 )
             return
-        email_account = await email_da.get_account_by_id(
-            session, account_id=campaign.email_account_id
-        )
-        if email_account is None or email_account.org_id != campaign.org_id:
-            for cid in contact_ids:
-                await _mark_message(
-                    session,
-                    campaign_id=campaign_id,
-                    contact_id=cid,
-                    new_status=CampaignMessageStatus.failed,
-                    error="sender mailbox not found or belongs to another org",
-                )
-            return
-        if email_account.sync_state != EmailAccountSyncState.live:
-            for cid in contact_ids:
-                await _mark_message(
-                    session,
-                    campaign_id=campaign_id,
-                    contact_id=cid,
-                    new_status=CampaignMessageStatus.failed,
-                    error="sender mailbox is not connected — reconnect it",
-                )
-            return
+        if campaign.email_account_id is not None:
+            email_account = await email_da.get_account_by_id(
+                session, account_id=campaign.email_account_id
+            )
+            if email_account is None or email_account.org_id != campaign.org_id:
+                for cid in contact_ids:
+                    await _mark_message(
+                        session,
+                        campaign_id=campaign_id,
+                        contact_id=cid,
+                        new_status=CampaignMessageStatus.failed,
+                        error="sender mailbox not found or belongs to another org",
+                    )
+                return
+            if email_account.sync_state != EmailAccountSyncState.live:
+                for cid in contact_ids:
+                    await _mark_message(
+                        session,
+                        campaign_id=campaign_id,
+                        contact_id=cid,
+                        new_status=CampaignMessageStatus.failed,
+                        error="sender mailbox is not connected — reconnect it",
+                    )
+                return
+        else:
+            from src.app.core.email_senders import data_access as smtp_da
+
+            email_smtp_sender = await smtp_da.get_by_id(
+                session,
+                org_id=campaign.org_id,
+                sender_id=campaign.smtp_sender_id,
+            )
+            if email_smtp_sender is None:
+                for cid in contact_ids:
+                    await _mark_message(
+                        session,
+                        campaign_id=campaign_id,
+                        contact_id=cid,
+                        new_status=CampaignMessageStatus.failed,
+                        error="SMTP sender not found or belongs to another org",
+                    )
+                return
+            if email_smtp_sender.verified_at is None:
+                for cid in contact_ids:
+                    await _mark_message(
+                        session,
+                        campaign_id=campaign_id,
+                        contact_id=cid,
+                        new_status=CampaignMessageStatus.failed,
+                        error=(
+                            "SMTP sender is not verified — enter the 6-digit code "
+                            "in Integrations → Email Sender"
+                        ),
+                    )
+                return
         if campaign.template_id is not None:
             from src.app.core.templates import service as templates_service
 
@@ -1299,7 +1394,10 @@ async def dispatch_chunk(
         # its own account resolution, MIME composition, threading, and
         # inbox-message persistence.
         if campaign.channel == ConversationChannel.email:
-            assert email_account is not None  # noqa: S101 — pre-loaded above
+            # Migration 0213 — exactly one of the two pre-loaded senders
+            # is non-None here (guarded above). Retain the assertion so
+            # a future refactor that adds a new sender kind trips fast.
+            assert email_account is not None or email_smtp_sender is not None  # noqa: S101
             from fastapi import HTTPException as _HTTPExc
 
             from src.app.core.campaigns.send_guard import (
@@ -1350,17 +1448,36 @@ async def dispatch_chunk(
             rendered_html = render_body(eff_html, contact) if eff_html else None
             rendered_text = render_body(eff_text, contact) if eff_text else ""
 
+            # Migration 0213 — sender-identity branch. OAuth path uses
+            # the mailbox owner's user_id as sender_user_id (matches the
+            # single-user compose path). SMTP path falls back to the
+            # campaign creator — SMTP senders are org-shared identities,
+            # not tied to a specific rep, so the campaign creator is the
+            # closest "who authored this send" attribution we have.
             try:
-                result = await send_email(
-                    session,
-                    org_id=campaign.org_id,
-                    sender_user_id=email_account.user_id,
-                    account_id=email_account.id,
-                    contact_id=contact.id,
-                    subject=rendered_subject,
-                    body_text=rendered_text,
-                    body_html=rendered_html,
-                )
+                if email_account is not None:
+                    result = await send_email(
+                        session,
+                        org_id=campaign.org_id,
+                        sender_user_id=email_account.user_id,
+                        account_id=email_account.id,
+                        contact_id=contact.id,
+                        subject=rendered_subject,
+                        body_text=rendered_text,
+                        body_html=rendered_html,
+                    )
+                else:
+                    assert email_smtp_sender is not None  # noqa: S101 — narrowed above
+                    result = await send_email(
+                        session,
+                        org_id=campaign.org_id,
+                        sender_user_id=campaign.created_by_id or uuid.UUID(int=0),
+                        smtp_sender_id=email_smtp_sender.id,
+                        contact_id=contact.id,
+                        subject=rendered_subject,
+                        body_text=rendered_text,
+                        body_html=rendered_html,
+                    )
             except _HTTPExc as exc:
                 logger.info("campaign email send rejected", extra={"contact_id": str(cid)})
                 await _mark_message(
