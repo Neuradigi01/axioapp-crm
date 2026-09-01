@@ -16,7 +16,17 @@ from src.app.core.notifications.schemas import NotificationOut
 
 
 def render_email(notif: NotificationOut) -> tuple[str, str, str] | None:
-    """Return `(subject, html, text)` or None for unsupported types."""
+    """Return `(subject, html, text)` or None for unsupported types.
+
+    ``task.assigned`` and ``task.completed`` intentionally return None:
+    email delivery for both events is owned by the seeded "Task
+    Assigned" / "Task Completed" preset workflows (send.email nodes
+    addressed to ``assignee.email``). Routing them through here as
+    well would deliver two copies of the same email to the assignee.
+    The in-app bell + WebSocket push still fire via
+    ``notifications.notify`` — only the SMTP path is short-circuited
+    for these types.
+    """
     if notif.type == "appointment.assigned":
         return _render_appointment_assigned(notif)
     if notif.type == "appointment.rescheduled":
@@ -25,10 +35,6 @@ def render_email(notif: NotificationOut) -> tuple[str, str, str] | None:
         return _render_appointment_cancelled(notif)
     if notif.type == "appointment.completed":
         return _render_appointment_completed(notif)
-    if notif.type == "task.assigned":
-        return _render_task_assigned(notif)
-    if notif.type == "task.completed":
-        return _render_task_completed(notif)
     return None
 
 
@@ -138,54 +144,6 @@ def _render_appointment_completed(notif: NotificationOut) -> tuple[str, str, str
         f"<li><b>Title:</b> {title}</li>"
         f"<li><b>Contact:</b> {_fmt(p.get('contact_name'))}</li>"
         f"<li><b>When:</b> {_fmt(p.get('scheduled_at'))}</li>"
-        "</ul>"
-        "<p>No further action needed.</p>"
-    )
-    return subject, html, text
-
-
-def _render_task_assigned(notif: NotificationOut) -> tuple[str, str, str]:
-    p = _p(notif)
-    title = _fmt(p.get("title"), "Untitled")
-    subject = f"New task: {title}"
-    text = (
-        "Hi,\n\n"
-        "You've been assigned a new task:\n\n"
-        f"  Title:    {title}\n"
-        f"  Due:      {_fmt(p.get('due_at'))}\n"
-        f"  Priority: {_fmt(p.get('priority'))}\n\n"
-        "Open the dashboard to see details.\n"
-    )
-    html = (
-        "<p>Hi,</p>"
-        "<p>You've been assigned a new task:</p>"
-        "<ul>"
-        f"<li><b>Title:</b> {title}</li>"
-        f"<li><b>Due:</b> {_fmt(p.get('due_at'))}</li>"
-        f"<li><b>Priority:</b> {_fmt(p.get('priority'))}</li>"
-        "</ul>"
-        "<p>Open the dashboard to see details.</p>"
-    )
-    return subject, html, text
-
-
-def _render_task_completed(notif: NotificationOut) -> tuple[str, str, str]:
-    p = _p(notif)
-    title = _fmt(p.get("title"), "Untitled")
-    subject = f"Task completed: {title}"
-    text = (
-        "Hi,\n\n"
-        "A task you own has been marked complete:\n\n"
-        f"  Title: {title}\n"
-        f"  Due:   {_fmt(p.get('due_at'))}\n\n"
-        "No further action needed.\n"
-    )
-    html = (
-        "<p>Hi,</p>"
-        "<p>A task you own has been marked complete:</p>"
-        "<ul>"
-        f"<li><b>Title:</b> {title}</li>"
-        f"<li><b>Due:</b> {_fmt(p.get('due_at'))}</li>"
         "</ul>"
         "<p>No further action needed.</p>"
     )
