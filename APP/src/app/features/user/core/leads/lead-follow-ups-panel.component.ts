@@ -17,6 +17,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   computed,
@@ -58,11 +59,21 @@ const TYPE_META: Record<TaskFollowupType, FollowupTypeMeta> = {
 export class LeadFollowUpsPanelComponent {
   private readonly api = inject(TasksApiService);
   private readonly destroyRef = inject(DestroyRef);
+  /** Belt-and-braces for zoneless mode: HTTP subscribe callbacks fire
+   *  outside any tracked execution context; signal writes SHOULD
+   *  schedule change detection on their own, but in this component
+   *  the initial data was arriving in memory but not repainting until
+   *  the next user interaction. Explicit `markForCheck()` after every
+   *  async state mutation removes the race. */
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly leadId = input.required<string>();
 
   protected readonly tasks = signal<Task[]>([]);
-  protected readonly loading = signal(false);
+  /** Start `true` so the panel renders the amber skeleton on mount
+   *  instead of flashing the misleading "No follow-ups scheduled"
+   *  empty state for the ~200 ms until the first fetch resolves. */
+  protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
   protected readonly total = signal(0);
   protected readonly page = signal(1);
@@ -155,12 +166,14 @@ export class LeadFollowUpsPanelComponent {
       .subscribe({
         next: () => {
           this._setMutating(task.id, false);
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this._setMutating(task.id, false);
           this.tasks.set(snapshot);
           this.total.update((n) => n + 1);
           this._flashRowError(task.id, extractApiError(err) ?? 'Could not mark done.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -211,10 +224,12 @@ export class LeadFollowUpsPanelComponent {
           this.tasks.update((rows) =>
             rows.map((r) => (r.id === updated.id ? updated : r)).sort(this._compareDueAt),
           );
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this._setMutating(task.id, false);
           this._flashRowError(task.id, extractApiError(err) ?? 'Could not reschedule.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -257,10 +272,12 @@ export class LeadFollowUpsPanelComponent {
             this.tasks.set(merged.sort(this._compareDueAt));
           }
           this.page.set(page);
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load follow-ups.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -280,7 +297,10 @@ export class LeadFollowUpsPanelComponent {
     this.rowError.set({ id, message });
     setTimeout(() => {
       const cur = this.rowError();
-      if (cur && cur.id === id) this.rowError.set(null);
+      if (cur && cur.id === id) {
+        this.rowError.set(null);
+        this.cdr.markForCheck();
+      }
     }, 4000);
   }
 

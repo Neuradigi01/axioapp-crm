@@ -270,6 +270,85 @@ async def _notify_task_event(
     )
 
 
+async def _notify_creator_of_delegation(
+    *,
+    org_id: uuid.UUID,
+    task: Task,
+    actor_user_id: uuid.UUID,
+) -> None:
+    """Copy the creator on their own task assignment.
+
+    Mirrors ``_notify_task_event(task.assigned)`` but goes to the person
+    who created / scheduled the task rather than the assignee. Used when
+    the creator hands the task to someone else — they get a paper-trail
+    "You scheduled X for Y" record in their inbox that mirrors the
+    assignee's bell.
+
+    Caller must ensure ``actor_user_id != task.assigned_to_id`` — this
+    helper does not de-dupe.
+    """
+    if task.assigned_to_id is None:
+        return
+    payload: dict[str, Any] = {
+        "task_id": str(task.id),
+        "title": task.title,
+        "due_at": task.due_at.isoformat() if task.due_at else None,
+        "priority": task.priority.value,
+        "assigned_to_id": str(task.assigned_to_id),
+        "related_entity_type": task.related_entity_type,
+        "related_entity_id": (
+            str(task.related_entity_id) if task.related_entity_id else None
+        ),
+    }
+    from src.app.core.notifications import service as notifications
+
+    await notifications.notify(
+        org_id=org_id,
+        user_id=actor_user_id,
+        type="task.assigned",
+        title=f"You scheduled a task: {task.title}",
+        body=f"Due {_fmt_due_at(task.due_at)} · Assigned to teammate",
+        payload=payload,
+    )
+
+
+async def notify_task_created(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    task: Task,
+    actor_user_id: uuid.UUID | None,
+) -> None:
+    """Fan-out notification for a newly-created task: assignee + creator.
+
+    Two audiences:
+     * **Assignee** — always notified when there is one. This is the
+       "New task: <title>" bell/email they've come to expect.
+     * **Creator (actor)** — additionally notified when they delegated
+       the task to somebody else (creator != assignee). Suppressed when
+       the creator assigned it to themselves so they don't get a bell
+       for their own to-do.
+
+    Publishes ``task.assigned`` on the workflow bus as a side-effect so
+    user-authored automations fire off the same signal.
+
+    Best-effort: every notification/publish failure is swallowed by the
+    underlying helpers so a broken notifier can never unwind the
+    caller's transaction.
+    """
+    if task.assigned_to_id is not None:
+        await _notify_task_event(org_id=org_id, task=task, event_type="task.assigned")
+        await _publish_task_assigned(session, org_id=org_id, task=task)
+    if (
+        task.assigned_to_id is not None
+        and actor_user_id is not None
+        and actor_user_id != task.assigned_to_id
+    ):
+        await _notify_creator_of_delegation(
+            org_id=org_id, task=task, actor_user_id=actor_user_id
+        )
+
+
 async def _publish_task_assigned(
     session: AsyncSession, *, org_id: uuid.UUID, task: Task
 ) -> None:
@@ -386,18 +465,14 @@ async def create_task(
         after=_snapshot(task),
     )
 
-    # Fire `task.assigned` only when the assignee isn't the creator —
-    # a rep creating a self-note doesn't need an email to themselves.
-    # Explicit assignees (delegation) always publish, even if the
-    # picked user is the creator, because that was a conscious action.
-    is_self_assign = (
-        payload.assigned_to_id is None and task.assigned_to_id == current_user_id
+    # Fan-out notifications to the assignee AND the creator (paper trail
+    # when the creator delegated it to somebody else). Self-created +
+    # self-assigned tasks stop at the single assignee bell — no double
+    # noise for the rep making their own to-do. Detailed rules live in
+    # `notify_task_created`.
+    await notify_task_created(
+        session, org_id=org_id, task=task, actor_user_id=current_user_id
     )
-    if not is_self_assign:
-        await _publish_task_assigned(session, org_id=org_id, task=task)
-        await _notify_task_event(
-            org_id=org_id, task=task, event_type="task.assigned"
-        )
     return task
 
 
@@ -801,5 +876,6 @@ __all__ = [
     "list_all_in_org",
     "list_my_tasks",
     "list_tasks_for_entity",
+    "notify_task_created",
     "update_task",
 ]

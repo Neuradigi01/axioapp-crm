@@ -67,6 +67,7 @@ from src.app.core.pipelines import data_access as _pipelines_da
 from src.app.core.pipelines import move_card
 from src.app.core.pipelines.service import get_pipeline_by_key
 from src.app.core.tasks import data_access as _tasks_da
+from src.app.core.tasks import service as _tasks_service
 from src.app.core.tasks.models import Task
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.custom_fields import validate_custom_data
@@ -2052,6 +2053,22 @@ async def log_update_for_lead(
                 else lead.status.value
             ),
         )
+
+    # 10. Notify + publish for the follow-up task, if one was created.
+    #     The task was inserted via the raw DAL (step 7) so it bypassed
+    #     `create_task`; without this call the assignee would never get
+    #     the "New task" bell that a direct POST /tasks fires. Fans out
+    #     to both the assignee and the creator (paper-trail bell when
+    #     delegating), matching create_task's behaviour.
+    if next_task_id is not None:
+        follow_up = await _tasks_da.get_task_by_id(session, next_task_id)
+        if follow_up is not None:
+            await _tasks_service.notify_task_created(
+                session,
+                org_id=org_id,
+                task=follow_up,
+                actor_user_id=actor_id,
+            )
 
     return lead, next_task_id
 
