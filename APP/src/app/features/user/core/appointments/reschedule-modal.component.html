@@ -14,26 +14,16 @@
       }
     </header>
     <div class="space-y-3 px-5 py-4">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label for="reschedule_date" class="block text-xs font-medium text-default">Date</label>
-          <input
-            id="reschedule_date"
-            type="date"
-            [formControl]="dateControl"
-            [min]="todayDate()"
-            max="9999-12-31"
-            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          />
-        </div>
-        <div>
-          <label for="reschedule_time" class="block text-xs font-medium text-default">Time</label>
-          <input
-            id="reschedule_time"
-            type="time"
-            [formControl]="timeControl"
-            [attr.min]="minTimeForSelectedDate()"
-            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+      <div>
+        <label for="reschedule_scheduled_at" class="block text-xs font-medium text-default">
+          New slot
+        </label>
+        <div class="mt-1">
+          <crm-mobile-datetime
+            id="reschedule_scheduled_at"
+            [formControl]="scheduledAtControl"
+            [min]="scheduledAtMin"
+            placeholder="Pick date & time"
           />
         </div>
       </div>
