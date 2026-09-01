@@ -45,6 +45,12 @@ CATALOG: list[NotificationEventEntry] = [
         description="An appointment you own was cancelled.",
         group="Appointments",
     ),
+    NotificationEventEntry(
+        event_type="appointment.completed",
+        label="Appointment I own was marked complete",
+        description="An appointment you own was marked complete.",
+        group="Appointments",
+    ),
     # --- Tasks ------------------------------------------------------------
     NotificationEventEntry(
         event_type="task.assigned",

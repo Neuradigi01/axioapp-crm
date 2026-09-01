@@ -150,10 +150,11 @@ async def _dispatch_calendar_sync(
 
 # --- Notification helpers --------------------------------------------------
 #
-# Three notification types fire from this module:
+# Four notification types fire from this module:
 #   - appointment.assigned    — new appointment OR reassign
 #   - appointment.rescheduled — slot moved
 #   - appointment.cancelled   — status flipped to cancelled
+#   - appointment.completed   — status flipped to completed
 #
 # The notifications service opens its own session and is non-raising, so
 # these helpers are safe to call after the main transaction commits.
@@ -205,6 +206,12 @@ async def _notify_appointment_event(
             body = f"{contact_name} on {when_human} was cancelled"
         else:
             body = f"{when_human} was cancelled"
+    elif event_type == "appointment.completed":
+        title = f"Appointment completed: {appt.title}"
+        if contact_name:
+            body = f"{contact_name} on {when_human} marked complete"
+        else:
+            body = f"{when_human} marked complete"
     else:
         return  # unknown type, nothing to send
 
@@ -541,6 +548,28 @@ async def update_appointment(
                 recipient_user_id=appt.assigned_to_id,
                 actor_user_id=current_user_id,
                 event_type="appointment.cancelled",
+            )
+
+    # Notify on a status-flip to `completed`. No self-suppression:
+    # marking-complete is a milestone we want to leave a paper trail
+    # for even when the owner did it themselves (same pattern as
+    # reschedule). Users who don't want the noise can toggle the
+    # ``appointment.completed`` preference off in Settings.
+    if (
+        "status" in changes
+        and changes["status"] is not None
+        and appt.status == AppointmentStatus.completed
+        and appt.status != old_status
+    ):
+        ctx = get_context()
+        if ctx.org_id is not None:
+            await _notify_appointment_event(
+                session=session,
+                appt=appt,
+                org_id=ctx.org_id,
+                recipient_user_id=appt.assigned_to_id,
+                actor_user_id=current_user_id,
+                event_type="appointment.completed",
             )
 
     # tasks/google-calendar-sync Step 4 — calendar-sync dispatch. Two

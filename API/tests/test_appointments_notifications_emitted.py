@@ -1,13 +1,14 @@
 """HTTP coverage for the notifications emitted by the appointments module
 (Step 5 of update-appointments-page).
 
-Three notification types fire from appointments/service.py:
+Four notification types fire from appointments/service.py:
   - `appointment.assigned`    (on create + on reassign single + bulk)
   - `appointment.rescheduled` (on reschedule)
   - `appointment.cancelled`   (on PATCH status -> cancelled)
+  - `appointment.completed`   (on PATCH status -> completed)
 
 Self-spam suppression: when the recipient == actor, no row is written.
-Reschedule is the only event that fires unconditionally (paper trail).
+Reschedule and completed fire unconditionally (paper trail).
 """
 
 from __future__ import annotations
