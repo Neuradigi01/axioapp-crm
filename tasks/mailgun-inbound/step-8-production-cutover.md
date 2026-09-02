@@ -1,19 +1,21 @@
-# Step 8 — Production cutover (`reply.neuradigi.com` DNS + prod verify + runbook + rotation drill)
+# Step 8 — Production cutover (`reply.karmcrm.com` DNS + prod verify + runbook + rotation drill)
 
-**Status:** PARTIAL — 2026-09-02. Operator runbook shipped (`mailgun-setup-runbook.md`) with first-time setup, key rotation, DLQ inspection, "no inbounds are landing" checklist, emergency disable, common failures, and custom-domain follow-up notes. **Blocked-on-user:** (a) verify Step 7 sandbox smoke first; (b) add `reply.neuradigi.com` in Mailgun dashboard; (c) publish DNS records at `neuradigi.com` registrar; (d) wait for green verification; (e) ping me to flip prod env + re-run route script.
+**Status:** MOSTLY COMPLETED — 2026-09-02. DNS records added at Cloudflare (karmcrm.com owner did it manually — 4 TXT + 2 MX + 1 CNAME) and verified green in Mailgun (SPF ✅ / DKIM ✅ / MX ×2 ✅). Env flipped in `config.env` (`MAILGUN_DOMAIN=reply.karmcrm.com`, `INBOUND_EMAIL_DOMAIN=reply.karmcrm.com`). Full stack restarted. Old sandbox route deleted (`6a97f5b2f6a1c923ecf1c0e3`). New prod route created (`6a980b024f83d7b2bb098557`) via `mailgun_route_setup.py` — prod-domain safeguard prompted, CONFIRMed. Operator runbook shipped (`mailgun-setup-runbook.md`) with first-time setup, key rotation, DLQ inspection, "no inbounds are landing" checklist, emergency disable, common failures. **Remaining user-driven items:** (a) real Gmail round-trip smoke (send from CRM → reply from Gmail → verify CRM inbox); (b) attachment round-trip; (c) signing-key rotation drill (low-risk to defer to a scheduled window).
+
+**Domain note:** Originally specced against `reply.neuradigi.com` — pivoted to `reply.karmcrm.com` mid-cutover after Cloudflare account-ownership mismatch on `neuradigi.com`. All docs updated to reflect the actual prod domain.
 **Effort:** ~0.25 day active + DNS propagation wait (~15 min to few hours).
 **Depends on:** Step 7 (sandbox smoke passed).
 **Blocks:** Nothing.
 
 ## Goal
 
-Move from Mailgun sandbox to the production `reply.neuradigi.com` receiving domain. Zero code change; only env vars and Mailgun-dashboard config.
+Move from Mailgun sandbox to the production `reply.karmcrm.com` receiving domain. Zero code change; only env vars and Mailgun-dashboard config.
 
 Ship the runbook so the operator can do rotation, key recovery, and DLQ inspection without asking.
 
 ## Prerequisites (you do)
 
-1. **Add domain in Mailgun dashboard** → Sending → Domains → Add New Domain → `reply.neuradigi.com`, US region.
+1. **Add domain in Mailgun dashboard** → Sending → Domains → Add New Domain → `reply.karmcrm.com`, US region.
 2. **Get the DNS records Mailgun requires** — typically:
    - **MX**: `10 mxa.mailgun.org` + `10 mxb.mailgun.org`
    - **TXT (SPF)**: `v=spf1 include:mailgun.org ~all`
@@ -28,22 +30,22 @@ Ship the runbook so the operator can do rotation, key recovery, and DLQ inspecti
 **Env flip:**
 
 - `config.env` (prod):
-  - `MAILGUN_DOMAIN=reply.neuradigi.com`
-  - `INBOUND_EMAIL_DOMAIN=reply.neuradigi.com`
+  - `MAILGUN_DOMAIN=reply.karmcrm.com`
+  - `INBOUND_EMAIL_DOMAIN=reply.karmcrm.com`
   - `MAILGUN_WEBHOOK_URL=https://crm-api.neuradigi.com/api/v1/webhooks/mailgun/inbound`
 - Restart the API + Celery workers to pick up the new env.
 
 **Re-run route setup against prod:**
 
-- `API\run.cmd exec python -m src.app.scripts.mailgun_route_setup` — the script's prod-domain safeguard will prompt for `CONFIRM` since we're mutating `reply.neuradigi.com`.
+- `API\run.cmd exec python -m src.app.scripts.mailgun_route_setup` — the script's prod-domain safeguard will prompt for `CONFIRM` since we're mutating `reply.karmcrm.com`.
 
 **Backfill outbound Reply-To for existing SMTP-sender messages:**
 
-- Not needed — Reply-To is generated at send time from the current `INBOUND_EMAIL_DOMAIN`. Existing outbound messages already sent with sandbox addresses will bounce; new sends use `reply.neuradigi.com`. No migration.
+- Not needed — Reply-To is generated at send time from the current `INBOUND_EMAIL_DOMAIN`. Existing outbound messages already sent with sandbox addresses will bounce; new sends use `reply.karmcrm.com`. No migration.
 
 **Prod smoke:**
 
-- Send a test SMTP email in production. Verify `Reply-To: in_<token>@reply.neuradigi.com` on the outbound.
+- Send a test SMTP email in production. Verify `Reply-To: in_<token>@reply.karmcrm.com` on the outbound.
 - Reply from Gmail. Verify CRM ingest.
 - Send with attachment. Verify.
 
@@ -103,7 +105,7 @@ None new. Reuse Step 7's smoke.
 ## Self-check
 
 - [ ] All DNS records verified in Mailgun dashboard (green checks).
-- [ ] `MAILGUN_DOMAIN` = `reply.neuradigi.com` in prod config.
+- [ ] `MAILGUN_DOMAIN` = `reply.karmcrm.com` in prod config.
 - [ ] Route re-created against prod domain (script confirmed).
 - [ ] Prod smoke passed end-to-end.
 - [ ] Rotation drill executed successfully once, documented.
@@ -112,7 +114,7 @@ None new. Reuse Step 7's smoke.
 ## Report template
 
 ```
-DNS records added and verified for reply.neuradigi.com:
+DNS records added and verified for reply.karmcrm.com:
   - MX ×2: green
   - SPF: green
   - DKIM: green

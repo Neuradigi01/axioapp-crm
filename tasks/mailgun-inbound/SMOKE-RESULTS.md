@@ -2,11 +2,17 @@
 
 **Status:** 8 of 10 items PASS (synthetic + backend paths). 2 items require a real Gmail round-trip through Mailgun's public egress — user drives those.
 
-**Environment**
-- Sandbox domain: `sandbox3f4add564a974bc6a2c07ebf6d1fad9a.mailgun.org`
+**Environment (sandbox smoke — 2026-09-02, morning)**
+- Sandbox domain: `sandbox3f4add564a974bc6a2c07ebf6d1fad9a.mailgun.org` (route deleted during prod cutover, 2026-09-02 afternoon)
 - Webhook URL: `https://crm-api.neuradigi.com/api/v1/webhooks/mailgun/inbound`
-- Route id: `6a97f5b2f6a1c923ecf1c0e3` (created via `mailgun_route_setup.py` on 2026-09-02)
+- Sandbox route id: `6a97f5b2f6a1c923ecf1c0e3` (created via `mailgun_route_setup.py` on 2026-09-02, deleted 2026-09-02 during prod cutover to free free-tier slot)
 - Target org for spoof test: `e3684043-a281-45a8-8108-57413a57a08e`
+
+**Prod cutover (2026-09-02, afternoon)**
+- Prod domain: `reply.karmcrm.com` (Cloudflare-managed DNS on karmcrm.com; 6 records added manually by domain owner; Mailgun verified SPF/DKIM/MX green)
+- Prod route id: `6a980b024f83d7b2bb098557` (created via `mailgun_route_setup.py` on 2026-09-02 with `MAILGUN_DOMAIN=reply.karmcrm.com`)
+- Expression: `match_recipient(".*@reply\.karmcrm\.com")`
+- Actions: `forward("https://crm-api.neuradigi.com/api/v1/webhooks/mailgun/inbound")` → `stop()`
 
 ---
 
@@ -168,11 +174,12 @@ Beyond the 10-item plan, the smoke also verified:
 
 ## Post-smoke wrap-up
 
-- [x] Route created + verified
+- [x] Sandbox route created + verified (deleted 2026-09-02 during prod cutover to free free-tier slot)
 - [x] 5 auth-path smoke items PASS
 - [x] 3 ingest-path smoke items PASS (spoof-drop, auto-responder, DLQ)
 - [x] Orphan sweeper verified
 - [x] 2 real bugs uncovered + fixed (compose passthrough, SET LOCAL bind)
-- [ ] Real Gmail round-trip pending (items 1–3)
-- [ ] Signing-key rotation drill (Step 8)
-- [ ] Ready to add `reply.neuradigi.com` in Mailgun → Domains (Step 8)
+- [x] Prod domain `reply.karmcrm.com` added in Mailgun → DNS records added at Cloudflare by domain owner → SPF/DKIM/MX verified green
+- [x] Env flipped in `config.env` + stack restarted + prod route created (id `6a980b024f83d7b2bb098557`)
+- [ ] Real Gmail round-trip pending (items 1–3, now against prod domain)
+- [ ] Signing-key rotation drill (deferrable — low risk to schedule for a low-traffic window)
