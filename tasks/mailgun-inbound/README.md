@@ -413,7 +413,7 @@ Gmail and Microsoft OAuth mailboxes do not have this problem — the sync daemon
 | # | Title | Status | Files | Effort |
 |---|---|---|---|---|
 | 0 | [Migration: partial unique index on `tbl_messages` + collision probe (per-org prereq)](step-0-messages-dedup-index.md) | **COMPLETED** (2026-09-02, migration `0214` applied against prod; 685 existing messages passed probe) | 3 (migration + model + tests) | ~0.25 day |
-| 1 | [Backend: `inbound_token` + `capture_replies_in_crm` columns + SPF/DKIM columns + DLQ table + backfill + `find_contact_by_email`](step-1-backend-schema-and-dal.md) | Pending | 7 | ~0.5 day |
+| 1 | [Backend: `inbound_token` + `capture_replies_in_crm` columns + SPF/DKIM columns + DLQ table + backfill + `find_contact_by_email`](step-1-backend-schema-and-dal.md) | **COMPLETED** (2026-09-02, migration `0215` applied against prod; 2 existing SMTP senders backfilled with tokens; DLQ table live) | 10 | ~0.5 day |
 | 2 | [Backend: 3-line Reply-To injection in `send_email` + capture toggle service + test suite](step-2-backend-reply-to-injection.md) | Pending | 3 | ~0.25 day |
 | 3 | [Backend: `core/email/mailgun/` module — webhook + signature + payload-to-disk + Celery enqueue + replay cache + key rotation](step-3-backend-webhook-and-signature.md) | Pending | 6 | ~0.75 day |
 | 4 | [Backend: ingest — token resolve + SPF/DKIM enforcement + auto-responder detection + shared `_persist_inbound_email` refactor + threading org-scoping](step-4-backend-ingest-and-shared-helper.md) | Pending | 5 | ~1 day |

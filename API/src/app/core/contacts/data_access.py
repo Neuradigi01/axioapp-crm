@@ -70,6 +70,36 @@ async def get_contact_by_phone(session: AsyncSession, phone: str) -> Contact | N
     return result.scalar_one_or_none()
 
 
+async def find_contact_by_email(
+    session: AsyncSession, *, org_id: uuid.UUID, email: str
+) -> Contact | None:
+    """Resolve a contact by email within a specific org.
+
+    Case-insensitive lookup on ``Contact.email``. ``org_id`` is passed
+    EXPLICITLY (not left to the tenant listener) because the Mailgun
+    ingest path runs in a Celery task where the caller has just
+    resolved the org from an inbound token — passing it in guarantees
+    the query never leaks across tenants regardless of ambient
+    context state (Attacker C3 finding from PLANNING_RULES review).
+
+    Returns the most-recently-updated match when the org has multiple
+    contacts sharing the email (rare, but the DB permits it — no
+    unique constraint on ``(org_id, email)``). Anonymised contacts
+    are excluded so an inbound reply doesn't reattach activity to a
+    DPDP-wiped record.
+    """
+    normalized = email.strip().lower()
+    result = await session.execute(
+        select(Contact)
+        .where(Contact.org_id == org_id)
+        .where(func.lower(Contact.email) == normalized)
+        .where(Contact.anonymised_at.is_(None))
+        .order_by(Contact.updated_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 def insert_contact(session: AsyncSession, contact: Contact) -> None:
     """Register an already-constructed Contact for INSERT. Caller
     commits or flushes. Used by webhook intake paths that need to
@@ -671,6 +701,7 @@ __all__ = [
     "count_contacts_filtered",
     "delete_contact_row",
     "delete_contacts_in_org",
+    "find_contact_by_email",
     "find_duplicate_candidates",
     "get_contact",
     "get_contact_by_phone",

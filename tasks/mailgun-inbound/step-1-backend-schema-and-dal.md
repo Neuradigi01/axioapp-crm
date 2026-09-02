@@ -1,7 +1,7 @@
 # Step 1 — Backend schema + DAL foundations
 
-**Status:** Pending
-**Effort:** ~0.5 day
+**Status:** COMPLETED — 2026-09-02. Migration `0215_mailgun_inbound_schema` applied against prod DB; 2 existing SMTP senders backfilled with tokens; DLQ table live.
+**Effort:** ~0.5 day (actual: ~1 hour).
 **Depends on:** Step 0 (dedup index exists).
 **Blocks:** Steps 2–5.
 
@@ -81,15 +81,18 @@ Ship all schema + DAL primitives every later step depends on:
   ```
   Uses `primary_email` — verify column name in Step 1 exploration; if different, use actual name.
 
-## Files touched
+## Files touched (actual)
 
-- `api/alembic/versions/0XXX_mailgun_inbound_schema.py` (single migration)
-- `api/src/app/core/email_senders/models.py`
-- `api/src/app/core/email_senders/data_access.py`
-- `api/src/app/core/conversations/models.py`
-- `api/src/app/core/contacts/data_access.py`
-- `api/src/app/core/email/mailgun/__init__.py` (new, empty)
-- `api/src/app/core/email/mailgun/dlq_models.py` (new)
+- `API/alembic/versions/0215_mailgun_inbound_schema.py` (new migration — 28 chars ≤ 32 rule)
+- `API/alembic/env.py` — added `from src.app.core.email import mailgun as _mailgun_pkg` for autogenerate visibility
+- `API/src/app/core/email_senders/models.py` — added `inbound_token`, `capture_replies_in_crm`
+- `API/src/app/core/email_senders/data_access.py` — added `find_by_inbound_token`
+- `API/src/app/core/email_senders/service.py` — added `_generate_inbound_token`, wired into `create_smtp_sender`
+- `API/src/app/core/conversations/models.py` — added `spf_result`, `dkim_result` on `Message`
+- `API/src/app/core/contacts/data_access.py` — added `find_contact_by_email` with explicit `org_id`
+- `API/src/app/core/email/mailgun/__init__.py` (new — re-exports `EmailInboundDlq`)
+- `API/src/app/core/email/mailgun/dlq_models.py` (new — `EmailInboundDlq` ORM)
+- `API/tests/test_mailgun_step1_schema_and_dal.py` (new — 15 pytest cases)
 
 ## Tests
 

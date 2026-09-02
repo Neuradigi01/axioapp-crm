@@ -39,6 +39,7 @@ from src.app.core.billing import models as _billing_models  # noqa: F401
 from src.app.core.dev import models as _dev_models  # noqa: F401
 from src.app.core.subscriptions import models as _subscriptions_models  # noqa: F401
 from src.app.core.chatbots import models as _chatbots_models  # noqa: F401
+from src.app.core.email import mailgun as _mailgun_pkg  # noqa: F401  # registers EmailInboundDlq
 # Layer-2 pack models. Core/Alembic loads them so autogenerate sees
 # the `fp_*` tables; the pack itself never imports core.
 from src.app.packs.furniture.modules.inventory import (

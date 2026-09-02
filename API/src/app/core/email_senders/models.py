@@ -84,6 +84,23 @@ class EmailSmtpSender(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("false"),
     )
+    # mailgun-inbound track: opaque per-sender token that becomes the
+    # recipient local-part of the outbound ``Reply-To`` header
+    # (``in_<token>@<INBOUND_EMAIL_DOMAIN>``). 12 chars of base64url =
+    # ~72 bits of entropy — url-safe, human-copyable, doesn't leak
+    # sequential DB IDs. Backfilled by migration 0215 for every
+    # existing row and enforced NOT NULL + UNIQUE thereafter.
+    inbound_token: Mapped[str] = mapped_column(
+        String(32), nullable=False, unique=True
+    )
+    # mailgun-inbound track: per-sender opt-out toggle (HubSpot parity).
+    # When ``false`` we do NOT rewrite ``Reply-To`` on this sender's
+    # outbound — replies go back to the SMTP mailbox instead of the
+    # CRM. Small-biz operators running SMTP against their own Gmail
+    # app-password often want this.
+    capture_replies_in_crm: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("true")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

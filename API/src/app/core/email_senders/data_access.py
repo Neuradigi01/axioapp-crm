@@ -74,6 +74,23 @@ async def find_default_verified(
     return result.scalar_one_or_none()
 
 
+async def find_by_inbound_token(
+    session: AsyncSession, token: str
+) -> EmailSmtpSender | None:
+    """Reverse-lookup by the sender's opaque Mailgun-inbound token.
+
+    Called from the Mailgun webhook Celery task to resolve
+    ``in_<token>@…`` → sender → org. NOT tenant-scoped: the token
+    IS the tenant discriminator (each token points at exactly one
+    sender in exactly one org via the FK chain). No caller-supplied
+    ``org_id`` because the caller doesn't yet know one.
+    """
+    result = await session.execute(
+        select(EmailSmtpSender).where(EmailSmtpSender.inbound_token == token)
+    )
+    return result.scalar_one_or_none()
+
+
 async def find_any_verified(
     session: AsyncSession, *, org_id: uuid.UUID
 ) -> EmailSmtpSender | None:
@@ -155,6 +172,7 @@ __all__ = [
     "count_verified",
     "delete_by_id",
     "find_any_verified",
+    "find_by_inbound_token",
     "find_by_org_and_from",
     "find_default_verified",
     "get_by_id",

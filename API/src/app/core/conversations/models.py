@@ -272,6 +272,14 @@ class Message(Base, TenantScoped):
         server_default=sql_text("'[]'::jsonb"),
     )
     channel_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # mailgun-inbound track: Mailgun's SPF / DKIM verdict for the
+    # inbound message. NULL for outbound and for provider paths that
+    # don't surface auth results. Values: ``pass|fail|softfail|
+    # neutral|none``. Used by the ingest policy — SPF-fail or
+    # DKIM-fail + a contact-match → persist with ``contact_id=NULL``
+    # + ``payload.spoof_suspected=true`` + skip workflow events.
+    spf_result: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    dkim_result: Mapped[str | None] = mapped_column(String(16), nullable=True)
     payload: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,

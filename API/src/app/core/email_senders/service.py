@@ -58,6 +58,21 @@ def _generate_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 
 
+# mailgun-inbound track: opaque per-sender token that becomes the local
+# part of the outbound Reply-To address (``in_<token>@<INBOUND_EMAIL_DOMAIN>``).
+# 12 chars of URL-safe base64 = ~60 bits of entropy post-slice. Matches
+# the migration-side backfill helper (0215). UNIQUE-collision at these
+# odds is <1e-18 per sender — on that vanishingly rare event the DB
+# constraint raises and the caller retries.
+_INBOUND_TOKEN_LEN = 12
+
+
+def _generate_inbound_token() -> str:
+    """12-char URL-safe token. Used as the local-part of the sender's
+    ``in_<token>@<INBOUND_EMAIL_DOMAIN>`` Reply-To address."""
+    return secrets.token_urlsafe(9)[: _INBOUND_TOKEN_LEN]
+
+
 def _hash_code(code: str) -> str:
     return hashlib.sha256(code.encode("utf-8")).hexdigest()
 
@@ -162,10 +177,16 @@ async def create_smtp_sender(
         smtp_username=payload.smtp_username,
         smtp_password_enc=fernet.encrypt(raw_password),
         tls_mode=payload.tls_mode,
+        inbound_token=_generate_inbound_token(),
         verification_code_hash=_hash_code(code),
         verification_expires_at=now + _VERIFICATION_TTL,
     )
     data_access.add_sender(session, row)
+    # ``inbound_token`` UNIQUE conflict on ~60-bit collision would raise
+    # here; the caller retries the request and gets a fresh token.
+    # A retry loop in-process would need to rollback + rebuild the row,
+    # which tears down the outer transaction unnecessarily for a
+    # <1e-18 per-sender event.
     await session.flush()  # allocate row.id + expose UNIQUE conflicts
 
     subject = "Verify your CRM sender identity"
