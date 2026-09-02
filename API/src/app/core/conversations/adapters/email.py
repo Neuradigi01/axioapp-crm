@@ -38,7 +38,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.message import EmailMessage
-from email.utils import make_msgid, parseaddr
+from email.utils import formatdate, make_msgid, parseaddr
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -70,7 +70,6 @@ from src.app.core.email.models import (
     EmailAccountProvider,
     EmailAccountSyncState,
 )
-from src.app.core.email_senders.models import EmailSmtpSender
 from src.app.core.email.tracking import (
     footer as tracking_footer,
 )
@@ -83,6 +82,7 @@ from src.app.core.email.tracking import (
 from src.app.core.email.tracking import (
     tokens as tracking_tokens,
 )
+from src.app.core.email_senders.models import EmailSmtpSender
 from src.app.core.events import bus as events_bus
 from src.app.core.events.event_catalog import EMAIL_MESSAGE_RECEIVED, EMAIL_REPLIED
 from src.app.core.notifications.service import notify
@@ -239,6 +239,7 @@ async def send_email(
     body_html: str | None = None,
     in_reply_to_message_id: uuid.UUID | None = None,
     conversation_id: uuid.UUID | None = None,
+    reply_to: str | None = None,
 ) -> SendEmailResult:
     """Send an email from the org's connected sender identity.
 
@@ -270,8 +271,7 @@ async def send_email(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "send_email requires exactly one of account_id (OAuth) "
-                "or smtp_sender_id (SMTP)."
+                "send_email requires exactly one of account_id (OAuth) or smtp_sender_id (SMTP)."
             ),
         )
 
@@ -299,9 +299,7 @@ async def send_email(
         if account.sync_state == EmailAccountSyncState.disconnected:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    "Email account is disconnected — reconnect in Settings → Email Accounts."
-                ),
+                detail=("Email account is disconnected — reconnect in Settings → Email Accounts."),
             )
         sender_email = account.email_address
         sender_display = account.display_name
@@ -310,9 +308,7 @@ async def send_email(
         from src.app.core.email_senders import data_access as smtp_da
 
         assert smtp_sender_id is not None  # noqa: S101 — narrowed above
-        smtp_sender = await smtp_da.get_by_id(
-            session, org_id=org_id, sender_id=smtp_sender_id
-        )
+        smtp_sender = await smtp_da.get_by_id(session, org_id=org_id, sender_id=smtp_sender_id)
         if smtp_sender is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -426,6 +422,7 @@ async def send_email(
         body_html=tracked_body_html,
         message_id=own_msg_id_raw,
         in_reply_to=parent_msg_id,
+        reply_to=reply_to,
         list_unsubscribe_url=unsub_url,
         list_unsubscribe_mailto=_LIST_UNSUB_MAILTO,
     )
@@ -478,23 +475,22 @@ async def send_email(
                 ),
             )
     else:
-        # SMTP path (migration 0213). Dispatch straight through the raw
-        # SMTP backend — no provider API involved, no OAuth token to
-        # refresh. Fernet-decrypt of the stored password happens inside
-        # OrgSmtpBackend.send(); SMTP-level failures bubble out as
+        # SMTP path (migration 0213). Dispatch the same `raw_bytes` MIME
+        # we built above — the one carrying Message-ID, Date,
+        # List-Unsubscribe, List-Unsubscribe-Post, Reply-To, and
+        # threading headers. Rebuilding a minimal MIME inside the
+        # backend (the prior implementation) dropped all of these,
+        # which caused Gmail to junk bulk sends under its Feb-2024
+        # bulk-sender rules. SMTP-level failures bubble out as
         # aiosmtplib exceptions which the campaign send-batch catches
         # + marks the recipient row failed.
         assert smtp_sender is not None  # noqa: S101 — narrowed above
-        from src.app.shared.email import Email as _Email
         from src.app.shared.email.org_sender import OrgSmtpBackend as _OrgSmtpBackend
 
-        await _OrgSmtpBackend(sender=smtp_sender).send(
-            _Email(
-                to=contact.email,
-                subject=subject,
-                body_text=body_text,
-                body_html=tracked_body_html,
-            )
+        await _OrgSmtpBackend(sender=smtp_sender).send_raw(
+            raw_bytes=raw_bytes,
+            envelope_from=sender_email,
+            envelope_to=contact.email,
         )
         # SMTP doesn't hand us a provider-side message id — the RFC
         # Message-Id we minted (own_msg_id_bare) is the threading key.
@@ -764,9 +760,7 @@ def _email_auth_passed(headers: dict[str, str]) -> bool:
     metadata gap. Full DKIM signature verification (via ``dkimpy``)
     is a follow-up if abuse warrants it.
     """
-    auth_results = headers.get("authentication-results") or headers.get(
-        "Authentication-Results"
-    )
+    auth_results = headers.get("authentication-results") or headers.get("Authentication-Results")
     if not auth_results:
         return True
     lowered = auth_results.lower()
@@ -808,9 +802,7 @@ async def _publish_email_message_received(
             EMAIL_MESSAGE_RECEIVED,
             {
                 "conversation_id": str(conversation.id),
-                "contact_id": (
-                    str(conversation.contact_id) if conversation.contact_id else None
-                ),
+                "contact_id": (str(conversation.contact_id) if conversation.contact_id else None),
                 "message_id": str(message.id),
                 "text": text,
                 "channel": conversation.channel.value,
@@ -879,6 +871,7 @@ def _build_outbound_mime(
     body_html: str | None,
     message_id: str,
     in_reply_to: str | None,
+    reply_to: str | None = None,
     list_unsubscribe_url: str | None = None,
     list_unsubscribe_mailto: str | None = None,
 ) -> EmailMessage:
@@ -891,12 +884,25 @@ def _build_outbound_mime(
     and `List-Unsubscribe-Post` headers are set per RFC 8058 (Gmail /
     Outlook / Apple Mail show a one-click unsubscribe button in the
     UI). Both header forms are concatenated — Gmail prefers the URL,
-    Outlook the mailto, so providing both maximises the surface."""
+    Outlook the mailto, so providing both maximises the surface.
+
+    `Date` is always set. Gmail's / Microsoft's send APIs would inject
+    one on our behalf, but raw SMTP relays don't always — and mail
+    without a Date header is a strong spam signal for most receiving
+    MTAs. Emitting it here keeps every transport path consistent.
+
+    `Reply-To` is set only when the caller provides one (campaigns
+    surface a Reply-to field on the Content step; single-thread compose
+    doesn't). Absent Reply-To, replies go back to the From address.
+    """
     msg = EmailMessage()
     msg["From"] = f'"{from_name}" <{from_email}>' if from_name else from_email
     msg["To"] = f'"{to_name}" <{to_email}>' if to_name else to_email
     msg["Subject"] = subject
     msg["Message-ID"] = message_id
+    msg["Date"] = formatdate(localtime=True)
+    if reply_to:
+        msg["Reply-To"] = reply_to
     # Step 8 — RFC 8058 one-click unsubscribe. Mailto first so an
     # MUA without web-fetch support still has a working path.
     if list_unsubscribe_url:
@@ -945,9 +951,7 @@ async def _find_or_create_conversation(
         if existing is not None:
             return existing
 
-    existing = await _find_latest_email_conversation_for_contact(
-        session, contact_id=contact_id
-    )
+    existing = await _find_latest_email_conversation_for_contact(session, contact_id=contact_id)
     if existing is not None:
         return existing
 

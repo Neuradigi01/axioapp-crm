@@ -700,10 +700,7 @@ async def update_campaign(
         # the row keeps satisfying the exactly-one CHECK constraint.
         campaign.smtp_sender_id = None
         changed = True
-    if (
-        payload.smtp_sender_id is not None
-        and payload.smtp_sender_id != campaign.smtp_sender_id
-    ):
+    if payload.smtp_sender_id is not None and payload.smtp_sender_id != campaign.smtp_sender_id:
         await _resolve_smtp_sender(
             session,
             org_id=campaign.org_id,
@@ -1465,6 +1462,7 @@ async def dispatch_chunk(
                         subject=rendered_subject,
                         body_text=rendered_text,
                         body_html=rendered_html,
+                        reply_to=campaign.reply_to,
                     )
                 else:
                     assert email_smtp_sender is not None  # noqa: S101 — narrowed above
@@ -1477,6 +1475,7 @@ async def dispatch_chunk(
                         subject=rendered_subject,
                         body_text=rendered_text,
                         body_html=rendered_html,
+                        reply_to=campaign.reply_to,
                     )
             except _HTTPExc as exc:
                 logger.info("campaign email send rejected", extra={"contact_id": str(cid)})

@@ -34,9 +34,11 @@ Preference order:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import ssl
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from email.message import EmailMessage
 from email.mime.multipart import MIMEMultipart
@@ -69,8 +71,6 @@ class OrgSmtpBackend:
     sender: EmailSmtpSender
 
     async def send(self, email: Email) -> None:
-        password = fernet.decrypt(self.sender.smtp_password_enc)
-
         msg = MIMEMultipart("alternative")
         msg["Subject"] = email.subject
         msg["From"] = _format_from(self.sender)
@@ -78,6 +78,42 @@ class OrgSmtpBackend:
         msg.attach(MIMEText(email.body_text, "plain", "utf-8"))
         if email.body_html:
             msg.attach(MIMEText(email.body_html, "html", "utf-8"))
+
+        async with self._client() as smtp:
+            await smtp.send_message(msg)
+
+    async def send_raw(
+        self,
+        *,
+        raw_bytes: bytes,
+        envelope_from: str,
+        envelope_to: str,
+    ) -> None:
+        """Dispatch a pre-built MIME message via SMTP.
+
+        Used by :func:`core.conversations.adapters.email.send_email` so
+        the SMTP path ships the exact same MIME (Message-ID, Date,
+        List-Unsubscribe, Reply-To, threading headers) that the Gmail /
+        Microsoft OAuth paths do. Rebuilding a minimal message on the
+        way out would strip those headers and trigger Gmail's bulk-
+        sender junking rules.
+
+        `envelope_from` / `envelope_to` are the SMTP-envelope addresses
+        (MAIL FROM / RCPT TO) — kept separate from whatever the message
+        headers say so we can drive them from the resolved sender +
+        contact rows rather than re-parsing the MIME.
+        """
+        async with self._client() as smtp:
+            await smtp.sendmail(envelope_from, [envelope_to], raw_bytes)
+
+    @contextlib.asynccontextmanager
+    async def _client(self) -> AsyncIterator[aiosmtplib.SMTP]:
+        """Open an authenticated SMTP session that respects the
+        sender's `tls_mode`. Yielded client is ready to send; `quit()`
+        runs on exit and swallows shutdown errors so a healthy send
+        isn't rewritten as a failure by a lazy server closing the
+        socket."""
+        password = fernet.decrypt(self.sender.smtp_password_enc)
 
         use_tls = self.sender.tls_mode == "tls"
         start_tls = self.sender.tls_mode == "starttls"
@@ -99,7 +135,7 @@ class OrgSmtpBackend:
             if start_tls:
                 await smtp.starttls(tls_context=tls_context)
             await smtp.login(self.sender.smtp_username, password)
-            await smtp.send_message(msg)
+            yield smtp
         finally:
             try:
                 await smtp.quit()
@@ -156,14 +192,11 @@ class OrgOauthBackend:
             return
 
         raise RuntimeError(
-            f"OrgOauthBackend: unsupported provider {provider!r} for account "
-            f"{self.account.id}"
+            f"OrgOauthBackend: unsupported provider {provider!r} for account {self.account.id}"
         )
 
 
-async def resolve_org_sender(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> EmailBackend | None:
+async def resolve_org_sender(session: AsyncSession, *, org_id: uuid.UUID) -> EmailBackend | None:
     """Pick the outbound backend for org-originated mail.
 
     Returns ``None`` when the org has no verified SMTP sender AND no
