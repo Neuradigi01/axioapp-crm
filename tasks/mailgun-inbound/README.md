@@ -79,7 +79,7 @@ Gmail and Microsoft OAuth mailboxes do not have this problem — the sync daemon
 | Rate limit | **Only on signature-verify FAILURES per IP, 20/min via `rate_hit`.** Signed traffic bypasses. | Prevents Mailgun IP-pool sharing from shedding legit mail (Attacker H1). |
 | Reply-To injection point | **Inside `send_email()` in `core/conversations/adapters/email.py`.** Compute the value there, pass through the already-existing `reply_to` param to `_build_outbound_mime()`. | The `reply_to` param already exists at both layers (`send_email:229`, `_build_outbound_mime:863`). |
 | Reply-To collision | **SMTP-capture is authoritative — replaces caller-supplied `reply_to`.** Original preserved in `Message.payload.original_reply_to`. | Predictable + auditable (Attacker H4). |
-| Idempotency guarantee | **Partial unique index `UNIQUE(org_id, channel, channel_message_id) WHERE channel_message_id IS NOT NULL` on `tbl_messages`.** Own migration step (Step 0) with data probe. | Cross-channel index — sequenced separately so a probe failure doesn't block Mailgun steps. |
+| Idempotency guarantee | **Partial unique index `UNIQUE(org_id, channel_message_id) WHERE channel_message_id IS NOT NULL` on `tbl_messages`.** Own migration step (Step 0) with data probe. `channel` deliberately NOT included — `tbl_messages` has no `channel` column (lives on `tbl_conversations`); provider ID formats (`mg:<uuid>`, `wamid.HB...`, RFC `<uuid@domain>`) are disjoint in practice. | Per-org index — sequenced separately so a probe failure doesn't block Mailgun steps. |
 | `channel_message_id` for Mailgun path | **`mg:<mailgun_delivery_id>`** — Mailgun-minted per-delivery ID, NOT the RFC `Message-ID` header. | Prevents attacker pre-reservation censorship (Attacker M3). RFC `Message-ID` kept in `payload.rfc_message_id` for threading only. |
 | Unknown recipient | **Return 200 (Celery task audits + drops).** No signal to attacker whether token exists. | Response-time constancy. |
 | Inactive sender / no-contact | **Persist to org's inbox with `payload.system_review_required = true`.** Visible to Owner+Admin via existing filter chip. | Never silently drop customer replies. |
@@ -412,7 +412,7 @@ Gmail and Microsoft OAuth mailboxes do not have this problem — the sync daemon
 
 | # | Title | Status | Files | Effort |
 |---|---|---|---|---|
-| 0 | [Migration: partial unique index on `tbl_messages` + collision probe (cross-channel prereq)](step-0-messages-dedup-index.md) | Pending | 1 (migration) | ~0.25 day |
+| 0 | [Migration: partial unique index on `tbl_messages` + collision probe (per-org prereq)](step-0-messages-dedup-index.md) | **COMPLETED** (2026-09-02, migration `0214` applied against prod; 685 existing messages passed probe) | 3 (migration + model + tests) | ~0.25 day |
 | 1 | [Backend: `inbound_token` + `capture_replies_in_crm` columns + SPF/DKIM columns + DLQ table + backfill + `find_contact_by_email`](step-1-backend-schema-and-dal.md) | Pending | 7 | ~0.5 day |
 | 2 | [Backend: 3-line Reply-To injection in `send_email` + capture toggle service + test suite](step-2-backend-reply-to-injection.md) | Pending | 3 | ~0.25 day |
 | 3 | [Backend: `core/email/mailgun/` module — webhook + signature + payload-to-disk + Celery enqueue + replay cache + key rotation](step-3-backend-webhook-and-signature.md) | Pending | 6 | ~0.75 day |

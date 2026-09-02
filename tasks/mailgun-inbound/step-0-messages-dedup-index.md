@@ -1,54 +1,59 @@
-# Step 0 — Cross-channel dedup index prereq on `tbl_messages`
+# Step 0 — Per-org dedup index prereq on `tbl_messages`
 
-**Status:** Pending
-**Effort:** ~0.25 day
+**Status:** COMPLETED — 2026-09-02. Migration `0214_messages_dedup_partial_idx` applied against prod DB; 685 existing messages passed the probe (no collisions).
+**Effort:** ~0.25 day (actual: ~1 hour).
 **Depends on:** Nothing.
 **Blocks:** Step 4 (Mailgun ingest needs idempotency), and any future channel that wants at-most-once persistence.
 
 ## Goal
 
-Add `UNIQUE(org_id, channel, channel_message_id) WHERE channel_message_id IS NOT NULL` partial index to `tbl_messages`. This is a **cross-channel prereq** — it constrains Gmail, Microsoft, WhatsApp, Meta inbound messages too, not just Mailgun.
+Add `UNIQUE(org_id, channel_message_id) WHERE channel_message_id IS NOT NULL` partial index to `tbl_messages`.
 
-Sequenced separately from the Mailgun-specific steps so that if the pre-insert collision probe hard-fails on existing production data, we discover it in a self-contained migration rather than tangled with a Mailgun step.
+**Design correction from initial spec:** the index does NOT include `channel`. `tbl_messages` has no `channel` column (it lives on `tbl_conversations`); adding one would require denormalization + backfill. Provider ID formats are disjoint in practice (`mg:<uuid>`, `wamid.HB...`, RFC `<uuid@domain>`), so cross-provider collision within one org is astronomically unlikely. A future provider using raw un-prefixed IDs would need to namespace its IDs.
+
+This constrains data across ALL inbound channels (Gmail, Microsoft, WhatsApp, Meta, Mailgun). Sequenced separately from Mailgun-specific steps so the pre-insert collision probe surfaces any pre-existing data issues in isolation.
 
 ## Scope
 
-- **One Alembic migration** at `api/alembic/versions/`. Revision ID ≤ 32 chars.
-- **Probe query** in the `upgrade()` body BEFORE the `CREATE INDEX`:
+- **One Alembic migration** at `api/alembic/versions/0214_messages_dedup_partial_idx.py`. Revision ID 30 chars ✓ (≤ 32 rule).
+- **Probe query** in the `upgrade()` body BEFORE `CREATE INDEX`:
   ```sql
-  SELECT org_id, channel, channel_message_id, COUNT(*)
+  SELECT org_id, channel_message_id, COUNT(*)
   FROM tbl_messages
   WHERE channel_message_id IS NOT NULL
-  GROUP BY org_id, channel, channel_message_id
+  GROUP BY org_id, channel_message_id
   HAVING COUNT(*) > 1
   LIMIT 10;
   ```
-  If any rows return → `raise RuntimeError(f"Cross-channel dedup collisions found: {rows}")`. Migration aborts. Operator fixes data, re-runs.
+  If any rows return → `raise RuntimeError(...)` with the offending groups named. Migration aborts.
 - **Index creation** on probe success:
   ```sql
-  CREATE UNIQUE INDEX CONCURRENTLY ix_messages_dedup_partial
-    ON tbl_messages (org_id, channel, channel_message_id)
+  CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_messages_org_channel_msgid
+    ON tbl_messages (org_id, channel_message_id)
     WHERE channel_message_id IS NOT NULL;
   ```
-  `CONCURRENTLY` for zero-downtime — no exclusive lock on `tbl_messages`. Must be run OUTSIDE a transaction; Alembic `op.execute()` with `autocommit_block()` context.
-- **Downgrade** drops the index.
+  `CONCURRENTLY` in an `autocommit_block()` — no exclusive lock on `tbl_messages`. `IF NOT EXISTS` for resumability if a prior run left an INVALID index behind (recovery: `DROP INDEX CONCURRENTLY` then re-run).
+- **Downgrade** drops the index via `DROP INDEX CONCURRENTLY IF EXISTS` in an autocommit block.
+- **Model change:** `uq_messages_org_channel_msgid` also added to `Message.__table_args__` alongside the existing `uq_messages_conv_wamid` so tests (which use `Base.metadata.create_all`) pick it up — matches existing convention.
 
 ## Files touched
 
-- `api/alembic/versions/0XXX_messages_dedup_partial_index.py` — new migration.
+- `api/alembic/versions/0214_messages_dedup_partial_idx.py` — new migration.
+- `api/src/app/core/conversations/models.py` — added Index to `Message.__table_args__`.
+- `api/tests/test_messages_dedup_index.py` — 6 pytest cases.
 
 ## Files NOT touched
 
-- No ORM model change (partial indexes not typically declared in SQLAlchemy metadata — the migration is the source of truth).
 - No service / router / DAL changes.
 
-## Tests
+## Tests (in `test_messages_dedup_index.py`)
 
-- `test_step0_migration_probe_hard_fails_on_channel_message_id_collision` — insert two `tbl_messages` rows with same `(org_id, channel, channel_message_id)`, run migration, assert `RuntimeError`.
-- `test_step0_migration_probe_passes_on_clean_data` — insert distinct rows, run migration, assert index exists via `pg_indexes` query.
-- `test_step0_migration_partial_unique_index_created` — post-upgrade, `pg_indexes` includes `ix_messages_dedup_partial` on `tbl_messages`.
-- `test_step0_migration_down_drops_index` — downgrade, assert index absent.
-- `test_step0_index_ignores_null_channel_message_id` — insert two rows both with `channel_message_id=NULL` after upgrade; both succeed (partial index scope).
+- `test_partial_unique_index_exists_on_messages` — post-upgrade, `pg_indexes` includes `uq_messages_org_channel_msgid`.
+- `test_duplicate_org_channel_msgid_raises_integrity_error` — two `Message` rows with same `(org_id, channel_message_id)` → second commit raises `IntegrityError`.
+- `test_two_null_channel_message_ids_coexist` — partial `WHERE channel_message_id IS NOT NULL` scope verified.
+- `test_same_msgid_different_org_allowed` — cross-org: same id, different org → both persist.
+- `test_probe_query_finds_collisions_when_present` — the exact migration probe SQL runs against clean data and returns empty.
+- (Design change: dropped `test_same_msgid_different_channel_allowed` because `channel` isn't in the index — see design correction above.)
 
 ## Self-check
 

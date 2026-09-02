@@ -229,6 +229,25 @@ class Message(Base, TenantScoped):
             unique=True,
             postgresql_where=sql_text("channel_message_id IS NOT NULL"),
         ),
+        # Per-org dedup across every inbound provider. The
+        # conversation-scoped index above catches retries that thread
+        # to the same conversation, but a retry (or Mailgun replay)
+        # whose threading logic picks a *different* conversation slips
+        # through. This wider index guarantees at-most-once persistence
+        # per (org_id, channel_message_id) for every provider that
+        # sets a channel-side id. `channel` isn't included because
+        # ``tbl_messages`` doesn't carry it (it lives on
+        # ``tbl_conversations``); provider id formats are disjoint in
+        # practice (``mg:<uuid>`` vs ``wamid.HB...`` vs RFC
+        # ``<uuid@domain>``) so cross-provider collision within one
+        # org is astronomically unlikely.
+        Index(
+            "uq_messages_org_channel_msgid",
+            "org_id",
+            "channel_message_id",
+            unique=True,
+            postgresql_where=sql_text("channel_message_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
