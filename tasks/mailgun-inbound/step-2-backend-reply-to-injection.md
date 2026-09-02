@@ -1,7 +1,7 @@
 # Step 2 — Reply-To injection in `send_email` (SMTP-only)
 
-**Status:** Pending
-**Effort:** ~0.25 day
+**Status:** COMPLETED — 2026-09-02. Reply-To injection wired via `_mailgun_reply_to_for` helper; `PATCH /email-senders/smtp/{id}/capture-toggle` live; `INBOUND_EMAIL_DOMAIN` set in `config.env` (sandbox domain); full app tree imports cleanly.
+**Effort:** ~0.25 day (actual: ~45 min).
 **Depends on:** Step 1 (`inbound_token`, `capture_replies_in_crm` exist).
 **Blocks:** Step 7 (end-to-end smoke needs outbound with Reply-To).
 
@@ -40,12 +40,16 @@ Add a service endpoint to toggle `capture_replies_in_crm` per sender.
 - `core/email_senders/schemas.py` — `SenderCaptureToggle` payload schema (exposes only `capture: bool`).
 - Sender-detail response gets an `inbound_reply_address` sub-object: `{token: str, address: str, capture_enabled: bool}`. Address is `f"in_{token}@{INBOUND_EMAIL_DOMAIN}"`.
 
-## Files touched
+## Files touched (actual)
 
-- `api/src/app/core/conversations/adapters/email.py` — Reply-To computation.
-- `api/src/app/core/email_senders/service.py` — `set_capture_toggle`.
-- `api/src/app/core/email_senders/router.py` — PATCH endpoint.
-- `api/src/app/core/email_senders/schemas.py` — toggle payload + reply-address sub-schema.
+- `API/src/app/core/conversations/adapters/email.py` — new `_mailgun_reply_to_for(smtp_sender)` helper + call site in `send_email` + `original_reply_to` preservation in outbound payload
+- `API/src/app/core/email_senders/service.py` — new `set_capture_toggle`, `build_inbound_reply_address`, `_attach_inbound_address`; wired `build_inbound_reply_address(r)` into `list_unified_senders`
+- `API/src/app/core/email_senders/router.py` — new `PATCH /email-senders/smtp/{id}/capture-toggle` + `_to_out()` helper that attaches `inbound_reply_address` to every `SmtpSenderOut` response
+- `API/src/app/core/email_senders/schemas.py` — new `InboundReplyAddress`, `SenderCaptureToggle`; added `inbound_reply_address` field to `SmtpSenderOut` and `UnifiedSenderOut`
+- `API/config.env` — added `MAILGUN_DOMAIN`, `INBOUND_EMAIL_DOMAIN`, `MAILGUN_WEBHOOK_URL` (sandbox values for now)
+- `API/tests/test_mailgun_step2_reply_to_and_toggle.py` — 14 pytest cases
+
+**Design note (small refactor beyond the spec):** Reply-To computation was extracted into a pure `_mailgun_reply_to_for(smtp_sender) -> str | None` helper so it can be unit-tested without spinning up the whole `send_email` chain. Semantics unchanged from the spec — same 4 conditions, same output. The call site in `send_email` is 3 lines.
 
 ## Tests
 

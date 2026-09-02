@@ -226,6 +226,37 @@ class SendEmailResult:
     near_soft_cap: bool
 
 
+def _mailgun_reply_to_for(smtp_sender: EmailSmtpSender | None) -> str | None:
+    """Compute the ``in_<token>@<INBOUND_EMAIL_DOMAIN>`` Reply-To
+    address for an SMTP sender, or ``None`` when this send must not be
+    rewritten.
+
+    Returns None when:
+      * caller isn't sending via SMTP (``smtp_sender is None``) —
+        OAuth mailboxes get replies via their own inbound sync, so
+        rewriting Reply-To would silently divert replies away from
+        the sync and break threading;
+      * the sender has ``capture_replies_in_crm=False`` — per-sender
+        opt-out (HubSpot-parity — a small-biz owner running SMTP
+        against their own Gmail app-password may want replies at
+        their own inbox);
+      * the sender has no ``inbound_token`` (shouldn't happen post
+        migration 0215 but is defensive);
+      * ``INBOUND_EMAIL_DOMAIN`` isn't set in the deploy — the platform
+        hasn't opted into Mailgun-inbound at all.
+    """
+    if smtp_sender is None:
+        return None
+    if not smtp_sender.capture_replies_in_crm:
+        return None
+    if not smtp_sender.inbound_token:
+        return None
+    inbound_domain = os.getenv("INBOUND_EMAIL_DOMAIN", "").strip()
+    if not inbound_domain:
+        return None
+    return f"in_{smtp_sender.inbound_token}@{inbound_domain}"
+
+
 async def send_email(
     session: AsyncSession,
     *,
@@ -325,6 +356,12 @@ async def send_email(
         sender_email = smtp_sender.from_address
         sender_display = smtp_sender.display_name
         sender_provider_label = "smtp"
+
+    # mailgun-inbound track: rewrite `Reply-To` on SMTP-only outbound.
+    original_reply_to = reply_to
+    inbound_rewrite = _mailgun_reply_to_for(smtp_sender)
+    if inbound_rewrite is not None:
+        reply_to = inbound_rewrite
 
     contact = await contacts_da.get_contact(session, contact_id)
     if contact is None or not contact.email:
@@ -503,6 +540,23 @@ async def send_email(
     # `id` is pre-allocated above so the tracking tokens we already
     # baked into the HTML reference this exact row.
     now = datetime.now(UTC)
+    outbound_payload: dict[str, Any] = {
+        "subject": subject,
+        "from": sender_email,
+        "to": contact.email,
+        "in_reply_to": parent_msg_id,
+        "provider": sender_provider_label,
+        "provider_message_id": provider_message_id,
+        "body_html_present": body_html is not None,
+    }
+    # Preserve any caller-supplied Reply-To that our SMTP-capture
+    # rewrite overrode. Auditors + support engineers can see what the
+    # send *would* have carried without the rewrite.
+    if original_reply_to is not None and original_reply_to != reply_to:
+        outbound_payload["original_reply_to"] = original_reply_to
+    if reply_to is not None:
+        outbound_payload["reply_to"] = reply_to
+
     msg = Message(
         id=pre_message_id,
         org_id=org_id,
@@ -512,15 +566,7 @@ async def send_email(
         text=body_text,
         attachments=[],
         channel_message_id=own_msg_id_bare,
-        payload={
-            "subject": subject,
-            "from": sender_email,
-            "to": contact.email,
-            "in_reply_to": parent_msg_id,
-            "provider": sender_provider_label,
-            "provider_message_id": provider_message_id,
-            "body_html_present": body_html is not None,
-        },
+        payload=outbound_payload,
         sent_at=now,
         delivered_at=now,
     )

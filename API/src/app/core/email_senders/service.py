@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import secrets
 import ssl
 import uuid
@@ -40,6 +41,7 @@ from src.app.core.email.models import EmailAccount, EmailAccountSyncState
 from src.app.core.email_senders import data_access
 from src.app.core.email_senders.models import EmailSmtpSender
 from src.app.core.email_senders.schemas import (
+    InboundReplyAddress,
     SmtpSenderCreate,
     UnifiedSenderOut,
 )
@@ -71,6 +73,33 @@ def _generate_inbound_token() -> str:
     """12-char URL-safe token. Used as the local-part of the sender's
     ``in_<token>@<INBOUND_EMAIL_DOMAIN>`` Reply-To address."""
     return secrets.token_urlsafe(9)[: _INBOUND_TOKEN_LEN]
+
+
+def build_inbound_reply_address(row: EmailSmtpSender) -> InboundReplyAddress | None:
+    """Compose the reply-capture address block for API responses.
+
+    Returns ``None`` when ``INBOUND_EMAIL_DOMAIN`` isn't set — the
+    deploy hasn't opted into Mailgun-inbound and the frontend should
+    hide the Reply Capture panel entirely rather than surface a broken
+    ``in_<token>@`` string with no domain suffix.
+    """
+    domain = os.getenv("INBOUND_EMAIL_DOMAIN", "").strip()
+    if not domain or not row.inbound_token:
+        return None
+    return InboundReplyAddress(
+        token=row.inbound_token,
+        address=f"in_{row.inbound_token}@{domain}",
+        capture_enabled=bool(row.capture_replies_in_crm),
+    )
+
+
+def _attach_inbound_address(row: EmailSmtpSender) -> EmailSmtpSender:
+    """Mutate the ORM row to carry the ``inbound_reply_address``
+    attribute the Pydantic response schema reads. ORM rows don't
+    normally expose derived fields; setting the attribute directly is
+    fine because the response is constructed and thrown away."""
+    row.inbound_reply_address = build_inbound_reply_address(row)  # type: ignore[attr-defined]
+    return row
 
 
 def _hash_code(code: str) -> str:
@@ -353,6 +382,35 @@ async def set_default_sender(
     return row
 
 
+async def set_capture_toggle(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    sender_id: uuid.UUID,
+    capture: bool,
+) -> EmailSmtpSender:
+    """Flip the per-sender ``capture_replies_in_crm`` boolean.
+
+    When ``True`` (default), outbound mail from this SMTP sender gets
+    a ``Reply-To: in_<token>@<INBOUND_EMAIL_DOMAIN>`` header so replies
+    land in the CRM via Mailgun. When ``False``, no rewrite — replies
+    go back to the SMTP mailbox as they would without this track.
+
+    404 (not 403) on cross-org access so token existence isn't
+    revealed to unauthorized callers.
+    """
+    row = await data_access.get_by_id(session, org_id=org_id, sender_id=sender_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SMTP sender not found.",
+        )
+    row.capture_replies_in_crm = bool(capture)
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
 async def delete_sender(
     session: AsyncSession,
     *,
@@ -396,6 +454,7 @@ async def list_unified_senders(
                 display_name=r.display_name,
                 verified=r.verified_at is not None,
                 is_default=r.is_default,
+                inbound_reply_address=build_inbound_reply_address(r),
             )
         )
     for r in oauth_rows:
@@ -455,10 +514,12 @@ async def list_unified_senders(
 
 
 __all__ = [
+    "build_inbound_reply_address",
     "create_smtp_sender",
     "delete_sender",
     "list_unified_senders",
     "resend_code",
+    "set_capture_toggle",
     "set_default_sender",
     "verify_smtp_sender",
 ]

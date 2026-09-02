@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.email_senders import service
 from src.app.core.email_senders.schemas import (
+    SenderCaptureToggle,
     SmtpSenderCreate,
     SmtpSenderOut,
     SmtpSenderVerify,
@@ -24,6 +25,15 @@ from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
 router = APIRouter(prefix="/email-senders", tags=["Email Senders"])
+
+
+def _to_out(row) -> SmtpSenderOut:
+    """Build the response schema with the Mailgun reply-address block
+    attached. Kept here (not in the service) so the ORM row stays
+    clean and the transformation is close to the HTTP boundary."""
+    out = SmtpSenderOut.model_validate(row)
+    out.inbound_reply_address = service.build_inbound_reply_address(row)
+    return out
 
 
 @router.get("/", response_model=list[UnifiedSenderOut])
@@ -50,7 +60,7 @@ async def create_smtp_sender_endpoint(
     surfaces the SMTP error verbatim so the operator can diagnose
     port/auth issues without checking logs."""
     row = await service.create_smtp_sender(db, org_id=user.org_id, payload=payload)
-    return SmtpSenderOut.model_validate(row)
+    return _to_out(row)
 
 
 @router.post("/smtp/{sender_id}/verify", response_model=SmtpSenderOut)
@@ -64,7 +74,7 @@ async def verify_smtp_sender_endpoint(
     row = await service.verify_smtp_sender(
         db, org_id=user.org_id, sender_id=sender_id, code=payload.code
     )
-    return SmtpSenderOut.model_validate(row)
+    return _to_out(row)
 
 
 @router.post("/smtp/{sender_id}/resend-code", response_model=SmtpSenderOut)
@@ -75,7 +85,7 @@ async def resend_code_endpoint(
 ) -> SmtpSenderOut:
     """Regenerate + redispatch the verification code."""
     row = await service.resend_code(db, org_id=user.org_id, sender_id=sender_id)
-    return SmtpSenderOut.model_validate(row)
+    return _to_out(row)
 
 
 @router.post("/smtp/{sender_id}/set-default", response_model=SmtpSenderOut)
@@ -88,7 +98,27 @@ async def set_default_sender_endpoint(
     row = await service.set_default_sender(
         db, org_id=user.org_id, sender_id=sender_id
     )
-    return SmtpSenderOut.model_validate(row)
+    return _to_out(row)
+
+
+@router.patch("/smtp/{sender_id}/capture-toggle", response_model=SmtpSenderOut)
+async def set_capture_toggle_endpoint(
+    sender_id: uuid.UUID,
+    payload: SenderCaptureToggle,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("email.accounts.manage")),
+) -> SmtpSenderOut:
+    """mailgun-inbound track: per-sender opt-out of Reply-To rewriting.
+
+    When ``capture=false``, outbound mail from this sender leaves the
+    caller-supplied ``Reply-To`` (or none) alone — replies go back to
+    the SMTP mailbox instead of the CRM. Defaults to ``true`` on new
+    senders.
+    """
+    row = await service.set_capture_toggle(
+        db, org_id=user.org_id, sender_id=sender_id, capture=payload.capture
+    )
+    return _to_out(row)
 
 
 @router.delete("/{sender_id}", status_code=status.HTTP_204_NO_CONTENT)

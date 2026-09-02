@@ -37,6 +37,42 @@ class SmtpSenderVerify(BaseModel):
     code: str = Field(pattern=r"^\d{6}$")
 
 
+class InboundReplyAddress(BaseModel):
+    """mailgun-inbound track: the per-sender reply-capture address
+    surfaced on the sender detail response + toggle endpoint.
+
+    - ``token`` — the opaque 12-char id (safe to expose; already in
+      every outbound Reply-To in the wild).
+    - ``address`` — the fully-qualified address, ``in_<token>@<domain>``.
+      Uses ``INBOUND_EMAIL_DOMAIN`` from server config.
+    - ``capture_enabled`` — mirror of ``capture_replies_in_crm`` so
+      the frontend can render the toggle state without a second call.
+
+    Deliberately omits Mailgun's API + signing keys — those live in
+    SOPS and are never surfaced through the API surface at all.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    token: str
+    address: str
+    capture_enabled: bool
+
+
+class SenderCaptureToggle(BaseModel):
+    """Payload for ``PATCH /email-senders/smtp/{id}/capture-toggle``.
+
+    Only ``capture`` is exposed to the caller — every other field on
+    the sender row is server-owned. Mass-assign attempts on
+    ``inbound_token`` / ``org_id`` / anything else are rejected by
+    ``extra="forbid"``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    capture: bool
+
+
 class SmtpSenderOut(ORMModel):
     """Response shape — deliberately omits the encrypted password."""
 
@@ -50,6 +86,7 @@ class SmtpSenderOut(ORMModel):
     verified_at: datetime | None
     is_default: bool
     created_at: datetime
+    inbound_reply_address: InboundReplyAddress | None = None
 
 
 class UnifiedSenderOut(BaseModel):
@@ -79,9 +116,16 @@ class UnifiedSenderOut(BaseModel):
     token_expires_at: datetime | None = None
     sync_state: str | None = None
     last_sync_error: str | None = None
+    # SMTP-only reply-capture surface — None for OAuth (Gmail /
+    # Microsoft handle inbound replies via their own sync). Also None
+    # for SMTP rows when ``INBOUND_EMAIL_DOMAIN`` isn't configured
+    # in this deploy.
+    inbound_reply_address: InboundReplyAddress | None = None
 
 
 __all__ = [
+    "InboundReplyAddress",
+    "SenderCaptureToggle",
     "SmtpSenderCreate",
     "SmtpSenderOut",
     "SmtpSenderVerify",
