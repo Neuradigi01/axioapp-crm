@@ -31,7 +31,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
@@ -110,6 +110,79 @@ from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
+
+# mailgun-inbound Step 5: a SEPARATE router mounted alongside the
+# conversations router so the URL surface is ``/messages/{id}/...``
+# rather than ``/conversations/messages/{id}/...``. Composition happens
+# in main.py — this router is exported and included at prefix
+# ``/api/v1`` (like the ownership_router pattern).
+message_attachments_router = APIRouter(
+    prefix="/messages", tags=["Message Attachments"]
+)
+
+_ATTACHMENT_KEY_RE = __import__("re").compile(r"^[A-Za-z0-9._-]{1,255}$")
+
+
+@message_attachments_router.get(
+    "/{message_id}/attachments/{safe_key}",
+    response_class=FileResponse,
+)
+async def download_message_attachment(
+    message_id: uuid.UUID,
+    safe_key: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.read")),
+) -> FileResponse:
+    """Serve an inbound-email attachment from local disk.
+
+    Auth: JWT (via ``conversations.read``) + explicit ``org_id`` check
+    against the message row + ``safe_key`` regex guard against path
+    traversal. Content-Disposition ALWAYS ``attachment`` (never
+    ``inline``) regardless of the sniffed content type — PDFs, images,
+    HTML would all render inline in the browser and become XSS /
+    exploit vectors on our origin. Force-download shifts the risk to
+    the user's local viewer (Attacker H3 fix).
+
+    404 on cross-org access, missing key, or missing file on disk —
+    never 403 (no signal of existence)."""
+    from pathlib import Path as _Path
+
+    from src.app.core.conversations import data_access as _da
+
+    if not _ATTACHMENT_KEY_RE.match(safe_key):
+        raise HTTPException(status_code=400, detail="invalid attachment key")
+
+    msg = await _da.get_message_by_id(db, message_id)
+    if msg is None or msg.org_id != user.org_id:
+        raise HTTPException(status_code=404, detail="attachment not found")
+
+    # The Message row must list this key in its attachments JSONB —
+    # prevents an attacker from downloading a sibling file by name
+    # even after guessing the message id.
+    entries = msg.attachments or []
+    matched = next(
+        (e for e in entries if e.get("storage_key") == safe_key), None
+    )
+    if matched is None:
+        raise HTTPException(status_code=404, detail="attachment not found")
+
+    storage_root = _Path(
+        __import__("os").getenv("STORAGE_ROOT", "./storage")
+    )
+    file_path = (
+        storage_root / str(msg.org_id) / "messages" / str(msg.id) / safe_key
+    )
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="attachment not found")
+
+    return FileResponse(
+        path=str(file_path),
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_key}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 async def _require_conversation_write_access(

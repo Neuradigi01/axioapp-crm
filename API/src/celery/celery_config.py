@@ -285,4 +285,27 @@ beat_schedule = {
         "task": "src.app.core.ai_assistants.tasks.janitor_heartbeat",
         "schedule": 60.0,  # every 1 minute
     },
+    # tasks/mailgun-inbound Step 3 — every 5 min, re-enqueue any
+    # pending-inbound directory older than 5 minutes. Covers the case
+    # where the webhook returned 200 but the Celery broker was down
+    # at delivery time (payload lives on disk regardless of broker
+    # health). Threshold matches beat cadence: a directory is either
+    # enqueued at write-time OR picked up on the next beat, never both.
+    "mailgun-sweep-pending-inbound": {
+        "task": "src.app.core.email.mailgun.pending_inbound_sweeper.sweep_pending_inbound",
+        "schedule": 300.0,
+    },
+    # tasks/mailgun-inbound Step 5 — 15-min sweep of staged-but-
+    # never-committed attachment dirs older than 1h. Cheap.
+    "mailgun-sweep-staging-orphans": {
+        "task": "src.app.core.email.mailgun.orphan_cleanup.sweep_staging_orphans",
+        "schedule": crontab(minute="*/15"),
+    },
+    # tasks/mailgun-inbound Step 5 — daily sweep of messages/{id}/
+    # dirs with no matching row (rare rollback / manual delete path).
+    # Runs at 04:00 UTC to offset other daily janitor jobs.
+    "mailgun-sweep-messages-orphans": {
+        "task": "src.app.core.email.mailgun.orphan_cleanup.sweep_messages_orphans",
+        "schedule": crontab(hour=4, minute=0),
+    },
 }

@@ -210,6 +210,13 @@ _CORE_OWNER_KEYS: list[str] = _CORE_ADMIN_KEYS + [
     # invoice surface but cannot mutate plan / payment state.
     "billing.manage",
     "leads.scoring.manage",
+    # mailgun-inbound Step 5 — inspect / reprocess the Mailgun
+    # inbound-email DLQ. Owner-only because the DLQ can contain PII
+    # from every SMTP-sender inbound that failed ingest (spoofed
+    # senders, malformed payloads, unresolved recipients) — leaking
+    # this to an Admin who shouldn't see cross-tenant customer emails
+    # would be a bug.
+    "mailgun.inbound.dlq.manage",
 ]
 
 

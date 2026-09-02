@@ -617,20 +617,217 @@ async def send_email(
 # --- Inbound: receive_email() ------------------------------------------
 
 
+async def _persist_inbound_email(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    contact_id: uuid.UUID | None,
+    headers: dict[str, str],
+    body_text: str,
+    body_html: str | None,
+    attachments: list[dict[str, Any]],
+    channel_message_id: str,
+    thread_keys: set[str],
+    provider_message_id: str | None,
+    provider_message_id_fallback_provider: EmailAccountProvider | None,
+    spf_result: str | None,
+    dkim_result: str | None,
+    auto_generated: bool,
+    source_provider: str,
+    source_reference: dict[str, Any],
+    publish_workflow_events: bool,
+    activity_user_id: uuid.UUID | None,
+    account_email_label: str | None,
+) -> Message | None:
+    """Shared inbound-persistence helper for OAuth AND Mailgun paths.
+
+    Both ``receive_email`` (Gmail / Microsoft sync) and Mailgun's
+    ingest Celery task funnel through this helper so threading,
+    dedup, conversation resolution, unread bump, activity log,
+    assignee notify, and workflow-event publishing behave identically
+    across providers.
+
+    ``org_id`` is passed EXPLICITLY (Attacker C3 finding from the
+    PLANNING_RULES review) — every threading DAL call it makes is
+    scoped by ``org_id``, never trusting session-scoped tenant
+    context alone.
+
+    Returns the persisted ``Message`` on success; ``None`` when the
+    message is a dedup hit (already persisted).
+
+    Sender-auth policy is the CALLER's decision — it passes
+    ``publish_workflow_events`` after evaluating SPF/DKIM (Mailgun)
+    or ``Authentication-Results`` (OAuth). The helper trusts that
+    signal + never publishes when ``auto_generated=True``.
+    """
+    # Dedupe against the partial unique index added in Step 0
+    # (uq_messages_org_channel_msgid). This is the belt half of
+    # belt-and-braces — the DB rejects the INSERT if we somehow
+    # skipped the check, but doing it here means we don't hit the
+    # constraint on every retry.
+    if channel_message_id and await _exists_by_rfc_id(
+        session, channel_message_id, org_id=org_id
+    ):
+        logger.debug(
+            "_persist_inbound_email: dedupe hit provider=%s channel_message_id=%s",
+            source_provider,
+            channel_message_id,
+        )
+        return None
+    # OAuth secondary dedup (some providers ship a stable per-mailbox
+    # id in ``provider_message_id`` distinct from the RFC Message-ID).
+    if (
+        provider_message_id
+        and provider_message_id_fallback_provider is not None
+        and await _exists_by_provider_id(
+            session,
+            provider_message_id,
+            provider_message_id_fallback_provider,
+            org_id=org_id,
+        )
+    ):
+        return None
+
+    # Find existing conversation by:
+    #  1. Any thread key (Message-ID / References / In-Reply-To)
+    #     that matches a known prior message — honours real email-
+    #     client threading so the same reply chain always lands in
+    #     the same conversation regardless of subject drift.
+    #  2. Failing that, the most recent email conversation for this
+    #     contact — matches the outbound flow so a customer with
+    #     multiple different-subject inbounds still shows as ONE
+    #     conversation in the inbox.
+    #  3. Create a fresh conversation.
+    #
+    # If ``contact_id`` is None (Mailgun path: unknown sender or
+    # spoof-suspected drop), the thread-key + contact-latest paths
+    # both no-op and we create a bare conversation whose
+    # ``contact_id`` remains NULL for operator review.
+    conversation: Conversation | None = None
+    if contact_id is not None:
+        conversation = await _find_conversation_by_thread_keys(
+            session, org_id, thread_keys, contact_id
+        )
+        if conversation is None:
+            conversation = await _find_latest_email_conversation_for_contact(
+                session, contact_id=contact_id, org_id=org_id
+            )
+    if conversation is None:
+        conversation = await _create_email_conversation(
+            session,
+            org_id=org_id,
+            contact_id=contact_id,
+            contact_email=_extract_address(headers.get("from", "")),
+        )
+
+    # Persist the inbound message.
+    now = datetime.now(UTC)
+    payload: dict[str, Any] = {
+        "subject": headers.get("subject", ""),
+        "from": headers.get("from", ""),
+        "to": headers.get("to", ""),
+        "provider": source_provider,
+        "thread_keys": sorted(thread_keys),
+        # Provider-specific bookkeeping (Gmail/Microsoft: rfc_message_id,
+        # conversation_id_provider; Mailgun: smtp_sender_id,
+        # mailgun_delivery_id).
+        **source_reference,
+    }
+    if provider_message_id is not None:
+        payload["provider_message_id"] = provider_message_id
+    if auto_generated:
+        payload["auto_generated"] = True
+
+    msg = Message(
+        org_id=org_id,
+        conversation_id=conversation.id,
+        direction=MessageDirection.in_,
+        text=body_text or headers.get("subject", "")[:1024],
+        attachments=list(attachments or []),
+        channel_message_id=channel_message_id,
+        payload=payload,
+        spf_result=spf_result,
+        dkim_result=dkim_result,
+        sent_at=now,
+    )
+    session.add(msg)
+    conversation.last_message_at = now
+    conversation.unread_count = (conversation.unread_count or 0) + 1
+    await session.commit()
+    await session.refresh(msg)
+    await session.refresh(conversation)
+
+    # Best-effort: contact activity + assignee notification. Skip
+    # activity log when we have no contact (Mailgun: unknown sender)
+    # — contact activity requires an entity_id.
+    if contact_id is not None:
+        await activities_log(
+            entity_type="contact",
+            entity_id=contact_id,
+            type=ActivityType.email,
+            payload={
+                "direction": "inbound",
+                "subject": headers.get("subject", ""),
+                "preview": (body_text or "")[:160],
+                "conversation_id": str(conversation.id),
+                "message_id": str(msg.id),
+                "account_email": account_email_label,
+            },
+            org_id=org_id,
+            user_id=activity_user_id,
+        )
+    if conversation.assigned_to_id is not None:
+        await notify(
+            org_id=org_id,
+            user_id=conversation.assigned_to_id,
+            type="conversation.message",
+            title=f"New email from {headers.get('from', 'a contact')}",
+            body=(headers.get("subject", "") or "")[:160] or None,
+            payload={
+                "conversation_id": str(conversation.id),
+                "channel": "email",
+            },
+        )
+
+    if not publish_workflow_events:
+        # Caller has already decided (spoof / auto-responder / OAuth
+        # SPF-DKIM fail) that no workflow events should fire.
+        return msg
+
+    await _publish_email_message_received(
+        session,
+        conversation=conversation,
+        message=msg,
+        text=body_text,
+    )
+
+    # If the inbound message references a prior message, it's a reply
+    # to something we sent — fire the workflow-facing ``email.replied``
+    # event alongside the chatbot ``email.message_received`` fire above.
+    if thread_keys:
+        await _publish_email_replied(
+            session,
+            conversation=conversation,
+            message=msg,
+            text=body_text,
+            subject=headers.get("subject", ""),
+        )
+    return msg
+
+
 async def receive_email(account: EmailAccount, matched: dict[str, Any]) -> Message | None:
     """Step 4's inbound-handler signature. Called from
     `email_tasks._dispatch_inbound` for every `MatchedMessage` the
     sync routines pulled.
 
-    Opens its own session (Step 4 holds one but releases it before
-    calling here — we MUST not nest sessions across the await chain).
-    Tenant context is set BEFORE calling here by Step 4's task body,
-    so the ORM tenant filter + RLS are active inside our session.
+    Thin wrapper over ``_persist_inbound_email`` that maps the OAuth
+    matched-message dict into the shared helper's kwargs. Preserves
+    byte-identical output for OAuth callers (Gmail / Microsoft sync
+    behaviour is unchanged after this refactor).
 
-    Returns the persisted `Message` on success; `None` when the
-    matched message would be a duplicate (already persisted with
-    the same provider message id) or when contact resolution drops
-    it (matched dict missing contact_id).
+    Opens its own session — Step 4's dispatcher releases the caller
+    session before invoking us so we don't nest sessions across the
+    await chain.
     """
     contact_id = matched.get("contact_id")
     if contact_id is None:
@@ -644,150 +841,50 @@ async def receive_email(account: EmailAccount, matched: dict[str, Any]) -> Messa
     from src.app.shared.db import async_session
 
     async with async_session() as session:
-        # Dedupe: provider_message_id is unique per inbox + we've
-        # already persisted this one if there's a row with matching
-        # channel_message_id headers.message-id from the provider.
         headers: dict[str, str] = matched.get("headers") or {}
         rfc_message_id = extract_message_id(headers)
         provider_message_id = matched.get("message_id")
-        if rfc_message_id and await _exists_by_rfc_id(session, rfc_message_id):
-            logger.debug(
-                "receive_email: dedupe hit account=%s rfc_id=%s",
-                account.id,
-                rfc_message_id,
-            )
+        # OAuth stores the RFC Message-ID (or provider id when RFC is
+        # missing) as ``channel_message_id`` — same as prior behaviour.
+        channel_message_id = rfc_message_id or provider_message_id
+        if not channel_message_id:
+            # No addressable id at all — silently drop; the sync will
+            # try again on the next tick if the provider re-lists it.
             return None
-        if provider_message_id and await _exists_by_provider_id(
-            session, provider_message_id, account.provider
-        ):
-            return None
-
-        # Find existing conversation by:
-        #  1. Any thread key (Message-ID / References / In-Reply-To)
-        #     that matches a known prior message — honours real email-
-        #     client threading so the same reply chain always lands in
-        #     the same conversation regardless of subject drift.
-        #  2. Failing that, the most recent email conversation for this
-        #     contact — matches the outbound flow so a customer with
-        #     multiple different-subject inbounds still shows as ONE
-        #     conversation in the inbox (CRM-inbox model, not Zendesk-
-        #     ticket model). Subject-based splitting was removed on
-        #     2026-08-26 after users repeatedly saw the same email
-        #     address duplicated across rows.
-        #  3. Create a fresh conversation.
         thread_keys = extract_thread_keys(headers)
-        conversation = await _find_conversation_by_thread_keys(
-            session, account.org_id, thread_keys, contact_id
-        )
-        if conversation is None:
-            conversation = await _find_latest_email_conversation_for_contact(
-                session, contact_id=contact_id
-            )
-        if conversation is None:
-            conversation = await _create_email_conversation(
-                session,
-                org_id=account.org_id,
-                contact_id=contact_id,
-                contact_email=_extract_address(headers.get("from", "")),
-            )
-
-        # Persist the inbound message. `channel_message_id` is the
-        # RFC Message-ID so future replies thread back through us.
         body_text = (matched.get("body_text") or "").strip()
-        now = datetime.now(UTC)
-        msg = Message(
+        return await _persist_inbound_email(
+            session,
             org_id=account.org_id,
-            conversation_id=conversation.id,
-            direction=MessageDirection.in_,
-            text=body_text or headers.get("subject", "")[:1024],
+            contact_id=contact_id,
+            headers=headers,
+            body_text=body_text,
+            body_html=None,
             attachments=[],
-            channel_message_id=rfc_message_id or provider_message_id,
-            payload={
-                "subject": headers.get("subject", ""),
-                "from": headers.get("from", ""),
-                "to": headers.get("to", ""),
-                "provider": account.provider.value,
-                "provider_message_id": provider_message_id,
+            channel_message_id=channel_message_id,
+            thread_keys=thread_keys,
+            provider_message_id=provider_message_id,
+            provider_message_id_fallback_provider=account.provider,
+            # OAuth sync doesn't extract structured SPF/DKIM columns
+            # today; ``_email_auth_passed(headers)`` below applies the
+            # legacy Authentication-Results check for workflow gating.
+            spf_result=None,
+            dkim_result=None,
+            auto_generated=False,
+            source_provider=account.provider.value,
+            source_reference={
                 "conversation_id_provider": matched.get("conversation_id"),
                 "rfc_message_id": rfc_message_id,
-                "thread_keys": sorted(thread_keys),
             },
-            sent_at=now,
+            # Preserve legacy OAuth policy: publish workflow events iff
+            # the Authentication-Results header didn't say fail. The
+            # Mailgun path passes False when its own SPF/DKIM parsers
+            # detect spoof; the two policies converge on the same
+            # helper.
+            publish_workflow_events=_email_auth_passed(headers),
+            activity_user_id=account.user_id,
+            account_email_label=account.email_address,
         )
-        session.add(msg)
-        conversation.last_message_at = now
-        conversation.unread_count = (conversation.unread_count or 0) + 1
-        await session.commit()
-        await session.refresh(msg)
-        await session.refresh(conversation)
-
-        # Best-effort: contact activity + assignee notification.
-        await activities_log(
-            entity_type="contact",
-            entity_id=contact_id,
-            type=ActivityType.email,
-            payload={
-                "direction": "inbound",
-                "subject": headers.get("subject", ""),
-                "preview": (body_text or "")[:160],
-                "conversation_id": str(conversation.id),
-                "message_id": str(msg.id),
-                "account_email": account.email_address,
-            },
-            org_id=account.org_id,
-            user_id=account.user_id,
-        )
-        if conversation.assigned_to_id is not None:
-            await notify(
-                org_id=account.org_id,
-                user_id=conversation.assigned_to_id,
-                type="conversation.message",
-                title=f"New email from {headers.get('from', 'a contact')}",
-                body=(headers.get("subject", "") or "")[:160] or None,
-                payload={
-                    "conversation_id": str(conversation.id),
-                    "channel": "email",
-                },
-            )
-
-        # tasks/chatbot-builder Step 4 — publish email.message_received.
-        # Fail-closed on SPF / DKIM explicit failures (audit +
-        # short-circuit). IMAP-fetched mail carries the mailbox
-        # provider's ``Authentication-Results`` header; we honour it
-        # rather than doing our own DNS-heavy verification (that path
-        # can land as a follow-up once the bot triggers on inbound
-        # email surface real spoofing attempts).
-        if not _email_auth_passed(headers):
-            logger.info(
-                "chatbot.email.spf_dkim_failed account=%s msg=%s",
-                account.id,
-                msg.id,
-            )
-            return msg
-
-        await _publish_email_message_received(
-            session,
-            conversation=conversation,
-            message=msg,
-            text=body_text,
-        )
-
-        # If the inbound message references a prior message (via
-        # In-Reply-To / References headers), it's a reply to something
-        # we sent — fire the workflow-facing ``email.replied`` event
-        # alongside the chatbot ``email.message_received`` fire above.
-        # Distinct events because reply-to-CRM-outbound has different
-        # workflow semantics than "any inbound landed" (the reply is
-        # the trigger for sales-follow-up flows).
-        if thread_keys:
-            await _publish_email_replied(
-                session,
-                conversation=conversation,
-                message=msg,
-                text=body_text,
-                subject=headers.get("subject", ""),
-            )
-        return msg
 
 
 # --- Helpers ------------------------------------------------------------
@@ -1013,6 +1110,7 @@ async def _find_latest_email_conversation_for_contact(
     session: AsyncSession,
     *,
     contact_id: uuid.UUID,
+    org_id: uuid.UUID | None = None,
 ) -> Conversation | None:
     """Return the most recent email conversation this contact belongs
     to, regardless of status. Used by BOTH the inbound flow (after
@@ -1020,18 +1118,23 @@ async def _find_latest_email_conversation_for_contact(
     didn't pin a specific conversation_id) so email delivery for one
     contact always concentrates in a single row.
 
+    ``org_id`` is optional to preserve the OAuth call sites that run
+    inside a set-tenant-context session; Mailgun's Celery task passes
+    it explicitly so the query never trusts session-scoped context
+    alone (Attacker C3 finding from PLANNING_RULES review).
+
     Ordering: ``last_message_at DESC NULLS LAST`` mirrors the inbox
     list — the conversation the operator was most recently looking at
     is the same one new email lands on."""
-    return (
-        await session.execute(
-            select(Conversation)
-            .where(Conversation.channel == ConversationChannel.email)
-            .where(Conversation.contact_id == contact_id)
-            .order_by(Conversation.last_message_at.desc().nullslast())
-            .limit(1)
-        )
-    ).scalar_one_or_none()
+    stmt = (
+        select(Conversation)
+        .where(Conversation.channel == ConversationChannel.email)
+        .where(Conversation.contact_id == contact_id)
+    )
+    if org_id is not None:
+        stmt = stmt.where(Conversation.org_id == org_id)
+    stmt = stmt.order_by(Conversation.last_message_at.desc().nullslast()).limit(1)
+    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 async def _create_email_conversation(
@@ -1060,15 +1163,20 @@ async def _find_conversation_by_thread_keys(
     contact_id: uuid.UUID,
 ) -> Conversation | None:
     """Return the conversation that owns any prior message whose
-    `channel_message_id` matches one of `thread_keys`. The
-    `contact_id` filter is belt-and-braces: a forged thread key
-    that collides with another customer's id would still be
-    scoped to this contact's conversations."""
+    `channel_message_id` matches one of `thread_keys`.
+
+    Both queries are org-scoped **explicitly** (Attacker C3 finding):
+    a captured Message-ID from Org A's outbound cannot thread an
+    inbound into Org B's conversations even if the session's tenant
+    context is somehow bypassed. The `contact_id` + `channel` filters
+    are belt-and-braces on top."""
     if not thread_keys:
         return None
     rows = (
         await session.execute(
-            select(Message.conversation_id).where(Message.channel_message_id.in_(list(thread_keys)))
+            select(Message.conversation_id)
+            .where(Message.org_id == org_id)
+            .where(Message.channel_message_id.in_(list(thread_keys)))
         )
     ).all()
     if not rows:
@@ -1078,6 +1186,7 @@ async def _find_conversation_by_thread_keys(
         (
             await session.execute(
                 select(Conversation)
+                .where(Conversation.org_id == org_id)
                 .where(Conversation.id.in_(list(candidate_ids)))
                 .where(Conversation.contact_id == contact_id)
                 .where(Conversation.channel == ConversationChannel.email)
@@ -1091,14 +1200,20 @@ async def _find_conversation_by_thread_keys(
     return convs
 
 
-async def _exists_by_rfc_id(session: AsyncSession, rfc_id: str) -> bool:
-    """Dedupe lookup — would this RFC Message-ID create a duplicate
-    row inside this org? RLS scopes the search."""
-    rows = (
-        await session.execute(
-            select(Message.id).where(Message.channel_message_id == rfc_id).limit(1)
-        )
-    ).first()
+async def _exists_by_rfc_id(
+    session: AsyncSession, rfc_id: str, *, org_id: uuid.UUID | None = None
+) -> bool:
+    """Dedupe lookup — would this ``channel_message_id`` create a
+    duplicate row inside the target org?
+
+    ``org_id`` is optional to preserve OAuth callers; Mailgun path
+    passes it explicitly (Attacker C3 finding). When set, the query
+    uses the partial unique index ``uq_messages_org_channel_msgid``
+    added in Step 0 for an O(log n) lookup."""
+    stmt = select(Message.id).where(Message.channel_message_id == rfc_id)
+    if org_id is not None:
+        stmt = stmt.where(Message.org_id == org_id)
+    rows = (await session.execute(stmt.limit(1))).first()
     return rows is not None
 
 
@@ -1106,21 +1221,20 @@ async def _exists_by_provider_id(
     session: AsyncSession,
     provider_message_id: str,
     provider: EmailAccountProvider,
+    *,
+    org_id: uuid.UUID | None = None,
 ) -> bool:
     """Secondary dedupe — for inbound messages where the RFC
     Message-ID is malformed/missing, fall back to checking the
     provider's own id stamped into `payload.provider_message_id`."""
     if not provider_message_id:
         return False
-    # JSONB indexed lookup; this is rare-path so a sequential scan
-    # is acceptable. The RFC-id check above catches the common case.
-    rows = (
-        await session.execute(
-            select(Message.id)
-            .where(Message.payload["provider_message_id"].astext == provider_message_id)
-            .limit(1)
-        )
-    ).first()
+    stmt = select(Message.id).where(
+        Message.payload["provider_message_id"].astext == provider_message_id
+    )
+    if org_id is not None:
+        stmt = stmt.where(Message.org_id == org_id)
+    rows = (await session.execute(stmt.limit(1))).first()
     return rows is not None
 
 

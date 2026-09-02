@@ -79,10 +79,17 @@ from src.app.core.catalog.router import router as catalog_router
 from src.app.core.contacts.groups.router import router as contact_groups_router
 from src.app.core.contacts.imports.router import router as contact_imports_router
 from src.app.core.contacts.router import router as contacts_router
-from src.app.core.conversations.router import router as conversations_router
+from src.app.core.conversations.router import (
+    message_attachments_router,
+    router as conversations_router,
+)
 from src.app.core.custom_fields.router import router as custom_fields_router
 from src.app.core.dashboard.router import router as dashboard_router
 from src.app.core.dev.router import router as dev_router
+from src.app.core.email.mailgun.router import (
+    dlq_admin_router as mailgun_dlq_admin_router,
+    router as mailgun_inbound_router,
+)
 from src.app.core.email.router import router as email_router
 from src.app.core.email.tracking.router import router as email_tracking_router
 from src.app.core.email_sender_setup.router import router as email_sender_setup_router
@@ -437,6 +444,19 @@ app.include_router(rp_property_router, prefix="/api/v1")
 app.include_router(rp_property_public_router, prefix="/api")
 app.include_router(plans_router, prefix="/api/v1")
 app.include_router(stripe_webhooks_router, prefix="/api/v1")
+# mailgun-inbound track — public webhook + health check.
+# Path shape: POST /api/v1/webhooks/mailgun/inbound, GET .../inbound/health.
+# Signed by Mailgun's HMAC (not JWT); unauthenticated at the FastAPI layer.
+app.include_router(mailgun_inbound_router, prefix="/api/v1/webhooks")
+# mailgun-inbound Step 5 — attachment download endpoint. JWT-auth'd
+# via ``conversations.read`` inside the endpoint. Mounted at /api/v1
+# so the path shape is GET /api/v1/messages/{id}/attachments/{key}.
+app.include_router(message_attachments_router, prefix="/api/v1")
+# mailgun-inbound Step 5 — Owner-only DLQ admin surface for the
+# Mailgun inbound-ingest failure queue. Path shape:
+# GET  /api/v1/admin/email-inbound-dlq
+# POST /api/v1/admin/email-inbound-dlq/{id}/reprocess
+app.include_router(mailgun_dlq_admin_router, prefix="/api/v1")
 
 # Dev-only routes (test-login dropdown backing endpoint, etc). Mounted
 # only when IS_DEVELOPMENT=true on the API container — production never

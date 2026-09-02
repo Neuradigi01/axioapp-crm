@@ -85,6 +85,22 @@ celery.autodiscover_tasks(
         # endpoints. Without this entry the worker can't find the
         # task name and every upload stays stuck at status='pending'.
         "src.app.core.ai_assistants.tasks",
+        # tasks/mailgun-inbound Step 3 — Mailgun inbound webhook ingest.
+        # ``process_mailgun_inbound`` is dispatched by the webhook after
+        # persisting the raw multipart to disk. Without this entry the
+        # webhook enqueue silently fails and the pending-inbound
+        # sweeper (below) is the only path that clears the on-disk
+        # queue — one-tick-slower delivery is fine but the worker MUST
+        # know the task name.
+        "src.app.core.email.mailgun.tasks",
+        # tasks/mailgun-inbound Step 3 — 5-min sweeper that re-enqueues
+        # any pending-inbound directory left behind by a broker outage
+        # at delivery time. Beat entry lives in celery_config.py.
+        "src.app.core.email.mailgun.pending_inbound_sweeper",
+        # tasks/mailgun-inbound Step 5 — filesystem orphan sweepers
+        # for staging (15-min cadence) + messages/ (daily). Beat
+        # entries in celery_config.py.
+        "src.app.core.email.mailgun.orphan_cleanup",
     ]
 )
 

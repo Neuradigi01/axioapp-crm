@@ -1,7 +1,7 @@
 # Step 5 — Attachments (two-phase write, MIME allowlist, libmagic sniff) + download endpoint + orphan sweeper + DLQ admin endpoint
 
-**Status:** Pending
-**Effort:** ~0.75 day
+**Status:** COMPLETED — 2026-09-02. Two-phase attachment write (staging → messages/) with libmagic sniff + explicit MIME allowlist + size caps live; `GET /api/v1/messages/{id}/attachments/{safe_key}` download endpoint mounted (auth-gated, forced `Content-Disposition: attachment`); Owner-only DLQ admin at `/api/v1/admin/email-inbound-dlq` + reprocess; orphan sweepers (staging 15-min, messages/ daily 04:00 UTC) with beat entries.
+**Effort:** ~0.75 day (actual: ~2 hours).
 **Depends on:** Step 4 (`process_mailgun_inbound` task).
 **Blocks:** Step 7 (end-to-end smoke with attachments).
 

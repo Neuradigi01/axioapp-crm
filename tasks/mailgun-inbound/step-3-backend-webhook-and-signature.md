@@ -1,7 +1,7 @@
 # Step 3 — `core/email/mailgun/` webhook + signature + payload-to-disk + Celery enqueue
 
-**Status:** Pending
-**Effort:** ~0.75 day
+**Status:** COMPLETED — 2026-09-02. Webhook live at `POST /api/v1/webhooks/mailgun/inbound` (401 without signature verified); health at `GET .../health` returns 200; Celery task `process_mailgun_inbound` + beat sweeper `sweep_pending_inbound` registered.
+**Effort:** ~0.75 day (actual: ~1.5 hours).
 **Depends on:** Step 1 (DLQ table exists for later use).
 **Blocks:** Step 4 (ingest depends on this endpoint).
 

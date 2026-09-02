@@ -1,7 +1,7 @@
 # Step 4 — Ingest service + shared `_persist_inbound_email` refactor + SPF/DKIM enforcement + auto-responder detection
 
-**Status:** Pending
-**Effort:** ~1 day (largest step — combines the refactor with the auth policy)
+**Status:** COMPLETED — 2026-09-02. Shared `_persist_inbound_email` extracted (OAuth `receive_email` refactored to wrap it, byte-shape identical); threading DALs take `org_id` explicitly (Attacker C3 fix); Mailgun task body wires token→sender→org resolution + SPF/DKIM enforcement + auto-responder detection + multi-recipient guard + DLQ on exhausted retries.
+**Effort:** ~1 day (actual: ~2 hours).
 **Depends on:** Steps 1 (schema + DAL), 3 (webhook writes pending-inbound).
 **Blocks:** Step 5 (attachments extend this), Step 7 (end-to-end smoke).
 
