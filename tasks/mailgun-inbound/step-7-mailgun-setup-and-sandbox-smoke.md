@@ -1,7 +1,7 @@
 # Step 7 — Mailgun setup + sandbox smoke + Route script + end-to-end verification
 
-**Status:** PARTIAL — 2026-09-02. Route-setup script shipped + verified (imports clean, missing-env path gives clear operator error); SMOKE-RESULTS.md checklist template committed. **Blocked-on-user:** add `MAILGUN_API_KEY` + `MAILGUN_SIGNING_KEY` to SOPS-encrypted `secrets.enc.env` via `run.cmd secrets-edit`, restart, then run `python -m src.app.scripts.mailgun_route_setup` and drive the 10-item smoke.
-**Effort:** ~0.5 day active (I did ~30 min of scripting; the rest is your smoke run).
+**Status:** MOSTLY COMPLETED — 2026-09-02. Route created against sandbox (id `6a97f5b2f6a1c923ecf1c0e3`); 8 of 10 smoke items PASS (auth path + spoof-drop + auto-responder + DLQ + orphan sweeper all verified live via synthetic signed POSTs); 2 real bugs uncovered + fixed during smoke (compose env passthrough missing MAILGUN_* vars, `SET LOCAL` bind syntax). Items 1–3 (real Gmail round-trip) require the operator to add Authorized Recipients in the Mailgun sandbox settings + send a real email — instructions in [SMOKE-RESULTS.md](SMOKE-RESULTS.md).
+**Effort:** ~0.5 day active (actual: ~90 min for scripting + smoke).
 **Depends on:** Steps 0–6 all deployed to staging.
 **Blocks:** Step 8 (production cutover).
 

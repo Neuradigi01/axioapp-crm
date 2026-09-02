@@ -77,8 +77,7 @@ def _make_contact(
     return Contact(
         id=uuid.uuid4(),
         org_id=org_id,
-        first_name="C",
-        last_name=str(uuid.uuid4())[:6],
+        full_name=f"Contact {uuid.uuid4().hex[:6]}",
         email=email,
         anonymised_at=anonymised_at,
         created_at=now,

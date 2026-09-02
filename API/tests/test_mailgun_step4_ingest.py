@@ -226,8 +226,7 @@ async def _make_contact(session, org_id: uuid.UUID, email: str) -> Contact:
     c = Contact(
         id=uuid.uuid4(),
         org_id=org_id,
-        first_name="Cust",
-        last_name=str(uuid.uuid4())[:6],
+        full_name=f"Cust {uuid.uuid4().hex[:6]}",
         email=email,
         created_at=now,
         updated_at=now,

@@ -188,10 +188,14 @@ async def _process_async(task, pending_dir: Path) -> None:
         org_id = sender.org_id
 
         # Set the RLS tenant context inside the Celery worker session —
-        # every ORM read/write below runs scoped to this org. Matches
-        # the workflows-sweep pattern.
+        # every ORM read/write below runs scoped to this org.
+        # ``SET LOCAL`` doesn't accept parametric binds (asyncpg
+        # translates to ``$1`` which Postgres rejects on GUC-set
+        # statements). Use ``set_config(name, value, is_local=TRUE)``
+        # which is the SQL-native equivalent + accepts binds cleanly.
         await session.execute(
-            text("SET LOCAL app.current_org_id = :o"), {"o": str(org_id)}
+            text("SELECT set_config('app.current_org_id', :o, TRUE)"),
+            {"o": str(org_id)},
         )
 
         # Parse SPF/DKIM verdicts + auto-responder headers.

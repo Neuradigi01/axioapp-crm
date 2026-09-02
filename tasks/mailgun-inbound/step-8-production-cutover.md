@@ -1,6 +1,6 @@
 # Step 8 — Production cutover (`reply.neuradigi.com` DNS + prod verify + runbook + rotation drill)
 
-**Status:** Pending — BLOCKED on DNS records added at `neuradigi.com` registrar.
+**Status:** PARTIAL — 2026-09-02. Operator runbook shipped (`mailgun-setup-runbook.md`) with first-time setup, key rotation, DLQ inspection, "no inbounds are landing" checklist, emergency disable, common failures, and custom-domain follow-up notes. **Blocked-on-user:** (a) verify Step 7 sandbox smoke first; (b) add `reply.neuradigi.com` in Mailgun dashboard; (c) publish DNS records at `neuradigi.com` registrar; (d) wait for green verification; (e) ping me to flip prod env + re-run route script.
 **Effort:** ~0.25 day active + DNS propagation wait (~15 min to few hours).
 **Depends on:** Step 7 (sandbox smoke passed).
 **Blocks:** Nothing.

@@ -25,6 +25,13 @@ x-secret-vars: &secret-vars
   STRIPE_SECRET_KEY:
   STRIPE_WEBHOOK_SECRET:
   AI_PROVIDER_KEY_KEK:
+  # mailgun-inbound track — inbound webhook + Route API auth.
+  # MAILGUN_SIGNING_KEY_PREVIOUS is empty except during a key
+  # rotation window; must be forwarded so the fallback verify path
+  # still activates when the operator populates it.
+  MAILGUN_API_KEY:
+  MAILGUN_SIGNING_KEY:
+  MAILGUN_SIGNING_KEY_PREVIOUS:
 
 services:
   api:
