@@ -1,7 +1,7 @@
 # Step 7 — Mailgun setup + sandbox smoke + Route script + end-to-end verification
 
-**Status:** Pending — BLOCKED on Mailgun account creation.
-**Effort:** ~0.5 day active + Mailgun account lead time.
+**Status:** PARTIAL — 2026-09-02. Route-setup script shipped + verified (imports clean, missing-env path gives clear operator error); SMOKE-RESULTS.md checklist template committed. **Blocked-on-user:** add `MAILGUN_API_KEY` + `MAILGUN_SIGNING_KEY` to SOPS-encrypted `secrets.enc.env` via `run.cmd secrets-edit`, restart, then run `python -m src.app.scripts.mailgun_route_setup` and drive the 10-item smoke.
+**Effort:** ~0.5 day active (I did ~30 min of scripting; the rest is your smoke run).
 **Depends on:** Steps 0–6 all deployed to staging.
 **Blocks:** Step 8 (production cutover).
 
