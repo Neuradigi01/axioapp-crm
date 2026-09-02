@@ -52,7 +52,7 @@ import {
 } from '../templates/templates-api.service';
 import { TemplateStatusBadgeComponent } from '../templates/template-status-badge.component';
 import { FieldErrorComponent } from '../shared/forms/field-error.component';
-import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
+import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 
 /**
@@ -814,6 +814,17 @@ export class CreateCampaignModalComponent {
   protected _composeSenderValue(sender: UnifiedSender): string {
     return `${sender.kind}:${sender.id}`;
   }
+
+  /** Options for the shared `crm-mobile-select` — mirrors the label
+   *  format used by the old native `<select>` so the picker reads the
+   *  same. Derived from `emailAccounts()` so it re-evaluates when the
+   *  senders list resolves. */
+  protected readonly senderOptions = computed<readonly MobileSelectOption[]>(() =>
+    (this.emailAccounts() ?? []).map((a) => ({
+      value: this._composeSenderValue(a),
+      label: `[${a.kind === 'gmail' ? 'Gmail' : a.kind === 'microsoft' ? 'Outlook' : 'SMTP'}] ${a.from_address}${a.display_name ? ' · ' + a.display_name : ''}`,
+    })),
+  );
 
   /** Read the currently-selected sender back out of the two mutually-
    *  exclusive form controls as the same "kind:id" composite the

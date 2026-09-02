@@ -440,29 +440,21 @@
                        (Gmail / Microsoft) and verified SMTP senders. The
                        option value is a "kind:id" composite so the
                        component knows which form control to route the
-                       selection into. `[ngModel]` reflects the current
-                       selection back — we don't `formControlName` here
-                       because the picker has to write to one of TWO form
-                       controls depending on the picked row's kind. -->
-                  <select
-                    [ngModel]="currentSenderCompositeValue()"
-                    [ngModelOptions]="{ standalone: true }"
-                    (ngModelChange)="onSenderPicked($event)"
-                    class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-                  >
-                    <option [ngValue]="''">— Pick a sender —</option>
-                    @for (a of emailAccounts() ?? []; track a.kind + ':' + a.id) {
-                      <option [ngValue]="a.kind + ':' + a.id">
-                        [{{
-                          a.kind === 'gmail'
-                            ? 'Gmail'
-                            : a.kind === 'microsoft'
-                              ? 'Outlook'
-                              : 'SMTP'
-                        }}] {{ a.from_address }}{{ a.display_name ? ' · ' + a.display_name : '' }}
-                      </option>
-                    }
-                  </select>
+                       selection into. Uses `crm-mobile-select` so the
+                       popup matches every other picker in the app (dark
+                       theme, in-DOM panel) instead of the OS-native
+                       browser popup. We bind `[value]` + `(valueChange)`
+                       instead of `formControlName` because the picker
+                       has to write to one of TWO form controls depending
+                       on the picked row's kind. -->
+                  <div class="mt-1">
+                    <crm-mobile-select
+                      [options]="senderOptions()"
+                      [value]="currentSenderCompositeValue()"
+                      placeholder="— Pick a sender —"
+                      (valueChange)="onSenderPicked($event)"
+                    />
+                  </div>
                   <span class="mt-0.5 block text-[10px] text-muted">
                     Includes verified Gmail / Outlook mailboxes and SMTP sender identities.
                   </span>
