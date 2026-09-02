@@ -72,7 +72,7 @@ _INBOUND_TOKEN_LEN = 12
 def _generate_inbound_token() -> str:
     """12-char URL-safe token. Used as the local-part of the sender's
     ``in_<token>@<INBOUND_EMAIL_DOMAIN>`` Reply-To address."""
-    return secrets.token_urlsafe(9)[: _INBOUND_TOKEN_LEN]
+    return secrets.token_urlsafe(9)[:_INBOUND_TOKEN_LEN]
 
 
 def build_inbound_reply_address(row: EmailSmtpSender) -> InboundReplyAddress | None:
@@ -417,7 +417,33 @@ async def delete_sender(
     org_id: uuid.UUID,
     sender_id: uuid.UUID,
 ) -> None:
-    """Remove one SMTP sender. 404 on miss, idempotent on repeat."""
+    """Remove one SMTP sender. 404 on miss, idempotent on repeat.
+
+    Pre-checks for campaigns that reference this sender. The FK on
+    ``tbl_campaigns.smtp_sender_id`` is ``ON DELETE RESTRICT`` so the
+    campaign row's audit trail keeps naming the sender it dispatched
+    through even long after send. Without this pre-check the raw
+    ``asyncpg`` ``ForeignKeyViolationError`` surfaces to the frontend
+    as a 500 with a wall of SQL — this returns a 409 with a concise
+    breakdown of the referencing campaigns' statuses instead.
+    """
+    from src.app.core.campaigns import data_access as campaigns_da
+
+    referenced_by_status = await campaigns_da.count_campaigns_by_status_for_smtp_sender(
+        session, org_id=org_id, smtp_sender_id=sender_id
+    )
+    total_refs = sum(referenced_by_status.values())
+    if total_refs:
+        breakdown = ", ".join(f"{n} {s}" for s, n in sorted(referenced_by_status.items()))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"This SMTP sender is still used by {total_refs} campaign(s) "
+                f"({breakdown}). Delete or reassign those campaigns before "
+                "removing the sender."
+            ),
+        )
+
     deleted = await data_access.delete_by_id(session, org_id=org_id, sender_id=sender_id)
     if not deleted:
         raise HTTPException(

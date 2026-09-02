@@ -74,6 +74,29 @@ async def count_all_campaigns(session: AsyncSession) -> int:
     return int(result.scalar_one())
 
 
+async def count_campaigns_by_status_for_smtp_sender(
+    session: AsyncSession, *, org_id: uuid.UUID, smtp_sender_id: uuid.UUID
+) -> dict[str, int]:
+    """Group campaigns that reference this SMTP sender by status.
+
+    Used by the email-senders delete-sender flow to produce a helpful
+    409 message instead of letting the FK RESTRICT violation surface
+    as a raw asyncpg IntegrityError / 500.
+    """
+    result = await session.execute(
+        select(Campaign.status, func.count())
+        .where(
+            Campaign.org_id == org_id,
+            Campaign.smtp_sender_id == smtp_sender_id,
+        )
+        .group_by(Campaign.status)
+    )
+    return {
+        str(status.value if hasattr(status, "value") else status): int(n)
+        for status, n in result.all()
+    }
+
+
 async def list_campaigns_page(session: AsyncSession, *, offset: int, limit: int) -> list[Campaign]:
     """Page of campaigns sorted newest-first."""
     rows = (
@@ -283,9 +306,7 @@ async def stats_by_status(
     return [(r[0], int(r[1])) for r in rows]
 
 
-async def email_tracking_counts(
-    session: AsyncSession, *, campaign_id: uuid.UUID
-) -> dict[str, int]:
+async def email_tracking_counts(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str, int]:
     """Campaigns v1 Step 05 — per-classifier counts for the Email
     funnel. ``bounced`` counts rows with a non-null ``bounced_at``,
     ``unsubscribed`` counts rows with a non-null ``unsubscribed_at``.
@@ -314,9 +335,7 @@ async def email_tracking_counts(
     }
 
 
-async def dashboard_stats_since(
-    session: AsyncSession, *, since: datetime
-) -> dict[str, int]:
+async def dashboard_stats_since(session: AsyncSession, *, since: datetime) -> dict[str, int]:
     """Aggregate `CampaignMessage` counts across all campaigns whose
     messages were sent on or after `since`.
 
@@ -334,9 +353,7 @@ async def dashboard_stats_since(
         await session.execute(
             select(
                 func.count().filter(CampaignMessage.sent_at.is_not(None)).label("sent"),
-                func.count()
-                .filter(CampaignMessage.delivered_at.is_not(None))
-                .label("delivered"),
+                func.count().filter(CampaignMessage.delivered_at.is_not(None)).label("delivered"),
                 func.count()
                 .filter(
                     or_(
@@ -399,6 +416,7 @@ __all__ = [
     "add_outbound_message",
     "bulk_upsert_queued_campaign_messages",
     "count_all_campaigns",
+    "count_campaigns_by_status_for_smtp_sender",
     "count_messages_filtered",
     "count_queued_messages_for_campaign",
     "delete_campaign_row",
