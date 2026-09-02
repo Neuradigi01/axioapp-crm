@@ -293,48 +293,51 @@ async def send_email_reply(
             detail="Email conversation has no linked contact — cannot reply.",
         )
 
-    # Default account: the org's SHARED connected mailbox from
-    # Settings → Integrations → Email Sender. Every rep (Owner /
-    # Admin / Employee / custom role) sends replies through the same
-    # organisation-scoped mailbox — mirrors how Zoho Desk / Freshdesk
-    # handle team inboxes and removes the per-rep OAuth burden. The
-    # persisted Message still records ``sender_user_id`` = who clicked
-    # Send (author attribution stays intact); only the OAuth account
-    # used for the actual SMTP hop is org-scoped.
+    # Default sender: the org's SHARED sender identity from Settings →
+    # Integrations → Email Sender. Preference matches
+    # ``resolve_org_sender`` (shared/email/org_sender.py): verified SMTP
+    # sender first (default, else any), then live OAuth mailbox. Every
+    # rep sends through the same org-scoped identity; the persisted
+    # Message still records ``sender_user_id`` for author attribution.
     #
-    # ``sync_state`` gating deliberately mirrors ``resolve_org_sender``
-    # in ``shared/email/org_sender.py``: any non-``disconnected`` row
-    # with a live refresh_token can send, because sync_state reflects
-    # INBOUND backfill completeness — irrelevant to outbound send.
-    # (See project_email_sender_stuck_syncing_fix memory.)
+    # ``sync_state`` gating on the OAuth branch: any non-``disconnected``
+    # row with a live refresh_token can send — sync_state describes
+    # INBOUND backfill only (project_email_sender_stuck_syncing_fix).
+    smtp_sender_id: uuid.UUID | None = None
     if account_id is None:
         from sqlalchemy import select as _select
 
         from src.app.core.email.models import EmailAccount
+        from src.app.core.email_senders import data_access as _smtp_da
 
-        oauth = (
-            await session.execute(
-                _select(EmailAccount)
-                .where(
-                    EmailAccount.org_id == conv.org_id,
-                    EmailAccount.sync_state != EmailAccountSyncState.disconnected,
-                    EmailAccount.refresh_token_enc.is_not(None),
+        default_smtp = await _smtp_da.find_default_verified(session, org_id=conv.org_id)
+        smtp_row = default_smtp or await _smtp_da.find_any_verified(session, org_id=conv.org_id)
+        if smtp_row is not None:
+            smtp_sender_id = smtp_row.id
+        else:
+            oauth = (
+                await session.execute(
+                    _select(EmailAccount)
+                    .where(
+                        EmailAccount.org_id == conv.org_id,
+                        EmailAccount.sync_state != EmailAccountSyncState.disconnected,
+                        EmailAccount.refresh_token_enc.is_not(None),
+                    )
+                    .order_by(EmailAccount.connected_at.asc())
+                    .limit(1)
                 )
-                .order_by(EmailAccount.connected_at.asc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        if oauth is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "This organisation has no connected email account. "
-                    "Owner or Admin must connect one in Settings → "
-                    "Integrations → Email Sender before anyone can reply "
-                    "to email conversations."
-                ),
-            )
-        account_id = oauth.id
+            ).scalar_one_or_none()
+            if oauth is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "This organisation has no connected email account. "
+                        "Owner or Admin must connect one in Settings → "
+                        "Integrations → Email Sender before anyone can reply "
+                        "to email conversations."
+                    ),
+                )
+            account_id = oauth.id
 
     # Auto-thread on the newest inbound message so Gmail / Outlook
     # collapse the reply into the customer's original thread. Single
@@ -351,6 +354,7 @@ async def send_email_reply(
         org_id=conv.org_id,
         sender_user_id=user_id,
         account_id=account_id,
+        smtp_sender_id=smtp_sender_id,
         contact_id=conv.contact_id,
         subject=subject_final,
         body_text=body_text,
