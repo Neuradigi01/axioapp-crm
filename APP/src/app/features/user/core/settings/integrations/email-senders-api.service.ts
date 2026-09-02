@@ -29,6 +29,20 @@ export type SmtpTlsMode = 'starttls' | 'tls' | 'none';
 
 export type UnifiedSenderKind = 'gmail' | 'microsoft' | 'smtp';
 
+/** SMTP-sender reply-capture surface exposed by the mailgun-inbound
+ *  track. `null` for OAuth rows (Gmail/Microsoft handle inbound
+ *  replies via their own sync) and for SMTP rows when the deploy
+ *  hasn't opted into Mailgun inbound (INBOUND_EMAIL_DOMAIN empty).
+ *
+ *  `address` is server-composed (`in_<token>@<INBOUND_EMAIL_DOMAIN>`)
+ *  — never construct it client-side; that would leak deploy config
+ *  into the frontend and hard-code sandbox-vs-prod. */
+export interface InboundReplyAddress {
+  token: string;
+  address: string;
+  capture_enabled: boolean;
+}
+
 export interface UnifiedSender {
   kind: UnifiedSenderKind;
   id: string;
@@ -45,6 +59,11 @@ export interface UnifiedSender {
   token_expires_at?: string | null;
   sync_state?: string | null;
   last_sync_error?: string | null;
+  /** SMTP-only reply-capture block. `null` for OAuth rows or when
+   *  the deploy hasn't wired the Mailgun receiving domain. Nullable
+   *  end-to-end so the card renders cleanly during phased rollout
+   *  when the backend hasn't shipped INBOUND_EMAIL_DOMAIN yet. */
+  inbound_reply_address?: InboundReplyAddress | null;
 }
 
 export interface SmtpSender {
@@ -58,6 +77,8 @@ export interface SmtpSender {
   verified_at: string | null;
   is_default: boolean;
   created_at: string;
+  /** Reply-capture block, matching `UnifiedSender.inbound_reply_address`. */
+  inbound_reply_address?: InboundReplyAddress | null;
 }
 
 export interface CreateSmtpSenderPayload {
@@ -97,5 +118,15 @@ export class EmailSendersApiService {
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);
+  }
+
+  /** mailgun-inbound track: flip the per-sender opt-out for Reply-To
+   *  rewriting. `capture=false` means outbound from this SMTP sender
+   *  leaves the caller-supplied Reply-To alone; replies go back to
+   *  the SMTP mailbox instead of the CRM. */
+  setCaptureToggle(id: string, capture: boolean): Observable<SmtpSender> {
+    return this.http.patch<SmtpSender>(`${this.base}/smtp/${id}/capture-toggle`, {
+      capture,
+    });
   }
 }

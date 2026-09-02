@@ -255,6 +255,7 @@
                         Verify
                       </button>
                     }
+
                     @if (row.kind === 'smtp') {
                       <button
                         type="button"
@@ -320,6 +321,71 @@
                   </div>
                 </td>
               </tr>
+              <!-- mailgun-inbound track: Reply capture sub-row. Renders only
+                   for SMTP senders when the backend has exposed a reply
+                   address (INBOUND_EMAIL_DOMAIN is set on this deploy). -->
+              @if (row.kind === 'smtp' && row.inbound_reply_address; as replyAddr) {
+                <tr>
+                  <td colspan="5" class="bg-surface-2/40 px-4 py-3">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="flex flex-1 flex-col gap-1">
+                        <div
+                          class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted"
+                        >
+                          <lucide-icon name="mail-check" size="12" aria-hidden="true"></lucide-icon>
+                          Reply capture
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <code
+                            class="inline-flex max-w-full items-center break-all rounded-md border border-subtle bg-surface px-2 py-1 font-mono text-[11px] text-default"
+                            [attr.title]="replyAddr.address"
+                          >
+                            {{ replyAddr.address }}
+                          </code>
+                          <button
+                            type="button"
+                            class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-[11px] font-medium text-default hover:bg-surface-2"
+                            (click)="copyReplyAddress(row)"
+                            [attr.aria-label]="'Copy reply address for ' + row.from_address"
+                          >
+                            @if (copiedReplyId() === row.id) {
+                              <lucide-icon name="check" size="12" aria-hidden="true"></lucide-icon>
+                              Copied
+                            } @else {
+                              <lucide-icon name="copy" size="12" aria-hidden="true"></lucide-icon>
+                              Copy
+                            }
+                          </button>
+                        </div>
+                      </div>
+                      <label
+                        class="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap text-[11px] font-medium text-default"
+                      >
+                        <input
+                          type="checkbox"
+                          class="rounded border-subtle"
+                          [checked]="replyAddr.capture_enabled"
+                          [disabled]="togglingCaptureId() === row.id"
+                          (change)="toggleCapture(row, $any($event.target).checked)"
+                        />
+                        Capture replies in CRM
+                      </label>
+                    </div>
+                    @if (!replyAddr.capture_enabled) {
+                      <!-- Standard amber warning banner (memory:
+                           feedback_standard_warning_banner_pattern). -->
+                      <div
+                        class="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-[11px] text-amber-400"
+                      >
+                        Replies to
+                        <span class="font-mono">{{ row.from_address }}</span>
+                        will go to your SMTP inbox instead of the CRM. Turn on to capture replies
+                        here.
+                      </div>
+                    }
+                  </td>
+                </tr>
+              }
             }
           </tbody>
         </table>

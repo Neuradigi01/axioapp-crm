@@ -1,7 +1,7 @@
 # Step 6 — Frontend: Reply capture panel + capture toggle + warning banner
 
-**Status:** Pending
-**Effort:** ~0.5 day
+**Status:** COMPLETED — 2026-09-02. Reply capture sub-row live under each verified SMTP sender in Settings → Integrations → Email Sender (address pill + Copy + Capture toggle + amber warning banner when off); email attachments in the conversation thread render as downloadable links via the new `/api/v1/messages/{id}/attachments/{key}` endpoint. Full `ng build` clean.
+**Effort:** ~0.5 day (actual: ~1.5 hours).
 **Depends on:** Steps 1 + 2 (API exposes `inbound_reply_address` on sender detail; PATCH toggle endpoint exists).
 **Blocks:** Nothing (Step 7 is Mailgun-side setup).
 
