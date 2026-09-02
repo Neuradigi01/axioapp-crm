@@ -450,10 +450,4 @@ export class AddSenderIdentityModalComponent {
     if (this.submitting() || this.redirecting() !== null) return;
     this.cancelled.emit();
   }
-
-  onBackdropClick(event: MouseEvent): void {
-    if (event.target === event.currentTarget) {
-      this.cancel();
-    }
-  }
 }

@@ -1,7 +1,11 @@
-<div
-  class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
-  (click)="onBackdropClick($event)"
->
+<!--
+  Backdrop is intentionally NOT click-to-dismiss. The form carries up
+  to 6 fields of SMTP credentials (host / port / username / password /
+  display-name / TLS) and losing them to an accidental click on the
+  dimmed sidebar was reported as bad UX. Close only via the explicit
+  X button in the header or the Cancel button in the footer.
+-->
+<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
   <div
     class="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-subtle bg-surface shadow-lg"
   >
