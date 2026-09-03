@@ -161,6 +161,10 @@ export class ContactImportWizardPageComponent implements OnInit {
   protected readonly cancelling = signal(false);
   protected readonly cancelError = signal<string | null>(null);
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Set true by `stopPolling()` — the poll callbacks check this before
+   *  scheduling the next tick so a late HTTP error can't resurrect the
+   *  loop after the component has been destroyed / navigated away. */
+  private pollingCancelled = false;
 
   protected readonly isProcessing = computed(() => {
     const r = this.commitResult();
@@ -517,13 +521,16 @@ export class ContactImportWizardPageComponent implements OnInit {
    *  ``destroyRef`` cleanup. */
   private startPolling(importId: string): void {
     this.stopPolling();
+    this.pollingCancelled = false;
     let ticks = 0;
     const poll = () => {
+      if (this.pollingCancelled) return;
       this.api
         .getImport(importId)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: (result) => {
+            if (this.pollingCancelled) return;
             this.commitResult.set(result);
             if (this.isTerminalStatus(result.status)) {
               this.committing.set(false);
@@ -536,7 +543,12 @@ export class ContactImportWizardPageComponent implements OnInit {
           },
           // On a transient poll error, back off and try again — the
           // worker is still running, we just lost one round-trip.
+          // The `pollingCancelled` guard stops the retry if the
+          // component was destroyed between HTTP dispatch and the
+          // error callback (`takeUntilDestroyed` won't fire the
+          // callback after destroy, but a scheduled setTimeout does).
           error: () => {
+            if (this.pollingCancelled) return;
             this.pollTimer = setTimeout(poll, 3000);
           },
         });
@@ -548,6 +560,7 @@ export class ContactImportWizardPageComponent implements OnInit {
   }
 
   private stopPolling(): void {
+    this.pollingCancelled = true;
     if (this.pollTimer !== null) {
       clearTimeout(this.pollTimer);
       this.pollTimer = null;

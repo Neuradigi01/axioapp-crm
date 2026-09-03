@@ -4,6 +4,7 @@ import {
   DestroyRef,
   Injectable,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -286,13 +287,22 @@ export class ContactsListPageComponent {
     // Reactive: search box change resets to page 1 and re-fetches.
     // Column-header filters call `onColumnFilterChange` directly so
     // they follow the same reset-and-reload path without a separate
-    // valueChanges pipeline.
-    this.searchControl.valueChanges
-      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        this.state.page.set(1);
-        this.reload();
-      });
+    // valueChanges pipeline. Drive the reload off the `q()` signal
+    // (already debounced+distinct via toSignal on the same control)
+    // — subscribing a second time to `valueChanges` with its own
+    // debounce raced against the signal write and could `reload()`
+    // with the previous `q` value.
+    let initialQ = true;
+    effect(() => {
+      // Track q() so the effect re-runs on debounced search changes.
+      this.q();
+      if (initialQ) {
+        initialQ = false;
+        return;
+      }
+      this.state.page.set(1);
+      this.reload();
+    });
     // Honour `/user/contacts?new=1` (used by the dashboard quick-action)
     // so landing on the page from elsewhere drops the user straight
     // into the create-contact modal. Strip the param after consuming
@@ -363,7 +373,13 @@ export class ContactsListPageComponent {
     return this.userMap().get(assignedTo) ?? 'Unknown';
   }
 
+  /** Monotonic request id — bumped on every `reload()`, checked in the
+   *  response callback so a slow earlier response can't overwrite a
+   *  faster later one when the user changes filters quickly. */
+  private reloadSeq = 0;
+
   protected reload(): void {
+    const seq = ++this.reloadSeq;
     this.state.loading.set(true);
     this.state.loadError.set(null);
     const sources = this.sourceFilter();
@@ -382,11 +398,13 @@ export class ContactsListPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
+          if (seq !== this.reloadSeq) return;
           this.state.items.set(resp.items);
           this.state.total.set(resp.total);
           this.state.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
+          if (seq !== this.reloadSeq) return;
           this.state.items.set([]);
           this.state.total.set(0);
           this.state.loadError.set(extractApiError(err) ?? 'Could not load contacts.');

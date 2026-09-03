@@ -124,7 +124,12 @@ async def list_contacts_endpoint(
             "offer wiped records as merge / link targets."
         ),
     ),
-    sort: Literal["full_name", "created_at", "last_activity_at"] = Query(default="created_at"),
+    # Default matches the frontend list page (contacts-list.page.ts) so
+    # first-load and URL-persistence-stripped calls see the same order —
+    # otherwise the sort dropdown shows "Last activity" but the rows come
+    # back "Created". "Recent activity first" is also the more useful
+    # default for a CRM contact list.
+    sort: Literal["full_name", "created_at", "last_activity_at"] = Query(default="last_activity_at"),
     order: Literal["asc", "desc"] = Query(default="desc"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
