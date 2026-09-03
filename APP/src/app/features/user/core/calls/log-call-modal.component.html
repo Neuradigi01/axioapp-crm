@@ -130,17 +130,23 @@
           (click)="close()"
           class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         >
-          Cancel
+          @if (createdCall()) {
+            Close (call saved)
+          } @else {
+            Cancel
+          }
         </button>
         <button
           type="submit"
-          [disabled]="submitting()"
+          [disabled]="submitting() || (createdCall() !== null && !recordingFile())"
           class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
         >
           @if (uploadingRecording()) {
             Uploading recording…
           } @else if (submitting()) {
             Saving…
+          } @else if (createdCall()) {
+            Retry recording upload
           } @else {
             Log call
           }

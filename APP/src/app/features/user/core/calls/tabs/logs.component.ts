@@ -50,6 +50,10 @@ export class CallLogsTabComponent {
   protected readonly outcomes = signal<CallOutcome[]>([]);
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
+  /** Set when `listOutcomes()` fails. Without outcomes, the Log Call
+   *  modal's outcome-picker picklist validator rejects every choice —
+   *  operators need to see WHY, not just a silent broken picker. */
+  protected readonly outcomesError = signal<string | null>(null);
   protected readonly modalOpen = signal(false);
 
   protected readonly outcomeById = computed(() => {
@@ -64,9 +68,17 @@ export class CallLogsTabComponent {
       .listOutcomes()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (rows) => this.outcomes.set(rows),
-        error: () => {
-          /* outcomes aren't fatal — leave list empty */
+        next: (rows) => {
+          this.outcomes.set(rows);
+          this.outcomesError.set(null);
+        },
+        error: (err: HttpErrorResponse) => {
+          // Empty outcome list makes the Log Call modal's outcome
+          // picklist validator reject every value the rep picks —
+          // record the reason so the tab can surface it inline.
+          this.outcomesError.set(
+            extractApiError(err) ?? 'Could not load call outcomes — logging a call may fail.',
+          );
         },
       });
 
@@ -86,7 +98,13 @@ export class CallLogsTabComponent {
     });
   }
 
+  /** Monotonic request id — bumped on every `reload()`, checked in the
+   *  response callback so a slow earlier response can't overwrite a
+   *  faster later one when the user changes filters / tabs quickly. */
+  private reloadSeq = 0;
+
   protected reload(): void {
+    const seq = ++this.reloadSeq;
     this.loading.set(true);
     this.loadError.set(null);
     this.api
@@ -94,10 +112,12 @@ export class CallLogsTabComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
+          if (seq !== this.reloadSeq) return;
           this.items.set(resp.items);
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
+          if (seq !== this.reloadSeq) return;
           this.items.set([]);
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load calls.');

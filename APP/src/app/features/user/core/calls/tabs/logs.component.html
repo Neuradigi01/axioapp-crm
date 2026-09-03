@@ -7,6 +7,14 @@
     </div>
   }
 
+  @if (outcomesError(); as err) {
+    <div
+      class="mb-3 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-400"
+    >
+      {{ err }}
+    </div>
+  }
+
   @if (loading()) {
     <div
       class="rounded-xl border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"

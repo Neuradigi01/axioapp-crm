@@ -2,9 +2,11 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   EventEmitter,
   Input,
   Output,
+  inject,
   signal,
 } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
@@ -54,6 +56,20 @@ export class CallPickerModalComponent {
    *  briefly reads "Copied ✓" instead of "Copy Number". */
   protected readonly copied = signal(false);
 
+  /** Pending "Copied ✓" → close delay. Held so component destroy can
+   *  clear it — otherwise a modal dismissed within the 600ms window
+   *  still emits `picked` into a torn-down parent. */
+  private copyDelay: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      if (this.copyDelay !== null) {
+        clearTimeout(this.copyDelay);
+        this.copyDelay = null;
+      }
+    });
+  }
+
   protected onWhatsApp(): void {
     const digits = this.digitsOnly(this.phone);
     if (digits) {
@@ -75,7 +91,10 @@ export class CallPickerModalComponent {
       this.copied.set(true);
       // Give the user a beat to see the "Copied ✓" feedback before
       // the modal closes.
-      setTimeout(() => this.picked.emit('copy'), 600);
+      this.copyDelay = setTimeout(() => {
+        this.copyDelay = null;
+        this.picked.emit('copy');
+      }, 600);
     } catch {
       // Clipboard API may fail in some browsers — fall through with
       // the emit so the log modal still opens.

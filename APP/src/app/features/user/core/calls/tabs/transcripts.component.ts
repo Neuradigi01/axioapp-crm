@@ -90,7 +90,16 @@ export class CallTranscriptsTabComponent {
     return new Date(iso).toLocaleString();
   }
 
+  /** Monotonic id for `reloadCalls()` — same last-write-wins guard as
+   *  the sibling tabs. */
+  private listSeq = 0;
+  /** Monotonic id for the per-selection transcript fetch, so a rapid
+   *  left-rail selection change can't paint the OLD call's transcript
+   *  once its slower request finally resolves. */
+  private transcriptSeq = 0;
+
   protected reloadCalls(): void {
+    const seq = ++this.listSeq;
     this.callsLoading.set(true);
     this.listError.set(null);
     this.api
@@ -98,10 +107,12 @@ export class CallTranscriptsTabComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
+          if (seq !== this.listSeq) return;
           this.calls.set(resp.items);
           this.callsLoading.set(false);
         },
         error: (err: HttpErrorResponse) => {
+          if (seq !== this.listSeq) return;
           this.calls.set([]);
           this.callsLoading.set(false);
           this.listError.set(extractApiError(err) ?? 'Could not load calls.');
@@ -110,6 +121,7 @@ export class CallTranscriptsTabComponent {
   }
 
   private loadTranscript(callId: string): void {
+    const seq = ++this.transcriptSeq;
     this.transcriptLoading.set(true);
     this.transcriptHas404.set(false);
     this.transcript.set(null);
@@ -121,12 +133,14 @@ export class CallTranscriptsTabComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (t) => {
+          if (seq !== this.transcriptSeq) return;
           this.transcript.set(t);
           this.textControl.setValue(t.text);
           this.langControl.setValue(t.language ?? 'en');
           this.transcriptLoading.set(false);
         },
         error: (err: HttpErrorResponse) => {
+          if (seq !== this.transcriptSeq) return;
           this.transcriptLoading.set(false);
           if (err.status === 404) {
             this.transcriptHas404.set(true);

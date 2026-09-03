@@ -89,6 +89,13 @@ export class LogCallModalComponent {
   protected readonly dragActive = signal(false);
   protected readonly uploadingRecording = signal(false);
 
+  /** Non-null once `POST /calls` succeeds. If the follow-up recording
+   *  upload then fails, we keep the modal open — the call row already
+   *  exists so the rep can pick a different file and retry the upload
+   *  without re-creating the call. `close()` propagates this to the
+   *  parent so the list still refreshes on manual dismiss. */
+  protected readonly createdCall = signal<Call | null>(null);
+
   protected readonly recordingSizeLabel = computed(() => {
     const f = this.recordingFile();
     if (!f) return '';
@@ -170,6 +177,13 @@ export class LogCallModalComponent {
   }
 
   protected save(): void {
+    // Post-create retry path: call already exists, only the recording
+    // upload failed. Skip re-POST /calls and just retry the upload.
+    const existing = this.createdCall();
+    if (existing !== null) {
+      this.afterCreate(existing);
+      return;
+    }
     if (!this.form.valid) {
       this.form.markAllAsTouched();
       return;
@@ -188,7 +202,10 @@ export class LogCallModalComponent {
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (call) => this.afterCreate(call),
+        next: (call) => {
+          this.createdCall.set(call);
+          this.afterCreate(call);
+        },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.submitError.set(extractApiError(err) ?? 'Could not log call.');
@@ -208,6 +225,8 @@ export class LogCallModalComponent {
       return;
     }
     this.uploadingRecording.set(true);
+    this.submitting.set(true);
+    this.submitError.set(null);
     this.api
       .uploadRecording(call.id, file)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -220,18 +239,28 @@ export class LogCallModalComponent {
         error: (err: HttpErrorResponse) => {
           this.uploadingRecording.set(false);
           this.submitting.set(false);
-          // The Call row exists; recording failed. Surface the error
-          // but still emit `saved` so the parent closes cleanly — the
-          // rep can retry via the Edit Call flow later.
+          // The Call row exists; recording failed. Keep the modal open
+          // so the rep can see the error, swap the file, and retry
+          // the upload — there is no separate "edit call" flow to fall
+          // back to. `close()` still emits `saved` so the parent's
+          // list refreshes if the rep gives up and dismisses the modal.
           this.submitError.set(
-            extractApiError(err) ?? 'Call logged, but the recording upload failed.',
+            extractApiError(err) ?? 'Recording upload failed. Try a different file or dismiss.',
           );
-          this.saved.emit(call);
         },
       });
   }
 
   protected close(): void {
+    // If the call already landed but the recording upload didn't,
+    // treat close as a "give up on the recording" — emit saved so the
+    // parent list picks up the new call row instead of leaving it
+    // stranded (invisible to the operator until a manual refresh).
+    const existing = this.createdCall();
+    if (existing !== null) {
+      this.saved.emit(existing);
+      return;
+    }
     this.cancel.emit();
   }
 
