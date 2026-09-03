@@ -164,6 +164,7 @@
   <app-task-form-modal
     [task]="editingTask()"
     [assignees]="assignees()"
+    [canAssignOthers]="canAssignOthers"
     [callerUuid]="callerUuid()"
     (saved)="onEditSaved($event)"
     (cancelled)="closeEdit()"

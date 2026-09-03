@@ -184,7 +184,18 @@ export class TasksPageComponent {
     chip: {
       read: () => this.activeChip(),
       write: (v) => {
-        if (v === 'all' || v === 'mine' || v === 'overdue' || v === 'today' || v === 'done') {
+        // Keep in sync with the `Chip` union at the top of the file —
+        // omitting a valid chip here silently no-ops the URL round-trip
+        // and drops the chip's persistence (deep links + refresh reset
+        // to the default). `missed` was the missing member.
+        if (
+          v === 'all' ||
+          v === 'mine' ||
+          v === 'overdue' ||
+          v === 'today' ||
+          v === 'done' ||
+          v === 'missed'
+        ) {
           this.selectChip(v);
         }
       },
@@ -663,18 +674,56 @@ export class TasksPageComponent {
   }
 
   protected applyView(v: SavedView): void {
+    // Whitelist each field before writing it into a signal. A saved
+    // view carries JSON from the DB — a stale schema, hand-crafted
+    // API call, or future refactor could drop unexpected values in,
+    // and the backend then 422s the next list call. Ignore unknowns.
     const cfg = (v.config ?? {}) as SavedViewConfig & {
-      chip?: Chip;
-      status?: Task['status'];
-      due_filter?: TaskDueFilter;
-      priority?: TaskPriority;
+      chip?: unknown;
+      status?: unknown;
+      due_filter?: unknown;
+      priority?: unknown;
     };
-    if (cfg.chip) this.selectChip(cfg.chip);
-    if (cfg.status) this.status.set(cfg.status);
-    if (cfg.due_filter) this.dueFilter.set(cfg.due_filter);
-    if (cfg.priority) this.priorityFilter.set(cfg.priority);
-    if (cfg.sort) this.sortBy.set(cfg.sort as TaskSortBy);
-    if (cfg.order) this.sortDir.set(cfg.order);
+    if (
+      cfg.chip === 'all' ||
+      cfg.chip === 'mine' ||
+      cfg.chip === 'overdue' ||
+      cfg.chip === 'today' ||
+      cfg.chip === 'done' ||
+      cfg.chip === 'missed'
+    ) {
+      this.selectChip(cfg.chip);
+    }
+    if (
+      cfg.status === 'open' ||
+      cfg.status === 'done' ||
+      cfg.status === 'cancelled' ||
+      cfg.status === 'missed'
+    ) {
+      this.status.set(cfg.status);
+    }
+    if (
+      cfg.due_filter === 'today' ||
+      cfg.due_filter === 'overdue' ||
+      cfg.due_filter === 'upcoming'
+    ) {
+      this.dueFilter.set(cfg.due_filter);
+    }
+    if (cfg.priority === 'low' || cfg.priority === 'med' || cfg.priority === 'high') {
+      this.priorityFilter.set(cfg.priority);
+    }
+    if (
+      cfg.sort === 'due_at' ||
+      cfg.sort === 'priority' ||
+      cfg.sort === 'title' ||
+      cfg.sort === 'created_at' ||
+      cfg.sort === 'last_activity_at'
+    ) {
+      this.sortBy.set(cfg.sort);
+    }
+    if (cfg.order === 'asc' || cfg.order === 'desc') {
+      this.sortDir.set(cfg.order);
+    }
     this.currentViewId.set(v.id);
     this.currentViewName.set(v.name);
     this.viewsMenuOpen.set(false);
@@ -750,7 +799,13 @@ export class TasksPageComponent {
     }
   }
 
+  /** Monotonic request id — bumped on every `fetch()`, checked in the
+   *  response callback so a slow earlier response can't overwrite a
+   *  faster later one when the user clicks chips rapidly. */
+  private fetchSeq = 0;
+
   private fetch(): void {
+    const seq = ++this.fetchSeq;
     this.state.loading.set(true);
     this.state.loadError.set(null);
 
@@ -769,6 +824,7 @@ export class TasksPageComponent {
 
     obs.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res: TaskListResponse) => {
+        if (seq !== this.fetchSeq) return;
         this.state.items.set(res.items);
         this.state.total.set(res.total);
         this.state.loading.set(false);
@@ -788,6 +844,7 @@ export class TasksPageComponent {
         }
       },
       error: (err: HttpErrorResponse) => {
+        if (seq !== this.fetchSeq) return;
         this.state.items.set([]);
         this.state.total.set(0);
         this.state.loading.set(false);
@@ -803,9 +860,15 @@ export class TasksPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => this.assignees.set(rows),
-        // Silent fallback — the modal handles an empty assignee list
-        // (it hides the dropdown and defaults to the caller).
-        error: () => this.assignees.set([]),
+        // The modal handles an empty assignee list (hides the dropdown
+        // and defaults to the caller), but a silent 401/403/500 leaves
+        // every row's Owner column rendering "—" and admins have no
+        // way to reassign — surface via console.warn so the failure
+        // is attributable when troubleshooting.
+        error: (err: HttpErrorResponse) => {
+          console.warn('[tasks] assignees load failed', err.status, err.message);
+          this.assignees.set([]);
+        },
       });
   }
 
