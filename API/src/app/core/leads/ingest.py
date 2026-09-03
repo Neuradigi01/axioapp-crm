@@ -140,7 +140,14 @@ async def ingest(
         )
 
     # 2. Fresh lead — pick an assignee, then create.
-    assignee_id = await pick_assignee(session, org_id=org_id, source=source.value)
+    # Manual entries belong to the human who typed them in — no
+    # round-robin. Every other channel (widget, ad webhooks, bulk
+    # import, whatsapp flow, ai assistant) is data-from-outside and
+    # goes through round-robin so no single rep drowns.
+    if source == LeadSource.manual and actor_user_id is not None:
+        assignee_id: uuid.UUID | None = actor_user_id
+    else:
+        assignee_id = await pick_assignee(session, org_id=org_id, source=source.value)
     # Rebuild the payload so source / contact_id / assignee come from
     # ingest's arguments, not whatever the caller put on the payload.
     # `model_copy(update=...)` is the Pydantic v2 idiom.
