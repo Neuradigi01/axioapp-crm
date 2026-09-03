@@ -13,6 +13,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import {
@@ -81,6 +82,7 @@ interface EmailAttachmentMeta {
 })
 export class ChatThreadComponent implements AfterViewChecked, OnChanges {
   private readonly auth = inject(FurnitureAuthService);
+  private readonly http = inject(HttpClient);
 
   @Input({ required: true }) conversation!: Conversation;
   @Input() detail: ConversationDetail | null = null;
@@ -491,6 +493,27 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
    *  regardless of MIME (Attacker H3). */
   protected emailAttachmentUrl(m: ConversationMessage, att: EmailAttachmentMeta): string {
     return `${environment.apiBaseUrl}/messages/${m.id}/attachments/${att.storage_key}`;
+  }
+
+  /** Fetch the attachment via HttpClient so the auth interceptor
+   *  attaches the JWT header (native ``<a href>`` clicks don't carry
+   *  the Authorization header and get 401'd by the server). Streams
+   *  the response into a Blob, hands it to a hidden ``<a download>``,
+   *  then revokes the object URL. */
+  protected downloadEmailAttachment(m: ConversationMessage, att: EmailAttachmentMeta): void {
+    const url = this.emailAttachmentUrl(m, att);
+    this.http.get(url, { responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = att.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(objectUrl);
+      },
+    });
   }
 
   /** Compact size label — "42 KB" / "3 MB" — for the download link
