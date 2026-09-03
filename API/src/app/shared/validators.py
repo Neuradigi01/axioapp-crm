@@ -114,6 +114,33 @@ def validate_phone(value: str) -> str:
     return stripped
 
 
+def coerce_phone_prefix(value: str | None) -> str | None:
+    """Bulk-import helper — add the leading `+` when a spreadsheet
+    cell has dropped it.
+
+    Excel silently strips the `+` off `+919876543210` when the cell
+    is typed as Number and re-saves it as `919876543210`; operators
+    then upload the CSV/XLSX and every row fails `validate_phone`
+    (E.164 requires the `+`). This helper re-adds the missing prefix
+    so downstream validation + persistence see a well-formed E.164
+    number.
+
+    Blank / None → None (kept nullable so the import treats it as
+    "no phone provided"). Any other value is trimmed of surrounding
+    whitespace; if the first non-whitespace char isn't `+`, one is
+    prepended. Separators inside the number (spaces, dashes, parens)
+    are left alone — `validate_phone` strips them at validation time.
+    """
+    if value is None:
+        return None
+    trimmed = str(value).strip()
+    if not trimmed:
+        return None
+    if trimmed.startswith("+"):
+        return trimmed
+    return "+" + trimmed
+
+
 def validate_password_strength(value: str) -> None:
     """Raise if the password fails the length / character-class rules.
 

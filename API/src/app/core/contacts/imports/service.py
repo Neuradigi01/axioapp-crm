@@ -947,6 +947,11 @@ def _apply_mapping(raw: dict[str, str], mapping: dict[str, str]) -> dict[str, An
       date, …). ``<key>`` is trusted to be a valid contact custom
       field — ``_validate_mapping`` rejected the mapping upstream if
       it wasn't.
+
+    - ``target='phone'`` — the leading ``+`` is re-added when Excel
+      has stripped it (numeric-typed cells lose the sign). Every
+      downstream consumer (dedup key, shape validator, persisted
+      value) then sees a well-formed E.164 number.
     """
     out: dict[str, Any] = {}
     tags_bucket: list[str] = []
@@ -964,6 +969,9 @@ def _apply_mapping(raw: dict[str, str], mapping: dict[str, str]) -> dict[str, An
             key = target[len(_CUSTOM_TARGET_PREFIX) :]
             if key and value not in (None, ""):
                 custom_bucket[key] = value
+            continue
+        if target == "phone":
+            out[target] = validators.coerce_phone_prefix(value)
             continue
         out[target] = value
     if tags_bucket:

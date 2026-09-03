@@ -379,7 +379,12 @@ async def _commit_rows(
     for parsed in rows_iter:
         mapped = parsed.mapped
         full_name = (mapped.get("contact.full_name") or "").strip()
-        phone = mapped.get("contact.phone")
+        # Excel drops the leading `+` when a phone cell is typed as
+        # Number, so `+919876543210` re-saves as `919876543210` and
+        # then fails E.164 validation. Re-add the `+` before anything
+        # else touches the value — dedup + validation + persistence
+        # all see the well-formed number.
+        phone = shared_validators.coerce_phone_prefix(mapped.get("contact.phone"))
         email = mapped.get("contact.email")
 
         if not full_name:
