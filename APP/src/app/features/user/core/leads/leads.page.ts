@@ -98,6 +98,7 @@ interface ContactSummary {
   id: string;
   full_name: string;
   phone: string | null;
+  email: string | null;
   source: string | null;
 }
 
@@ -1062,7 +1063,8 @@ export class LeadsPageComponent {
         k === 'created_at' ||
         k === 'last_activity_at' ||
         k === 'lead_score' ||
-        k === 'contact_name'
+        k === 'contact_name' ||
+        k === 'next_follow_up_due'
       ) {
         this.sortKey.set(k);
       }
@@ -1341,9 +1343,6 @@ export class LeadsPageComponent {
   }
 
   protected onItemMoved(event: ItemMovedEvent): void {
-    // Debug: temporary. Comment out once persistence is confirmed working.
-
-    console.log('[leads.page] onItemMoved reached', event);
     // F2 — intercept move-to-Won up-front so the Won-capture modal
     // can prompt for close details before the API call fires. Same
     // shape as the Lost interception but proactive (backend doesn't
@@ -1452,8 +1451,15 @@ export class LeadsPageComponent {
       .subscribe({
         next: (r) => this.pipelineRollup.set(r),
         error: () => {
-          // Header is aesthetic — silently hide on failure.
+          // Header header would otherwise silently blank on failure and
+          // read as "₹0 pipeline" to a rep who's mid-quota. Emit a toast
+          // so the miss is attributable to a network/API hiccup, not
+          // "the pipeline is empty".
           this.pipelineRollup.set(null);
+          this.toast.warn('Pipeline totals unavailable', {
+            subtitle: 'Could not load the header totals. Refresh to retry.',
+            durationMs: 5000,
+          });
         },
       });
   }
@@ -1819,34 +1825,50 @@ export class LeadsPageComponent {
       });
   }
 
+  /** Ids currently being hydrated. Prevents the reactive effect from
+   *  firing overlapping `POST /contacts/hydrate` calls when the user
+   *  changes filters faster than the network round-trip. Ids are held
+   *  here until the request resolves, then released so a later refresh
+   *  can re-fetch if the cache entry was invalidated. */
+  private readonly hydrateInFlight = new Set<string>();
+
   private fetchContacts(ids: string[]): void {
     // Batched hydrate collapses N per-id `GET /contacts/{id}` requests
     // into one `POST /contacts/hydrate`. Backend caps id lists at
     // 200; the list size matches the leads page cap so chunking is a
     // no-op today, but we chunk defensively for future page-size
     // bumps.
+    const pending = ids.filter((id) => !this.hydrateInFlight.has(id));
+    if (pending.length === 0) return;
+    for (const id of pending) this.hydrateInFlight.add(id);
     const CHUNK = 200;
-    for (let i = 0; i < ids.length; i += CHUNK) {
-      const slice = ids.slice(i, i + CHUNK);
+    for (let i = 0; i < pending.length; i += CHUNK) {
+      const slice = pending.slice(i, i + CHUNK);
       this.contactsApi
         .hydrateByIds(slice)
         .pipe(
           catchError(() => of([])),
           takeUntilDestroyed(this.destroyRef),
         )
-        .subscribe((results) => {
-          this.contactsById.update((cache) => {
-            const next = { ...cache };
-            for (const c of results) {
-              next[c.id] = {
-                id: c.id,
-                full_name: c.full_name,
-                phone: c.phone,
-                source: c.source,
-              };
-            }
-            return next;
-          });
+        .subscribe({
+          next: (results) => {
+            this.contactsById.update((cache) => {
+              const next = { ...cache };
+              for (const c of results) {
+                next[c.id] = {
+                  id: c.id,
+                  full_name: c.full_name,
+                  phone: c.phone,
+                  email: c.email,
+                  source: c.source,
+                };
+              }
+              return next;
+            });
+          },
+          complete: () => {
+            for (const id of slice) this.hydrateInFlight.delete(id);
+          },
         });
     }
   }

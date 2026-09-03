@@ -688,7 +688,7 @@
                         }
                       }
                       @case ('email') {
-                        @let email = $any(contact)?.email;
+                        @let email = contact?.email;
                         @if (email) {
                           <a
                             [attr.href]="'mailto:' + email"
