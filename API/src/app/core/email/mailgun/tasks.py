@@ -262,13 +262,21 @@ async def _process_async(task, pending_dir: Path) -> None:
         # Body text — Mailgun ships plain text + stripped/quoted
         # variants. Prefer stripped-text (reply chain stripped) as
         # the "text" of the message, matching Gmail sync's preference
-        # for readable prose.
-        body_text = str(
-            payload.get("stripped-text")
-            or payload.get("body-plain")
-            or ""
-        ).strip()
-        body_html = payload.get("stripped-html") or payload.get("body-html")
+        # for readable prose. Fall back to body-plain ONLY when
+        # stripped-text is absent from the payload — an *empty*
+        # stripped-text (reply with only an attachment / only a
+        # signature) is a valid Mailgun verdict of "no new prose to
+        # display" and must NOT be overridden with the quoted body,
+        # otherwise every attachment-only reply renders as the full
+        # quoted thread in the CRM inbox.
+        if "stripped-text" in payload:
+            body_text = str(payload.get("stripped-text") or "").strip()
+        else:
+            body_text = str(payload.get("body-plain") or "").strip()
+        if "stripped-html" in payload:
+            body_html = payload.get("stripped-html") or None
+        else:
+            body_html = payload.get("body-html") or None
 
         # Extract attachments into ``./storage/{org_id}/staging/
         # {request_id}/`` FIRST (Attacker M5: two-phase write). The
