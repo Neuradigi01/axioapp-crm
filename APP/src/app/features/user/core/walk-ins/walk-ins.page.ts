@@ -697,11 +697,19 @@ export class WalkInsPageComponent {
       .subscribe({
         next: (resp) => {
           this.convertSubmitting.set(false);
-          // Update the local row's linked_lead_id so the "→ Lead" badge
-          // appears immediately.
+          // Update the local row's linked_lead_id + status so the
+          // "→ Lead" badge appears immediately AND the row's status
+          // pill matches what the server persisted (the walk-in
+          // state machine transitions to `converted` on this call —
+          // see `convert_walk_in_to_lead` in walk_ins/service.py).
+          // Without the status patch, the UI briefly reads
+          // "interested / browsing / follow_up" until the next full
+          // reload, disagreeing with the backend.
           this.state.items.update((rows) =>
             rows.map((r) =>
-              r.id === resp.walk_in_id ? { ...r, linked_lead_id: resp.lead_id } : r,
+              r.id === resp.walk_in_id
+                ? { ...r, linked_lead_id: resp.lead_id, status: 'converted' }
+                : r,
             ),
           );
           this.reloadRollup();
@@ -890,7 +898,13 @@ export class WalkInsPageComponent {
     return rem > 0 ? `${hours}h ${rem}m` : `${hours}h`;
   }
 
+  /** Monotonic request id — bumped on every `reload()`, checked in
+   *  the response callback so a slow earlier response can't overwrite
+   *  a faster later one when scope/sort/date-chip is toggled rapidly. */
+  private reloadSeq = 0;
+
   private reload(): void {
+    const seq = ++this.reloadSeq;
     this.state.loading.set(true);
     this.state.loadError.set(null);
     const filter = this.statusFilter();
@@ -907,10 +921,12 @@ export class WalkInsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => {
+          if (seq !== this.reloadSeq) return;
           this.state.items.set(rows);
           this.state.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
+          if (seq !== this.reloadSeq) return;
           this.state.items.set([]);
           this.state.loading.set(false);
           this.state.loadError.set(extractApiError(err) ?? 'Could not load walk-ins.');
@@ -964,20 +980,17 @@ export class WalkInsPageComponent {
               return next;
             });
           },
-          // Silent: contact summaries are decorative; the list still
-          // renders id-only if the hydrate hiccups.
-          error: () => undefined,
+          // Contact summaries are decorative — the list still renders
+          // id-only if the hydrate hiccups — but a silent 401/403/500
+          // leaves rows stuck on "Loading…" with zero telemetry. Log
+          // to console so an operator with DevTools open (or a Sentry
+          // interceptor upstream) can see the failure attributed to
+          // the hydrate endpoint rather than assuming the row itself
+          // is broken.
+          error: (err: HttpErrorResponse) => {
+            console.warn('[walk-ins] contact hydrate failed', err.status, err.message);
+          },
         });
     }
-  }
-
-  private isToday(iso: string): boolean {
-    const d = new Date(iso);
-    const now = new Date();
-    return (
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate()
-    );
   }
 }

@@ -238,7 +238,12 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
 
     this.form.controls.phone.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((value) => this.phoneInput$.next(value));
+      // `nonNullable: true` on the control guarantees `value` is a
+      // string today, but a future refactor or a stray `reset(null)`
+      // would emit null and break `.trim()` inside the duplicate-
+      // check pipe. `?? ''` guards defensively so a bad emit reads
+      // as "no phone typed yet" rather than crashing the pipeline.
+      .subscribe((value) => this.phoneInput$.next(value ?? ''));
   }
 
   /** Re-seed the `+` prefix on focus if it was cleared. */
