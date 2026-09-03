@@ -121,17 +121,24 @@ export class AddItemModalComponent {
   }
 
   private refreshStdFields(): void {
-    this.stdApi.render('catalog_item').subscribe({
-      next: (resp) => {
-        const map: Record<string, StandardFieldRendered> = {};
-        for (const f of resp.items) map[f.field_key] = f;
-        this.stdFields.set(map);
-        this.applyStandardValidators(map);
-      },
-      error: () => {
-        /* fallbacks keep the form usable */
-      },
-    });
+    // `takeUntilDestroyed` matches every other subscription in this
+    // file. Without it, closing the modal mid-render leaks the
+    // subscription and can `.set()` on a destroyed component when
+    // the response finally lands.
+    this.stdApi
+      .render('catalog_item')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resp) => {
+          const map: Record<string, StandardFieldRendered> = {};
+          for (const f of resp.items) map[f.field_key] = f;
+          this.stdFields.set(map);
+          this.applyStandardValidators(map);
+        },
+        error: () => {
+          /* fallbacks keep the form usable */
+        },
+      });
   }
 
   /** `sku` + `name` + `price` are backend-required (locked).
@@ -487,10 +494,23 @@ export class AddItemModalComponent {
           if (wasCreate) {
             // Roll back — delete the item we just created so the user
             // sees one clean error instead of a half-created row.
+            // If the rollback delete ALSO fails, log so the orphan
+            // product isn't invisible — the operator will otherwise
+            // see "product not created" while a row silently exists
+            // in the DB, findable only by a page refresh.
             this.api
               .delete(item.id)
               .pipe(takeUntilDestroyed(this.destroyRef))
-              .subscribe({ error: () => undefined });
+              .subscribe({
+                error: (rollbackErr: HttpErrorResponse) => {
+                  console.warn(
+                    '[catalog] rollback delete failed for orphan product',
+                    item.id,
+                    rollbackErr.status,
+                    rollbackErr.message,
+                  );
+                },
+              });
             this.submitting.set(false);
             this.submitError.set(
               this.errorFor(err) ??

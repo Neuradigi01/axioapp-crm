@@ -251,6 +251,10 @@ export class OptInSectionComponent {
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.busy.set(false);
+          // Drop the prior snapshot so the chip/history don't stay
+          // rendered underneath the error banner (contradictory state:
+          // "opted-in as of last week" alongside "could not load").
+          this.history.set(null);
           this.error.set(extractApiError(err) ?? 'Could not load opt-in.');
         },
       });

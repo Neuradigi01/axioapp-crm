@@ -54,6 +54,10 @@ export interface Campaign {
    *  validator; the frontend mirrors the same requirement via the
    *  create modal's disabled-submit gate. */
   email_account_id: string | null;
+  /** Migration 0213 — alternate SMTP sender identity. Exactly one of
+   *  `email_account_id` / `smtp_sender_id` is populated on Email rows;
+   *  both are `null` on non-Email campaigns. */
+  smtp_sender_id: string | null;
   sender_name: string | null;
   reply_to: string | null;
   subject: string | null;
@@ -101,6 +105,11 @@ export interface CampaignCreate {
    *  channel. Backend rejects with 422 if any required field is
    *  missing on an Email payload. */
   email_account_id?: string | null;
+  /** Migration 0213 — alternate SMTP sender identity. Send exactly
+   *  one of `email_account_id` (OAuth mailbox) or `smtp_sender_id`
+   *  (verified SMTP identity) for Email campaigns. Backend rejects
+   *  with 422 if both / neither / non-Email carries either. */
+  smtp_sender_id?: string | null;
   sender_name?: string | null;
   reply_to?: string | null;
   subject?: string | null;
@@ -122,6 +131,9 @@ export type CampaignUpdate = Partial<{
   /** Campaigns v1 Step 03 — Email fields editable on Draft campaigns.
    *  Channel itself stays immutable post-create. */
   email_account_id: string | null;
+  /** Migration 0213 — swap a draft Email campaign between an OAuth
+   *  mailbox and a verified SMTP sender identity. */
+  smtp_sender_id: string | null;
   sender_name: string | null;
   reply_to: string | null;
   subject: string | null;

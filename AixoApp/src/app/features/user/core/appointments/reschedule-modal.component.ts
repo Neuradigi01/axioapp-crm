@@ -10,14 +10,14 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { commonValidators } from '../shared/validators';
 import { Appointment } from './appointments-api.service';
 
 /**
- * Reschedule modal — focused date / time picker plus an optional
- * "reason" textarea. The full edit form is overkill for this hot
- * path (rep on a call moving a slot 30 minutes); this component
- * gives a fast two-input flow.
+ * Reschedule modal — one `<crm-mobile-datetime>` slot picker plus an
+ * optional "reason" textarea. The full edit form is overkill for this
+ * hot path (rep on a call moving a slot 30 minutes).
  *
  * Emits `{ scheduledAt, reason }` on confirm. Parent owns the API
  * call so a single conflict-409 surfaces back here via `error`.
@@ -31,7 +31,7 @@ export interface RescheduleConfirm {
   selector: 'app-reschedule-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, MobileDateTimeComponent],
   templateUrl: './reschedule-modal.component.html',
 })
 export class RescheduleModalComponent {
@@ -42,13 +42,9 @@ export class RescheduleModalComponent {
   @Input() set appointment(value: Appointment | null) {
     this._appointment.set(value);
     if (value) {
-      const d = new Date(value.scheduled_at);
-      // Emit valueChanges so the toSignal mirrors (dateValue / timeValue)
-      // pick up the prefilled slot. With `emitEvent: false` the signals
-      // would stay at their initial '' and `canConfirm` would keep the
-      // Save button disabled until the user re-touched both fields.
-      this.dateControl.setValue(this.toDateInput(d));
-      this.timeControl.setValue(this.toTimeInput(d));
+      // Prefill the datetime picker with the current slot in local
+      // `YYYY-MM-DDTHH:mm` shape (the mobile-datetime value contract).
+      this.scheduledAtControl.setValue(this.toDateTimeInput(new Date(value.scheduled_at)));
     }
   }
 
@@ -63,11 +59,7 @@ export class RescheduleModalComponent {
   @Output() readonly confirm = new EventEmitter<RescheduleConfirm>();
   @Output() readonly cancel = new EventEmitter<void>();
 
-  protected readonly dateControl = new FormControl<string>('', {
-    nonNullable: true,
-    validators: [Validators.required, commonValidators.isoDate],
-  });
-  protected readonly timeControl = new FormControl<string>('', {
+  protected readonly scheduledAtControl = new FormControl<string>('', {
     nonNullable: true,
     validators: [Validators.required],
   });
@@ -76,41 +68,31 @@ export class RescheduleModalComponent {
     validators: [commonValidators.maxLength(500)],
   });
 
-  /** Today in `YYYY-MM-DD` — used as the date input's `min` so the
-   *  native picker can't offer past dates at all, instead of letting
-   *  the user pick one and rejecting on Save. */
-  protected readonly todayDate = signal(this.toDateInput(new Date()));
+  /** Now (local, minute precision) in `YYYY-MM-DDTHH:mm` — pinned to
+   *  the picker's `[min]` so past slots are disabled in-panel. Matches
+   *  the pattern used by `book-appointment-modal`. */
+  protected readonly scheduledAtMin = (() => {
+    const d = new Date();
+    const p = (n: number): string => String(n).padStart(2, '0');
+    return (
+      `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` +
+      `T${p(d.getHours())}:${p(d.getMinutes())}`
+    );
+  })();
 
-  /** Reactive mirrors of the form controls' values. Signals are
-   *  required because `dateControl.value` is a plain accessor and
-   *  won't invalidate a `computed` when the user types. Without
-   *  these, `crossFieldError`/`canConfirm` would run once at open
-   *  and freeze — e.g. the "matches the current slot" error would
-   *  persist after the user changed the time. */
-  private readonly dateValue = toSignal(this.dateControl.valueChanges, {
-    initialValue: this.dateControl.value,
-  });
-  private readonly timeValue = toSignal(this.timeControl.valueChanges, {
-    initialValue: this.timeControl.value,
-  });
-
-  /** When the selected date is today, `min` on the time input is the
-   *  current `HH:MM` so users can't pick a slot earlier today. On any
-   *  future date the constraint is removed. */
-  protected readonly minTimeForSelectedDate = computed<string | null>(() => {
-    const selected = this.dateValue();
-    if (selected !== this.todayDate()) return null;
-    return this.toTimeInput(new Date());
+  /** Reactive mirror of the datetime control — signal so `computed`
+   *  re-runs when the user picks a slot (raw `.value` is a plain
+   *  accessor and won't invalidate). */
+  private readonly scheduledAtValue = toSignal(this.scheduledAtControl.valueChanges, {
+    initialValue: this.scheduledAtControl.value,
   });
 
-  /** Cross-field check: the new date+time must be a valid datetime
-   *  that is (a) not in the past and (b) different from the
-   *  appointment's original `scheduled_at`. */
+  /** Slot validity: not in the past, not identical to the current
+   *  slot. Returns the message to render inline. */
   protected readonly crossFieldError = computed<string | null>(() => {
-    const d = this.dateValue();
-    const t = this.timeValue();
-    if (!d || !t) return null;
-    const parsed = new Date(`${d}T${t}`);
+    const v = this.scheduledAtValue();
+    if (!v) return null;
+    const parsed = new Date(v);
     if (Number.isNaN(parsed.getTime())) return null;
     // 5-min grace covers clock skew, matches `dateNotPastValidator`.
     if (parsed.getTime() + 5 * 60 * 1000 < Date.now()) {
@@ -125,7 +107,7 @@ export class RescheduleModalComponent {
 
   protected readonly canConfirm = computed(() => {
     if (this._submitting()) return false;
-    if (!this.dateValue() || !this.timeValue()) return false;
+    if (!this.scheduledAtValue()) return false;
     if (this.reasonControl.invalid) return false;
     return this.crossFieldError() === null;
   });
@@ -146,7 +128,7 @@ export class RescheduleModalComponent {
 
   protected onConfirm(): void {
     if (!this.canConfirm()) return;
-    const local = new Date(`${this.dateControl.value}T${this.timeControl.value}`);
+    const local = new Date(this.scheduledAtControl.value);
     if (Number.isNaN(local.getTime())) return;
     const reason = this.reasonControl.value.trim();
     this.confirm.emit({
@@ -155,11 +137,12 @@ export class RescheduleModalComponent {
     });
   }
 
-  private toDateInput(d: Date): string {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+  private toDateTimeInput(d: Date): string {
+    const p = (n: number): string => String(n).padStart(2, '0');
+    return (
+      `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` +
+      `T${p(d.getHours())}:${p(d.getMinutes())}`
+    );
   }
 
   private toTimeInput(d: Date): string {

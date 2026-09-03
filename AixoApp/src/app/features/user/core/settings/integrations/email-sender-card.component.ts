@@ -14,6 +14,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   OnInit,
@@ -66,6 +67,12 @@ export class EmailSenderCardComponent implements OnInit {
   private readonly accountsApi = inject(EmailAccountsApiService);
   private readonly domainsApi = inject(EmailSenderSetupApiService);
   private readonly destroyRef = inject(DestroyRef);
+  /** Zoneless-mode belt-and-braces: HTTP subscribe callbacks land
+   *  signal writes but the view sometimes doesn't repaint until the
+   *  next user interaction. Explicit `markForCheck()` after every
+   *  async mutation removes the race — same pattern as the fix in
+   *  `lead-follow-ups-panel.component.ts`. */
+  private readonly cdr = inject(ChangeDetectorRef);
 
   protected readonly senders = signal<UnifiedSender[] | null>(null);
   protected readonly loading = signal(false);
@@ -98,6 +105,15 @@ export class EmailSenderCardComponent implements OnInit {
    *  Disconnect (soft-delete). */
   protected readonly reconnectingId = signal<string | null>(null);
   protected readonly disconnectingId = signal<string | null>(null);
+
+  /** mailgun-inbound track: which SMTP row is currently flipping its
+   *  capture toggle. Prevents double-click while the PATCH is in
+   *  flight; row-level so multiple senders can flip concurrently. */
+  protected readonly togglingCaptureId = signal<string | null>(null);
+  /** mailgun-inbound track: which SMTP row just had its reply
+   *  address copied to the clipboard. Used to swap the Copy icon
+   *  → Check for 1.5s, matching the DNS-records-modal pattern. */
+  protected readonly copiedReplyId = signal<string | null>(null);
 
   // --- Domain-authentication sub-section state (reused SPF/DKIM/DMARC UI).
   protected readonly domains = signal<EmailSenderDomain[] | null>(null);
@@ -177,10 +193,12 @@ export class EmailSenderCardComponent implements OnInit {
             message: `Default sender set to ${row.from_address}.`,
           });
           this._load();
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.settingDefaultId.set(null);
           this.rowError.set(extractApiError(err) ?? 'Could not set default sender.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -206,10 +224,12 @@ export class EmailSenderCardComponent implements OnInit {
           this.deletingId.set(null);
           this.toast.set({ tone: 'success', message: `Removed ${row.from_address}.` });
           this._load();
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.deletingId.set(null);
           this.rowError.set(extractApiError(err) ?? 'Could not delete sender.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -241,6 +261,7 @@ export class EmailSenderCardComponent implements OnInit {
       error: (err: HttpErrorResponse) => {
         this.reconnectingId.set(null);
         this.rowError.set(extractApiError(err) ?? 'Could not start reconnect.');
+        this.cdr.markForCheck();
       },
     });
   }
@@ -271,16 +292,89 @@ export class EmailSenderCardComponent implements OnInit {
           this.disconnectingId.set(null);
           this.toast.set({ tone: 'success', message: `Disconnected ${row.from_address}.` });
           this._load();
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.disconnectingId.set(null);
           this.rowError.set(extractApiError(err) ?? 'Could not disconnect account.');
+          this.cdr.markForCheck();
         },
       });
   }
 
   dismissToast(): void {
     this.toast.set(null);
+  }
+
+  // --- mailgun-inbound Reply capture actions -----------------
+
+  /** Copy this sender's `in_<token>@…` reply address to the clipboard.
+   *  Swallows the Permissions API rejection some browsers surface —
+   *  the failure toast pattern already exists for other copy flows
+   *  in `dns-records-modal`; here the intent is a passive success
+   *  indicator, so silence on failure is preferable to noise. */
+  async copyReplyAddress(row: UnifiedSender): Promise<void> {
+    const address = row.inbound_reply_address?.address;
+    if (!address) return;
+    try {
+      await navigator.clipboard.writeText(address);
+      this.copiedReplyId.set(row.id);
+      setTimeout(() => {
+        if (this.copiedReplyId() === row.id) {
+          this.copiedReplyId.set(null);
+          this.cdr.markForCheck();
+        }
+      }, 1500);
+      this.cdr.markForCheck();
+    } catch {
+      // Permission-denied / no clipboard — fall through silently.
+    }
+  }
+
+  /** mailgun-inbound track: flip `capture_replies_in_crm` on the
+   *  server + reflect the new state locally on success. Optimistic
+   *  updates rolled back on error so the toggle mirrors the server.
+   *  Failure surfaces via the existing row-level `rowError` banner. */
+  toggleCapture(row: UnifiedSender, next: boolean): void {
+    if (row.kind !== 'smtp') return;
+    if (!row.inbound_reply_address) return;
+    if (this.togglingCaptureId() !== null) return;
+
+    this.togglingCaptureId.set(row.id);
+    this.rowError.set(null);
+    this.api
+      .setCaptureToggle(row.id, next)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.togglingCaptureId.set(null);
+          // Merge the server response into the local list — avoids
+          // a full refetch just to flip one boolean.
+          this.senders.update((rows) => {
+            if (!rows) return rows;
+            return rows.map((r) =>
+              r.id === row.id
+                ? {
+                    ...r,
+                    inbound_reply_address: updated.inbound_reply_address ?? null,
+                  }
+                : r,
+            );
+          });
+          this.toast.set({
+            tone: 'success',
+            message: next
+              ? `Replies to ${row.from_address} now land in the CRM.`
+              : `Replies to ${row.from_address} will go to your SMTP mailbox.`,
+          });
+          this.cdr.markForCheck();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.togglingCaptureId.set(null);
+          this.rowError.set(extractApiError(err) ?? 'Could not update reply capture.');
+          this.cdr.markForCheck();
+        },
+      });
   }
 
   // --- Domain authentication actions --------------------------
@@ -311,10 +405,12 @@ export class EmailSenderCardComponent implements OnInit {
           });
           this._loadDomains();
           this._loadDnsForDomain(row.id);
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.creatingDomain.set(false);
           this.domainsError.set(extractApiError(err) ?? 'Could not add domain.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -336,6 +432,7 @@ export class EmailSenderCardComponent implements OnInit {
               : `${result.domain} — DNS records not yet detected. Try again in a few minutes.`,
           });
           this._loadDomains();
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.verifyingDomainId.set(null);
@@ -346,6 +443,7 @@ export class EmailSenderCardComponent implements OnInit {
           } else {
             this.domainsError.set(extractApiError(err) ?? 'Could not verify domain.');
           }
+          this.cdr.markForCheck();
         },
       });
   }
@@ -378,10 +476,12 @@ export class EmailSenderCardComponent implements OnInit {
           this.deletingDomainId.set(null);
           this.toast.set({ tone: 'success', message: `Removed ${row.domain}.` });
           this._loadDomains();
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.deletingDomainId.set(null);
           this.domainsError.set(extractApiError(err) ?? 'Could not remove domain.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -487,10 +587,12 @@ export class EmailSenderCardComponent implements OnInit {
           } else {
             this.domains.set(null);
           }
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load senders.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -504,10 +606,12 @@ export class EmailSenderCardComponent implements OnInit {
         next: (rows) => {
           this.domains.set(rows);
           this.domainsLoading.set(false);
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.domainsLoading.set(false);
           this.domainsError.set(extractApiError(err) ?? 'Could not load domains.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -519,9 +623,11 @@ export class EmailSenderCardComponent implements OnInit {
       .subscribe({
         next: (res) => {
           this.dnsModal.set({ domain: res.domain, records: res.records });
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.domainsError.set(extractApiError(err) ?? 'Could not load DNS records.');
+          this.cdr.markForCheck();
         },
       });
   }

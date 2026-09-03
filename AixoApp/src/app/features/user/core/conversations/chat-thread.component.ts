@@ -13,6 +13,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import {
@@ -35,6 +36,22 @@ import { VCardAttachment, VCardBubbleComponent } from './thread/vcard-bubble.com
 import { StaffListItem } from '../staff/staff-api.service';
 import { OwnerColor, ownerColor, staffInitials } from '../shared/owner-color.util';
 import { FurnitureAuthService } from '../auth/auth.service';
+import { environment } from '../../../../../environments/environment';
+
+/** mailgun-inbound Step 5 attachment shape (email path):
+ *  ``{filename, size, content_type, storage_key, storage_backend}``.
+ *  WhatsApp / Meta attachments use a different shape keyed on
+ *  ``type`` — the render helpers below discriminate purely on the
+ *  presence of ``storage_key`` so email files render as a
+ *  downloadable link and WA media rides its existing counter.
+ */
+interface EmailAttachmentMeta {
+  filename: string;
+  size?: number;
+  content_type?: string;
+  storage_key: string;
+  storage_backend?: string;
+}
 
 /**
  * Chat thread — renders bubbles, auto-scrolls to bottom on new
@@ -65,6 +82,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
 })
 export class ChatThreadComponent implements AfterViewChecked, OnChanges {
   private readonly auth = inject(FurnitureAuthService);
+  private readonly http = inject(HttpClient);
 
   @Input({ required: true }) conversation!: Conversation;
   @Input() detail: ConversationDetail | null = null;
@@ -440,6 +458,71 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
       (att) => (att as { type?: string }).type === 'sticker',
     );
     return found ? (found as unknown as StickerAttachment) : null;
+  }
+
+  /** mailgun-inbound Step 5 — pluck email-shaped attachments
+   *  (those carrying a ``storage_key`` field). WhatsApp / Meta
+   *  attachments never have ``storage_key`` so they're naturally
+   *  excluded and continue to ride their existing render path. */
+  protected emailAttachments(m: ConversationMessage): EmailAttachmentMeta[] {
+    const out: EmailAttachmentMeta[] = [];
+    for (const att of m.attachments ?? []) {
+      const raw = att as unknown as {
+        storage_key?: unknown;
+        filename?: unknown;
+        size?: unknown;
+        content_type?: unknown;
+        storage_backend?: unknown;
+      };
+      if (typeof raw.storage_key === 'string' && typeof raw.filename === 'string') {
+        out.push({
+          filename: raw.filename,
+          storage_key: raw.storage_key,
+          size: typeof raw.size === 'number' ? raw.size : undefined,
+          content_type: typeof raw.content_type === 'string' ? raw.content_type : undefined,
+          storage_backend:
+            typeof raw.storage_backend === 'string' ? raw.storage_backend : undefined,
+        });
+      }
+    }
+    return out;
+  }
+
+  /** Compose the auth-gated download URL for one email attachment.
+   *  Server enforces org isolation + Content-Disposition: attachment
+   *  regardless of MIME (Attacker H3). */
+  protected emailAttachmentUrl(m: ConversationMessage, att: EmailAttachmentMeta): string {
+    return `${environment.apiBaseUrl}/messages/${m.id}/attachments/${att.storage_key}`;
+  }
+
+  /** Fetch the attachment via HttpClient so the auth interceptor
+   *  attaches the JWT header (native ``<a href>`` clicks don't carry
+   *  the Authorization header and get 401'd by the server). Streams
+   *  the response into a Blob, hands it to a hidden ``<a download>``,
+   *  then revokes the object URL. */
+  protected downloadEmailAttachment(m: ConversationMessage, att: EmailAttachmentMeta): void {
+    const url = this.emailAttachmentUrl(m, att);
+    this.http.get(url, { responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = att.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(objectUrl);
+      },
+    });
+  }
+
+  /** Compact size label — "42 KB" / "3 MB" — for the download link
+   *  hover title. Missing / zero size falls back to no suffix. */
+  protected formatAttachmentSize(bytes: number | undefined): string {
+    if (!bytes || bytes <= 0) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   // --- Reply / quote / reactions (Step 7) ----------------------------

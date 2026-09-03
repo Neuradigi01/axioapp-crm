@@ -107,7 +107,13 @@ export class CallPhoneBookTabComponent {
     this.modalState.set(null);
   }
 
+  /** Monotonic request id — bumped on every `reload()`, checked in
+   *  the response callback so a slow earlier response can't overwrite
+   *  a faster later one when the search box is typed into rapidly. */
+  private reloadSeq = 0;
+
   protected reload(): void {
+    const seq = ++this.reloadSeq;
     this.loading.set(true);
     this.loadError.set(null);
     const q = this.searchControl.value.trim();
@@ -116,12 +122,14 @@ export class CallPhoneBookTabComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
+          if (seq !== this.reloadSeq) return;
           // Only show contacts that actually have a phone — clicking
           // "Call" on a row without one is a footgun.
           this.items.set(resp.items.filter((c) => !!c.phone));
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
+          if (seq !== this.reloadSeq) return;
           this.items.set([]);
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load phone book.');

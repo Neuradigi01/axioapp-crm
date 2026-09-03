@@ -417,6 +417,34 @@
                   {{ mediaAttachmentCount(m) }} attachment(s)
                 </p>
               }
+              <!-- mailgun-inbound Step 5 — email attachments render as
+                   downloadable links. Server forces
+                   Content-Disposition: attachment for every MIME type
+                   so clicking never renders a PDF/image inline. -->
+              @if (emailAttachments(m); as emailAtts) {
+                @if (emailAtts.length > 0) {
+                  <div class="mt-2 flex flex-col gap-1">
+                    @for (att of emailAtts; track att.storage_key) {
+                      <button
+                        type="button"
+                        (click)="downloadEmailAttachment(m, att)"
+                        [attr.title]="
+                          formatAttachmentSize(att.size)
+                            ? att.filename + ' · ' + formatAttachmentSize(att.size)
+                            : att.filename
+                        "
+                        class="inline-flex items-center gap-1.5 self-start rounded-md border border-subtle bg-surface px-2 py-1 text-[11px] text-default hover:bg-surface-2"
+                      >
+                        <lucide-icon name="paperclip" size="12" aria-hidden="true"></lucide-icon>
+                        <span class="max-w-[220px] truncate">{{ att.filename }}</span>
+                        @if (formatAttachmentSize(att.size); as sizeLabel) {
+                          <span class="text-faint">· {{ sizeLabel }}</span>
+                        }
+                      </button>
+                    }
+                  </div>
+                }
+              }
               @if (groupedReactions(m); as reactions) {
                 @if (reactions.length > 0) {
                   <div

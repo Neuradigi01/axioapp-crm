@@ -14,6 +14,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService } from '../auth/auth.service';
+import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { commonValidators } from '../shared/validators';
 import { TaskAssignee, TaskFormModalComponent } from './task-form-modal.component';
 import { Task, TaskPriority, TasksApiService } from './tasks-api.service';
@@ -42,12 +43,21 @@ export class TasksPanelComponent {
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(FurnitureAuthService);
+  private readonly usersDir = inject(UsersDirectoryService);
 
   // T6 — Edit + delete on the panel. Edit reuses the shared
   // TaskFormModal; delete uses a native confirm to stay lightweight.
   protected readonly editingTask = signal<Task | null>(null);
   protected readonly callerUuid = signal<string | null>(null);
+  /** Populated on mount from the session-cached UsersDirectoryService.
+   *  Feeds the panel-hosted edit modal's assignee picker — without it
+   *  the picker renders as empty and an Admin editing a task from a
+   *  contact / lead / walk-in detail page has no way to reassign. */
   protected readonly assignees = signal<TaskAssignee[]>([]);
+  /** Mirrors the main tasks-page permission check. Passed through to
+   *  the modal so a rep without `tasks.assign_others` sees no picker
+   *  (edits still work for their own tasks). */
+  protected readonly canAssignOthers = this.auth.hasPermission('tasks.assign_others');
 
   readonly entityType = input.required<string>();
   readonly entityId = input.required<string>();
@@ -79,6 +89,28 @@ export class TasksPanelComponent {
     // Cache caller UUID for the edit-modal (used as the fallback
     // assignee). Silently no-op if /me isn't accessible.
     this.callerUuid.set(this.auth.currentUserId());
+    // Load assignees once via the shared directory service — cached
+    // per session so opening the panel on multiple detail pages
+    // doesn't re-fetch. Only needed when the caller can reassign.
+    if (this.canAssignOthers) {
+      this.usersDir
+        .list()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (rows) =>
+            this.assignees.set(
+              rows.map((u) => ({ id: u.id, full_name: u.full_name, email: u.email })),
+            ),
+          error: (err: HttpErrorResponse) => {
+            // Fall back to an empty list — the modal handles that by
+            // hiding the picker — but log so the failure isn't
+            // invisible when an Admin can't figure out why they
+            // suddenly can't reassign.
+            console.warn('[tasks-panel] assignees load failed', err.status, err.message);
+            this.assignees.set([]);
+          },
+        });
+    }
     effect(() => {
       const eType = this.entityType();
       const eId = this.entityId();

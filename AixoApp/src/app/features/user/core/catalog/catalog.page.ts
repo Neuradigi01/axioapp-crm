@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -129,17 +130,33 @@ export class CatalogPageComponent {
   readonly activeProducts = computed(() => this.items().filter((i) => i.is_active).length);
   readonly inactiveProducts = computed(() => this.items().filter((i) => !i.is_active).length);
   readonly distinctCategories = computed(() => this.categoryOptions().length);
+  /** True when the loaded row set is smaller than the server total —
+   *  the Active / Inactive KPIs are counted from the loaded items
+   *  only, so they undercount once the org has more than one page of
+   *  products. Template shows a "(this page)" caption when true so
+   *  the numbers can't silently disagree with `totalProducts`. */
+  readonly kpiCountsPartial = computed(() => this.total() > this.items().length);
 
   constructor() {
     this.reload();
     this.reloadCategories();
 
-    this.searchControl.valueChanges
-      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.reload());
-    this.categoryControl.valueChanges
-      .pipe(distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.reload());
+    // Drive reload off the debounced+distinct `q()` and
+    // `categoryFilter()` signals rather than subscribing to
+    // valueChanges a second time. Two independent debounced
+    // pipelines from the same source raced against the signal
+    // write and fired reload twice per keystroke.
+    let initial = true;
+    effect(() => {
+      // Track both signals so the effect re-runs on either change.
+      this.q();
+      this.categoryFilter();
+      if (initial) {
+        initial = false;
+        return;
+      }
+      this.reload();
+    });
   }
 
   protected reloadCategories(): void {
@@ -154,7 +171,13 @@ export class CatalogPageComponent {
       });
   }
 
+  /** Monotonic request id — bumped on every `reload()`, checked in
+   *  the response callback so a slow earlier response can't overwrite
+   *  a faster later one when the user types / changes category fast. */
+  private reloadSeq = 0;
+
   protected reload(): void {
+    const seq = ++this.reloadSeq;
     this.loading.set(true);
     this.loadError.set(null);
     this.api
@@ -166,6 +189,7 @@ export class CatalogPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
+          if (seq !== this.reloadSeq) return;
           this.items.set(resp.items);
           this.total.set(resp.total);
           this.loading.set(false);
@@ -175,6 +199,7 @@ export class CatalogPageComponent {
           this.brokenImages.set(new Set());
         },
         error: (err: HttpErrorResponse) => {
+          if (seq !== this.reloadSeq) return;
           this.items.set([]);
           this.total.set(0);
           this.loading.set(false);
@@ -259,17 +284,23 @@ export class CatalogPageComponent {
     });
   }
 
-  /** Pick an emoji based on the category for the card icon. */
+  /** Lookup: category name → CatalogCategory, for `emojiFor()` to
+   *  read the operator-picked `icon_emoji` without a per-cell scan. */
+  private readonly categoryByName = computed(() => {
+    const m = new Map<string, CatalogCategory>();
+    for (const c of this.categories()) m.set(c.name, c);
+    return m;
+  });
+
+  /** Emoji for the product card. Reads the operator-picked
+   *  `icon_emoji` off the resolved `CatalogCategory` and falls back
+   *  to a generic 📦. Previously hardcoded a furniture-vertical
+   *  keyword map here (sofa/bed/chair/dining…), which violated
+   *  Rule #1 (core must stay vertical-agnostic — verticals live in
+   *  `packs/`). Categories now carry their own icon on
+   *  `tbl_catalog_categories.icon_emoji`. */
   protected emojiFor(category: string | null): string {
     if (!category) return '📦';
-    const c = category.toLowerCase();
-    if (c.includes('sofa') || c.includes('couch')) return '🛋️';
-    if (c.includes('bed')) return '🛏️';
-    if (c.includes('chair')) return '🪑';
-    if (c.includes('table')) return '🪟';
-    if (c.includes('dining')) return '🍽️';
-    if (c.includes('storage') || c.includes('shelf') || c.includes('cabinet')) return '🗄️';
-    if (c.includes('light') || c.includes('lamp')) return '💡';
-    return '📦';
+    return this.categoryByName().get(category)?.icon_emoji ?? '📦';
   }
 }

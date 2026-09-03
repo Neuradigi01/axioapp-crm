@@ -10,7 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
@@ -31,7 +31,10 @@ import {
   IntegrationsApiService,
   WhatsAppCapacity,
 } from '../settings/integrations/integrations-api.service';
-import { EmailAccount, EmailAccountsApiService } from '../services/email-accounts-api.service';
+import {
+  EmailSendersApiService,
+  UnifiedSender,
+} from '../settings/integrations/email-senders-api.service';
 import { OrgSettings, SettingsApiService } from '../settings/settings-api.service';
 import {
   AudienceFilter,
@@ -49,7 +52,7 @@ import {
 } from '../templates/templates-api.service';
 import { TemplateStatusBadgeComponent } from '../templates/template-status-badge.component';
 import { FieldErrorComponent } from '../shared/forms/field-error.component';
-import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
+import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 
 /**
@@ -132,6 +135,7 @@ const _TEMPLATE_CHANNELS: ReadonlySet<ConversationChannel> = new Set<Conversatio
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule,
+    FormsModule,
     RouterLink,
     LucideAngularModule,
     SendFromPickerComponent,
@@ -150,7 +154,7 @@ export class CreateCampaignModalComponent {
   private readonly templatesApi = inject(TemplatesApiService);
   private readonly groupsApi = inject(ContactGroupsApiService);
   private readonly contactsApi = inject(ContactsApiService);
-  private readonly emailAccountsApi = inject(EmailAccountsApiService);
+  private readonly emailSendersApi = inject(EmailSendersApiService);
   private readonly settingsApi = inject(SettingsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -331,12 +335,16 @@ export class CreateCampaignModalComponent {
 
   // --- Campaigns v1 Step 03 — Email sender identity state -----------
 
-  /** Verified (`sync_state === 'live'`) mailboxes the org has connected.
-   *  Fetched lazily the first time the channel switches to Email so
-   *  WhatsApp-only orgs never pay the roundtrip. `null` = not fetched
-   *  yet; `[]` = fetched and org has zero verified accounts (drives the
-   *  empty-state banner in the template). */
-  protected readonly emailAccounts = signal<EmailAccount[] | null>(null);
+  /** Verified sender identities the org can dispatch through — a merged
+   *  list of live OAuth mailboxes (`kind: 'gmail' | 'microsoft'`) AND
+   *  verified SMTP senders (`kind: 'smtp'`, migration 0213). Fetched
+   *  lazily the first time the channel switches to Email so WhatsApp-
+   *  only orgs never pay the roundtrip. `null` = not fetched yet;
+   *  `[]` = fetched and org has zero verified senders of either kind
+   *  (drives the empty-state banner in the template). Only rows with
+   *  `verified === true` are kept — pending SMTP senders and OAuth
+   *  mailboxes with dead refresh tokens are filtered out. */
+  protected readonly emailAccounts = signal<UnifiedSender[] | null>(null);
   protected readonly emailAccountsLoading = signal(false);
 
   /** Campaigns v1 Step 07c — proactive CAN-SPAM check. Populated on
@@ -520,6 +528,12 @@ export class CreateCampaignModalComponent {
     // Required-when-Email is enforced in `save()` before we hit the
     // API, and the backend echoes the same check with a 422.
     email_account_id: this.fb.control<string | null>(null),
+    // Migration 0213 — alternate sender identity for Email campaigns
+    // that dispatch through a verified SMTP row instead of an OAuth
+    // mailbox. Exactly one of email_account_id / smtp_sender_id is
+    // set for Email; both null for non-Email. `_setSenderFromComposite`
+    // maintains the invariant on picker changes.
+    smtp_sender_id: this.fb.control<string | null>(null),
     sender_name: this.fb.control<string | null>(null, [Validators.maxLength(120)]),
     reply_to: this.fb.control<string | null>(null, [Validators.email, Validators.maxLength(320)]),
     subject: this.fb.control<string | null>(null, [Validators.maxLength(998)]),
@@ -536,12 +550,16 @@ export class CreateCampaignModalComponent {
       const v = this.form.getRawValue();
       this.emailBranchState.set({
         email_account_id: v.email_account_id ?? null,
+        smtp_sender_id: v.smtp_sender_id ?? null,
         sender_name: v.sender_name ?? '',
         subject: v.subject ?? '',
         reply_to: v.reply_to ?? '',
       });
     };
     this.form.controls.email_account_id.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(_pushEmailBranchState);
+    this.form.controls.smtp_sender_id.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(_pushEmailBranchState);
     this.form.controls.sender_name.valueChanges
@@ -596,6 +614,7 @@ export class CreateCampaignModalComponent {
         } else {
           this.form.patchValue({
             email_account_id: null,
+            smtp_sender_id: null,
             sender_name: null,
             reply_to: null,
             subject: null,
@@ -710,11 +729,13 @@ export class CreateCampaignModalComponent {
    *  disabled even when every field is filled. */
   protected readonly emailBranchState = signal<{
     email_account_id: string | null;
+    smtp_sender_id: string | null;
     sender_name: string;
     subject: string;
     reply_to: string;
   }>({
     email_account_id: null,
+    smtp_sender_id: null,
     sender_name: '',
     subject: '',
     reply_to: '',
@@ -747,8 +768,12 @@ export class CreateCampaignModalComponent {
   protected readonly emailBranchIncomplete = computed<boolean>(() => {
     if (!this.isEmailChannel()) return false;
     const v = this.emailBranchState();
+    // Exactly one of the two sender ids must be set (migration 0213).
+    // The picker's `_setSenderFromComposite` maintains the invariant on
+    // every change, so here we just need at least one non-empty.
+    const hasSender = !!v.email_account_id || !!v.smtp_sender_id;
     if (
-      !v.email_account_id ||
+      !hasSender ||
       !(v.sender_name && v.sender_name.trim()) ||
       !(v.subject && v.subject.trim())
     ) {
@@ -759,25 +784,93 @@ export class CreateCampaignModalComponent {
 
   private _loadEmailAccounts(): void {
     this.emailAccountsLoading.set(true);
-    this.emailAccountsApi
-      .listVerified()
+    this.emailSendersApi
+      .list()
       .pipe(
-        catchError(() => of<EmailAccount[]>([])),
+        catchError(() => of<UnifiedSender[]>([])),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((rows) => {
-        this.emailAccounts.set(rows);
+        // Only sendable senders — verified SMTP identities and OAuth
+        // mailboxes with a live refresh token. Backend already skips
+        // disconnected OAuth rows from the list, but filtering here
+        // is belt-and-braces and mirrors what other pickers do.
+        const sendable = rows.filter((r) => r.verified);
+        this.emailAccounts.set(sendable);
         this.emailAccountsLoading.set(false);
-        // Auto-pick the mailbox when the operator has exactly one
-        // verified account. Removes a form-control sync bug where the
-        // `<select>` visually shows the option but the reactive form
-        // never captures it, leaving `email_account_id` null and the
-        // Save Draft button disabled with an "Pick a mailbox…" tooltip.
-        if (rows.length === 1 && !this.form.controls.email_account_id.value) {
-          this.form.controls.email_account_id.setValue(rows[0].id);
-          this.form.controls.email_account_id.markAsDirty();
+        // Auto-pick the sender when there's exactly one. Delegates to
+        // the same handler as manual selection so the OAuth vs SMTP
+        // form-control routing stays in one spot.
+        if (sendable.length === 1 && !this.currentSenderCompositeValue()) {
+          this._setSenderFromComposite(this._composeSenderValue(sendable[0]));
         }
       });
+  }
+
+  /** Compose the "kind:id" string a UnifiedSender row is identified by
+   *  in the sender-picker `<select>`. Two-part key because the id
+   *  alone doesn't distinguish an SMTP row from an OAuth row (two
+   *  independent UUID spaces). */
+  protected _composeSenderValue(sender: UnifiedSender): string {
+    return `${sender.kind}:${sender.id}`;
+  }
+
+  /** Options for the shared `crm-mobile-select` — mirrors the label
+   *  format used by the old native `<select>` so the picker reads the
+   *  same. Derived from `emailAccounts()` so it re-evaluates when the
+   *  senders list resolves. */
+  protected readonly senderOptions = computed<readonly MobileSelectOption[]>(() =>
+    (this.emailAccounts() ?? []).map((a) => ({
+      value: this._composeSenderValue(a),
+      label: `[${a.kind === 'gmail' ? 'Gmail' : a.kind === 'microsoft' ? 'Outlook' : 'SMTP'}] ${a.from_address}${a.display_name ? ' · ' + a.display_name : ''}`,
+    })),
+  );
+
+  /** Read the currently-selected sender back out of the two mutually-
+   *  exclusive form controls as the same "kind:id" composite the
+   *  picker binds to. Returns '' when neither control is set. */
+  protected currentSenderCompositeValue(): string {
+    const oauth = this.form.controls.email_account_id.value;
+    if (oauth) {
+      const row = (this.emailAccounts() ?? []).find((r) => r.id === oauth && r.kind !== 'smtp');
+      if (row) return this._composeSenderValue(row);
+      // Row not (yet) loaded — best-effort default to gmail; the
+      // dropdown will re-sync once the fetch resolves.
+      return `gmail:${oauth}`;
+    }
+    const smtp = this.form.controls.smtp_sender_id.value;
+    if (smtp) return `smtp:${smtp}`;
+    return '';
+  }
+
+  /** Picker `<select>` change handler. Splits the "kind:id" composite
+   *  and routes the id into either `email_account_id` (OAuth) or
+   *  `smtp_sender_id` (SMTP), clearing the sibling so the payload
+   *  never carries both — the backend rejects that with 422 via the
+   *  ``_email_channel_requires_sender_and_subject`` validator. */
+  protected onSenderPicked(compositeValue: string | null): void {
+    this._setSenderFromComposite(compositeValue);
+  }
+
+  private _setSenderFromComposite(compositeValue: string | null): void {
+    if (!compositeValue) {
+      this.form.controls.email_account_id.setValue(null);
+      this.form.controls.smtp_sender_id.setValue(null);
+      return;
+    }
+    const idx = compositeValue.indexOf(':');
+    const kind = idx > 0 ? compositeValue.slice(0, idx) : '';
+    const id = idx > 0 ? compositeValue.slice(idx + 1) : '';
+    if (!id) return;
+    if (kind === 'smtp') {
+      this.form.controls.email_account_id.setValue(null);
+      this.form.controls.smtp_sender_id.setValue(id);
+      this.form.controls.smtp_sender_id.markAsDirty();
+    } else {
+      this.form.controls.email_account_id.setValue(id);
+      this.form.controls.smtp_sender_id.setValue(null);
+      this.form.controls.email_account_id.markAsDirty();
+    }
   }
 
   private _loadOrgSettings(): void {
@@ -1132,7 +1225,9 @@ export class CreateCampaignModalComponent {
     // error inline instead of round-tripping a 422.
     if (channel === 'email') {
       const missing: string[] = [];
-      if (!v.email_account_id) missing.push('a sender mailbox');
+      // Migration 0213 — accept either sender kind (OAuth or SMTP).
+      // Picker maintains the exactly-one invariant on selection.
+      if (!v.email_account_id && !v.smtp_sender_id) missing.push('a sender identity');
       if (!(v.sender_name && v.sender_name.trim())) missing.push('a sender name');
       if (!(v.subject && v.subject.trim())) missing.push('a subject');
       if (missing.length) {
@@ -1167,7 +1262,11 @@ export class CreateCampaignModalComponent {
         winner_holdback_hours: v.winner_holdback_hours ?? 24,
         // Campaigns v1 Step 03 — Email sender identity + subject + preheader.
         // Null on non-Email channels so backend + DB row stay clean.
+        // Migration 0213 — send exactly one of email_account_id /
+        // smtp_sender_id (picker maintains the invariant); the other
+        // one is null.
         email_account_id: channel === 'email' ? (v.email_account_id ?? null) : null,
+        smtp_sender_id: channel === 'email' ? (v.smtp_sender_id ?? null) : null,
         sender_name: channel === 'email' ? (v.sender_name ?? null) : null,
         reply_to: channel === 'email' ? (v.reply_to ?? null) : null,
         subject: channel === 'email' ? (v.subject ?? null) : null,

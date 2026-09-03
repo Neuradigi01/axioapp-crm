@@ -424,34 +424,40 @@
               <div
                 class="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-400"
               >
-                No verified sender mailbox. Connect one in
-                <a routerLink="/user/settings/email" class="font-medium underline">
-                  Settings → Email
-                </a>
-                first, then come back to send an Email campaign.
+                No verified sender identity yet. Add one in
+                <a routerLink="/user/integrations" class="font-medium underline">Integrations</a>
+                — either a Gmail / Outlook mailbox (OAuth) or a verified SMTP sender (Titan,
+                Hostinger, custom server, etc.). Then come back to send an Email campaign.
               </div>
             } @else {
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label class="block text-sm">
                   <span class="block text-xs font-medium text-muted">
-                    Send from mailbox
+                    Send from
                     <span class="ml-1 text-red-500">*</span>
                   </span>
-                  <select
-                    formControlName="email_account_id"
-                    class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-                  >
-                    <option [ngValue]="null">— Pick a mailbox —</option>
-                    @for (a of emailAccounts() ?? []; track a.id) {
-                      <option [ngValue]="a.id">
-                        {{ a.email_address }}{{ a.display_name ? ' · ' + a.display_name : '' }}
-                      </option>
-                    }
-                  </select>
-                  <crm-field-error
-                    [control]="form.controls.email_account_id"
-                    message="Pick a verified mailbox to send from."
-                  />
+                  <!-- Migration 0213 — dropdown lists both OAuth mailboxes
+                       (Gmail / Microsoft) and verified SMTP senders. The
+                       option value is a "kind:id" composite so the
+                       component knows which form control to route the
+                       selection into. Uses `crm-mobile-select` so the
+                       popup matches every other picker in the app (dark
+                       theme, in-DOM panel) instead of the OS-native
+                       browser popup. We bind `[value]` + `(valueChange)`
+                       instead of `formControlName` because the picker
+                       has to write to one of TWO form controls depending
+                       on the picked row's kind. -->
+                  <div class="mt-1">
+                    <crm-mobile-select
+                      [options]="senderOptions()"
+                      [value]="currentSenderCompositeValue()"
+                      placeholder="— Pick a sender —"
+                      (valueChange)="onSenderPicked($event)"
+                    />
+                  </div>
+                  <span class="mt-0.5 block text-[10px] text-muted">
+                    Includes verified Gmail / Outlook mailboxes and SMTP sender identities.
+                  </span>
                 </label>
                 <label class="block text-sm">
                   <span class="block text-xs font-medium text-muted">

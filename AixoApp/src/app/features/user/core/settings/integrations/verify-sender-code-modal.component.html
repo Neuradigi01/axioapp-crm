@@ -51,7 +51,7 @@
       </div>
     }
 
-    <form (ngSubmit)="submit()">
+    <form (submit)="$event.preventDefault(); submit()">
       <label class="block">
         <span class="text-xs font-medium text-default">Verification code</span>
         <input

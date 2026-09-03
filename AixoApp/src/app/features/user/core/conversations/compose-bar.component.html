@@ -72,6 +72,47 @@
     </div>
   }
 
+  <!-- Composer-mode tab bar. Sits ABOVE the textarea so it visually
+       belongs to the input, not the send/action row. Underline
+       treatment (no pill fill) makes it read as a tab rather than
+       an action button (which the old pill style did — it looked
+       identical to the Send button). -->
+  <div class="mb-1.5 flex items-center gap-4 border-b border-subtle text-xs" role="tablist">
+    <button
+      type="button"
+      role="tab"
+      [attr.aria-selected]="mode() === 'reply'"
+      (click)="setMode('reply')"
+      [class]="
+        'relative -mb-px flex items-center gap-1.5 border-b-2 px-1 pb-2 pt-1 font-medium transition ' +
+        (mode() === 'reply'
+          ? 'border-accent text-default'
+          : 'border-transparent text-muted hover:text-default')
+      "
+    >
+      <lucide-icon name="corner-up-left" size="12" aria-hidden="true" />
+      Reply to customer
+    </button>
+    <button
+      type="button"
+      role="tab"
+      [attr.aria-selected]="mode() === 'note'"
+      (click)="setMode('note')"
+      [class]="
+        'relative -mb-px flex items-center gap-1.5 border-b-2 px-1 pb-2 pt-1 font-medium transition ' +
+        (mode() === 'note'
+          ? 'border-amber-500 text-amber-500'
+          : 'border-transparent text-muted hover:text-default')
+      "
+    >
+      <lucide-icon name="sticky-note" size="12" aria-hidden="true" />
+      Internal note
+    </button>
+    @if (isNoteMode()) {
+      <span class="ml-auto text-[10px] text-amber-500"> Only your team can see this </span>
+    }
+  </div>
+
   @if (replyingTo; as r) {
     <div
       class="mb-2 flex items-center gap-2 rounded-md border-l-2 border-subtle bg-surface-2 px-2 py-1 text-xs text-default"
@@ -232,76 +273,51 @@
       }
     </div>
   </div>
-  <!-- Action row: Reply/Note mode toggle on the left, then template
-       picker (email-only), AI toggle, and Send stacked HORIZONTALLY
-       on the right. Horizontal stacking (was vertical) shortens the
-       compose bar by ~80px on typical viewports so more of the chat
-       thread is visible above. -->
-  <div class="mt-1.5 flex flex-wrap items-center justify-between gap-2">
-    <!-- Mode toggle (Reply / Note) — Step 13. Compact so it sits
-         inline with the action buttons. -->
-    <div
-      class="inline-flex items-center gap-0.5 rounded-lg border border-subtle bg-surface p-0.5 text-xs"
+  <!-- Action row: template picker (email-only) + AI toggle + Send.
+       The Reply/Note mode toggle now lives ABOVE the textarea as a
+       tab bar — kept out of this row so operators don't confuse a
+       mode switch with an action button. -->
+  <div class="mt-1.5 flex flex-wrap items-center justify-end gap-1.5">
+    @if (channel === 'email') {
+      <app-email-template-picker
+        [contactId]="contactId"
+        [leadId]="leadId"
+        (templateSelected)="onTemplateSelected($event)"
+        (errored)="onTemplateError($event)"
+      />
+    }
+    <button
+      type="button"
+      (click)="flipAi()"
+      [class]="
+        'rounded-md px-3 py-1.5 text-xs font-medium transition ' +
+        (aiHandling
+          ? 'bg-violet-500/10 text-violet-700 hover:bg-violet-200'
+          : 'border border-subtle bg-surface text-default hover:bg-surface-2')
+      "
     >
-      <button
-        type="button"
-        (click)="setMode('reply')"
-        [class]="
-          'rounded-md px-2.5 py-1 font-medium transition ' +
-          (mode() === 'reply' ? 'bg-accent text-white' : 'text-muted hover:bg-surface-2')
-        "
-      >
-        Reply
-      </button>
-      <button
-        type="button"
-        (click)="setMode('note')"
-        [class]="
-          'rounded-md px-2.5 py-1 font-medium transition ' +
-          (mode() === 'note' ? 'bg-amber-500 text-white' : 'text-muted hover:bg-surface-2')
-        "
-      >
-        <lucide-icon name="sticky-note" size="11" class="mr-1 inline" />
-        Note
-      </button>
-    </div>
-    <div class="flex items-center gap-1.5">
-      @if (channel === 'email') {
-        <app-email-template-picker
-          [contactId]="contactId"
-          [leadId]="leadId"
-          (templateSelected)="onTemplateSelected($event)"
-          (errored)="onTemplateError($event)"
-        />
-      }
-      <button
-        type="button"
-        (click)="flipAi()"
-        [class]="
-          'rounded-md px-3 py-1.5 text-xs font-medium transition ' +
-          (aiHandling
-            ? 'bg-violet-500/10 text-violet-700 hover:bg-violet-200'
-            : 'border border-subtle bg-surface text-default hover:bg-surface-2')
-        "
-      >
-        {{ aiHandling ? 'AI On' : 'Let AI handle' }}
-      </button>
-      <button
-        type="button"
-        (click)="submit()"
-        [disabled]="(!isNoteMode() && outOfSession) || (!stagedFile() && !text().trim().length)"
-        [title]="
-          !isNoteMode() && outOfSession
-            ? '24-hour WhatsApp reply window has expired. Send a pre-approved template instead (see banner above), or wait for the customer to message you.'
-            : !stagedFile() && !text().trim().length
-              ? 'Type a message or attach a file first.'
+      {{ aiHandling ? 'AI On' : 'Let AI handle' }}
+    </button>
+    <button
+      type="button"
+      (click)="submit()"
+      [disabled]="(!isNoteMode() && outOfSession) || (!stagedFile() && !text().trim().length)"
+      [title]="
+        !isNoteMode() && outOfSession
+          ? '24-hour WhatsApp reply window has expired. Send a pre-approved template instead (see banner above), or wait for the customer to message you.'
+          : !stagedFile() && !text().trim().length
+            ? 'Type a message or attach a file first.'
+            : isNoteMode()
+              ? 'Save internal note'
               : 'Send'
-        "
-        class="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        Send
-      </button>
-    </div>
+      "
+      [class]="
+        'rounded-md px-3 py-1.5 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 ' +
+        (isNoteMode() ? 'bg-amber-500' : 'bg-accent')
+      "
+    >
+      {{ isNoteMode() ? 'Save note' : 'Send' }}
+    </button>
   </div>
 </div>
 

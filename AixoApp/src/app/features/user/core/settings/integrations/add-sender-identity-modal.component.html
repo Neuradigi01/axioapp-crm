@@ -1,7 +1,11 @@
-<div
-  class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
-  (click)="onBackdropClick($event)"
->
+<!--
+  Backdrop is intentionally NOT click-to-dismiss. The form carries up
+  to 6 fields of SMTP credentials (host / port / username / password /
+  display-name / TLS) and losing them to an accidental click on the
+  dimmed sidebar was reported as bad UX. Close only via the explicit
+  X button in the header or the Cancel button in the footer.
+-->
+<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
   <div
     class="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-subtle bg-surface shadow-lg"
   >
@@ -138,6 +142,30 @@
         @case ('smtp') {
           <form class="space-y-4" [formGroup]="form" (ngSubmit)="submitSmtp()">
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <!-- Provider preset — auto-fills host / port / TLS / (some
+                   providers) username. Picking anything other than
+                   "Custom SMTP server" locks those fields so the
+                   operator only enters their email + password. This
+                   defuses the port ↔ TLS-mode mismatch trap that hits
+                   users configuring Titan / Hostinger / Gmail-SMTP. -->
+              <div class="block sm:col-span-2">
+                <span class="text-xs font-medium text-default">Email provider</span>
+                <crm-mobile-select
+                  class="mt-1 block"
+                  [options]="providerOptions"
+                  formControlName="provider"
+                />
+                <span class="mt-1 block text-xs text-muted">
+                  @if (isPresetProvider()) {
+                    We'll fill in the server settings for this provider — you just need your email
+                    address and password below.
+                  } @else {
+                    Pick your provider from the list above to auto-fill server settings, or leave on
+                    "Custom" if you're pointing at your own SMTP server.
+                  }
+                </span>
+              </div>
+
               <label class="block sm:col-span-2">
                 <span class="text-xs font-medium text-default"
                   >From address <span class="text-red-500">*</span></span
@@ -204,7 +232,11 @@
                 <input
                   type="text"
                   autocomplete="off"
-                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  [readonly]="isPresetProvider()"
+                  [class]="
+                    'mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent ' +
+                    (isPresetProvider() ? 'cursor-not-allowed bg-surface-2 text-muted' : '')
+                  "
                   placeholder="smtp.gmail.com"
                   formControlName="smtp_host"
                 />
@@ -229,7 +261,11 @@
                   type="number"
                   min="1"
                   max="65535"
-                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  [readonly]="isPresetProvider()"
+                  [class]="
+                    'mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent ' +
+                    (isPresetProvider() ? 'cursor-not-allowed bg-surface-2 text-muted' : '')
+                  "
                   placeholder="587"
                   formControlName="smtp_port"
                 />
@@ -251,7 +287,7 @@
                 <input
                   type="text"
                   autocomplete="off"
-                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 font-mono text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-muted"
                   placeholder="hello@yourshop.com"
                   formControlName="smtp_username"
                 />
@@ -263,6 +299,10 @@
                       Must be 254 characters or fewer.
                     }
                   </p>
+                } @else {
+                  <span class="mt-1 block text-xs text-muted">
+                    Usually the same as your From address. We fill this in from the email above.
+                  </span>
                 }
               </label>
 
@@ -304,6 +344,19 @@
                     Stored encrypted (Fernet). We never render it back to the UI once saved.
                   </span>
                 }
+                @if (passwordHint(); as hint) {
+                  <div
+                    class="mt-2 flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs text-amber-500"
+                  >
+                    <lucide-icon
+                      name="info"
+                      size="12"
+                      class="mt-0.5 shrink-0"
+                      aria-hidden="true"
+                    ></lucide-icon>
+                    <span>{{ hint }}</span>
+                  </div>
+                }
               </label>
 
               <div class="block sm:col-span-2">
@@ -313,6 +366,11 @@
                   [options]="tlsModeOptions"
                   formControlName="tls_mode"
                 />
+                @if (!isPresetProvider()) {
+                  <span class="mt-1 block text-xs text-muted">
+                    Port auto-updates to match — 587 for STARTTLS, 465 for Implicit TLS.
+                  </span>
+                }
               </div>
             </div>
 
