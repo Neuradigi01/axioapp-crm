@@ -1,14 +1,19 @@
 # SOPS configuration — declares which files get encrypted and who can decrypt
-# them. The `run.sh`/`run.cmd` secrets-* commands wrap sops; you rarely call it directly.
+# them. The `run.cmd`/`run.sh` secrets-* commands wrap sops; you rarely call it
+# directly.
+#
+# Two rules, one per environment:
+#   secrets.local.enc.env — devs only. Prod servers CANNOT decrypt.
+#   secrets.prod.enc.env  — devs + prod-server keys. Loaded on the deployed box.
 #
 # Each entry under `keys:` is one person/machine's age PUBLIC key, anchored
 # (&name) so it can be referenced (*name) in creation_rules below. sops itself
 # ignores the `keys:` block — it exists so every key is labelled with its owner.
 #
-# To grant access: add an anchored key line + its *alias under `age:`, then run
-# `run.cmd secrets-rekey`. To revoke: delete both lines, re-key, AND rotate the
-# actual secret values at their source (a removed key still holds any
-# plaintext/data-key it already had).
+# To grant access: add an anchored key line + its *alias under the appropriate
+# rule's `age:` list, then run `run.cmd secrets-rekey <local|prod>`. To revoke:
+# delete both lines, re-key, AND rotate the actual secret values at their source
+# (a removed key still holds any plaintext/data-key it already had).
 #
 # Generate your keypair with `run.cmd secrets-keygen` (prints your age1... key),
 # then send it to whoever manages this file.
@@ -18,15 +23,26 @@ keys:
   - &sagar         age100ggf6lrynn392esamkea5a4cca9vemzx8rpws7kdzdn3mqvrg5q68pza9   # Sagar
   - &pratik        age1s3huk7pyru23zmmjzexjnhcrfvqzvdruyw86hglmuedpxtps540svrh49m   # Pratik
   - &prod-server   age1xcsw0mafsq5mdh890sxk6w65v4k9vsvlyyw2qjd7czv7ygpuxfasd5nq52   # Production server (srv634277, key in /root)
-  - &prod-server2   age10jgvatqaawvt3jg3h4qvlatv4nmzspgwatxvyfd8q9psk34u556szjp6ne   # Production server (srv634277, key in /root)
+  - &prod-server2  age10jgvatqaawvt3jg3h4qvlatv4nmzspgwatxvyfd8q9psk34u556szjp6ne   # Production server (srv634277, key in /root)
   - &ankesh        age1m5408duwpttc7hr59nd44fn2dvnc0aqxru7yrlffxqlkuyjvvqzqe2k0ev   # Ankesh
   - &ajay          age19e8x8gw2smj9ldhxww5jxmc074y3unutwc7lxm04esahrjwex4xsf5adxx   # Ajay
 
-# The secrets file is named secrets.enc.env (the .env extension lets sops
-# auto-detect dotenv format — required for `sops exec-env`, which has no
-# --input-type flag). path_regex matches it; the $ anchor stops over-matching.
+# The .env extension lets sops auto-detect dotenv format — required for
+# `sops exec-env`, which has no --input-type flag. path_regex uses a `$`
+# anchor so `secrets.local.enc.env` and `secrets.prod.enc.env` match their
+# own rule and nothing else.
 creation_rules:
-  - path_regex: secrets\.enc\.env$
+  - path_regex: secrets\.local\.enc\.env$
+    key_groups:
+      - age:
+          - *ryder-home
+          - *ryder-office
+          - *sagar
+          - *pratik
+          - *ankesh
+          - *ajay
+
+  - path_regex: secrets\.prod\.enc\.env$
     key_groups:
       - age:
           - *ryder-home
