@@ -16,6 +16,10 @@ import { ValidationMessageComponent } from '@shared/components/validation-messag
 import { CaptchaComponent } from '@shared/components/captcha/captcha.component';
 import { PasswordToggleDirective } from '@shared/directives/password-toggle.directive';
 import {
+  MobileSelectComponent,
+  type MobileSelectOption,
+} from '@app/features/user/core/shared/forms/mobile-select.component';
+import {
   emailValidator,
   matchFieldValidator,
   nameValidator,
@@ -53,6 +57,7 @@ import { ICountry, IState } from '@app/schemas/common';
     ValidationMessageComponent,
     CaptchaComponent,
     PasswordToggleDirective,
+    MobileSelectComponent,
   ],
 })
 export class RegisterComponent implements OnInit, OnDestroy {
@@ -103,8 +108,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
     last_name: ['', [Validators.required, nameValidator]],
     email: ['', [Validators.required, emailValidator, Validators.maxLength(254)]],
     mobile_no: ['', [phoneValidator]],
-    country_id: [null as number | null],
-    state_id: [{ value: null as number | null, disabled: true }],
+    country_id: [''],
+    state_id: [{ value: '', disabled: true }],
     referral_id: [''],
     email_otp_code: [''],
     mobile_otp_code: [''],
@@ -116,6 +121,12 @@ export class RegisterComponent implements OnInit, OnDestroy {
   readonly countries = signal<ICountry[]>([]);
   readonly states = signal<IState[]>([]);
   readonly statesLoading = signal(false);
+  readonly countryOptions = computed<MobileSelectOption[]>(() =>
+    this.countries().map((c) => ({ value: String(c.id), label: c.name })),
+  );
+  readonly stateOptions = computed<MobileSelectOption[]>(() =>
+    this.states().map((s) => ({ value: String(s.id), label: s.name })),
+  );
 
   private readonly captchaRef = viewChild<CaptchaComponent>('captchaRef');
 
@@ -205,9 +216,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
   }
 
   async onCountryChange(): Promise<void> {
-    const countryId = this.registerForm.get('country_id')!.value;
-    this.registerForm.patchValue({ state_id: null });
+    const raw = this.registerForm.get('country_id')!.value;
+    this.registerForm.patchValue({ state_id: '' });
 
+    const countryId = raw ? Number(raw) : null;
     if (!countryId) {
       this.states.set([]);
       this.registerForm.get('state_id')!.disable();
@@ -234,6 +246,22 @@ export class RegisterComponent implements OnInit, OnDestroy {
   async onSubmit(): Promise<void> {
     if (this.registerForm.invalid) {
       this.registerForm.markAllAsTouched();
+      const invalidFields = Object.keys(this.registerForm.controls).filter(
+        (k) => this.registerForm.get(k)?.invalid,
+      );
+      // Console log helps devs; snackbar tells the user WHY the button
+      // did nothing (previously it silently returned — mystery bug from
+      // the user's perspective).
+      console.warn('[register] form invalid — submit blocked', {
+        invalidFields,
+        errors: invalidFields.reduce<Record<string, unknown>>((acc, k) => {
+          acc[k] = this.registerForm.get(k)?.errors;
+          return acc;
+        }, {}),
+      });
+      this.snackBar.open(`Please fill / fix: ${invalidFields.join(', ')}`, SNACKBAR_ACTION, {
+        duration: SNACKBAR_DURATION,
+      });
       return;
     }
 
