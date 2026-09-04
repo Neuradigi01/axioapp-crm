@@ -143,10 +143,13 @@
                       >
                         {{ c.unread_count }}
                       </span>
-                    } @else if (!c.ai_handling) {
+                    } @else if (!c.ai_active && !c.ai_paused) {
                       <!-- Single-dot "needs human" indicator — replaces
                            the old amber chip so rows stay one line tall
-                           without hiding the signal entirely. -->
+                           without hiding the signal entirely. Gated on
+                           ``ai_active`` (real bound-assistant state), not
+                           the legacy ``ai_handling`` flag which the
+                           backend now ignores when an assistant is bound. -->
                       <span
                         class="inline-block h-1.5 w-1.5 rounded-full bg-amber-400"
                         aria-label="Needs human"
@@ -189,7 +192,7 @@
                     <span class="text-amber-400" title="A team member took over from AI">
                       · ✋ Human took over
                     </span>
-                  } @else if (c.ai_handling) {
+                  } @else if (c.ai_active) {
                     <span class="text-violet-400" title="AI is handling this conversation">
                       · 🤖 AI handled
                     </span>

@@ -56,7 +56,11 @@ interface EmailAttachmentMeta {
 /**
  * Chat thread — renders bubbles, auto-scrolls to bottom on new
  * messages. The conversation header shows the external_id + channel +
- * the AI-Handled / Needs-Human pill (clickable: emits `toggleAi`).
+ * a state-aware AI pill that reflects the real ``ai_active`` /
+ * ``ai_paused`` truth (bound-assistant + takeover state) rather than
+ * the legacy per-conversation ``ai_handling`` flag. Clicking the pill
+ * emits ``takeoverAi`` / ``resumeAiOut`` — same handlers the banner's
+ * Take Over / Return to AI buttons drive.
  *
  * Optimistic outbound messages have ids that start with `tmp-`; we
  * grey them slightly so the user can tell the wire hasn't ack'd yet.
@@ -88,8 +92,6 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
   @Input() detail: ConversationDetail | null = null;
   @Input() loading = false;
   @Input() staffById: Map<string, StaffListItem> = new Map();
-
-  @Output() readonly toggleAi = new EventEmitter<boolean>();
 
   /** tasks/ai-assistants-omnichannel Step 4 — user clicked the Take
    *  Over button on the AI-status banner. The page owns the POST +
@@ -287,10 +289,6 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
     if (m.delivered_at) return 'delivered';
     if (m.sent_at) return 'sent';
     return 'pending';
-  }
-
-  protected toggle(): void {
-    this.toggleAi.emit(!this.conversation.ai_handling);
   }
 
   // --- AI takeover banner (omnichannel Step 4) ---------------------
