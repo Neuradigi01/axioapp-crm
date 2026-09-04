@@ -14,18 +14,14 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { Subject, of } from 'rxjs';
+import { EMPTY, Subject, of } from 'rxjs';
 import { catchError, debounceTime, switchMap } from 'rxjs/operators';
 
 import { ConversationChannel } from '../conversations/conversations-api.service';
 import { SendFromPickerComponent } from '../whatsapp/shared/send-from-picker.component';
 import { AbTestSectionComponent } from './ab/ab-test-section.component';
 import { extractApiError } from '@core/services/api-error.util';
-import {
-  ContactGroup,
-  ContactGroupsApiService,
-  GroupFilter,
-} from '../contacts/groups/groups-api.service';
+import { ContactGroup, ContactGroupsApiService } from '../contacts/groups/groups-api.service';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import {
   IntegrationsApiService,
@@ -939,30 +935,24 @@ export class CreateCampaignModalComponent {
         catchError(() => of(null)),
       );
     }
-    // filter mode — call shape uses `GroupFilter` (the
-    // preview-size endpoint is owned by the groups API and only
-    // accepts q/source/tag; `group_id` belongs to the campaign-side
-    // AudienceFilter shape, not the preview request).
-    const filter: GroupFilter = {};
-    const v = this.form.getRawValue();
-    if (v.audience_q?.trim()) filter.q = v.audience_q.trim();
-    if (v.audience_source?.trim()) filter.source = v.audience_source.trim();
-    if (v.audience_tag?.trim()) filter.tag = v.audience_tag.trim();
-    if (!filter.q && !filter.source && !filter.tag) {
-      this.audienceCountLoading.set(false);
-      return of(null);
-    }
-    this.audienceCountLoading.set(true);
-    return this.groupsApi.previewSize({ filter_json: filter }).pipe(
-      switchMap((r) => of(r.count)),
-      catchError(() => of(null)),
-    );
+    // filter mode — the rows observable owns the count in this mode
+    // (contacts.list returns items+total in one call, so we don't need
+    // a second round-trip through the groups previewSize endpoint,
+    // which rejects empty filter payloads anyway). EMPTY here means
+    // the count subscriber never fires and never fights the rows
+    // subscriber over `audienceCount` / `audienceCountLoading`.
+    return EMPTY;
   }
 
   /** Rows companion to the count observable. Only Custom-filter mode
    *  fetches — Everyone and Saved-group modes clear the list.
-   *  Sends q/source/tag through the contacts list endpoint (same
-   *  filters the audience count uses) and takes a small page. */
+   *  Sends q/source/tag through the contacts list endpoint and takes
+   *  a small page. Fires even when no filters are entered so the
+   *  operator lands on a browsable contact list instead of an empty
+   *  "add a filter first" state. Also pipes `resp.total` into
+   *  `audienceCount` — one round-trip covers both the row preview
+   *  and the header count, replacing the groups previewSize call in
+   *  filter mode (which rejects empty filters). */
   private _currentAudiencePreviewRowsObservable() {
     const mode = this.audienceMode();
     if (mode !== 'filter') {
@@ -973,11 +963,8 @@ export class CreateCampaignModalComponent {
     const q = v.audience_q?.trim() || undefined;
     const source = v.audience_source?.trim() || undefined;
     const tag = v.audience_tag?.trim() || undefined;
-    if (!q && !source && !tag) {
-      this.audiencePreviewLoading.set(false);
-      return of<ContactListItem[]>([]);
-    }
     this.audiencePreviewLoading.set(true);
+    this.audienceCountLoading.set(true);
     return this.contactsApi
       .list({
         q,
@@ -989,8 +976,16 @@ export class CreateCampaignModalComponent {
         size: this.AUDIENCE_PREVIEW_LIMIT,
       })
       .pipe(
-        switchMap((resp) => of(resp.items)),
-        catchError(() => of<ContactListItem[]>([])),
+        switchMap((resp) => {
+          this.audienceCount.set(resp.total);
+          this.audienceCountLoading.set(false);
+          return of(resp.items);
+        }),
+        catchError(() => {
+          this.audienceCount.set(null);
+          this.audienceCountLoading.set(false);
+          return of<ContactListItem[]>([]);
+        }),
       );
   }
 

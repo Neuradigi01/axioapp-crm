@@ -271,7 +271,7 @@
                 <!-- Collapsed: body hidden. Chip strip below still shows the selection. -->
               } @else if (audiencePreviewRows().length === 0 && !audiencePreviewLoading()) {
                 <p class="px-2 py-2 text-xs text-muted">
-                  Add a search / source / tag above to preview matching contacts.
+                  No contacts match — clear a filter above or add contacts first.
                 </p>
               } @else {
                 <ul class="max-h-48 divide-y divide-subtle overflow-y-auto">
@@ -364,7 +364,7 @@
                 @if (audienceMode() === 'group') {
                   Pick a group to see the count.
                 } @else {
-                  Add a filter to see the count.
+                  Loading contacts…
                 }
               </span>
             }
