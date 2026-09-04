@@ -128,6 +128,35 @@ async def bulk_last_message_bodies(
     return await _da.bulk_last_message_body_for_conversations(session, conversation_ids)
 
 
+async def compute_ai_active(
+    session: AsyncSession,
+    conversations: list[Conversation],
+) -> dict[uuid.UUID, bool]:
+    """Per-conversation "is AI actually going to answer this?" flag,
+    mirroring the rule ``send_outbound`` uses to auto-pause on human
+    reply: ``NOT ai_paused AND (ai_handling OR org has an active
+    assistant bound to this channel)``.
+
+    Fetches the org's active bound-channel set once and evaluates
+    each conversation against it in memory — no N+1 on the inbox
+    list. Empty when the caller has no conversations."""
+    if not conversations:
+        return {}
+    from src.app.core.ai_assistants import data_access as _ai_da
+
+    bound_channels = await _ai_da.list_active_bound_channels(session)
+    result: dict[uuid.UUID, bool] = {}
+    for conv in conversations:
+        if conv.ai_paused:
+            result[conv.id] = False
+            continue
+        if conv.ai_handling:
+            result[conv.id] = True
+            continue
+        result[conv.id] = conv.channel.value in bound_channels
+    return result
+
+
 # --- access gates ---------------------------------------------------------
 
 

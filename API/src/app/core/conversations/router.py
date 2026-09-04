@@ -47,6 +47,7 @@ from src.app.core.conversations.media_upload import (
     validate_attachment,
 )
 from src.app.core.conversations.models import (
+    Conversation,
     ConversationChannel,
     ConversationStatus,
 )
@@ -76,6 +77,7 @@ from src.app.core.conversations.schemas import (
 )
 from src.app.core.conversations.service import (
     bulk_last_message_bodies,
+    compute_ai_active,
     ensure_can_write_conversation,
     get_conversation,
     list_conversations,
@@ -185,6 +187,23 @@ async def download_message_attachment(
     )
 
 
+async def _serialize_conversation(
+    db: AsyncSession,
+    conv: Conversation,
+) -> ConversationOut:
+    """Build a ``ConversationOut`` with the ``ai_active`` flag
+    populated. Used by every single-conversation endpoint (create,
+    patch, pause/resume-ai, mark-read/unread, ai-handling) so a
+    mutation response consistently reflects whether AI is still
+    going to answer this thread — the frontend banner reads
+    ``ai_active`` and would flicker back to the wrong state on
+    every mutation without this."""
+    ai_active_map = await compute_ai_active(db, [conv])
+    out = ConversationOut.model_validate(conv)
+    out.ai_active = ai_active_map.get(conv.id, False)
+    return out
+
+
 async def _require_conversation_write_access(
     conversation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -245,15 +264,18 @@ async def list_endpoint(
     )
     # Bulk-fetch tags + last-message previews for the rows we're about
     # to return so the chip row + preview line in the list view don't
-    # N+1 the inbox render.
+    # N+1 the inbox render. ``ai_active`` piggybacks on a single
+    # org-level lookup shared across every row.
     conv_ids = [r.id for r in rows]
     tags_by_conv = await bulk_tags_for_conversations(db, conv_ids)
     preview_by_conv = await bulk_last_message_bodies(db, conv_ids)
+    ai_active_by_conv = await compute_ai_active(db, rows)
     items = []
     for r in rows:
         out = ConversationOut.model_validate(r)
         out.tags = tags_by_conv.get(r.id, [])
         out.last_message_body = preview_by_conv.get(r.id)
+        out.ai_active = ai_active_by_conv.get(r.id, False)
         items.append(out)
     return ConversationListResponse(items=items, total=total, page=page, size=size)
 
@@ -274,7 +296,7 @@ async def create_endpoint(
         channel=payload.channel,
         contact_id=payload.contact_id,
     )
-    return ConversationOut.model_validate(conv)
+    return await _serialize_conversation(db, conv)
 
 
 # --- Tags (whatsapp-platform-upgrade Step 14) -----------------------------
@@ -368,6 +390,8 @@ async def get_detail_endpoint(
     msgs = await list_messages(db, conversation_id, limit=_THREAD_MESSAGES_PAGE_SIZE)
     conv_out = ConversationOut.model_validate(conv)
     conv_out.tags = await list_tags_for_conversation(db, conversation_id)
+    ai_active_map = await compute_ai_active(db, [conv])
+    conv_out.ai_active = ai_active_map.get(conv.id, False)
     # Step 15 — attach WhatsApp 24-hour session state only for
     # whatsapp conversations. Other channels (SMS / Email / web)
     # have no session-window concept; the banner stays hidden.
@@ -779,7 +803,7 @@ async def patch_endpoint(
         caller_user_id=user.legacy_uuid,
         caller_role_id=user.role_id,
     )
-    return ConversationOut.model_validate(conv)
+    return await _serialize_conversation(db, conv)
 
 
 # --- AI takeover (omnichannel Step 3) ------------------------------------
@@ -807,7 +831,7 @@ async def pause_ai_endpoint(
         conversation_id=conversation_id,
         actor_user_id=user.legacy_uuid,
     )
-    return ConversationOut.model_validate(conv)
+    return await _serialize_conversation(db, conv)
 
 
 @router.post(
@@ -832,7 +856,7 @@ async def resume_ai_endpoint(
         actor_user_id=user.legacy_uuid,
         caller_is_admin=caller_is_admin,
     )
-    return ConversationOut.model_validate(conv)
+    return await _serialize_conversation(db, conv)
 
 
 @router.post(
@@ -854,7 +878,7 @@ async def mark_read_endpoint(
     open and from a right-click "Mark as read" menu on the list row.
     """
     conv = await mark_conversation_read(db, conversation_id=conversation_id)
-    return ConversationOut.model_validate(conv)
+    return await _serialize_conversation(db, conv)
 
 
 @router.post(
@@ -874,7 +898,7 @@ async def mark_unread_endpoint(
     the row is already unread.
     """
     conv = await mark_conversation_unread(db, conversation_id=conversation_id)
-    return ConversationOut.model_validate(conv)
+    return await _serialize_conversation(db, conv)
 
 
 @router.get(
@@ -998,7 +1022,7 @@ async def patch_ai_handling_endpoint(
         caller_user_id=user.legacy_uuid,
         caller_role_id=user.role_id,
     )
-    return ConversationOut.model_validate(conv)
+    return await _serialize_conversation(db, conv)
 
 
 @router.get(

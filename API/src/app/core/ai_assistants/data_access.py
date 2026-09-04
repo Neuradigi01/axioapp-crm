@@ -98,6 +98,25 @@ async def find_active_assistant_bound_to_channel(
     return result.scalar_one_or_none()
 
 
+async def list_active_bound_channels(db: AsyncSession) -> set[str]:
+    """Return the union of ``bound_channels`` across every active
+    assistant in the caller's org (TenantScoped auto-filter narrows
+    the query). Used by the conversations router to compute the
+    per-row ``ai_active`` flag without an N+1 per conversation:
+    fetch this set once, then check membership in memory.
+
+    Returns an empty set when the org has no active assistants."""
+    stmt = select(AiAssistant.bound_channels).where(
+        AiAssistant.status == AiAssistantStatus.active,
+    )
+    result = await db.execute(stmt)
+    channels: set[str] = set()
+    for (row_channels,) in result.all():
+        if row_channels:
+            channels.update(str(c) for c in row_channels)
+    return channels
+
+
 async def list_assistants(
     db: AsyncSession,
     *,
@@ -779,6 +798,7 @@ __all__ = [
     "insert_knowledge",
     "insert_message_meta_pending",
     "insert_user_message",
+    "list_active_bound_channels",
     "list_assistants",
     "list_knowledge_by_assistant",
     "reassign_assistant_key_ids",

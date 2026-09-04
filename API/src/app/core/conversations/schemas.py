@@ -356,6 +356,16 @@ class ConversationOut(ORMModel):
     ai_paused: bool = False
     ai_paused_by_user_id: uuid.UUID | None = None
     ai_paused_at: datetime | None = None
+    # True when AI will actually answer this conversation on the next
+    # inbound — matches the server-side ``should_pause`` rule in
+    # ``send_outbound``: NOT paused AND (per-conversation
+    # ``ai_handling`` flag OR the org has an active assistant bound
+    # to this channel). Populated by the list + detail endpoints from
+    # a single per-request lookup of the org's active bound-channel
+    # set, so no N+1. Frontend uses this to decide whether to render
+    # the "🤖 AI is handling" banner — without it the banner shows on
+    # every AI-capable channel regardless of real state.
+    ai_active: bool = False
     last_message_at: datetime | None
     # Short preview of the most recent external message (whitespace-collapsed
     # + trimmed to 140 chars server-side). Populated only by the list
