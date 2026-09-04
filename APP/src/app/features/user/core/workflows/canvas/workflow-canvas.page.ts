@@ -18,6 +18,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { CanvasNode, CanvasStateService } from './canvas-state.service';
 import { ContextMenuComponent, ContextMenuItem } from './context-menu.component';
 import { WorkflowEdgeComponent } from './edge.component';
@@ -108,6 +109,7 @@ export class WorkflowCanvasPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   @ViewChild('canvasRoot', { static: false })
   canvasRoot!: ElementRef<SVGSVGElement>;
@@ -305,6 +307,19 @@ export class WorkflowCanvasPageComponent {
   }
 
   save(opts: { silent?: boolean; changeNote?: string } = {}): void {
+    // Client-side pre-flight — mirrors the backend graph rules so the
+    // operator sees plain-language guidance instantly instead of a
+    // round-trip 422. Silent auto-save aborts quietly; explicit Save
+    // surfaces the message in the header error banner AND a toast.
+    const preflight = this.preflightGraph();
+    if (preflight) {
+      if (!opts.silent) {
+        this.error.set(preflight);
+        this.toast.warn("Can't save yet", { subtitle: preflight });
+      }
+      return;
+    }
+
     // Step 17 — explicit Save Draft on an existing workflow pops the
     // change-note modal so the version row gets a meaningful label.
     // Auto-save (`silent: true`) and brand-new workflows skip it.
@@ -314,6 +329,64 @@ export class WorkflowCanvasPageComponent {
       return;
     }
     this.flushSave(opts);
+  }
+
+  /** Fast client-side check that mirrors the cheap subset of the
+   *  backend's `validate_graph`. Catches the three failures beginners
+   *  hit constantly (empty graph, missing trigger, unconnected nodes)
+   *  so we can show plain-language guidance without a network trip.
+   *  Deeper checks (registry lookups, condition AST, template refs)
+   *  still land server-side. Returns null when the graph looks OK. */
+  private preflightGraph(): string | null {
+    const nodes = this.state.nodes();
+    if (nodes.length === 0) {
+      return this.friendlyGraphError('workflow.graph must contain at least one node');
+    }
+    const triggers = nodes.filter((n) => (n.type || '').startsWith('trigger'));
+    if (triggers.length === 0) {
+      return this.friendlyGraphError('workflow.graph must contain a trigger node');
+    }
+    if (triggers.length > 1) {
+      return this.friendlyGraphError(
+        `workflow.graph must contain exactly one trigger node; found ${triggers.length}`,
+      );
+    }
+    const trigger = triggers[0];
+    const eventType = (trigger.config as Record<string, unknown> | undefined)?.['event_type'];
+    if (typeof eventType !== 'string' || eventType.trim() === '') {
+      return this.friendlyGraphError(
+        `trigger node '${trigger.id}' missing non-empty config.event_type`,
+      );
+    }
+    // Reachability from the trigger. Wait-for-event `timeout` edges may
+    // back-flow, so we skip them for the forward walk (matches
+    // graph.py's rule).
+    const edges = this.state.edges();
+    const forward = new Map<string, string[]>();
+    for (const e of edges) {
+      if (e.label === 'timeout') continue;
+      const list = forward.get(e.source) ?? [];
+      list.push(e.target);
+      forward.set(e.source, list);
+    }
+    const reachable = new Set<string>([trigger.id]);
+    const stack: string[] = [trigger.id];
+    while (stack.length) {
+      const current = stack.pop() as string;
+      for (const next of forward.get(current) ?? []) {
+        if (!reachable.has(next)) {
+          reachable.add(next);
+          stack.push(next);
+        }
+      }
+    }
+    const unreachable = nodes.filter((n) => !reachable.has(n.id));
+    if (unreachable.length > 0) {
+      return this.friendlyGraphError(
+        `workflow.graph has unreachable nodes: ${unreachable.map((n) => n.id).join(', ')}`,
+      );
+    }
+    return null;
   }
 
   private flushSave(opts: { silent?: boolean; changeNote?: string } = {}): void {
@@ -334,22 +407,73 @@ export class WorkflowCanvasPageComponent {
 
     obs.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (workflow) => {
+        const wasCreate = !id;
         this.state.setWorkflowId(workflow.id);
         this.state.setStatus(workflow.status);
         this.state.clearDirty();
         this.loadedWorkflow.set(workflow);
         this.saving.set(false);
-        if (!id && !opts.silent) {
+        if (!opts.silent) {
+          this.toast.success(wasCreate ? 'Workflow created' : 'Workflow saved');
+        }
+        if (wasCreate && !opts.silent) {
           // Created — swap the URL so subsequent refreshes load the
           // workflow rather than re-creating blanks.
           this.router.navigate(['/user/workflows', workflow.id], { replaceUrl: true });
         }
       },
       error: (err: HttpErrorResponse) => {
-        this.error.set(extractApiError(err) ?? 'Save failed.');
+        const friendly = this.friendlyHttpError(err, 'Save failed.');
+        this.error.set(friendly);
         this.saving.set(false);
+        if (!opts.silent) {
+          this.toast.error('Save failed', { subtitle: friendly });
+        }
       },
     });
+  }
+
+  /** Turns an HttpErrorResponse into a plain-language string for the
+   *  banner + toast. Handles the three common non-graph failure modes
+   *  (401 session expired, 403 missing permission, network offline)
+   *  before falling back to the graph-specific translator. */
+  private friendlyHttpError(err: HttpErrorResponse, fallback: string): string {
+    if (err.status === 401) {
+      return 'Session expired — please sign in again.';
+    }
+    if (err.status === 403) {
+      return extractApiError(err) ?? "You don't have permission to do that.";
+    }
+    if (err.status === 0) {
+      return 'Network unreachable — check your connection and try again.';
+    }
+    return this.friendlyGraphError(extractApiError(err) ?? fallback);
+  }
+
+  /** Rewrites low-level backend graph-validation reasons into
+   *  plain-language guidance the operator can act on. Falls through
+   *  to the raw message when we don't recognise the shape. */
+  private friendlyGraphError(reason: string): string {
+    const lower = reason.toLowerCase();
+    if (lower.includes('unreachable node')) {
+      return "Some nodes aren't connected. Drag from the trigger's output port (bottom) to each node's input port (top) so every node is reachable from the trigger.";
+    }
+    if (lower.includes('must contain a trigger node')) {
+      return 'Add a Trigger node from the palette — every workflow needs one entry point.';
+    }
+    if (lower.includes('exactly one trigger node')) {
+      return 'A workflow can only have one Trigger node. Remove the extras.';
+    }
+    if (lower.includes('missing non-empty config.event_type')) {
+      return 'Open the Trigger node and pick an event (e.g. "Contact created") before saving.';
+    }
+    if (lower.includes('must contain at least one node')) {
+      return 'Add at least one node (start with a Trigger from the palette) before saving.';
+    }
+    if (lower.includes('contains a cycle')) {
+      return 'The graph contains a loop. Only wait-for-event timeout edges may loop back — remove the cyclic edge.';
+    }
+    return reason;
   }
 
   // --- Step 17 — change-note + version + import/export -------------
@@ -493,8 +617,17 @@ export class WorkflowCanvasPageComponent {
       .activate(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (workflow) => this.state.setStatus(workflow.status),
-        error: (err) => this.error.set(extractApiError(err) ?? 'Activate failed.'),
+        next: (workflow) => {
+          this.state.setStatus(workflow.status);
+          this.toast.success('Workflow activated', {
+            subtitle: 'New matching events will now enroll contacts.',
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          const friendly = this.friendlyHttpError(err, 'Activate failed.');
+          this.error.set(friendly);
+          this.toast.error('Activate failed', { subtitle: friendly });
+        },
       });
   }
 
@@ -505,8 +638,17 @@ export class WorkflowCanvasPageComponent {
       .pause(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (workflow) => this.state.setStatus(workflow.status),
-        error: (err) => this.error.set(extractApiError(err) ?? 'Pause failed.'),
+        next: (workflow) => {
+          this.state.setStatus(workflow.status);
+          this.toast.info('Workflow paused', {
+            subtitle: 'No new enrollments until you reactivate.',
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          const friendly = this.friendlyHttpError(err, 'Pause failed.');
+          this.error.set(friendly);
+          this.toast.error('Pause failed', { subtitle: friendly });
+        },
       });
   }
 

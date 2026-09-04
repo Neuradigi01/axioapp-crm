@@ -9,6 +9,9 @@ import { HttpErrorResponse } from '@angular/common/http';
  *   3. `.detail` if it's a string (FastAPI's default `{ detail }` envelope)
  *   4. `.detail` if it's a FastAPI request-validation list
  *      (`[{loc, msg}, ...]`) — flattened to "field: message" lines
+ *   5. `.detail` if it's an object carrying `.message` or `.reason`
+ *      (FastAPI HTTPException with a structured detail dict — e.g.
+ *      `{ detail: { code: "invalid_graph", reason: "..." } }`)
  *
  * Returns `null` if no usable string is present so callers can fall
  * back to their own copy ("Could not save lead." etc.).
@@ -32,6 +35,11 @@ export function extractApiError(err: HttpErrorResponse): string | null {
         })
         .filter((l): l is string => !!l);
       if (lines.length > 0) return lines.join('; ');
+    }
+    if (candidate && typeof candidate === 'object') {
+      const nested = candidate as { message?: unknown; reason?: unknown };
+      if (typeof nested.message === 'string') return nested.message;
+      if (typeof nested.reason === 'string') return nested.reason;
     }
   }
   return null;
