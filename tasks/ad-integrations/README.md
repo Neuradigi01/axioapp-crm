@@ -61,6 +61,7 @@ A new Owner, on a fresh org, can:
 | 10 | [Backend: per-form pipeline_stage on subscriptions](step-10-backend-per-form-pipeline-stage.md) | Done (migration awaits upgrade) | ~0.5 day |
 | 11 | [Backend: Google worker parity for pipeline_stage](step-11-backend-google-worker-pipeline-parity.md) | Done | ~0.1 day |
 | 12 | [Frontend: Pipeline Stage dropdown in the mapping editor](step-12-frontend-mapping-editor-pipeline-stage.md) | Done | ~0.5 day |
+| 13 | [Backend: auto-attach every Lead Form when a Page is subscribed](step-13-backend-auto-attach-forms-on-page-subscribe.md) | Done | ~0.3 day |
 
 **Total: ~8 working days.** This is the most external-dependency-heavy track in the project; expect overruns from OAuth app review processes on both Google and Meta sides (typically 1–2 weeks of back-and-forth before scopes are approved for production traffic). The code is ready in 8 days; production go-live waits on OAuth app review.
 

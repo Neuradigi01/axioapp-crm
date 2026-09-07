@@ -595,3 +595,125 @@ async def test_update_subscription_omitted_pipeline_stage_leaves_row_alone(monke
     )
     assert sub.pipeline_stage == "qualified"
     assert sub.enabled is False
+
+
+# --- 7. Step 13: auto-attach on Page subscribe ---------------------------
+
+
+class _AutoAttachSession:
+    """Session stand-in for `auto_attach_forms` — needs a distinct
+    execute-returns-form-id-set path plus the `add`/`commit` capture."""
+
+    def __init__(self, existing_form_ids: set[str]) -> None:
+        self._existing = existing_form_ids
+        self.added: list = []
+        self.committed = False
+
+    async def execute(self, _stmt, _params=None):
+        # `list_subscription_form_ids` calls `.scalars().all()` — return
+        # the fake result carrying the pre-existing form ID set.
+        return _FakeResult(list(self._existing))
+
+    def add(self, row):
+        self.added.append(row)
+
+    async def commit(self):
+        self.committed = True
+
+    async def refresh(self, _row):
+        pass
+
+
+def test_default_mapping_heuristic_covers_standard_meta_fields():
+    """Backend heuristic must produce the same targets the frontend
+    editor's DEFAULT_RULES produce — auto-attach + manual "Use
+    defaults" have to agree."""
+    result = service._default_mapping_for_questions(
+        [
+            "full_name",
+            "email",
+            "phone_number",
+            "work_email",
+            "what_service_are_you_interested_in",  # no default — omitted
+        ]
+    )
+    assert result == {
+        "full_name": "contact.full_name",
+        "email": "contact.email",
+        "phone_number": "contact.phone",
+        "work_email": "contact.email",
+    }
+
+
+def test_default_mapping_heuristic_skips_empty_and_dedups():
+    result = service._default_mapping_for_questions(
+        ["", "email", "email", None]  # type: ignore[list-item]
+    )
+    assert result == {"email": "contact.email"}
+
+
+@pytest.mark.asyncio
+async def test_auto_attach_creates_rows_for_new_forms():
+    session = _AutoAttachSession(existing_form_ids=set())
+    inserted = await service.auto_attach_forms(
+        session,
+        org_id=_ORG_ID,
+        integration_id=_INTEGRATION_ID,
+        forms=[
+            ("form-a", "Sofa Enquiries", ["full_name", "email", "phone_number"]),
+            ("form-b", "Bulk Inquiry", ["full_name", "email"]),
+        ],
+    )
+    assert inserted == 2
+    assert len(session.added) == 2
+    assert session.committed is True
+    a, b = session.added
+    assert a.external_form_id == "form-a"
+    assert a.external_form_label == "Sofa Enquiries"
+    assert a.field_mapping == {
+        "full_name": "contact.full_name",
+        "email": "contact.email",
+        "phone_number": "contact.phone",
+    }
+    assert a.enabled is True
+    assert a.pipeline_stage is None
+    assert b.external_form_id == "form-b"
+
+
+@pytest.mark.asyncio
+async def test_auto_attach_is_idempotent_on_existing_forms():
+    """Re-subscribing a Page must never touch existing rows —
+    operator's mapping and pipeline_stage edits are sacred."""
+    session = _AutoAttachSession(existing_form_ids={"form-a"})
+    inserted = await service.auto_attach_forms(
+        session,
+        org_id=_ORG_ID,
+        integration_id=_INTEGRATION_ID,
+        forms=[
+            ("form-a", "Sofa Enquiries", ["full_name"]),
+            ("form-b", "Bulk Inquiry", ["email"]),
+        ],
+    )
+    # Only form-b landed; form-a was skipped without touching the row.
+    assert inserted == 1
+    assert len(session.added) == 1
+    assert session.added[0].external_form_id == "form-b"
+
+
+@pytest.mark.asyncio
+async def test_auto_attach_noop_when_all_forms_already_subscribed():
+    """No new rows → no commit — avoids a wasted transaction on the
+    common re-subscribe-with-no-new-forms path."""
+    session = _AutoAttachSession(existing_form_ids={"form-a", "form-b"})
+    inserted = await service.auto_attach_forms(
+        session,
+        org_id=_ORG_ID,
+        integration_id=_INTEGRATION_ID,
+        forms=[
+            ("form-a", "Sofa Enquiries", ["full_name"]),
+            ("form-b", "Bulk Inquiry", ["email"]),
+        ],
+    )
+    assert inserted == 0
+    assert session.added == []
+    assert session.committed is False

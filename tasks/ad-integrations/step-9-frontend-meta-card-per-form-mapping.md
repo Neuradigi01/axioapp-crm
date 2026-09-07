@@ -32,7 +32,7 @@ In-scope:
 Out of scope:
 
 - Per-form pipeline/owner routing (would require a schema change on `tbl_integration_subscriptions`; follow-up task).
-- Auto-attach every discovered form on Page subscribe (deliberate — leaving forms un-attached lets the operator discover and consciously map each one).
+- Auto-attach every discovered form on Page subscribe — **REVISED in Step 13:** industry-standard behaviour is now that subscribing a Page auto-attaches every form with heuristic defaults so leads flow immediately. The per-form Attach button on this card stays for forms Meta adds to the Page later.
 - Multi-value / conditional-question handling (worker takes `values[0]` today; separator-join for multi-value follow-up).
 
 ## Files to touch

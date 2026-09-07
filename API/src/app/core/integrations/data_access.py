@@ -194,6 +194,25 @@ def insert_subscription(session: AsyncSession, subscription: IntegrationSubscrip
     session.add(subscription)
 
 
+async def list_subscription_form_ids(
+    session: AsyncSession,
+    *,
+    integration_id: uuid.UUID,
+) -> set[str]:
+    """Return the set of ``external_form_id`` strings already subscribed
+    for the given integration. Used by the Step-13 auto-attach helper
+    for an O(1) skip-check when a Page is re-subscribed — cheaper than
+    per-form ``find_subscription_for_form`` round-trips."""
+    rows = (
+        await session.execute(
+            select(IntegrationSubscription.external_form_id).where(
+                IntegrationSubscription.integration_id == integration_id
+            )
+        )
+    ).scalars().all()
+    return set(rows)
+
+
 async def delete_subscription_row(
     session: AsyncSession, subscription: IntegrationSubscription
 ) -> None:

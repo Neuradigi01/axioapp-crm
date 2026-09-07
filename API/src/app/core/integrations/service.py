@@ -12,8 +12,10 @@ needs them — no module-level caching, no logging.
 
 from __future__ import annotations
 
+import re
 import secrets
 import uuid
+from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
@@ -314,6 +316,85 @@ async def create_subscription(
         },
     )
     return row
+
+
+# --- Step 13: auto-attach forms on Page subscribe ------------------------
+
+
+# Backend mirror of the frontend `field-mapping-editor` DEFAULT_RULES.
+# Compared case-insensitively against each ad-form question key. When
+# the operator hits "Use defaults" in the mapping editor they get the
+# same target-for-key result — auto-attach and manual editor stay in
+# lockstep, no surprise flips when the operator opens the modal after a
+# subscribe.
+_DEFAULT_MAPPING_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"^full[_ ]?name$", re.IGNORECASE), "contact.full_name"),
+    (re.compile(r"^name$", re.IGNORECASE), "contact.full_name"),
+    (re.compile(r"^first[_ ]?name$", re.IGNORECASE), "contact.full_name"),
+    (re.compile(r"^phone(?:[_ ]?number)?$", re.IGNORECASE), "contact.phone"),
+    (re.compile(r"^mobile(?:[_ ]?number)?$", re.IGNORECASE), "contact.phone"),
+    (re.compile(r"^email$", re.IGNORECASE), "contact.email"),
+    (re.compile(r"^work[_ ]?email$", re.IGNORECASE), "contact.email"),
+)
+
+
+def _default_mapping_for_questions(questions: Iterable[str]) -> dict[str, str]:
+    """Apply the heuristic rules to a form's question keys — returns a
+    fresh `{form_field: crm_target}` dict. Fields that don't match any
+    rule are omitted (same effect as picking "(Ignore)" in the editor —
+    worker drops them at ingest). Duplicate question keys keep the
+    first match; Meta and Google both guarantee unique keys per form."""
+    out: dict[str, str] = {}
+    for name in questions:
+        if not isinstance(name, str) or not name or name in out:
+            continue
+        for pattern, target in _DEFAULT_MAPPING_RULES:
+            if pattern.match(name):
+                out[name] = target
+                break
+    return out
+
+
+async def auto_attach_forms(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    integration_id: uuid.UUID,
+    forms: Sequence[tuple[str, str, Sequence[str]]],
+) -> int:
+    """Idempotently ensure a subscription row exists for every form
+    passed in. Each `forms` entry is `(external_form_id, label, question_keys)`.
+
+    Called by `subscribe_page_endpoint` (Meta) after Meta confirms the
+    Page subscription — CRM industry standard is "subscribe = leads
+    start flowing," not "subscribe then manually attach each form."
+
+    Idempotency guarantees:
+      - Existing rows are NEVER modified. Operator edits to
+        `field_mapping`, `pipeline_stage`, and `enabled` are safe
+        across re-subscribes.
+      - Only forms without a row get a fresh row with the heuristic
+        default mapping.
+
+    Returns the number of NEW rows inserted (0 when nothing new)."""
+    existing_ids = await _da.list_subscription_form_ids(session, integration_id=integration_id)
+    inserted = 0
+    for form_id, label, questions in forms:
+        if form_id in existing_ids:
+            continue
+        row = IntegrationSubscription(
+            org_id=org_id,
+            integration_id=integration_id,
+            external_form_id=form_id,
+            external_form_label=label or None,
+            field_mapping=_default_mapping_for_questions(questions),
+            enabled=True,
+        )
+        _da.insert_subscription(session, row)
+        inserted += 1
+    if inserted:
+        await session.commit()
+    return inserted
 
 
 async def update_subscription(
