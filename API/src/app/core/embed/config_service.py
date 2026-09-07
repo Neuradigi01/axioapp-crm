@@ -161,7 +161,7 @@ async def update(
         merged_dict[key] = value
     merged = WidgetConfigDocument.model_validate(merged_dict)
 
-    await _validate_custom_field_refs(session, fields=merged.fields)
+    await validate_custom_field_refs(session, fields=merged.fields)
 
     row.config = merged.model_dump(mode="json")
     row.updated_by = actor_id
@@ -181,7 +181,7 @@ async def update(
     return row
 
 
-async def _validate_custom_field_refs(
+async def validate_custom_field_refs(
     session: AsyncSession,
     *,
     fields: list[WidgetConfigField],
@@ -280,4 +280,5 @@ __all__ = [
     "list_available_widget_custom_fields",
     "public_get",
     "update",
+    "validate_custom_field_refs",
 ]

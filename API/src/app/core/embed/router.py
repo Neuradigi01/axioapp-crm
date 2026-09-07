@@ -39,7 +39,8 @@ from src.app.core.embed.config_service import (
 from src.app.core.embed.config_service import (
     update as update_config,
 )
-from src.app.core.embed.models import EmbedSubmissionOutcome
+from src.app.core.embed import form_service
+from src.app.core.embed.models import EmbedSubmissionOutcome, WidgetConfig
 from src.app.core.embed.schemas import (
     AiAssistantEmbedKeyIssue,
     AvailableCustomField,
@@ -57,6 +58,10 @@ from src.app.core.embed.schemas import (
     WidgetConfigPublicDocument,
     WidgetConfigRead,
     WidgetConfigUpdate,
+    WidgetFormCreate,
+    WidgetFormListItem,
+    WidgetFormRead,
+    WidgetFormUpdate,
 )
 from src.app.core.embed.service import (
     RESOURCE_TYPE_AI_ASSISTANT,
@@ -311,6 +316,161 @@ async def update_widget_config_endpoint(
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
+
+
+# --- Admin: multi-form CRUD (multi-form Step 2) --------------------------
+#
+# Every org may own many lead-capture forms — one per use case
+# (Contact Us / Quote Request / Newsletter / ...). The legacy
+# ``/embed/config`` endpoints continue to operate on the org's default
+# form so existing UIs and embed snippets keep working; these new
+# ``/embed/forms/*`` endpoints are what the multi-form Settings page
+# and the future per-form snippet builder call into.
+#
+# All gated by the SAME ``settings.integrations.embed.manage``
+# permission as the legacy config endpoints — one grant covers both
+# surfaces so Owners don't need a second permission.
+
+
+def _project_form(form: WidgetConfig, key_count: int) -> WidgetFormListItem:
+    return WidgetFormListItem(
+        id=form.id,
+        name=form.name,
+        slug=form.slug,
+        is_default=form.is_default,
+        key_count=key_count,
+        created_at=form.created_at,
+        updated_at=form.updated_at,
+    )
+
+
+def _project_form_read(form: WidgetConfig) -> WidgetFormRead:
+    return WidgetFormRead(
+        id=form.id,
+        org_id=form.org_id,
+        name=form.name,
+        slug=form.slug,
+        is_default=form.is_default,
+        config=WidgetConfigDocument.model_validate(form.config),
+        updated_by=form.updated_by,
+        created_at=form.created_at,
+        updated_at=form.updated_at,
+    )
+
+
+@router.get("/forms", response_model=list[WidgetFormListItem])
+async def list_widget_forms_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("settings.integrations.embed.manage")),
+) -> list[WidgetFormListItem]:
+    """List every live form on the org (default first, then alphabetical
+    by name). Each row carries ``key_count`` — the number of live embed
+    keys pinned to that form — so the Settings → Forms list can render
+    a "N keys" pill without a second round-trip."""
+    pairs = await form_service.list_forms(db, org_id=_user.org_id)
+    return [_project_form(form, count) for form, count in pairs]
+
+
+@router.post(
+    "/forms",
+    response_model=WidgetFormRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_widget_form_endpoint(
+    payload: WidgetFormCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("settings.integrations.embed.manage")),
+) -> WidgetFormRead:
+    """Create a new form. Slug is auto-derived from name when omitted
+    and de-duped against existing live slugs on the org. Newly-created
+    forms are NEVER marked default — the org's default only moves via
+    ``POST /forms/{form_id}/set-default``."""
+    form = await form_service.create_form(
+        db,
+        org_id=user.org_id,
+        actor_id=user.legacy_uuid,
+        payload=payload,
+    )
+    return _project_form_read(form)
+
+
+@router.get("/forms/{form_id}", response_model=WidgetFormRead)
+async def get_widget_form_endpoint(
+    form_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("settings.integrations.embed.manage")),
+) -> WidgetFormRead:
+    """Single form with its full config document. 404 on unknown or
+    soft-deleted form id."""
+    form = await form_service.get_form(db, form_id=form_id)
+    return _project_form_read(form)
+
+
+@router.put("/forms/{form_id}", response_model=WidgetFormRead)
+async def update_widget_form_endpoint(
+    form_id: uuid.UUID,
+    payload: WidgetFormUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("settings.integrations.embed.manage")),
+) -> WidgetFormRead:
+    """Patch-style update: supplied fields (name / slug / config) are
+    applied; omitted fields stay as they are. The config sub-patch, if
+    present, is merged into the existing document and re-validated
+    (custom-field refs, select-field option lists) before persistence."""
+    form = await form_service.update_form(
+        db,
+        org_id=user.org_id,
+        form_id=form_id,
+        actor_id=user.legacy_uuid,
+        payload=payload,
+    )
+    return _project_form_read(form)
+
+
+@router.post(
+    "/forms/{form_id}/set-default",
+    response_model=WidgetFormRead,
+)
+async def set_default_widget_form_endpoint(
+    form_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("settings.integrations.embed.manage")),
+) -> WidgetFormRead:
+    """Promote ``form_id`` to the org's default form. Atomic swap —
+    the previous default is cleared in the same transaction, so the
+    "exactly one default per org" invariant is never violated."""
+    form = await form_service.set_default_form(
+        db,
+        org_id=user.org_id,
+        form_id=form_id,
+        actor_id=user.legacy_uuid,
+    )
+    return _project_form_read(form)
+
+
+@router.delete(
+    "/forms/{form_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_widget_form_endpoint(
+    form_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("settings.integrations.embed.manage")),
+) -> Response:
+    """Soft-delete the form (stamps ``deleted_at``). Historical leads
+    that carry ``attribution.form_id`` still resolve a name from the
+    retired row.
+
+    422 when the target is the org's default form OR the org's only
+    live form — set a different form as default (and/or create a
+    replacement) first."""
+    await form_service.delete_form(
+        db,
+        org_id=user.org_id,
+        form_id=form_id,
+        actor_id=user.legacy_uuid,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # --- Admin: submission log (Step 9) --------------------------------------
