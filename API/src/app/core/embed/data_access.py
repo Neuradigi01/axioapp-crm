@@ -229,12 +229,28 @@ async def clear_grace_expiry(session: AsyncSession, key_id: uuid.UUID) -> None:
 async def get_widget_config_for_org(
     session: AsyncSession, org_id: uuid.UUID
 ) -> WidgetConfig | None:
-    """Single-row widget config keyed by ``org_id``. Used by both the
-    authed Settings → Widget read AND the public submission path (the
-    public caller bypasses tenant context — the explicit
-    ``WHERE org_id = ...`` is the authorisation gate)."""
+    """Resolve the org's DEFAULT widget form.
+
+    Pre-0216 the table was one-row-per-org. Post-0216 an org may own
+    many forms; this helper resolves the single form flagged
+    ``is_default=true`` — the one every legacy embed snippet without
+    a ``data-form`` attribute continues to resolve to. Soft-deleted
+    rows are excluded so an admin who retires a default form doesn't
+    keep serving its config.
+
+    Used by both the authed Settings → Widget read (via
+    ``get_or_create``) AND the public submission / config endpoints
+    (the public caller bypasses tenant context — the explicit
+    ``WHERE org_id = ...`` is the authorisation gate).
+    """
     return (
-        await session.execute(select(WidgetConfig).where(WidgetConfig.org_id == org_id))
+        await session.execute(
+            select(WidgetConfig)
+            .where(WidgetConfig.org_id == org_id)
+            .where(WidgetConfig.is_default.is_(True))
+            .where(WidgetConfig.deleted_at.is_(None))
+            .limit(1)
+        )
     ).scalar_one_or_none()
 
 

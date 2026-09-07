@@ -17,7 +17,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CHAR, DateTime, Enum, Integer, String, Text, text
+from sqlalchemy import Boolean, CHAR, DateTime, Enum, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -103,23 +103,61 @@ class EmbedKey(Base, TenantScoped):
 
 
 class WidgetConfig(Base, TenantScoped):
-    """Per-org widget configuration. UNIQUE on `org_id` — single
-    widget config per org for v1. The JSONB `config` document holds
-    the full shape (fields, branding, submit-button label, thank-you
-    copy); see `core/embed/schemas.py` for the typed projection.
+    """A single lead-capture form belonging to an org.
 
-    `updated_by` is a plain UUID (post-0037 convention).
+    Migration 0216 lifted the org-singleton cap from this table so an
+    org can own many forms — one per use case (Contact Us, Quote
+    Request, Newsletter, etc.). Each form carries its own JSONB
+    ``config`` document (fields, branding, submit-button label,
+    thank-you copy — see ``core/embed/schemas.py``) and is referenced
+    by an :class:`EmbedKey` (``resource_type='lead_form'`` +
+    ``resource_id=<this row's id>``).
+
+    ``is_default`` — the form the widget resolves to when the embed
+    snippet omits ``data-form``. Exactly one live form per org should
+    carry ``is_default=true`` (service layer enforces).
+
+    ``deleted_at`` — soft-delete stamp. Historical leads keep their
+    ``attribution.form_id`` pointing at the deleted row so the source
+    column still renders "Forms · <name>". A partial UNIQUE index on
+    ``(org_id, slug) WHERE deleted_at IS NULL`` means a deleted form's
+    slug is free to reuse.
+
+    ``updated_by`` is a plain UUID (post-0037 convention).
     """
 
     __tablename__ = "tbl_widget_configs"
+    __table_args__ = (
+        # Partial UNIQUE — one live form per (org, slug). Deleted rows
+        # are excluded so their slug frees up for a fresh form. Mirrors
+        # the DDL in migration 0216 exactly; SQLAlchemy needs the same
+        # shape declared so `create_all` in tests produces the index too.
+        Index(
+            "uq_widget_configs_org_slug_live",
+            "org_id",
+            "slug",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_default: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+    )
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

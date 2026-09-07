@@ -118,13 +118,23 @@ async def get_or_create(
     *,
     org_id: uuid.UUID,
 ) -> WidgetConfig:
-    """Return the org's widget config row, seeding defaults on miss."""
+    """Return the org's default widget form, seeding it on miss.
+
+    After migration 0216 an org may own many forms — this helper
+    resolves the ``is_default=true`` row (the one every legacy embed
+    snippet without a ``data-form`` attribute continues to resolve
+    to). On miss it seeds a fresh default form so an Owner opening
+    Settings → Forms always sees a usable starting point.
+    """
     existing = await _da.get_widget_config_for_org(session, org_id)
     if existing is not None:
         return existing
 
     row = WidgetConfig(
         org_id=org_id,
+        name="Default form",
+        slug="default",
+        is_default=True,
         config=_default_document().model_dump(mode="json"),
     )
     _da.insert_widget_config(session, row)
