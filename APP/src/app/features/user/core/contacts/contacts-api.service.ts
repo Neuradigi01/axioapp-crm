@@ -157,6 +157,15 @@ export interface ContactListQuery {
    *  excluded server-side. Merge modal + link pickers pass true so a
    *  wiped record can never appear as a merge / link target. */
   exclude_anonymised?: boolean;
+  /** Restrict to contacts with at least one Lead whose ``status`` is
+   *  in this set. Serialized as repeated `?lead_status=` params. */
+  lead_status?: string[];
+  /** Restrict to contacts with at least one Lead whose pipeline-stage
+   *  key is in this set. Serialized as repeated `?lead_stage=` params. */
+  lead_stage?: string[];
+  /** Restrict to contacts with at least one Lead whose ``source`` is
+   *  in this set. Serialized as repeated `?lead_source=` params. */
+  lead_source?: string[];
 }
 
 /** Targets the operator can map a CSV column to. Mirrors the
@@ -269,6 +278,9 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
       source: query.source,
       tag: query.tag,
       assigned_to_id: query.assigned_to_id,
+      lead_status: query.lead_status,
+      lead_stage: query.lead_stage,
+      lead_source: query.lead_source,
       sort: query.sort,
       order: query.order,
       page: query.page,

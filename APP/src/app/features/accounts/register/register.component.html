@@ -160,27 +160,25 @@
     <!-- Country / State Row -->
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div>
-        <label for="country_id" class="mb-1 block text-sm font-medium text-default">Country</label>
-        <select
-          id="country_id"
+        <label class="mb-1 block text-sm font-medium text-default">Country</label>
+        <crm-mobile-select
           formControlName="country_id"
-          (change)="onCountryChange()"
-          class="input"
-        >
-          <option [ngValue]="null">-- Select --</option>
-          @for (country of countries(); track country.id) {
-            <option [ngValue]="country.id">{{ country.name }}</option>
-          }
-        </select>
+          [options]="countryOptions()"
+          placeholder="-- Select --"
+          [searchable]="true"
+          searchPlaceholder="Search country…"
+          (valueChange)="onCountryChange()"
+        />
       </div>
       <div>
-        <label for="state_id" class="mb-1 block text-sm font-medium text-default">State</label>
-        <select id="state_id" formControlName="state_id" class="input">
-          <option [ngValue]="null">{{ statesLoading() ? 'Loading…' : '-- Select --' }}</option>
-          @for (state of states(); track state.id) {
-            <option [ngValue]="state.id">{{ state.name }}</option>
-          }
-        </select>
+        <label class="mb-1 block text-sm font-medium text-default">State</label>
+        <crm-mobile-select
+          formControlName="state_id"
+          [options]="stateOptions()"
+          [placeholder]="statesLoading() ? 'Loading…' : '-- Select --'"
+          [searchable]="true"
+          searchPlaceholder="Search state…"
+        />
       </div>
     </div>
 

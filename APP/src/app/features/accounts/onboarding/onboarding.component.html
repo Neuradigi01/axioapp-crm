@@ -131,19 +131,12 @@
               />
             </div>
             <div>
-              <label for="team_size" class="block text-sm font-medium text-default mb-1">
-                Team size
-              </label>
-              <select
-                id="team_size"
+              <label class="block text-sm font-medium text-default mb-1"> Team size </label>
+              <crm-mobile-select
                 formControlName="team_size"
-                class="block w-full rounded-lg border border-subtle px-3 py-2 text-default focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 focus:outline-none bg-surface"
-              >
-                <option value="">Select…</option>
-                @for (size of teamSizes; track size) {
-                  <option [value]="size">{{ size }}</option>
-                }
-              </select>
+                [options]="teamSizeOptions"
+                placeholder="Select…"
+              />
             </div>
           </div>
         </div>

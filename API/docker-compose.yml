@@ -47,6 +47,7 @@ services:
       - ../widget/dist:/app/widget:ro
     env_file:
       - config.env
+      - config.${APP_ENV}.env
     environment:
       <<: *secret-vars
     depends_on:
@@ -63,6 +64,7 @@ services:
     command: celery -A src.celery.worker.celery worker --loglevel=info --concurrency=4 --hostname=celery_worker@%h
     env_file:
       - config.env
+      - config.${APP_ENV}.env
     environment:
       <<: *secret-vars
     volumes:
@@ -80,6 +82,7 @@ services:
     command: celery -A src.celery.worker.celery beat --loglevel=info
     env_file:
       - config.env
+      - config.${APP_ENV}.env
     environment:
       <<: *secret-vars
     depends_on:
@@ -96,6 +99,7 @@ services:
       sh -c "celery -A src.celery.worker.celery flower --port=5555 --basic_auth='${FLOWER_USER:-admin}:${FLOWER_PASS:-admin}' --persistent=True --db=./flower/flower.db"
     env_file:
       - config.env
+      - config.${APP_ENV}.env
     environment:
       <<: *secret-vars
     volumes:

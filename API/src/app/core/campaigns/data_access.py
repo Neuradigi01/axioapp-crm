@@ -149,11 +149,25 @@ async def list_contact_ids_for_audience(
     q: str | None,
     source: str | None,
     tag: str | None,
+    lead_statuses: list[str] | None = None,
+    lead_stages: list[str] | None = None,
+    lead_sources: list[str] | None = None,
 ) -> list[uuid.UUID]:
-    """Resolve the (q / source / tag) audience filter into contact ids.
+    """Resolve the audience filter into contact ids.
+
+    Contact-level predicates (``q`` / ``source`` / ``tag``) still match
+    columns on `tbl_contacts` directly. The lead-linked predicates
+    (``lead_statuses`` / ``lead_stages`` / ``lead_sources``) each emit
+    an EXISTS subquery against `tbl_leads` — a contact qualifies when
+    it has at least one lead matching every requested facet.
 
     Empty filter ⇒ every contact in the org (auto-tenant-scoped).
     """
+    # Local import — Lead already depends on Contact via FK, so
+    # importing at module scope would create a circular in the
+    # campaigns → contacts → leads chain during model registration.
+    from src.app.core.leads.models import Lead
+
     filters: list[Any] = []
     if q:
         like = f"%{q}%"
@@ -168,6 +182,27 @@ async def list_contact_ids_for_audience(
         filters.append(Contact.source == source)
     if tag:
         filters.append(Contact.tags.contains([tag]))
+    if lead_statuses:
+        filters.append(
+            select(Lead.id)
+            .where(Lead.contact_id == Contact.id)
+            .where(Lead.status.in_(lead_statuses))
+            .exists()
+        )
+    if lead_stages:
+        filters.append(
+            select(Lead.id)
+            .where(Lead.contact_id == Contact.id)
+            .where(Lead.pipeline_stage.in_(lead_stages))
+            .exists()
+        )
+    if lead_sources:
+        filters.append(
+            select(Lead.id)
+            .where(Lead.contact_id == Contact.id)
+            .where(Lead.source.in_(lead_sources))
+            .exists()
+        )
 
     stmt = select(Contact.id)
     if filters:
