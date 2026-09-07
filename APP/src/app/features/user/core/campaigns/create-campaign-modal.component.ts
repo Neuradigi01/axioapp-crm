@@ -23,6 +23,7 @@ import { AbTestSectionComponent } from './ab/ab-test-section.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { ContactGroup, ContactGroupsApiService } from '../contacts/groups/groups-api.service';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
+import { PipelineStage, PipelinesApiService } from '../pipelines/pipelines-api.service';
 import {
   IntegrationsApiService,
   WhatsAppCapacity,
@@ -150,6 +151,7 @@ export class CreateCampaignModalComponent {
   private readonly templatesApi = inject(TemplatesApiService);
   private readonly groupsApi = inject(ContactGroupsApiService);
   private readonly contactsApi = inject(ContactsApiService);
+  private readonly pipelinesApi = inject(PipelinesApiService);
   private readonly emailSendersApi = inject(EmailSendersApiService);
   private readonly settingsApi = inject(SettingsApiService);
   private readonly destroyRef = inject(DestroyRef);
@@ -174,15 +176,106 @@ export class CreateCampaignModalComponent {
   protected readonly audienceCountLoading = signal(false);
   private readonly audiencePreview$ = new Subject<void>();
 
-  /** Live preview of the first page of contacts matching the current
+  /** Live preview of the paged contacts matching the current
    *  Custom-filter inputs. Populated only in filter mode so the
    *  operator can visually confirm who they're targeting before
-   *  scheduling. */
+   *  scheduling. Grows by ``AUDIENCE_PREVIEW_LIMIT`` each time the
+   *  operator clicks "Load more" — earlier pages stay in the list so
+   *  their tick-boxes aren't lost when scrolling. */
   protected readonly audiencePreviewRows = signal<ContactListItem[]>([]);
   protected readonly audiencePreviewLoading = signal(false);
-  /** Preview page size. Kept small — the list is a visual sanity
-   *  check, not a full paginated table. */
-  private readonly AUDIENCE_PREVIEW_LIMIT = 20;
+  protected readonly audiencePreviewLoadingMore = signal(false);
+  /** Preview page size — number of contacts fetched per round-trip.
+   *  Small enough that the list stays scannable, large enough that
+   *  "Load more" doesn't feel like a poll. */
+  private readonly AUDIENCE_PREVIEW_LIMIT = 25;
+  /** Current preview page (1-based). Reset to 1 on any filter change;
+   *  incremented by ``loadMoreAudience`` and appended to the row list. */
+  protected readonly audiencePreviewPage = signal<number>(1);
+
+  /** Pipeline stages for the lead-stage dropdown, loaded lazily the
+   *  first time the operator opens Custom-filter mode. Empty until
+   *  the fetch resolves. */
+  protected readonly pipelineStages = signal<PipelineStage[]>([]);
+  private pipelineStagesLoaded = false;
+
+  protected readonly pipelineStageOptions = computed<MobileSelectOption[]>(() =>
+    [...this.pipelineStages()]
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((s) => ({ value: s.key, label: s.name })),
+  );
+
+  /** Hard-coded lists that mirror the backend Lead enums — kept in
+   *  lock-step with ``core.leads.models.LeadStatus`` / ``LeadSource``. */
+  protected readonly leadStatusOptions: ReadonlyArray<MobileSelectOption> = [
+    { value: 'active', label: 'Active' },
+    { value: 'won', label: 'Won' },
+    { value: 'lost', label: 'Lost' },
+  ];
+  protected readonly leadSourceOptions: ReadonlyArray<MobileSelectOption> = [
+    { value: 'manual', label: 'Manual' },
+    { value: 'bulk_import', label: 'Bulk import' },
+    { value: 'widget', label: 'Widget' },
+    { value: 'google_ads', label: 'Google Ads' },
+    { value: 'meta_ads', label: 'Meta Ads' },
+    { value: 'whatsapp_flow', label: 'WhatsApp flow' },
+    { value: 'walk_in', label: 'Walk-in' },
+  ];
+
+  /** Multi-select selections for the lead-linked dropdowns. Empty
+   *  array = no filter on that facet. Backed by chip UI in the
+   *  template. */
+  protected readonly leadStatusFilter = signal<string[]>([]);
+  protected readonly leadStageFilter = signal<string[]>([]);
+  protected readonly leadSourceFilter = signal<string[]>([]);
+
+  protected toggleLeadStatus(value: string): void {
+    this.leadStatusFilter.update((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
+    );
+    this.audiencePreview$.next();
+  }
+  protected toggleLeadStage(value: string): void {
+    this.leadStageFilter.update((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
+    );
+    this.audiencePreview$.next();
+  }
+  protected toggleLeadSource(value: string): void {
+    this.leadSourceFilter.update((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
+    );
+    this.audiencePreview$.next();
+  }
+
+  protected leadStatusLabel(value: string): string {
+    return this.leadStatusOptions.find((o) => o.value === value)?.label ?? value;
+  }
+  protected leadStageLabel(value: string): string {
+    return this.pipelineStageOptions().find((o) => o.value === value)?.label ?? value;
+  }
+  protected leadSourceLabel(value: string): string {
+    return this.leadSourceOptions.find((o) => o.value === value)?.label ?? value;
+  }
+
+  protected onAddLeadStatus(value: string | null): void {
+    if (value && !this.leadStatusFilter().includes(value)) {
+      this.leadStatusFilter.update((prev) => [...prev, value]);
+      this.audiencePreview$.next();
+    }
+  }
+  protected onAddLeadStage(value: string | null): void {
+    if (value && !this.leadStageFilter().includes(value)) {
+      this.leadStageFilter.update((prev) => [...prev, value]);
+      this.audiencePreview$.next();
+    }
+  }
+  protected onAddLeadSource(value: string | null): void {
+    if (value && !this.leadSourceFilter().includes(value)) {
+      this.leadSourceFilter.update((prev) => [...prev, value]);
+      this.audiencePreview$.next();
+    }
+  }
 
   /** Collapsed state for the Matching-contacts panel. Once the
    *  operator has finished picking contacts they can click "Hide" to
@@ -433,7 +526,14 @@ export class CreateCampaignModalComponent {
     // filter mode
     if (this.selectedContactMap().size > 0) return true;
     const v = this.form.getRawValue();
-    return Boolean(v.audience_q?.trim() || v.audience_source?.trim() || v.audience_tag?.trim());
+    return Boolean(
+      v.audience_q?.trim() ||
+      v.audience_source?.trim() ||
+      v.audience_tag?.trim() ||
+      this.leadStatusFilter().length > 0 ||
+      this.leadStageFilter().length > 0 ||
+      this.leadSourceFilter().length > 0,
+    );
   });
 
   /** Step 2 (Content) requires a picked template plus every WA
@@ -894,8 +994,29 @@ export class CreateCampaignModalComponent {
         audience_source: null,
         audience_tag: null,
       });
+      this.leadStatusFilter.set([]);
+      this.leadStageFilter.set([]);
+      this.leadSourceFilter.set([]);
       this.clearSelection();
+    } else if (!this.pipelineStagesLoaded) {
+      // Lazy-load leads pipeline stages the first time the operator
+      // enters Custom-filter mode. The dropdown reads through
+      // ``pipelineStages()`` so the render just fills in when it arrives.
+      this._loadPipelineStages();
     }
+  }
+
+  private _loadPipelineStages(): void {
+    this.pipelineStagesLoaded = true;
+    this.pipelinesApi
+      .getByKey('leads')
+      .pipe(
+        catchError(() => of<{ stages: PipelineStage[] } | null>(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((res) => {
+        this.pipelineStages.set(res?.stages ?? []);
+      });
   }
 
   protected onSelectedGroupChange(groupId: string): void {
@@ -946,47 +1067,85 @@ export class CreateCampaignModalComponent {
 
   /** Rows companion to the count observable. Only Custom-filter mode
    *  fetches — Everyone and Saved-group modes clear the list.
-   *  Sends q/source/tag through the contacts list endpoint and takes
-   *  a small page. Fires even when no filters are entered so the
-   *  operator lands on a browsable contact list instead of an empty
-   *  "add a filter first" state. Also pipes `resp.total` into
-   *  `audienceCount` — one round-trip covers both the row preview
-   *  and the header count, replacing the groups previewSize call in
-   *  filter mode (which rejects empty filters). */
+   *  Sends q/source/tag + lead_* through the contacts list endpoint
+   *  and takes one page at a time. On a fresh filter change this
+   *  resets the page counter to 1 and replaces the row list. Also
+   *  pipes ``resp.total`` into ``audienceCount`` — one round-trip
+   *  covers both the row preview and the header count, replacing the
+   *  groups previewSize call in filter mode (which rejects empty
+   *  filters). */
   private _currentAudiencePreviewRowsObservable() {
     const mode = this.audienceMode();
     if (mode !== 'filter') {
       this.audiencePreviewLoading.set(false);
+      this.audiencePreviewPage.set(1);
       return of<ContactListItem[]>([]);
     }
+    // Filter-change reset: page back to 1 and clear the accumulated
+    // row list so the fresh page fully replaces the old set. Load
+    // more increments the page after the fetch instead of before, so
+    // page(1) is always the state that lands here from the debounced
+    // filter subject.
+    this.audiencePreviewPage.set(1);
+    this.audiencePreviewLoading.set(true);
+    this.audienceCountLoading.set(true);
+    return this._fetchAudiencePage(1).pipe(
+      switchMap((resp) => {
+        this.audienceCount.set(resp.total);
+        this.audienceCountLoading.set(false);
+        return of(resp.items);
+      }),
+      catchError(() => {
+        this.audienceCount.set(null);
+        this.audienceCountLoading.set(false);
+        return of<ContactListItem[]>([]);
+      }),
+    );
+  }
+
+  private _fetchAudiencePage(page: number) {
     const v = this.form.getRawValue();
     const q = v.audience_q?.trim() || undefined;
     const source = v.audience_source?.trim() || undefined;
     const tag = v.audience_tag?.trim() || undefined;
-    this.audiencePreviewLoading.set(true);
-    this.audienceCountLoading.set(true);
-    return this.contactsApi
-      .list({
-        q,
-        // Audience-filter mode is single-value per column here; the
-        // multi-value contacts API takes arrays, so wrap.
-        source: source ? [source] : undefined,
-        tag: tag ? [tag] : undefined,
-        page: 1,
-        size: this.AUDIENCE_PREVIEW_LIMIT,
-      })
+    return this.contactsApi.list({
+      q,
+      source: source ? [source] : undefined,
+      tag: tag ? [tag] : undefined,
+      lead_status: this.leadStatusFilter().length ? this.leadStatusFilter() : undefined,
+      lead_stage: this.leadStageFilter().length ? this.leadStageFilter() : undefined,
+      lead_source: this.leadSourceFilter().length ? this.leadSourceFilter() : undefined,
+      page,
+      size: this.AUDIENCE_PREVIEW_LIMIT,
+    });
+  }
+
+  /** True when there are more contacts server-side than the preview
+   *  has already rendered — drives the "Load more" button visibility. */
+  protected readonly hasMoreAudience = computed<boolean>(() => {
+    const total = this.audienceCount();
+    if (total === null) return false;
+    return this.audiencePreviewRows().length < total;
+  });
+
+  /** Fetch the next page of audience preview rows and append them to
+   *  the current list. Independent of the debounced filter subject so
+   *  it doesn't clobber the accumulated rows. */
+  protected loadMoreAudience(): void {
+    if (this.audiencePreviewLoadingMore()) return;
+    if (!this.hasMoreAudience()) return;
+    const nextPage = this.audiencePreviewPage() + 1;
+    this.audiencePreviewLoadingMore.set(true);
+    this._fetchAudiencePage(nextPage)
       .pipe(
-        switchMap((resp) => {
-          this.audienceCount.set(resp.total);
-          this.audienceCountLoading.set(false);
-          return of(resp.items);
-        }),
-        catchError(() => {
-          this.audienceCount.set(null);
-          this.audienceCountLoading.set(false);
-          return of<ContactListItem[]>([]);
-        }),
-      );
+        catchError(() => of({ items: [] as ContactListItem[], total: 0, page: nextPage, size: 0 })),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((resp) => {
+        this.audiencePreviewRows.update((prev) => [...prev, ...resp.items]);
+        this.audiencePreviewPage.set(nextPage);
+        this.audiencePreviewLoadingMore.set(false);
+      });
   }
 
   protected onTemplateChange(templateId: string): void {
@@ -1178,13 +1337,16 @@ export class CreateCampaignModalComponent {
     } else if (mode === 'filter') {
       const picked = Array.from(this.selectedContactMap().keys());
       if (picked.length > 0) {
-        // Explicit selection wins over q/source/tag — send goes to
-        // exactly the ticked contacts.
+        // Explicit selection wins over q/source/tag/lead_* — send
+        // goes to exactly the ticked contacts.
         audience.contact_ids = picked;
       } else {
         if (v.audience_q?.trim()) audience.q = v.audience_q.trim();
         if (v.audience_source?.trim()) audience.source = v.audience_source.trim();
         if (v.audience_tag?.trim()) audience.tag = v.audience_tag.trim();
+        if (this.leadStatusFilter().length) audience.lead_status = this.leadStatusFilter();
+        if (this.leadStageFilter().length) audience.lead_stage = this.leadStageFilter();
+        if (this.leadSourceFilter().length) audience.lead_source = this.leadSourceFilter();
       }
     }
     // 'everyone' mode leaves `audience` as {} — backend treats as

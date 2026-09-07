@@ -157,7 +157,7 @@
               (click)="onAudienceModeChange('filter')"
             >
               <span class="font-medium text-default">Custom filter</span>
-              <p class="mt-0.5 text-[10px] text-muted">q / source / tag</p>
+              <p class="mt-0.5 text-[10px] text-muted">q · lead status/stage/source · tag</p>
             </button>
           </div>
 
@@ -201,7 +201,7 @@
                 />
               </label>
               <label class="block text-sm">
-                <span class="block text-[10px] text-muted">Source</span>
+                <span class="block text-[10px] text-muted">Contact source</span>
                 <input
                   type="text"
                   formControlName="audience_source"
@@ -210,7 +210,7 @@
                 />
               </label>
               <label class="block text-sm">
-                <span class="block text-[10px] text-muted">Tag</span>
+                <span class="block text-[10px] text-muted">Contact tag</span>
                 <input
                   type="text"
                   formControlName="audience_tag"
@@ -218,6 +218,119 @@
                   class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
                 />
               </label>
+            </div>
+
+            <!-- Lead-linked filters — same entities the Leads page filters by.
+                 A contact qualifies when it has at least one lead matching each
+                 picked facet (OR within each facet, AND across). Native
+                 `<select>` is used here in "pick to add" mode: the bound
+                 `value=""` resets the trigger back to the placeholder after
+                 every change so the operator can keep adding chips. -->
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div class="block text-sm">
+                <span class="block text-[10px] text-muted">Lead status</span>
+                <select
+                  [value]="''"
+                  (change)="
+                    onAddLeadStatus($any($event.target).value); $any($event.target).value = ''
+                  "
+                  class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  <option value="">Any status — pick to add</option>
+                  @for (o of leadStatusOptions; track o.value) {
+                    <option [value]="o.value">{{ o.label }}</option>
+                  }
+                </select>
+                @if (leadStatusFilter().length > 0) {
+                  <div class="mt-1 flex flex-wrap gap-1">
+                    @for (v of leadStatusFilter(); track v) {
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-default"
+                      >
+                        {{ leadStatusLabel(v) }}
+                        <button
+                          type="button"
+                          (click)="toggleLeadStatus(v)"
+                          aria-label="Remove"
+                          class="ml-0.5 rounded-full text-muted hover:text-default"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
+
+              <div class="block text-sm">
+                <span class="block text-[10px] text-muted">Lead stage</span>
+                <select
+                  [value]="''"
+                  (change)="
+                    onAddLeadStage($any($event.target).value); $any($event.target).value = ''
+                  "
+                  class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  <option value="">Any stage — pick to add</option>
+                  @for (o of pipelineStageOptions(); track o.value) {
+                    <option [value]="o.value">{{ o.label }}</option>
+                  }
+                </select>
+                @if (leadStageFilter().length > 0) {
+                  <div class="mt-1 flex flex-wrap gap-1">
+                    @for (v of leadStageFilter(); track v) {
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-default"
+                      >
+                        {{ leadStageLabel(v) }}
+                        <button
+                          type="button"
+                          (click)="toggleLeadStage(v)"
+                          aria-label="Remove"
+                          class="ml-0.5 rounded-full text-muted hover:text-default"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
+
+              <div class="block text-sm">
+                <span class="block text-[10px] text-muted">Lead source</span>
+                <select
+                  [value]="''"
+                  (change)="
+                    onAddLeadSource($any($event.target).value); $any($event.target).value = ''
+                  "
+                  class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  <option value="">Any source — pick to add</option>
+                  @for (o of leadSourceOptions; track o.value) {
+                    <option [value]="o.value">{{ o.label }}</option>
+                  }
+                </select>
+                @if (leadSourceFilter().length > 0) {
+                  <div class="mt-1 flex flex-wrap gap-1">
+                    @for (v of leadSourceFilter(); track v) {
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-default"
+                      >
+                        {{ leadSourceLabel(v) }}
+                        <button
+                          type="button"
+                          (click)="toggleLeadSource(v)"
+                          aria-label="Remove"
+                          class="ml-0.5 rounded-full text-muted hover:text-default"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
             </div>
 
             <div class="mt-2 rounded-lg border border-subtle bg-surface">
@@ -274,7 +387,7 @@
                   No contacts match — clear a filter above or add contacts first.
                 </p>
               } @else {
-                <ul class="max-h-48 divide-y divide-subtle overflow-y-auto">
+                <ul class="max-h-64 divide-y divide-subtle overflow-y-auto">
                   @for (c of audiencePreviewRows(); track c.id) {
                     <li>
                       <label
@@ -298,6 +411,24 @@
                     </li>
                   }
                 </ul>
+                @if (hasMoreAudience()) {
+                  <div class="border-t border-subtle bg-surface-2/50 px-2 py-1.5 text-center">
+                    <button
+                      type="button"
+                      (click)="loadMoreAudience()"
+                      [disabled]="audiencePreviewLoadingMore()"
+                      class="rounded border border-subtle bg-surface px-2 py-1 text-[11px] font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                    >
+                      {{
+                        audiencePreviewLoadingMore()
+                          ? 'Loading…'
+                          : 'Load more (' +
+                            (audienceCount()! - audiencePreviewRows().length) +
+                            ' remaining)'
+                      }}
+                    </button>
+                  </div>
+                }
               }
             </div>
           }
