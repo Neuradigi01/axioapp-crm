@@ -196,7 +196,10 @@ export class LeadCardComponent {
       case 'bulk_import':
         return 'Bulk import';
       case 'widget':
-        return 'Widget';
+        // Multi-form track: `widget` enum → "Forms" label on every
+        // user-facing surface. Step 6 layers "Forms · <FormName>" on
+        // top when `attribution.form_name` is set.
+        return 'Forms';
       case 'google_ads':
         return 'Google Ads';
       case 'meta_ads':

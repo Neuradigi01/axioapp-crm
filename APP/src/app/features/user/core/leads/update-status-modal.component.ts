@@ -84,7 +84,9 @@ interface FormShape {
 const SOURCE_OPTIONS: ReadonlyArray<MobileSelectOption> = [
   { value: 'manual', label: 'Manual' },
   { value: 'walk_in', label: 'Walk-in' },
-  { value: 'widget', label: 'Web form' },
+  // Multi-form track: match the "Forms" label used elsewhere so
+  // operators see the same wording on every source dropdown.
+  { value: 'widget', label: 'Forms' },
   { value: 'google_ads', label: 'Google Ads' },
   { value: 'meta_ads', label: 'Meta Ads' },
   { value: 'whatsapp_flow', label: 'WhatsApp' },

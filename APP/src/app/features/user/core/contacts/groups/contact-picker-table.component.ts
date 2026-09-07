@@ -55,7 +55,9 @@ const LEAD_STATUS_OPTIONS: ReadonlyArray<MobileSelectOption> = [
 const LEAD_SOURCE_OPTIONS: ReadonlyArray<MobileSelectOption> = [
   { value: 'manual', label: 'Manual' },
   { value: 'bulk_import', label: 'Bulk import' },
-  { value: 'widget', label: 'Widget' },
+  // Multi-form track: `widget` enum stays, UI label renders as
+  // "Forms" — the source bucket matches any form-sourced lead.
+  { value: 'widget', label: 'Forms' },
   { value: 'google_ads', label: 'Google Ads' },
   { value: 'meta_ads', label: 'Meta Ads' },
   { value: 'whatsapp_flow', label: 'WhatsApp flow' },

@@ -215,7 +215,11 @@ export class CreateCampaignModalComponent {
   protected readonly leadSourceOptions: ReadonlyArray<MobileSelectOption> = [
     { value: 'manual', label: 'Manual' },
     { value: 'bulk_import', label: 'Bulk import' },
-    { value: 'widget', label: 'Widget' },
+    // Multi-form track: the `widget` enum stays canonical on the
+    // backend, but every UI surface renders it as "Forms" — the source
+    // bucket now stands for "any form-sourced lead", regardless of
+    // which specific form the visitor submitted to.
+    { value: 'widget', label: 'Forms' },
     { value: 'google_ads', label: 'Google Ads' },
     { value: 'meta_ads', label: 'Meta Ads' },
     { value: 'whatsapp_flow', label: 'WhatsApp flow' },
