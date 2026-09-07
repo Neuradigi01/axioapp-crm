@@ -56,6 +56,19 @@ export class MetaCardComponent {
   readonly subscriptions = input<IntegrationSubscription[]>([]);
 
   readonly changed = output<void>();
+  /** Emitted when the user clicks "Edit mapping" on an attached form.
+   *  The parent opens the field-mapping-editor modal with the Meta
+   *  form's actual question keys as the left-hand dropdown rows.
+   *
+   *  Meta lead forms allow custom questions with per-form keys (unlike
+   *  Google's fixed catalog), so `formFields` is the specific form's
+   *  `questions` list — fetched from Meta's Graph API at expansion
+   *  time and carried through on `MetaLeadForm.questions`. */
+  readonly editMapping = output<{
+    subscription: IntegrationSubscription;
+    formFields: string[];
+    formLabel: string | null;
+  }>();
   readonly inlineError = signal<string | null>(null);
 
   private readonly api = inject(IntegrationsApiService);
@@ -72,6 +85,9 @@ export class MetaCardComponent {
 
   /** In-flight Page-level subscribe/unsubscribe button. */
   protected readonly pageActionInFlight = signal<string | null>(null);
+
+  /** In-flight per-form Attach/Detach button (keyed by form_id). */
+  protected readonly toggleInFlightFor = signal<string | null>(null);
 
   protected readonly isConnected = computed(() => this.integration()?.status === 'connected');
   protected readonly needsReconnect = computed(() => {
@@ -110,6 +126,22 @@ export class MetaCardComponent {
       out[page.page_id] = forms.some((f) => subs.some((s) => s.external_form_id === f.form_id));
     }
     return out;
+  });
+
+  /** form_id → subscription row for THIS integration. Drives the
+   *  per-form Attach/Detach button state and gates the Edit-Mapping
+   *  button (only visible once a row exists — the mapping editor
+   *  needs one to point at). Mirrors the Google card's shape. */
+  protected readonly subscriptionsByForm = computed(() => {
+    const id = this.integration()?.id;
+    const map: Record<string, IntegrationSubscription> = {};
+    if (!id) return map;
+    for (const s of this.subscriptions()) {
+      if (s.integration_id === id) {
+        map[s.external_form_id] = s;
+      }
+    }
+    return map;
   });
 
   // --- actions -----------------------------------------------------
@@ -260,6 +292,64 @@ export class MetaCardComponent {
     if (!url) return;
     void navigator.clipboard.writeText(url).catch(() => {
       this.inlineError.set('Could not copy to clipboard.');
+    });
+  }
+
+  /** Attach or detach a per-form subscription row. Attaching creates
+   *  a `tbl_integration_subscriptions` row with an empty
+   *  `field_mapping` — the operator opens the mapping editor next to
+   *  fill it in. Detaching deletes the row; the worker then DLQs any
+   *  webhook delivery for that form, giving the operator a signal to
+   *  either re-attach or investigate.
+   *
+   *  This does NOT change Page-level `leadgen` subscription — that's
+   *  the `subscribePage` / `unsubscribePage` handlers. Meta delivers
+   *  webhooks based on Page subscription; the per-form row governs
+   *  whether we ingest or DLQ. */
+  toggleSubscribe(form: MetaLeadForm): void {
+    const integration = this.integration();
+    if (!integration) return;
+    if (this.toggleInFlightFor()) return;
+    this.toggleInFlightFor.set(form.form_id);
+    this.inlineError.set(null);
+
+    const existing = this.subscriptionsByForm()[form.form_id];
+    const done = () => {
+      this.toggleInFlightFor.set(null);
+      this.changed.emit();
+    };
+    const fail = (err: HttpErrorResponse) => {
+      this.toggleInFlightFor.set(null);
+      this.inlineError.set(extractApiError(err));
+    };
+    if (existing) {
+      this.api
+        .deleteSubscription(existing.id)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({ next: done, error: fail });
+    } else {
+      this.api
+        .createSubscription({
+          integration_id: integration.id,
+          external_form_id: form.form_id,
+          external_form_label: form.name,
+        })
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({ next: done, error: fail });
+    }
+  }
+
+  /** Emit the editMapping event so the parent page opens the modal
+   *  with this form's actual question keys. Guarded on subscription
+   *  existence — the mapping editor PUTs against a subscription id,
+   *  so an unattached form has nothing to point at. */
+  openMapping(form: MetaLeadForm): void {
+    const sub = this.subscriptionsByForm()[form.form_id];
+    if (!sub) return;
+    this.editMapping.emit({
+      subscription: sub,
+      formFields: [...form.questions],
+      formLabel: form.name,
     });
   }
 }

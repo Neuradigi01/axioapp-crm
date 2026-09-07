@@ -185,7 +185,15 @@ async def list_lead_forms_endpoint(
             status_code=401,
             detail="Meta token expired — reconnect required.",
         ) from None
-    return [{"form_id": f.form_id, "name": f.name, "status": f.status} for f in forms]
+    return [
+        {
+            "form_id": f.form_id,
+            "name": f.name,
+            "status": f.status,
+            "questions": list(f.questions),
+        }
+        for f in forms
+    ]
 
 
 @router.post("/pages/{page_id}/subscribe")

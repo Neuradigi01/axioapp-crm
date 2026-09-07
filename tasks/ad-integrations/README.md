@@ -57,6 +57,7 @@ A new Owner, on a fresh org, can:
 | 6 | [Backend: cross-source dedup + lead routing (round-robin / by-store)](step-6-backend-dedup-and-routing.md) | Pending | ~1 day |
 | 7 | [Frontend (Settings): Integrations page — connect/disconnect + form/campaign picker](step-7-frontend-settings-integrations-page.md) | Pending | ~1 day |
 | 8 | [Frontend: per-integration field mapping editor + integration status dashboard](step-8-frontend-mapping-editor-and-status.md) | Pending | ~1 day |
+| 9 | [Frontend: Meta card per-form Attach + Edit-Mapping (parity with Google card)](step-9-frontend-meta-card-per-form-mapping.md) | Done | ~0.5 day |
 
 **Total: ~8 working days.** This is the most external-dependency-heavy track in the project; expect overruns from OAuth app review processes on both Google and Meta sides (typically 1–2 weeks of back-and-forth before scopes are approved for production traffic). The code is ready in 8 days; production go-live waits on OAuth app review.
 

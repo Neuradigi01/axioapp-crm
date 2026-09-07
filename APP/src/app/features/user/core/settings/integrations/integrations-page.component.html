@@ -225,6 +225,9 @@
             [integration]="meta()"
             [subscriptions]="subscriptions()"
             (changed)="onCardChanged()"
+            (editMapping)="
+              openMappingEditor($event.subscription, $event.formFields, $event.formLabel)
+            "
           ></app-meta-card>
         </div>
       }

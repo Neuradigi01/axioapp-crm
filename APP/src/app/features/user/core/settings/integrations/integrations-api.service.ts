@@ -106,6 +106,13 @@ export interface MetaLeadForm {
   form_id: string;
   name: string;
   status: string;
+  /** Question keys defined on the Meta form. Each string matches the
+   *  `field_data[].name` later delivered in webhook payloads and is
+   *  what the field-mapping editor uses as its left-hand dropdown
+   *  column. Includes both Meta's standard prefill fields
+   *  (`full_name`, `email`, `phone_number`, …) and any custom
+   *  questions the advertiser added. */
+  questions: string[];
 }
 
 export interface IntegrationDLQRow {

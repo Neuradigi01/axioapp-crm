@@ -589,8 +589,23 @@ class TestSubscriptions:
                 200,
                 {
                     "data": [
-                        {"id": "form-1", "name": "Showroom Visit", "status": "ACTIVE"},
-                        {"id": "form-2", "name": "Bulk Inquiry", "status": "ACTIVE"},
+                        {
+                            "id": "form-1",
+                            "name": "Showroom Visit",
+                            "status": "ACTIVE",
+                            "questions": [
+                                {"key": "full_name"},
+                                {"key": "email"},
+                                {"key": "phone_number"},
+                                {"key": "what_service_are_you_interested_in"},
+                            ],
+                        },
+                        {
+                            "id": "form-2",
+                            "name": "Bulk Inquiry",
+                            "status": "ACTIVE",
+                            "questions": [{"key": "full_name"}],
+                        },
                         {"id": "form-3", "name": "Old Form", "status": "ARCHIVED"},
                     ]
                 },
@@ -601,9 +616,60 @@ class TestSubscriptions:
             graph, page_id="page-1", page_token="page-tok-1"
         )
         assert [f.form_id for f in forms] == ["form-1", "form-2", "form-3"]
+        # Questions were extracted per form (the mapping editor's left-hand column).
+        assert forms[0].questions == (
+            "full_name",
+            "email",
+            "phone_number",
+            "what_service_are_you_interested_in",
+        )
+        assert forms[1].questions == ("full_name",)
+        # Missing `questions` field → empty tuple, never crashes.
+        assert forms[2].questions == ()
         # The call carried the PAGE token, not the user token.
         call = client.calls[0]
         assert call["params"]["access_token"] == "page-tok-1"
+        # And requested the `questions{key}` field expansion — that's the whole
+        # point of this step (mapping editor needs the actual question keys).
+        assert "questions{key}" in call["params"]["fields"]
+
+    @pytest.mark.asyncio
+    async def test_list_lead_forms_survives_malformed_questions(self, _meta_oauth_env):
+        """Meta's Graph API occasionally returns half-shaped entries when a
+        form is in a strange state (partial delete, permission edge case).
+        Every non-dict question entry and every entry missing `key` should be
+        skipped silently — the caller gets whatever keys ARE valid."""
+        row = _connected_meta()
+        session = _CapturingSession(existing=row)
+        client = _FakeAsyncClient()
+        client.respond(
+            "GET",
+            "https://graph.facebook.com/v19.0/page-1/leadgen_forms",
+            _FakeResponse(
+                200,
+                {
+                    "data": [
+                        {
+                            "id": "form-x",
+                            "name": "Broken",
+                            "status": "ACTIVE",
+                            "questions": [
+                                {"key": "email"},
+                                "not-a-dict",  # skipped
+                                {"label": "No key here"},  # skipped
+                                {"key": "phone_number"},
+                                {"key": None},  # skipped (falsy)
+                            ],
+                        },
+                    ]
+                },
+            ),
+        )
+        graph = MetaGraphClient(integration=row, session=session, http_client=client)
+        forms = await subscriptions.list_lead_forms_for_page(
+            graph, page_id="page-1", page_token="page-tok-1"
+        )
+        assert forms[0].questions == ("email", "phone_number")
 
     @pytest.mark.asyncio
     async def test_subscribe_page(self, _meta_oauth_env):
