@@ -43,6 +43,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 import { Contact } from '../contacts/contacts-api.service';
 import { PipelineStage } from '../pipelines/pipelines-api.service';
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import { UserMini, UsersDirectoryService } from '../shared/services/users-directory.service';
 import { commonValidators } from '../shared/validators';
@@ -126,6 +127,7 @@ const LOST_REASON_OPTIONS: ReadonlyArray<MobileSelectOption> = [
     LucideAngularModule,
     ReactiveFormsModule,
     MobileSelectComponent,
+    MobileDateTimeComponent,
     LeadFollowUpsPanelComponent,
   ],
   templateUrl: './update-status-modal.component.html',
