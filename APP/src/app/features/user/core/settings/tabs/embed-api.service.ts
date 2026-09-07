@@ -126,7 +126,7 @@ export interface EmbedKeyIssueResponse {
  * Slim projection of a widget form for the Settings → Forms list AND
  * the "Form name" chip picker on the campaign audience / group picker
  * filters (multi-form Step 7). Full config document lives on
- * `WidgetFormRead` (Step 8's Forms edit page will surface that).
+ * `WidgetFormRead` (Step 8's Forms edit page surfaces that).
  */
 export interface WidgetFormListItem {
   id: string;
@@ -138,13 +138,45 @@ export interface WidgetFormListItem {
   updated_at: string;
 }
 
+/** Full form read — powers the Settings → Forms edit view (Step 8).
+ *  Same config document shape the legacy per-org widget used. */
+export interface WidgetFormRead {
+  id: string;
+  org_id: string;
+  name: string;
+  slug: string;
+  is_default: boolean;
+  config: WidgetConfigDocument;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WidgetFormCreatePayload {
+  name: string;
+  /** Optional — service auto-generates from name when omitted. */
+  slug?: string;
+}
+
+export interface WidgetFormUpdatePayload {
+  name?: string;
+  slug?: string;
+  config?: WidgetConfigUpdatePayload;
+}
+
 @Injectable({ providedIn: 'root' })
 export class EmbedApiService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/embed`;
 
-  listKeys(): Observable<EmbedKey[]> {
-    return this.http.get<EmbedKey[]>(`${this.base}/keys`);
+  /** List embed keys for the active org.
+   *
+   *  Multi-form Step 8: pass ``formId`` to restrict to keys pinned to
+   *  one specific form — powers the per-form keys strip on the
+   *  Settings → Forms tab. Omit to list every key across every form. */
+  listKeys(formId?: string): Observable<EmbedKey[]> {
+    const params = buildHttpParams({ form_id: formId });
+    return this.http.get<EmbedKey[]>(`${this.base}/keys`, { params });
   }
 
   /** Multi-form Step 7 — every live form on the org, default first
@@ -155,9 +187,40 @@ export class EmbedApiService {
     return this.http.get<WidgetFormListItem[]>(`${this.base}/forms`);
   }
 
-  issueKey(name: string | null): Observable<EmbedKeyIssueResponse> {
+  /** Full form read — used by the Settings → Forms edit view to load
+   *  the config document when the operator switches which form is
+   *  active. */
+  getForm(id: string): Observable<WidgetFormRead> {
+    return this.http.get<WidgetFormRead>(`${this.base}/forms/${id}`);
+  }
+
+  /** Create a new form. Slug is derived from name when omitted. */
+  createForm(payload: WidgetFormCreatePayload): Observable<WidgetFormRead> {
+    return this.http.post<WidgetFormRead>(`${this.base}/forms`, payload);
+  }
+
+  /** Patch-style update — name / slug / config each independent. */
+  updateForm(id: string, payload: WidgetFormUpdatePayload): Observable<WidgetFormRead> {
+    return this.http.put<WidgetFormRead>(`${this.base}/forms/${id}`, payload);
+  }
+
+  /** Atomic swap — the previous default is cleared in the same tx. */
+  setDefaultForm(id: string): Observable<WidgetFormRead> {
+    return this.http.post<WidgetFormRead>(`${this.base}/forms/${id}/set-default`, {});
+  }
+
+  /** Soft-delete. 422 when the form is the org's default or the org's
+   *  only live form. */
+  deleteForm(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/forms/${id}`);
+  }
+
+  /** Issue a new key. Pass ``formId`` to bind it to a specific form
+   *  (Step 3 backend); omit to bind to the org's default form. */
+  issueKey(name: string | null, formId?: string): Observable<EmbedKeyIssueResponse> {
     return this.http.post<EmbedKeyIssueResponse>(`${this.base}/keys`, {
       name: name || null,
+      form_id: formId ?? null,
     });
   }
 

@@ -90,11 +90,21 @@ export interface WidgetConfig {
  * - `key`: the customer's `pk_live_…` embed key.
  * - `host`: backend API base URL (e.g. `https://api.furnicrm.app`).
  * - `mountId`: id of the `<div>` the form renders into.
+ * - `formSlug`: multi-form (Step 9) — the ``data-form`` attribute
+ *   from the install snippet. Optional; the backend resolves the
+ *   target form from the ``EmbedKey.resource_id`` binding today,
+ *   so this is currently declarative metadata — passed through on
+ *   the API calls so a future backend can enforce
+ *   "supplied slug must match key's bound form" and so a customer
+ *   who reads the network tab can see which form they're rendering.
+ *   Also stamped on the mount element as ``data-form-slug`` for
+ *   per-form CSS overrides on the host page.
  */
 export interface InitConfig {
   key: string;
   host: string;
   mountId: string;
+  formSlug?: string | null;
 }
 
 // --- AI Assistant chat mode (Step 15) -----------------------------------

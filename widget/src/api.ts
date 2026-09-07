@@ -42,8 +42,14 @@ interface PublicConfigEnvelope {
 export async function getConfig(
   key: string,
   host: string,
+  formSlug?: string | null,
 ): Promise<WidgetConfig> {
-  const url = `${host}/api/v1/embed/config/public?key=${encodeURIComponent(key)}`;
+  // Multi-form Step 9: pass the snippet's ``data-form`` slug through
+  // as a query param. Backend today resolves the target form from the
+  // key's ``resource_id`` binding and ignores unknown params; a future
+  // version can enforce slug/key consistency without a snippet change.
+  const formParam = formSlug ? `&form=${encodeURIComponent(formSlug)}` : "";
+  const url = `${host}/api/v1/embed/config/public?key=${encodeURIComponent(key)}${formParam}`;
   const r = await fetch(url, { mode: "cors" });
   if (!r.ok) {
     const detail = await safeReadDetail(r);
@@ -57,8 +63,15 @@ export async function submitLead(
   key: string,
   host: string,
   payload: SubmissionPayload,
+  formSlug?: string | null,
 ): Promise<SubmitResult> {
   const url = `${host}/api/v1/embed/leads`;
+  // Multi-form Step 9: echo the snippet's ``data-form`` slug into the
+  // POST body as ``form_slug``. Pydantic v2 ignores unknown fields on
+  // this schema today, so old backends still accept the payload
+  // unchanged; new backends can pick it up for slug/key verification.
+  const body: Record<string, unknown> = { ...payload };
+  if (formSlug) body.form_slug = formSlug;
   const r = await fetch(url, {
     method: "POST",
     mode: "cors",
@@ -66,15 +79,17 @@ export async function submitLead(
       "Content-Type": "application/json",
       "X-FurniCRM-Key": key,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
-  const body = await r.json().catch(() => ({}));
+  const respBody = await r.json().catch(() => ({}));
   if (!r.ok) {
     const detail =
-      typeof body?.detail === "string" ? body.detail : "Submission failed";
+      typeof respBody?.detail === "string"
+        ? respBody.detail
+        : "Submission failed";
     throw new ApiError(r.status, detail);
   }
-  return body as SubmitResult;
+  return respBody as SubmitResult;
 }
 
 async function safeReadDetail(r: Response): Promise<string> {

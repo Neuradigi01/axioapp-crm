@@ -1,10 +1,128 @@
 <div class="space-y-6 p-4 md:p-6 max-w-4xl">
   <header class="space-y-1">
-    <h2 class="text-lg font-semibold text-default">Embed widget</h2>
+    <h2 class="text-lg font-semibold text-default">Forms</h2>
     <p class="text-sm text-muted">
-      Issue keys, configure the form, and copy the snippet to paste onto your website.
+      Create as many lead-capture forms as you need — one per use case (Contact Us, Newsletter,
+      Quote Request). Each form has its own fields, snippet, and embed keys.
     </p>
   </header>
+
+  <!-- Multi-form Step 8 — Forms toolbar. Select which form the editor
+       below is scoped to, promote a different form to default, or
+       retire the currently-selected one. -->
+  <section class="space-y-3 rounded-lg border border-subtle bg-surface-2 p-3" aria-label="Forms">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-medium uppercase tracking-wide text-muted">Form</span>
+        @for (f of forms(); track f.id) {
+          @let selected = f.id === selectedFormId();
+          <button
+            type="button"
+            (click)="onSelectForm(f.id)"
+            [disabled]="toolbarBusy()"
+            [class.bg-accent]="selected"
+            [class.text-white]="selected"
+            [class.border-accent]="selected"
+            [class.bg-surface]="!selected"
+            [class.text-default]="!selected"
+            [class.border-subtle]="!selected"
+            [class.hover:bg-surface-2]="!selected"
+            class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium disabled:opacity-50"
+          >
+            <span class="truncate max-w-[10rem]">{{ f.name }}</span>
+            @if (f.is_default) {
+              <span
+                class="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                [class.bg-accent/10]="!selected"
+                [class.text-accent]="!selected"
+              >
+                Default
+              </span>
+            }
+            <span
+              class="rounded-full px-1.5 py-0.5 text-[10px] tabular-nums"
+              [class.bg-white/20]="selected"
+              [class.bg-surface-2]="!selected"
+              [class.text-muted]="!selected"
+            >
+              {{ f.key_count }} key{{ f.key_count === 1 ? '' : 's' }}
+            </span>
+          </button>
+        }
+      </div>
+      <div class="flex items-center gap-2">
+        @if (selectedForm(); as sf) {
+          @if (!sf.is_default) {
+            <button
+              type="button"
+              (click)="setDefault(sf.id)"
+              [disabled]="toolbarBusy()"
+              class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+            >
+              Set as default
+            </button>
+          }
+          @if (!sf.is_default && hasMultipleForms()) {
+            <button
+              type="button"
+              (click)="deleteSelectedForm()"
+              [disabled]="toolbarBusy()"
+              class="inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+            >
+              <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
+              Delete
+            </button>
+          }
+        }
+        <button
+          type="button"
+          (click)="openNewForm()"
+          [disabled]="toolbarBusy() || newFormOpen()"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-95 disabled:opacity-50"
+        >
+          <lucide-icon name="plus" class="h-3.5 w-3.5" />
+          New form
+        </button>
+      </div>
+    </div>
+
+    <!-- Inline "New form" input — kept in-panel (no separate modal
+         component) since the flow is one field + submit. -->
+    @if (newFormOpen()) {
+      <div class="flex flex-wrap items-end gap-2 rounded-md border border-subtle bg-surface p-3">
+        <label class="flex-1">
+          <span class="mb-1 block text-xs font-medium text-muted">Form name</span>
+          <input
+            type="text"
+            [value]="newFormName()"
+            (input)="onNewFormNameInput($event)"
+            placeholder="e.g. Contact Us"
+            autofocus
+            class="block w-full rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </label>
+        <button
+          type="button"
+          (click)="submitNewForm()"
+          [disabled]="!newFormName().trim() || newFormSaving()"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
+        >
+          {{ newFormSaving() ? 'Creating…' : 'Create form' }}
+        </button>
+        <button
+          type="button"
+          (click)="closeNewForm()"
+          [disabled]="newFormSaving()"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
+      @if (newFormError(); as err) {
+        <p class="text-xs text-red-400">{{ err }}</p>
+      }
+    }
+  </section>
 
   <!-- Tab strip -->
   <div class="flex items-center gap-1 border-b border-subtle">
@@ -551,4 +669,8 @@
   }
 </div>
 
-<app-embed-issue-key-modal [open]="issueModalOpen()" (closed)="onModalClosed()" />
+<app-embed-issue-key-modal
+  [open]="issueModalOpen()"
+  [formId]="selectedFormId()"
+  (closed)="onModalClosed()"
+/>

@@ -18,12 +18,12 @@ import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.se
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
-import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
+import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import { Pipeline, PipelinesApiService } from '../pipelines/pipelines-api.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { commonValidators } from '../shared/validators';
-import { Lead, LeadCreate, LeadUpdate, LeadsApiService } from './leads-api.service';
+import { Lead, LeadCreate, LeadSource, LeadUpdate, LeadsApiService } from './leads-api.service';
 import { nullableTrim } from '@core/services/form.util';
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -142,10 +142,26 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
   }
 
   readonly standard = this.fb.group({
+    // Provenance dropdown shown in create mode. Default 'manual' — when
+    // the operator doesn't pick anything the lead is stamped as a manual
+    // entry (same fallback the backend applies when `source` is omitted).
+    // Labels mirror `SOURCE_OPTIONS` in update-status-modal so operators
+    // see the same wording on every source picker.
+    source: this.fb.control<LeadSource>('manual', { nonNullable: true }),
     pipeline_stage: this.fb.control<string>('', { nonNullable: true }),
     budget: this.fb.control<string>('', { nonNullable: true }),
     expected_close_date: this.fb.control<string>('', { nonNullable: true }),
   });
+
+  protected readonly sourceOptions: ReadonlyArray<MobileSelectOption> = [
+    { value: 'manual', label: 'Manual' },
+    { value: 'walk_in', label: 'Walk-in' },
+    { value: 'widget', label: 'Forms' },
+    { value: 'google_ads', label: 'Google Ads' },
+    { value: 'meta_ads', label: 'Meta Ads' },
+    { value: 'whatsapp_flow', label: 'WhatsApp' },
+    { value: 'bulk_import', label: 'Bulk import' },
+  ];
 
   protected renderCustomFields$(): Observable<FieldDef[]> {
     return this.api.renderFields();
@@ -347,6 +363,7 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
           budget: nullableTrim(raw.budget),
           expected_close_date: nullableTrim(raw.expected_close_date),
           custom_data: this.customValue() as Record<string, unknown>,
+          source: raw.source,
         };
         this.save.emit({
           create: payload,
@@ -358,6 +375,7 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
 
   private resetForm(lead: Lead): void {
     this.standard.reset({
+      source: lead.source,
       pipeline_stage: lead.pipeline_stage,
       budget: lead.budget ?? '',
       expected_close_date: lead.expected_close_date ?? '',

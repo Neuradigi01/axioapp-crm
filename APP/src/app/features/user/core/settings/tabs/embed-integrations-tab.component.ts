@@ -21,6 +21,7 @@ import {
   WidgetConfigField,
   WidgetConfigSpamProtection,
   WidgetConfigUpdatePayload,
+  WidgetFormListItem,
 } from './embed-api.service';
 import { IssueKeyModalComponent } from './issue-key-modal.component';
 import { SubmissionLogComponent } from './submission-log.component';
@@ -82,12 +83,46 @@ export class EmbedIntegrationsTabComponent {
   protected readonly saveError = signal<string | null>(null);
   protected readonly saveOkAt = signal<number | null>(null);
 
+  // --- Multi-form (Step 8) — Forms toolbar state -----------------------
+
+  /** Every live form the org owns. Populated on load; refreshed after
+   *  create / set-default / delete. */
+  protected readonly forms = signal<WidgetFormListItem[]>([]);
+
+  /** The form the config editor + keys table are scoped to. Starts on
+   *  the org's default form; the operator switches with the top strip. */
+  protected readonly selectedFormId = signal<string | null>(null);
+
+  /** Derived row for the toolbar header (name + slug + is_default). */
+  protected readonly selectedForm = computed<WidgetFormListItem | null>(
+    () => this.forms().find((f) => f.id === this.selectedFormId()) ?? null,
+  );
+
+  /** True when the org has more than one live form — hides the
+   *  "delete" button on the last remaining form (backend also 422s
+   *  this, but the UI polish is nicer if the button just isn't there). */
+  protected readonly hasMultipleForms = computed(() => this.forms().length > 1);
+
+  /** Inline "New form" state — a simple name input rendered above the
+   *  toolbar when open. Kept in-tab (no dedicated modal component) so
+   *  Step 8 stays small; a proper modal is a nice future polish. */
+  protected readonly newFormOpen = signal(false);
+  protected readonly newFormName = signal('');
+  protected readonly newFormSaving = signal(false);
+  protected readonly newFormError = signal<string | null>(null);
+
+  /** Guard for confusable UI states — save/delete/set-default all
+   *  briefly disable the toolbar while their request is in flight. */
+  protected readonly toolbarBusy = signal(false);
+
   // --- Panel 1: keys ----------------------------------------------------
   protected readonly keys = signal<EmbedKey[]>([]);
   protected readonly issueModalOpen = signal(false);
   protected readonly revokingId = signal<string | null>(null);
 
-  /** Most-recent live key, used to pre-fill the install snippet. */
+  /** Most-recent live key for the CURRENTLY-SELECTED form, used to
+   *  pre-fill the install snippet. `listKeys(formId)` already scopes
+   *  the fetch to this form, so we just pick the newest live row. */
   protected readonly activeKey = computed<EmbedKey | null>(() => {
     const live = this.keys().filter((k) => !k.revoked_at);
     return live.length > 0 ? live[0] : null;
@@ -125,10 +160,17 @@ export class EmbedIntegrationsTabComponent {
   protected readonly snippet = computed<string>(() => {
     const key = this.activeKey();
     if (!key) return '';
+    const form = this.selectedForm();
+    // Multi-form Step 9: the widget JS bundle honours ``data-form`` on
+    // the script tag to load the right form's config. Non-default forms
+    // MUST supply it; the default form works without it too but we
+    // include it uniformly so operators don't have to remember which
+    // one is default.
+    const dataForm = form ? ` data-form="${form.slug}"` : '';
     return (
       '<div id="crm-form"></div>\n' +
       `<script src="${environment.embedWidgetHost}/v1/widget.js" ` +
-      `data-key="${key.prefix}…"></script>`
+      `data-key="${key.prefix}…"${dataForm}></script>`
     );
   });
 
@@ -139,8 +181,47 @@ export class EmbedIntegrationsTabComponent {
   private reload(): void {
     this.loading.set(true);
     this.loadError.set(null);
+    // Multi-form: load the forms list first, then pick the default
+    // (or the current selection when the operator is refreshing after
+    // an edit) as the scope for the config + keys panels below.
     this.api
-      .listKeys()
+      .listForms()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          this.forms.set(rows);
+          const desired = this.selectedFormId();
+          const picked =
+            (desired ? rows.find((f) => f.id === desired) : null) ??
+            rows.find((f) => f.is_default) ??
+            rows[0] ??
+            null;
+          this.selectedFormId.set(picked ? picked.id : null);
+          if (picked) {
+            this._loadFormAndKeys(picked.id);
+          } else {
+            // Fresh org with no forms yet — the config-service
+            // ``get_or_create`` lazy-seeds a default form on first
+            // ``GET /embed/config``, so hit that once and then
+            // re-list forms to pick it up.
+            this._bootstrapDefaultForm();
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loading.set(false);
+          this.loadError.set(extractApiError(err) ?? 'Could not load forms.');
+        },
+      });
+  }
+
+  /** Called after the operator switches which form the editor is
+   *  scoped to (or after a successful save/create/set-default). Loads
+   *  the form's full config + its embed keys in parallel. */
+  private _loadFormAndKeys(formId: string): void {
+    this.loading.set(true);
+    this.loadError.set(null);
+    this.api
+      .listKeys(formId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => this.keys.set(rows),
@@ -148,17 +229,33 @@ export class EmbedIntegrationsTabComponent {
           this.loadError.set(extractApiError(err) ?? 'Could not load keys.'),
       });
     this.api
-      .getConfig()
+      .getForm(formId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (resp) => {
-          this.config.set(resp.config);
+        next: (form) => {
+          this.config.set(form.config);
           this.dirty.set(false);
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(extractApiError(err) ?? 'Could not load widget config.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load form config.');
+        },
+      });
+  }
+
+  /** No-forms case: hit the legacy ``GET /embed/config`` which lazy-
+   *  seeds the org's default form, then re-run ``reload()`` to pick
+   *  it up. Runs at most once per empty-org load. */
+  private _bootstrapDefaultForm(): void {
+    this.api
+      .getConfig()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => this.reload(),
+        error: (err: HttpErrorResponse) => {
+          this.loading.set(false);
+          this.loadError.set(extractApiError(err) ?? 'Could not create default form.');
         },
       });
   }
@@ -171,8 +268,13 @@ export class EmbedIntegrationsTabComponent {
 
   protected onModalClosed(): void {
     this.issueModalOpen.set(false);
+    const formId = this.selectedFormId();
+    if (!formId) return;
+    // Multi-form Step 8: rescope the key list to the currently
+    // selected form so a newly-issued key shows up on this form's
+    // panel (issued keys are always pinned to a form via the modal).
     this.api
-      .listKeys()
+      .listKeys(formId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((rows) => this.keys.set(rows));
   }
@@ -466,10 +568,11 @@ export class EmbedIntegrationsTabComponent {
 
   protected save(): void {
     const cur = this.config();
-    if (!cur || !this.dirty() || this.saving()) return;
+    const formId = this.selectedFormId();
+    if (!cur || !formId || !this.dirty() || this.saving()) return;
     this.saving.set(true);
     this.saveError.set(null);
-    const payload: WidgetConfigUpdatePayload = {
+    const configPayload: WidgetConfigUpdatePayload = {
       fields: cur.fields,
       submit_button_label: cur.submit_button_label,
       thank_you_message: cur.thank_you_message,
@@ -478,7 +581,7 @@ export class EmbedIntegrationsTabComponent {
       spam_protection: cur.spam_protection,
     };
     this.api
-      .updateConfig(payload)
+      .updateForm(formId, { config: configPayload })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
@@ -489,7 +592,110 @@ export class EmbedIntegrationsTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.saveError.set(extractApiError(err) ?? 'Could not save widget config.');
+          this.saveError.set(extractApiError(err) ?? 'Could not save form config.');
+        },
+      });
+  }
+
+  // --- Multi-form toolbar handlers -------------------------------------
+
+  /** Switch which form the editor is scoped to. Guards unsaved changes
+   *  with a confirm prompt — bailing out preserves the operator's
+   *  in-progress edits on the current form. */
+  protected onSelectForm(formId: string): void {
+    if (formId === this.selectedFormId()) return;
+    if (this.dirty() && !confirm('You have unsaved changes. Discard and switch form?')) {
+      return;
+    }
+    this.selectedFormId.set(formId);
+    this._loadFormAndKeys(formId);
+  }
+
+  protected openNewForm(): void {
+    this.newFormName.set('');
+    this.newFormError.set(null);
+    this.newFormOpen.set(true);
+  }
+
+  protected closeNewForm(): void {
+    this.newFormOpen.set(false);
+  }
+
+  protected onNewFormNameInput(event: Event): void {
+    this.newFormName.set((event.target as HTMLInputElement).value);
+  }
+
+  protected submitNewForm(): void {
+    const name = this.newFormName().trim();
+    if (!name || this.newFormSaving()) return;
+    this.newFormSaving.set(true);
+    this.newFormError.set(null);
+    this.api
+      .createForm({ name })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (form) => {
+          this.newFormSaving.set(false);
+          this.newFormOpen.set(false);
+          // Switch to the freshly-created form so the operator can
+          // start editing its config immediately.
+          this.selectedFormId.set(form.id);
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.newFormSaving.set(false);
+          this.newFormError.set(extractApiError(err) ?? 'Could not create form.');
+        },
+      });
+  }
+
+  protected setDefault(formId: string): void {
+    if (this.toolbarBusy()) return;
+    const form = this.forms().find((f) => f.id === formId);
+    if (!form || form.is_default) return;
+    this.toolbarBusy.set(true);
+    this.api
+      .setDefaultForm(formId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.toolbarBusy.set(false);
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toolbarBusy.set(false);
+          this.loadError.set(extractApiError(err) ?? 'Could not set default form.');
+        },
+      });
+  }
+
+  protected deleteSelectedForm(): void {
+    const formId = this.selectedFormId();
+    const form = this.selectedForm();
+    if (!formId || !form || this.toolbarBusy()) return;
+    if (form.is_default) return; // Backend also 422s — belt-and-suspenders.
+    if (!this.hasMultipleForms()) return;
+    if (
+      !confirm(
+        `Delete form "${form.name}"? Its embed keys will be revoked — any live snippets stop accepting submissions.`,
+      )
+    ) {
+      return;
+    }
+    this.toolbarBusy.set(true);
+    this.api
+      .deleteForm(formId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.toolbarBusy.set(false);
+          // Fall back to the org default on the next reload.
+          this.selectedFormId.set(null);
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toolbarBusy.set(false);
+          this.loadError.set(extractApiError(err) ?? 'Could not delete form.');
         },
       });
   }

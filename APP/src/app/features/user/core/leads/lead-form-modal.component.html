@@ -133,6 +133,18 @@
       <section class="mt-6 border-t border-subtle pt-5">
         <h3 class="text-xs font-semibold uppercase tracking-wide text-muted">Standard</h3>
         <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          @if (!isEdit()) {
+            <label class="block">
+              <span class="block text-xs font-medium text-default">Source</span>
+              <div class="mt-1">
+                <crm-mobile-select [options]="sourceOptions" formControlName="source" />
+              </div>
+              <p class="mt-1 text-xs text-muted">
+                Defaults to <span class="font-medium">Manual</span> when left unchanged.
+              </p>
+            </label>
+          }
+
           @if (!isHidden('pipeline_stage')) {
             <div>
               <label class="block text-xs font-medium text-default" for="lf_stage">
