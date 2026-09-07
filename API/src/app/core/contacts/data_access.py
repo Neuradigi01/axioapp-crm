@@ -129,6 +129,7 @@ def _build_filters(
     lead_statuses: list[str] | None = None,
     lead_stages: list[str] | None = None,
     lead_sources: list[str] | None = None,
+    lead_form_ids: list[uuid.UUID] | None = None,
 ) -> list[ColumnElement[bool]]:
     """Shared filter assembler used by list / export / count helpers.
 
@@ -190,6 +191,25 @@ def _build_filters(
                 .where(Lead.pipeline_stage.in_(lead_stages))
             )
         )
+    if lead_form_ids:
+        # Multi-form (Step 4): every widget-sourced lead carries
+        # ``attribution.form_id`` — filter to contacts with at least
+        # one lead whose form id is in the requested set. Compares
+        # the JSONB path as text (uuid is stored as its string form
+        # in the widget submission handler). Only lead rows with
+        # ``source='widget'`` populate ``form_id`` today, so the
+        # extra source predicate short-circuits non-widget rows out
+        # of the EXISTS lookup and lets Postgres use the leads
+        # (contact_id, source) index.
+        form_id_strings = [str(fid) for fid in lead_form_ids]
+        filters.append(
+            exists(
+                select(Lead.id)
+                .where(Lead.contact_id == Contact.id)
+                .where(Lead.source == "widget")
+                .where(Lead.attribution["form_id"].astext.in_(form_id_strings))
+            )
+        )
     if lead_sources:
         filters.append(
             exists(
@@ -215,6 +235,7 @@ def build_contact_list_query(
     lead_statuses: list[str] | None = None,
     lead_stages: list[str] | None = None,
     lead_sources: list[str] | None = None,
+    lead_form_ids: list[uuid.UUID] | None = None,
 ) -> Select[tuple[Contact]]:
     """Assemble the paginated list query with filter + sort applied.
 
@@ -233,6 +254,7 @@ def build_contact_list_query(
         lead_statuses=lead_statuses,
         lead_stages=lead_stages,
         lead_sources=lead_sources,
+        lead_form_ids=lead_form_ids,
     )
     base = select(Contact)
     if filters:

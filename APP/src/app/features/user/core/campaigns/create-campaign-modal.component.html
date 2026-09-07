@@ -316,6 +316,51 @@
               </div>
             </div>
 
+            <!-- Multi-form Step 7 — "Form name" secondary picker. Only
+                 renders when the org has ≥1 form; drills the "Forms"
+                 lead-source bucket down to specific forms. Same
+                 chip-picker pattern as the lead status/stage/source
+                 pickers above. -->
+            @if (widgetForms().length > 0) {
+              <div class="grid grid-cols-1 gap-2">
+                <div class="block text-sm">
+                  <span class="block text-[10px] text-muted">
+                    Form name
+                    <span class="ml-1 text-faint">
+                      · narrows the "Forms" source to specific form(s)
+                    </span>
+                  </span>
+                  <div class="mt-0.5">
+                    <crm-mobile-select
+                      [options]="widgetFormOptions()"
+                      [pickToAdd]="true"
+                      placeholder="Any form — pick to add"
+                      (valueChange)="onAddLeadForm($event)"
+                    />
+                  </div>
+                  @if (leadFormFilter().length > 0) {
+                    <div class="mt-1 flex flex-wrap gap-1">
+                      @for (id of leadFormFilter(); track id) {
+                        <span
+                          class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-default"
+                        >
+                          {{ widgetFormLabel(id) }}
+                          <button
+                            type="button"
+                            (click)="toggleLeadForm(id)"
+                            aria-label="Remove"
+                            class="ml-0.5 rounded-full text-muted hover:text-default"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
             <div class="mt-2 rounded-lg border border-subtle bg-surface">
               <div
                 class="flex items-center justify-between gap-2 border-b border-subtle px-2 py-1 text-[10px] uppercase tracking-wide text-muted"

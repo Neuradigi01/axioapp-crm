@@ -814,6 +814,7 @@ async def resolve_audience(
         lead_statuses=af.lead_status,
         lead_stages=af.lead_stage,
         lead_sources=af.lead_source,
+        lead_form_ids=af.lead_form_id,
     )
 
 

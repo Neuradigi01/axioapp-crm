@@ -36,6 +36,7 @@ import {
   MobileSelectComponent,
   MobileSelectOption,
 } from '../../shared/forms/mobile-select.component';
+import { EmbedApiService, WidgetFormListItem } from '../../settings/tabs/embed-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 type FilterKey = 'name' | 'source' | 'tag';
@@ -74,6 +75,7 @@ const LEAD_SOURCE_OPTIONS: ReadonlyArray<MobileSelectOption> = [
 export class ContactPickerTableComponent {
   private readonly contactsApi = inject(ContactsApiService);
   private readonly pipelinesApi = inject(PipelinesApiService);
+  private readonly embedApi = inject(EmbedApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   /** Two-way bound. Parent seeds it with a group's existing member ids
@@ -157,6 +159,31 @@ export class ContactPickerTableComponent {
     this._onFilterChange();
   }
 
+  // Multi-form Step 7 — "Form name" chip picker. Same behaviour as the
+  // lead status/stage/source pickers above; only visible when the org
+  // has ≥1 form (otherwise the picker stays hidden and never adds a
+  // filter). Fetched on construction alongside the pipeline stages.
+  protected readonly widgetForms = signal<WidgetFormListItem[]>([]);
+  protected readonly widgetFormOptions = computed<MobileSelectOption[]>(() =>
+    this.widgetForms().map((f) => ({ value: f.id, label: f.name })),
+  );
+  protected readonly leadFormFilter = signal<string[]>([]);
+  protected widgetFormLabel(id: string): string {
+    return this.widgetFormOptions().find((o) => o.value === id)?.label ?? id;
+  }
+  protected onAddLeadForm(id: string | null): void {
+    if (id && !this.leadFormFilter().includes(id)) {
+      this.leadFormFilter.update((prev) => [...prev, id]);
+      this._onFilterChange();
+    }
+  }
+  protected toggleLeadForm(id: string): void {
+    this.leadFormFilter.update((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+    this._onFilterChange();
+  }
+
   // Table data + paging state.
   protected readonly rows = signal<ContactListItem[]>([]);
   protected readonly loading = signal(false);
@@ -191,7 +218,8 @@ export class ContactPickerTableComponent {
       this.tagCtrl.value.trim() ||
       this.leadStatusFilter().length ||
       this.leadStageFilter().length ||
-      this.leadSourceFilter().length
+      this.leadSourceFilter().length ||
+      this.leadFormFilter().length
     );
   });
 
@@ -282,6 +310,19 @@ export class ContactPickerTableComponent {
       )
       .subscribe((res) => this.pipelineStages.set(res?.stages ?? []));
 
+    // Multi-form Step 7 — load the org's forms so the "Form name"
+    // chip picker is ready the moment the picker renders. Silent-fail
+    // (empty list) on 403 / 500 so operators without embed-manage
+    // permission still see the rest of the filters; the Form name
+    // picker just stays hidden until forms are available.
+    this.embedApi
+      .listForms()
+      .pipe(
+        catchError(() => of<WidgetFormListItem[]>([])),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((rows) => this.widgetForms.set(rows));
+
     // Hydrate any selected id we don't yet have contact data for. Fires
     // once when the parent seeds an existing group's members on edit,
     // and any time an operator checks a row we haven't cached yet
@@ -314,6 +355,7 @@ export class ContactPickerTableComponent {
     this.leadStatusFilter.set([]);
     this.leadStageFilter.set([]);
     this.leadSourceFilter.set([]);
+    this.leadFormFilter.set([]);
     this._onFilterChange();
   }
 
@@ -399,6 +441,7 @@ export class ContactPickerTableComponent {
     lead_status?: string[];
     lead_stage?: string[];
     lead_source?: string[];
+    lead_form_id?: string[];
   } {
     const out: {
       q?: string;
@@ -407,6 +450,7 @@ export class ContactPickerTableComponent {
       lead_status?: string[];
       lead_stage?: string[];
       lead_source?: string[];
+      lead_form_id?: string[];
     } = {};
     const q = this.nameCtrl.value.trim();
     const source = this.sourceCtrl.value.trim();
@@ -420,6 +464,7 @@ export class ContactPickerTableComponent {
     if (this.leadStatusFilter().length) out.lead_status = this.leadStatusFilter();
     if (this.leadStageFilter().length) out.lead_stage = this.leadStageFilter();
     if (this.leadSourceFilter().length) out.lead_source = this.leadSourceFilter();
+    if (this.leadFormFilter().length) out.lead_form_id = this.leadFormFilter();
     return out;
   }
 }

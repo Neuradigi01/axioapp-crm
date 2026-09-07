@@ -152,6 +152,7 @@ async def list_contact_ids_for_audience(
     lead_statuses: list[str] | None = None,
     lead_stages: list[str] | None = None,
     lead_sources: list[str] | None = None,
+    lead_form_ids: list[uuid.UUID] | None = None,
 ) -> list[uuid.UUID]:
     """Resolve the audience filter into contact ids.
 
@@ -201,6 +202,19 @@ async def list_contact_ids_for_audience(
             select(Lead.id)
             .where(Lead.contact_id == Contact.id)
             .where(Lead.source.in_(lead_sources))
+            .exists()
+        )
+    if lead_form_ids:
+        # Multi-form (Step 7): narrow "Forms" audience to specific
+        # forms via ``attribution.form_id``. Same predicate the
+        # contacts DAL uses — kept parallel so preview + dispatch
+        # always agree.
+        form_id_strings = [str(fid) for fid in lead_form_ids]
+        filters.append(
+            select(Lead.id)
+            .where(Lead.contact_id == Contact.id)
+            .where(Lead.source == "widget")
+            .where(Lead.attribution["form_id"].astext.in_(form_id_strings))
             .exists()
         )
 

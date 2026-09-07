@@ -1019,6 +1019,7 @@ async def list_contacts(
     lead_statuses: list[str] | None = None,
     lead_stages: list[str] | None = None,
     lead_sources: list[str] | None = None,
+    lead_form_ids: list[uuid.UUID] | None = None,
 ) -> tuple[list[Contact], int]:
     """Paginated list with optional filters. Returns (rows, total).
 
@@ -1050,6 +1051,7 @@ async def list_contacts(
         lead_statuses=lead_statuses,
         lead_stages=lead_stages,
         lead_sources=lead_sources,
+        lead_form_ids=lead_form_ids,
     )
     return await paginate(session, base, page=page, size=size)
 

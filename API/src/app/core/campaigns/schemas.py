@@ -41,6 +41,11 @@ class AudienceFilter(BaseModel):
     lead_status: list[str] | None = None
     lead_stage: list[str] | None = None
     lead_source: list[str] | None = None
+    # Multi-form (Step 7): narrow the "Forms" bucket to specific
+    # form ids. Same OR-within / AND-across semantics as the lists
+    # above; applied via an EXISTS subquery on
+    # ``tbl_leads.attribution->>'form_id'`` at dispatch time.
+    lead_form_id: list[uuid.UUID] | None = None
     group_id: uuid.UUID | None = None
     contact_ids: list[uuid.UUID] | None = None
 
@@ -53,6 +58,7 @@ class AudienceFilter(BaseModel):
             or self.lead_status
             or self.lead_stage
             or self.lead_source
+            or self.lead_form_id
         )
         has_group = self.group_id is not None
         has_ids = self.contact_ids is not None and len(self.contact_ids) > 0
@@ -60,7 +66,7 @@ class AudienceFilter(BaseModel):
         if active > 1:
             raise ValueError(
                 "Use exactly one of: filter fields "
-                "(q/source/tag/lead_status/lead_stage/lead_source), "
+                "(q/source/tag/lead_status/lead_stage/lead_source/lead_form_id), "
                 "group_id, or contact_ids."
             )
         if self.contact_ids is not None and len(self.contact_ids) == 0:

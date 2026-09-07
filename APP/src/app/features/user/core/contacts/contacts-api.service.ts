@@ -166,6 +166,11 @@ export interface ContactListQuery {
   /** Restrict to contacts with at least one Lead whose ``source`` is
    *  in this set. Serialized as repeated `?lead_source=` params. */
   lead_source?: string[];
+  /** Multi-form Step 7 — narrow "Forms" leads to specific form ids.
+   *  Backend applies an EXISTS subquery on
+   *  ``tbl_leads.attribution->>'form_id'``. Serialized as repeated
+   *  `?lead_form_id=` params. */
+  lead_form_id?: string[];
 }
 
 /** Targets the operator can map a CSV column to. Mirrors the
@@ -281,6 +286,7 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
       lead_status: query.lead_status,
       lead_stage: query.lead_stage,
       lead_source: query.lead_source,
+      lead_form_id: query.lead_form_id,
       sort: query.sort,
       order: query.order,
       page: query.page,

@@ -28,6 +28,10 @@ export interface AudienceFilter {
   lead_status?: string[];
   lead_stage?: string[];
   lead_source?: string[];
+  /** Multi-form Step 7 — narrow "Forms" leads to specific form ids.
+   *  Applied at dispatch time via an EXISTS subquery on
+   *  ``tbl_leads.attribution->>'form_id'``. */
+  lead_form_id?: string[];
   /** Saved contact group id. Mutually exclusive with the filter fields
    *  above — backend rejects mixed payloads with 422. */
   group_id?: string;

@@ -24,6 +24,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { ContactGroup, ContactGroupsApiService } from '../contacts/groups/groups-api.service';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { PipelineStage, PipelinesApiService } from '../pipelines/pipelines-api.service';
+import { EmbedApiService, WidgetFormListItem } from '../settings/tabs/embed-api.service';
 import {
   IntegrationsApiService,
   WhatsAppCapacity,
@@ -152,6 +153,7 @@ export class CreateCampaignModalComponent {
   private readonly groupsApi = inject(ContactGroupsApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly pipelinesApi = inject(PipelinesApiService);
+  private readonly embedApi = inject(EmbedApiService);
   private readonly emailSendersApi = inject(EmailSendersApiService);
   private readonly settingsApi = inject(SettingsApiService);
   private readonly destroyRef = inject(DestroyRef);
@@ -232,6 +234,36 @@ export class CreateCampaignModalComponent {
   protected readonly leadStatusFilter = signal<string[]>([]);
   protected readonly leadStageFilter = signal<string[]>([]);
   protected readonly leadSourceFilter = signal<string[]>([]);
+
+  /** Multi-form Step 7 — the org's live forms (loaded on demand the
+   *  first time the operator enters Custom-filter mode) and the ids
+   *  the operator has selected as a "Form name" filter. Empty forms
+   *  list hides the picker; empty selection = no filter. */
+  protected readonly widgetForms = signal<WidgetFormListItem[]>([]);
+  private widgetFormsLoaded = false;
+  protected readonly leadFormFilter = signal<string[]>([]);
+
+  protected readonly widgetFormOptions = computed<MobileSelectOption[]>(() =>
+    this.widgetForms().map((f) => ({ value: f.id, label: f.name })),
+  );
+
+  protected widgetFormLabel(id: string): string {
+    return this.widgetFormOptions().find((o) => o.value === id)?.label ?? id;
+  }
+
+  protected onAddLeadForm(id: string | null): void {
+    if (id && !this.leadFormFilter().includes(id)) {
+      this.leadFormFilter.update((prev) => [...prev, id]);
+      this.audiencePreview$.next();
+    }
+  }
+
+  protected toggleLeadForm(id: string): void {
+    this.leadFormFilter.update((prev) =>
+      prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id],
+    );
+    this.audiencePreview$.next();
+  }
 
   protected toggleLeadStatus(value: string): void {
     this.leadStatusFilter.update((prev) =>
@@ -535,7 +567,8 @@ export class CreateCampaignModalComponent {
       v.audience_tag?.trim() ||
       this.leadStatusFilter().length > 0 ||
       this.leadStageFilter().length > 0 ||
-      this.leadSourceFilter().length > 0,
+      this.leadSourceFilter().length > 0 ||
+      this.leadFormFilter().length > 0,
     );
   });
 
@@ -995,12 +1028,18 @@ export class CreateCampaignModalComponent {
       this.leadStatusFilter.set([]);
       this.leadStageFilter.set([]);
       this.leadSourceFilter.set([]);
+      this.leadFormFilter.set([]);
       this.clearSelection();
-    } else if (!this.pipelineStagesLoaded) {
-      // Lazy-load leads pipeline stages the first time the operator
-      // enters Custom-filter mode. The dropdown reads through
-      // ``pipelineStages()`` so the render just fills in when it arrives.
-      this._loadPipelineStages();
+    } else {
+      if (!this.pipelineStagesLoaded) {
+        // Lazy-load leads pipeline stages the first time the operator
+        // enters Custom-filter mode. The dropdown reads through
+        // ``pipelineStages()`` so the render just fills in when it arrives.
+        this._loadPipelineStages();
+      }
+      if (!this.widgetFormsLoaded) {
+        this._loadWidgetForms();
+      }
     }
   }
 
@@ -1015,6 +1054,22 @@ export class CreateCampaignModalComponent {
       .subscribe((res) => {
         this.pipelineStages.set(res?.stages ?? []);
       });
+  }
+
+  private _loadWidgetForms(): void {
+    // Multi-form Step 7 — populates the "Form name" chip picker on
+    // the audience filter. Silent-fail on 403 / 500 so an operator
+    // without the ``settings.integrations.embed.manage`` permission
+    // still sees the rest of the audience UI; the picker just stays
+    // hidden (widget forms list stays empty).
+    this.widgetFormsLoaded = true;
+    this.embedApi
+      .listForms()
+      .pipe(
+        catchError(() => of<WidgetFormListItem[]>([])),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((rows) => this.widgetForms.set(rows));
   }
 
   protected onSelectedGroupChange(groupId: string): void {
@@ -1111,6 +1166,7 @@ export class CreateCampaignModalComponent {
       lead_status: this.leadStatusFilter().length ? this.leadStatusFilter() : undefined,
       lead_stage: this.leadStageFilter().length ? this.leadStageFilter() : undefined,
       lead_source: this.leadSourceFilter().length ? this.leadSourceFilter() : undefined,
+      lead_form_id: this.leadFormFilter().length ? this.leadFormFilter() : undefined,
       page,
       size: this.AUDIENCE_PREVIEW_LIMIT,
     });
@@ -1342,6 +1398,7 @@ export class CreateCampaignModalComponent {
         if (this.leadStatusFilter().length) audience.lead_status = this.leadStatusFilter();
         if (this.leadStageFilter().length) audience.lead_stage = this.leadStageFilter();
         if (this.leadSourceFilter().length) audience.lead_source = this.leadSourceFilter();
+        if (this.leadFormFilter().length) audience.lead_form_id = this.leadFormFilter();
       }
     }
     // 'everyone' mode leaves `audience` as {} — backend treats as

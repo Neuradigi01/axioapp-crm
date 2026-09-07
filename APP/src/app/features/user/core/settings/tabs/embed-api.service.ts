@@ -122,6 +122,22 @@ export interface EmbedKeyIssueResponse {
   created_at: string;
 }
 
+/**
+ * Slim projection of a widget form for the Settings → Forms list AND
+ * the "Form name" chip picker on the campaign audience / group picker
+ * filters (multi-form Step 7). Full config document lives on
+ * `WidgetFormRead` (Step 8's Forms edit page will surface that).
+ */
+export interface WidgetFormListItem {
+  id: string;
+  name: string;
+  slug: string;
+  is_default: boolean;
+  key_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class EmbedApiService {
   private readonly http = inject(HttpClient);
@@ -129,6 +145,14 @@ export class EmbedApiService {
 
   listKeys(): Observable<EmbedKey[]> {
     return this.http.get<EmbedKey[]>(`${this.base}/keys`);
+  }
+
+  /** Multi-form Step 7 — every live form on the org, default first
+   *  then alphabetical. Powers the "Form name" chip picker on the
+   *  campaign audience filter + the group-builder contact picker.
+   *  Also drives the Settings → Forms list (Step 8). */
+  listForms(): Observable<WidgetFormListItem[]> {
+    return this.http.get<WidgetFormListItem[]>(`${this.base}/forms`);
   }
 
   issueKey(name: string | null): Observable<EmbedKeyIssueResponse> {
