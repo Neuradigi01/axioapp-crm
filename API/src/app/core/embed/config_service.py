@@ -274,11 +274,29 @@ async def public_get(org_id: uuid.UUID) -> WidgetConfig | None:
         return await _da.get_widget_config_for_org(session, org_id)
 
 
+async def public_get_form_by_id(form_id: uuid.UUID) -> WidgetConfig | None:
+    """Public-endpoint read for a specific form.
+
+    Same "no tenant context, explicit id lookup is the auth gate"
+    contract as :func:`public_get`. The caller (widget submission,
+    ``/embed/config/public`` renderer) resolves the form id from the
+    incoming key's ``resource_id`` first, then hands it here to load
+    the config document.
+
+    Returns the row even when soft-deleted so historical leads that
+    still point at a retired form can render its config for read
+    purposes (submission path double-checks ``deleted_at`` before
+    accepting a submission)."""
+    async with async_session() as session:
+        return await _da.get_widget_form_by_id(session, form_id)
+
+
 __all__ = [
     "get_or_create",
     "list_available_contact_custom_fields",
     "list_available_widget_custom_fields",
     "public_get",
+    "public_get_form_by_id",
     "update",
     "validate_custom_field_refs",
 ]

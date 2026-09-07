@@ -57,6 +57,7 @@ from src.app.core.contacts.schemas import ContactCreate
 from src.app.core.contacts.service import create_contact
 from src.app.core.embed import log_service
 from src.app.core.embed.config_service import public_get as public_get_config
+from src.app.core.embed.config_service import public_get_form_by_id
 from src.app.core.embed.models import EmbedSubmissionOutcome
 from src.app.core.embed.rate_limit import check_per_ip, check_per_key
 from src.app.core.embed.recaptcha import verify_token as verify_recaptcha_token
@@ -148,8 +149,25 @@ async def submit(
     org_id = key_row.org_id
     key_id = key_row.id
 
-    # 4. Load the org's widget config (or bundle defaults).
-    config_row = await public_get_config(org_id)
+    # 4. Load the form's widget config. Multi-form (Step 3) binds every
+    # ``lead_form`` key to a specific form via ``resource_id`` — we load
+    # THAT form's config so a submission validates against the fields
+    # the operator configured for THAT form, not against some other
+    # form's schema. Fall back to the org default when the key predates
+    # the multi-form backfill (defensive; 0217 covers legacy keys), and
+    # to bundle defaults when the org has never opened Settings → Forms.
+    form_row = None
+    if key_row.resource_id is not None:
+        form_row = await public_get_form_by_id(key_row.resource_id)
+        if form_row is not None and form_row.deleted_at is not None:
+            # Retired form — new submissions must not accept against it
+            # (its embed keys should already be cascade-revoked by
+            # ``form_service.delete_form``; belt-and-suspenders here).
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or revoked embed key.",
+            )
+    config_row = form_row or await public_get_config(org_id)
     if config_row is not None:
         document = WidgetConfigDocument.model_validate(config_row.config)
     else:
@@ -157,6 +175,15 @@ async def submit(
 
         document = _default_document()
     spam = document.spam_protection
+
+    # Snapshot the form binding on the attribution payload so the lead
+    # row + reports can render "Forms · <form_name>" without a runtime
+    # join. Fields are additive — the visitor's UTM / referrer stays
+    # untouched.
+    form_attribution: dict[str, object] = {}
+    if form_row is not None:
+        form_attribution["form_id"] = str(form_row.id)
+        form_attribution["form_name"] = form_row.name
 
     # 5. Honeypot check. Audit context is the key's org so the Owner
     # can see spam blocks in Step 9's submission log.
@@ -309,6 +336,12 @@ async def submit(
             # "touchpoint" activity instead of creating a new lead.
             # Otherwise it creates the lead and picks a round-robin
             # assignee in one shot.
+            attribution_payload = payload.attribution.model_dump(exclude_none=False)
+            # Merge form binding into attribution so the leads UI can
+            # render "Forms · <form_name>" from a single JSONB read.
+            # UTM / referrer keys from the visitor's page stay in
+            # place — form_id / form_name are additive.
+            attribution_payload.update(form_attribution)
             result = await ingest_lead(
                 session,
                 org_id=org_id,
@@ -317,7 +350,7 @@ async def submit(
                 lead_payload=LeadCreate(
                     contact_id=contact_id,
                     source=LeadSource.widget,
-                    attribution=payload.attribution.model_dump(exclude_none=False),
+                    attribution=attribution_payload,
                     custom_data=lead_custom_data,
                 ),
                 actor_user_id=None,

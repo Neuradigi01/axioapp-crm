@@ -37,6 +37,9 @@ from src.app.core.embed.config_service import (
     public_get as public_get_config,
 )
 from src.app.core.embed.config_service import (
+    public_get_form_by_id,
+)
+from src.app.core.embed.config_service import (
     update as update_config,
 )
 from src.app.core.embed import form_service
@@ -659,7 +662,24 @@ async def public_widget_config_endpoint(
             detail="Invalid or revoked embed key.",
         )
 
-    row = await public_get_config(key_row.org_id)
+    # Multi-form: prefer the config for the form THIS key is pinned to,
+    # so the widget bundle renders the right fields / branding / CTA
+    # for that specific form. Fall back to the org default when the
+    # key predates the 0217 backfill (defensive), and to bundle
+    # defaults when the org has no configs at all.
+    row = None
+    if key_row.resource_id is not None:
+        row = await public_get_form_by_id(key_row.resource_id)
+        if row is not None and row.deleted_at is not None:
+            # Retired form — treat like a revoked key so the widget on
+            # the customer's page stops rendering rather than serving
+            # a stale form config.
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or revoked embed key.",
+            )
+    if row is None:
+        row = await public_get_config(key_row.org_id)
     if row is None:
         # Owner never opened the Settings tab to seed defaults. Return
         # the bundle-default shape so the widget still renders.
