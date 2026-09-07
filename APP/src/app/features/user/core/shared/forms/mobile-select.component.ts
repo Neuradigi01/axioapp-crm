@@ -140,6 +140,11 @@ export class MobileSelectComponent implements ControlValueAccessor {
    *  Off by default — small option lists don't need it. */
   readonly searchable = input<boolean>(false);
   readonly searchPlaceholder = input<string>('Search…');
+  /** Chip-based multi-select "pick to add" mode. When true, `pick()`
+   *  emits `valueChange` without retaining the picked value on the
+   *  trigger — the trigger keeps rendering the placeholder so the
+   *  operator can keep adding chips. The parent owns the chip strip. */
+  readonly pickToAdd = input<boolean>(false);
   readonly valueChange = output<string>();
   /** Also disable-able via a FormControl (`control.disable()`). */
   readonly disabled = signal(false);
@@ -299,7 +304,13 @@ export class MobileSelectComponent implements ControlValueAccessor {
   }
 
   protected pick(v: string): void {
-    this.writtenValue.set(v);
+    // Pick-to-add mode leaves `writtenValue` on '' so the trigger keeps
+    // rendering the placeholder (`activeLabel()` falls back when no
+    // option matches the current value). The parent's chip strip owns
+    // the picked-values state.
+    if (!this.pickToAdd()) {
+      this.writtenValue.set(v);
+    }
     // Notify Angular Forms BEFORE emitting valueChange so a parent
     // (valueChange) handler that reads the FormControl value sees the
     // just-picked value, not the previous one. Register's onCountryChange

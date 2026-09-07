@@ -52,6 +52,104 @@
     </div>
   </div>
 
+  <!-- Lead-linked filter row — same dropdown+chip style as the campaign
+       audience filter. A contact qualifies when it has at least one lead
+       matching every picked facet (OR-within, AND-across). -->
+  <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+    <div class="block text-sm">
+      <span class="block text-[10px] text-muted">Lead status</span>
+      <div class="mt-0.5">
+        <crm-mobile-select
+          [options]="leadStatusOptions"
+          [pickToAdd]="true"
+          placeholder="Any status — pick to add"
+          (valueChange)="onAddLeadStatus($event)"
+        />
+      </div>
+      @if (leadStatusFilter().length > 0) {
+        <div class="mt-1 flex flex-wrap gap-1">
+          @for (v of leadStatusFilter(); track v) {
+            <span
+              class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-default"
+            >
+              {{ leadStatusLabel(v) }}
+              <button
+                type="button"
+                (click)="toggleLeadStatus(v)"
+                aria-label="Remove"
+                class="ml-0.5 rounded-full text-muted hover:text-default"
+              >
+                ×
+              </button>
+            </span>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="block text-sm">
+      <span class="block text-[10px] text-muted">Lead stage</span>
+      <div class="mt-0.5">
+        <crm-mobile-select
+          [options]="pipelineStageOptions()"
+          [pickToAdd]="true"
+          placeholder="Any stage — pick to add"
+          (valueChange)="onAddLeadStage($event)"
+        />
+      </div>
+      @if (leadStageFilter().length > 0) {
+        <div class="mt-1 flex flex-wrap gap-1">
+          @for (v of leadStageFilter(); track v) {
+            <span
+              class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-default"
+            >
+              {{ leadStageLabel(v) }}
+              <button
+                type="button"
+                (click)="toggleLeadStage(v)"
+                aria-label="Remove"
+                class="ml-0.5 rounded-full text-muted hover:text-default"
+              >
+                ×
+              </button>
+            </span>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="block text-sm">
+      <span class="block text-[10px] text-muted">Lead source</span>
+      <div class="mt-0.5">
+        <crm-mobile-select
+          [options]="leadSourceOptions"
+          [pickToAdd]="true"
+          placeholder="Any source — pick to add"
+          (valueChange)="onAddLeadSource($event)"
+        />
+      </div>
+      @if (leadSourceFilter().length > 0) {
+        <div class="mt-1 flex flex-wrap gap-1">
+          @for (v of leadSourceFilter(); track v) {
+            <span
+              class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-default"
+            >
+              {{ leadSourceLabel(v) }}
+              <button
+                type="button"
+                (click)="toggleLeadSource(v)"
+                aria-label="Remove"
+                class="ml-0.5 rounded-full text-muted hover:text-default"
+              >
+                ×
+              </button>
+            </span>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
   <div class="text-xs text-muted">
     {{ total() | number }} contact{{ total() === 1 ? '' : 's' }}
     @if (hasActiveFilter()) {

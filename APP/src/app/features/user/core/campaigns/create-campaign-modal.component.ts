@@ -528,7 +528,6 @@ export class CreateCampaignModalComponent {
     const v = this.form.getRawValue();
     return Boolean(
       v.audience_q?.trim() ||
-      v.audience_source?.trim() ||
       v.audience_tag?.trim() ||
       this.leadStatusFilter().length > 0 ||
       this.leadStageFilter().length > 0 ||
@@ -601,7 +600,6 @@ export class CreateCampaignModalComponent {
       validators: [Validators.required],
     }),
     audience_q: this.fb.control<string | null>(null),
-    audience_source: this.fb.control<string | null>(null),
     audience_tag: this.fb.control<string | null>(null),
     schedule_at: this.fb.control<string | null>(null),
     // Step 27b — multi-number Send-From selector. Null = use org
@@ -766,9 +764,6 @@ export class CreateCampaignModalComponent {
       this.audiencePreview$.next();
     });
     this.form.controls.audience_q.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.audiencePreview$.next());
-    this.form.controls.audience_source.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.audiencePreview$.next());
     this.form.controls.audience_tag.valueChanges
@@ -991,7 +986,6 @@ export class CreateCampaignModalComponent {
     if (mode !== 'filter') {
       this.form.patchValue({
         audience_q: null,
-        audience_source: null,
         audience_tag: null,
       });
       this.leadStatusFilter.set([]);
@@ -1106,11 +1100,9 @@ export class CreateCampaignModalComponent {
   private _fetchAudiencePage(page: number) {
     const v = this.form.getRawValue();
     const q = v.audience_q?.trim() || undefined;
-    const source = v.audience_source?.trim() || undefined;
     const tag = v.audience_tag?.trim() || undefined;
     return this.contactsApi.list({
       q,
-      source: source ? [source] : undefined,
       tag: tag ? [tag] : undefined,
       lead_status: this.leadStatusFilter().length ? this.leadStatusFilter() : undefined,
       lead_stage: this.leadStageFilter().length ? this.leadStageFilter() : undefined,
@@ -1337,12 +1329,11 @@ export class CreateCampaignModalComponent {
     } else if (mode === 'filter') {
       const picked = Array.from(this.selectedContactMap().keys());
       if (picked.length > 0) {
-        // Explicit selection wins over q/source/tag/lead_* — send
-        // goes to exactly the ticked contacts.
+        // Explicit selection wins over q/tag/lead_* — send goes to
+        // exactly the ticked contacts.
         audience.contact_ids = picked;
       } else {
         if (v.audience_q?.trim()) audience.q = v.audience_q.trim();
-        if (v.audience_source?.trim()) audience.source = v.audience_source.trim();
         if (v.audience_tag?.trim()) audience.tag = v.audience_tag.trim();
         if (this.leadStatusFilter().length) audience.lead_status = this.leadStatusFilter();
         if (this.leadStageFilter().length) audience.lead_stage = this.leadStageFilter();
