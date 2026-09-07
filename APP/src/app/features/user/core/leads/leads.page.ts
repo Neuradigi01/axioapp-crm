@@ -429,6 +429,25 @@ export class LeadsPageComponent {
     return trimmed.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
+  /** Rendered text for the leads-list Source column.
+   *
+   *  Multi-form track (Step 6): for widget-sourced leads, override the
+   *  free-text contact.source with the enum-driven "Forms" label, plus
+   *  the specific form name from ``lead.attribution.form_name`` when
+   *  set. Every other lead source keeps rendering the contact's
+   *  free-text source (unchanged behaviour). */
+  protected sourceCellLabel(lead: Lead, contactSource: string | null | undefined): string | null {
+    if (lead.source === 'widget') {
+      const attribution = (lead.attribution as { form_name?: unknown } | null) ?? null;
+      const formName = attribution?.form_name;
+      if (typeof formName === 'string' && formName.trim()) {
+        return `Forms · ${formName}`;
+      }
+      return 'Forms';
+    }
+    return contactSource ?? null;
+  }
+
   /** `crm-mobile-select` shape for the source filter — same data as
    *  `sourceOptions()` plus the sentinel "All sources" first entry. */
   readonly sourceSelectOptions = computed<{ value: string; label: string }[]>(() => [
