@@ -121,6 +121,24 @@ export class EmbedIntegrationsTabComponent {
    *  briefly disable the toolbar while their request is in flight. */
   protected readonly toolbarBusy = signal(false);
 
+  /** Delete-form confirm dialog state. Non-null while open. */
+  protected readonly deleteFormConfirm = signal<{
+    form: WidgetFormListItem;
+    submitting: boolean;
+    error: string | null;
+  } | null>(null);
+
+  /** Rename-form modal state. Held here (not on the form row) so a
+   *  refresh via ``reload()`` doesn't tear down the modal mid-edit.
+   *  The rename modal is a small dedicated overlay with a text input,
+   *  distinct from the confirm-dialog which is body-text-only. */
+  protected readonly renameFormState = signal<{
+    form: WidgetFormListItem;
+    name: string;
+    submitting: boolean;
+    error: string | null;
+  } | null>(null);
+
   // --- Panel 1: keys ----------------------------------------------------
   protected readonly keys = signal<EmbedKey[]>([]);
   protected readonly issueModalOpen = signal(false);
@@ -774,32 +792,122 @@ export class EmbedIntegrationsTabComponent {
   }
 
   protected deleteSelectedForm(): void {
-    const formId = this.selectedFormId();
     const form = this.selectedForm();
-    if (!formId || !form || this.toolbarBusy()) return;
+    if (!form || this.toolbarBusy()) return;
     if (form.is_default) return; // Backend also 422s — belt-and-suspenders.
     if (!this.hasMultipleForms()) return;
-    if (
-      !confirm(
-        `Delete form "${form.name}"? Its embed keys will be revoked — any live snippets stop accepting submissions.`,
-      )
-    ) {
-      return;
-    }
-    this.toolbarBusy.set(true);
+    // Open the shared styled confirm-dialog. Actual DELETE fires from
+    // ``executeDeleteForm`` when the operator clicks Delete.
+    this.deleteFormConfirm.set({ form, submitting: false, error: null });
+  }
+
+  /** Delete-dialog title / body — as component methods (not inline
+   *  template strings) so we can use apostrophes freely without
+   *  breaking Angular's expression parser. */
+  protected deleteFormTitle(): string {
+    const dc = this.deleteFormConfirm();
+    return dc ? `Delete form "${dc.form.name}"?` : '';
+  }
+
+  protected deleteFormBody(): string {
+    return (
+      'Every embed key on this form will be revoked — any live snippets on your site ' +
+      'stop accepting submissions. Historical leads from this form keep their attribution. ' +
+      "This can't be undone."
+    );
+  }
+
+  protected cancelDeleteForm(): void {
+    const c = this.deleteFormConfirm();
+    if (!c || c.submitting) return;
+    this.deleteFormConfirm.set(null);
+  }
+
+  protected executeDeleteForm(): void {
+    const c = this.deleteFormConfirm();
+    if (!c || c.submitting) return;
+    this.deleteFormConfirm.update((prev) =>
+      prev ? { ...prev, submitting: true, error: null } : prev,
+    );
     this.api
-      .deleteForm(formId)
+      .deleteForm(c.form.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.toolbarBusy.set(false);
-          // Fall back to the org default on the next reload.
+          this.deleteFormConfirm.set(null);
           this.selectedFormId.set(null);
           this.reload();
         },
         error: (err: HttpErrorResponse) => {
-          this.toolbarBusy.set(false);
-          this.loadError.set(extractApiError(err) ?? 'Could not delete form.');
+          this.deleteFormConfirm.update((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  submitting: false,
+                  error: extractApiError(err) ?? 'Could not delete form.',
+                }
+              : prev,
+          );
+        },
+      });
+  }
+
+  // --- Rename form (works on any form including the default) -----------
+
+  /** Open the rename modal, prefilled with the form's current name. */
+  protected openRenameForm(): void {
+    const form = this.selectedForm();
+    if (!form || this.toolbarBusy()) return;
+    this.renameFormState.set({
+      form,
+      name: form.name,
+      submitting: false,
+      error: null,
+    });
+  }
+
+  protected onRenameNameInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.renameFormState.update((prev) => (prev ? { ...prev, name: value } : prev));
+  }
+
+  protected cancelRenameForm(): void {
+    const c = this.renameFormState();
+    if (!c || c.submitting) return;
+    this.renameFormState.set(null);
+  }
+
+  protected submitRenameForm(): void {
+    const c = this.renameFormState();
+    if (!c || c.submitting) return;
+    const next = c.name.trim();
+    if (!next) return;
+    if (next === c.form.name) {
+      // No-op rename — just close the modal without a round-trip.
+      this.renameFormState.set(null);
+      return;
+    }
+    this.renameFormState.update((prev) =>
+      prev ? { ...prev, submitting: true, error: null } : prev,
+    );
+    this.api
+      .updateForm(c.form.id, { name: next })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.renameFormState.set(null);
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.renameFormState.update((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  submitting: false,
+                  error: extractApiError(err) ?? 'Could not rename form.',
+                }
+              : prev,
+          );
         },
       });
   }
