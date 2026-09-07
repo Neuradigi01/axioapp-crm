@@ -40,6 +40,7 @@ from src.app.core.embed.schemas import (
     WidgetFormCreate,
     WidgetFormUpdate,
 )
+from src.app.core.embed.service import RESOURCE_TYPE_LEAD_FORM
 from src.app.shared.audit import log_entity_change
 
 # --- Slug helpers ----------------------------------------------------------
@@ -319,9 +320,27 @@ async def delete_form(
             ),
         )
 
-    await _da.soft_delete_widget_form(
-        session, form_id=form_id, deleted_at=datetime.now(UTC)
+    now = datetime.now(UTC)
+
+    # Cascade-revoke every live embed key pinned to this form BEFORE
+    # the form is soft-deleted. Retiring a form should stop every one
+    # of its embed snippets from accepting new submissions — otherwise
+    # a live key would still authenticate but the public submission
+    # path would then fail to resolve the form name for attribution.
+    keys = await _da.list_embed_keys_for_resource(
+        session,
+        resource_type=RESOURCE_TYPE_LEAD_FORM,
+        resource_id=form_id,
     )
+    revoked_key_count = 0
+    for key in keys:
+        if key.revoked_at is not None:
+            continue
+        key.revoked_at = now
+        key.revoked_by = actor_id
+        revoked_key_count += 1
+
+    await _da.soft_delete_widget_form(session, form_id=form_id, deleted_at=now)
     await session.commit()
 
     await log_entity_change(
@@ -331,6 +350,7 @@ async def delete_form(
         after={
             "form_id": str(form_id),
             "name": form.name,
+            "revoked_key_count": revoked_key_count,
         },
     )
 

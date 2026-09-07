@@ -97,12 +97,17 @@ async def issue_embed_key_endpoint(
     """Issue a new API key for the widget. The plaintext `secret`
     appears in this response ONCE — the Owner must copy it before
     navigating away. Subsequent reads only show the 11-char prefix.
+
+    ``form_id`` pins the new key to a specific lead form. When
+    omitted, the service falls back to the org's default form so
+    legacy callers keep working.
     """
     row, plain = await issue(
         db,
         org_id=user.org_id,
         actor_id=user.legacy_uuid,
         name=payload.name,
+        resource_id=payload.form_id,
     )
     return EmbedKeyIssueResponse(
         id=row.id,
@@ -115,10 +120,17 @@ async def issue_embed_key_endpoint(
 
 @router.get("/keys", response_model=list[EmbedKeyRead])
 async def list_embed_keys_endpoint(
+    form_id: uuid.UUID | None = Query(
+        default=None,
+        description=(
+            "Restrict the listing to keys pinned to this form id. "
+            "Powers the per-form key panel on Settings → Forms."
+        ),
+    ),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("settings.integrations.embed.manage")),
 ) -> list[EmbedKeyRead]:
-    rows = await list_keys(db)
+    rows = await list_keys(db, form_id=form_id)
     return [EmbedKeyRead.model_validate(r) for r in rows]
 
 

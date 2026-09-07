@@ -29,9 +29,17 @@ from src.app.shared.schemas import ORMModel
 
 class EmbedKeyIssue(BaseModel):
     """Body for `POST /embed/keys`. `name` is an optional friendly
-    label for the Owner to remember what the key is for."""
+    label for the Owner to remember what the key is for.
+
+    ``form_id`` pins the new key to a specific lead-form. Optional —
+    when omitted the service falls back to the org's default form so
+    scripts / older callers that don't specify a form keep working.
+    Rejected with 422 when the form belongs to a different org or is
+    soft-deleted.
+    """
 
     name: str | None = Field(default=None, max_length=128)
+    form_id: uuid.UUID | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
