@@ -539,14 +539,16 @@ export class UpdateStatusModalComponent {
     return null;
   }
 
-  /** Tomorrow at 10:00 in the user's local TZ, formatted as the
-   *  ``YYYY-MM-DDTHH:mm`` string ``<input type="datetime-local">``
-   *  wants. Sir's screenshot showed 1950 as a placeholder default;
-   *  ship a sane one instead. */
+  /** Now + 2 hours (rounded down to the minute) in the user's local TZ,
+   *  formatted as the ``YYYY-MM-DDTHH:mm`` string
+   *  ``<input type="datetime-local">`` wants. Chosen so a fresh
+   *  follow-up lands in the dashboard's Today's Follow-ups widget the
+   *  moment the modal saves — a tomorrow-10:00 default (the previous
+   *  behaviour) never showed up on the widget same-day, which read as
+   *  a bug to operators. */
   private _defaultFollowUpAt(): string {
     const d = new Date();
-    d.setDate(d.getDate() + 1);
-    d.setHours(10, 0, 0, 0);
+    d.setHours(d.getHours() + 2, d.getMinutes(), 0, 0);
     return this._toLocalDateTimeInput(d);
   }
 
