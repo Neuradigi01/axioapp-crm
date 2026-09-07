@@ -72,6 +72,7 @@ from src.app.core.embed.service import (
     issue,
     list_keys,
     list_keys_for_resource,
+    purge,
     revoke,
     revoke_now,
     rotate,
@@ -146,6 +147,29 @@ async def revoke_embed_key_endpoint(
     """Soft-revoke an API key. Idempotent — re-revoking returns 204
     without emitting a second audit event."""
     await revoke(
+        db,
+        org_id=user.org_id,
+        actor_id=user.legacy_uuid,
+        key_id=key_id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    "/keys/{key_id}/purge",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def purge_embed_key_endpoint(
+    key_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("settings.integrations.embed.manage")),
+) -> Response:
+    """Hard-delete a previously-revoked key so it disappears from the
+    Settings → Forms keys list. Requires the key to already be revoked
+    (422 with ``must_revoke_first`` reason otherwise) — the two-step
+    flow protects operators from removing keys that are still live on
+    a customer site."""
+    await purge(
         db,
         org_id=user.org_id,
         actor_id=user.legacy_uuid,

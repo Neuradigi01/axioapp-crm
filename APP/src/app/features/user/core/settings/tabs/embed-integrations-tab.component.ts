@@ -25,6 +25,7 @@ import {
 } from './embed-api.service';
 import { IssueKeyModalComponent } from './issue-key-modal.component';
 import { SubmissionLogComponent } from './submission-log.component';
+import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
 
 /** Map a contact-custom-field type to the widget field_type the
  *  renderer knows about. Backend `_WIDGET_SUPPORTED_CUSTOM_TYPES`
@@ -65,7 +66,12 @@ function customTypeToWidgetType(t: string): WidgetConfigField['field_type'] {
   selector: 'app-settings-embed-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, IssueKeyModalComponent, SubmissionLogComponent],
+  imports: [
+    LucideAngularModule,
+    IssueKeyModalComponent,
+    SubmissionLogComponent,
+    ConfirmDialogComponent,
+  ],
   templateUrl: './embed-integrations-tab.component.html',
 })
 export class EmbedIntegrationsTabComponent {
@@ -119,6 +125,27 @@ export class EmbedIntegrationsTabComponent {
   protected readonly keys = signal<EmbedKey[]>([]);
   protected readonly issueModalOpen = signal(false);
   protected readonly revokingId = signal<string | null>(null);
+  /** In-flight guard for the two-step revoke → remove flow. */
+  protected readonly purgingId = signal<string | null>(null);
+
+  /** Confirm-dialog state for revoke / remove. Uses the shared
+   *  ``app-confirm-dialog`` so the messaging + button styling match
+   *  the rest of the CRM (contacts, leads, walk-ins) instead of the
+   *  native ``window.confirm`` prompt. Null when closed; otherwise
+   *  holds the key + action being confirmed. */
+  protected readonly keyConfirm = signal<{
+    action: 'revoke' | 'purge';
+    key: EmbedKey;
+    error: string | null;
+  } | null>(null);
+
+  /** True when an in-flight submit is happening for the confirmed
+   *  action — drives the dialog's disabled state. */
+  protected readonly keyConfirmSubmitting = computed(() => {
+    const c = this.keyConfirm();
+    if (!c) return false;
+    return c.action === 'revoke' ? this.revokingId() === c.key.id : this.purgingId() === c.key.id;
+  });
 
   /** Most-recent live key for the CURRENTLY-SELECTED form, used to
    *  pre-fill the install snippet. `listKeys(formId)` already scopes
@@ -281,8 +308,59 @@ export class EmbedIntegrationsTabComponent {
 
   protected revoke(key: EmbedKey): void {
     if (key.revoked_at) return;
-    const label = key.name ? `"${key.name}"` : `prefix ${key.prefix}`;
-    if (!confirm(`Revoke key ${label}? Any sites using it will stop working.`)) return;
+    // Open the shared confirm dialog instead of a native ``confirm``
+    // so the messaging + styling match the rest of the CRM. The
+    // ``(confirm)`` handler on the dialog dispatches the actual API
+    // call via ``executeKeyConfirm``.
+    this.keyConfirm.set({ action: 'revoke', key, error: null });
+  }
+
+  /** Two-step-flow "remove from list" — only valid on revoked keys.
+   *  The backend enforces the same rule (422 ``must_revoke_first``)
+   *  so the button is defensive UX rather than authoritative. */
+  protected purge(key: EmbedKey): void {
+    if (!key.revoked_at) return;
+    if (this.purgingId() === key.id) return;
+    this.keyConfirm.set({ action: 'purge', key, error: null });
+  }
+
+  /** Confirm-dialog labels — derived from the pending action so the
+   *  template stays declarative. `keyConfirm()` is non-null exactly
+   *  when the dialog is open. */
+  protected keyConfirmTitle(): string {
+    const c = this.keyConfirm();
+    if (!c) return '';
+    const label = c.key.name ? `"${c.key.name}"` : `prefix ${c.key.prefix}`;
+    return c.action === 'revoke' ? `Revoke key ${label}?` : `Remove key ${label}?`;
+  }
+
+  protected keyConfirmBody(): string {
+    const c = this.keyConfirm();
+    if (!c) return '';
+    return c.action === 'revoke'
+      ? 'Any sites using this key will stop working immediately. The key stays visible in the list until you remove it.'
+      : "This permanently deletes the key from the list. Can't be undone — but since it's already revoked, no live site is affected.";
+  }
+
+  protected keyConfirmButton(): string {
+    return this.keyConfirm()?.action === 'purge' ? 'Remove' : 'Revoke';
+  }
+
+  /** Fired by the shared confirm-dialog's ``(confirm)`` output.
+   *  Dispatches to the right API call based on the pending action. */
+  protected executeKeyConfirm(): void {
+    const c = this.keyConfirm();
+    if (!c) return;
+    if (c.action === 'revoke') this._doRevoke(c.key);
+    else this._doPurge(c.key);
+  }
+
+  protected cancelKeyConfirm(): void {
+    if (this.keyConfirmSubmitting()) return;
+    this.keyConfirm.set(null);
+  }
+
+  private _doRevoke(key: EmbedKey): void {
     this.revokingId.set(key.id);
     this.api
       .revokeKey(key.id)
@@ -293,8 +371,34 @@ export class EmbedIntegrationsTabComponent {
           this.keys.update((rows) =>
             rows.map((r) => (r.id === key.id ? { ...r, revoked_at: new Date().toISOString() } : r)),
           );
+          this.keyConfirm.set(null);
         },
-        error: () => this.revokingId.set(null),
+        error: (err: HttpErrorResponse) => {
+          this.revokingId.set(null);
+          this.keyConfirm.update((prev) =>
+            prev ? { ...prev, error: extractApiError(err) ?? 'Could not revoke key.' } : prev,
+          );
+        },
+      });
+  }
+
+  private _doPurge(key: EmbedKey): void {
+    this.purgingId.set(key.id);
+    this.api
+      .purgeKey(key.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.purgingId.set(null);
+          this.keys.update((rows) => rows.filter((r) => r.id !== key.id));
+          this.keyConfirm.set(null);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.purgingId.set(null);
+          this.keyConfirm.update((prev) =>
+            prev ? { ...prev, error: extractApiError(err) ?? 'Could not remove key.' } : prev,
+          );
+        },
       });
   }
 

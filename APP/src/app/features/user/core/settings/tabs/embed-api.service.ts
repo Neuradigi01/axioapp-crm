@@ -228,6 +228,13 @@ export class EmbedApiService {
     return this.http.delete<void>(`${this.base}/keys/${id}`);
   }
 
+  /** Hard-delete a revoked key so it disappears from the list.
+   *  Two-step flow (safety): the key MUST be revoked first — backend
+   *  422s with ``must_revoke_first`` otherwise. */
+  purgeKey(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/keys/${id}/purge`);
+  }
+
   getConfig(): Observable<WidgetConfigRead> {
     return this.http.get<WidgetConfigRead>(`${this.base}/config`);
   }

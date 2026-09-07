@@ -537,6 +537,57 @@ async def list_keys_for_resource(
     )
 
 
+async def purge(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,  # noqa: ARG001 — tenant filter enforces scope on the DAL read
+    actor_id: uuid.UUID,
+    key_id: uuid.UUID,
+) -> None:
+    """Hard-delete a previously-revoked key.
+
+    Two-step-flow: an active key must be revoked first (``DELETE
+    /embed/keys/{id}``), then removed (``DELETE
+    /embed/keys/{id}/purge``). Active keys can't be purged so an
+    operator can't accidentally drop a key that's live on a customer
+    site — a single delete-click on a revoked row is a much safer
+    action, and the revoke has already stopped submissions.
+
+    Submission-log rows carry ``key_id`` as a plain UUID (no FK, per
+    the post-0037 convention) so the deletion leaves the audit trail
+    intact — the log still shows "invalid key" / "accepted" rows
+    against the purged key's id, just without a joined row on
+    ``tbl_embed_keys``.
+    """
+    row = await _da.get_embed_key_by_id(session, key_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="embed key not found"
+        )
+    if row.revoked_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "reason": "must_revoke_first",
+                "message": (
+                    "Revoke the key first, then remove it. This two-step "
+                    "flow prevents an accidental delete on a key that's "
+                    "live on a customer site."
+                ),
+            },
+        )
+    prefix = row.prefix
+    await session.delete(row)
+    await session.commit()
+
+    await audit.log(
+        "embed.key.purged",
+        entity_type="embed_key",
+        entity_id=key_id,
+        after={"key_id": str(key_id), "prefix": prefix},
+    )
+
+
 __all__ = [
     "RESOURCE_TYPE_AI_ASSISTANT",
     "RESOURCE_TYPE_LEAD_FORM",
@@ -546,6 +597,7 @@ __all__ = [
     "issue",
     "list_keys",
     "list_keys_for_resource",
+    "purge",
     "resolve_embed_key",
     "revoke",
     "revoke_now",
