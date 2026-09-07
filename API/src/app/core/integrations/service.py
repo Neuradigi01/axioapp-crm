@@ -38,13 +38,45 @@ from src.app.core.integrations.schemas import (
     IntegrationSubscriptionUpdate,
     IntegrationUpsert,
 )
+from src.app.core.pipelines.service import get_pipeline_by_key
 from src.app.shared.audit import log_entity_change
+
+# Same constant the leads service uses for its own stage validation.
+# Duplicated (not imported) to avoid a leads → integrations dependency.
+_LEADS_PIPELINE_KEY = "leads"
 
 
 def _new_webhook_secret() -> str:
     """A 32-byte url-safe random token. Long enough that brute-forcing
     the per-tenant webhook path is computationally infeasible."""
     return secrets.token_urlsafe(32)
+
+
+async def _validate_pipeline_stage(
+    session: AsyncSession,
+    *,
+    stage_key: str,
+) -> None:
+    """Reject a per-form `pipeline_stage` that isn't part of the org's
+    leads pipeline. Mirrors `leads.service._resolve_initial_stage` so a
+    subscription that persists here won't blow up later at ingest time
+    when the shared ingest service applies the same check.
+
+    Raises 422 if the stage key doesn't resolve; 400 if the org has no
+    leads pipeline configured at all (same error text `leads.service`
+    surfaces on the create path)."""
+    pipeline = await get_pipeline_by_key(session, key=_LEADS_PIPELINE_KEY)
+    if pipeline is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=("no 'leads' pipeline configured for this org — install the pack first"),
+        )
+    stage_keys = {s.key for s in pipeline.stages}
+    if stage_key not in stage_keys:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(f"pipeline_stage {stage_key!r} is not part of the leads pipeline"),
+        )
 
 
 async def get(
@@ -248,6 +280,8 @@ async def create_subscription(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"integration {payload.integration_id} not found",
         )
+    if payload.pipeline_stage is not None:
+        await _validate_pipeline_stage(session, stage_key=payload.pipeline_stage)
     row = IntegrationSubscription(
         org_id=org_id,
         integration_id=payload.integration_id,
@@ -255,6 +289,7 @@ async def create_subscription(
         external_form_label=payload.external_form_label,
         field_mapping=dict(payload.field_mapping or {}),
         enabled=payload.enabled,
+        pipeline_stage=payload.pipeline_stage,
     )
     _da.insert_subscription(session, row)
     try:
@@ -295,6 +330,11 @@ async def update_subscription(
             detail="subscription not found",
         )
     changes = payload.model_dump(exclude_unset=True)
+    # Absent-vs-null distinguishes "leave alone" from "clear override";
+    # only validate when the caller actually supplied a non-null string.
+    new_stage = changes.get("pipeline_stage")
+    if "pipeline_stage" in changes and new_stage is not None:
+        await _validate_pipeline_stage(session, stage_key=new_stage)
     for field, value in changes.items():
         setattr(row, field, value)
     await session.commit()

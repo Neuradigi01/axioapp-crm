@@ -36,6 +36,8 @@ from src.app.core.integrations.models import (
 )
 from src.app.core.integrations.schemas import (
     IntegrationStatusResponse,
+    IntegrationSubscriptionCreate,
+    IntegrationSubscriptionUpdate,
     SubscriptionMappingUpdate,
 )
 
@@ -376,3 +378,220 @@ class TestMappingPayloadSchema:
         # raises ValidationError. Defends against typo'd request bodies.
         with pytest.raises(ValidationError):
             SubscriptionMappingUpdate.model_validate({"mapping": {}, "extra_field": "x"})
+
+
+# --- 6. per-form pipeline_stage override (Step 10) -----------------------
+
+
+class _FakeStage:
+    """Tiny stand-in for `PipelineStage` — service only touches `.key`."""
+
+    def __init__(self, key: str) -> None:
+        self.key = key
+
+
+class _FakePipeline:
+    def __init__(self, keys: list[str]) -> None:
+        self.stages = [_FakeStage(k) for k in keys]
+
+
+class _StubSessionForCreate:
+    """Distinct from `_CapturingSession` because create_subscription
+    calls `_da.get_integration_by_id` (returns the parent integration)
+    AND `_da.insert_subscription` (session.add). The single `existing`
+    slot on the shared helper conflates the two."""
+
+    def __init__(self, integration) -> None:
+        self._integration = integration
+        self.added: list = []
+        self.committed = False
+
+    async def execute(self, _stmt, _params=None):
+        return _FakeResult(self._integration)
+
+    def add(self, row):
+        self.added.append(row)
+
+    async def commit(self):
+        self.committed = True
+
+    async def refresh(self, _row):
+        pass
+
+
+def _stub_leads_pipeline(monkeypatch, keys=("new", "qualified", "demo_scheduled", "won", "lost")):
+    async def _fake_get_pipeline(_session, *, key):
+        assert key == "leads", "service should query the 'leads' pipeline"
+        return _FakePipeline(list(keys))
+
+    monkeypatch.setattr(service, "get_pipeline_by_key", _fake_get_pipeline)
+
+
+@pytest.mark.asyncio
+async def test_create_subscription_persists_valid_pipeline_stage(monkeypatch):
+    parent = Integration(
+        id=_INTEGRATION_ID,
+        org_id=_ORG_ID,
+        provider=IntegrationProvider.meta_ads,
+        status=IntegrationStatus.connected,
+    )
+    session = _StubSessionForCreate(integration=parent)
+    _stub_leads_pipeline(monkeypatch)
+
+    row = await service.create_subscription(
+        session,
+        org_id=_ORG_ID,
+        payload=IntegrationSubscriptionCreate(
+            integration_id=_INTEGRATION_ID,
+            external_form_id="form-1",
+            external_form_label="Sofa Enquiries",
+            field_mapping={"full_name": "contact.full_name"},
+            pipeline_stage="qualified",
+        ),
+    )
+    assert row.pipeline_stage == "qualified"
+    assert session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_create_subscription_422_on_invalid_pipeline_stage(monkeypatch):
+    parent = Integration(
+        id=_INTEGRATION_ID,
+        org_id=_ORG_ID,
+        provider=IntegrationProvider.meta_ads,
+        status=IntegrationStatus.connected,
+    )
+    session = _StubSessionForCreate(integration=parent)
+    _stub_leads_pipeline(monkeypatch)
+
+    with pytest.raises(Exception) as exc:
+        await service.create_subscription(
+            session,
+            org_id=_ORG_ID,
+            payload=IntegrationSubscriptionCreate(
+                integration_id=_INTEGRATION_ID,
+                external_form_id="form-2",
+                external_form_label=None,
+                pipeline_stage="not-a-real-stage",
+            ),
+        )
+    assert exc.value.status_code == 422
+    # Row never landed in the session — validation runs before insert.
+    assert session.added == []
+
+
+@pytest.mark.asyncio
+async def test_create_subscription_null_pipeline_stage_skips_validation(monkeypatch):
+    """Default path — pipeline_stage=None means "use the org's default
+    first stage on ingest". Validation must not fire; the pipelines
+    module should not be touched at all."""
+    parent = Integration(
+        id=_INTEGRATION_ID,
+        org_id=_ORG_ID,
+        provider=IntegrationProvider.meta_ads,
+        status=IntegrationStatus.connected,
+    )
+    session = _StubSessionForCreate(integration=parent)
+
+    async def _boom(*_a, **_k):
+        raise AssertionError("get_pipeline_by_key must NOT be called when pipeline_stage is None")
+
+    monkeypatch.setattr(service, "get_pipeline_by_key", _boom)
+
+    row = await service.create_subscription(
+        session,
+        org_id=_ORG_ID,
+        payload=IntegrationSubscriptionCreate(
+            integration_id=_INTEGRATION_ID,
+            external_form_id="form-3",
+            external_form_label=None,
+        ),
+    )
+    assert row.pipeline_stage is None
+
+
+@pytest.mark.asyncio
+async def test_update_subscription_sets_pipeline_stage(monkeypatch):
+    sub = IntegrationSubscription(
+        id=_SUB_ID,
+        org_id=_ORG_ID,
+        integration_id=_INTEGRATION_ID,
+        external_form_id="form-1",
+        field_mapping={},
+        enabled=True,
+        pipeline_stage=None,
+    )
+    session = _CapturingSession(existing=sub)
+    _stub_leads_pipeline(monkeypatch)
+
+    row = await service.update_subscription(
+        session,
+        subscription_id=_SUB_ID,
+        payload=IntegrationSubscriptionUpdate(pipeline_stage="demo_scheduled"),
+    )
+    assert row.pipeline_stage == "demo_scheduled"
+    assert session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_update_subscription_clear_pipeline_stage_skips_validation(monkeypatch):
+    """Explicit null clears the override; no validation runs (there's
+    nothing to validate). Uses model_construct to bypass Pydantic's
+    default-null coercion so `pipeline_stage` appears in the change dict."""
+    sub = IntegrationSubscription(
+        id=_SUB_ID,
+        org_id=_ORG_ID,
+        integration_id=_INTEGRATION_ID,
+        external_form_id="form-1",
+        field_mapping={},
+        enabled=True,
+        pipeline_stage="qualified",
+    )
+    session = _CapturingSession(existing=sub)
+
+    async def _boom(*_a, **_k):
+        raise AssertionError("get_pipeline_by_key must NOT be called when clearing pipeline_stage")
+
+    monkeypatch.setattr(service, "get_pipeline_by_key", _boom)
+
+    # Marking pipeline_stage as explicitly set to None (Pydantic v2:
+    # model_construct + __fields_set__ is one of the ways to force
+    # inclusion in `model_dump(exclude_unset=True)`).
+    payload = IntegrationSubscriptionUpdate.model_construct(pipeline_stage=None)
+    payload.__pydantic_fields_set__ = {"pipeline_stage"}
+
+    row = await service.update_subscription(
+        session,
+        subscription_id=_SUB_ID,
+        payload=payload,
+    )
+    assert row.pipeline_stage is None
+
+
+@pytest.mark.asyncio
+async def test_update_subscription_omitted_pipeline_stage_leaves_row_alone(monkeypatch):
+    """A PUT that only touches, say, `enabled` must not affect an
+    existing pipeline_stage override."""
+    sub = IntegrationSubscription(
+        id=_SUB_ID,
+        org_id=_ORG_ID,
+        integration_id=_INTEGRATION_ID,
+        external_form_id="form-1",
+        field_mapping={},
+        enabled=True,
+        pipeline_stage="qualified",
+    )
+    session = _CapturingSession(existing=sub)
+
+    async def _boom(*_a, **_k):
+        raise AssertionError("get_pipeline_by_key must NOT be called when field is absent")
+
+    monkeypatch.setattr(service, "get_pipeline_by_key", _boom)
+
+    await service.update_subscription(
+        session,
+        subscription_id=_SUB_ID,
+        payload=IntegrationSubscriptionUpdate(enabled=False),
+    )
+    assert sub.pipeline_stage == "qualified"
+    assert sub.enabled is False

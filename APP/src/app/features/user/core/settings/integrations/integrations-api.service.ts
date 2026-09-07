@@ -67,6 +67,10 @@ export interface IntegrationSubscription {
   external_form_label: string | null;
   field_mapping: Record<string, string>;
   enabled: boolean;
+  /** Per-form pipeline_stage override (Step 10). `null` = fall back to
+   *  the org's default first stage on ingest; set = the ad-webhook
+   *  worker passes this key through as `LeadCreate.pipeline_stage`. */
+  pipeline_stage: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -77,12 +81,16 @@ export interface SubscriptionCreatePayload {
   external_form_label: string | null;
   field_mapping?: Record<string, string>;
   enabled?: boolean;
+  pipeline_stage?: string | null;
 }
 
 export interface SubscriptionUpdatePayload {
   external_form_label?: string | null;
   field_mapping?: Record<string, string>;
   enabled?: boolean;
+  /** Set to a stage key to override; explicit `null` clears an existing
+   *  override (see backend service's absent-vs-null discipline). */
+  pipeline_stage?: string | null;
 }
 
 export interface GoogleAdsAccount {

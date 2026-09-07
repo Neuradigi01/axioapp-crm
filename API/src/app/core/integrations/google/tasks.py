@@ -265,6 +265,12 @@ async def process_google_lead_async(
             # Route through the centralised ingest service so the
             # open-lead dedup + round-robin assignment apply uniformly
             # across all five channels.
+            #
+            # Per-form pipeline_stage override (Step 11 — parity with
+            # Meta's Step 10 wiring): pass the subscription's stage
+            # through when set; ingest's `_resolve_initial_stage`
+            # validates it against the org's leads pipeline. None
+            # falls back to the default first stage, unchanged.
             result = await ingest_lead(
                 session,
                 org_id=org_id,
@@ -275,6 +281,7 @@ async def process_google_lead_async(
                     custom_data=_extract_custom(mapped, prefix="lead."),
                     source=LeadSource.google_ads,
                     attribution=_build_attribution(payload),
+                    pipeline_stage=subscription.pipeline_stage,
                 ),
             )
 
