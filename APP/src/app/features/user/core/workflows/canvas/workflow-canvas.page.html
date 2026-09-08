@@ -585,9 +585,25 @@
                 </div>
               </div>
             } @else {
-              <p class="mt-1 text-[14px] text-muted">
-                Select a node to configure it, or click <em>Test fire</em> to dry-run the workflow.
-              </p>
+              <div class="flex flex-col items-center justify-center py-10 text-center">
+                <span
+                  class="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-accent/10 text-accent ring-1 ring-accent/15"
+                  aria-hidden="true"
+                >
+                  <lucide-icon name="sparkles" class="h-6 w-6"></lucide-icon>
+                </span>
+                <p class="text-sm font-medium text-default">Nothing selected</p>
+                <p class="mt-1 max-w-[240px] text-[12px] text-muted">
+                  Click a node on the canvas to configure it, or hit
+                  <span
+                    class="mx-0.5 inline-flex items-center gap-1 rounded border border-subtle bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-default"
+                  >
+                    <lucide-icon name="play" class="h-2.5 w-2.5"></lucide-icon>
+                    Test fire
+                  </span>
+                  to dry-run the workflow.
+                </p>
+              </div>
             }
           </div>
         }

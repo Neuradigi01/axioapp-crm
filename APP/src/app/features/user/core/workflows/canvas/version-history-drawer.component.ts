@@ -20,6 +20,7 @@ import {
   WorkflowVersionSummary,
   WorkflowsApiService,
 } from '../workflows-api.service';
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 
 /**
  * Right-side drawer listing the workflow's version history (newest
@@ -43,6 +44,7 @@ import {
 export class VersionHistoryDrawerComponent {
   private readonly api = inject(WorkflowsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly workflowId = input.required<string>();
   /** Version currently rendered on the canvas overlay — used to
@@ -105,16 +107,16 @@ export class VersionHistoryDrawerComponent {
       });
   }
 
-  onRestore(version: number): void {
-    const proceed = confirm(
-      `Restore version ${version}? A new version will be written that mirrors v${version}'s graph; nothing is lost.`,
-    );
+  async onRestore(version: number): Promise<void> {
+    const proceed = await this.confirmDialog.ask({
+      title: `Restore version ${version}?`,
+      body: `A new version will be written that mirrors v${version}'s graph — nothing is lost. The change is logged as "Rolled back to v${version}".`,
+      confirmLabel: 'Restore version',
+    });
     if (!proceed) return;
-    const note = prompt('Change note (optional)', `Rolled back to v${version}`);
-    if (note === null) return;
     this.restoreVersion.emit({
       version,
-      changeNote: note.trim() || `Rolled back to v${version}`,
+      changeNote: `Rolled back to v${version}`,
     });
   }
 }

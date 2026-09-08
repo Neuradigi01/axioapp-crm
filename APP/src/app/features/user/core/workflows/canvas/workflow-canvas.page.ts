@@ -19,6 +19,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 import { CanvasNode, CanvasStateService } from './canvas-state.service';
 import { ContextMenuComponent, ContextMenuItem } from './context-menu.component';
 import { WorkflowEdgeComponent } from './edge.component';
@@ -110,6 +111,7 @@ export class WorkflowCanvasPageComponent {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   @ViewChild('canvasRoot', { static: false })
   canvasRoot!: ElementRef<SVGSVGElement>;
@@ -606,11 +608,16 @@ export class WorkflowCanvasPageComponent {
       });
   }
 
-  activate(): void {
+  async activate(): Promise<void> {
     const id = this.state.workflowId();
     if (!id) return;
     if (this.state.dirty()) {
-      if (!confirm('You have unsaved changes — save first?')) return;
+      const ok = await this.confirmDialog.ask({
+        title: 'Save unsaved changes first?',
+        body: 'The workflow has unsaved edits. Activating without saving would use the previously-persisted graph.',
+        confirmLabel: 'Save & activate',
+      });
+      if (!ok) return;
       this.save();
     }
     this.api
@@ -652,11 +659,15 @@ export class WorkflowCanvasPageComponent {
       });
   }
 
-  discard(): void {
+  async discard(): Promise<void> {
     if (!this.state.dirty()) return;
-    if (!confirm('Discard unsaved changes? The canvas will revert to the last saved state.')) {
-      return;
-    }
+    const ok = await this.confirmDialog.ask({
+      title: 'Discard unsaved changes?',
+      body: 'The canvas will revert to the last saved state. This cannot be undone.',
+      confirmLabel: 'Discard changes',
+      danger: true,
+    });
+    if (!ok) return;
     const id = this.state.workflowId();
     if (id) {
       this.loadExisting(id);
@@ -665,13 +676,16 @@ export class WorkflowCanvasPageComponent {
     }
   }
 
-  testFire(): void {
+  async testFire(): Promise<void> {
     const id = this.state.workflowId();
     if (!id) return;
     if (this.state.dirty()) {
-      if (!confirm('Save before test-firing? The dry-run uses the persisted graph.')) {
-        return;
-      }
+      const ok = await this.confirmDialog.ask({
+        title: 'Save before test-firing?',
+        body: 'The dry-run uses the persisted graph, so unsaved edits won’t be included until you save.',
+        confirmLabel: 'Save & test fire',
+      });
+      if (!ok) return;
       this.save();
     }
     this.testFireBusy.set(true);
@@ -862,7 +876,7 @@ export class WorkflowCanvasPageComponent {
     this.contextMenu.set(null);
   }
 
-  onContextMenuSelect(actionId: string): void {
+  async onContextMenuSelect(actionId: string): Promise<void> {
     const ctx = this.contextMenu();
     if (!ctx) return;
     const nodeId = ctx.nodeId;
@@ -892,7 +906,15 @@ export class WorkflowCanvasPageComponent {
         }
         break;
       case 'delete':
-        if (nodeId && confirm('Delete this node and its connections?')) {
+        if (!nodeId) break;
+        if (
+          await this.confirmDialog.ask({
+            title: 'Delete this node?',
+            body: 'The node and every edge attached to it will be removed. You can undo with Ctrl+Z.',
+            confirmLabel: 'Delete',
+            danger: true,
+          })
+        ) {
           this.state.deleteNode(nodeId);
         }
         break;
@@ -1120,16 +1142,16 @@ export class WorkflowCanvasPageComponent {
     this.state.setStatus(workflow.status);
   }
 
-  unpairAB(): void {
+  async unpairAB(): Promise<void> {
     const id = this.state.workflowId();
     if (!id) return;
-    if (
-      !confirm(
-        'Cancel this A/B test? Both workflows revert to standalone — no winner will be recorded.',
-      )
-    ) {
-      return;
-    }
+    const ok = await this.confirmDialog.ask({
+      title: 'Cancel this A/B test?',
+      body: 'Both workflows revert to standalone — no winner will be recorded.',
+      confirmLabel: 'Cancel A/B test',
+      danger: true,
+    });
+    if (!ok) return;
     this.api
       .unpairAB(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
