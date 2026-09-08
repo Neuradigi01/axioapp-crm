@@ -3,7 +3,66 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { LucideAngularModule } from 'lucide-angular';
 
 import { CanvasNode } from './canvas-state.service';
-import { getNodeType, WorkflowNodeType } from './node-type-registry';
+import { getNodeType, WorkflowNodeCategory, WorkflowNodeType } from './node-type-registry';
+
+/** Per-category SVG-safe styling for the node card — Tailwind's
+ *  `fill-*` / `stroke-*` utilities so the same class strings work
+ *  inside `<svg:rect>` markup. Kept in lockstep with the palette
+ *  component's `CATEGORY_ACCENT` map so the palette-to-canvas
+ *  transition reads as one visual system (triggers=amber,
+ *  send=sky, record=emerald, routing=violet, tagging/lifecycle=rose,
+ *  flow-control=slate). */
+interface CanvasNodeStyle {
+  /** Left-edge accent bar fill (solid category colour). */
+  accent: string;
+  /** Header strip fill (light tint of category colour). */
+  headerTint: string;
+  /** Node card outline stroke. */
+  bodyStroke: string;
+  /** Header icon colour (Tailwind text-* — foreignObject renders HTML). */
+  iconColor: string;
+}
+
+const CANVAS_NODE_STYLE: Record<WorkflowNodeCategory, CanvasNodeStyle> = {
+  trigger: {
+    accent: 'fill-amber-500',
+    headerTint: 'fill-amber-100',
+    bodyStroke: 'stroke-amber-400',
+    iconColor: 'text-amber-600',
+  },
+  send: {
+    accent: 'fill-sky-500',
+    headerTint: 'fill-sky-100',
+    bodyStroke: 'stroke-sky-400',
+    iconColor: 'text-sky-600',
+  },
+  record: {
+    accent: 'fill-emerald-500',
+    headerTint: 'fill-emerald-100',
+    bodyStroke: 'stroke-emerald-400',
+    iconColor: 'text-emerald-600',
+  },
+  routing: {
+    accent: 'fill-violet-500',
+    headerTint: 'fill-violet-100',
+    bodyStroke: 'stroke-violet-400',
+    iconColor: 'text-violet-600',
+  },
+  tag_lifecycle: {
+    accent: 'fill-rose-500',
+    headerTint: 'fill-rose-100',
+    bodyStroke: 'stroke-rose-400',
+    iconColor: 'text-rose-600',
+  },
+  flow_control: {
+    accent: 'fill-slate-500',
+    headerTint: 'fill-slate-100',
+    bodyStroke: 'stroke-slate-400',
+    iconColor: 'text-slate-600',
+  },
+};
+
+const DEFAULT_NODE_STYLE: CanvasNodeStyle = CANVAS_NODE_STYLE.flow_control;
 
 /**
  * Single canvas node — type-agnostic. Renders the rounded card with
@@ -57,27 +116,28 @@ export const NODE_HEADER = 30;
         />
       }
 
+      <!-- Card body: white fill + category-tinted outline. -->
       <svg:rect
         [attr.width]="WIDTH"
         [attr.height]="HEIGHT"
         rx="10"
         ry="10"
-        [class]="bodyClass()"
+        [class]="'fill-white ' + style().bodyStroke"
         stroke-width="1.5"
       />
 
-      <svg:rect
-        [attr.width]="WIDTH"
-        [attr.height]="HEADER"
-        rx="10"
-        ry="10"
-        class="fill-white/60 stroke-transparent"
-      />
+      <!-- Header strip — tinted with the category colour so the
+           group is legible at a glance without opening the node. -->
+      <svg:path [attr.d]="headerPath()" [class]="style().headerTint + ' stroke-transparent'" />
       <svg:rect [attr.width]="WIDTH" height="1" [attr.y]="HEADER" class="fill-zinc-200" />
 
+      <!-- Left accent bar — solid group colour, anchors the card to
+           its palette section. -->
+      <svg:path [attr.d]="accentPath()" [class]="style().accent + ' stroke-transparent'" />
+
       <svg:foreignObject [attr.width]="WIDTH" [attr.height]="HEADER" x="0" y="0">
-        <div class="flex items-center gap-2 px-3 h-full text-xs font-semibold text-default">
-          <lucide-icon [name]="icon()" class="w-3.5 h-3.5 text-muted"></lucide-icon>
+        <div class="flex items-center gap-2 px-3 h-full text-xs font-semibold text-zinc-900">
+          <lucide-icon [name]="icon()" [class]="'w-3.5 h-3.5 ' + style().iconColor"></lucide-icon>
           <span class="truncate flex-1">{{ displayName() }}</span>
           @if (validationFailed()) {
             <span
@@ -94,7 +154,7 @@ export const NODE_HEADER = 30;
         x="0"
         [attr.y]="HEADER + 4"
       >
-        <div class="px-3 text-[11px] leading-snug text-muted">
+        <div class="px-3 text-[11px] leading-snug text-zinc-600">
           {{ description() }}
         </div>
       </svg:foreignObject>
@@ -102,7 +162,7 @@ export const NODE_HEADER = 30;
       <svg:foreignObject [attr.x]="WIDTH - 26" y="6" width="20" height="20">
         <button
           type="button"
-          class="w-5 h-5 flex items-center justify-center rounded text-faint hover:text-default hover:bg-surface-2"
+          class="w-5 h-5 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-black/5"
           (click)="onMenuClick($event)"
           (mousedown)="$event.stopPropagation()"
           aria-label="Node actions"
@@ -210,7 +270,34 @@ export class WorkflowNodeComponent {
 
     return type.description;
   });
-  readonly bodyClass = computed(() => this.nodeType()?.colorClass ?? 'bg-surface-2 border-subtle');
+  /** Group-derived visual style. Every trigger renders amber, every
+   *  send renders sky, etc. — mirrors the palette so the drop reads
+   *  as the same node the operator dragged. */
+  readonly style = computed<CanvasNodeStyle>(() => {
+    const cat = this.nodeType()?.category;
+    return cat ? (CANVAS_NODE_STYLE[cat] ?? DEFAULT_NODE_STYLE) : DEFAULT_NODE_STYLE;
+  });
+
+  /** SVG path for the header strip — full-width strip with the top
+   *  two corners rounded (matching the card's 10px `rx`) and the
+   *  bottom edge flat. Kept as a `<path>` because `<rect rx>` rounds
+   *  all four corners. */
+  readonly headerPath = computed<string>(() => {
+    const w = this.WIDTH;
+    const h = this.HEADER;
+    const r = 10;
+    return `M ${r} 0 L ${w - r} 0 A ${r} ${r} 0 0 1 ${w} ${r} L ${w} ${h} L 0 ${h} L 0 ${r} A ${r} ${r} 0 0 1 ${r} 0 Z`;
+  });
+
+  /** SVG path for the left accent bar — 4px wide, full height, top-
+   *  and bottom-left corners rounded to match the card. */
+  readonly accentPath = computed<string>(() => {
+    const h = this.HEIGHT;
+    const r = 10;
+    const w = 4;
+    return `M ${r} 0 L ${w} 0 L ${w} ${h} L ${r} ${h} A ${r} ${r} 0 0 1 0 ${h - r} L 0 ${r} A ${r} ${r} 0 0 1 ${r} 0 Z`;
+  });
+
   readonly transform = computed(() => {
     const pos = this.node().position ?? { x: 0, y: 0 };
     return `translate(${pos.x}, ${pos.y})`;
