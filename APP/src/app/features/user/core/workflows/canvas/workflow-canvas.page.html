@@ -467,51 +467,64 @@
           </div>
         }
 
-        <!-- Floating control panel (bottom-right) -->
+        <!-- Floating control tray (bottom-right) — matches the
+             toolbar's icon-tray look so the zoom controls read as
+             the same visual system as the rest of the editor
+             chrome. Every click handler is the original one. -->
         <div
-          class="absolute bottom-4 right-4 flex items-center gap-1 bg-surface border border-subtle rounded-lg shadow-sm px-2 py-1.5"
+          class="absolute bottom-4 right-4 flex items-center rounded-md border border-subtle bg-surface-2/80 p-0.5 shadow-sm backdrop-blur"
         >
           <button
             type="button"
-            class="px-2 py-1 text-xs text-muted hover:bg-surface-2 rounded"
+            class="flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-surface hover:text-default"
             (click)="state.setZoom(state.zoom() / 1.2)"
             title="Zoom out"
+            aria-label="Zoom out"
           >
-            <lucide-icon name="zoom-out" class="w-4 h-4"></lucide-icon>
+            <lucide-icon name="zoom-out" class="h-3.5 w-3.5"></lucide-icon>
           </button>
-          <span class="text-[11px] text-muted w-10 text-center"> {{ zoomPercent() }}% </span>
+          <span
+            class="w-11 select-none text-center font-mono text-[11px] font-medium text-muted"
+            title="Current zoom"
+          >
+            {{ zoomPercent() }}%
+          </span>
           <button
             type="button"
-            class="px-2 py-1 text-xs text-muted hover:bg-surface-2 rounded"
+            class="flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-surface hover:text-default"
             (click)="state.setZoom(state.zoom() * 1.2)"
             title="Zoom in"
+            aria-label="Zoom in"
           >
-            <lucide-icon name="zoom-in" class="w-4 h-4"></lucide-icon>
+            <lucide-icon name="zoom-in" class="h-3.5 w-3.5"></lucide-icon>
           </button>
-          <div class="w-px h-5 bg-surface-2 mx-1"></div>
+          <div class="mx-0.5 h-4 w-px bg-subtle"></div>
           <button
             type="button"
-            class="px-2 py-1 text-xs text-muted hover:bg-surface-2 rounded"
+            class="flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-surface hover:text-default"
             (click)="fitToView()"
             title="Fit to view"
+            aria-label="Fit to view"
           >
-            <lucide-icon name="maximize-2" class="w-4 h-4"></lucide-icon>
+            <lucide-icon name="maximize-2" class="h-3.5 w-3.5"></lucide-icon>
           </button>
           <button
             type="button"
-            class="px-2 py-1 text-xs text-muted hover:bg-surface-2 rounded"
+            class="flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-surface hover:text-default"
             (click)="resetZoom()"
-            title="Reset zoom"
+            title="Reset zoom to 100%"
+            aria-label="Reset zoom"
           >
-            <lucide-icon name="rotate-ccw" class="w-4 h-4"></lucide-icon>
+            <lucide-icon name="rotate-ccw" class="h-3.5 w-3.5"></lucide-icon>
           </button>
           <button
             type="button"
-            class="px-2 py-1 text-xs text-muted hover:bg-surface-2 rounded"
+            class="flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-surface hover:text-default"
             (click)="autoLayout()"
-            title="Auto-layout"
+            title="Auto-layout — arrange nodes automatically"
+            aria-label="Auto-layout"
           >
-            <lucide-icon name="layout-grid" class="w-4 h-4"></lucide-icon>
+            <lucide-icon name="layout-grid" class="h-3.5 w-3.5"></lucide-icon>
           </button>
         </div>
       }
