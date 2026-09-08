@@ -406,11 +406,17 @@ export class WorkflowsPageComponent {
     this.openMenuId.set(null);
   }
 
-  protected onClone(row: WorkflowRead, event: MouseEvent): void {
+  protected async onClone(row: WorkflowRead, event: MouseEvent): Promise<void> {
     event.stopPropagation();
     this.closeMenu();
     if (!this.canClone()) return;
-    const name = prompt('Name for the cloned workflow', `${row.name} (copy)`);
+    const name = await this.confirmDialog.prompt({
+      title: 'Clone workflow',
+      body: `A copy of "${row.name}" will be created as a draft. Give the copy a name — you can rename it later.`,
+      placeholder: 'Workflow name',
+      initialValue: `${row.name} (copy)`,
+      confirmLabel: 'Clone',
+    });
     if (!name) return;
     this.api
       .clone(row.id, name.trim())

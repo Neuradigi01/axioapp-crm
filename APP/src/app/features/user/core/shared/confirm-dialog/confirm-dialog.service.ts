@@ -14,8 +14,23 @@ export interface ConfirmDialogOptions {
   danger?: boolean;
 }
 
+/** Options for the text-input prompt variant (`prompt()`). */
+export interface PromptDialogOptions {
+  title: string;
+  body?: string | null;
+  placeholder?: string;
+  /** Seed value pre-filled in the input; empty by default. */
+  initialValue?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+}
+
 interface PendingConfirm extends ConfirmDialogOptions {
   resolve: (value: boolean) => void;
+}
+
+interface PendingPrompt extends PromptDialogOptions {
+  resolve: (value: string | null) => void;
 }
 
 /**
@@ -42,9 +57,12 @@ interface PendingConfirm extends ConfirmDialogOptions {
 @Injectable({ providedIn: 'root' })
 export class ConfirmDialogService {
   private readonly pendingSig = signal<PendingConfirm | null>(null);
+  private readonly pendingPromptSig = signal<PendingPrompt | null>(null);
 
-  /** Snapshot of the currently pending dialog (`null` when none). */
+  /** Snapshot of the currently pending confirm dialog (`null` when none). */
   readonly pending = this.pendingSig.asReadonly();
+  /** Snapshot of the currently pending prompt dialog (`null` when none). */
+  readonly pendingPrompt = this.pendingPromptSig.asReadonly();
 
   /** Open a confirm dialog. Resolves to `true` when the operator
    *  clicks the confirm button, `false` on cancel / dismiss. If a
@@ -55,6 +73,17 @@ export class ConfirmDialogService {
     if (prev) prev.resolve(false);
     return new Promise<boolean>((resolve) => {
       this.pendingSig.set({ ...options, resolve });
+    });
+  }
+
+  /** Open a text-input prompt dialog. Resolves to the trimmed input
+   *  string on confirm, or `null` on cancel / dismiss / empty input.
+   *  Same "auto-resolve prior pending" contract as `ask()`. */
+  prompt(options: PromptDialogOptions): Promise<string | null> {
+    const prev = this.pendingPromptSig();
+    if (prev) prev.resolve(null);
+    return new Promise<string | null>((resolve) => {
+      this.pendingPromptSig.set({ ...options, resolve });
     });
   }
 
@@ -72,5 +101,21 @@ export class ConfirmDialogService {
     if (!p) return;
     this.pendingSig.set(null);
     p.resolve(false);
+  }
+
+  /** Host-only — prompt dialog's Confirm handler. */
+  submitPrompt(value: string): void {
+    const p = this.pendingPromptSig();
+    if (!p) return;
+    this.pendingPromptSig.set(null);
+    p.resolve(value);
+  }
+
+  /** Host-only — prompt dialog's Cancel handler. */
+  cancelPrompt(): void {
+    const p = this.pendingPromptSig();
+    if (!p) return;
+    this.pendingPromptSig.set(null);
+    p.resolve(null);
   }
 }
