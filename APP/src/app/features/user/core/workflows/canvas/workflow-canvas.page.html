@@ -165,6 +165,29 @@
         </button>
       </div>
 
+      <!-- Validation-issue chip — count of nodes whose typed editor
+           flagged `config.__valid === false`. Click to camera-focus +
+           select the first bad one so the operator lands on the
+           problem instead of hunting for a small red dot on the
+           canvas. Hidden when everything is clean. -->
+      @if (invalidNodes().length > 0) {
+        <button
+          type="button"
+          (click)="focusFirstInvalid()"
+          class="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-500 ring-1 ring-red-500/20 hover:brightness-110"
+          [title]="
+            invalidNodes().length +
+            ' step' +
+            (invalidNodes().length === 1 ? '' : 's') +
+            ' need attention — click to jump to the first one'
+          "
+        >
+          <lucide-icon name="alert-triangle" class="h-3 w-3" />
+          {{ invalidNodes().length }}
+          {{ invalidNodes().length === 1 ? 'issue' : 'issues' }}
+        </button>
+      }
+
       <!-- Unsaved / Saving pill — replaces the old raw amber text so
            the status reads as a real chip beside the actions. -->
       @if (saving()) {

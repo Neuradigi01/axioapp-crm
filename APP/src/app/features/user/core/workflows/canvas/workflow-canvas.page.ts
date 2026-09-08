@@ -246,6 +246,44 @@ export class WorkflowCanvasPageComponent {
     return m;
   });
 
+  /** Nodes whose typed editor has flagged the config as invalid
+   *  (missing required field, unresolvable template, etc.). Populated
+   *  by each editor via `onValidityChange` → `state.updateNodeConfig
+   *  ({__valid: false})`. Drives the toolbar's issue-chip so the
+   *  operator sees at a glance how many steps still need work. */
+  readonly invalidNodes = computed<CanvasNode[]>(() =>
+    this.state.nodes().filter((n) => {
+      const cfg = n.config as Record<string, unknown> | undefined;
+      return cfg?.['__valid'] === false;
+    }),
+  );
+
+  /** Toolbar issue-chip click — jump the camera to the first invalid
+   *  node and open its inspector. If the canvas is scrolled/zoomed
+   *  away from the node we re-centre on it at current zoom so the
+   *  operator lands looking straight at the problem. */
+  focusFirstInvalid(): void {
+    const first = this.invalidNodes()[0];
+    if (!first) return;
+    this.state.selectNode(first.id);
+    const svg = this.canvasRoot?.nativeElement;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const z = this.state.zoom();
+    const cx = (first.position?.x ?? 0) + NODE_WIDTH / 2;
+    const cy = (first.position?.y ?? 0) + NODE_HEIGHT / 2;
+    // Center the node in the viewport at the current zoom (matches
+    // the transform: `translate(pan) scale(zoom)` used by the SVG).
+    this.state.setPan({
+      x: rect.width / 2 - cx * z,
+      y: rect.height / 2 - cy * z,
+    });
+    // Also open the mobile inspector so the operator sees the
+    // validation issues right away on touch devices.
+    this.mobileInspectorOpen.set(true);
+    this.mobilePaletteOpen.set(false);
+  }
+
   readonly pendingEdgePath = computed(() => {
     const p = this.pendingEdge();
     if (!p) return '';
