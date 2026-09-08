@@ -403,6 +403,47 @@
           </g>
         </svg>
 
+        <!-- Empty-canvas state — shown when the workflow has no nodes
+             yet. Sits above the SVG grid but has `pointer-events-none`
+             on the wrapper so the operator can still drop a node from
+             the palette onto the canvas underneath; the "Add Trigger"
+             button opts back in via `pointer-events-auto`. -->
+        @if (state.nodes().length === 0 && !pendingEdgePath()) {
+          <div
+            class="pointer-events-none absolute inset-0 flex items-center justify-center px-6"
+            aria-hidden="true"
+          >
+            <div
+              class="pointer-events-auto flex max-w-md flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-subtle bg-surface/80 px-6 py-8 text-center shadow-sm backdrop-blur-sm"
+            >
+              <span
+                class="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent ring-1 ring-accent/20"
+              >
+                <lucide-icon name="zap" class="h-5 w-5"></lucide-icon>
+              </span>
+              <div>
+                <h2 class="text-sm font-semibold text-default">Start with a Trigger</h2>
+                <p class="mt-1 text-xs text-muted">
+                  A trigger is the event that fires this workflow — a new lead, a scheduled time, a
+                  form submission, and so on.
+                </p>
+              </div>
+              <button
+                type="button"
+                (click)="onPaletteTap('trigger')"
+                class="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 text-xs font-semibold text-white shadow-sm hover:brightness-95"
+              >
+                <lucide-icon name="plus" class="h-3.5 w-3.5"></lucide-icon>
+                Add Trigger
+              </button>
+              <p class="hidden text-[11px] text-faint md:flex md:items-center md:gap-1">
+                <lucide-icon name="arrow-left" class="h-3 w-3"></lucide-icon>
+                or drag any node from the palette
+              </p>
+            </div>
+          </div>
+        }
+
         <!-- Floating control panel (bottom-right) -->
         <div
           class="absolute bottom-4 right-4 flex items-center gap-1 bg-surface border border-subtle rounded-lg shadow-sm px-2 py-1.5"
