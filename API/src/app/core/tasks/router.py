@@ -213,7 +213,9 @@ async def bulk_mark_done_tasks_endpoint(
 async def bulk_delete_tasks_endpoint(
     payload: TaskBulkDelete,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_permissions("tasks.write")),
+    # Delete is Owner/Admin-only. Employees + Sales Manager + Support
+    # Agent can create + edit + complete but cannot remove tasks.
+    user: User = Depends(require_permissions("tasks.delete")),
 ) -> TaskBulkDeleteResult:
     n = await bulk_delete_tasks(db, ids=payload.ids, org_id=user.org_id)
     return TaskBulkDeleteResult(deleted=n)
@@ -256,7 +258,9 @@ async def update_task_endpoint(
 async def delete_task_endpoint(
     task_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("tasks.write")),
+    # Delete is Owner/Admin-only. Everyone else with `tasks.write` can
+    # create + edit + complete, but only Owner/Admin can remove.
+    _user: User = Depends(require_permissions("tasks.delete")),
 ) -> Response:
     await delete_task(db, task_id=task_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -45,6 +45,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import API_BASE_URL
 from src.app.core import audit
 from src.app.core.activities.models import ActivityType
 from src.app.core.activities.service import log as activities_log
@@ -94,19 +95,21 @@ logger = logging.getLogger(__name__)
 
 # Local-part of `Message-ID` for outbound mail. Stays stable across
 # environments so a customer's reply (which echoes the value into
-# `In-Reply-To`) always threads back. Override per-deploy if the
-# product domain changes via `EMAIL_MESSAGE_ID_DOMAIN` env var.
-_MESSAGE_ID_DOMAIN = os.getenv("EMAIL_MESSAGE_ID_DOMAIN", "furnicrm.app")
+# `In-Reply-To`) always threads back. Set via `EMAIL_MESSAGE_ID_DOMAIN`
+# in the shared config.env — do NOT split across local/prod files.
+_MESSAGE_ID_DOMAIN = os.getenv("EMAIL_MESSAGE_ID_DOMAIN", "crm.neuradigi.com")
 
-# Step 8 — public tracking base URL. Defaults to local in dev; in
-# prod set via env. No trailing slash — pixel/link helpers append the
-# full `/api/v1/track/...` path themselves.
-_TRACKING_BASE_URL = os.getenv("TRACKING_BASE_URL", "http://localhost:8000").rstrip("/")
+# Step 8 — public tracking base URL for open-pixel + click-rewrite
+# links. Uses the env-selected API host (`config.API_BASE_URL`, set
+# per env in config.local.env / config.prod.env) so tracked links
+# always point at the same origin serving `/api/v1/track/...`.
+_TRACKING_BASE_URL = API_BASE_URL.rstrip("/")
 
 # `mailto:` target for the `List-Unsubscribe` header. The MIME
 # headers carry both the URL and a mailto so RFC 8058 one-click
-# unsubscribe works in Gmail / Outlook / Apple Mail.
-_LIST_UNSUB_MAILTO = os.getenv("LIST_UNSUBSCRIBE_MAILTO", "unsubscribe@furnicrm.app")
+# unsubscribe works in Gmail / Outlook / Apple Mail. Stable across
+# envs — same reasoning as `_MESSAGE_ID_DOMAIN` above.
+_LIST_UNSUB_MAILTO = os.getenv("LIST_UNSUBSCRIBE_MAILTO", "unsubscribe@crm.neuradigi.com")
 
 
 class EmailUseSendEmailEndpoint(HTTPException):

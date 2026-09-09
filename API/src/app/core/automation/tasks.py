@@ -351,7 +351,7 @@ async def _execute_send(session, run) -> str | None:
         raise _PermanentSendError(f"channel_not_registered: {exc}") from exc
 
     if trigger.channel == ConversationChannel.email:
-        import os
+        from config import API_BASE_URL
 
         from src.app.core.automation.tracking import (
             inject_tracking_pixel_and_links,
@@ -364,7 +364,7 @@ async def _execute_send(session, run) -> str | None:
         # plain-text part stays untouched so privacy-conscious
         # clients (text-only readers) get the original message
         # without any tracking artefacts.
-        public_base_url = os.environ.get("PUBLIC_API_BASE_URL", "http://localhost:8000")
+        public_base_url = API_BASE_URL.rstrip("/")
         html_skeleton = (
             f"<html><body>"
             f'<pre style="font-family:inherit;white-space:pre-wrap">'

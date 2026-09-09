@@ -13,8 +13,15 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { extractApiError } from '@core/services/api-error.util';
 
+import {
+  ContactListItem,
+  ContactListResponse,
+  ContactsApiService,
+} from '../contacts/contacts-api.service';
 import { commonValidators } from '../shared/validators';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
@@ -56,6 +63,7 @@ const recordingUploadValidator = commonValidators.fileUpload({
 export class LogCallModalComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(CallsApiService);
+  private readonly contactsApi = inject(ContactsApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   @Input() set outcomes(list: CallOutcome[]) {
@@ -67,13 +75,52 @@ export class LogCallModalComponent {
     return this._outcomes;
   }
   private _outcomes: CallOutcome[] = [];
-  /** Pre-fill the contact id (used by Phone Book's click-to-call). */
+  /** Pre-fill the contact id (used by Phone Book's click-to-call).
+   *  Seeds the chip immediately with `prefilledContactName` (when
+   *  supplied) so there is no empty-chip flash, then overlays the full
+   *  contact record from the API so phone / email round out for the
+   *  "Change → pick another" flow. */
   @Input() set prefilledContactId(value: string | null) {
-    if (value) {
-      this.form.patchValue({ contact_id: value });
+    if (!value) return;
+    this.form.patchValue({ contact_id: value });
+    const seedName = this.prefilledContactName;
+    if (seedName) {
+      this.selectedContact.set({
+        id: value,
+        full_name: seedName,
+        phone: null,
+        email: null,
+        source: null,
+        tags: [],
+        assigned_to_id: null,
+        last_activity_at: null,
+        created_at: new Date().toISOString(),
+      } as unknown as ContactListItem);
     }
+    this.contactsApi
+      .get(value)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (c) =>
+          this.selectedContact.set({
+            id: c.id,
+            full_name: c.full_name,
+            phone: c.phone,
+            email: c.email,
+            source: c.source,
+            tags: c.tags ?? [],
+            assigned_to_id: c.assigned_to_id,
+            last_activity_at: c.last_activity_at,
+            created_at: c.created_at,
+          } as ContactListItem),
+        error: () => {
+          /* leave whatever the seed painted; id is still on the form */
+        },
+      });
   }
-  /** Read-only label rendered if `prefilledContactId` is set. */
+  /** Optional display name from the caller — used only to paint the
+   *  chip immediately so there's no flash while the full contact record
+   *  loads. Phone Book supplies this from its already-in-hand row. */
   @Input() prefilledContactName: string | null = null;
 
   @Output() readonly saved = new EventEmitter<Call>();
@@ -95,6 +142,188 @@ export class LogCallModalComponent {
    *  without re-creating the call. `close()` propagates this to the
    *  parent so the list still refreshes on manual dismiss. */
   protected readonly createdCall = signal<Call | null>(null);
+
+  // --- Contact picker state ------------------------------------------
+  // Two-mode paginated picker:
+  //   - Browse: fetch page 1 (50 rows) on modal open sorted by
+  //     `last_activity_at desc` so the rep's recent conversations
+  //     surface first. Infinite scroll on the dropdown loads the next
+  //     page when the user scrolls near the bottom, up to the org's
+  //     full contact count. No 200-row ceiling.
+  //   - Search: 2+ chars kick a debounced API search — also paginated
+  //     with the same scroll-to-load handler so orgs with lots of
+  //     matches don't get truncated. Clearing the search input
+  //     restores the browse list without re-fetching.
+  //
+  // The picked contact's id feeds `form.contact_id`; the chip shows
+  // name/phone/email so a wrong pick is instantly visible.
+  protected readonly selectedContact = signal<ContactListItem | null>(null);
+  protected readonly contactSearch = signal('');
+  protected readonly contactSearching = signal(false);
+  protected readonly contactsLoading = signal(true);
+  protected readonly contactsLoadingMore = signal(false);
+
+  /** Rows per page for both browse and search paths. 10 keeps the
+   *  inline dropdown short (only pushes the rest of the form down by
+   *  the height of ~4 visible rows before internal scroll takes over)
+   *  and matches the manager-locked "10 per page" ask. */
+  private static readonly PAGE_SIZE = 10;
+
+  // Browse-mode paging state.
+  private readonly browseContacts = signal<ContactListItem[]>([]);
+  private browsePage = 1;
+  private browseTotal = 0;
+
+  // Search-mode paging state — cleared each new search term.
+  private readonly searchResults = signal<ContactListItem[]>([]);
+  private searchPage = 1;
+  private searchTotal = 0;
+  private currentSearchTerm = '';
+
+  /** What the template renders: search results when input has 2+ chars,
+   *  otherwise the browse list. */
+  protected readonly visibleContacts = computed<ContactListItem[]>(() =>
+    this.contactSearch().trim().length >= 2 ? this.searchResults() : this.browseContacts(),
+  );
+
+  /** Whether the current mode has more rows the server can serve. Used
+   *  by the scroll handler to short-circuit past the last page. */
+  protected readonly hasMoreContacts = computed<boolean>(() => {
+    if (this.contactSearch().trim().length >= 2) {
+      return this.searchResults().length < this.searchTotal;
+    }
+    return this.browseContacts().length < this.browseTotal;
+  });
+
+  private readonly contactSearch$ = new Subject<string>();
+
+  constructor() {
+    // Debounced search subscription. Each new term resets to page 1;
+    // subsequent pages for the same term are loaded via `loadMoreContacts`.
+    this.contactSearch$
+      .pipe(
+        debounceTime(200),
+        distinctUntilChanged(),
+        switchMap((q) => {
+          const trimmed = q.trim();
+          this.currentSearchTerm = trimmed;
+          this.searchPage = 1;
+          this.searchTotal = 0;
+          this.searchResults.set([]);
+          if (trimmed.length < 2) {
+            this.contactSearching.set(false);
+            return [{ items: [] as ContactListItem[], total: 0 } as ContactListResponse];
+          }
+          this.contactSearching.set(true);
+          return this.contactsApi.list({
+            q: trimmed,
+            page: 1,
+            size: LogCallModalComponent.PAGE_SIZE,
+          });
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (resp) => {
+          this.searchResults.set(resp.items);
+          this.searchTotal = resp.total;
+          this.contactSearching.set(false);
+        },
+        error: () => this.contactSearching.set(false),
+      });
+
+    // Kick page 1 of the browse list — silent on error, the search
+    // fallback still works if the preload 500s or the network drops.
+    this.contactsApi
+      .list({
+        page: 1,
+        size: LogCallModalComponent.PAGE_SIZE,
+        sort: 'last_activity_at',
+        order: 'desc',
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resp) => {
+          this.browseContacts.set(resp.items);
+          this.browseTotal = resp.total;
+          this.contactsLoading.set(false);
+        },
+        error: () => this.contactsLoading.set(false),
+      });
+  }
+
+  protected onContactSearchInput(event: Event): void {
+    const v = (event.target as HTMLInputElement).value;
+    this.contactSearch.set(v);
+    this.contactSearch$.next(v);
+  }
+
+  /** Scroll-to-load handler bound to the results `<ul>`. Fires the
+   *  next page when the operator has scrolled within `TRIGGER_PX` of
+   *  the bottom. Guards against duplicate in-flight requests via
+   *  `contactsLoadingMore` so a fast-scrolling user doesn't stack up
+   *  four requests for the same page. */
+  protected onContactsScroll(event: Event): void {
+    if (this.contactsLoadingMore() || !this.hasMoreContacts()) return;
+    const el = event.target as HTMLElement;
+    const TRIGGER_PX = 40;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight > TRIGGER_PX) return;
+    this.loadMoreContacts();
+  }
+
+  private loadMoreContacts(): void {
+    const inSearch = this.contactSearch().trim().length >= 2;
+    this.contactsLoadingMore.set(true);
+    const query = inSearch
+      ? {
+          q: this.currentSearchTerm,
+          page: this.searchPage + 1,
+          size: LogCallModalComponent.PAGE_SIZE,
+        }
+      : {
+          page: this.browsePage + 1,
+          size: LogCallModalComponent.PAGE_SIZE,
+          sort: 'last_activity_at' as const,
+          order: 'desc' as const,
+        };
+    this.contactsApi
+      .list(query)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resp) => {
+          if (inSearch) {
+            // Guard against a stale response arriving after the operator
+            // typed a new search term — drop it silently in that case.
+            if (this.currentSearchTerm !== query.q) return;
+            this.searchResults.update((rows) => [...rows, ...resp.items]);
+            this.searchPage += 1;
+          } else {
+            this.browseContacts.update((rows) => [...rows, ...resp.items]);
+            this.browsePage += 1;
+          }
+          this.contactsLoadingMore.set(false);
+        },
+        error: () => this.contactsLoadingMore.set(false),
+      });
+  }
+
+  protected pickContact(row: ContactListItem): void {
+    this.selectedContact.set(row);
+    this.form.controls.contact_id.setValue(row.id);
+    this.searchResults.set([]);
+    this.searchPage = 1;
+    this.searchTotal = 0;
+    this.contactSearch.set('');
+  }
+
+  protected clearContact(): void {
+    this.selectedContact.set(null);
+    this.form.controls.contact_id.setValue(null);
+    this.contactSearch.set('');
+    this.searchResults.set([]);
+    this.searchPage = 1;
+    this.searchTotal = 0;
+  }
 
   protected readonly recordingSizeLabel = computed(() => {
     const f = this.recordingFile();

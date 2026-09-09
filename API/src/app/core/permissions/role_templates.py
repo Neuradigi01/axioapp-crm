@@ -124,6 +124,10 @@ _CORE_ADMIN_KEYS: list[str] = [
     # Delegate tasks to other users. Owner + Admin get this by default;
     # Employees can create tasks only for themselves.
     "tasks.assign_others",
+    # Delete tasks (single + bulk). Owner + Admin only — Employee /
+    # Support Agent / Sales Manager can create + edit + complete their
+    # own tasks but cannot remove them from the system.
+    "tasks.delete",
     "pipelines.read",
     "pipelines.manage",
     "pipelines.write",

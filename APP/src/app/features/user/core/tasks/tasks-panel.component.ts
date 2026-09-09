@@ -58,6 +58,10 @@ export class TasksPanelComponent {
    *  the modal so a rep without `tasks.assign_others` sees no picker
    *  (edits still work for their own tasks). */
   protected readonly canAssignOthers = this.auth.hasPermission('tasks.assign_others');
+  /** Row delete is Owner/Admin-only — same gate as the standalone
+   *  Tasks page. Hides the trash icon for Employee / Sales Manager /
+   *  Support Agent, whose backend call would 403 anyway. */
+  protected readonly canDelete = this.auth.hasPermission('tasks.delete');
 
   readonly entityType = input.required<string>();
   readonly entityId = input.required<string>();
