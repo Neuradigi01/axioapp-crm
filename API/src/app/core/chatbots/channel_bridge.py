@@ -145,6 +145,23 @@ def render_variables(
                 return str(value or "")
             value = contact_scope.get(rest[0], "")
             return str(value or "")
+        if head == "lead":
+            # ``lead.<field>`` + ``lead.custom.<key>`` read from the
+            # ``_lead`` slot on the contact scope — the most recent
+            # active lead for this contact, populated by
+            # :func:`_shared.load_lead_data`. Empty when the contact
+            # has no lead at all.
+            lead_scope = contact_scope.get("_lead") or {}
+            if not isinstance(lead_scope, dict) or not rest:
+                return ""
+            if rest[0] == "custom":
+                if len(rest) < 2:
+                    return ""
+                custom = lead_scope.get("custom_data") or {}
+                value = custom.get(rest[1], "") if isinstance(custom, dict) else ""
+                return str(value or "")
+            value = lead_scope.get(rest[0], "")
+            return str(value or "")
         if head == "run":
             if not rest:
                 return ""
