@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 import { CanvasEdge, CanvasNode, CanvasStateService } from './canvas-state.service';
 import { NODE_HEIGHT, NODE_WIDTH } from './node.component';
 import { getNodeType } from './node-type-registry';
@@ -66,6 +67,7 @@ export class WorkflowEdgeComponent {
   readonly deleted = output<string>();
 
   private readonly state = inject(CanvasStateService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   // Source output-port position in graph coordinates.
   private readonly sourcePort = computed(() => {
@@ -118,12 +120,17 @@ export class WorkflowEdgeComponent {
     return 'rgb(148 163 184)'; // slate-400
   });
 
-  onClick(event: MouseEvent): void {
+  async onClick(event: MouseEvent): Promise<void> {
     event.stopPropagation();
-    if (confirm('Delete this edge?')) {
-      const id = this.edge().id;
-      this.state.deleteEdge(id);
-      this.deleted.emit(id);
-    }
+    const ok = await this.confirmDialog.ask({
+      title: 'Delete this edge?',
+      body: 'The two nodes will no longer be connected. You can undo with Ctrl+Z.',
+      confirmLabel: 'Delete edge',
+      danger: true,
+    });
+    if (!ok) return;
+    const id = this.edge().id;
+    this.state.deleteEdge(id);
+    this.deleted.emit(id);
   }
 }

@@ -366,6 +366,7 @@ export class ConversationsPageComponent {
       d && d.conversation.id === msg.conversation_id ? { ...d, messages: [...d.messages, msg] } : d,
     );
     this.bumpListLastMessage(msg.conversation_id, msg.sent_at ?? msg.created_at);
+    this.claimAssigneeOnSend(msg.conversation_id);
   }
 
   /** Inline picker surfaced an error (network / Meta refusal / etc).
@@ -494,6 +495,7 @@ export class ConversationsPageComponent {
       next: (real) => {
         this.swapOptimisticMessage(id, optimistic.id, real);
         this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
+        this.claimAssigneeOnSend(id);
       },
       error: (err: HttpErrorResponse) => {
         this.removeOptimisticMessage(id, optimistic.id);
@@ -633,6 +635,7 @@ export class ConversationsPageComponent {
         next: (real) => {
           this.swapOptimisticMessage(id, optimistic.id, real);
           this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
+          this.claimAssigneeOnSend(id);
         },
         error: (err: HttpErrorResponse) => {
           this.removeOptimisticMessage(id, optimistic.id);
@@ -697,6 +700,7 @@ export class ConversationsPageComponent {
         next: (msg) => {
           this.swapOptimisticMessage(id, optimistic.id, msg);
           this.bumpListLastMessage(id, msg.sent_at ?? msg.created_at);
+          this.claimAssigneeOnSend(id);
         },
         error: (err: HttpErrorResponse) => {
           this.removeOptimisticMessage(id, optimistic.id);
@@ -756,6 +760,7 @@ export class ConversationsPageComponent {
         next: (real) => {
           this.swapOptimisticMessage(id, optimistic.id, real);
           this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
+          this.claimAssigneeOnSend(id);
         },
         error: (err: HttpErrorResponse) => {
           this.removeOptimisticMessage(id, optimistic.id);
@@ -1148,6 +1153,29 @@ export class ConversationsPageComponent {
       ...d,
       messages: d.messages.filter((m) => m.id !== optimisticId),
     }));
+  }
+
+  /** Mirror the backend's implicit-claim on outbound send. When a
+   *  human replies on an unassigned thread, ``send_outbound`` /
+   *  ``send_email_reply`` set ``assigned_to_id = <sender>`` server-
+   *  side. The optimistic-send path here only patches
+   *  ``last_message_at``, so the assignee pill would stay
+   *  "Unassigned" until a WS refresh landed. Patch both signals
+   *  right after a successful send so the pill flips immediately
+   *  and matches what the DB already reflects. */
+  private claimAssigneeOnSend(conversationId: string): void {
+    const me = this.auth.currentUserId();
+    if (!me) return;
+    const conv = this.items().find((c) => c.id === conversationId);
+    if (!conv || conv.assigned_to_id) return;
+    this.items.update((rows) =>
+      rows.map((r) => (r.id === conversationId ? { ...r, assigned_to_id: me } : r)),
+    );
+    this.detail.update((d) =>
+      d && d.conversation.id === conversationId
+        ? { ...d, conversation: { ...d.conversation, assigned_to_id: me } }
+        : d,
+    );
   }
 
   private bumpListLastMessage(id: string, isoTs: string): void {

@@ -5,8 +5,8 @@
         Catalog
       </h1>
       <p class="mt-1 text-[14px] text-muted">
-        {{ totalProducts() }} product{{ totalProducts() === 1 ? '' : 's' }} · what your contacts
-        &amp; leads can show interest in.
+        {{ totalProducts() }} product{{ totalProducts() === 1 ? '' : 's' }} · publish to generate a
+        shareable customer link.
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -44,28 +44,48 @@
       <p class="mt-2 text-2xl font-semibold text-default">{{ totalProducts() }}</p>
     </div>
     <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted">
-        Active
-        @if (kpiCountsPartial()) {
-          <span class="ml-1 text-[10px] font-normal normal-case text-faint">(this page)</span>
-        }
-      </p>
-      <p class="mt-2 text-2xl font-semibold text-emerald-600">{{ activeProducts() }}</p>
+      <p class="text-xs font-medium uppercase tracking-wide text-muted">Published</p>
+      <p class="mt-2 text-2xl font-semibold text-emerald-600">{{ publishedProducts() }}</p>
     </div>
     <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted">
-        Inactive
-        @if (kpiCountsPartial()) {
-          <span class="ml-1 text-[10px] font-normal normal-case text-faint">(this page)</span>
-        }
-      </p>
-      <p class="mt-2 text-2xl font-semibold text-muted">{{ inactiveProducts() }}</p>
+      <p class="text-xs font-medium uppercase tracking-wide text-muted">Draft</p>
+      <p class="mt-2 text-2xl font-semibold text-muted">{{ draftProducts() }}</p>
     </div>
     <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
       <p class="text-xs font-medium uppercase tracking-wide text-muted">Categories</p>
       <p class="mt-2 text-2xl font-semibold text-default">{{ distinctCategories() }}</p>
     </div>
   </section>
+
+  <!-- Status tabs -->
+  <nav
+    class="flex flex-wrap gap-1 rounded-lg border border-subtle bg-surface p-1"
+    role="tablist"
+    aria-label="Filter by publish status"
+  >
+    @for (t of TABS; track t.key) {
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab() === t.key"
+        (click)="selectTab(t.key)"
+        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition"
+        [class.bg-accent]="activeTab() === t.key"
+        [class.text-white]="activeTab() === t.key"
+        [class.text-muted]="activeTab() !== t.key"
+        [class.hover:bg-surface-2]="activeTab() !== t.key"
+      >
+        {{ t.label }}
+        <span
+          class="rounded-full bg-black/10 px-1.5 text-[11px] font-semibold"
+          [class.text-white]="activeTab() === t.key"
+          [class.text-muted]="activeTab() !== t.key"
+        >
+          {{ countForTab(t.key) }}
+        </span>
+      </button>
+    }
+  </nav>
 
   <!-- Filters -->
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
@@ -87,12 +107,6 @@
     </div>
     <div class="min-w-[11rem]">
       <label class="sr-only">Category</label>
-      <!-- C2 — dropdown fed by the server categories list. Free-text
-           fallback (derived from loaded items) kicks in when the
-           categories fetch hasn't landed yet or the org is still on
-           the pre-0163 shape. crm-mobile-select renders in-DOM
-           (dark theme, readable options, no OS-picker overflow on
-           mobile emulation). -->
       <crm-mobile-select
         [options]="categorySelectOptions()"
         [value]="categoryControl.value"
@@ -116,8 +130,10 @@
     <p
       class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-10 text-center text-sm text-muted"
     >
-      No products yet.
-      <span class="block text-xs text-faint">Click "Add Product" to create your first item.</span>
+      No products in this tab.
+      <span class="block text-xs text-faint">
+        Click "Add Product" to create one, or switch to another tab.
+      </span>
     </p>
   } @else {
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -151,40 +167,27 @@
                 {{ item.category ?? 'Uncategorized' }}
               </p>
             </div>
-            @if (!item.is_active) {
-              <span
-                class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted ring-1 border-subtle"
-              >
-                inactive
-              </span>
-            } @else {
-              <span
-                class="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 border-emerald-500/20"
-              >
-                active
-              </span>
-            }
+            <span
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 capitalize {{
+                statusBadgeClass(item.status)
+              }}"
+            >
+              {{ item.status }}
+            </span>
           </div>
 
           <div class="mt-3 flex items-center justify-between">
             <p class="text-base font-semibold text-default">
               {{ item.price | formatINR }}
             </p>
-            <div class="flex items-center gap-1" (click)="$event.stopPropagation()">
-              <button
-                type="button"
-                (click)="openEdit(item)"
-                class="rounded-lg border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                (click)="onDelete(item)"
-                class="rounded-md border border-red-500/20 bg-surface px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-500/10"
-              >
-                Delete
-              </button>
+            <div (click)="$event.stopPropagation()">
+              <app-catalog-row-menu
+                [item]="item"
+                (editRequested)="openEdit($event)"
+                (optimisticStatus)="applyOptimistic($event)"
+                (removed)="onRowRemoved($event)"
+                (refresh)="reload()"
+              />
             </div>
           </div>
         </article>

@@ -66,6 +66,22 @@
                mobile card pattern for consistency. -->
           <dl class="flex flex-col gap-2 px-3 py-3 text-[12px]">
             <div class="flex items-center gap-2">
+              <lucide-icon name="user" class="h-3.5 w-3.5 shrink-0 text-faint" />
+              <dt class="sr-only">Contact</dt>
+              <dd class="min-w-0 truncate font-medium text-default">
+                {{ c.contact_name || '—' }}
+              </dd>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <lucide-icon name="user-check" class="h-3.5 w-3.5 shrink-0 text-faint" />
+              <dt class="sr-only">Logged by</dt>
+              <dd class="min-w-0 truncate text-default">
+                {{ c.created_by_name || '—' }}
+              </dd>
+            </div>
+
+            <div class="flex items-center gap-2">
               <lucide-icon name="clock" class="h-3.5 w-3.5 shrink-0 text-faint" />
               <dt class="sr-only">Duration</dt>
               <dd class="font-medium text-default">{{ formatDuration(c.duration_sec) }}</dd>
@@ -130,6 +146,9 @@
               Started
             </th>
             <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
+              Contact
+            </th>
+            <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
               Direction
             </th>
             <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-muted">
@@ -137,6 +156,9 @@
             </th>
             <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
               Outcome
+            </th>
+            <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
+              Logged by
             </th>
             <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
               Notes
@@ -151,6 +173,13 @@
             <tr>
               <td class="whitespace-nowrap px-4 py-2 text-default">
                 {{ formatTimestamp(c.started_at) }}
+              </td>
+              <td class="max-w-[14rem] px-4 py-2">
+                @if (c.contact_name) {
+                  <span class="block truncate font-medium text-default">{{ c.contact_name }}</span>
+                } @else {
+                  <span class="text-xs text-faint">—</span>
+                }
               </td>
               <td class="px-4 py-2">
                 <span
@@ -177,6 +206,13 @@
                   >
                     {{ outcome.label }}
                   </span>
+                } @else {
+                  <span class="text-xs text-faint">—</span>
+                }
+              </td>
+              <td class="max-w-[12rem] px-4 py-2">
+                @if (c.created_by_name) {
+                  <span class="block truncate text-default">{{ c.created_by_name }}</span>
                 } @else {
                   <span class="text-xs text-faint">—</span>
                 }

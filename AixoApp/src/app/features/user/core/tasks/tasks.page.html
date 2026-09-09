@@ -288,16 +288,18 @@
                 Missed
               </button>
             }
-            <button
-              type="button"
-              (click)="openDeleteRow(t)"
-              class="ml-auto inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-surface px-2 py-1 text-[10.5px] font-medium text-red-500 hover:bg-red-500/10"
-              title="Delete task"
-              aria-label="Delete task"
-            >
-              <lucide-icon name="trash-2" class="h-3 w-3" />
-              Delete
-            </button>
+            @if (canDelete()) {
+              <button
+                type="button"
+                (click)="openDeleteRow(t)"
+                class="ml-auto inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-surface px-2 py-1 text-[10.5px] font-medium text-red-500 hover:bg-red-500/10"
+                title="Delete task"
+                aria-label="Delete task"
+              >
+                <lucide-icon name="trash-2" class="h-3 w-3" />
+                Delete
+              </button>
+            }
           </div>
         </li>
       }
@@ -496,16 +498,18 @@
                       <lucide-icon name="clock-alert" class="h-3.5 w-3.5" />
                     </button>
                   }
-                  <!-- T2 — Single-row delete. -->
-                  <button
-                    type="button"
-                    (click)="openDeleteRow(t)"
-                    class="rounded-md p-1 text-faint hover:bg-red-500/10 hover:text-red-400"
-                    title="Delete task"
-                    aria-label="Delete task"
-                  >
-                    <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
-                  </button>
+                  <!-- T2 — Single-row delete. Owner + Admin only. -->
+                  @if (canDelete()) {
+                    <button
+                      type="button"
+                      (click)="openDeleteRow(t)"
+                      class="rounded-md p-1 text-faint hover:bg-red-500/10 hover:text-red-400"
+                      title="Delete task"
+                      aria-label="Delete task"
+                    >
+                      <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
+                    </button>
+                  }
                 </div>
               </td>
             </tr>

@@ -21,8 +21,19 @@ export interface AudienceFilter {
   q?: string;
   source?: string;
   tag?: string;
-  /** Saved contact group id. Mutually exclusive with q/source/tag —
-   *  backend rejects mixed payloads with 422. */
+  /** Restrict to contacts with at least one Lead whose ``status`` /
+   *  pipeline-stage / ``source`` sits in the given set. Each field is
+   *  OR-within, AND-across — mirrors the ``/contacts?lead_*=…`` list
+   *  query. Applied at dispatch time so filter mode stays dynamic. */
+  lead_status?: string[];
+  lead_stage?: string[];
+  lead_source?: string[];
+  /** Multi-form Step 7 — narrow "Forms" leads to specific form ids.
+   *  Applied at dispatch time via an EXISTS subquery on
+   *  ``tbl_leads.attribution->>'form_id'``. */
+  lead_form_id?: string[];
+  /** Saved contact group id. Mutually exclusive with the filter fields
+   *  above — backend rejects mixed payloads with 422. */
   group_id?: string;
   /** Explicit hand-picked contact ids. Mutually exclusive with all
    *  other modes — set from the campaign modal's live preview when

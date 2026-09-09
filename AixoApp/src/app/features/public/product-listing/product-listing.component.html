@@ -1,0 +1,86 @@
+<section>
+  @if (!orgSlug()) {
+    <div class="rounded-xl border border-subtle bg-surface px-6 py-14 text-center shadow-sm">
+      <lucide-icon name="info" class="mx-auto mb-2 h-8 w-8 text-faint"></lucide-icon>
+      <h1 class="text-lg font-semibold text-default">Add an organization to your link</h1>
+      <p class="mt-1 text-sm text-muted">
+        Use a link like <code class="rounded bg-surface-2 px-1">/catalog?org=your-slug</code>.
+      </p>
+    </div>
+  } @else {
+    <header class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold text-default">Products</h1>
+        <p class="mt-1 text-sm text-muted">Browse the latest published items.</p>
+      </div>
+      <div class="w-full max-w-xs">
+        <label for="p_q" class="sr-only">Search</label>
+        <div class="relative">
+          <lucide-icon
+            name="search"
+            class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
+          ></lucide-icon>
+          <input
+            id="p_q"
+            type="search"
+            [formControl]="searchControl"
+            placeholder="Search products…"
+            class="block w-full rounded-lg border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
+      </div>
+    </header>
+
+    @if (loadError(); as err) {
+      <p class="rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 ring-red-500/20">
+        {{ err }}
+      </p>
+    } @else if (loading()) {
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        @for (i of [0, 1, 2, 3, 4, 5]; track i) {
+          <div class="h-64 animate-pulse rounded-xl bg-surface-2"></div>
+        }
+      </div>
+    } @else if (filteredItems().length === 0) {
+      <p
+        class="rounded-md border border-dashed border-subtle bg-surface-2 px-4 py-14 text-center text-sm text-muted"
+      >
+        No products match the current filter.
+      </p>
+    } @else {
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        @for (c of filteredItems(); track c.public_url) {
+          <a
+            [routerLink]="c.public_url"
+            class="group overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm transition hover:shadow-md"
+          >
+            <div class="aspect-[4/3] w-full overflow-hidden bg-surface-2">
+              @if (c.image_url) {
+                <img
+                  [src]="imgSrc(c.image_url)"
+                  [alt]="c.name"
+                  loading="lazy"
+                  class="h-full w-full object-cover transition group-hover:scale-105"
+                />
+              } @else {
+                <div class="flex h-full w-full items-center justify-center text-faint">
+                  <lucide-icon name="package" class="h-8 w-8"></lucide-icon>
+                </div>
+              }
+            </div>
+            <div class="p-4">
+              <p class="text-[11px] font-mono uppercase tracking-wider text-muted">{{ c.sku }}</p>
+              <h2 class="mt-0.5 truncate text-sm font-semibold text-default">{{ c.name }}</h2>
+              @if (c.category) {
+                <p class="mt-1 truncate text-xs text-muted">{{ c.category }}</p>
+              }
+              <p class="mt-2 text-lg font-semibold text-default">
+                {{ formatPrice(c.price, c.currency) }}
+              </p>
+            </div>
+          </a>
+        }
+      </div>
+    }
+  }
+</section>

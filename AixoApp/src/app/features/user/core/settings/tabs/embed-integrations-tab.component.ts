@@ -21,9 +21,11 @@ import {
   WidgetConfigField,
   WidgetConfigSpamProtection,
   WidgetConfigUpdatePayload,
+  WidgetFormListItem,
 } from './embed-api.service';
 import { IssueKeyModalComponent } from './issue-key-modal.component';
 import { SubmissionLogComponent } from './submission-log.component';
+import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
 
 /** Map a contact-custom-field type to the widget field_type the
  *  renderer knows about. Backend `_WIDGET_SUPPORTED_CUSTOM_TYPES`
@@ -64,7 +66,12 @@ function customTypeToWidgetType(t: string): WidgetConfigField['field_type'] {
   selector: 'app-settings-embed-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, IssueKeyModalComponent, SubmissionLogComponent],
+  imports: [
+    LucideAngularModule,
+    IssueKeyModalComponent,
+    SubmissionLogComponent,
+    ConfirmDialogComponent,
+  ],
   templateUrl: './embed-integrations-tab.component.html',
 })
 export class EmbedIntegrationsTabComponent {
@@ -82,12 +89,85 @@ export class EmbedIntegrationsTabComponent {
   protected readonly saveError = signal<string | null>(null);
   protected readonly saveOkAt = signal<number | null>(null);
 
+  // --- Multi-form (Step 8) — Forms toolbar state -----------------------
+
+  /** Every live form the org owns. Populated on load; refreshed after
+   *  create / set-default / delete. */
+  protected readonly forms = signal<WidgetFormListItem[]>([]);
+
+  /** The form the config editor + keys table are scoped to. Starts on
+   *  the org's default form; the operator switches with the top strip. */
+  protected readonly selectedFormId = signal<string | null>(null);
+
+  /** Derived row for the toolbar header (name + slug + is_default). */
+  protected readonly selectedForm = computed<WidgetFormListItem | null>(
+    () => this.forms().find((f) => f.id === this.selectedFormId()) ?? null,
+  );
+
+  /** True when the org has more than one live form — hides the
+   *  "delete" button on the last remaining form (backend also 422s
+   *  this, but the UI polish is nicer if the button just isn't there). */
+  protected readonly hasMultipleForms = computed(() => this.forms().length > 1);
+
+  /** Inline "New form" state — a simple name input rendered above the
+   *  toolbar when open. Kept in-tab (no dedicated modal component) so
+   *  Step 8 stays small; a proper modal is a nice future polish. */
+  protected readonly newFormOpen = signal(false);
+  protected readonly newFormName = signal('');
+  protected readonly newFormSaving = signal(false);
+  protected readonly newFormError = signal<string | null>(null);
+
+  /** Guard for confusable UI states — save/delete/set-default all
+   *  briefly disable the toolbar while their request is in flight. */
+  protected readonly toolbarBusy = signal(false);
+
+  /** Delete-form confirm dialog state. Non-null while open. */
+  protected readonly deleteFormConfirm = signal<{
+    form: WidgetFormListItem;
+    submitting: boolean;
+    error: string | null;
+  } | null>(null);
+
+  /** Rename-form modal state. Held here (not on the form row) so a
+   *  refresh via ``reload()`` doesn't tear down the modal mid-edit.
+   *  The rename modal is a small dedicated overlay with a text input,
+   *  distinct from the confirm-dialog which is body-text-only. */
+  protected readonly renameFormState = signal<{
+    form: WidgetFormListItem;
+    name: string;
+    submitting: boolean;
+    error: string | null;
+  } | null>(null);
+
   // --- Panel 1: keys ----------------------------------------------------
   protected readonly keys = signal<EmbedKey[]>([]);
   protected readonly issueModalOpen = signal(false);
   protected readonly revokingId = signal<string | null>(null);
+  /** In-flight guard for the two-step revoke → remove flow. */
+  protected readonly purgingId = signal<string | null>(null);
 
-  /** Most-recent live key, used to pre-fill the install snippet. */
+  /** Confirm-dialog state for revoke / remove. Uses the shared
+   *  ``app-confirm-dialog`` so the messaging + button styling match
+   *  the rest of the CRM (contacts, leads, walk-ins) instead of the
+   *  native ``window.confirm`` prompt. Null when closed; otherwise
+   *  holds the key + action being confirmed. */
+  protected readonly keyConfirm = signal<{
+    action: 'revoke' | 'purge';
+    key: EmbedKey;
+    error: string | null;
+  } | null>(null);
+
+  /** True when an in-flight submit is happening for the confirmed
+   *  action — drives the dialog's disabled state. */
+  protected readonly keyConfirmSubmitting = computed(() => {
+    const c = this.keyConfirm();
+    if (!c) return false;
+    return c.action === 'revoke' ? this.revokingId() === c.key.id : this.purgingId() === c.key.id;
+  });
+
+  /** Most-recent live key for the CURRENTLY-SELECTED form, used to
+   *  pre-fill the install snippet. `listKeys(formId)` already scopes
+   *  the fetch to this form, so we just pick the newest live row. */
   protected readonly activeKey = computed<EmbedKey | null>(() => {
     const live = this.keys().filter((k) => !k.revoked_at);
     return live.length > 0 ? live[0] : null;
@@ -125,10 +205,17 @@ export class EmbedIntegrationsTabComponent {
   protected readonly snippet = computed<string>(() => {
     const key = this.activeKey();
     if (!key) return '';
+    const form = this.selectedForm();
+    // Multi-form Step 9: the widget JS bundle honours ``data-form`` on
+    // the script tag to load the right form's config. Non-default forms
+    // MUST supply it; the default form works without it too but we
+    // include it uniformly so operators don't have to remember which
+    // one is default.
+    const dataForm = form ? ` data-form="${form.slug}"` : '';
     return (
       '<div id="crm-form"></div>\n' +
       `<script src="${environment.embedWidgetHost}/v1/widget.js" ` +
-      `data-key="${key.prefix}…"></script>`
+      `data-key="${key.prefix}…"${dataForm}></script>`
     );
   });
 
@@ -139,8 +226,47 @@ export class EmbedIntegrationsTabComponent {
   private reload(): void {
     this.loading.set(true);
     this.loadError.set(null);
+    // Multi-form: load the forms list first, then pick the default
+    // (or the current selection when the operator is refreshing after
+    // an edit) as the scope for the config + keys panels below.
     this.api
-      .listKeys()
+      .listForms()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          this.forms.set(rows);
+          const desired = this.selectedFormId();
+          const picked =
+            (desired ? rows.find((f) => f.id === desired) : null) ??
+            rows.find((f) => f.is_default) ??
+            rows[0] ??
+            null;
+          this.selectedFormId.set(picked ? picked.id : null);
+          if (picked) {
+            this._loadFormAndKeys(picked.id);
+          } else {
+            // Fresh org with no forms yet — the config-service
+            // ``get_or_create`` lazy-seeds a default form on first
+            // ``GET /embed/config``, so hit that once and then
+            // re-list forms to pick it up.
+            this._bootstrapDefaultForm();
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loading.set(false);
+          this.loadError.set(extractApiError(err) ?? 'Could not load forms.');
+        },
+      });
+  }
+
+  /** Called after the operator switches which form the editor is
+   *  scoped to (or after a successful save/create/set-default). Loads
+   *  the form's full config + its embed keys in parallel. */
+  private _loadFormAndKeys(formId: string): void {
+    this.loading.set(true);
+    this.loadError.set(null);
+    this.api
+      .listKeys(formId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => this.keys.set(rows),
@@ -148,17 +274,33 @@ export class EmbedIntegrationsTabComponent {
           this.loadError.set(extractApiError(err) ?? 'Could not load keys.'),
       });
     this.api
-      .getConfig()
+      .getForm(formId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (resp) => {
-          this.config.set(resp.config);
+        next: (form) => {
+          this.config.set(form.config);
           this.dirty.set(false);
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(extractApiError(err) ?? 'Could not load widget config.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load form config.');
+        },
+      });
+  }
+
+  /** No-forms case: hit the legacy ``GET /embed/config`` which lazy-
+   *  seeds the org's default form, then re-run ``reload()`` to pick
+   *  it up. Runs at most once per empty-org load. */
+  private _bootstrapDefaultForm(): void {
+    this.api
+      .getConfig()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => this.reload(),
+        error: (err: HttpErrorResponse) => {
+          this.loading.set(false);
+          this.loadError.set(extractApiError(err) ?? 'Could not create default form.');
         },
       });
   }
@@ -171,16 +313,72 @@ export class EmbedIntegrationsTabComponent {
 
   protected onModalClosed(): void {
     this.issueModalOpen.set(false);
+    const formId = this.selectedFormId();
+    if (!formId) return;
+    // Multi-form Step 8: rescope the key list to the currently
+    // selected form so a newly-issued key shows up on this form's
+    // panel (issued keys are always pinned to a form via the modal).
     this.api
-      .listKeys()
+      .listKeys(formId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((rows) => this.keys.set(rows));
   }
 
   protected revoke(key: EmbedKey): void {
     if (key.revoked_at) return;
-    const label = key.name ? `"${key.name}"` : `prefix ${key.prefix}`;
-    if (!confirm(`Revoke key ${label}? Any sites using it will stop working.`)) return;
+    // Open the shared confirm dialog instead of a native ``confirm``
+    // so the messaging + styling match the rest of the CRM. The
+    // ``(confirm)`` handler on the dialog dispatches the actual API
+    // call via ``executeKeyConfirm``.
+    this.keyConfirm.set({ action: 'revoke', key, error: null });
+  }
+
+  /** Two-step-flow "remove from list" — only valid on revoked keys.
+   *  The backend enforces the same rule (422 ``must_revoke_first``)
+   *  so the button is defensive UX rather than authoritative. */
+  protected purge(key: EmbedKey): void {
+    if (!key.revoked_at) return;
+    if (this.purgingId() === key.id) return;
+    this.keyConfirm.set({ action: 'purge', key, error: null });
+  }
+
+  /** Confirm-dialog labels — derived from the pending action so the
+   *  template stays declarative. `keyConfirm()` is non-null exactly
+   *  when the dialog is open. */
+  protected keyConfirmTitle(): string {
+    const c = this.keyConfirm();
+    if (!c) return '';
+    const label = c.key.name ? `"${c.key.name}"` : `prefix ${c.key.prefix}`;
+    return c.action === 'revoke' ? `Revoke key ${label}?` : `Remove key ${label}?`;
+  }
+
+  protected keyConfirmBody(): string {
+    const c = this.keyConfirm();
+    if (!c) return '';
+    return c.action === 'revoke'
+      ? 'Any sites using this key will stop working immediately. The key stays visible in the list until you remove it.'
+      : "This permanently deletes the key from the list. Can't be undone — but since it's already revoked, no live site is affected.";
+  }
+
+  protected keyConfirmButton(): string {
+    return this.keyConfirm()?.action === 'purge' ? 'Remove' : 'Revoke';
+  }
+
+  /** Fired by the shared confirm-dialog's ``(confirm)`` output.
+   *  Dispatches to the right API call based on the pending action. */
+  protected executeKeyConfirm(): void {
+    const c = this.keyConfirm();
+    if (!c) return;
+    if (c.action === 'revoke') this._doRevoke(c.key);
+    else this._doPurge(c.key);
+  }
+
+  protected cancelKeyConfirm(): void {
+    if (this.keyConfirmSubmitting()) return;
+    this.keyConfirm.set(null);
+  }
+
+  private _doRevoke(key: EmbedKey): void {
     this.revokingId.set(key.id);
     this.api
       .revokeKey(key.id)
@@ -191,8 +389,34 @@ export class EmbedIntegrationsTabComponent {
           this.keys.update((rows) =>
             rows.map((r) => (r.id === key.id ? { ...r, revoked_at: new Date().toISOString() } : r)),
           );
+          this.keyConfirm.set(null);
         },
-        error: () => this.revokingId.set(null),
+        error: (err: HttpErrorResponse) => {
+          this.revokingId.set(null);
+          this.keyConfirm.update((prev) =>
+            prev ? { ...prev, error: extractApiError(err) ?? 'Could not revoke key.' } : prev,
+          );
+        },
+      });
+  }
+
+  private _doPurge(key: EmbedKey): void {
+    this.purgingId.set(key.id);
+    this.api
+      .purgeKey(key.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.purgingId.set(null);
+          this.keys.update((rows) => rows.filter((r) => r.id !== key.id));
+          this.keyConfirm.set(null);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.purgingId.set(null);
+          this.keyConfirm.update((prev) =>
+            prev ? { ...prev, error: extractApiError(err) ?? 'Could not remove key.' } : prev,
+          );
+        },
       });
   }
 
@@ -466,10 +690,11 @@ export class EmbedIntegrationsTabComponent {
 
   protected save(): void {
     const cur = this.config();
-    if (!cur || !this.dirty() || this.saving()) return;
+    const formId = this.selectedFormId();
+    if (!cur || !formId || !this.dirty() || this.saving()) return;
     this.saving.set(true);
     this.saveError.set(null);
-    const payload: WidgetConfigUpdatePayload = {
+    const configPayload: WidgetConfigUpdatePayload = {
       fields: cur.fields,
       submit_button_label: cur.submit_button_label,
       thank_you_message: cur.thank_you_message,
@@ -478,7 +703,7 @@ export class EmbedIntegrationsTabComponent {
       spam_protection: cur.spam_protection,
     };
     this.api
-      .updateConfig(payload)
+      .updateForm(formId, { config: configPayload })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
@@ -489,7 +714,200 @@ export class EmbedIntegrationsTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.saveError.set(extractApiError(err) ?? 'Could not save widget config.');
+          this.saveError.set(extractApiError(err) ?? 'Could not save form config.');
+        },
+      });
+  }
+
+  // --- Multi-form toolbar handlers -------------------------------------
+
+  /** Switch which form the editor is scoped to. Guards unsaved changes
+   *  with a confirm prompt — bailing out preserves the operator's
+   *  in-progress edits on the current form. */
+  protected onSelectForm(formId: string): void {
+    if (formId === this.selectedFormId()) return;
+    if (this.dirty() && !confirm('You have unsaved changes. Discard and switch form?')) {
+      return;
+    }
+    this.selectedFormId.set(formId);
+    this._loadFormAndKeys(formId);
+  }
+
+  protected openNewForm(): void {
+    this.newFormName.set('');
+    this.newFormError.set(null);
+    this.newFormOpen.set(true);
+  }
+
+  protected closeNewForm(): void {
+    this.newFormOpen.set(false);
+  }
+
+  protected onNewFormNameInput(event: Event): void {
+    this.newFormName.set((event.target as HTMLInputElement).value);
+  }
+
+  protected submitNewForm(): void {
+    const name = this.newFormName().trim();
+    if (!name || this.newFormSaving()) return;
+    this.newFormSaving.set(true);
+    this.newFormError.set(null);
+    this.api
+      .createForm({ name })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (form) => {
+          this.newFormSaving.set(false);
+          this.newFormOpen.set(false);
+          // Switch to the freshly-created form so the operator can
+          // start editing its config immediately.
+          this.selectedFormId.set(form.id);
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.newFormSaving.set(false);
+          this.newFormError.set(extractApiError(err) ?? 'Could not create form.');
+        },
+      });
+  }
+
+  protected setDefault(formId: string): void {
+    if (this.toolbarBusy()) return;
+    const form = this.forms().find((f) => f.id === formId);
+    if (!form || form.is_default) return;
+    this.toolbarBusy.set(true);
+    this.api
+      .setDefaultForm(formId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.toolbarBusy.set(false);
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toolbarBusy.set(false);
+          this.loadError.set(extractApiError(err) ?? 'Could not set default form.');
+        },
+      });
+  }
+
+  protected deleteSelectedForm(): void {
+    const form = this.selectedForm();
+    if (!form || this.toolbarBusy()) return;
+    if (form.is_default) return; // Backend also 422s — belt-and-suspenders.
+    if (!this.hasMultipleForms()) return;
+    // Open the shared styled confirm-dialog. Actual DELETE fires from
+    // ``executeDeleteForm`` when the operator clicks Delete.
+    this.deleteFormConfirm.set({ form, submitting: false, error: null });
+  }
+
+  /** Delete-dialog title / body — as component methods (not inline
+   *  template strings) so we can use apostrophes freely without
+   *  breaking Angular's expression parser. */
+  protected deleteFormTitle(): string {
+    const dc = this.deleteFormConfirm();
+    return dc ? `Delete form "${dc.form.name}"?` : '';
+  }
+
+  protected deleteFormBody(): string {
+    return (
+      'Every embed key on this form will be revoked — any live snippets on your site ' +
+      'stop accepting submissions. Historical leads from this form keep their attribution. ' +
+      "This can't be undone."
+    );
+  }
+
+  protected cancelDeleteForm(): void {
+    const c = this.deleteFormConfirm();
+    if (!c || c.submitting) return;
+    this.deleteFormConfirm.set(null);
+  }
+
+  protected executeDeleteForm(): void {
+    const c = this.deleteFormConfirm();
+    if (!c || c.submitting) return;
+    this.deleteFormConfirm.update((prev) =>
+      prev ? { ...prev, submitting: true, error: null } : prev,
+    );
+    this.api
+      .deleteForm(c.form.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.deleteFormConfirm.set(null);
+          this.selectedFormId.set(null);
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.deleteFormConfirm.update((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  submitting: false,
+                  error: extractApiError(err) ?? 'Could not delete form.',
+                }
+              : prev,
+          );
+        },
+      });
+  }
+
+  // --- Rename form (works on any form including the default) -----------
+
+  /** Open the rename modal, prefilled with the form's current name. */
+  protected openRenameForm(): void {
+    const form = this.selectedForm();
+    if (!form || this.toolbarBusy()) return;
+    this.renameFormState.set({
+      form,
+      name: form.name,
+      submitting: false,
+      error: null,
+    });
+  }
+
+  protected onRenameNameInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.renameFormState.update((prev) => (prev ? { ...prev, name: value } : prev));
+  }
+
+  protected cancelRenameForm(): void {
+    const c = this.renameFormState();
+    if (!c || c.submitting) return;
+    this.renameFormState.set(null);
+  }
+
+  protected submitRenameForm(): void {
+    const c = this.renameFormState();
+    if (!c || c.submitting) return;
+    const next = c.name.trim();
+    if (!next) return;
+    if (next === c.form.name) {
+      // No-op rename — just close the modal without a round-trip.
+      this.renameFormState.set(null);
+      return;
+    }
+    this.renameFormState.update((prev) =>
+      prev ? { ...prev, submitting: true, error: null } : prev,
+    );
+    this.api
+      .updateForm(c.form.id, { name: next })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.renameFormState.set(null);
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.renameFormState.update((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  submitting: false,
+                  error: extractApiError(err) ?? 'Could not rename form.',
+                }
+              : prev,
+          );
         },
       });
   }

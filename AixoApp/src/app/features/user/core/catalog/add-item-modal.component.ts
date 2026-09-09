@@ -88,6 +88,7 @@ export class AddItemModalComponent {
     });
     this.destroyRef.onDestroy(() => {
       this.revokePreview();
+      this.clearStagedGallery();
     });
     this.loadCategories();
     this.loadCustomFields();
@@ -141,10 +142,17 @@ export class AddItemModalComponent {
       });
   }
 
-  /** `sku` + `name` + `price` are backend-required (locked).
-   *  `category` accepts `required`. `price` additionally accepts `min`/`max`. */
+  /** `name` + `price` are backend-required (locked). `sku` is
+   *  backend-required, but the frontend auto-generates one from
+   *  ``name`` when the field is left blank (see ``autoGenerateSku``)
+   *  so the input is treated as OPTIONAL on the form level — most
+   *  operators shouldn't need to think about product codes.
+   *  ``category`` accepts `required`. `price` additionally accepts
+   *  `min`/`max`. */
   private applyStandardValidators(map: Record<string, StandardFieldRendered>): void {
-    this.form.controls.sku.setValidators([Validators.required, Validators.maxLength(64)]);
+    // SKU: format-only. Required-ness is handled by the auto-gen
+    // fallback in the submit path, not by the form validator.
+    this.form.controls.sku.setValidators([Validators.maxLength(64)]);
     this.form.controls.sku.updateValueAndValidity({ emitEvent: false });
 
     this.form.controls.name.setValidators([Validators.required, Validators.maxLength(255)]);
@@ -216,13 +224,52 @@ export class AddItemModalComponent {
   }
 
   readonly isEdit = computed(() => this._item() !== null);
-  readonly canAddGallery = computed(() => this._item() !== null);
-  readonly galleryUrls = computed<string[]>(() => this._item()?.image_urls ?? []);
+  /** Gallery add/remove is available in BOTH create and edit modes.
+   *  Create mode stages files locally via ``stagedGallery`` (previews
+   *  from `URL.createObjectURL`, chained upload after item creation).
+   *  Edit mode goes straight to the server via the `/images` endpoints. */
+  readonly canAddGallery = computed(() => true);
+  /** Server-locked gallery cap. Total per product = 1 primary + 4
+   *  gallery = 5 images. Kept in sync manually with
+   *  ``_MAX_GALLERY`` on the backend service. */
+  readonly MAX_GALLERY = 4;
+  readonly hasSavedCover = computed(() => !!this._item()?.image_url);
+
+  /** Locally-picked gallery files staged during CREATE (before the
+   *  item row exists). Each entry keeps its own ObjectURL for the
+   *  preview; ``removeStagedGalleryFile`` revokes it on remove and
+   *  ``resetForCreate`` revokes any leftovers. */
+  protected readonly stagedGallery = signal<{ file: File; previewUrl: string }[]>([]);
+
+  /** Unified view for the gallery strip. Edit mode reads persisted
+   *  URLs off the item; create mode reads local ObjectURL previews.
+   *  Returned entries carry an ``isStaged`` flag so the template can
+   *  route the X button to the right handler. */
+  readonly galleryEntries = computed<{ url: string; isStaged: boolean; index: number }[]>(() => {
+    if (this.isEdit()) {
+      return (this._item()?.image_urls ?? []).map((u, i) => ({
+        url: this.galleryHref(u),
+        isStaged: false,
+        index: i,
+      }));
+    }
+    return this.stagedGallery().map((s, i) => ({
+      url: s.previewUrl,
+      isStaged: true,
+      index: i,
+    }));
+  });
+
+  /** Total per-product image count that counts against MAX_GALLERY.
+   *  Draws from persisted OR staged depending on mode. */
+  readonly galleryCount = computed(() =>
+    this.isEdit() ? (this._item()?.image_urls?.length ?? 0) : this.stagedGallery().length,
+  );
 
   protected readonly form = this.fb.group({
     sku: this.fb.control('', {
       nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(64)],
+      validators: [Validators.maxLength(64)],
     }),
     name: this.fb.control('', {
       nonNullable: true,
@@ -315,6 +362,30 @@ export class AddItemModalComponent {
     this.imageError.set(null);
   }
 
+  /** Delete the persisted primary cover on the server. Distinct from
+   *  ``clearImage()`` which only drops the freshly-picked file that
+   *  hasn't been uploaded yet. Only available in edit mode (need
+   *  an existing item id) and when a saved cover actually exists. */
+  protected removeSavedCover(): void {
+    const item = this._item();
+    if (!item?.image_url) return;
+    if (!confirm('Remove the primary cover image?')) return;
+    this.imageError.set(null);
+    this.api
+      .removeImage(item.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this._item.set(updated);
+          this.revokePreview();
+          this.selectedFile.set(null);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.imageError.set(this.errorFor(err) ?? 'Could not remove cover image.');
+        },
+      });
+  }
+
   private acceptFile(file: File): void {
     if (!AddItemModalComponent.ALLOWED_IMAGE_MIME.has(file.type)) {
       this.imageError.set('Pick a JPEG, PNG, or WebP image.');
@@ -347,8 +418,6 @@ export class AddItemModalComponent {
   }
 
   private uploadGalleryImage(file: File): void {
-    const item = this._item();
-    if (!item) return;
     if (!AddItemModalComponent.ALLOWED_IMAGE_MIME.has(file.type)) {
       this.galleryError.set('Pick a JPEG, PNG, or WebP image.');
       return;
@@ -357,8 +426,21 @@ export class AddItemModalComponent {
       this.galleryError.set('Image exceeds the 5 MB cap.');
       return;
     }
-    this.galleryBusy.set(true);
+    if (this.galleryCount() >= this.MAX_GALLERY) {
+      this.galleryError.set(`Up to ${this.MAX_GALLERY} additional images per product.`);
+      return;
+    }
     this.galleryError.set(null);
+
+    const item = this._item();
+    if (!item) {
+      // Create mode — stage locally, upload on save.
+      const previewUrl = URL.createObjectURL(file);
+      this.stagedGallery.update((s) => [...s, { file, previewUrl }]);
+      return;
+    }
+    // Edit mode — hit the server immediately.
+    this.galleryBusy.set(true);
     this.api
       .addGalleryImage(item.id, file)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -374,10 +456,19 @@ export class AddItemModalComponent {
       });
   }
 
-  protected removeGalleryImage(index: number): void {
+  protected removeGalleryEntry(index: number, isStaged: boolean): void {
+    if (!confirm('Remove this image?')) return;
+    if (isStaged) {
+      this.stagedGallery.update((rows) => {
+        const target = rows[index];
+        if (target) URL.revokeObjectURL(target.previewUrl);
+        return rows.filter((_, i) => i !== index);
+      });
+      this.galleryError.set(null);
+      return;
+    }
     const item = this._item();
     if (!item) return;
-    if (!confirm('Remove this gallery image?')) return;
     this.galleryBusy.set(true);
     this.galleryError.set(null);
     this.api
@@ -393,6 +484,13 @@ export class AddItemModalComponent {
           this.galleryError.set(this.errorFor(err) ?? 'Could not remove gallery image.');
         },
       });
+  }
+
+  /** Revoke every staged ObjectURL on modal reset / component destroy
+   *  so we don't leak blobs. */
+  private clearStagedGallery(): void {
+    for (const s of this.stagedGallery()) URL.revokeObjectURL(s.previewUrl);
+    this.stagedGallery.set([]);
   }
 
   // --- Submit -----------------------------------------------------------
@@ -436,9 +534,10 @@ export class AddItemModalComponent {
           },
         });
     } else {
+      const skuValue = raw.sku.trim() || this.autoGenerateSku(raw.name);
       this.api
         .create({
-          sku: raw.sku.trim(),
+          sku: skuValue,
           name: raw.name,
           description: nullableTrim(raw.description),
           category: nullableTrim(raw.category),
@@ -472,56 +571,98 @@ export class AddItemModalComponent {
    *  saved; error shown) — an existing row with a failed image swap
    *  isn't ambiguous. */
   private maybeUploadImage(item: CatalogItem, wasCreate: boolean): void {
-    const file = this.selectedFile();
-    if (!file) {
-      this.submitting.set(false);
-      this.revokePreview();
-      this.selectedFile.set(null);
-      this.saved.emit(item);
+    const coverFile = this.selectedFile();
+    if (!coverFile) {
+      // No primary cover to upload. Still may have staged gallery
+      // files (create path) — chain those directly.
+      if (wasCreate) {
+        this.chainStagedGalleryUploads(item, wasCreate);
+        return;
+      }
+      this.finishSave(item);
       return;
     }
     this.api
-      .uploadImage(item.id, file)
+      .uploadImage(item.id, coverFile)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.submitting.set(false);
-          this.revokePreview();
-          this.selectedFile.set(null);
-          this.saved.emit(updated);
-        },
-        error: (err: HttpErrorResponse) => {
           if (wasCreate) {
-            // Roll back — delete the item we just created so the user
-            // sees one clean error instead of a half-created row.
-            // If the rollback delete ALSO fails, log so the orphan
-            // product isn't invisible — the operator will otherwise
-            // see "product not created" while a row silently exists
-            // in the DB, findable only by a page refresh.
-            this.api
-              .delete(item.id)
-              .pipe(takeUntilDestroyed(this.destroyRef))
-              .subscribe({
-                error: (rollbackErr: HttpErrorResponse) => {
-                  console.warn(
-                    '[catalog] rollback delete failed for orphan product',
-                    item.id,
-                    rollbackErr.status,
-                    rollbackErr.message,
-                  );
-                },
-              });
-            this.submitting.set(false);
-            this.submitError.set(
-              this.errorFor(err) ??
-                'Image upload failed; the product was not created. Try again with a different image.',
-            );
+            this.chainStagedGalleryUploads(updated, wasCreate);
           } else {
-            this.submitting.set(false);
-            this.submitError.set(this.errorFor(err) ?? 'Saved, but the image upload failed.');
+            this.finishSave(updated);
           }
         },
+        error: (err: HttpErrorResponse) => this.handleImageUploadError(err, item, wasCreate),
       });
+  }
+
+  /** Sequential upload of every staged gallery file (create path
+   *  only). One at a time keeps the display-order predictable and
+   *  the memory profile flat. A failure on any single file rolls
+   *  back the whole create + shows the error banner. */
+  private chainStagedGalleryUploads(item: CatalogItem, wasCreate: boolean): void {
+    const staged = this.stagedGallery();
+    if (staged.length === 0) {
+      this.finishSave(item);
+      return;
+    }
+    const [next, ...rest] = staged;
+    this.api
+      .addGalleryImage(item.id, next.file)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          URL.revokeObjectURL(next.previewUrl);
+          this.stagedGallery.set(rest);
+          this.chainStagedGalleryUploads(updated, wasCreate);
+        },
+        error: (err: HttpErrorResponse) => this.handleImageUploadError(err, item, wasCreate),
+      });
+  }
+
+  /** Common tail — clears preview + emits saved. */
+  private finishSave(item: CatalogItem): void {
+    this.submitting.set(false);
+    this.revokePreview();
+    this.selectedFile.set(null);
+    this.clearStagedGallery();
+    this.saved.emit(item);
+  }
+
+  /** Image-upload failure handler shared by cover + gallery paths.
+   *  On CREATE: rolls back the product row so the user isn't left
+   *  with a half-saved product + orphan images. On EDIT: keeps the
+   *  row (the operator's other edits are already persisted) and
+   *  surfaces the error banner. */
+  private handleImageUploadError(
+    err: HttpErrorResponse,
+    item: CatalogItem,
+    wasCreate: boolean,
+  ): void {
+    if (wasCreate) {
+      this.api
+        .delete(item.id)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          error: (rollbackErr: HttpErrorResponse) => {
+            console.warn(
+              '[catalog] rollback delete failed for orphan product',
+              item.id,
+              rollbackErr.status,
+              rollbackErr.message,
+            );
+          },
+        });
+      this.submitting.set(false);
+      this.submitError.set(
+        this.errorFor(err) ??
+          'Image upload failed; the product was not created. Try again with a different image.',
+      );
+      return;
+    }
+    this.submitting.set(false);
+    this.submitError.set(this.errorFor(err) ?? 'Saved, but the image upload failed.');
   }
 
   private resetForm(item: CatalogItem): void {
@@ -554,6 +695,26 @@ export class AddItemModalComponent {
     this.customValue.set({});
     this.tagInput.set('');
     this.galleryError.set(null);
+    this.clearStagedGallery();
+  }
+
+  /** Generate a sensible product code from the product name when the
+   *  operator leaves the SKU field blank. Shape:
+   *  ``<UP-TO-24-CHARS-OF-NAME>-<4-hex-chars>``, e.g.
+   *  ``COMFY-SOFA-A3F0``. Uniqueness within the org is guaranteed by
+   *  the backend's ``(org_id, sku)`` unique constraint; the random
+   *  suffix keeps client-side collisions rare. */
+  private autoGenerateSku(name: string): string {
+    const base = name
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 24);
+    const suffix = Math.floor(Math.random() * 0xffff)
+      .toString(16)
+      .toUpperCase()
+      .padStart(4, '0');
+    return base ? `${base}-${suffix}` : `PROD-${suffix}`;
   }
 
   private errorFor(err: HttpErrorResponse): string | null {

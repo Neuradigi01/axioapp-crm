@@ -99,6 +99,13 @@ export interface Conversation {
   ai_paused?: boolean;
   ai_paused_by_user_id?: string | null;
   ai_paused_at?: string | null;
+  /** Server-computed: true when AI will actually answer the next
+   *  inbound on this conversation — i.e. NOT paused AND (per-conv
+   *  `ai_handling` flag OR the org has an active assistant bound to
+   *  this channel). The chat-thread banner gates on this so the
+   *  "🤖 AI is handling" banner never renders when no AI is really
+   *  configured for the channel. */
+  ai_active?: boolean;
   last_message_at: string | null;
   /** Short preview of the most recent external message (whitespace-collapsed
    *  + trimmed to 140 chars server-side). Populated by the list endpoint

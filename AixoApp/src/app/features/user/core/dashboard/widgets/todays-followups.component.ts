@@ -19,6 +19,7 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
 import { RescheduleInlineComponent } from './reschedule-inline.component';
 import {
   FollowupBucket,
@@ -76,7 +77,14 @@ const PRIORITY_LABELS: Record<FollowupPriority, { label: string; dot: string; te
   selector: 'app-todays-followups',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, LucideAngularModule, RouterLink, RescheduleInlineComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    LucideAngularModule,
+    RouterLink,
+    RescheduleInlineComponent,
+    ConfirmDialogComponent,
+  ],
   templateUrl: './todays-followups.component.html',
 })
 export class TodaysFollowupsComponent {
@@ -104,6 +112,10 @@ export class TodaysFollowupsComponent {
   /** Row ids optimistically flipped to `missed`. Same revert-on-error
    *  contract as `optimisticallyDone`. */
   protected readonly optimisticallyMissed = signal<ReadonlySet<string>>(new Set());
+  /** Row pending Complete confirmation. `null` when the dialog is closed. */
+  protected readonly completingRow = signal<FollowupItem | null>(null);
+  /** Row pending Mark-missed confirmation. `null` when the dialog is closed. */
+  protected readonly missingRow = signal<FollowupItem | null>(null);
 
   protected readonly items = computed<FollowupItem[]>(() => {
     const resp = this.response();
@@ -307,10 +319,23 @@ export class TodaysFollowupsComponent {
       });
   }
 
+  /** Button click → open the confirm dialog. The API call fires from
+   *  `confirmComplete` after the operator clicks through. */
   protected onComplete(row: FollowupItem): void {
     if (row.status === 'done') return;
-    // Optimistic: flip the row locally + adjust the counters so the
-    // click feels instant. Revert on failure.
+    this.completingRow.set(row);
+  }
+
+  protected closeCompleteConfirm(): void {
+    this.completingRow.set(null);
+  }
+
+  protected confirmComplete(): void {
+    const row = this.completingRow();
+    if (!row) return;
+    this.completingRow.set(null);
+    // Optimistic: flip the row locally so the click feels instant.
+    // Revert on failure.
     this.setOptimisticDone(row.id, true);
     this.api
       .markDone(row.id)
@@ -335,6 +360,17 @@ export class TodaysFollowupsComponent {
 
   protected onMarkMissed(row: FollowupItem): void {
     if (!this.canMarkMissed(row)) return;
+    this.missingRow.set(row);
+  }
+
+  protected closeMarkMissedConfirm(): void {
+    this.missingRow.set(null);
+  }
+
+  protected confirmMarkMissed(): void {
+    const row = this.missingRow();
+    if (!row) return;
+    this.missingRow.set(null);
     this.setOptimisticMissed(row.id, true);
     this.api
       .markMissed(row.id)

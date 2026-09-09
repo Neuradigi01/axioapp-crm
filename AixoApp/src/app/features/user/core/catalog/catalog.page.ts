@@ -18,16 +18,34 @@ import { RouterLink } from '@angular/router';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { InrPipe } from '../shared/pipes/inr.pipe';
 import {
+  CATALOG_STATUSES,
   CatalogApiService,
   CatalogCategoriesApiService,
   CatalogCategory,
   CatalogItem,
+  CatalogStatus,
   buildCatalogImageHref,
 } from './catalog-api.service';
 import { AddItemModalComponent } from './add-item-modal.component';
+import { CatalogRowMenuComponent } from './catalog-row-menu.component';
 import { ViewItemModalComponent } from './view-item-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { deriveApiOrigin } from '@core/services/url.util';
+
+type StatusTabKey = 'all' | CatalogStatus;
+
+interface StatusTab {
+  key: StatusTabKey;
+  label: string;
+}
+
+const STATUS_TABS: StatusTab[] = [
+  { key: 'all', label: 'All' },
+  { key: 'draft', label: 'Draft' },
+  { key: 'published', label: 'Published' },
+  { key: 'unpublished', label: 'Unpublished' },
+  { key: 'archived', label: 'Archived' },
+];
 
 /**
  * Catalog page — bare-minimum product table matching the reference
@@ -47,6 +65,7 @@ import { deriveApiOrigin } from '@core/services/url.util';
     AddItemModalComponent,
     ViewItemModalComponent,
     MobileSelectComponent,
+    CatalogRowMenuComponent,
   ],
   templateUrl: './catalog.page.html',
 })
@@ -62,8 +81,12 @@ export class CatalogPageComponent {
 
   readonly items = signal<CatalogItem[]>([]);
   readonly total = signal<number>(0);
+  readonly statusCounts = signal<Partial<Record<CatalogStatus, number>>>({});
   readonly loading = signal(false);
   readonly loadError = signal<string | null>(null);
+
+  readonly TABS = STATUS_TABS;
+  readonly activeTab = signal<StatusTabKey>('all');
 
   readonly searchControl = new FormControl('', { nonNullable: true });
   readonly categoryControl = new FormControl('', { nonNullable: true });
@@ -127,16 +150,39 @@ export class CatalogPageComponent {
   // --- KPI cards ---
 
   readonly totalProducts = computed(() => this.total());
-  readonly activeProducts = computed(() => this.items().filter((i) => i.is_active).length);
-  readonly inactiveProducts = computed(() => this.items().filter((i) => !i.is_active).length);
+  readonly publishedProducts = computed(() => this.statusCounts()['published'] ?? 0);
+  readonly draftProducts = computed(() => this.statusCounts()['draft'] ?? 0);
   readonly distinctCategories = computed(() => this.categoryOptions().length);
-  /** True when the loaded row set is smaller than the server total —
-   *  the Active / Inactive KPIs are counted from the loaded items
-   *  only, so they undercount once the org has more than one page of
-   *  products. Template shows a "(this page)" caption when true so
-   *  the numbers can't silently disagree with `totalProducts`. */
-  readonly kpiCountsPartial = computed(() => this.total() > this.items().length);
 
+  /** Total across every status — displayed on the "All" tab. */
+  readonly allCount = computed(() =>
+    CATALOG_STATUSES.reduce((sum, s) => sum + (this.statusCounts()[s] ?? 0), 0),
+  );
+
+  countForTab(tab: StatusTabKey): number {
+    if (tab === 'all') return this.allCount();
+    return this.statusCounts()[tab] ?? 0;
+  }
+
+  selectTab(tab: StatusTabKey): void {
+    if (this.activeTab() === tab) return;
+    this.activeTab.set(tab);
+    this.reload();
+  }
+
+  statusBadgeClass(s: CatalogStatus): string {
+    switch (s) {
+      case 'published':
+        return 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20';
+      case 'unpublished':
+        return 'bg-amber-500/10 text-amber-400 ring-amber-500/20';
+      case 'archived':
+        return 'bg-surface-2 text-muted ring-zinc-500/20';
+      case 'draft':
+      default:
+        return 'bg-surface-2 text-muted ring-zinc-500/20';
+    }
+  }
   constructor() {
     this.reload();
     this.reloadCategories();
@@ -180,10 +226,14 @@ export class CatalogPageComponent {
     const seq = ++this.reloadSeq;
     this.loading.set(true);
     this.loadError.set(null);
+    const tab = this.activeTab();
+    const statuses: CatalogStatus[] | undefined =
+      tab === 'all' ? undefined : [tab as CatalogStatus];
     this.api
       .list({
         q: this.q() || undefined,
         category: this.categoryFilter() || undefined,
+        statuses,
         size: 200,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -192,20 +242,36 @@ export class CatalogPageComponent {
           if (seq !== this.reloadSeq) return;
           this.items.set(resp.items);
           this.total.set(resp.total);
+          this.statusCounts.set(resp.status_counts ?? {});
           this.loading.set(false);
-          // Reset the broken-image set on a fresh list: any product
-          // whose image was previously 404 might have been re-uploaded
-          // via edit — give it another chance to load before we hide it.
           this.brokenImages.set(new Set());
         },
         error: (err: HttpErrorResponse) => {
           if (seq !== this.reloadSeq) return;
           this.items.set([]);
           this.total.set(0);
+          this.statusCounts.set({});
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load catalog.');
         },
       });
+  }
+
+  /** Optimistic status update from the row menu. On error the menu
+   *  emits again with the previous status; on success we still
+   *  refetch so the tab counts stay correct. */
+  protected applyOptimistic(event: { id: string; status: CatalogStatus }): void {
+    this.items.update((rows) =>
+      rows.map((r) => (r.id === event.id ? { ...r, status: event.status } : r)),
+    );
+  }
+
+  /** Row disappeared (delete via row menu). Drop it locally and
+   *  refetch to keep tab counts in sync. */
+  protected onRowRemoved(id: string): void {
+    this.items.update((rows) => rows.filter((r) => r.id !== id));
+    this.total.update((n) => Math.max(0, n - 1));
+    this.reload();
   }
 
   protected openCreate(): void {
@@ -237,24 +303,6 @@ export class CatalogPageComponent {
   protected onSaved(_item: CatalogItem): void {
     this.modalState.set(null);
     this.reload();
-  }
-
-  protected onDelete(item: CatalogItem): void {
-    const ok = window.confirm(`Delete "${item.name}" (${item.sku})? This cannot be undone.`);
-    if (!ok) return;
-    const before = this.items();
-    this.items.update((rows) => rows.filter((i) => i.id !== item.id));
-    this.total.update((n) => n - 1);
-    this.api
-      .delete(item.id)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        error: (err: HttpErrorResponse) => {
-          this.items.set(before);
-          this.total.set(before.length);
-          this.loadError.set(extractApiError(err) ?? 'Could not delete item.');
-        },
-      });
   }
 
   /** Absolute URL for the backend-served `/files/...` image path. */
