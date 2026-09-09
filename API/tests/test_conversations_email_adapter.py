@@ -211,6 +211,26 @@ class TestBuildOutboundMime:
         assert msg["In-Reply-To"] == "<parent@d.com>"
         assert msg["References"] == "<parent@d.com>"
 
+    def test_reply_uses_explicit_references_chain(self):
+        """When the caller supplies a full ``References`` chain (AI reply
+        flow — carried over from the inbound envelope), the MIME builder
+        prefers it over the single-parent fallback."""
+        chain = "<older1@x.com> <older2@x.com> <parent@d.com>"
+        msg = email_adapter._build_outbound_mime(
+            from_email="asha@x.com",
+            from_name=None,
+            to_email="m@d.com",
+            to_name=None,
+            subject="Re: Quote",
+            body_text="hi",
+            body_html=None,
+            message_id="<own3@furnicrm.app>",
+            in_reply_to="parent@d.com",
+            references_chain=chain,
+        )
+        assert msg["In-Reply-To"] == "<parent@d.com>"
+        assert msg["References"] == chain
+
     def test_html_alternative(self):
         msg = email_adapter._build_outbound_mime(
             from_email="a@x.com",
@@ -340,6 +360,46 @@ def patch_external_io(monkeypatch):
 
 
 class TestSendEmail:
+    @pytest.mark.asyncio
+    async def test_rejects_neither_user_nor_ai(self):
+        """Every send must carry an author — human user OR AI assistant.
+        Passing neither is a caller-side bug the adapter surfaces as 400."""
+        from fastapi import HTTPException
+
+        session = _CapturingSession()
+        with pytest.raises(HTTPException) as exc:
+            await email_adapter.send_email(
+                session,
+                org_id=_ORG_ID,
+                account_id=uuid.uuid4(),
+                contact_id=uuid.uuid4(),
+                subject="x",
+                body_text="x",
+            )
+        assert exc.value.status_code == 400
+        assert "sender_user_id" in exc.value.detail
+
+    @pytest.mark.asyncio
+    async def test_rejects_both_user_and_ai(self):
+        """Passing both is also a caller-side bug — the outbound row's
+        ``payload.author`` can only be one value."""
+        from fastapi import HTTPException
+
+        session = _CapturingSession()
+        with pytest.raises(HTTPException) as exc:
+            await email_adapter.send_email(
+                session,
+                org_id=_ORG_ID,
+                sender_user_id=_USER_ID,
+                ai_assistant_id=uuid.uuid4(),
+                account_id=uuid.uuid4(),
+                contact_id=uuid.uuid4(),
+                subject="x",
+                body_text="x",
+            )
+        assert exc.value.status_code == 400
+        assert "sender_user_id" in exc.value.detail
+
     @pytest.mark.asyncio
     async def test_account_not_found_404(self, monkeypatch):
         async def fake_get_account(_sess, *, account_id):
