@@ -143,18 +143,25 @@
           />
         }
       </div>
-      <button
-        type="button"
-        (click)="toggle()"
-        [class]="
-          'rounded-full px-3 py-1 text-xs font-medium transition ' +
-          (conversation.ai_handling
-            ? 'bg-violet-500/10 text-violet-700 hover:bg-violet-500/10'
-            : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/10')
-        "
-      >
-        {{ conversation.ai_handling ? 'AI Handled' : 'Needs Human' }}
-      </button>
+      @if (conversation.ai_paused) {
+        <button
+          type="button"
+          (click)="onResumeClick()"
+          class="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-400 transition hover:bg-amber-500/20"
+          title="A team member is handling this — click to hand it back to AI"
+        >
+          ✋ Human handling
+        </button>
+      } @else if (conversation.ai_active) {
+        <button
+          type="button"
+          (click)="onTakeoverClick()"
+          class="rounded-full bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-400 transition hover:bg-violet-500/20"
+          title="AI is handling this — click to take over"
+        >
+          🤖 AI Handled
+        </button>
+      }
       <!-- Step 23 — DPDP transcript export + DND block action. -->
       <app-conversation-export-button [conversationId]="conversation.id" />
       @if (conversation.channel === 'whatsapp') {

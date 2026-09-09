@@ -15,6 +15,10 @@ import { startWith } from 'rxjs/operators';
 
 import { FurnitureAuthService } from '@app/features/user/core/auth/auth.service';
 import { SNACKBAR_ACTION, SNACKBAR_DURATION } from '@core/constants/app.constants';
+import {
+  MobileSelectComponent,
+  type MobileSelectOption,
+} from '@app/features/user/core/shared/forms/mobile-select.component';
 import { OnboardingApiService } from './onboarding-api.service';
 import { PackTileComponent } from './pack-tile.component';
 import { CatalogTile } from './onboarding.types';
@@ -26,7 +30,7 @@ const TEAM_SIZES = ['1-5', '6-20', '21-50', '51-200', '200+'] as const;
   templateUrl: './onboarding.component.html',
   styleUrl: './onboarding.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, PackTileComponent],
+  imports: [ReactiveFormsModule, PackTileComponent, MobileSelectComponent],
 })
 export class OnboardingComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
@@ -36,6 +40,10 @@ export class OnboardingComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
 
   readonly teamSizes = TEAM_SIZES;
+  readonly teamSizeOptions: MobileSelectOption[] = TEAM_SIZES.map((s) => ({
+    value: s,
+    label: s,
+  }));
 
   readonly tiles = signal<CatalogTile[]>([]);
   readonly isLoadingCatalog = signal<boolean>(true);

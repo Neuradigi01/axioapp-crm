@@ -17,6 +17,7 @@ import { forkJoin } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../auth/auth.service';
+import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 
 import { FolderCreateModalComponent } from './folders/folder-create.modal.component';
@@ -99,6 +100,7 @@ export class WorkflowsPageComponent {
   private readonly api = inject(WorkflowsApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   protected readonly STATUS_OPTIONS = STATUS_OPTIONS;
   protected readonly CATEGORY_OPTIONS = CATEGORY_OPTIONS;
@@ -346,14 +348,15 @@ export class WorkflowsPageComponent {
     this.runBulk('pause');
   }
 
-  protected bulkArchive(): void {
-    if (
-      !confirm(
-        `Archive ${this.selectedIds().size} workflow(s)? Outstanding runs continue under the archived version.`,
-      )
-    ) {
-      return;
-    }
+  protected async bulkArchive(): Promise<void> {
+    const count = this.selectedIds().size;
+    const ok = await this.confirmDialog.ask({
+      title: `Archive ${count} workflow${count === 1 ? '' : 's'}?`,
+      body: 'Outstanding runs continue under the archived version, but no new enrollments will happen.',
+      confirmLabel: 'Archive',
+      danger: true,
+    });
+    if (!ok) return;
     this.runBulk('archive');
   }
 
@@ -403,11 +406,17 @@ export class WorkflowsPageComponent {
     this.openMenuId.set(null);
   }
 
-  protected onClone(row: WorkflowRead, event: MouseEvent): void {
+  protected async onClone(row: WorkflowRead, event: MouseEvent): Promise<void> {
     event.stopPropagation();
     this.closeMenu();
     if (!this.canClone()) return;
-    const name = prompt('Name for the cloned workflow', `${row.name} (copy)`);
+    const name = await this.confirmDialog.prompt({
+      title: 'Clone workflow',
+      body: `A copy of "${row.name}" will be created as a draft. Give the copy a name — you can rename it later.`,
+      placeholder: 'Workflow name',
+      initialValue: `${row.name} (copy)`,
+      confirmLabel: 'Clone',
+    });
     if (!name) return;
     this.api
       .clone(row.id, name.trim())
@@ -423,11 +432,17 @@ export class WorkflowsPageComponent {
       });
   }
 
-  protected onArchiveRow(row: WorkflowRead, event: MouseEvent): void {
+  protected async onArchiveRow(row: WorkflowRead, event: MouseEvent): Promise<void> {
     event.stopPropagation();
     this.closeMenu();
     if (!this.canWrite()) return;
-    if (!confirm(`Archive "${row.name}"?`)) return;
+    const ok = await this.confirmDialog.ask({
+      title: `Archive "${row.name}"?`,
+      body: 'Outstanding runs continue under the archived version, but no new enrollments will happen.',
+      confirmLabel: 'Archive',
+      danger: true,
+    });
+    if (!ok) return;
     this.api
       .archive(row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))

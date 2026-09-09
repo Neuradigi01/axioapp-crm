@@ -79,6 +79,22 @@
 
     <button
       type="button"
+      (click)="variablesPanelOpen.set(!variablesPanelOpen())"
+      [class]="
+        'px-2 md:px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors inline-flex items-center gap-1.5 ' +
+        (variablesPanelOpen()
+          ? 'border-accent bg-accent-soft text-accent'
+          : 'border-subtle text-default hover:bg-surface-2')
+      "
+      title="Show available variables you can insert into messages"
+      aria-label="Variables"
+    >
+      <lucide-icon name="braces" size="12"></lucide-icon>
+      <span class="hidden md:inline">Variables</span>
+    </button>
+
+    <button
+      type="button"
       (click)="openTestModal()"
       [disabled]="!bot() || dirty() || saving()"
       class="px-2 md:px-3 py-1.5 rounded-md text-xs font-semibold border border-subtle text-default hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors"
@@ -541,6 +557,7 @@
                     [nodeId]="node.id"
                     [nodeIsPending]="pendingSourceId() === node.id"
                     [pendingPortLabel]="canvas.pendingSourceLabel()"
+                    [sessionVariables]="sessionVariables()"
                     (patch)="patchNodeConfig(node.id, $event)"
                     (portClick)="onOutputPortClick(node.id, $event.label, $event.event)"
                   ></app-node-config-form>
@@ -622,6 +639,13 @@
           }
         </div>
       </main>
+
+      @if (variablesPanelOpen()) {
+        <app-variables-panel
+          [sessionVariables]="sessionVariables()"
+          (close)="variablesPanelOpen.set(false)"
+        ></app-variables-panel>
+      }
     }
   </div>
 </div>

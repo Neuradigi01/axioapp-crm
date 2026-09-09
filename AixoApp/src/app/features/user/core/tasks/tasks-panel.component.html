@@ -141,15 +141,17 @@
             >
               <lucide-icon name="pencil" class="h-3.5 w-3.5" />
             </button>
-            <button
-              type="button"
-              (click)="onDelete(task)"
-              class="rounded-md p-1 text-faint hover:bg-red-500/10 hover:text-red-400"
-              title="Delete task"
-              aria-label="Delete task"
-            >
-              <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
-            </button>
+            @if (canDelete) {
+              <button
+                type="button"
+                (click)="onDelete(task)"
+                class="rounded-md p-1 text-faint hover:bg-red-500/10 hover:text-red-400"
+                title="Delete task"
+                aria-label="Delete task"
+              >
+                <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
+              </button>
+            }
           </div>
         </li>
       }

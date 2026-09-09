@@ -56,7 +56,11 @@ interface EmailAttachmentMeta {
 /**
  * Chat thread — renders bubbles, auto-scrolls to bottom on new
  * messages. The conversation header shows the external_id + channel +
- * the AI-Handled / Needs-Human pill (clickable: emits `toggleAi`).
+ * a state-aware AI pill that reflects the real ``ai_active`` /
+ * ``ai_paused`` truth (bound-assistant + takeover state) rather than
+ * the legacy per-conversation ``ai_handling`` flag. Clicking the pill
+ * emits ``takeoverAi`` / ``resumeAiOut`` — same handlers the banner's
+ * Take Over / Return to AI buttons drive.
  *
  * Optimistic outbound messages have ids that start with `tmp-`; we
  * grey them slightly so the user can tell the wire hasn't ack'd yet.
@@ -88,8 +92,6 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
   @Input() detail: ConversationDetail | null = null;
   @Input() loading = false;
   @Input() staffById: Map<string, StaffListItem> = new Map();
-
-  @Output() readonly toggleAi = new EventEmitter<boolean>();
 
   /** tasks/ai-assistants-omnichannel Step 4 — user clicked the Take
    *  Over button on the AI-status banner. The page owns the POST +
@@ -289,26 +291,17 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
     return 'pending';
   }
 
-  protected toggle(): void {
-    this.toggleAi.emit(!this.conversation.ai_handling);
-  }
-
   // --- AI takeover banner (omnichannel Step 4) ---------------------
 
-  /** Show the takeover banner on every channel that CAN carry AI —
-   *  widget conversations always can; WhatsApp / Email do when the
-   *  org has an assistant bound to that channel. Rather than
-   *  round-tripping the bind check on every render, we show the
-   *  banner on all three AI-capable channels + defer the "actually
-   *  paused / running" state to the server (a click always resolves
-   *  to a real conversation update on the backend). Pure non-AI
-   *  channels (sms / instagram / facebook / push) keep a clean
-   *  human-only UI. */
+  /** Show the takeover banner only when AI is genuinely part of this
+   *  conversation — either currently answering (``ai_active``) or
+   *  paused because a human took over (``ai_paused``). The old
+   *  fallback that showed the banner on every AI-capable channel
+   *  (whatsapp/email/ai_widget) lied when no assistant was actually
+   *  bound: the header would read "Needs Human" and the banner
+   *  underneath would claim "AI is handling this conversation". */
   protected showTakeoverBanner(): boolean {
-    if (this.conversation.ai_paused) return true;
-    if (this.conversation.ai_handling) return true;
-    const ch = this.conversation.channel;
-    return ch === 'ai_widget' || ch === 'whatsapp' || ch === 'email';
+    return !!this.conversation.ai_paused || !!this.conversation.ai_active;
   }
 
   /** Display name of whoever currently holds the paused conversation.

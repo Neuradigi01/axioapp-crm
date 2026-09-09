@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 import { CanvasNode, CanvasStateService } from './canvas-state.service';
 import { getNodeType } from './node-type-registry';
 
@@ -88,6 +89,7 @@ export class NodeEditorComponent {
   readonly close = output<void>();
 
   private readonly state = inject(CanvasStateService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly nodeType = computed(() => getNodeType(this.node().type));
 
@@ -175,11 +177,16 @@ export class NodeEditorComponent {
     }
   }
 
-  onDelete(): void {
-    if (confirm('Delete this node and its connections?')) {
-      this.state.deleteNode(this.node().id);
-      this.close.emit();
-    }
+  async onDelete(): Promise<void> {
+    const ok = await this.confirmDialog.ask({
+      title: 'Delete this node?',
+      body: 'The node and every edge attached to it will be removed. You can undo with Ctrl+Z.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    this.state.deleteNode(this.node().id);
+    this.close.emit();
   }
 
   // --- child IO bridge ------------------------------------------------

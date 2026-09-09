@@ -95,6 +95,26 @@ const MODE_OPTIONS = [
             </p>
           </div>
 
+          @if (mode() === 'any') {
+            <div
+              class="rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-400 p-3 text-[11px] leading-relaxed"
+            >
+              <div class="flex items-start gap-2">
+                <lucide-icon
+                  name="alert-triangle"
+                  size="14"
+                  class="flex-shrink-0 mt-0.5"
+                ></lucide-icon>
+                <div>
+                  <strong class="font-semibold">This bot fires on every inbound message.</strong>
+                  Any AI Assistant bound to the same channel will never respond — this bot takes
+                  every message. Add a <em>Route to AI</em> node inside your flow if you want the AI
+                  to answer specific branches.
+                </div>
+              </div>
+            </div>
+          }
+
           @if (mode() === 'keyword') {
             <div>
               <label class="block text-[11px] font-medium text-muted mb-1.5 uppercase tracking-wide"

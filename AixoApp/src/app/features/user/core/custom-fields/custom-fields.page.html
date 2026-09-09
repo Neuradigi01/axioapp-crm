@@ -1,120 +1,170 @@
-<section class="space-y-4">
-  <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-    <div>
-      <h2 class="text-base font-semibold text-default">Custom fields</h2>
-      <p class="mt-1 text-[14px] text-muted">
-        Add fields to an entity, rename labels, mark required, hide, or reorder by dragging. Pack
-        and system fields are labelled so you know where they came from — you can delete them too,
-        but if the pack&rsquo;s imports or workflows reference the key you&rsquo;ll need to re-add
-        it later.
-      </p>
+<section class="space-y-6">
+  <!-- Page intro -->
+  <header>
+    <h2 class="text-base font-semibold text-default">Custom fields</h2>
+    <p class="mt-1 text-[14px] text-muted">
+      Extend any entity with your own fields — like "Preferred colour" on contacts or "Warranty
+      months" on products. Pick an entity below, then add and reorder fields for it.
+    </p>
+  </header>
+
+  <!-- Step 1: entity picker ================================================ -->
+  <div>
+    <div class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
+      <span
+        class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-white"
+      >
+        1
+      </span>
+      <span class="text-default">Pick an entity to customise</span>
     </div>
-    <div class="flex items-center gap-2">
-      <label class="text-xs text-default">Entity</label>
-      <div class="min-w-[10rem]">
-        <crm-mobile-select
-          [options]="entityTypes"
-          [value]="entityType()"
-          (valueChange)="onEntityChange($event)"
-        />
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      @for (e of entityTypes; track e.value) {
+        <button
+          type="button"
+          (click)="onEntityChange(e.value)"
+          class="group flex flex-col items-start gap-1 rounded-lg border bg-surface p-3 text-left transition"
+          [class.border-accent]="entityType() === e.value"
+          [class.ring-2]="entityType() === e.value"
+          [class.ring-accent]="entityType() === e.value"
+          [class.border-subtle]="entityType() !== e.value"
+          [class.hover:border-muted]="entityType() !== e.value"
+          [class.hover:bg-surface-2]="entityType() !== e.value"
+        >
+          <span
+            class="flex h-8 w-8 items-center justify-center rounded-md"
+            [class.bg-accent]="entityType() === e.value"
+            [class.text-white]="entityType() === e.value"
+            [class.bg-surface-2]="entityType() !== e.value"
+            [class.text-muted]="entityType() !== e.value"
+          >
+            <lucide-icon [name]="e.icon" class="h-4 w-4"></lucide-icon>
+          </span>
+          <span class="mt-1 text-sm font-semibold text-default">{{ e.label }}</span>
+          <span class="text-[11px] leading-tight text-muted">{{ e.description }}</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- Step 2: fields for the selected entity ============================== -->
+  <div>
+    <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
+        <span
+          class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-white"
+        >
+          2
+        </span>
+        <span class="text-default">Fields for {{ selectedEntity().label }}</span>
       </div>
       <button
         type="button"
-        class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
         (click)="openCreate()"
       >
+        <lucide-icon name="plus" class="h-4 w-4"></lucide-icon>
         Add field
       </button>
     </div>
-  </header>
 
-  @if (loadError()) {
-    <div class="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400 ring-1 border-red-500/20">
-      {{ loadError() }}
-    </div>
-  }
-
-  @if (loading()) {
-    <div
-      class="rounded-md border border-dashed border-subtle px-3 py-12 text-center text-sm text-muted"
-    >
-      Loading fields…
-    </div>
-  } @else if (fields().length === 0) {
-    <div
-      class="rounded-md border border-dashed border-subtle px-3 py-12 text-center text-sm text-muted"
-    >
-      No fields defined for this entity yet.
-    </div>
-  } @else {
-    <div class="overflow-hidden rounded-md ring-1 border-subtle">
+    @if (loadError()) {
       <div
-        class="grid grid-cols-12 gap-2 border-b border-subtle bg-surface-2 px-3 py-2 text-xs font-medium text-muted"
+        class="mb-3 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400 ring-1 border-red-500/20"
       >
-        <div class="col-span-1"></div>
-        <div class="col-span-3">Key</div>
-        <div class="col-span-4">Label</div>
-        <div class="col-span-1">Type</div>
-        <div class="col-span-1">Source</div>
-        <div class="col-span-1 text-right">Required</div>
-        <div class="col-span-1 text-right">Actions</div>
+        {{ loadError() }}
       </div>
-      <ul cdkDropList class="divide-y divide-subtle" (cdkDropListDropped)="onDrop($event)">
-        @for (field of fields(); track field.id) {
-          <li
-            cdkDrag
-            class="grid grid-cols-12 items-center gap-2 bg-surface px-3 py-2 text-sm text-default"
-          >
-            <span
-              cdkDragHandle
-              class="col-span-1 cursor-grab text-faint hover:text-default"
-              aria-label="Drag to reorder"
-              title="Drag to reorder"
+    }
+
+    @if (loading()) {
+      <div
+        class="rounded-md border border-dashed border-subtle px-3 py-12 text-center text-sm text-muted"
+      >
+        Loading fields…
+      </div>
+    } @else if (fields().length === 0) {
+      <div
+        class="rounded-md border border-dashed border-subtle bg-surface-2 px-3 py-12 text-center"
+      >
+        <lucide-icon
+          [name]="selectedEntity().icon"
+          class="mx-auto mb-2 h-6 w-6 text-faint"
+        ></lucide-icon>
+        <p class="text-sm text-default">No custom fields on {{ selectedEntity().label }} yet.</p>
+        <p class="mt-1 text-xs text-muted">
+          Click <span class="font-semibold">Add field</span> to create your first one.
+        </p>
+      </div>
+    } @else {
+      <div class="overflow-hidden rounded-md ring-1 border-subtle">
+        <div
+          class="grid grid-cols-12 gap-2 border-b border-subtle bg-surface-2 px-3 py-2 text-xs font-medium text-muted"
+        >
+          <div class="col-span-1"></div>
+          <div class="col-span-3">Key</div>
+          <div class="col-span-4">Label</div>
+          <div class="col-span-1">Type</div>
+          <div class="col-span-1">Source</div>
+          <div class="col-span-1 text-right">Required</div>
+          <div class="col-span-1 text-right">Actions</div>
+        </div>
+        <ul cdkDropList class="divide-y divide-subtle" (cdkDropListDropped)="onDrop($event)">
+          @for (field of fields(); track field.id) {
+            <li
+              cdkDrag
+              class="grid grid-cols-12 items-center gap-2 bg-surface px-3 py-2 text-sm text-default"
             >
-              ☰
-            </span>
-            <span class="col-span-3 truncate font-mono text-xs text-muted">{{
-              field.field_key
-            }}</span>
-            <span class="col-span-4 truncate" [class.text-faint]="field.is_hidden">
-              {{ field.field_label }}
-              @if (field.is_hidden) {
-                <span class="ml-2 text-xs text-faint">(hidden)</span>
-              }
-            </span>
-            <span class="col-span-1 text-xs text-muted">{{ field.field_type }}</span>
-            <span class="col-span-1">
               <span
-                class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1"
-                [class]="badgeClass(field.source)"
+                cdkDragHandle
+                class="col-span-1 cursor-grab text-faint hover:text-default"
+                aria-label="Drag to reorder"
+                title="Drag to reorder"
               >
-                {{ badgeLabel(field.source) }}
+                ☰
               </span>
-            </span>
-            <span class="col-span-1 text-right text-xs text-muted">
-              {{ field.is_required ? 'Yes' : '—' }}
-            </span>
-            <span class="col-span-1 flex justify-end gap-2">
-              <button
-                type="button"
-                class="text-xs font-medium text-default hover:text-default"
-                (click)="openEdit(field)"
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                class="text-xs font-medium text-red-600 hover:text-red-400"
-                (click)="onDelete(field)"
-              >
-                Delete
-              </button>
-            </span>
-          </li>
-        }
-      </ul>
-    </div>
-  }
+              <span class="col-span-3 truncate font-mono text-xs text-muted">{{
+                field.field_key
+              }}</span>
+              <span class="col-span-4 truncate" [class.text-faint]="field.is_hidden">
+                {{ field.field_label }}
+                @if (field.is_hidden) {
+                  <span class="ml-2 text-xs text-faint">(hidden)</span>
+                }
+              </span>
+              <span class="col-span-1 text-xs text-muted">{{ field.field_type }}</span>
+              <span class="col-span-1">
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1"
+                  [class]="badgeClass(field.source)"
+                >
+                  {{ badgeLabel(field.source) }}
+                </span>
+              </span>
+              <span class="col-span-1 text-right text-xs text-muted">
+                {{ field.is_required ? 'Yes' : '—' }}
+              </span>
+              <span class="col-span-1 flex justify-end gap-2">
+                <button
+                  type="button"
+                  class="text-xs font-medium text-default hover:text-default"
+                  (click)="openEdit(field)"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-red-600 hover:text-red-400"
+                  (click)="onDelete(field)"
+                >
+                  Delete
+                </button>
+              </span>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+  </div>
 </section>
 
 @if (formOpen()) {
@@ -128,10 +178,7 @@
   ></app-field-form>
 }
 
-<!-- In-app delete confirmation. Replaces window.confirm so the dialog
-     matches the app's styling (same shape as the merge-contact modal).
-     Amber warning box shows for pack + system fields so the operator
-     sees the extra consequence before wiping a pack-installed row. -->
+<!-- In-app delete confirmation. Amber warning for pack + system fields. -->
 @if (pendingDelete(); as field) {
   <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
     <div class="w-full max-w-md rounded-lg bg-surface shadow-xl ring-1 border-subtle">

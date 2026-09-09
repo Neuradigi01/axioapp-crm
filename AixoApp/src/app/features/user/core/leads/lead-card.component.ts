@@ -161,6 +161,20 @@ export class LeadCardComponent {
   /** Human label for the per-source badge. */
   readonly sourceBadgeLabel = computed(() => this.labelForSource(this.lead().source));
 
+  /** Hover tooltip for the source pill. For widget-sourced leads with
+   *  a form binding on ``attribution.form_name`` (multi-form Step 4),
+   *  reveals ``via <form_name>`` so the operator can identify which
+   *  specific form produced this lead without leaving the kanban view.
+   *  Non-widget sources return null (no tooltip). */
+  readonly sourceBadgeTooltip = computed<string | null>(() => {
+    const l = this.lead();
+    if (l.source !== 'widget') return null;
+    const attribution = (l.attribution as { form_name?: unknown } | null) ?? null;
+    const formName = attribution?.form_name;
+    if (typeof formName !== 'string' || !formName.trim()) return null;
+    return `via ${formName}`;
+  });
+
   private classForStatus(status: LeadStatus): string {
     switch (status) {
       case 'won':
@@ -196,7 +210,10 @@ export class LeadCardComponent {
       case 'bulk_import':
         return 'Bulk import';
       case 'widget':
-        return 'Widget';
+        // Multi-form track: `widget` enum → "Forms" label on every
+        // user-facing surface. Step 6 layers "Forms · <FormName>" on
+        // top when `attribution.form_name` is set.
+        return 'Forms';
       case 'google_ads':
         return 'Google Ads';
       case 'meta_ads':

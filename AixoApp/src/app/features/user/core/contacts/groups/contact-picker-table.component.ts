@@ -31,21 +31,51 @@ import { Subject, of } from 'rxjs';
 import { catchError, debounceTime, switchMap } from 'rxjs/operators';
 
 import { ContactListItem, ContactsApiService } from '../contacts-api.service';
+import { PipelineStage, PipelinesApiService } from '../../pipelines/pipelines-api.service';
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../shared/forms/mobile-select.component';
+import { EmbedApiService, WidgetFormListItem } from '../../settings/tabs/embed-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 type FilterKey = 'name' | 'source' | 'tag';
 
 const PAGE_SIZE = 20;
 
+/** Hard-coded lists that mirror the backend Lead enums — kept in
+ *  lock-step with ``core.leads.models.LeadStatus`` / ``LeadSource``.
+ *  Same shape as the campaign audience filter so both surfaces read
+ *  identically. */
+const LEAD_STATUS_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'active', label: 'Active' },
+  { value: 'won', label: 'Won' },
+  { value: 'lost', label: 'Lost' },
+];
+
+const LEAD_SOURCE_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'manual', label: 'Manual' },
+  { value: 'bulk_import', label: 'Bulk import' },
+  // Multi-form track: `widget` enum stays, UI label renders as
+  // "Forms" — the source bucket matches any form-sourced lead.
+  { value: 'widget', label: 'Forms' },
+  { value: 'google_ads', label: 'Google Ads' },
+  { value: 'meta_ads', label: 'Meta Ads' },
+  { value: 'whatsapp_flow', label: 'WhatsApp flow' },
+  { value: 'walk_in', label: 'Walk-in' },
+];
+
 @Component({
   selector: 'app-contact-picker-table',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, LucideAngularModule, ReactiveFormsModule],
+  imports: [CommonModule, LucideAngularModule, ReactiveFormsModule, MobileSelectComponent],
   templateUrl: './contact-picker-table.component.html',
 })
 export class ContactPickerTableComponent {
   private readonly contactsApi = inject(ContactsApiService);
+  private readonly pipelinesApi = inject(PipelinesApiService);
+  private readonly embedApi = inject(EmbedApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   /** Two-way bound. Parent seeds it with a group's existing member ids
@@ -62,6 +92,97 @@ export class ContactPickerTableComponent {
 
   /** Which column filter popover is currently open, or `null` for none. */
   protected readonly openFilter = signal<FilterKey | null>(null);
+
+  // Lead-linked chip filters — same shape and behaviour as the
+  // campaign audience filter. Empty array = no filter on that facet;
+  // otherwise a contact qualifies only when it has at least one lead
+  // matching every requested facet (OR-within, AND-across).
+  protected readonly leadStatusOptions = LEAD_STATUS_OPTIONS;
+  protected readonly leadSourceOptions = LEAD_SOURCE_OPTIONS;
+  protected readonly leadStatusFilter = signal<string[]>([]);
+  protected readonly leadStageFilter = signal<string[]>([]);
+  protected readonly leadSourceFilter = signal<string[]>([]);
+
+  /** Pipeline stages for the lead-stage dropdown, loaded lazily on
+   *  construction. */
+  protected readonly pipelineStages = signal<PipelineStage[]>([]);
+  protected readonly pipelineStageOptions = computed<MobileSelectOption[]>(() =>
+    [...this.pipelineStages()]
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((s) => ({ value: s.key, label: s.name })),
+  );
+
+  protected leadStatusLabel(v: string): string {
+    return this.leadStatusOptions.find((o) => o.value === v)?.label ?? v;
+  }
+  protected leadStageLabel(v: string): string {
+    return this.pipelineStageOptions().find((o) => o.value === v)?.label ?? v;
+  }
+  protected leadSourceLabel(v: string): string {
+    return this.leadSourceOptions.find((o) => o.value === v)?.label ?? v;
+  }
+
+  protected onAddLeadStatus(value: string | null): void {
+    if (value && !this.leadStatusFilter().includes(value)) {
+      this.leadStatusFilter.update((prev) => [...prev, value]);
+      this._onFilterChange();
+    }
+  }
+  protected onAddLeadStage(value: string | null): void {
+    if (value && !this.leadStageFilter().includes(value)) {
+      this.leadStageFilter.update((prev) => [...prev, value]);
+      this._onFilterChange();
+    }
+  }
+  protected onAddLeadSource(value: string | null): void {
+    if (value && !this.leadSourceFilter().includes(value)) {
+      this.leadSourceFilter.update((prev) => [...prev, value]);
+      this._onFilterChange();
+    }
+  }
+  protected toggleLeadStatus(v: string): void {
+    this.leadStatusFilter.update((prev) =>
+      prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v],
+    );
+    this._onFilterChange();
+  }
+  protected toggleLeadStage(v: string): void {
+    this.leadStageFilter.update((prev) =>
+      prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v],
+    );
+    this._onFilterChange();
+  }
+  protected toggleLeadSource(v: string): void {
+    this.leadSourceFilter.update((prev) =>
+      prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v],
+    );
+    this._onFilterChange();
+  }
+
+  // Multi-form Step 7 — "Form name" chip picker. Same behaviour as the
+  // lead status/stage/source pickers above; only visible when the org
+  // has ≥1 form (otherwise the picker stays hidden and never adds a
+  // filter). Fetched on construction alongside the pipeline stages.
+  protected readonly widgetForms = signal<WidgetFormListItem[]>([]);
+  protected readonly widgetFormOptions = computed<MobileSelectOption[]>(() =>
+    this.widgetForms().map((f) => ({ value: f.id, label: f.name })),
+  );
+  protected readonly leadFormFilter = signal<string[]>([]);
+  protected widgetFormLabel(id: string): string {
+    return this.widgetFormOptions().find((o) => o.value === id)?.label ?? id;
+  }
+  protected onAddLeadForm(id: string | null): void {
+    if (id && !this.leadFormFilter().includes(id)) {
+      this.leadFormFilter.update((prev) => [...prev, id]);
+      this._onFilterChange();
+    }
+  }
+  protected toggleLeadForm(id: string): void {
+    this.leadFormFilter.update((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+    this._onFilterChange();
+  }
 
   // Table data + paging state.
   protected readonly rows = signal<ContactListItem[]>([]);
@@ -94,7 +215,11 @@ export class ContactPickerTableComponent {
     return !!(
       this.nameCtrl.value.trim() ||
       this.sourceCtrl.value.trim() ||
-      this.tagCtrl.value.trim()
+      this.tagCtrl.value.trim() ||
+      this.leadStatusFilter().length ||
+      this.leadStageFilter().length ||
+      this.leadSourceFilter().length ||
+      this.leadFormFilter().length
     );
   });
 
@@ -174,6 +299,30 @@ export class ContactPickerTableComponent {
     // component mounts, the request is on the wire.
     this.fetchTrigger$.next();
 
+    // Load leads-pipeline stages on mount so the Lead stage dropdown
+    // is populated the moment the picker renders — no need for the
+    // operator to click into the picker first.
+    this.pipelinesApi
+      .getByKey('leads')
+      .pipe(
+        catchError(() => of<{ stages: PipelineStage[] } | null>(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((res) => this.pipelineStages.set(res?.stages ?? []));
+
+    // Multi-form Step 7 — load the org's forms so the "Form name"
+    // chip picker is ready the moment the picker renders. Silent-fail
+    // (empty list) on 403 / 500 so operators without embed-manage
+    // permission still see the rest of the filters; the Form name
+    // picker just stays hidden until forms are available.
+    this.embedApi
+      .listForms()
+      .pipe(
+        catchError(() => of<WidgetFormListItem[]>([])),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((rows) => this.widgetForms.set(rows));
+
     // Hydrate any selected id we don't yet have contact data for. Fires
     // once when the parent seeds an existing group's members on edit,
     // and any time an operator checks a row we haven't cached yet
@@ -202,8 +351,12 @@ export class ContactPickerTableComponent {
   protected clearAllFilters(): void {
     this.nameCtrl.setValue('', { emitEvent: false });
     this.sourceCtrl.setValue('', { emitEvent: false });
-    this.tagCtrl.setValue('');
-    // Emitting on the last setValue is enough to trigger one fetch.
+    this.tagCtrl.setValue('', { emitEvent: false });
+    this.leadStatusFilter.set([]);
+    this.leadStageFilter.set([]);
+    this.leadSourceFilter.set([]);
+    this.leadFormFilter.set([]);
+    this._onFilterChange();
   }
 
   protected onRowToggle(id: string, checked: boolean): void {
@@ -281,8 +434,24 @@ export class ContactPickerTableComponent {
       });
   }
 
-  private _currentQuery(): { q?: string; source?: string[]; tag?: string[] } {
-    const out: { q?: string; source?: string[]; tag?: string[] } = {};
+  private _currentQuery(): {
+    q?: string;
+    source?: string[];
+    tag?: string[];
+    lead_status?: string[];
+    lead_stage?: string[];
+    lead_source?: string[];
+    lead_form_id?: string[];
+  } {
+    const out: {
+      q?: string;
+      source?: string[];
+      tag?: string[];
+      lead_status?: string[];
+      lead_stage?: string[];
+      lead_source?: string[];
+      lead_form_id?: string[];
+    } = {};
     const q = this.nameCtrl.value.trim();
     const source = this.sourceCtrl.value.trim();
     const tag = this.tagCtrl.value.trim();
@@ -292,6 +461,10 @@ export class ContactPickerTableComponent {
     // into an array so the API's multi-value contract is satisfied.
     if (source) out.source = [source];
     if (tag) out.tag = [tag];
+    if (this.leadStatusFilter().length) out.lead_status = this.leadStatusFilter();
+    if (this.leadStageFilter().length) out.lead_stage = this.leadStageFilter();
+    if (this.leadSourceFilter().length) out.lead_source = this.leadSourceFilter();
+    if (this.leadFormFilter().length) out.lead_form_id = this.leadFormFilter();
     return out;
   }
 }

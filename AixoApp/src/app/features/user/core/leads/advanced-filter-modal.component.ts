@@ -46,7 +46,10 @@ const STANDARD_FIELDS: StandardFieldDef[] = [
     choices: [
       { value: 'manual', label: 'Manual' },
       { value: 'bulk_import', label: 'Bulk import' },
-      { value: 'widget', label: 'Widget' },
+      // Multi-form track: `widget` enum stays, UI label renders as
+      // "Forms" — matches every other lead-source dropdown across
+      // the CRM (lead-card badge, campaigns, contact picker).
+      { value: 'widget', label: 'Forms' },
       { value: 'google_ads', label: 'Google Ads' },
       { value: 'meta_ads', label: 'Meta Ads' },
       { value: 'whatsapp_flow', label: 'WhatsApp Flow' },
