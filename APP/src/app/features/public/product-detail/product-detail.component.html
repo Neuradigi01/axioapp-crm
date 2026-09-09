@@ -12,112 +12,134 @@
       </p>
     </div>
   } @else if (detail(); as d) {
-    <!-- Hero image + carousel -->
-    <div class="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-surface-2 shadow-sm">
-      @if (currentImage(); as img) {
-        <img [src]="imgSrc(img)" [alt]="d.name" class="h-full w-full object-cover" />
-      } @else {
-        <div class="flex h-full w-full items-center justify-center text-faint">
-          <lucide-icon name="image-off" class="h-10 w-10"></lucide-icon>
-        </div>
-      }
-
-      @if (hasMultipleImages()) {
-        <button
-          type="button"
-          (click)="prevImage()"
-          class="absolute left-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-surface/90 text-default shadow-sm hover:bg-surface"
-          aria-label="Previous image"
-        >
-          <lucide-icon name="chevron-left" class="h-5 w-5"></lucide-icon>
-        </button>
-        <button
-          type="button"
-          (click)="nextImage()"
-          class="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-surface/90 text-default shadow-sm hover:bg-surface"
-          aria-label="Next image"
-        >
-          <lucide-icon name="chevron-right" class="h-5 w-5"></lucide-icon>
-        </button>
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-[1.15fr_1fr] lg:gap-12">
+      <!-- Left: image gallery ============================================ -->
+      <div class="flex flex-col gap-3">
+        <!-- Main hero image — square framing so tall + wide product
+             photos both look sensible; object-contain (not cover) so we
+             don't crop off features like the top of a chair. -->
         <div
-          class="absolute right-3 top-3 rounded-full bg-black/60 px-2.5 py-0.5 text-xs font-medium text-white"
+          class="relative aspect-square w-full overflow-hidden rounded-2xl border border-subtle bg-surface shadow-sm"
         >
-          {{ heroIndex() + 1 }} / {{ orderedImages().length }}
-        </div>
-      }
-    </div>
+          @if (currentImage(); as img) {
+            <img [src]="imgSrc(img)" [alt]="d.name" class="h-full w-full object-contain p-4" />
+          } @else {
+            <div class="flex h-full w-full items-center justify-center text-faint">
+              <lucide-icon name="image-off" class="h-12 w-12"></lucide-icon>
+            </div>
+          }
 
-    @if (hasMultipleImages()) {
-      <div
-        class="mt-3 flex gap-2 overflow-x-auto pb-1"
-        role="tablist"
-        aria-label="Product image gallery"
-      >
-        @for (img of orderedImages(); track img; let idx = $index) {
-          <button
-            type="button"
-            (click)="selectImage(idx)"
-            [class.ring-zinc-900]="idx === heroIndex()"
-            [class.ring-2]="idx === heroIndex()"
-            [class.ring-transparent]="idx !== heroIndex()"
-            [class.opacity-60]="idx !== heroIndex()"
-            class="h-16 w-24 flex-shrink-0 overflow-hidden rounded-md ring-1 ring-zinc-200 transition hover:opacity-100"
-            [attr.aria-label]="'Show image ' + (idx + 1)"
-            [attr.aria-current]="idx === heroIndex()"
-          >
-            <img
-              [src]="imgSrc(img)"
-              [alt]="'Thumbnail ' + (idx + 1)"
-              class="h-full w-full object-cover"
-              loading="lazy"
-            />
-          </button>
-        }
-      </div>
-    }
-
-    <!-- Title + price -->
-    <div class="mt-6 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <p class="text-[11px] font-mono uppercase tracking-wider text-muted">{{ d.sku }}</p>
-        <h1 class="mt-1 text-2xl font-semibold text-default">{{ d.name }}</h1>
-        @if (d.category) {
-          <span
-            class="mt-2 inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 ring-zinc-200"
-          >
-            {{ d.category }}
-          </span>
-        }
-      </div>
-      <div class="text-right">
-        <p class="text-2xl font-semibold text-default">
-          {{ formatPrice(d.price, d.currency) }}
-        </p>
-      </div>
-    </div>
-
-    @if (d.description) {
-      <div class="mt-6 rounded-xl border border-subtle bg-surface p-5 shadow-sm">
-        <h2 class="text-sm font-semibold uppercase tracking-wide text-muted">Description</h2>
-        <p class="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-default">
-          {{ d.description }}
-        </p>
-      </div>
-    }
-
-    @if (d.tags.length > 0) {
-      <div class="mt-4">
-        <h2 class="text-sm font-semibold uppercase tracking-wide text-muted">Tags</h2>
-        <div class="mt-2 flex flex-wrap gap-1.5">
-          @for (tag of d.tags; track tag) {
-            <span
-              class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 ring-zinc-200"
+          @if (hasMultipleImages()) {
+            <button
+              type="button"
+              (click)="prevImage()"
+              class="absolute left-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-surface/95 text-default shadow-md ring-1 border-subtle hover:bg-surface"
+              aria-label="Previous image"
             >
-              {{ tag }}
+              <lucide-icon name="chevron-left" class="h-5 w-5"></lucide-icon>
+            </button>
+            <button
+              type="button"
+              (click)="nextImage()"
+              class="absolute right-3 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-surface/95 text-default shadow-md ring-1 border-subtle hover:bg-surface"
+              aria-label="Next image"
+            >
+              <lucide-icon name="chevron-right" class="h-5 w-5"></lucide-icon>
+            </button>
+            <div
+              class="absolute right-3 top-3 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-medium text-white"
+            >
+              {{ heroIndex() + 1 }} / {{ orderedImages().length }}
+            </div>
+          }
+        </div>
+
+        <!-- Thumbnail rail — every image visible at once, click to swap.
+             `grid-flow-col` on wide screens keeps a fixed-height strip;
+             on mobile it wraps into rows so nothing gets squeezed. -->
+        @if (hasMultipleImages()) {
+          <div
+            class="grid grid-cols-5 gap-2 sm:grid-cols-6 md:grid-cols-5"
+            role="tablist"
+            aria-label="Product image gallery"
+          >
+            @for (img of orderedImages(); track img; let idx = $index) {
+              <button
+                type="button"
+                (click)="selectImage(idx)"
+                [attr.aria-current]="idx === heroIndex()"
+                [attr.aria-label]="'Show image ' + (idx + 1)"
+                class="group relative aspect-square overflow-hidden rounded-lg border bg-surface transition"
+                [class.border-accent]="idx === heroIndex()"
+                [class.ring-2]="idx === heroIndex()"
+                [class.ring-accent]="idx === heroIndex()"
+                [class.border-subtle]="idx !== heroIndex()"
+                [class.opacity-70]="idx !== heroIndex()"
+                [class.hover:opacity-100]="idx !== heroIndex()"
+              >
+                <img
+                  [src]="imgSrc(img)"
+                  [alt]="'Thumbnail ' + (idx + 1)"
+                  class="h-full w-full object-contain p-1"
+                  loading="lazy"
+                />
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Right: product info ============================================ -->
+      <aside class="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
+        <!-- SKU + name -->
+        <div>
+          <p class="text-[11px] font-mono uppercase tracking-wider text-muted">{{ d.sku }}</p>
+          <h1 class="mt-1 text-2xl font-semibold leading-tight text-default sm:text-3xl">
+            {{ d.name }}
+          </h1>
+          @if (d.category) {
+            <span
+              class="mt-2 inline-flex items-center rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-default ring-1 ring-zinc-200"
+            >
+              {{ d.category }}
             </span>
           }
         </div>
-      </div>
-    }
+
+        <!-- Price -->
+        <div class="rounded-xl border border-subtle bg-surface-2 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-muted">Price</p>
+          <p class="mt-0.5 text-2xl font-semibold text-default sm:text-3xl">
+            {{ formatPrice(d.price, d.currency) }}
+          </p>
+        </div>
+
+        <!-- Description -->
+        @if (d.description) {
+          <div>
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-muted">Description</h2>
+            <p class="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-default">
+              {{ d.description }}
+            </p>
+          </div>
+        }
+
+        <!-- Tags -->
+        @if (d.tags.length > 0) {
+          <div>
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-muted">Tags</h2>
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              @for (tag of d.tags; track tag) {
+                <span
+                  class="inline-flex items-center rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-default ring-1 ring-zinc-200"
+                >
+                  {{ tag }}
+                </span>
+              }
+            </div>
+          </div>
+        }
+      </aside>
+    </div>
   }
 </section>
