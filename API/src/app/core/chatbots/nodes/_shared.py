@@ -38,7 +38,13 @@ async def load_contact_data(
     session: AsyncSession, *, contact_id: uuid.UUID | None
 ) -> dict[str, Any] | None:
     """Minimal contact dict for variable rendering. Kept small so we
-    don't leak the whole contact ORM object into templates."""
+    don't leak the whole contact ORM object into templates.
+
+    The ``custom_data`` slot carries the contact's ``JSONB custom_data``
+    column verbatim so :func:`channel_bridge.render_variables` can
+    resolve ``{{contact.custom.<key>}}`` at render time. Absent keys
+    render as empty strings — same fallback the rest of the renderer
+    already applies for unknown paths."""
     if contact_id is None:
         return None
     from src.app.core.contacts import service as contacts_service
@@ -54,6 +60,7 @@ async def load_contact_data(
         "full_name": full_name,
         "email": contact.email or "",
         "phone": contact.phone or "",
+        "custom_data": dict(contact.custom_data or {}),
     }
 
 

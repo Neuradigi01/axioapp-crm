@@ -133,6 +133,16 @@ def render_variables(
         if head == "contact":
             if not rest:
                 return ""
+            # ``contact.custom.<key>`` reads from the JSONB ``custom_data``
+            # dict populated by :func:`_shared.load_contact_data`. Unknown
+            # keys render as empty strings so a bot that references a
+            # custom field the org later removes doesn't crash the send.
+            if rest[0] == "custom":
+                if len(rest) < 2:
+                    return ""
+                custom = contact_scope.get("custom_data") or {}
+                value = custom.get(rest[1], "") if isinstance(custom, dict) else ""
+                return str(value or "")
             value = contact_scope.get(rest[0], "")
             return str(value or "")
         if head == "run":

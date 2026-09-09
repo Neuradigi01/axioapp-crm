@@ -13,9 +13,9 @@ import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 
 import { InrPipe } from '../shared/pipes/inr.pipe';
 import {
@@ -45,7 +45,7 @@ export class ViewItemModalComponent {
   private readonly _item = signal<CatalogItem | null>(null);
   private readonly apiOrigin = deriveApiOrigin();
   private readonly api = inject(CatalogApiService);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
 
   @Input() set item(value: CatalogItem | null) {
@@ -110,16 +110,14 @@ export class ViewItemModalComponent {
           const url = `${window.location.origin}/product/${resp.token}`;
           try {
             await navigator.clipboard.writeText(url);
-            this.snackBar.open('Public URL copied to clipboard.', 'Dismiss', { duration: 2500 });
+            this.toast.success('Public URL copied to clipboard.');
           } catch {
             this.clipboardFallbackUrl.set(url);
           }
         },
         error: (err: HttpErrorResponse) => {
           this.sharing.set(false);
-          this.snackBar.open(extractApiError(err) ?? 'Could not generate public URL', 'Dismiss', {
-            duration: 4000,
-          });
+          this.toast.error(extractApiError(err) ?? 'Could not generate public URL');
         },
       });
   }

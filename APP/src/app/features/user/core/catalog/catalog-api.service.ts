@@ -247,6 +247,12 @@ export class CatalogApiService extends BaseCrudApiService<
     return this.http.post<CatalogItem>(`${this.base}/${itemId}/image`, fd);
   }
 
+  /** Clear the primary cover image (delete the stored file too).
+   *  Idempotent — returns the item unchanged if no cover was set. */
+  removeImage(itemId: string): Observable<CatalogItem> {
+    return this.http.delete<CatalogItem>(`${this.base}/${itemId}/image`);
+  }
+
   /** C5 — Append a new image to the gallery. */
   addGalleryImage(itemId: string, file: File): Observable<CatalogItem> {
     const fd = new FormData();

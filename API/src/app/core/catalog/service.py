@@ -63,7 +63,10 @@ from src.app.shared.storage import get_storage
 _log = logging.getLogger(__name__)
 
 _CATALOG_ENTITY = "catalog_item"
-_MAX_GALLERY = 8  # cover + up to 8 secondaries; a reasonable card-shape cap
+# Total per-product image cap = 5. Split as 1 primary cover + up to
+# 4 gallery secondaries. Manager-locked 2026-09-09 to keep product
+# cards scannable and storage usage predictable.
+_MAX_GALLERY = 4
 
 
 _SNAPSHOT_FIELDS = (
@@ -401,6 +404,38 @@ async def delete_item(session: AsyncSession, *, item_id: uuid.UUID) -> None:
         entity_id=item_uuid,
         before=before,
     )
+
+
+async def remove_item_image(
+    session: AsyncSession,
+    *,
+    item_id: uuid.UUID,
+) -> CatalogItem:
+    """Clear the primary cover image on an item.
+
+    Idempotent — returns the item unchanged if no cover was set. Also
+    deletes the physical file (best-effort) so the storage volume
+    stays clean."""
+    item = ensure_found(await get_item(session, item_id), entity="catalog item")
+    if not item.image_url:
+        return item
+    before = _snapshot(item)
+    old_url = item.image_url
+    item.image_url = None
+    item.updated_at = datetime.now(timezone.utc)
+    await session.commit()
+    await session.refresh(item)
+
+    await _delete_stored_image(old_url)
+
+    await log_entity_change(
+        action="catalog.image_removed",
+        entity_type=_CATALOG_ENTITY,
+        entity_id=item.id,
+        before=before,
+        after=_snapshot(item),
+    )
+    return item
 
 
 async def set_item_image(
@@ -1015,6 +1050,7 @@ __all__ = [
     "list_public_items",
     "publish_item",
     "remove_gallery_image",
+    "remove_item_image",
     "set_item_image",
     "unarchive_item",
     "unpublish_item",

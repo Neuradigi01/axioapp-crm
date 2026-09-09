@@ -49,6 +49,9 @@ from src.app.core.chatbots.schemas import (
     ChatbotVersionRead,
     TestFireRequest,
     TestFireResponse,
+    VariableGroupRead,
+    VariableRead,
+    VariablesListResponse,
 )
 from src.app.core.users.models import User
 from src.app.shared.context import get_context
@@ -119,6 +122,47 @@ def _actor_user_id(user: User) -> uuid.UUID | None:
 
 # --- save-target picker (mounted FIRST so '/save-targets' doesn't
 # get swallowed by '/{chatbot_id}') ---------------------------------------
+
+
+@router.get(
+    "/variables",
+    response_model=VariablesListResponse,
+)
+async def list_variables_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_VIEW)),
+) -> VariablesListResponse:
+    """Picker source for the builder's ``<variable-picker>`` component
+    + the canvas-side Variables panel.
+
+    Returns the org's full set of readable variables grouped by scope
+    (Contact, Contact — Custom, Lead, Lead — Custom, Runtime). Session
+    variables (``answers.<node_id>``) are per-graph and computed
+    frontend-side from the current bot's Ask-* nodes, so they aren't
+    included here.
+    """
+    from src.app.core.chatbots import variables as variables_registry
+
+    org_id = _require_org_id()
+    groups = await variables_registry.list_variables(db, org_id=org_id)
+    return VariablesListResponse(
+        groups=[
+            VariableGroupRead(
+                key=g.key,
+                label=g.label,
+                variables=[
+                    VariableRead(
+                        path=v.path,
+                        label=v.label,
+                        description=v.description,
+                        sample=v.sample,
+                    )
+                    for v in g.variables
+                ],
+            )
+            for g in groups
+        ]
+    )
 
 
 @router.get(

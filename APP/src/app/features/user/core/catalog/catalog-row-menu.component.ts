@@ -14,9 +14,9 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 
 import { FurnitureAuthService } from '../auth/auth.service';
 
@@ -72,7 +72,7 @@ export class CatalogRowMenuComponent {
 
   private readonly api = inject(CatalogApiService);
   private readonly auth = inject(FurnitureAuthService);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
   private readonly hostRef = inject(ElementRef<HTMLElement>);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -161,12 +161,21 @@ export class CatalogRowMenuComponent {
         );
         break;
       case 'archived':
-        specs.push({
-          key: 'unarchive',
-          label: 'Unarchive',
-          icon: 'rotate-ccw',
-          requiresPermission: 'catalog.archive',
-        });
+        specs.push(
+          {
+            key: 'unarchive',
+            label: 'Unarchive',
+            icon: 'rotate-ccw',
+            requiresPermission: 'catalog.archive',
+          },
+          {
+            key: 'delete',
+            label: 'Delete permanently',
+            icon: 'trash-2',
+            destructive: true,
+            requiresPermission: 'catalog.write',
+          },
+        );
         break;
     }
     return specs.filter(
@@ -203,9 +212,7 @@ export class CatalogRowMenuComponent {
     event.stopPropagation();
     this.close();
     if (action.key === 'publish' && !this.hasImages()) {
-      this.snackBar.open('Add at least one image before publishing.', 'Dismiss', {
-        duration: 3500,
-      });
+      this.toast.warn('Add at least one image before publishing.');
       return;
     }
     if (action.key === 'delete') {
@@ -304,7 +311,7 @@ export class CatalogRowMenuComponent {
           .subscribe({
             next: () => {
               this.removed.emit(it.id);
-              this.snackBar.open('Product deleted.', 'Dismiss', { duration: 2500 });
+              this.toast.success('Product deleted.');
             },
             error: (err: HttpErrorResponse) => this.showError(err, 'Delete failed'),
           });
@@ -323,7 +330,7 @@ export class CatalogRowMenuComponent {
   }
 
   private done(message: string): void {
-    this.snackBar.open(message, 'Dismiss', { duration: 2500 });
+    this.toast.success(message);
     this.refresh.emit();
   }
 
@@ -333,7 +340,7 @@ export class CatalogRowMenuComponent {
   }
 
   private showError(err: HttpErrorResponse, fallback: string): void {
-    this.snackBar.open(extractApiError(err) ?? fallback, 'Dismiss', { duration: 4000 });
+    this.toast.error(extractApiError(err) ?? fallback);
   }
 
   /** Assemble the public URL from the browser's own origin + the
@@ -354,7 +361,7 @@ export class CatalogRowMenuComponent {
           const url = this.publicUrlFromToken(resp.token);
           try {
             await navigator.clipboard.writeText(url);
-            this.snackBar.open('Public URL copied to clipboard.', 'Dismiss', { duration: 2500 });
+            this.toast.success('Public URL copied to clipboard.');
           } catch {
             // Older browser / permission blocked — reveal a fallback
             // modal with the URL in a read-only field.

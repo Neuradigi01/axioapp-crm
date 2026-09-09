@@ -797,6 +797,43 @@ async def _persist_inbound_email(
         # SPF-DKIM fail) that no workflow events should fire.
         return msg
 
+    # Bot-vs-AI arbitration — mirrors the WhatsApp path in
+    # ``conversations/service.py::receive_webhook`` (Decision §12):
+    # a matching bot always takes precedence over the org's AI
+    # assistant. If a bot WILL fire (new trigger match) or an
+    # existing parked bot run is waiting on this conversation, do
+    # not invoke AI dispatch inline — the bot pipeline owns the
+    # reply. Fail-soft on pre-check errors (``bot_will_handle =
+    # False``): AI is the fallback, so a broken pre-check should
+    # never silence AI.
+    from src.app.core.conversations import data_access as _conv_da
+
+    bot_will_handle = False
+    is_first_message = True
+    try:
+        prior_inbound = await _conv_da.count_inbound_messages_before(
+            session,
+            conversation_id=conversation.id,
+            exclude_message_id=msg.id,
+        )
+        is_first_message = prior_inbound == 0
+
+        from src.app.core.chatbots.trigger_matcher import has_any_matching_bot
+
+        bot_will_handle = await has_any_matching_bot(
+            session,
+            org_id=org_id,
+            channel="email",
+            text=body_text,
+            is_first_message=is_first_message,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "chatbot.precedence_precheck_failed conv=%s",
+            conversation.id,
+        )
+        bot_will_handle = False
+
     await _publish_email_message_received(
         session,
         conversation=conversation,
@@ -815,6 +852,53 @@ async def _persist_inbound_email(
             text=body_text,
             subject=headers.get("subject", ""),
         )
+
+    # AI dispatch — only when the bot pipeline is not going to own
+    # this inbound. Same two skip signals the WhatsApp path uses:
+    # (1) a new trigger matches, (2) an existing parked bot run is
+    # waiting for the next inbound (Ask-Question, Assign-AI-Assistant,
+    # etc.). Route through the channel-agnostic entry point so the
+    # guardrail (``AI_EMAIL_INBOUND_ENABLED`` flag, role-account /
+    # bounce filter, ``ai_paused`` takeover) fires uniformly.
+    skip_ai_dispatch = bot_will_handle
+    if not skip_ai_dispatch:
+        try:
+            from src.app.core.chatbots import data_access as _chatbot_dal
+
+            parked_runs = await _chatbot_dal.list_parked_runs_for_conversation(
+                session, conversation_id=conversation.id
+            )
+            skip_ai_dispatch = bool(parked_runs)
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "chatbot.parked_run_check_failed conv=%s",
+                conversation.id,
+            )
+            skip_ai_dispatch = False
+
+    if not skip_ai_dispatch:
+        try:
+            from src.app.core.ai_assistants import dispatch as ai_dispatch
+            from src.app.core.ai_assistants.email_guardrails import InboundEmail
+
+            _, sender_addr = parseaddr(headers.get("from") or "")
+            inbound_envelope = InboundEmail(
+                sender_email=sender_addr or "",
+                subject=headers.get("subject"),
+                body_text=body_text or "",
+                headers=headers,
+            )
+            await ai_dispatch.route_email_inbound(
+                session,
+                conversation=conversation,
+                inbound_email=inbound_envelope,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "ai_dispatch.email_route_failed conv=%s",
+                conversation.id,
+            )
+
     return msg
 
 

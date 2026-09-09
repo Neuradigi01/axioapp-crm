@@ -76,6 +76,7 @@ from src.app.core.catalog.service import (
     list_items,
     publish_item,
     remove_gallery_image,
+    remove_item_image,
     set_item_image,
     unarchive_item,
     unpublish_item,
@@ -248,6 +249,18 @@ async def upload_item_image_endpoint(
     is deleted first (C1 correlate)."""
     file_bytes = await file.read()
     item = await set_item_image(db, org_id=user.org_id, item_id=item_id, file_bytes=file_bytes)
+    return CatalogItemOut.model_validate(item)
+
+
+@router.delete("/{item_id}/image", response_model=CatalogItemOut)
+async def remove_item_image_endpoint(
+    item_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("catalog.write")),
+) -> CatalogItemOut:
+    """Clear the primary cover image (and delete the stored file).
+    Idempotent — returns the item unchanged if no cover was set."""
+    item = await remove_item_image(db, item_id=item_id)
     return CatalogItemOut.model_validate(item)
 
 
