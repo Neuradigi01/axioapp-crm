@@ -7,6 +7,12 @@ import { FieldDef } from '../shared/dynamic-form/types';
 import { BaseCrudApiService } from '../shared/services/base-crud-api.service';
 import { buildHttpParams } from '../shared/services/query-builder';
 
+/** Publish state (migration 0223). Only ``published`` items are
+ *  shareable via a public URL. */
+export type CatalogStatus = 'draft' | 'published' | 'unpublished' | 'archived';
+
+export const CATALOG_STATUSES: CatalogStatus[] = ['draft', 'published', 'unpublished', 'archived'];
+
 export interface CatalogItem {
   id: string;
   org_id: string;
@@ -22,6 +28,10 @@ export interface CatalogItem {
   cost_price: string | null;
   currency: string;
   is_active: boolean;
+  /** Publish state machine (0223). */
+  status: CatalogStatus;
+  published_at: string | null;
+  archived_at: string | null;
   /** C13 — free-form labels. Empty array when unset. */
   tags: string[];
   image_url: string | null;
@@ -37,6 +47,19 @@ export interface CatalogListResponse {
   total: number;
   page: number;
   size: number;
+  /** Full histogram — every CatalogStatus key present, zeros
+   *  included so the tab bar renders every tab in an empty org. */
+  status_counts: Record<CatalogStatus, number>;
+}
+
+/** Response for POST /catalog/{id}/public-url. `url` is deploy-agnostic
+ *  (built from the request's own scheme+host on the API side); the
+ *  frontend re-assembles it against `window.location.origin` for the
+ *  end-user-facing copy to guarantee the URL matches whatever host the
+ *  operator is actually looking at. */
+export interface CatalogPublicUrl {
+  url: string;
+  token: string;
 }
 
 /** Anchor a server-relative `/files/...` URL to the API origin and
@@ -85,6 +108,7 @@ export interface CatalogListQuery {
   category?: string;
   category_id?: string;
   active_only?: boolean;
+  statuses?: CatalogStatus[];
   page?: number;
   size?: number;
 }
@@ -176,10 +200,37 @@ export class CatalogApiService extends BaseCrudApiService<
       category: query.category,
       category_id: query.category_id,
       active_only: query.active_only ? query.active_only : undefined,
+      statuses: query.statuses && query.statuses.length > 0 ? query.statuses : undefined,
       page: query.page,
       size: query.size,
     });
     return this.http.get<CatalogListResponse>(this.base, { params });
+  }
+
+  /** Publish → visible on the public product page + shareable URL. */
+  publish(itemId: string): Observable<CatalogItem> {
+    return this.http.post<CatalogItem>(`${this.base}/${itemId}/publish`, {});
+  }
+
+  unpublish(itemId: string): Observable<CatalogItem> {
+    return this.http.post<CatalogItem>(`${this.base}/${itemId}/unpublish`, {});
+  }
+
+  archive(itemId: string): Observable<CatalogItem> {
+    return this.http.post<CatalogItem>(`${this.base}/${itemId}/archive`, {});
+  }
+
+  unarchive(itemId: string): Observable<CatalogItem> {
+    return this.http.post<CatalogItem>(`${this.base}/${itemId}/unarchive`, {});
+  }
+
+  /** Mint the shareable public URL for a published product. Returns
+   *  ``{ url, token }`` — callers usually rebuild the URL from
+   *  ``window.location.origin`` + token so the URL matches the host
+   *  the operator is looking at (the backend can't know the FE
+   *  origin when it's deployed on a different domain). */
+  generatePublicUrl(itemId: string): Observable<CatalogPublicUrl> {
+    return this.http.post<CatalogPublicUrl>(`${this.base}/${itemId}/public-url`, {});
   }
 
   /** C3 — Field defs for `entity_type='catalog_item'`. Feeds the

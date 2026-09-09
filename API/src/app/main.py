@@ -75,6 +75,7 @@ from src.app.core.calls.router import (
     outcomes_router as call_outcomes_router,
 )
 from src.app.core.campaigns.router import router as campaigns_router
+from src.app.core.catalog.public_router import router as catalog_public_router
 from src.app.core.catalog.router import router as catalog_router
 from src.app.core.contacts.groups.router import router as contact_groups_router
 from src.app.core.contacts.imports.router import router as contact_imports_router
@@ -424,6 +425,12 @@ app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(notifications_ws_router, prefix="/api/v1")
 app.include_router(walk_ins_router, prefix="/api/v1")
 app.include_router(catalog_router, prefix="/api/v1")
+# tasks/catalog-share-link Step C — public (unauthenticated) product
+# detail + org grid. Path shape: /api/public/catalog/{token} and
+# /api/public/catalog?org=<slug>. Same "/api" prefix as the property
+# public router; both mount without a version segment so external URLs
+# stay stable across API-version bumps.
+app.include_router(catalog_public_router, prefix="/api")
 app.include_router(staff_router, prefix="/api/v1")
 app.include_router(staff_portal_router, prefix="/api/v1")
 app.include_router(conversations_router, prefix="/api/v1")

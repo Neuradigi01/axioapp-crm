@@ -1,7 +1,7 @@
 """HTTP routes for the catalog module.
 
 Items:
-  GET    /api/v1/catalog?q=&category=&category_id=&active_only=&page=&size=
+  GET    /api/v1/catalog?q=&category=&category_id=&active_only=&statuses=&page=&size=
   POST   /api/v1/catalog
   GET    /api/v1/catalog/categories                (list)
   POST   /api/v1/catalog/categories                (create)
@@ -14,9 +14,16 @@ Items:
   POST   /api/v1/catalog/{id}/image                (primary cover — multipart)
   POST   /api/v1/catalog/{id}/images               (gallery add — multipart)
   DELETE /api/v1/catalog/{id}/images?index=N       (gallery remove)
+  POST   /api/v1/catalog/{id}/publish              (draft/unpublished → published)
+  POST   /api/v1/catalog/{id}/unpublish            (published → unpublished)
+  POST   /api/v1/catalog/{id}/archive              (any → archived)
+  POST   /api/v1/catalog/{id}/unarchive            (archived → draft)
+  POST   /api/v1/catalog/{id}/public-url           (mint shareable URL)
 
-Reads need `catalog.read`; writes need `catalog.write`. Tenant scoping
-is automatic via the ORM filter on `TenantScoped`.
+Reads need `catalog.read`; writes need `catalog.write`. Publish /
+unpublish need `catalog.publish`; archive / unarchive need
+`catalog.archive`. Tenant scoping is automatic via the ORM filter on
+`TenantScoped`.
 
 Static-segment routes (``/categories``, ``/bulk-import``) are declared
 BEFORE the dynamic ``/{item_id}`` capture so FastAPI doesn't try to
@@ -33,6 +40,7 @@ from fastapi import (
     File,
     HTTPException,
     Query,
+    Request,
     Response,
     UploadFile,
     status,
@@ -40,6 +48,7 @@ from fastapi import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
+from src.app.core.catalog.constants import CatalogStatus
 from src.app.core.catalog.schemas import (
     CatalogCategoryCreate,
     CatalogCategoryOut,
@@ -50,19 +59,26 @@ from src.app.core.catalog.schemas import (
     CatalogItemOut,
     CatalogItemUpdate,
     CatalogListResponse,
+    PublicUrlOut,
 )
 from src.app.core.catalog.service import (
     add_gallery_image,
+    archive_item,
     bulk_import_items,
+    count_status_histogram,
     create_category,
     create_item,
     delete_category,
     delete_item,
+    generate_public_link,
     get_item,
     list_categories,
     list_items,
+    publish_item,
     remove_gallery_image,
     set_item_image,
+    unarchive_item,
+    unpublish_item,
     update_category,
     update_item,
 )
@@ -144,25 +160,30 @@ async def list_items_endpoint(
     category: str | None = Query(default=None, max_length=64),
     category_id: uuid.UUID | None = Query(default=None),
     active_only: bool = Query(default=False),
+    statuses: list[CatalogStatus] | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_permissions("catalog.read")),
+    user: User = Depends(require_permissions("catalog.read")),
 ) -> CatalogListResponse:
+    status_values = [s.value for s in statuses] if statuses else None
     rows, total = await list_items(
         db,
         q=q,
         category=category,
         category_id=category_id,
         active_only=active_only,
+        statuses=status_values,
         page=page,
         size=size,
     )
+    histogram = await count_status_histogram(db, org_id=user.org_id)
     return CatalogListResponse(
         items=[CatalogItemOut.model_validate(r) for r in rows],
         total=total,
         page=page,
         size=size,
+        status_counts=histogram,
     )
 
 
@@ -262,3 +283,67 @@ async def remove_gallery_image_endpoint(
     the strip without re-fetching."""
     item = await remove_gallery_image(db, item_id=item_id, index=index)
     return CatalogItemOut.model_validate(item)
+
+
+# --- Lifecycle transitions (migration 0223) --------------------------------
+
+
+@router.post("/{item_id}/publish", response_model=CatalogItemOut)
+async def publish_endpoint(
+    item_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("catalog.publish")),
+) -> CatalogItemOut:
+    item = await publish_item(db, item_id=item_id)
+    return CatalogItemOut.model_validate(item)
+
+
+@router.post("/{item_id}/unpublish", response_model=CatalogItemOut)
+async def unpublish_endpoint(
+    item_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("catalog.publish")),
+) -> CatalogItemOut:
+    item = await unpublish_item(db, item_id=item_id)
+    return CatalogItemOut.model_validate(item)
+
+
+@router.post("/{item_id}/archive", response_model=CatalogItemOut)
+async def archive_endpoint(
+    item_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("catalog.archive")),
+) -> CatalogItemOut:
+    item = await archive_item(db, item_id=item_id)
+    return CatalogItemOut.model_validate(item)
+
+
+@router.post("/{item_id}/unarchive", response_model=CatalogItemOut)
+async def unarchive_endpoint(
+    item_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("catalog.archive")),
+) -> CatalogItemOut:
+    item = await unarchive_item(db, item_id=item_id)
+    return CatalogItemOut.model_validate(item)
+
+
+# --- Public URL generation (still authenticated) ---------------------------
+
+
+@router.post("/{item_id}/public-url", response_model=PublicUrlOut)
+async def generate_public_url_endpoint(
+    item_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("catalog.read")),
+) -> PublicUrlOut:
+    """Mint the shareable public URL for a published product.
+
+    Host is derived from the request (scheme + host header) so the URL
+    is deploy-agnostic — production, staging, and dev all mint URLs
+    against their own domain automatically."""
+    host = f"{request.url.scheme}://{request.url.netloc}"
+    return await generate_public_link(
+        db, org_id=user.org_id, item_id=item_id, host=host
+    )

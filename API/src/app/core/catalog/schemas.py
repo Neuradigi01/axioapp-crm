@@ -17,12 +17,14 @@ Extended by the catalog review (migration 0163):
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from src.app.shared.schemas import PaginatedResponse, TimestampedOrgScopedOut
+from src.app.core.catalog.constants import CatalogStatus
+from src.app.shared.schemas import TimestampedOrgScopedOut
 
 _SKU_MAX = 64
 _NAME_MAX = 255
@@ -116,13 +118,44 @@ class CatalogItemOut(TimestampedOrgScopedOut):
     cost_price: Decimal | None = None
     currency: str
     is_active: bool
+    status: str
+    published_at: datetime | None = None
+    archived_at: datetime | None = None
     tags: list[str] = Field(default_factory=list)
     image_url: str | None = None
     image_urls: list[str] = Field(default_factory=list)
     custom_data: dict[str, Any]
 
 
-CatalogListResponse = PaginatedResponse[CatalogItemOut]
+class CatalogListResponse(BaseModel):
+    """Pagination envelope for ``GET /api/v1/catalog``.
+
+    Carries a ``status_counts`` histogram so the tab bar can render
+    its counts without a second round-trip. Field shape kept identical
+    to the previous ``PaginatedResponse[CatalogItemOut]`` alias for
+    backwards compatibility with existing frontend readers."""
+
+    items: list[CatalogItemOut]
+    total: int
+    page: int
+    size: int
+    status_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class CatalogListFilters(BaseModel):
+    """Query-string filters for ``GET /api/v1/catalog``. The router
+    still accepts each field individually — this shape is what the
+    service consumes internally."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    q: str | None = None
+    category: str | None = None
+    category_id: uuid.UUID | None = None
+    active_only: bool = False
+    statuses: list[CatalogStatus] | None = None
+    page: int = Field(default=1, ge=1)
+    size: int = Field(default=50, ge=1, le=200)
 
 
 # --- Category schemas ------------------------------------------------------
@@ -223,3 +256,49 @@ class CatalogItemBulkImportResult(BaseModel):
     skipped: int
     errors: list[CatalogItemBulkImportRowError]
     dry_run: bool
+
+
+# --- Public (unauthenticated) shapes --------------------------------------
+#
+# Never carry the item's UUID or the org's UUID — the Fernet token in
+# the URL is the only stable identifier a customer should ever see.
+
+
+class PublicCatalogCardOut(BaseModel):
+    """Grid card for ``GET /api/public/catalog?org=<slug>``.
+
+    Trimmed to what the customer-facing grid renders: name / SKU /
+    price / category + featured image + the shareable URL. No UUIDs,
+    no timestamps, no ``is_active`` (published only)."""
+
+    name: str
+    sku: str
+    category: str | None = None
+    price: Decimal
+    currency: str
+    short_description: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    image_url: str | None = None
+    public_url: str
+
+
+class PublicCatalogDetailOut(BaseModel):
+    """Detail page for ``GET /api/public/catalog/{token}``. Full
+    customer-safe field set + ordered gallery. Still no UUIDs."""
+
+    name: str
+    sku: str
+    description: str | None = None
+    category: str | None = None
+    price: Decimal
+    currency: str
+    tags: list[str] = Field(default_factory=list)
+    image_url: str | None = None
+    image_urls: list[str] = Field(default_factory=list)
+
+
+class PublicUrlOut(BaseModel):
+    """Response for the owner-side "get shareable URL" endpoint."""
+
+    url: str
+    token: str

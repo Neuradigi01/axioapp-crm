@@ -75,6 +75,11 @@ _CORE_ADMIN_KEYS: list[str] = [
     "walk_ins.write",
     "catalog.read",
     "catalog.write",
+    # tasks/catalog-share-link — publish state machine + public share.
+    # Owner + Admin can flip a product between draft / published /
+    # unpublished / archived; Employees stay read-only.
+    "catalog.publish",
+    "catalog.archive",
     "conversations.read",
     "conversations.write",
     # whatsapp-platform-upgrade Step 14 — tag CRUD. Owner + Admin only.
