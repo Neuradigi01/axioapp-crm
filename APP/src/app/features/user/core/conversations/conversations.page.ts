@@ -1009,7 +1009,32 @@ export class ConversationsPageComponent {
       .detail(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (fresh) => this.detail.set(fresh),
+        next: (fresh) => {
+          // Guard: thread switch mid-fetch. Drop the response so we
+          // don't paint stale content over the freshly-opened thread.
+          if (this.selectedId() !== id) return;
+          // MERGE — don't set(). A hard replace wipes any optimistic
+          // ``tmp-...`` bubbles that are mid-send when the poll (or
+          // WS-driven refresh) fires. The optimistic-swap that runs
+          // after the POST returns then can't find its placeholder
+          // and the sent message drops out of the UI until the next
+          // fetch. Merging keeps optimistic bubbles until the server
+          // supersedes them with a real row.
+          this.detail.update((current) => {
+            if (!current || current.conversation.id !== id) return fresh;
+            const freshIds = new Set(fresh.messages.map((m) => m.id));
+            const optimistic = current.messages.filter(
+              (m) => m.id.startsWith('tmp-') && !freshIds.has(m.id),
+            );
+            if (optimistic.length === 0) return fresh;
+            const merged = [...fresh.messages, ...optimistic].sort((a, b) => {
+              const at = a.sent_at ?? a.created_at ?? '';
+              const bt = b.sent_at ?? b.created_at ?? '';
+              return at.localeCompare(bt);
+            });
+            return { ...fresh, messages: merged };
+          });
+        },
         error: () => {
           /* silent — the takeover succeeded; the thread just won't
              re-render the system message until manual refresh. */
