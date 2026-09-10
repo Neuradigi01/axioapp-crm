@@ -242,6 +242,36 @@ export class ConversationsPageComponent {
     timer: ReturnType<typeof setTimeout>;
   } | null = null;
 
+  /** Fallback poll for the open thread. The WS-driven refresh only
+   *  fires when `notify()` is called — the backend gates that behind
+   *  `conversation.assigned_to_id is not None` and targets the
+   *  assignee's user_id only. So an unassigned thread (or one owned
+   *  by a different user) never pushes anything to this browser and
+   *  inbound messages would sit invisible until manual refresh. This
+   *  interval silently re-fetches the currently-open conversation so
+   *  new inbound messages surface within one poll window regardless
+   *  of the assignee state. Also re-loads the list at a slower cadence
+   *  so row previews + unread badges keep pace. Pauses while the tab
+   *  is hidden to avoid burning requests. */
+  private static readonly OPEN_THREAD_POLL_MS = 6_000;
+  private static readonly LIST_POLL_EVERY_N_TICKS = 3; // ≈ every 18s
+  private openThreadPollTimer: ReturnType<typeof setInterval> | null = null;
+  private openThreadPollTicks = 0;
+  private readonly onVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible') {
+      this.startOpenThreadPolling();
+      // Regained focus — refresh immediately so the operator doesn't
+      // wait a full tick before seeing what landed while they were away.
+      const id = this.selectedId();
+      if (id) {
+        this._reloadDetail(id);
+        this.reloadList();
+      }
+    } else {
+      this.stopOpenThreadPolling();
+    }
+  };
+
   /** AI take-over / return-to-AI confirmations. When set, the shared
    *  ConfirmDialogComponent renders — replaces the native ``confirm()``
    *  popups so the destructive-prompt UX matches the rest of the CRM
@@ -273,6 +303,12 @@ export class ConversationsPageComponent {
       this.onIncomingNotification(head.payload);
     });
 
+    // Refresh whenever the browser tab regains focus. Even with the
+    // interval below, a laptop lid re-opened after 10 minutes should
+    // pull fresh state on the next paint rather than wait for the
+    // tick after `visibilitychange` re-arms the interval.
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
+
     // Clear any coalescing timers so we don't run a reload after the
     // component has been torn down (would leak subscriptions).
     this.destroyRef.onDestroy(() => {
@@ -284,6 +320,8 @@ export class ConversationsPageComponent {
         clearTimeout(this.pendingDetailReload.timer);
         this.pendingDetailReload = null;
       }
+      this.stopOpenThreadPolling();
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
     });
   }
 
@@ -434,6 +472,7 @@ export class ConversationsPageComponent {
   protected onSelect(id: string): void {
     this.selectedId.set(id);
     this.loadDetail(id);
+    this.startOpenThreadPolling();
   }
 
   /** Mobile back button — clears the selection so the list pane
@@ -442,6 +481,33 @@ export class ConversationsPageComponent {
   protected deselect(): void {
     this.selectedId.set(null);
     this.replyingTo.set(null);
+    this.stopOpenThreadPolling();
+  }
+
+  private startOpenThreadPolling(): void {
+    if (this.openThreadPollTimer !== null) return;
+    if (document.visibilityState !== 'visible') return;
+    this.openThreadPollTicks = 0;
+    this.openThreadPollTimer = setInterval(() => {
+      const id = this.selectedId();
+      if (!id) {
+        this.stopOpenThreadPolling();
+        return;
+      }
+      this._reloadDetail(id);
+      this.openThreadPollTicks += 1;
+      if (this.openThreadPollTicks % ConversationsPageComponent.LIST_POLL_EVERY_N_TICKS === 0) {
+        this.reloadList();
+      }
+    }, ConversationsPageComponent.OPEN_THREAD_POLL_MS);
+  }
+
+  private stopOpenThreadPolling(): void {
+    if (this.openThreadPollTimer !== null) {
+      clearInterval(this.openThreadPollTimer);
+      this.openThreadPollTimer = null;
+    }
+    this.openThreadPollTicks = 0;
   }
 
   protected onSendText(text: string): void {
