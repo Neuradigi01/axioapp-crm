@@ -32,7 +32,7 @@ Ship the runbook so the operator can do rotation, key recovery, and DLQ inspecti
 - `config.env` (prod):
   - `MAILGUN_DOMAIN=reply.karmcrm.com`
   - `INBOUND_EMAIL_DOMAIN=reply.karmcrm.com`
-  - `MAILGUN_WEBHOOK_URL=https://crm-api.neuradigi.com/api/v1/webhooks/mailgun/inbound`
+  - `MAILGUN_WEBHOOK_URL=https://crm-api.aixoapp.com/api/v1/webhooks/mailgun/inbound`
 - Restart the API + Celery workers to pick up the new env.
 
 **Re-run route setup against prod:**

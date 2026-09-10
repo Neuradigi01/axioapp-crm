@@ -97,7 +97,7 @@ logger = logging.getLogger(__name__)
 # environments so a customer's reply (which echoes the value into
 # `In-Reply-To`) always threads back. Set via `EMAIL_MESSAGE_ID_DOMAIN`
 # in the shared config.env — do NOT split across local/prod files.
-_MESSAGE_ID_DOMAIN = os.getenv("EMAIL_MESSAGE_ID_DOMAIN", "crm.neuradigi.com")
+_MESSAGE_ID_DOMAIN = os.getenv("EMAIL_MESSAGE_ID_DOMAIN", "crm.aixoapp.com")
 
 # Step 8 — public tracking base URL for open-pixel + click-rewrite
 # links. Uses the env-selected API host (`config.API_BASE_URL`, set
@@ -109,7 +109,7 @@ _TRACKING_BASE_URL = API_BASE_URL.rstrip("/")
 # headers carry both the URL and a mailto so RFC 8058 one-click
 # unsubscribe works in Gmail / Outlook / Apple Mail. Stable across
 # envs — same reasoning as `_MESSAGE_ID_DOMAIN` above.
-_LIST_UNSUB_MAILTO = os.getenv("LIST_UNSUBSCRIBE_MAILTO", "unsubscribe@crm.neuradigi.com")
+_LIST_UNSUB_MAILTO = os.getenv("LIST_UNSUBSCRIBE_MAILTO", "unsubscribe@crm.aixoapp.com")
 
 
 class EmailUseSendEmailEndpoint(HTTPException):
