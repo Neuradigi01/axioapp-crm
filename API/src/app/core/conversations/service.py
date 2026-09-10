@@ -73,6 +73,8 @@ _PHONE_CHANNELS = {ConversationChannel.whatsapp, ConversationChannel.sms}
 async def list_conversations(
     session: AsyncSession,
     *,
+    caller_user_id: uuid.UUID,
+    caller_role_id: uuid.UUID,
     channel: ConversationChannel | None = None,
     status_filter: ConversationStatus | None = None,
     assigned_to: str | None = None,
@@ -98,12 +100,21 @@ async def list_conversations(
                     detail="assigned_to must be a UUID or 'unassigned'",
                 ) from exc
 
+    # Employees only see the unassigned pool + their own chats. Owner
+    # / Admin (``conversations.assign_others``) callers see everything
+    # so they can supervise and reassign. Matches the symmetric detail
+    # gate ``ensure_can_view_conversation``.
+    restrict_to_user_id: uuid.UUID | None = None
+    if not await _caller_can_assign_others(session, caller_role_id):
+        restrict_to_user_id = caller_user_id
+
     return await _da.list_conversations_query(
         session,
         channel=channel,
         status_filter=status_filter,
         assigned_to_id=assigned_to_id,
         assigned_to_unassigned=assigned_to_unassigned,
+        restrict_to_user_id=restrict_to_user_id,
         q=q,
         tag_ids=tag_ids,
         page=page,
@@ -175,8 +186,7 @@ async def ensure_can_write_conversation(
 ) -> None:
     """Guard for reply / react / tag / mark-read / close / take-over-AI.
 
-    Read paths (list + detail) stay org-wide via `conversations.read`
-    — this gate is only for state-changing operations. Rules:
+    Rules:
 
     * Chat unassigned (``assigned_to_id IS NULL``) → any writer with
       ``conversations.write`` passes (the compose bar auto-take-over
@@ -198,6 +208,40 @@ async def ensure_can_write_conversation(
         detail=(
             "This conversation is assigned to another user. "
             "Ask an Owner or Admin to reassign it before you can act on it."
+        ),
+    )
+
+
+async def ensure_can_view_conversation(
+    session: AsyncSession,
+    *,
+    conv: Conversation,
+    caller_user_id: uuid.UUID,
+    caller_role_id: uuid.UUID,
+) -> None:
+    """Read-side counterpart to :func:`ensure_can_write_conversation`.
+
+    An Employee should not be able to open a chat that belongs to
+    another Employee — the whole point of the assignee is a clear
+    line of ownership. Owner / Admin (``conversations.assign_others``)
+    stays able to view everything, so they can supervise and reassign.
+    Unassigned chats stay visible to anyone with ``conversations.read``
+    since the "any employee can jump in" workflow depends on it.
+
+    Symmetric with the list filter :func:`list_conversations` applies
+    — anything the list hides, the detail endpoint must refuse.
+    """
+    if conv.assigned_to_id is None:
+        return
+    if conv.assigned_to_id == caller_user_id:
+        return
+    if await _caller_can_assign_others(session, caller_role_id):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=(
+            "This conversation is assigned to another user. "
+            "Ask an Owner or Admin to reassign it if you need access."
         ),
     )
 
@@ -2137,6 +2181,8 @@ async def resume_ai(
 
 __all__ = [
     "apply_auto_pause",
+    "ensure_can_view_conversation",
+    "ensure_can_write_conversation",
     "get_conversation",
     "list_conversations",
     "list_messages",
