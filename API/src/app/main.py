@@ -333,9 +333,13 @@ app.include_router(reporting_router, prefix="/api/v1")
 app.include_router(invitations_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
 app.include_router(custom_fields_router, prefix="/api/v1")
+# `/contacts/imports` must be matched before `contacts_router`'s
+# `/contacts/{contact_id}` — otherwise `GET /contacts/imports` is
+# swallowed by the single-contact route and 422s on the UUID parse
+# ("invalid character: found `i` at 1").
+app.include_router(contact_imports_router, prefix="/api/v1")
 app.include_router(contacts_router, prefix="/api/v1")
 app.include_router(contact_groups_router, prefix="/api/v1")
-app.include_router(contact_imports_router, prefix="/api/v1")
 app.include_router(activities_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(pipelines_router, prefix="/api/v1")
