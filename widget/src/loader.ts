@@ -4,10 +4,10 @@
  * Customer install snippet:
  *
  *   <div id="crm-form"></div>
- *   <script src="https://crm-api.neuradigi.com/widget/v1/widget.js"
+ *   <script src="https://crm-api.aixoapp.com/widget/v1/widget.js"
  *           data-key="pk_live_…"
  *           data-form="contact-us"
- *           data-host="https://crm-api.neuradigi.com"
+ *           data-host="https://crm-api.aixoapp.com"
  *           data-mount="crm-form"></script>
  *
  * `data-mount` defaults to `"crm-form"` and `data-host` to the
@@ -39,7 +39,7 @@ export type {
   WidgetField,
 } from "./types";
 
-const DEFAULT_HOST = "https://crm-api.neuradigi.com";
+const DEFAULT_HOST = "https://crm-api.aixoapp.com";
 const DEFAULT_MOUNT = "crm-form";
 
 

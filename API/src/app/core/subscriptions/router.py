@@ -57,7 +57,7 @@ from src.app.shared.db import get_db
 # is rejected with 400 to prevent the endpoint from being used as an
 # open redirect — Stripe will gladly redirect anywhere the host gives
 # it. `localhost` / `127.0.0.1` cover dev; the env-configured
-# `FRONTEND_URL` host covers the deployed frontend (crm.neuradigi.com
+# `FRONTEND_URL` host covers the deployed frontend (crm.aixoapp.com
 # in prod, localhost in local).
 def _build_allowed_redirect_hosts() -> frozenset[str]:
     hosts: set[str] = {"localhost", "127.0.0.1"}

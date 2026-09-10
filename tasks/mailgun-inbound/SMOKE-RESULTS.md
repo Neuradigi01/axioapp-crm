@@ -4,7 +4,7 @@
 
 **Environment (sandbox smoke — 2026-09-02, morning)**
 - Sandbox domain: `sandbox3f4add564a974bc6a2c07ebf6d1fad9a.mailgun.org` (route deleted during prod cutover, 2026-09-02 afternoon)
-- Webhook URL: `https://crm-api.neuradigi.com/api/v1/webhooks/mailgun/inbound`
+- Webhook URL: `https://crm-api.aixoapp.com/api/v1/webhooks/mailgun/inbound`
 - Sandbox route id: `6a97f5b2f6a1c923ecf1c0e3` (created via `mailgun_route_setup.py` on 2026-09-02, deleted 2026-09-02 during prod cutover to free free-tier slot)
 - Target org for spoof test: `e3684043-a281-45a8-8108-57413a57a08e`
 
@@ -12,7 +12,7 @@
 - Prod domain: `reply.karmcrm.com` (Cloudflare-managed DNS on karmcrm.com; 6 records added manually by domain owner; Mailgun verified SPF/DKIM/MX green)
 - Prod route id: `6a980b024f83d7b2bb098557` (created via `mailgun_route_setup.py` on 2026-09-02 with `MAILGUN_DOMAIN=reply.karmcrm.com`)
 - Expression: `match_recipient(".*@reply\.karmcrm\.com")`
-- Actions: `forward("https://crm-api.neuradigi.com/api/v1/webhooks/mailgun/inbound")` → `stop()`
+- Actions: `forward("https://crm-api.aixoapp.com/api/v1/webhooks/mailgun/inbound")` → `stop()`
 
 ---
 
@@ -38,7 +38,7 @@ Requires actually sending a test email from the CRM UI to a Gmail address. Sandb
 
 ### 2. Reply from Gmail lands as inbound — **PENDING (user)**
 
-Depends on item 1 and Mailgun's public HTTPS reach into `crm-api.neuradigi.com`.
+Depends on item 1 and Mailgun's public HTTPS reach into `crm-api.aixoapp.com`.
 
 - **Expected:** Mailgun log shows forward, API log shows `POST /api/v1/webhooks/mailgun/inbound 200 OK`, CRM inbox shows the reply.
 

@@ -26,7 +26,7 @@ Ship the Route-setup script and run it against sandbox.
 6. **Update `config.env`:**
    - `MAILGUN_DOMAIN=sandbox<hex>.mailgun.org`
    - `INBOUND_EMAIL_DOMAIN=sandbox<hex>.mailgun.org`
-   - `MAILGUN_WEBHOOK_URL=https://staging-crm-api.neuradigi.com/api/v1/webhooks/mailgun/inbound`
+   - `MAILGUN_WEBHOOK_URL=https://staging-crm-api.aixoapp.com/api/v1/webhooks/mailgun/inbound`
 
 ## Scope (I do)
 
