@@ -85,6 +85,14 @@ async def list_conversations_query(
     carries at least one of the listed tag ids.
     """
     filters: list[Any] = []
+    # ai_widget rows are runtime-internal — they hold the ChatRuntime's
+    # per-turn context for the public embed + preview flows, not a
+    # real customer conversation. They must never appear in the
+    # operator inbox regardless of the caller's ``channel`` filter,
+    # so we exclude them unconditionally. (Adding this filter also
+    # hides any legacy widget rows that leaked in before the runtime
+    # started reusing the inbox conversation for inbound AI replies.)
+    filters.append(Conversation.channel != ConversationChannel.ai_widget)
     if channel is not None:
         filters.append(Conversation.channel == channel)
     if status_filter is not None:

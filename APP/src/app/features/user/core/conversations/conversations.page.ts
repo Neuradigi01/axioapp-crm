@@ -562,6 +562,13 @@ export class ConversationsPageComponent {
         this.swapOptimisticMessage(id, optimistic.id, real);
         this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
         this.claimAssigneeOnSend(id);
+        // Refresh the thread so the ``ai_paused`` flip (backend
+        // auto-pauses on human reply when a bound assistant exists)
+        // + the "AI is paused" system marker land immediately in the
+        // UI. Without this the operator waits up to one poll window
+        // (~6s) for the banner to swap from "AI is handling / Take
+        // Over" to "You are handling / Return to AI".
+        this._reloadDetail(id);
       },
       error: (err: HttpErrorResponse) => {
         this.removeOptimisticMessage(id, optimistic.id);

@@ -322,6 +322,31 @@ async def send_email_reply(
             detail="Email conversation has no linked contact — cannot reply.",
         )
 
+    # tasks/ai-assistants-omnichannel Step 5 — mirror of the WhatsApp
+    # ``send_outbound`` auto-pause. A human replying on an AI-handled
+    # email thread implicitly claims the conversation from the AI, so
+    # the next inbound doesn't trigger another AI reply that stomps
+    # over the human's answer. Intercom / Wati semantics: one implicit
+    # takeover, no extra button. Guarded by the same bound-assistant
+    # lookup ``send_outbound`` uses so the pause fires only for orgs
+    # that actually have AI wired on the email channel.
+    if not conv.ai_paused:
+        from src.app.core.ai_assistants import data_access as _ai_da
+        from src.app.core.ai_assistants.models import AiAssistantChannel
+
+        bound = await _ai_da.find_active_assistant_bound_to_channel(
+            session, channel=AiAssistantChannel.email.value
+        )
+        if bound is not None:
+            await apply_auto_pause(
+                session,
+                conversation=conv,
+                actor_user_id=user_id,
+                reason="human_reply",
+            )
+            await session.commit()
+            await session.refresh(conv)
+
     # Default sender: the org's SHARED sender identity from Settings →
     # Integrations → Email Sender. Preference matches
     # ``resolve_org_sender`` (shared/email/org_sender.py): verified SMTP
@@ -2082,6 +2107,14 @@ async def resume_ai(
             status_code=status.HTTP_409_CONFLICT,
             detail={"reason": "not_paused"},
         )
+    # Ownership handshake: handing the thread back to AI drops the
+    # human assignee. Product model: "AI is handling" == no human
+    # owner. Keeping the ex-holder assigned would misroute the next
+    # inbound notification to someone who's already stepped away.
+    # The bound assistant answers the next inbound; if a human needs
+    # to jump back in, ``send_outbound`` / ``send_email_reply`` will
+    # implicit-claim the thread again.
+    conv.assigned_to_id = None
     actor_name = await _display_name_for(session, actor_user_id)
     _insert_takeover_system_message(
         session,
