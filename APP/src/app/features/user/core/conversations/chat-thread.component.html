@@ -1,9 +1,13 @@
 <div class="flex min-h-0 flex-1 flex-col">
-  <!-- Slim contact header — Intercom-style. Assignee / status / tags /
-       AI / export / block used to live in this strip; they moved to
-       the right-side ``app-chat-details-rail`` so the middle column
-       stays focused on the actual conversation. -->
-  <div class="flex items-center gap-3 border-b border-subtle bg-surface px-3 py-2 md:px-4">
+  <!-- Slim contact header. The AI takeover banner (both variants —
+       "🤖 AI is handling" + Take Over, and "✋ Human handling" + Return
+       to AI) used to sit as its own full-width strip under this
+       header, eating a row. Merged into the right side of this row
+       instead so the message thread starts one row higher. Wraps
+       gracefully on narrow screens (flex-wrap on the outer). -->
+  <div
+    class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-subtle bg-surface px-3 py-2 md:px-4"
+  >
     <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-semibold text-default">
         {{ conversation.external_id }}
@@ -16,44 +20,46 @@
         }
       </p>
     </div>
-  </div>
-
-  <!-- AI takeover banner (omnichannel Step 4) -->
-  @if (showTakeoverBanner()) {
-    @if (conversation.ai_paused) {
-      <div
-        class="flex items-center justify-between gap-3 border-b border-amber-500/20 bg-amber-500/10 px-4 py-1 text-xs text-amber-400"
-      >
-        <span>
-          ✋ <strong>{{ pausedHolderName() }}</strong> is handling this conversation. AI is paused.
-        </span>
-        @if (canReturnToAi()) {
-          <button
-            type="button"
-            class="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/20"
-            (click)="onResumeClick()"
-          >
-            Return to AI
-          </button>
-        }
-      </div>
-    } @else {
-      <div
-        class="flex items-center justify-between gap-3 border-b border-emerald-500/20 bg-emerald-500/10 px-4 py-1 text-xs text-emerald-400"
-      >
-        <span> 🤖 AI is handling this conversation. </span>
-        @if (canTakeOver()) {
-          <button
-            type="button"
-            class="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20"
-            (click)="onTakeoverClick()"
-          >
-            Take Over
-          </button>
-        }
-      </div>
+    @if (showTakeoverBanner()) {
+      @if (conversation.ai_paused) {
+        <div
+          class="flex items-center gap-2 rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-500 ring-1 ring-amber-500/20"
+        >
+          <span class="flex items-center gap-1">
+            ✋
+            <strong class="font-semibold">{{ pausedHolderName() }}</strong>
+            handling
+          </span>
+          @if (canReturnToAi()) {
+            <button
+              type="button"
+              class="rounded-md border border-amber-500/30 bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-500 transition hover:bg-amber-500/25"
+              (click)="onResumeClick()"
+              title="Hand this conversation back to AI"
+            >
+              Return to AI
+            </button>
+          }
+        </div>
+      } @else {
+        <div
+          class="flex items-center gap-2 rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-500 ring-1 ring-emerald-500/20"
+        >
+          <span>🤖 AI is handling</span>
+          @if (canTakeOver()) {
+            <button
+              type="button"
+              class="rounded-md border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-medium text-emerald-500 transition hover:bg-emerald-500/25"
+              (click)="onTakeoverClick()"
+              title="Take over from AI"
+            >
+              Take Over
+            </button>
+          }
+        </div>
+      }
     }
-  }
+  </div>
 
   <!-- Messages -->
   <div #scrollHost class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-surface-2 px-4 py-4">

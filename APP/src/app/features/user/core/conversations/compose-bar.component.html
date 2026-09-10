@@ -233,14 +233,15 @@
         </div>
       }
       <textarea
+        #textareaEl
         [ngModel]="text()"
         (ngModelChange)="onTextChange($event)"
         (keydown)="onKey($event)"
-        rows="2"
+        rows="1"
         [attr.placeholder]="placeholder()"
         [disabled]="textareaDisabled()"
         [class]="
-          'block min-h-[2.5rem] w-full resize-none rounded-md border px-3 py-2 text-sm placeholder-zinc-400 shadow-sm focus:outline-none focus:ring-1 disabled:bg-surface-2 disabled:text-muted ' +
+          'block max-h-[12.5rem] min-h-[2rem] w-full resize-none overflow-y-auto rounded-md border px-3 py-1.5 text-sm placeholder-zinc-400 shadow-sm focus:outline-none focus:ring-1 disabled:bg-surface-2 disabled:text-muted ' +
           (isNoteMode()
             ? 'border-amber-300 bg-amber-500/10 focus:border-amber-500 focus:ring-amber-500'
             : 'border-subtle bg-surface focus:border-muted focus:ring-accent')
