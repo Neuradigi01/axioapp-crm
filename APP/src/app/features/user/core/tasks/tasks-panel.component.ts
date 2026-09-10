@@ -1,11 +1,13 @@
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   computed,
   effect,
   inject,
   input,
+  output,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -14,11 +16,21 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService } from '../auth/auth.service';
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
+import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { commonValidators } from '../shared/validators';
 import { TaskAssignee, TaskFormModalComponent } from './task-form-modal.component';
 import { Task, TaskPriority, TasksApiService } from './tasks-api.service';
 import { extractApiError } from '@core/services/api-error.util';
+
+/** Priority picker options for the inline add-task form. Same three
+ *  values the backend enum accepts; label-cased for display. */
+const PRIORITY_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'low', label: 'Low' },
+  { value: 'med', label: 'Medium' },
+  { value: 'high', label: 'High' },
+];
 
 /**
  * Tasks panel rendered inside any entity detail page. Inputs are
@@ -35,7 +47,13 @@ import { extractApiError } from '@core/services/api-error.util';
   selector: 'app-tasks-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, LucideAngularModule, TaskFormModalComponent],
+  imports: [
+    ReactiveFormsModule,
+    LucideAngularModule,
+    TaskFormModalComponent,
+    MobileDateTimeComponent,
+    MobileSelectComponent,
+  ],
   templateUrl: './tasks-panel.component.html',
 })
 export class TasksPanelComponent {
@@ -44,6 +62,11 @@ export class TasksPanelComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(FurnitureAuthService);
   private readonly usersDir = inject(UsersDirectoryService);
+  /** Zoneless: HTTP subscribe callbacks fire outside any tracked
+   *  execution context; signal writes should schedule CD on their own
+   *  but explicit `markForCheck()` is belt-and-braces after every async
+   *  state mutation. Same pattern as the sibling `LeadFollowUpsPanel`. */
+  private readonly cdr = inject(ChangeDetectorRef);
 
   // T6 — Edit + delete on the panel. Edit reuses the shared
   // TaskFormModal; delete uses a native confirm to stay lightweight.
@@ -66,6 +89,13 @@ export class TasksPanelComponent {
   readonly entityType = input.required<string>();
   readonly entityId = input.required<string>();
 
+  /** Emits after the inline add-task form successfully creates a row.
+   *  Lets an entity-detail parent (e.g. lead-detail) refresh a sibling
+   *  view that also lists these rows — the lead-detail Overview tab's
+   *  Follow-Up Status panel is a separate `LeadFollowUpsPanel` instance
+   *  and would otherwise stay stale until the user clicks Refresh. */
+  readonly created = output<Task>();
+
   protected readonly items = signal<Task[]>([]);
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
@@ -80,6 +110,14 @@ export class TasksPanelComponent {
     due_at: ['', [commonValidators.dateNotPast]],
     priority: this.fb.control<TaskPriority>('med', { nonNullable: true }),
   });
+
+  protected readonly priorityOptions = PRIORITY_OPTIONS;
+  /** `min` bound for the datetime picker so the calendar disables past
+   *  days at open-time — mirrors the `dateNotPast` validator on the
+   *  form control, which is authoritative. Recomputed each time the
+   *  panel is instantiated (constructor scope) which is good enough
+   *  for a form the user typically submits in a few seconds. */
+  protected readonly dueMin = this._todayLocalInput();
 
   protected readonly openCount = computed(
     () => this.items().filter((t) => t.status === 'open').length,
@@ -146,9 +184,11 @@ export class TasksPanelComponent {
       .subscribe({
         next: () => {
           this.items.update((rows) => rows.filter((r) => r.id !== task.id));
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.loadError.set(extractApiError(err) ?? 'Could not delete the task.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -163,11 +203,13 @@ export class TasksPanelComponent {
         next: (resp) => {
           this.items.set(resp.items);
           this.loading.set(false);
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loadError.set(extractApiError(err) ?? 'Could not load tasks.');
           this.loading.set(false);
+          this.cdr.markForCheck();
         },
       });
   }
@@ -198,10 +240,13 @@ export class TasksPanelComponent {
           // Re-fetch instead of locally inserting so server-side
           // due_at ordering stays consistent without us re-sorting.
           this.items.update((rows) => [task, ...rows].sort(this.compareTasks));
+          this.cdr.markForCheck();
+          this.created.emit(task);
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
           this.addError.set(extractApiError(err) ?? 'Could not create task.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -219,10 +264,12 @@ export class TasksPanelComponent {
       .subscribe({
         next: (updated) => {
           this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.items.set(before);
           this.loadError.set(extractApiError(err) ?? 'Could not update task.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -257,10 +304,22 @@ export class TasksPanelComponent {
 
   private normalizeDue(value: string | null | undefined): string | null {
     if (!value) return null;
-    // <input type="datetime-local"> emits "YYYY-MM-DDTHH:mm" — convert to ISO.
+    // `crm-mobile-datetime` emits "YYYY-MM-DDTHH:mm" (same shape as
+    // native <input type="datetime-local">) — convert to ISO for the
+    // backend, which stores every timestamp as UTC.
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return null;
     return d.toISOString();
+  }
+
+  /** Today at 00:00 in local wall-clock time, in the
+   *  `YYYY-MM-DDTHH:mm` shape `crm-mobile-datetime` uses for its
+   *  `[min]` bound. Prevents the calendar from letting the rep pick a
+   *  day earlier than today — matches `commonValidators.dateNotPast`. */
+  private _todayLocalInput(): string {
+    const d = new Date();
+    const pad = (n: number): string => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T00:00`;
   }
 
   private compareTasks(a: Task, b: Task): number {

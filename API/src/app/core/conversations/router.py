@@ -78,7 +78,6 @@ from src.app.core.conversations.schemas import (
 from src.app.core.conversations.service import (
     bulk_last_message_bodies,
     compute_ai_active,
-    ensure_can_view_conversation,
     ensure_can_write_conversation,
     get_conversation,
     list_conversations,
@@ -251,12 +250,10 @@ async def list_endpoint(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_permissions("conversations.read")),
+    _user: User = Depends(require_permissions("conversations.read")),
 ) -> ConversationListResponse:
     rows, total = await list_conversations(
         db,
-        caller_user_id=user.legacy_uuid,
-        caller_role_id=user.role_id,
         channel=channel,
         status_filter=status_,
         assigned_to=assigned_to,
@@ -378,7 +375,7 @@ _THREAD_MESSAGES_PAGE_SIZE = 50
 async def get_detail_endpoint(
     conversation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_permissions("conversations.read")),
+    _user: User = Depends(require_permissions("conversations.read")),
 ) -> ConversationDetail:
     """Thread detail — returns the **most recent** page of messages,
     not the full history.
@@ -390,12 +387,6 @@ async def get_detail_endpoint(
     scrolls up to load older pages.
     """
     conv = await get_conversation(db, conversation_id)
-    await ensure_can_view_conversation(
-        db,
-        conv=conv,
-        caller_user_id=user.legacy_uuid,
-        caller_role_id=user.role_id,
-    )
     msgs = await list_messages(db, conversation_id, limit=_THREAD_MESSAGES_PAGE_SIZE)
     conv_out = ConversationOut.model_validate(conv)
     conv_out.tags = await list_tags_for_conversation(db, conversation_id)
@@ -424,7 +415,7 @@ async def list_older_messages_endpoint(
     before_id: uuid.UUID,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_permissions("conversations.read")),
+    _user: User = Depends(require_permissions("conversations.read")),
 ) -> list[MessageOut]:
     """Return the page of messages **older than** ``before_id`` on this
     conversation, oldest-first (append to the top of the rendered
@@ -439,13 +430,7 @@ async def list_older_messages_endpoint(
     capped_limit = max(1, min(int(limit), 200))
     # Existence check so a bad ``before_id`` returns 404 rather than
     # silently walking the whole thread as if no anchor was supplied.
-    conv = await get_conversation(db, conversation_id)
-    await ensure_can_view_conversation(
-        db,
-        conv=conv,
-        caller_user_id=user.legacy_uuid,
-        caller_role_id=user.role_id,
-    )
+    await get_conversation(db, conversation_id)
     msgs = await list_messages(db, conversation_id, limit=capped_limit, before_id=before_id)
     return [MessageOut.model_validate(m) for m in msgs]
 

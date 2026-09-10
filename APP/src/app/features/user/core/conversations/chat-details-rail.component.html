@@ -1,0 +1,209 @@
+<div class="flex flex-col gap-4 px-3 py-4">
+  <!-- Contact identity block. Same source of truth as the chat-thread
+       header used to render, just relocated. -->
+  <section class="flex flex-col gap-2">
+    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">Conversation</p>
+    <p class="truncate text-sm font-semibold text-default" [title]="conversation.external_id">
+      {{ conversation.external_id }}
+    </p>
+    <p class="flex items-center gap-2 text-xs text-muted capitalize">
+      <span>{{ conversation.channel }} · {{ conversation.status }}</span>
+      @if (conversation.acquisition_source === 'ad') {
+        <app-attribution-chip [conversationId]="conversation.id" />
+      }
+    </p>
+  </section>
+
+  <!-- Assignee. Reuses the same ownerColor helper as the list badge
+       so the same person shows the same colour across pages. -->
+  <section class="flex flex-col gap-2">
+    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">Assignee</p>
+    @let ownerRail = staffColorFor(conversation.assigned_to_id);
+    @if (canReassign()) {
+      <button
+        type="button"
+        (click)="reassign.emit()"
+        [class]="
+          'inline-flex items-center gap-2 self-start rounded-full py-0.5 pl-0.5 pr-3 text-xs font-medium ring-1 transition hover:opacity-90 ' +
+          ownerRail.bg +
+          ' ' +
+          ownerRail.text +
+          ' ' +
+          ownerRail.ring
+        "
+        [title]="'Reassign — ' + staffNameFor(conversation.assigned_to_id)"
+      >
+        <span
+          class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-surface/60 text-[10px] font-semibold"
+        >
+          {{ staffInitialsFor(conversation.assigned_to_id) }}
+        </span>
+        {{ staffNameFor(conversation.assigned_to_id) }}
+      </button>
+    } @else {
+      <span
+        [class]="
+          'inline-flex items-center gap-2 self-start rounded-full py-0.5 pl-0.5 pr-3 text-xs font-medium ring-1 ' +
+          ownerRail.bg +
+          ' ' +
+          ownerRail.text +
+          ' ' +
+          ownerRail.ring
+        "
+        [title]="staffNameFor(conversation.assigned_to_id)"
+      >
+        <span
+          class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-surface/60 text-[10px] font-semibold"
+        >
+          {{ staffInitialsFor(conversation.assigned_to_id) }}
+        </span>
+        {{ staffNameFor(conversation.assigned_to_id) }}
+      </span>
+    }
+  </section>
+
+  <!-- Status. Same open/snoozed/closed menu the header used to host. -->
+  <section class="flex flex-col gap-2">
+    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">Status</p>
+    <div class="relative self-start">
+      <button
+        type="button"
+        (click)="toggleStatusMenu(); $event.stopPropagation()"
+        [class]="
+          'inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-xs font-medium capitalize transition hover:bg-surface-2 ' +
+          (conversation.status === 'closed'
+            ? 'bg-zinc-500/10 text-zinc-500'
+            : conversation.status === 'snoozed'
+              ? 'bg-sky-500/10 text-sky-600'
+              : 'bg-emerald-500/10 text-emerald-700')
+        "
+        [attr.aria-expanded]="statusMenuOpen()"
+        aria-haspopup="menu"
+      >
+        <lucide-icon
+          [name]="
+            conversation.status === 'closed'
+              ? 'check-circle-2'
+              : conversation.status === 'snoozed'
+                ? 'clock'
+                : 'circle-dot'
+          "
+          class="h-3 w-3"
+        />
+        {{ statusLabel[conversation.status] }}
+        <lucide-icon name="chevron-down" class="h-3 w-3 opacity-60" />
+      </button>
+      @if (statusMenuOpen()) {
+        <div
+          role="menu"
+          class="absolute left-0 z-30 mt-1 w-40 rounded-lg border border-subtle bg-surface p-1 shadow-lg"
+        >
+          @for (opt of statusOptions; track opt) {
+            <button
+              type="button"
+              role="menuitem"
+              (click)="pickStatus(opt); $event.stopPropagation()"
+              [class]="
+                'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs capitalize transition hover:bg-surface-2 ' +
+                (opt === conversation.status ? 'font-semibold text-default' : 'text-muted')
+              "
+            >
+              <lucide-icon
+                [name]="
+                  opt === 'closed' ? 'check-circle-2' : opt === 'snoozed' ? 'clock' : 'circle-dot'
+                "
+                class="h-3 w-3"
+              />
+              {{ statusLabel[opt] }}
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- Tags. Chip list + manager dropdown reused verbatim. -->
+  <section class="flex flex-col gap-2">
+    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">Tags</p>
+    @if (conversation.tags && conversation.tags.length > 0) {
+      <div class="flex flex-wrap gap-1">
+        @for (t of conversation.tags; track t.id) {
+          <app-tag-chip [tag]="t" />
+        }
+      </div>
+    }
+    <div class="relative">
+      <button
+        type="button"
+        (click)="toggleTagManager(); $event.stopPropagation()"
+        class="inline-flex items-center gap-1 self-start rounded-full border border-subtle bg-surface px-3 py-1 text-xs font-medium text-default hover:bg-surface-2"
+        aria-label="Manage tags"
+      >
+        <lucide-icon name="tag" class="h-3 w-3" />
+        <span>
+          {{
+            conversation.tags && conversation.tags.length > 0
+              ? conversation.tags.length + ' tag' + (conversation.tags.length === 1 ? '' : 's')
+              : 'Add tag'
+          }}
+        </span>
+      </button>
+      @if (tagManagerOpen()) {
+        <app-tag-manager
+          [conversationId]="conversation.id"
+          [assignedTags]="conversation.tags || []"
+          (tagsChanged)="onTagsChanged($event)"
+          (close)="closeTagManager()"
+        />
+      }
+    </div>
+  </section>
+
+  <!-- AI state pill. Same click-to-toggle behaviour the header pill
+       used to have; hidden when this thread has no AI at all. -->
+  @if (conversation.ai_paused || conversation.ai_active) {
+    <section class="flex flex-col gap-2">
+      <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">AI</p>
+      @if (conversation.ai_paused) {
+        <button
+          type="button"
+          [disabled]="!canReturnToAi()"
+          (click)="onResumeClick()"
+          class="inline-flex items-center gap-1.5 self-start rounded-full bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-500 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+          [title]="
+            canReturnToAi()
+              ? 'A team member is handling this — click to hand it back to AI'
+              : 'Only the current holder or an Owner/Admin can return this to AI'
+          "
+        >
+          ✋ Human handling
+        </button>
+      } @else {
+        <button
+          type="button"
+          [disabled]="!canTakeOver()"
+          (click)="onTakeoverClick()"
+          class="inline-flex items-center gap-1.5 self-start rounded-full bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-500 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+          [title]="
+            canTakeOver()
+              ? 'AI is handling this — click to take over'
+              : 'Only Owner or Admin can take over from AI'
+          "
+        >
+          🤖 AI Handled
+        </button>
+      }
+    </section>
+  }
+
+  <!-- Actions. Export is org-wide; Block is WhatsApp-only. -->
+  <section class="flex flex-col gap-2">
+    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">Actions</p>
+    <div class="flex flex-wrap items-center gap-2">
+      <app-conversation-export-button [conversationId]="conversation.id" />
+      @if (conversation.channel === 'whatsapp') {
+        <app-conversation-block-number-action [phoneNumber]="conversation.external_id" />
+      }
+    </div>
+  </section>
+</div>

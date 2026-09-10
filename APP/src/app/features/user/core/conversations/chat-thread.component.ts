@@ -198,19 +198,45 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
     return !!me && this.conversation?.assigned_to_id === me;
   });
 
-  /** Write gate for reply / react / tag / mark-read / take-over-AI on
-   * the current thread. Mirrors the backend
-   * `ensure_can_write_conversation` rule: passes if the chat is
-   * unassigned (any employee can jump in), if the caller IS the
-   * assignee, or if the caller is Owner/Admin. When false, the
-   * template renders the thread in view-only mode (compose bar
-   * disabled, reply/react/tag hidden, small banner explains why). */
+  /** Write gate for reply / react / tag / mark-read on the current
+   * thread. Mirrors the backend `ensure_can_write_conversation` rule
+   * (locked 2026-09-10):
+   *   - Chat unassigned → any writer can jump in. Sending a reply
+   *     auto-claims the chat for the sender (backend does the same
+   *     via `send_outbound` / `send_email_reply`).
+   *   - Caller is the current assignee → allowed.
+   *   - Owner / Admin (`conversations.assign_others`) → always
+   *     allowed.
+   *   - Anyone else viewing an assigned chat → view-only.
+   *
+   * When false the template renders the thread in view-only mode:
+   * compose bar hidden, reply/react/tag hidden, banner explains why. */
   protected readonly canInteract = computed(() => {
     if (this.auth.hasPermission('conversations.assign_others')) return true;
     const owner = this.conversation?.assigned_to_id ?? null;
     if (owner === null) return true;
     const me = this.auth.currentUserId();
     return !!me && owner === me;
+  });
+
+  /** Take-Over-from-AI button gate. Locked to Owner / Admin only —
+   * Employees never see the button (product rule 2026-09-10: only
+   * Owner/Admin can explicitly take over). Employees can still
+   * work an unassigned AI-handling chat by just replying (send
+   * auto-claims + auto-pauses via ``send_outbound``); the explicit
+   * "Take Over" motion is an admin-only supervisor action. */
+  protected readonly canTakeOver = computed(() =>
+    this.auth.hasPermission('conversations.assign_others'),
+  );
+
+  /** Return-to-AI gate. Only the current holder (assignee) OR an
+   * Owner / Admin can hand a paused chat back to AI. Matches the
+   * backend rule in ``resume_ai`` (403 ``not_holder`` otherwise). */
+  protected readonly canReturnToAi = computed(() => {
+    if (this.auth.hasPermission('conversations.assign_others')) return true;
+    const holder = this.conversation?.ai_paused_by_user_id ?? null;
+    const me = this.auth.currentUserId();
+    return !!me && holder === me;
   });
 
   /** Name of the current assignee — used by the view-only banner. */

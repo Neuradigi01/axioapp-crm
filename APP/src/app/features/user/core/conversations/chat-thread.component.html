@@ -1,12 +1,10 @@
 <div class="flex min-h-0 flex-1 flex-col">
-  <!-- Header — compact (py-2) so more vertical space goes to the
-       message thread on typical laptop viewports. On mobile the
-       header stacks (contact info top, action row below with
-       flex-wrap) so nothing gets clipped off the right edge. -->
-  <div
-    class="flex flex-col gap-2 border-b border-subtle bg-surface px-3 py-2 md:flex-row md:items-center md:justify-between md:px-4"
-  >
-    <div class="min-w-0">
+  <!-- Slim contact header — Intercom-style. Assignee / status / tags /
+       AI / export / block used to live in this strip; they moved to
+       the right-side ``app-chat-details-rail`` so the middle column
+       stays focused on the actual conversation. -->
+  <div class="flex items-center gap-3 border-b border-subtle bg-surface px-3 py-2 md:px-4">
+    <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-semibold text-default">
         {{ conversation.external_id }}
       </p>
@@ -18,197 +16,41 @@
         }
       </p>
     </div>
-    <div class="flex flex-wrap items-center gap-1.5 md:gap-2">
-      @let ownerHeader = staffColorFor(conversation.assigned_to_id);
-      @if (canReassign()) {
-        <button
-          type="button"
-          (click)="reassign.emit()"
-          [class]="
-            'inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 text-xs font-medium ring-1 transition hover:opacity-90 ' +
-            ownerHeader.bg +
-            ' ' +
-            ownerHeader.text +
-            ' ' +
-            ownerHeader.ring
-          "
-          [title]="'Reassign — ' + staffNameFor(conversation.assigned_to_id)"
-        >
-          <span
-            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface/50 text-[10px] font-semibold"
-          >
-            {{ staffInitialsFor(conversation.assigned_to_id) }}
-          </span>
-          {{ staffNameFor(conversation.assigned_to_id) }}
-        </button>
-      } @else {
-        <span
-          [class]="
-            'inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 text-xs font-medium ring-1 ' +
-            ownerHeader.bg +
-            ' ' +
-            ownerHeader.text +
-            ' ' +
-            ownerHeader.ring
-          "
-          [title]="staffNameFor(conversation.assigned_to_id)"
-        >
-          <span
-            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface/50 text-[10px] font-semibold"
-          >
-            {{ staffInitialsFor(conversation.assigned_to_id) }}
-          </span>
-          {{ staffNameFor(conversation.assigned_to_id) }}
-        </span>
-      }
-      <!-- J.16 fix — status pill + menu. Backend already accepts
-           `open` / `snoozed` / `closed` via PATCH; the UI now has
-           a control to emit that. Menu closes on selection. -->
-      <div class="relative">
-        <button
-          type="button"
-          (click)="toggleStatusMenu(); $event.stopPropagation()"
-          [class]="
-            'inline-flex items-center gap-1 rounded-full border border-subtle px-2.5 py-1 text-xs font-medium capitalize transition hover:bg-surface-2 ' +
-            (conversation.status === 'closed'
-              ? 'bg-zinc-500/10 text-zinc-500'
-              : conversation.status === 'snoozed'
-                ? 'bg-sky-500/10 text-sky-600'
-                : 'bg-emerald-500/10 text-emerald-700')
-          "
-          [attr.aria-expanded]="statusMenuOpen()"
-          aria-haspopup="menu"
-          [title]="'Status — ' + statusLabel[conversation.status]"
-        >
-          <lucide-icon
-            [name]="
-              conversation.status === 'closed'
-                ? 'check-circle-2'
-                : conversation.status === 'snoozed'
-                  ? 'clock'
-                  : 'circle-dot'
-            "
-            class="h-3 w-3"
-          />
-          {{ statusLabel[conversation.status] }}
-        </button>
-        @if (statusMenuOpen()) {
-          <div
-            role="menu"
-            class="absolute right-0 z-30 mt-1 w-40 rounded-lg border border-subtle bg-surface p-1 shadow-lg"
-          >
-            @for (opt of statusOptions; track opt) {
-              <button
-                type="button"
-                role="menuitem"
-                (click)="pickStatus(opt); $event.stopPropagation()"
-                [class]="
-                  'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs capitalize transition hover:bg-surface-2 ' +
-                  (opt === conversation.status ? 'font-semibold text-default' : 'text-muted')
-                "
-              >
-                <lucide-icon
-                  [name]="
-                    opt === 'closed' ? 'check-circle-2' : opt === 'snoozed' ? 'clock' : 'circle-dot'
-                  "
-                  class="h-3 w-3"
-                />
-                {{ statusLabel[opt] }}
-              </button>
-            }
-          </div>
-        }
-      </div>
-      <!-- Step 14 — Tags button with chip-row preview + manager dropdown -->
-      <div class="relative">
-        <button
-          type="button"
-          (click)="toggleTagManager(); $event.stopPropagation()"
-          class="inline-flex items-center gap-1 rounded-full border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
-          aria-label="Tags"
-        >
-          <lucide-icon name="tag" class="h-3 w-3" />
-          @if (conversation.tags && conversation.tags.length > 0) {
-            <span>{{ conversation.tags.length }}</span>
-          } @else {
-            <span>Tags</span>
-          }
-        </button>
-        @if (tagManagerOpen()) {
-          <app-tag-manager
-            [conversationId]="conversation.id"
-            [assignedTags]="conversation.tags || []"
-            (tagsChanged)="onTagsChanged($event)"
-            (close)="closeTagManager()"
-          />
-        }
-      </div>
-      @if (conversation.ai_paused) {
-        <button
-          type="button"
-          (click)="onResumeClick()"
-          class="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-400 transition hover:bg-amber-500/20"
-          title="A team member is handling this — click to hand it back to AI"
-        >
-          ✋ Human handling
-        </button>
-      } @else if (conversation.ai_active) {
-        <button
-          type="button"
-          (click)="onTakeoverClick()"
-          class="rounded-full bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-400 transition hover:bg-violet-500/20"
-          title="AI is handling this — click to take over"
-        >
-          🤖 AI Handled
-        </button>
-      }
-      <!-- Step 23 — DPDP transcript export + DND block action. -->
-      <app-conversation-export-button [conversationId]="conversation.id" />
-      @if (conversation.channel === 'whatsapp') {
-        <app-conversation-block-number-action [phoneNumber]="conversation.external_id" />
-      }
-    </div>
   </div>
-
-  @if (conversation.tags && conversation.tags.length > 0) {
-    <div class="border-b border-subtle bg-surface px-4 py-2">
-      <div class="flex flex-wrap gap-1">
-        @for (t of conversation.tags; track t.id) {
-          <app-tag-chip [tag]="t" />
-        }
-      </div>
-    </div>
-  }
 
   <!-- AI takeover banner (omnichannel Step 4) -->
   @if (showTakeoverBanner()) {
     @if (conversation.ai_paused) {
       <div
-        class="flex items-center justify-between gap-3 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-400"
+        class="flex items-center justify-between gap-3 border-b border-amber-500/20 bg-amber-500/10 px-4 py-1 text-xs text-amber-400"
       >
         <span>
           ✋ <strong>{{ pausedHolderName() }}</strong> is handling this conversation. AI is paused.
         </span>
-        <button
-          type="button"
-          class="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/20"
-          (click)="onResumeClick()"
-        >
-          Return to AI
-        </button>
+        @if (canReturnToAi()) {
+          <button
+            type="button"
+            class="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/20"
+            (click)="onResumeClick()"
+          >
+            Return to AI
+          </button>
+        }
       </div>
     } @else {
       <div
-        class="flex items-center justify-between gap-3 border-b border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs text-emerald-400"
+        class="flex items-center justify-between gap-3 border-b border-emerald-500/20 bg-emerald-500/10 px-4 py-1 text-xs text-emerald-400"
       >
         <span> 🤖 AI is handling this conversation. </span>
-        <button
-          type="button"
-          class="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20"
-          (click)="onTakeoverClick()"
-        >
-          Take Over
-        </button>
+        @if (canTakeOver()) {
+          <button
+            type="button"
+            class="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20"
+            (click)="onTakeoverClick()"
+          >
+            Take Over
+          </button>
+        }
       </div>
     }
   }
@@ -309,7 +151,7 @@
 
             <div
               [class]="
-                'relative max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ' +
+                'relative max-w-[92%] rounded-2xl px-3 py-2 text-sm shadow-sm md:max-w-[85%] ' +
                 (m.direction === 'out'
                   ? 'bg-accent text-white'
                   : 'bg-surface text-default ring-1 border-subtle') +

@@ -4,10 +4,10 @@
        compact (18px), subtitle moved into the empty-state message
        (`Pick a conversation...`) so it's not visible chrome when a
        thread is open. -->
-  <header class="border-b border-subtle bg-surface px-4 py-2 md:px-6">
+  <header class="border-b border-subtle bg-surface px-4 py-1.5 md:px-6">
     <div class="flex items-center justify-between gap-2">
       <h1
-        class="font-display text-[18px] font-semibold leading-tight tracking-[-0.01em] text-default"
+        class="font-display text-[15px] font-semibold leading-tight tracking-[-0.01em] text-default"
       >
         Conversations
       </h1>
@@ -85,9 +85,12 @@
 
   <div class="flex min-h-0 flex-1">
     <!-- Left: list. Hidden on mobile once a conversation is picked so the
-         thread pane can take the full width. -->
+         thread pane can take the full width. Aggressive trim to
+         maximise the middle chat column: 15rem default (still fits
+         truncated name + preview + chips), scaling up gently on
+         bigger screens. -->
     <aside
-      class="flex min-h-0 w-full flex-col border-r border-subtle bg-surface md:w-80 md:min-w-[18rem]"
+      class="flex min-h-0 w-full flex-col border-r border-subtle bg-surface md:w-60 md:min-w-[15rem] lg:w-64 xl:w-72"
       [class.hidden]="!!selectedId()"
       [class.md:flex]="!!selectedId()"
     >
@@ -107,7 +110,7 @@
       />
     </aside>
 
-    <!-- Right: thread + compose. Hidden on mobile when nothing selected so
+    <!-- Middle: thread + compose. Hidden on mobile when nothing selected so
          the list can take the full width. -->
     <section
       class="flex min-w-0 flex-1 flex-col bg-surface-2"
@@ -115,16 +118,31 @@
       [class.md:flex]="!selectedId()"
     >
       @if (selectedConversation(); as conv) {
-        <!-- Mobile-only back button to return to the list pane -->
-        <button
-          type="button"
-          (click)="deselect()"
-          class="flex items-center gap-1.5 border-b border-subtle bg-surface px-3 py-2 text-left text-xs font-medium text-muted transition hover:text-default md:hidden"
-          aria-label="Back to conversations"
+        <!-- Mobile-only strip: back button + a Details toggle so the
+             rail's assignee/status/tags/AI/export/block controls stay
+             reachable when the rail collapses on <md screens. -->
+        <div
+          class="flex items-center justify-between gap-2 border-b border-subtle bg-surface px-3 py-2 md:hidden"
         >
-          <lucide-icon name="chevron-left" class="h-3.5 w-3.5" />
-          Back to conversations
-        </button>
+          <button
+            type="button"
+            (click)="deselect()"
+            class="flex items-center gap-1.5 text-xs font-medium text-muted transition hover:text-default"
+            aria-label="Back to conversations"
+          >
+            <lucide-icon name="chevron-left" class="h-3.5 w-3.5" />
+            Back
+          </button>
+          <button
+            type="button"
+            (click)="openMobileRail()"
+            class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
+            aria-label="Show conversation details"
+          >
+            <lucide-icon name="panel-right-open" class="h-3.5 w-3.5" />
+            Details
+          </button>
+        </div>
         <!-- WhatsApp 24-hour session banner. Sits above the thread so
              the operator sees "session expired + how to unblock" the
              moment they open a stale conversation, instead of hunting
@@ -185,10 +203,13 @@
             (clearReply)="onClearReply()"
           />
         } @else {
-          <!-- View-only banner: chat is assigned to another user and
-               the viewer isn't Owner/Admin. Backend enforces the same
-               rule via `ensure_can_write_conversation`; this is the
-               UX affordance so the operator doesn't waste a click. -->
+          <!-- View-only banner: chat is assigned to another employee
+               and the viewer isn't Owner/Admin. Backend enforces the
+               same rule via `ensure_can_write_conversation`; this is
+               the UX affordance so the operator doesn't waste a
+               click. Unassigned chats never land here — any writer
+               can jump in on those, and the reply auto-claims the
+               chat for the sender. -->
           <div
             class="flex items-center justify-center gap-2 border-t border-subtle bg-surface-2 px-4 py-3 text-xs text-muted"
           >
@@ -214,6 +235,76 @@
         </div>
       }
     </section>
+
+    <!-- Right: Intercom-style details rail. Renders only when a
+         conversation is open; on <md screens it's hidden entirely to
+         keep the message column full-width on phones. Every action
+         inside (reassign / status / tags / AI / export / block) emits
+         the same event the chat-thread header used to emit, so the
+         page handlers already wired up keep working unchanged. -->
+    @if (selectedConversation(); as conv) {
+      <!-- Right rail. Kept as narrow as the pill controls allow so the
+           middle message column keeps the lion's share of the width.
+           md 13rem (208px — assignee chip + status pill still fit),
+           scaling up gradually on bigger screens. Hidden on <md
+           phones — the mobile back-button strip surfaces a "Details"
+           toggle that flips the rail on as an off-canvas drawer. -->
+      <aside
+        class="hidden min-h-0 w-52 shrink-0 flex-col border-l border-subtle bg-surface md:flex lg:w-60 xl:w-64"
+      >
+        <app-chat-details-rail
+          [conversation]="conv"
+          [staffById]="staffById()"
+          (reassign)="openReassign()"
+          (statusChange)="onStatusChange($event)"
+          (tagsChanged)="onTagsChanged($event)"
+          (takeoverAi)="onTakeoverAi()"
+          (resumeAiOut)="onResumeAi()"
+        />
+      </aside>
+      @if (mobileRailOpen()) {
+        <!-- Mobile drawer — the same rail rendered as an overlay when
+             the operator taps "Details" on the mobile back-button
+             strip. Sits above the chat surface on <md screens only
+             (the desktop path renders the rail inline in the aside
+             above). Close on backdrop tap. -->
+        <div
+          class="fixed inset-0 z-40 flex md:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Conversation details"
+        >
+          <button
+            type="button"
+            class="flex-1 bg-black/40"
+            aria-label="Close details"
+            (click)="closeMobileRail()"
+          ></button>
+          <div class="flex w-72 max-w-[80vw] flex-col border-l border-subtle bg-surface shadow-xl">
+            <div class="flex items-center justify-between border-b border-subtle px-3 py-2">
+              <span class="text-xs font-semibold uppercase tracking-wide text-muted">Details</span>
+              <button
+                type="button"
+                (click)="closeMobileRail()"
+                class="rounded p-1 text-muted hover:bg-surface-2 hover:text-default"
+                aria-label="Close"
+              >
+                <lucide-icon name="x" class="h-4 w-4" />
+              </button>
+            </div>
+            <app-chat-details-rail
+              [conversation]="conv"
+              [staffById]="staffById()"
+              (reassign)="openReassign(); closeMobileRail()"
+              (statusChange)="onStatusChange($event)"
+              (tagsChanged)="onTagsChanged($event)"
+              (takeoverAi)="onTakeoverAi(); closeMobileRail()"
+              (resumeAiOut)="onResumeAi(); closeMobileRail()"
+            />
+          </div>
+        </div>
+      }
+    }
   </div>
 </div>
 

@@ -111,6 +111,7 @@ export class LeadFollowUpsPanelComponent {
   prepend(task: Task): void {
     this.tasks.update((rows) => [task, ...rows].sort(this._compareDueAt));
     this.total.update((n) => n + 1);
+    this.cdr.markForCheck();
   }
 
   /** Public — parent's `onUpdateStatusSaved` calls this after a modal

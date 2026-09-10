@@ -179,6 +179,16 @@ export class LeadDetailPageComponent implements OnInit {
     this.timeline()?.prepend(activity);
   }
 
+  /** Fires when the Tasks-tab inline form creates a row. The
+   *  Follow-Up Status panel is a sibling on the Overview tab (a
+   *  separate `LeadFollowUpsPanel` instance) — without this reload
+   *  it stays stale until the user clicks Refresh, and in zoneless
+   *  mode the freshly-mounted panel on tab-switch can leave the new
+   *  row's cells unrendered until any user interaction triggers CD. */
+  protected onTaskCreated(): void {
+    this.followUpsPanel()?.reload();
+  }
+
   readonly customFields = computed(() => {
     const l = this.lead();
     if (l === null) return [] as { label: string; value: string }[];

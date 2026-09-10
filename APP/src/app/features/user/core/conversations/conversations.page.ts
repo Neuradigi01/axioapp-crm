@@ -1,5 +1,6 @@
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   ViewChild,
@@ -36,6 +37,7 @@ import {
   ComposerMediaPayload,
   ComposerNotePayload,
 } from './compose-bar.component';
+import { ChatDetailsRailComponent } from './chat-details-rail.component';
 import { ConversationListComponent } from './conversation-list.component';
 import { InteractiveBuilderComponent, InteractivePayload } from './interactive-builder.component';
 import { NewConversationModalComponent } from './new-conversation-modal.component';
@@ -70,6 +72,7 @@ import { extractApiError } from '@core/services/api-error.util';
   imports: [
     ConversationListComponent,
     ChatThreadComponent,
+    ChatDetailsRailComponent,
     ComposeBarComponent,
     InteractiveBuilderComponent,
     NewConversationModalComponent,
@@ -90,6 +93,15 @@ export class ConversationsPageComponent {
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
+  /** Zoneless CD: signal writes that fire from `setTimeout` /
+   *  `setInterval` callbacks (the debounced WS reload + the 6-second
+   *  open-thread poll) are outside any tracked reactive context and
+   *  do not always wake the scheduler — the new detail lands in the
+   *  signal but the thread doesn't repaint until the operator clicks
+   *  or presses a key. `markForCheck()` after every async signal
+   *  mutation closes that race. Same belt-and-braces pattern applied
+   *  to the sibling `LeadFollowUpsPanel` / `TasksPanel`. */
+  private readonly cdr = inject(ChangeDetectorRef);
 
   /** Step 27b — handle to the compose-bar so we can read its
    *  current Send-From selection on send. The picker self-hides
@@ -162,6 +174,22 @@ export class ConversationsPageComponent {
    *  fresh thread) or `cancel` (dismiss). */
   protected readonly newConversationOpen = signal(false);
 
+  /** Mobile-only rail drawer. On <md screens the details rail
+   *  collapses to keep the message column full-width; a "Details"
+   *  button in the mobile back-strip flips this to render the rail
+   *  as an off-canvas drawer. Auto-closes when the operator picks
+   *  an action that opens a modal (reassign) or toggles AI, and on
+   *  deselect / thread switch. */
+  protected readonly mobileRailOpen = signal(false);
+
+  protected openMobileRail(): void {
+    this.mobileRailOpen.set(true);
+  }
+
+  protected closeMobileRail(): void {
+    this.mobileRailOpen.set(false);
+  }
+
   protected openNewConversation(): void {
     this.newConversationOpen.set(true);
   }
@@ -201,13 +229,19 @@ export class ConversationsPageComponent {
   });
 
   /** View-only gate for the compose bar. Mirrors the backend
-   * `ensure_can_write_conversation` rule so the operator sees the
-   * disabled state instead of hitting a 403 after they try to send:
+   * `ensure_can_write_conversation` rule (locked 2026-09-10) so the
+   * operator sees the disabled state instead of hitting a 403 after
+   * they try to send:
    *   - Owner / Admin (`conversations.assign_others`) → always true.
-   *   - Chat unassigned → true (any employee can jump in and claim).
+   *   - Chat unassigned → true (anyone can jump in; the send auto-
+   *     claims the chat).
    *   - Caller is the current assignee → true.
-   *   - Otherwise → false; compose-bar hides and an inline banner
-   *     tells the operator who owns the chat + who can transfer it. */
+   *   - Chat owned by someone else → false; compose-bar hides and
+   *     the "assigned to X" view-only banner renders instead.
+   *
+   * The explicit "Take Over from AI" button in the chat-thread
+   * header is scoped tighter (Owner/Admin only) — that's the "steal
+   * another user's chat" motion the user restricted. */
   protected readonly canInteractWithSelected = computed(() => {
     const conv = this.selectedConversation();
     if (!conv) return false;
@@ -336,6 +370,7 @@ export class ConversationsPageComponent {
           const map = new Map<string, StaffListItem>();
           for (const r of rows) map.set(r.id, r);
           this.staffById.set(map);
+          this.cdr.markForCheck();
         },
         error: () => {
           // Intentionally silent — page remains usable; the badge
@@ -473,6 +508,10 @@ export class ConversationsPageComponent {
     this.selectedId.set(id);
     this.loadDetail(id);
     this.startOpenThreadPolling();
+    // Close the mobile rail if the operator flips to a different
+    // conversation while it's open — the drawer is scoped to the
+    // currently-selected conv and would look stale otherwise.
+    this.mobileRailOpen.set(false);
   }
 
   /** Mobile back button — clears the selection so the list pane
@@ -481,6 +520,7 @@ export class ConversationsPageComponent {
   protected deselect(): void {
     this.selectedId.set(null);
     this.replyingTo.set(null);
+    this.mobileRailOpen.set(false);
     this.stopOpenThreadPolling();
   }
 
@@ -1041,6 +1081,7 @@ export class ConversationsPageComponent {
             });
             return { ...fresh, messages: merged };
           });
+          this.cdr.markForCheck();
         },
         error: () => {
           /* silent — the takeover succeeded; the thread just won't
@@ -1088,11 +1129,13 @@ export class ConversationsPageComponent {
           this.items.set(resp.items);
           this.loading.set(false);
           this.hydrateContacts(resp.items);
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load conversations.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -1127,6 +1170,7 @@ export class ConversationsPageComponent {
           }
           return next;
         });
+        this.cdr.markForCheck();
       });
   }
 
@@ -1139,6 +1183,7 @@ export class ConversationsPageComponent {
         next: (d) => {
           this.detail.set(d);
           this.threadLoading.set(false);
+          this.cdr.markForCheck();
           // If the row we just opened has an unread badge, clear it
           // server-side. The endpoint is idempotent so we don't need
           // to gate on the count locally — the backend no-ops when
@@ -1160,6 +1205,7 @@ export class ConversationsPageComponent {
           this.detail.set(null);
           this.threadLoading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load thread.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -1219,6 +1265,7 @@ export class ConversationsPageComponent {
       if (d.conversation.id !== conversationId) return d;
       return mutator(d);
     });
+    this.cdr.markForCheck();
   }
 
   /** Replace an optimistic (`tmp-…`) row with the server row. Skips the
@@ -1274,6 +1321,7 @@ export class ConversationsPageComponent {
         ? { ...d, conversation: { ...d.conversation, assigned_to_id: me } }
         : d,
     );
+    this.cdr.markForCheck();
   }
 
   private bumpListLastMessage(id: string, isoTs: string): void {
@@ -1293,5 +1341,6 @@ export class ConversationsPageComponent {
           return bv.localeCompare(av);
         }),
     );
+    this.cdr.markForCheck();
   }
 }
