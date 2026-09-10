@@ -73,6 +73,8 @@ _PHONE_CHANNELS = {ConversationChannel.whatsapp, ConversationChannel.sms}
 async def list_conversations(
     session: AsyncSession,
     *,
+    caller_user_id: uuid.UUID,
+    caller_role_id: uuid.UUID,
     channel: ConversationChannel | None = None,
     status_filter: ConversationStatus | None = None,
     assigned_to: str | None = None,
@@ -98,12 +100,21 @@ async def list_conversations(
                     detail="assigned_to must be a UUID or 'unassigned'",
                 ) from exc
 
+    # Employees only see the unassigned pool + their own chats. Owner
+    # / Admin (``conversations.assign_others``) callers see everything
+    # so they can supervise and reassign. Matches the symmetric detail
+    # gate ``ensure_can_view_conversation``.
+    restrict_to_user_id: uuid.UUID | None = None
+    if not await _caller_can_assign_others(session, caller_role_id):
+        restrict_to_user_id = caller_user_id
+
     return await _da.list_conversations_query(
         session,
         channel=channel,
         status_filter=status_filter,
         assigned_to_id=assigned_to_id,
         assigned_to_unassigned=assigned_to_unassigned,
+        restrict_to_user_id=restrict_to_user_id,
         q=q,
         tag_ids=tag_ids,
         page=page,
@@ -175,8 +186,7 @@ async def ensure_can_write_conversation(
 ) -> None:
     """Guard for reply / react / tag / mark-read / close / take-over-AI.
 
-    Read paths (list + detail) stay org-wide via `conversations.read`
-    — this gate is only for state-changing operations. Rules:
+    Rules:
 
     * Chat unassigned (``assigned_to_id IS NULL``) → any writer with
       ``conversations.write`` passes (the compose bar auto-take-over
@@ -198,6 +208,40 @@ async def ensure_can_write_conversation(
         detail=(
             "This conversation is assigned to another user. "
             "Ask an Owner or Admin to reassign it before you can act on it."
+        ),
+    )
+
+
+async def ensure_can_view_conversation(
+    session: AsyncSession,
+    *,
+    conv: Conversation,
+    caller_user_id: uuid.UUID,
+    caller_role_id: uuid.UUID,
+) -> None:
+    """Read-side counterpart to :func:`ensure_can_write_conversation`.
+
+    An Employee should not be able to open a chat that belongs to
+    another Employee — the whole point of the assignee is a clear
+    line of ownership. Owner / Admin (``conversations.assign_others``)
+    stays able to view everything, so they can supervise and reassign.
+    Unassigned chats stay visible to anyone with ``conversations.read``
+    since the "any employee can jump in" workflow depends on it.
+
+    Symmetric with the list filter :func:`list_conversations` applies
+    — anything the list hides, the detail endpoint must refuse.
+    """
+    if conv.assigned_to_id is None:
+        return
+    if conv.assigned_to_id == caller_user_id:
+        return
+    if await _caller_can_assign_others(session, caller_role_id):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=(
+            "This conversation is assigned to another user. "
+            "Ask an Owner or Admin to reassign it if you need access."
         ),
     )
 
@@ -321,6 +365,31 @@ async def send_email_reply(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email conversation has no linked contact — cannot reply.",
         )
+
+    # tasks/ai-assistants-omnichannel Step 5 — mirror of the WhatsApp
+    # ``send_outbound`` auto-pause. A human replying on an AI-handled
+    # email thread implicitly claims the conversation from the AI, so
+    # the next inbound doesn't trigger another AI reply that stomps
+    # over the human's answer. Intercom / Wati semantics: one implicit
+    # takeover, no extra button. Guarded by the same bound-assistant
+    # lookup ``send_outbound`` uses so the pause fires only for orgs
+    # that actually have AI wired on the email channel.
+    if not conv.ai_paused:
+        from src.app.core.ai_assistants import data_access as _ai_da
+        from src.app.core.ai_assistants.models import AiAssistantChannel
+
+        bound = await _ai_da.find_active_assistant_bound_to_channel(
+            session, channel=AiAssistantChannel.email.value
+        )
+        if bound is not None:
+            await apply_auto_pause(
+                session,
+                conversation=conv,
+                actor_user_id=user_id,
+                reason="human_reply",
+            )
+            await session.commit()
+            await session.refresh(conv)
 
     # Default sender: the org's SHARED sender identity from Settings →
     # Integrations → Email Sender. Preference matches
@@ -2082,6 +2151,14 @@ async def resume_ai(
             status_code=status.HTTP_409_CONFLICT,
             detail={"reason": "not_paused"},
         )
+    # Ownership handshake: handing the thread back to AI drops the
+    # human assignee. Product model: "AI is handling" == no human
+    # owner. Keeping the ex-holder assigned would misroute the next
+    # inbound notification to someone who's already stepped away.
+    # The bound assistant answers the next inbound; if a human needs
+    # to jump back in, ``send_outbound`` / ``send_email_reply`` will
+    # implicit-claim the thread again.
+    conv.assigned_to_id = None
     actor_name = await _display_name_for(session, actor_user_id)
     _insert_takeover_system_message(
         session,
@@ -2104,6 +2181,8 @@ async def resume_ai(
 
 __all__ = [
     "apply_auto_pause",
+    "ensure_can_view_conversation",
+    "ensure_can_write_conversation",
     "get_conversation",
     "list_conversations",
     "list_messages",

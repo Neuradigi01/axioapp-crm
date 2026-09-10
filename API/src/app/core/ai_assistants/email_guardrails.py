@@ -88,7 +88,7 @@ _BOUNCE_SUBJECT_PREFIXES: tuple[str, ...] = (
     "autoresponder:",
 )
 
-_MIN_BODY_CHARS_AFTER_QUOTE_STRIP: int = 20
+_MIN_BODY_CHARS_AFTER_QUOTE_STRIP: int = 1
 
 # Case-insensitive matcher for a Gmail / Outlook / most-mail-clients
 # quote header line, e.g. "On Mon, Aug 20 2025 at 11:42, Jane <j@x.com> wrote:".

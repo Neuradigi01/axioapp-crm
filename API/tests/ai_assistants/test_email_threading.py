@@ -78,14 +78,11 @@ def test_build_reply_thread_full_shape() -> None:
     assert result.subject == "Re: Question about pricing"
     assert result.in_reply_to == "<abc-123@customer.com>"
     assert result.references == "<root@customer.com> <abc-123@customer.com>"
-    # AI text sits above the divider.
-    assert result.body.startswith("Yes, our Starter plan is $29")
-    # Divider + quoted body appended.
-    assert "--- Original message ---" in result.body
-    assert "> Hi, do you have a plan for 5 users?" in result.body
-    # Blank lines in the quoted body become bare `>` to preserve
-    # paragraph spacing.
-    assert ">\n> Thanks," in result.body
+    # Body is the AI reply only — threading rides on the RFC 5322
+    # headers, no ``--- Original message ---`` block appended.
+    assert result.body == "Yes, our Starter plan is $29/user/month for up to 5 users."
+    assert "--- Original message ---" not in result.body
+    assert "> Hi, do you have a plan for 5 users?" not in result.body
 
 
 def test_build_reply_thread_no_message_id_omits_in_reply_to() -> None:

@@ -69,6 +69,7 @@ async def list_conversations_query(
     status_filter: ConversationStatus | None = None,
     assigned_to_id: uuid.UUID | None = None,
     assigned_to_unassigned: bool = False,
+    restrict_to_user_id: uuid.UUID | None = None,
     q: str | None = None,
     tag_ids: list[uuid.UUID] | None = None,
     page: int = 1,
@@ -81,10 +82,27 @@ async def list_conversations_query(
     parses the ``'unassigned'`` sentinel from the wire and sets the
     flag.
 
+    ``restrict_to_user_id`` clamps the visible set to
+    ``(assigned_to IS NULL OR assigned_to = restrict_to_user_id)`` so
+    a plain Employee only sees the unassigned pool + their own
+    chats. Owner / Admin callers pass ``None`` and see every row.
+    Combines with the operator-facing ``assigned_to`` filter (Mine /
+    Unassigned pills) — a restriction narrows further, never widens.
+
     Tag filtering uses OR-semantics: a conversation matches when it
     carries at least one of the listed tag ids.
     """
+    from sqlalchemy import or_
+
     filters: list[Any] = []
+    # ai_widget rows are runtime-internal — they hold the ChatRuntime's
+    # per-turn context for the public embed + preview flows, not a
+    # real customer conversation. They must never appear in the
+    # operator inbox regardless of the caller's ``channel`` filter,
+    # so we exclude them unconditionally. (Adding this filter also
+    # hides any legacy widget rows that leaked in before the runtime
+    # started reusing the inbox conversation for inbound AI replies.)
+    filters.append(Conversation.channel != ConversationChannel.ai_widget)
     if channel is not None:
         filters.append(Conversation.channel == channel)
     if status_filter is not None:
@@ -93,6 +111,13 @@ async def list_conversations_query(
         filters.append(Conversation.assigned_to_id.is_(None))
     elif assigned_to_id is not None:
         filters.append(Conversation.assigned_to_id == assigned_to_id)
+    if restrict_to_user_id is not None:
+        filters.append(
+            or_(
+                Conversation.assigned_to_id.is_(None),
+                Conversation.assigned_to_id == restrict_to_user_id,
+            )
+        )
     if q:
         filters.append(Conversation.external_id.ilike(f"%{q}%"))
     if tag_ids:

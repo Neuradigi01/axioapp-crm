@@ -149,21 +149,38 @@ def test_bounce_subject_case_insensitive() -> None:
 
 
 def test_body_too_short_skips() -> None:
-    ok, reason = is_reply_worthy(_real_email(body_text="thx"))
+    # Empty body — no content at all after strip. Short-but-real
+    # messages like "thx" / "Hi" / "How are you sir" are legitimate
+    # conversational replies and must NOT be rejected here (bumping
+    # the threshold to 1 aligns with real inbox behaviour — the noise
+    # filters upstream — role account / List-Unsubscribe / bounce /
+    # Auto-Submitted — catch the actual auto-mail).
+    ok, reason = is_reply_worthy(_real_email(body_text=""))
     assert ok is False
     assert reason == "body_too_short"
 
 
 def test_body_almost_entirely_quoted_skips() -> None:
     body = (
-        "thx\n\n"
+        "\n\n"
         "On Mon, Aug 20 2025 at 11:42, Jane <j@x.com> wrote:\n"
         "> Hi we have a long previous message here that would blow past\n"
-        "> the 20-char threshold if we didn't strip it out first...\n"
+        "> the threshold if we didn't strip it out first...\n"
     )
     ok, reason = is_reply_worthy(_real_email(body_text=body))
     assert ok is False
     assert reason == "body_too_short"
+
+
+def test_short_real_reply_passes() -> None:
+    # Regression guard for the 2026-09-10 threshold change. Short
+    # human replies ("thx", "Hii", "How are you sir") were previously
+    # rejected as body_too_short at len < 20; the AI is now allowed
+    # to answer them since the auto-mail filters upstream already
+    # catch the real noise.
+    ok, reason = is_reply_worthy(_real_email(body_text="thx"))
+    assert ok is True
+    assert reason is None
 
 
 # --- strip_quoted_history helper ----------------------------------------
