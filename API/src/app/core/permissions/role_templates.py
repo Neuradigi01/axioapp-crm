@@ -205,6 +205,13 @@ _CORE_ADMIN_KEYS: list[str] = [
     # _CORE_EMPLOYEE_KEYS) so the sidebar entry renders read-only.
     "ai_assistants.view",
     "ai_assistants.manage",
+    # tasks/custom-events — org-defined named triggers. Admin can
+    # create/edit/delete definitions (manage), see the picker (read),
+    # and fire on a contact (fire). Employee gets read + fire only —
+    # see _CORE_EMPLOYEE_KEYS below.
+    "custom_events.read",
+    "custom_events.manage",
+    "custom_events.fire",
 ]
 
 
@@ -294,6 +301,11 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     # Mutation, knowledge upload, embed-key issuance stay Owner/Admin
     # unless the Owner explicitly grants `.manage` on a custom role.
     "ai_assistants.view",
+    # tasks/custom-events — Employees can see the list of custom
+    # events (so the "Log event" dropdown on the contact page renders)
+    # AND fire them against a contact. Definition CRUD stays Admin/Owner.
+    "custom_events.read",
+    "custom_events.fire",
 ]
 
 
