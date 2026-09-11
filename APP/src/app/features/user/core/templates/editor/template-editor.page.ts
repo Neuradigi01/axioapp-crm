@@ -7,6 +7,7 @@ import {
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   computed,
@@ -126,6 +127,7 @@ export class TemplateEditorPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   /** Attribution track — staff lookup for the "Created by X · Approved
    *  by Y" metadata bar above the form. Loaded once at page mount;
@@ -757,18 +759,25 @@ export class TemplateEditorPageComponent {
           // input will re-enable it.
           this.dirty.set(false);
 
-          // Zoneless CD kick — the sub-form's template reads FormGroup
-          // values directly (e.g. `form().controls.category.value` on the
-          // WA category cards), not via signals. Even though we set a
-          // fresh FormGroup reference above (which triggers the child's
-          // `form()` input signal), Angular schedules CD in the next
-          // microtask; some template expressions that read raw form
-          // state can render stale on the very first paint until a
-          // synthetic event forces re-evaluation. Firing valueChanges
-          // once after signals settle guarantees the child's
-          // FormGroup directive + the parent's preview effect re-run
-          // against the loaded values, so the page renders populated
-          // without waiting for user interaction.
+          // Zoneless CD kick — both the parent header (which binds the
+          // channel dropdown to `headerForm.controls.channel.value`, a
+          // plain getter with no signal dependency) AND the child sub-
+          // form (whose template reads raw FormGroup state, e.g. the WA
+          // category cards) can render stale on the very first paint.
+          // Angular's default reactivity scheduler will eventually run
+          // CD via signal writes above, but the first paint fires before
+          // that microtask settles — which is why the operator sees the
+          // page load blank until any keystroke or click forces a CD
+          // tick.
+          //
+          // Two-step guarantee:
+          //   1. Fire each sub-form's valueChanges so the child's
+          //      FormGroup directive re-writes the DOM with loaded
+          //      values + the parent's preview effect refreshes.
+          //   2. Force `detectChanges()` so ALL template bindings
+          //      (including the parent's `[value]="…channel.value"` on
+          //      the channel picker) re-evaluate against the loaded
+          //      state instead of waiting for the async scheduler.
           queueMicrotask(() => {
             this.waForm()?.updateValueAndValidity({ emitEvent: true });
             this.emailForm()?.updateValueAndValidity({ emitEvent: true });
@@ -778,6 +787,7 @@ export class TemplateEditorPageComponent {
             // valueChanges emitted above would re-flip dirty via the
             // sub-form's scheduleAutoSave path, so re-clear it once more.
             this.dirty.set(false);
+            this.cdr.detectChanges();
           });
         },
         error: (err: HttpErrorResponse) => {
