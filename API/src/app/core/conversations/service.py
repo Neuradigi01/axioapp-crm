@@ -1905,6 +1905,53 @@ async def _resolve_or_create_contact_by_phone(
     return contact.id
 
 
+async def resync_external_id_for_contact_phone(
+    session: AsyncSession,
+    *,
+    contact_id: uuid.UUID,
+    new_phone: str,
+) -> int:
+    """Cascade a contact-side phone edit onto every WhatsApp/SMS
+    conversation linked to that contact.
+
+    The conversation row snapshots the counterparty phone into
+    ``external_id`` at inbound time (see ``_find_or_create_conversation``)
+    and never updated it. Result: an operator adds a country code on the
+    Contacts page → the inbox header keeps rendering the old raw phone
+    AND the next inbound spawns a *second* conversation (Meta's E.164
+    matches nothing on ``ix_conversations_channel_external_id``).
+    This function is called from ``contacts.service.update_contact``
+    when ``phone`` changes so both problems disappear at edit time.
+
+    Duplicate-safe: if another live conversation already owns
+    ``(channel, new_external_id)`` — the common case when the customer
+    already messaged after the edit, spawning the second row — the
+    stale row is left alone rather than renamed into a hard conflict.
+    Merging the two threads is a separate operator-driven action.
+
+    Returns the number of conversation rows actually renamed. Caller
+    owns the transaction — this function only stages the UPDATE(s)."""
+    if not new_phone:
+        return 0
+    normalised = new_phone if new_phone.startswith("+") else "+" + new_phone
+    linked = await _da.list_phone_conversations_for_contact(session, contact_id=contact_id)
+    renamed = 0
+    for conv in linked:
+        if conv.external_id == normalised:
+            continue
+        conflict = await _da.conversation_exists_for_channel_external(
+            session,
+            channel=conv.channel,
+            external_id=normalised,
+            exclude_id=conv.id,
+        )
+        if conflict:
+            continue
+        conv.external_id = normalised
+        renamed += 1
+    return renamed
+
+
 def _snapshot(c: Conversation) -> dict[str, Any]:
     return {
         "id": str(c.id),

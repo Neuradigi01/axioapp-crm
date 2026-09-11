@@ -144,6 +144,45 @@ def insert_conversation(session: AsyncSession, conversation: Conversation) -> No
     session.add(conversation)
 
 
+async def list_phone_conversations_for_contact(
+    session: AsyncSession,
+    *,
+    contact_id: uuid.UUID,
+) -> list[Conversation]:
+    """Every WhatsApp/SMS conversation linked to this contact. Used by
+    the phone-cascade sync so a contact-side phone edit propagates to
+    the ``external_id`` snapshot on its live threads."""
+    result = await session.execute(
+        select(Conversation).where(
+            Conversation.contact_id == contact_id,
+            Conversation.channel.in_((ConversationChannel.whatsapp, ConversationChannel.sms)),
+        )
+    )
+    return list(result.scalars().all())
+
+
+async def conversation_exists_for_channel_external(
+    session: AsyncSession,
+    *,
+    channel: ConversationChannel,
+    external_id: str,
+    exclude_id: uuid.UUID,
+) -> bool:
+    """Duplicate-guard for the phone-cascade sync — return True when
+    *another* conversation already owns ``(channel, external_id)``.
+    Used to skip a rename that would create a stale-duplicate pair."""
+    result = await session.execute(
+        select(Conversation.id)
+        .where(
+            Conversation.channel == channel,
+            Conversation.external_id == external_id,
+            Conversation.id != exclude_id,
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
 # --- AI pause / resume compare-and-set (Step 3) --------------------------
 
 
@@ -653,8 +692,10 @@ __all__ = [
     "get_tag_by_id",
     "get_conversation_ai_pause_holder",
     "get_user_display_names_bulk",
+    "conversation_exists_for_channel_external",
     "insert_conversation",
     "insert_message",
+    "list_phone_conversations_for_contact",
     "insert_tag",
     "insert_tag_assignment",
     "list_active_members_with_names",

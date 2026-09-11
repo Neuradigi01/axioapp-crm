@@ -154,8 +154,20 @@ export class ConversationsPageComponent {
   /** Contact-name lookup for the list rows — resolves each row's
    *  `contact_id` to a display name so the list shows "Ananya Rao"
    *  instead of the raw phone/email `external_id`. Hydrated lazily
-   *  after each `reloadList()`; already-fetched ids are skipped. */
-  protected readonly contactsById = signal<Record<string, { id: string; full_name: string }>>({});
+   *  after each `reloadList()`; already-fetched ids are skipped.
+   *
+   *  ``phone`` is cached here too so the chat header + details rail
+   *  can render the contact's *current* phone instead of the
+   *  ``external_id`` snapshot captured at inbound time — the raw
+   *  snapshot goes stale the moment an operator adds a country code
+   *  on the Contacts page (backend cascades the same edit onto live
+   *  WhatsApp/SMS threads via
+   *  ``conversations.service.resync_external_id_for_contact_phone``,
+   *  but the fallback keeps the UI in sync for older stale rows too).
+   */
+  protected readonly contactsById = signal<
+    Record<string, { id: string; full_name: string; phone: string | null }>
+  >({});
 
   /** Step 13 — flat staff array for the @-mention picker in the
    *  composer. Derived from `staffById` (single source of truth). */
@@ -226,6 +238,26 @@ export class ConversationsPageComponent {
   protected readonly selectedConversation = computed<Conversation | null>(() => {
     const id = this.selectedId();
     return this.items().find((c) => c.id === id) ?? null;
+  });
+
+  /** Header/rail counterparty label. Prefers the linked contact's
+   *  *current* phone (kept fresh by the hydrated cache) over the
+   *  conversation's stored ``external_id`` snapshot so a "+91" the
+   *  operator just added on the Contacts page shows up here even on
+   *  legacy rows that pre-date the backend cascade. Falls back to
+   *  ``external_id`` for phone-less contacts (email threads, unlinked
+   *  rows, or phone channels where the contact record has no phone
+   *  yet). Only WhatsApp/SMS threads prefer the contact phone — email
+   *  conversations keep showing the email ``external_id`` unchanged. */
+  protected readonly selectedContactHandle = computed<string | null>(() => {
+    const conv = this.selectedConversation();
+    if (!conv) return null;
+    if (conv.channel !== 'whatsapp' && conv.channel !== 'sms') {
+      return conv.external_id ?? null;
+    }
+    const contact = conv.contact_id ? this.contactsById()[conv.contact_id] : undefined;
+    const phone = contact?.phone?.trim();
+    return phone && phone.length > 0 ? phone : (conv.external_id ?? null);
   });
 
   /** View-only gate for the compose bar. Mirrors the backend
@@ -1140,21 +1172,27 @@ export class ConversationsPageComponent {
       });
   }
 
-  /** Fetch contact rows for any `contact_id` we haven't seen yet, so
+  /** Fetch contact rows for the currently-visible ``contact_id``s so
    *  the list can show the person's name instead of the raw
    *  `external_id`. Uses the batch ``POST /contacts/hydrate`` endpoint
    *  — one request for the whole page instead of one per row (the
    *  previous ``forkJoin(missing.map(get))`` fanned out 75+ XHRs on
    *  a full inbox and clogged the network waterfall). Failures are
    *  swallowed — missing contacts fall back to the external id in
-   *  the template. */
+   *  the template.
+   *
+   *  Refetches *every* visible contact each reload (not just uncached
+   *  ones) so a contact edit made from the Contacts page — most
+   *  commonly adding a "+91" prefix to a phone — propagates into the
+   *  header/rail/list handle labels the next time this page pulls the
+   *  inbox. The list is capped at ~50 rows so the one extra bulk POST
+   *  per reload is negligible. */
   private hydrateContacts(rows: Conversation[]): void {
     const ids = new Set<string>();
     for (const r of rows) {
       if (r.contact_id) ids.add(r.contact_id);
     }
-    const cache = this.contactsById();
-    const missing = [...ids].filter((id) => !cache[id]);
+    const missing = [...ids];
     if (missing.length === 0) return;
     this.contactsApi
       .hydrateByIds(missing)
@@ -1166,7 +1204,7 @@ export class ConversationsPageComponent {
         this.contactsById.update((current) => {
           const next = { ...current };
           for (const c of results) {
-            next[c.id] = { id: c.id, full_name: c.full_name };
+            next[c.id] = { id: c.id, full_name: c.full_name, phone: c.phone ?? null };
           }
           return next;
         });

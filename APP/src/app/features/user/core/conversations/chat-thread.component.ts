@@ -93,6 +93,14 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
   @Input() loading = false;
   @Input() staffById: Map<string, StaffListItem> = new Map();
 
+  /** Counterparty label to render in the header. When the parent page
+   *  can resolve the linked contact's current phone (see
+   *  ``selectedContactHandle`` on the page) it passes that here so
+   *  post-edit "+91" prefixes show even on legacy rows whose stored
+   *  ``external_id`` snapshot went stale. Falls back to
+   *  ``conversation.external_id`` when null. */
+  @Input() displayHandle: string | null = null;
+
   /** tasks/ai-assistants-omnichannel Step 4 — user clicked the Take
    *  Over button on the AI-status banner. The page owns the POST +
    *  optimistic-flip semantics. Emitted only when ``ai_paused === false``

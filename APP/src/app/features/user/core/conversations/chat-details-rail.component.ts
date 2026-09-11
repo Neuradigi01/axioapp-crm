@@ -55,6 +55,13 @@ export class ChatDetailsRailComponent {
   @Input({ required: true }) conversation!: Conversation;
   @Input() staffById: Map<string, StaffListItem> = new Map();
 
+  /** Counterparty label rendered at the top of the rail. Parent page
+   *  resolves this from the linked contact's *current* phone so an
+   *  operator's "+91" prefix on the Contacts page reflects here even
+   *  on legacy rows whose ``external_id`` snapshot pre-dates the
+   *  backend cascade. Falls back to ``conversation.external_id``. */
+  @Input() displayHandle: string | null = null;
+
   @Output() readonly reassign = new EventEmitter<void>();
   @Output() readonly tagsChanged = new EventEmitter<ConversationTagRef[]>();
   @Output() readonly statusChange = new EventEmitter<ConversationStatus>();

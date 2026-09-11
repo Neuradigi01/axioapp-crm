@@ -3,8 +3,11 @@
        header used to render, just relocated. -->
   <section class="flex flex-col gap-2">
     <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">Conversation</p>
-    <p class="truncate text-sm font-semibold text-default" [title]="conversation.external_id">
-      {{ conversation.external_id }}
+    <p
+      class="truncate text-sm font-semibold text-default"
+      [title]="displayHandle || conversation.external_id"
+    >
+      {{ displayHandle || conversation.external_id }}
     </p>
     <p class="flex items-center gap-2 text-xs text-muted capitalize">
       <span>{{ conversation.channel }} · {{ conversation.status }}</span>

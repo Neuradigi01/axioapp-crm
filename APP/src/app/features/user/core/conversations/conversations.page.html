@@ -185,6 +185,7 @@
           [detail]="detail()"
           [loading]="threadLoading()"
           [staffById]="staffById()"
+          [displayHandle]="selectedContactHandle()"
           (takeoverAi)="onTakeoverAi()"
           (resumeAiOut)="onResumeAi()"
           (reassign)="openReassign()"
@@ -264,6 +265,7 @@
         <app-chat-details-rail
           [conversation]="conv"
           [staffById]="staffById()"
+          [displayHandle]="selectedContactHandle()"
           (reassign)="openReassign()"
           (statusChange)="onStatusChange($event)"
           (tagsChanged)="onTagsChanged($event)"
@@ -304,6 +306,7 @@
             <app-chat-details-rail
               [conversation]="conv"
               [staffById]="staffById()"
+              [displayHandle]="selectedContactHandle()"
               (reassign)="openReassign(); closeMobileRail()"
               (statusChange)="onStatusChange($event)"
               (tagsChanged)="onTagsChanged($event)"
