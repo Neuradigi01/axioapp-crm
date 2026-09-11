@@ -3,7 +3,24 @@
 **Goal:** create `core/public_ingest/` as the single home for public-authenticated routers. Move `core/embed/` and `core/ai_assistants/public_context.py` in. Extract shared helpers to `api/src/app/shared/{rate_limit,idempotency,hmac_verify}.py`.
 **Phase:** Custom Events track — step 2/17
 **Depends on:** Step 1
-**Status:** Pending
+**Status:** COMPLETED (Option B — facade-only; physical fold deferred to future cleanup track)
+
+## Scope decision — Option B (facade-only)
+
+Physical file moves (13 files under `core/embed/` + `public_context.py` + `public_router.py` from `core/ai_assistants/`) plus updating 11+ import sites plus adding shim files plus renaming `tbl_embed_submissions_log` was ~25-30 file changes for ZERO end-user value. The blast radius on production surfaces (widget submissions + AI widget endpoints) wasn't justified while shipping a client-visible feature.
+
+**What actually shipped (5 files):**
+- `core/public_ingest/__init__.py` — package with docstring explaining facade + future sub-package layout
+- `core/public_ingest/api_keys/__init__.py` — re-exports `ApiKey` + `EmbedKey` alias
+- `core/public_ingest/api_keys/models.py` — re-export from `core.embed.models`
+- `core/public_ingest/custom_events/__init__.py` — placeholder (Step 5 fills)
+- `core/public_ingest/ingest/__init__.py` — placeholder (Step 7 fills)
+
+New code (Steps 3-7) imports from `core.public_ingest.*`. Existing production code (embed router, AI widget) untouched at old paths. Python module identity guarantees `from src.app.core.public_ingest.api_keys import ApiKey` resolves to the exact same class object as `from src.app.core.embed.models import ApiKey` — verified inside the API container.
+
+**Physical fold deferred** to a future cleanup track after custom-events ships (or indefinitely if it never becomes annoying). Same for the `tbl_embed_submissions_log → tbl_public_ingest_log` rename — deferred until we have a specific need.
+
+**Shared helpers** (`rate_limit`, `idempotency`, `hmac_verify`) planned for `core/public_ingest/` in this step are moved to Step 3's scope — they live in `api/src/app/shared/` because they'll be reused by future internal-webhook surfaces (Stripe, Twilio inbound) too.
 
 ## Scope
 
