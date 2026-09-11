@@ -63,10 +63,24 @@ export class TriggerEditorComponent {
   readonly reEnrollmentOptions = RE_ENROLLMENT_OPTIONS;
 
   /** `<crm-mobile-select>` needs a `{value, label}` list. Map each
-   *  registry entry once here so the template can bind directly. */
-  readonly eventTypeOptions = computed<ReadonlyArray<MobileSelectOption>>(() =>
-    EVENT_TYPES.map((e) => ({ value: e.type, label: `${e.label} (${e.type})` })),
-  );
+   *  registry entry once here so the template can bind directly.
+   *
+   *  Safety net: if the stored `event_type` isn't in the frontend
+   *  catalog (e.g. backend added a new one before the frontend list
+   *  caught up, or a seeded workflow uses a specialised event), append
+   *  a synthetic option so the picker still shows the current value
+   *  instead of the "— pick an event —" placeholder. */
+  readonly eventTypeOptions = computed<ReadonlyArray<MobileSelectOption>>(() => {
+    const base = EVENT_TYPES.map((e) => ({
+      value: e.type,
+      label: `${e.label} (${e.type})`,
+    }));
+    const current = this.eventType();
+    if (current && !EVENT_TYPES.some((e) => e.type === current)) {
+      base.push({ value: current, label: current });
+    }
+    return base;
+  });
 
   readonly reEnrollmentSelectOptions: ReadonlyArray<MobileSelectOption> = RE_ENROLLMENT_OPTIONS.map(
     (opt) => ({ value: opt.value, label: opt.label }),

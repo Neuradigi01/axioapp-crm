@@ -10,13 +10,19 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 
+import { LucideAngularModule } from 'lucide-angular';
+
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
 
 import { StandardFieldsApiService } from '../../standard-fields/standard-fields-api.service';
 import { StandardFieldsSignalsService } from '../../standard-fields/standard-fields-signals.service';
 import type { StandardFieldEntity, StandardFieldRendered } from '../../standard-fields/types';
-import { MobileSelectComponent } from '../../shared/forms/mobile-select.component';
+import {
+  CORE_ENTITY_REGISTRY,
+  EntityDescriptor,
+  describeEntity,
+} from '../../shared/entity-registry/entity-registry';
 
 import { StandardFieldEditModalComponent } from './standard-field-edit-modal.component';
 
@@ -34,7 +40,7 @@ import { StandardFieldEditModalComponent } from './standard-field-edit-modal.com
   selector: 'app-settings-standard-fields-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [StandardFieldEditModalComponent, MobileSelectComponent],
+  imports: [StandardFieldEditModalComponent, LucideAngularModule],
   templateUrl: './standard-fields-tab.component.html',
 })
 export class StandardFieldsTabComponent {
@@ -103,15 +109,30 @@ export class StandardFieldsTabComponent {
       });
   }
 
-  /** `crm-mobile-select`-shaped options built from the loaded
-   *  `entities()` list. Label carries the field count so the dropdown
-   *  reads the same as the old native `<select>` ("appointment (5
-   *  fields)"). */
-  protected readonly entitySelectOptions = computed(() =>
-    this.entities().map((e) => ({
-      value: e.entity,
-      label: `${e.entity} (${e.field_count} field${e.field_count === 1 ? '' : 's'})`,
-    })),
+  /** Card-picker data — one entry per API-registered entity, ordered by
+   *  the shared `CORE_ENTITY_REGISTRY` so the picker reads the same on
+   *  Standard Fields as on Custom Fields. Unknown entities (future
+   *  vertical packs that register a new one before the registry catches
+   *  up) still render via `describeEntity`'s fallback. */
+  protected readonly entityCards = computed<Array<EntityDescriptor & { fieldCount: number }>>(
+    () => {
+      const byValue = new Map(this.entities().map((e) => [e.entity, e.field_count]));
+      const registered = CORE_ENTITY_REGISTRY.filter((d) => byValue.has(d.value)).map((d) => ({
+        ...d,
+        fieldCount: byValue.get(d.value) ?? 0,
+      }));
+      const known = new Set(registered.map((c) => c.value));
+      const extras = this.entities()
+        .filter((e) => !known.has(e.entity))
+        .map((e) => ({ ...describeEntity(e.entity), fieldCount: e.field_count }));
+      return [...registered, ...extras];
+    },
+  );
+
+  /** Metadata for the currently-selected entity. Drives the section
+   *  heading + description below the picker. */
+  protected readonly selectedEntity = computed<EntityDescriptor>(() =>
+    describeEntity(this.entity()),
   );
 
   protected onEntityChange(value: string): void {
