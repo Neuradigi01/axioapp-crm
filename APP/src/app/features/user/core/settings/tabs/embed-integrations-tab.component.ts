@@ -11,6 +11,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { deriveApiOrigin } from '@core/services/url.util';
 import { environment } from '../../../../../../environments/environment';
 import {
   AvailableCustomField,
@@ -212,10 +213,13 @@ export class EmbedIntegrationsTabComponent {
     // include it uniformly so operators don't have to remember which
     // one is default.
     const dataForm = form ? ` data-form="${form.slug}"` : '';
+    // ``data-host`` points the widget's config + submit calls at THIS
+    // instance's API. Without it the widget falls back to the
+    // ``DEFAULT_HOST`` baked into the bundle at build time.
     return (
       '<div id="crm-form"></div>\n' +
       `<script src="${environment.embedWidgetHost}/v1/widget.js" ` +
-      `data-key="${key.prefix}…"${dataForm}></script>`
+      `data-key="${key.prefix}…"${dataForm} data-host="${deriveApiOrigin()}"></script>`
     );
   });
 
