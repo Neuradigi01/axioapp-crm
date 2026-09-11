@@ -45,7 +45,6 @@ per-org tuning + proper audit visibility.
 from __future__ import annotations
 
 import logging
-import math
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -127,8 +126,10 @@ async def submit(
 
     # 3. Rate limit per-key + per-IP. Either trip → 429 (also logged
     # so Owners see "we're being hammered" in the submission log).
-    rl_key = check_per_key(key_row.prefix)
-    rl_ip = check_per_ip(ip)
+    # Redis-backed sliding window; fail-OPEN so a Redis outage doesn't
+    # drop legitimate visitors (legacy embed contract).
+    rl_key = await check_per_key(key_row.prefix)
+    rl_ip = await check_per_ip(ip)
     if not rl_key.allowed or not rl_ip.allowed:
         retry_after = max(rl_key.retry_after, rl_ip.retry_after)
         await log_service.record(
@@ -143,7 +144,7 @@ async def submit(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Rate limit exceeded. Please slow down.",
-            headers={"Retry-After": str(math.ceil(retry_after))},
+            headers={"Retry-After": str(max(1, int(retry_after)))},
         )
 
     org_id = key_row.org_id

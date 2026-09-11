@@ -3,7 +3,7 @@
 **Goal:** replace in-process rate-limit / idempotency / nonce-cache with Redis. Configure trusted-proxy list. Startup fail-loud in prod on missing config. Explicit fail-mode per surface (events = fail-closed 503; embed/ai keep fail-open).
 **Phase:** Custom Events track — step 3/17
 **Depends on:** Step 2
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Scope
 

@@ -196,7 +196,8 @@ from src.app.packs.real_estate.modules.property.router import (
     router as rp_property_router,
 )
 from src.app.shared.db import async_session
-from src.app.shared.middleware import TenantContextMiddleware
+from src.app.shared.middleware import RawBodyCaptureMiddleware, TenantContextMiddleware
+from src.app.shared.startup_checks import run_all as run_startup_checks
 
 # Bind the configured Celery app at API startup so @shared_task tasks
 # (e.g. process_meta_lead, process_google_lead, campaign senders) route
@@ -212,6 +213,10 @@ from src.routers import router as legacy_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("FurnitureCRM API starting up...")
+    # tasks/custom-events Step 3 — fail-loud on missing TRUSTED_PROXIES
+    # in production so XFF parsing (and per-IP rate limiting behind it)
+    # cannot silently degrade to a single-bucket-for-everyone posture.
+    run_startup_checks()
     await generate_routes_json()
     initialize_firebase()
 
@@ -289,6 +294,20 @@ from src.app.core.subscriptions.middleware import SubscriptionStateMiddleware  #
 
 app.add_middleware(SubscriptionStateMiddleware)
 app.add_middleware(TenantContextMiddleware)
+# tasks/custom-events Step 3 — capture raw request bytes on public
+# HMAC-signed surfaces so downstream verifiers (Meta webhook, Twilio,
+# Stripe, upcoming /events/track ingest) can compare against exactly
+# what the caller signed. Path-scoped so unrelated JSON POSTs don't
+# pay the memory-copy cost.
+app.add_middleware(
+    RawBodyCaptureMiddleware,
+    path_prefixes=(
+        "/api/v1/events/",
+        "/api/v1/webhooks/",
+        "/api/v1/integrations/meta/webhook",
+        "/api/v1/integrations/google/webhook",
+    ),
+)
 app.add_middleware(BaseHTTPMiddleware, dispatch=catch_exceptions_middleware)
 app.add_middleware(
     CORSMiddleware,

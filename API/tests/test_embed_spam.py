@@ -33,7 +33,7 @@ import httpx
 import pytest
 
 from src.app.core.embed import recaptcha, submissions
-from src.app.core.embed.rate_limit import RateLimitResult
+from src.app.core.embed.rate_limit import EmbedLimitOutcome
 from src.app.core.embed.schemas import (
     EmbedSubmission,
     SubmissionAttribution,
@@ -247,7 +247,11 @@ def _config_row(*, spam: WidgetConfigSpamProtection | None = None):
 
 
 def _allow():
-    return RateLimitResult(allowed=True, remaining=100, retry_after=0.0)
+    return EmbedLimitOutcome(allowed=True, retry_after=0)
+
+
+async def _allow_async(_arg=None):
+    return _allow()
 
 
 class _SubmitHarness:
@@ -298,8 +302,8 @@ class _SubmitHarness:
 
         monkeypatch.setattr(submissions, "find_by_plain_key", _find_key)
         monkeypatch.setattr(submissions, "public_get_config", _public_get)
-        monkeypatch.setattr(submissions, "check_per_key", lambda _p: _allow())
-        monkeypatch.setattr(submissions, "check_per_ip", lambda _ip: _allow())
+        monkeypatch.setattr(submissions, "check_per_key", _allow_async)
+        monkeypatch.setattr(submissions, "check_per_ip", _allow_async)
         monkeypatch.setattr(submissions, "find_existing_contact", _find_existing)
         monkeypatch.setattr(submissions, "create_contact", _create_contact)
         monkeypatch.setattr(submissions, "create_lead", _create_lead)
@@ -530,16 +534,8 @@ class TestCustomFieldRouting:
 
         monkeypatch.setattr(submissions, "find_by_plain_key", _find_key)
         monkeypatch.setattr(submissions, "public_get_config", _public_get)
-        monkeypatch.setattr(
-            submissions,
-            "check_per_key",
-            lambda _p: RateLimitResult(allowed=True, remaining=100, retry_after=0.0),
-        )
-        monkeypatch.setattr(
-            submissions,
-            "check_per_ip",
-            lambda _ip: RateLimitResult(allowed=True, remaining=10, retry_after=0.0),
-        )
+        monkeypatch.setattr(submissions, "check_per_key", _allow_async)
+        monkeypatch.setattr(submissions, "check_per_ip", _allow_async)
         monkeypatch.setattr(submissions, "find_existing_contact", _find_existing)
         monkeypatch.setattr(submissions, "create_contact", _create_contact)
         monkeypatch.setattr(submissions, "create_lead", _create_lead)
@@ -598,16 +594,8 @@ class TestCustomFieldRouting:
 
         monkeypatch.setattr(submissions, "find_by_plain_key", _find_key)
         monkeypatch.setattr(submissions, "public_get_config", _public_get)
-        monkeypatch.setattr(
-            submissions,
-            "check_per_key",
-            lambda _p: RateLimitResult(allowed=True, remaining=100, retry_after=0.0),
-        )
-        monkeypatch.setattr(
-            submissions,
-            "check_per_ip",
-            lambda _ip: RateLimitResult(allowed=True, remaining=10, retry_after=0.0),
-        )
+        monkeypatch.setattr(submissions, "check_per_key", _allow_async)
+        monkeypatch.setattr(submissions, "check_per_ip", _allow_async)
         monkeypatch.setattr(submissions, "find_existing_contact", _find_existing)
         monkeypatch.setattr(submissions, "create_contact", _create_contact)
         monkeypatch.setattr(submissions, "create_lead", _create_lead)
@@ -648,16 +636,8 @@ class TestCustomFieldRouting:
 
         monkeypatch.setattr(submissions, "find_by_plain_key", _find_key)
         monkeypatch.setattr(submissions, "public_get_config", _public_get)
-        monkeypatch.setattr(
-            submissions,
-            "check_per_key",
-            lambda _p: RateLimitResult(allowed=True, remaining=100, retry_after=0.0),
-        )
-        monkeypatch.setattr(
-            submissions,
-            "check_per_ip",
-            lambda _ip: RateLimitResult(allowed=True, remaining=10, retry_after=0.0),
-        )
+        monkeypatch.setattr(submissions, "check_per_key", _allow_async)
+        monkeypatch.setattr(submissions, "check_per_ip", _allow_async)
         monkeypatch.setattr(submissions.log_service, "record", _record_log)
 
         from fastapi import HTTPException
