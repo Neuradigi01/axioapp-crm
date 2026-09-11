@@ -77,6 +77,8 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 | — | [Automation Engine](automation-engine/README.md) | 14 | Core (side track — event-triggered automation; depends on `template-library`) |
 | — | [DAL Backfill](dal-backfill/README.md) | 14 | Core (side track — align every module to Router → Service → DAL; manager spec 2026-06-25) |
 | — | [Chat Bot Builder](chatbot-builder/README.md) | 15 | Core (side track — Pabbly-Chatflow-style inbound-message bot module; manager spec 2026-08-13; **COMPLETED**) |
+| — | [Variables Unification](variables-unification/README.md) | 13 | Core (side track — one registry for every picker; promote `templates/variables.py` → `core/variables/`; specced 2026-09-11) |
+| — | [Custom Events](custom-events/README.md) | 17 | Core (side track — user-defined event triggers + public `POST /events/track`; fold into `core/public_ingest/`; specced 2026-09-11) |
 
 **Total: 169 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides + Lead-Capture (4 tracks) + Pricing-and-Billing side tracks).
 
@@ -276,6 +278,41 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 
 ### Promote Integrations to Sidebar (side track — registry flip + route + tab cleanup)
 - [Step 1: Promote Integrations module — backend descriptor + frontend route + tab cleanup + redirect](promote-integrations-to-sidebar/step-1-promote-and-cleanup.md) — Done
+
+### Variables Unification (side track — one shared picker + registry for Templates + Workflows + Chatbots + Automation Conditions; specced 2026-09-11)
+- [Step 1: Promote `core/templates/variables.py` → `core/variables/` (module skeleton + import repointing)](variables-unification/step-1-promote-variables-module.md) — Pending
+- [Step 2: Unify `VariableDef` shape (fold `Variable` + `FieldSpec`) + adapter shims](variables-unification/step-2-unify-variable-shape.md) — Pending
+- [Step 3: Extend `custom_field_bridge` + `list_fields_by_entities(org_id)` required kwarg](variables-unification/step-3-extend-custom-field-bridge.md) — Pending
+- [Step 4: `GET /api/v1/variables` router with composer-permission dispatch](variables-unification/step-4-unified-router-perms.md) — Pending
+- [Step 5: `{{event.*}}` handling (transition-only keys) + `is_visible_to` pack filtering](variables-unification/step-5-event-namespace-and-pack-visibility.md) — Pending
+- [Step 6: `tbl_variable_stale_refs` table + custom-field delete/rename subscriber](variables-unification/step-6-stale-reference-detector.md) — Pending
+- [Step 7a: Generalise `shared/variable-picker/` component (input+textarea+contenteditable; search; recently-used; fallback-at-insertion)](variables-unification/step-7a-frontend-shared-picker-component.md) — Pending
+- [Step 7b: `VariableRegistryService` (cache key incl user_permission_hash + BroadcastChannel opaque payload + org.switched)](variables-unification/step-7b-frontend-registry-service.md) — Pending
+- [Step 8: Migrate Templates editor to shared picker](variables-unification/step-8-frontend-migrate-templates.md) — Pending
+- [Step 9: Migrate Workflows editor + delete hardcoded map](variables-unification/step-9-frontend-migrate-workflows.md) — Pending
+- [Step 10a: Migrate Chatbots editor + "not resolvable here" badge](variables-unification/step-10a-frontend-migrate-chatbots.md) — Pending
+- [Step 10b: Migrate Automation Conditions builder + `/event-types` becomes view over shared catalog](variables-unification/step-10b-frontend-migrate-automation-conditions.md) — Pending
+- [Step 11: Name-based CI pin-test + deprecation calendar + Ajay's Workspace smoke](variables-unification/step-11-cleanup-pintest-smoke.md) — Pending
+
+### Custom Events (side track — user-defined event triggers + public `POST /events/track`; specced 2026-09-11)
+- [Step 0: Minimal `core/workflows/dry_run.py` engine (conditional — skip if exists)](custom-events/step-0-workflow-dry-run-engine.md) — Pending
+- [Step 1: Rename `tbl_embed_keys` → `tbl_api_keys` + add events-scope columns](custom-events/step-1-rename-embed-to-api-keys.md) — Pending
+- [Step 2: Fold `core/embed/` + `ai_assistants/public_context.py` into `core/public_ingest/`](custom-events/step-2-fold-public-ingest-module.md) — Pending
+- [Step 3: Redis-backed rate-limit + idempotency + HMAC nonce cache in `api/src/app/shared/`](custom-events/step-3-redis-shared-infra.md) — Pending
+- [Step 4: API-keys hardening — HMAC prefilter, rotate-with-grace, live/test modes, separate rate buckets](custom-events/step-4-api-keys-hardening.md) — Pending
+- [Step 5: `tbl_custom_events` + `_occurrences` (denormalised schema snapshot) + `_archive` + `_test_runs` schema](custom-events/step-5-custom-events-schema.md) — Pending
+- [Step 6: `core/public_ingest/custom_events/` CRUD + Owner-only edits + `add_prefix` publish helper](custom-events/step-6-custom-events-crud.md) — Pending
+- [Step 7a: `POST /events/track` auth pipeline (HMAC prefilter → Argon → HMAC verify → idempotency → rate limits)](custom-events/step-7a-public-ingest-auth-pipeline.md) — Pending
+- [Step 7b: `POST /events/track` payload validation + contact resolution via service layer](custom-events/step-7b-public-ingest-payload-contact.md) — Pending
+- [Step 7c: `POST /events/track` bus publish + occurrence persistence + response shaping](custom-events/step-7c-public-ingest-publish-persist.md) — Pending
+- [Step 8: Bridges — catalog merge (service layer), workflow trigger picker, variables registry payload-schema](custom-events/step-8-bridges-catalog-workflow-variables.md) — Pending
+- [Step 9: Workflow lifecycle — soft-delete auto-disables, re-activation prompt, schema-removal review flag, extended contact-merge cascade](custom-events/step-9-workflow-lifecycle-and-cascade.md) — Pending
+- [Step 10: Celery beat — occurrence archive (90d), partition rotation, test-runs cleanup (7d), key-rotation 12h alert](custom-events/step-10-retention-jobs.md) — Pending
+- [Step 11: Frontend `/user/settings/api-keys` (Owner-only) — CRUD + reveal (copy-only) + rotate-with-grace + live/test badges](custom-events/step-11-frontend-api-keys-page.md) — Pending
+- [Step 12: Frontend `/user/settings/custom-events` list page](custom-events/step-12-frontend-custom-events-list.md) — Pending
+- [Step 13: Frontend create/edit modal + payload schema builder + sample preview + reserved-name validation](custom-events/step-13-frontend-custom-events-modal.md) — Pending
+- [Step 14: Frontend detail page — Overview / Occurrences / Test fires / Workflows using this / How to fire tabs](custom-events/step-14-frontend-custom-events-detail.md) — Pending
+- [Step 15: Docs + smoke — OpenAPI events + quickstart + Zapier walkthrough + Ajay's Workspace end-to-end smoke](custom-events/step-15-docs-and-smoke.md) — Pending
 
 ### DAL Backfill (side track — align every module to Router → Service → DAL; manager spec 2026-06-25)
 - [Step 1: Fix router transaction violations — inventory, leads, dev](dal-backfill/step-1-fix-router-transaction-violations.md) — Done
