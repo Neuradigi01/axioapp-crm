@@ -23,7 +23,18 @@
         @for (t of templates(); track t.id) {
           <option [value]="t.id">{{ t.name }} · {{ t.language }}</option>
         }
+        @if (hasUnlistedTemplate()) {
+          <option [value]="state().templateId">
+            (unlisted template · {{ state().templateId.slice(0, 8) }}…)
+          </option>
+        }
       </select>
+      @if (hasUnlistedTemplate()) {
+        <p class="mt-1 text-[10px] text-amber-400">
+          The selected template is no longer Meta-approved (archived, revoked, or pending). Re-pick
+          before enabling this workflow.
+        </p>
+      }
     }
     @if (!state().templateId) {
       <p class="text-[10px] text-red-500 mt-1">Template is required.</p>

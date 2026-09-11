@@ -657,8 +657,17 @@ export class TemplateEditorPageComponent {
           this.headerForm.controls.channel.setValue(row.channel as ChannelOption);
           // Channel-locked once saved.
           this.headerForm.controls.channel.disable({ emitEvent: false });
+          // Always build FRESH sub-forms on load. Reusing the existing
+          // FormGroup + patching in place keeps the same object reference,
+          // which under zoneless change detection means the child sub-form
+          // component's `form()` input signal doesn't fire — the child
+          // template's direct reads (e.g. `form().controls.category.value
+          // === cat.value` in the WA category picker) don't re-evaluate,
+          // and the page appears empty until the operator clicks/types
+          // and forces a CD tick. A brand-new FormGroup reference makes
+          // the signal write actually notify subscribers.
           if (row.channel === 'whatsapp') {
-            const f = this.waForm() ?? WaFormComponent.build();
+            const f = WaFormComponent.build();
             f.patchValue({
               body_text: row.body_text,
               language: row.language,
@@ -695,7 +704,7 @@ export class TemplateEditorPageComponent {
             }
             this.waForm.set(f);
           } else if (row.channel === 'email') {
-            const f = this.emailForm() ?? EmailFormComponent.build();
+            const f = EmailFormComponent.build();
             f.patchValue({
               subject: row.subject ?? '',
               preview_text: row.preview_text ?? '',
@@ -706,7 +715,7 @@ export class TemplateEditorPageComponent {
             });
             this.emailForm.set(f);
           } else if (row.channel === 'sms') {
-            const f = this.smsForm() ?? SmsFormComponent.build();
+            const f = SmsFormComponent.build();
             f.patchValue({ body_text: row.body_text });
             this.smsForm.set(f);
             this.loadSmsDltMetadata(row.id);
@@ -714,14 +723,14 @@ export class TemplateEditorPageComponent {
             // Step 13 — quick replies aren't persisted at the central
             // model level yet; they'll round-trip once the FB/IG
             // adapter ships. body_text is the source of truth in v1.
-            const f = this.fbForm() ?? FbFormComponent.build();
+            const f = FbFormComponent.build();
             f.patchValue({ body_text: row.body_text });
             this.fbForm.set(f);
           } else if (row.channel === 'push') {
             // Push title repurposes the central `subject` column per
             // the models docstring. action_url isn't persisted yet —
             // it'll round-trip when the push provider adapter lands.
-            const f = this.pushForm() ?? PushFormComponent.build();
+            const f = PushFormComponent.build();
             f.patchValue({
               title: row.subject ?? '',
               body_text: row.body_text,
@@ -747,6 +756,29 @@ export class TemplateEditorPageComponent {
           // so the Save Draft button starts disabled after load; user
           // input will re-enable it.
           this.dirty.set(false);
+
+          // Zoneless CD kick — the sub-form's template reads FormGroup
+          // values directly (e.g. `form().controls.category.value` on the
+          // WA category cards), not via signals. Even though we set a
+          // fresh FormGroup reference above (which triggers the child's
+          // `form()` input signal), Angular schedules CD in the next
+          // microtask; some template expressions that read raw form
+          // state can render stale on the very first paint until a
+          // synthetic event forces re-evaluation. Firing valueChanges
+          // once after signals settle guarantees the child's
+          // FormGroup directive + the parent's preview effect re-run
+          // against the loaded values, so the page renders populated
+          // without waiting for user interaction.
+          queueMicrotask(() => {
+            this.waForm()?.updateValueAndValidity({ emitEvent: true });
+            this.emailForm()?.updateValueAndValidity({ emitEvent: true });
+            this.smsForm()?.updateValueAndValidity({ emitEvent: true });
+            this.fbForm()?.updateValueAndValidity({ emitEvent: true });
+            this.pushForm()?.updateValueAndValidity({ emitEvent: true });
+            // valueChanges emitted above would re-flip dirty via the
+            // sub-form's scheduleAutoSave path, so re-clear it once more.
+            this.dirty.set(false);
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.loadError.set(extractApiError(err) ?? 'Could not load template.');

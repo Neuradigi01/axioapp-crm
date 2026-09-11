@@ -8,30 +8,68 @@
       >). Ask an Owner or Admin to grant access.
     </div>
   } @else {
-    <header class="mb-4">
+    <header class="mb-6">
       <h2 class="text-base font-semibold text-default">Standard fields</h2>
-      <p class="mt-1 text-sm text-muted">
+      <p class="mt-1 text-[14px] text-muted">
         Customise the label, required state, visibility, and numeric bounds of the canonical fields
         on each form. Changes apply to every form modal in your org. The
         <code class="font-mono">field_key</code> and underlying data type stay fixed.
       </p>
     </header>
 
-    <div class="mb-4 flex items-end gap-3">
-      <div>
-        <label class="block text-xs font-medium text-default">Entity</label>
-        <div class="mt-1 min-w-[12rem]">
-          <crm-mobile-select
-            [options]="entitySelectOptions()"
-            [value]="entity()"
-            (valueChange)="onEntityChange($event)"
-          />
-        </div>
+    <!-- Step 1: entity picker ============================================ -->
+    <div class="mb-6">
+      <div class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
+        <span
+          class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-white"
+        >
+          1
+        </span>
+        <span class="text-default">Pick an entity to customise</span>
       </div>
-      <p class="pb-2 text-xs text-muted">
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        @for (e of entityCards(); track e.value) {
+          <button
+            type="button"
+            (click)="onEntityChange(e.value)"
+            class="group flex flex-col items-start gap-1 rounded-lg border bg-surface p-3 text-left transition"
+            [class.border-accent]="entity() === e.value"
+            [class.ring-2]="entity() === e.value"
+            [class.ring-accent]="entity() === e.value"
+            [class.border-subtle]="entity() !== e.value"
+            [class.hover:border-muted]="entity() !== e.value"
+            [class.hover:bg-surface-2]="entity() !== e.value"
+          >
+            <span
+              class="flex h-8 w-8 items-center justify-center rounded-md"
+              [class.bg-accent]="entity() === e.value"
+              [class.text-white]="entity() === e.value"
+              [class.bg-surface-2]="entity() !== e.value"
+              [class.text-muted]="entity() !== e.value"
+            >
+              <lucide-icon [name]="e.icon" class="h-4 w-4"></lucide-icon>
+            </span>
+            <span class="mt-1 text-sm font-semibold text-default">{{ e.label }}</span>
+            <span class="text-[11px] leading-tight text-muted">
+              {{ e.fieldCount }} field{{ e.fieldCount === 1 ? '' : 's' }}
+            </span>
+          </button>
+        }
+      </div>
+    </div>
+
+    <!-- Step 2: fields table =========================================== -->
+    <div class="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
+      <span
+        class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-white"
+      >
+        2
+      </span>
+      <span class="text-default">Fields for {{ selectedEntity().label }}</span>
+      <span class="ml-2 text-[11px] normal-case font-normal tracking-normal text-muted">
         <span class="font-medium text-default">●</span> overridden &middot;
         <span class="text-default">🔒</span> locked by registry
-      </p>
+      </span>
     </div>
 
     @if (error(); as e) {

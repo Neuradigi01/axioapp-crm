@@ -17,6 +17,7 @@ import { RouterLink } from '@angular/router';
 import { MobileSelectComponent } from '../../../shared/forms/mobile-select.component';
 import { TemplateRead, TemplatesApiService } from '../../../templates/templates-api.service';
 import { CanvasNode } from '../canvas-state.service';
+import { buildTemplateOptions } from './send-editor-shared';
 
 /**
  * Slack send — diverges from the other channels because the
@@ -56,20 +57,12 @@ export class SendSlackEditorComponent {
   readonly templates = signal<TemplateRead[] | null>(null);
   readonly loadError = signal<string | null>(null);
 
-  /** Mapped for `crm-mobile-select` — `{value, label}` tuples with
-   *  a placeholder pinned first. Empty until templates load. */
-  readonly templateOptions = computed(() => {
-    const tpls = this.templates();
-    const base = [{ value: '', label: '— pick a template —' }];
-    if (!tpls) return base;
-    return [
-      ...base,
-      ...tpls.map((t) => ({
-        value: t.id,
-        label: t.subject ? `${t.name} — ${t.subject}` : t.name,
-      })),
-    ];
-  });
+  /** Mapped for `crm-mobile-select` — placeholder + loaded templates +
+   *  fallback for the stored id when it's not in the fetch (deleted,
+   *  archived, or outside the paginated slice). */
+  readonly templateOptions = computed(() =>
+    buildTemplateOptions(this.templates(), this.templateId()),
+  );
 
   constructor() {
     effect(() =>

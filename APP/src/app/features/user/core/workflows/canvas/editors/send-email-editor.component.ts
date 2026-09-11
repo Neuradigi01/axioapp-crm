@@ -18,7 +18,7 @@ import { MobileSelectComponent } from '../../../shared/forms/mobile-select.compo
 import { TemplateRead, TemplatesApiService } from '../../../templates/templates-api.service';
 import { CanvasNode } from '../canvas-state.service';
 import { EMAIL_RECIPIENTS, SEND_CATEGORIES } from './editor-contract';
-import { readSendState, sendIsValid } from './send-editor-shared';
+import { buildTemplateOptions, readSendState, sendIsValid } from './send-editor-shared';
 
 @Component({
   selector: 'app-send-email-editor',
@@ -51,19 +51,12 @@ export class SendEmailEditorComponent {
   readonly templates = signal<TemplateRead[] | null>(null);
   readonly loadError = signal<string | null>(null);
 
-  /** Mapped for `crm-mobile-select` — a placeholder pinned first. */
-  readonly templateOptions = computed(() => {
-    const tpls = this.templates();
-    const base = [{ value: '', label: '— pick a template —' }];
-    if (!tpls) return base;
-    return [
-      ...base,
-      ...tpls.map((t) => ({
-        value: t.id,
-        label: t.subject ? `${t.name} — ${t.subject}` : t.name,
-      })),
-    ];
-  });
+  /** Mapped for `crm-mobile-select` — placeholder + loaded templates +
+   *  fallback for the stored id when it's not in the fetch (deleted,
+   *  archived, or outside the paginated slice). */
+  readonly templateOptions = computed(() =>
+    buildTemplateOptions(this.templates(), this.state().templateId),
+  );
 
   readonly recipientOptionsForSelect = computed(() => [
     { value: '', label: '— pick a recipient —' },
