@@ -9,7 +9,6 @@ import {
 import { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
@@ -32,7 +31,7 @@ import { CustomEvent, CustomEventsApiService } from './custom-events-api.service
   selector: 'app-custom-events-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, LucideAngularModule, RouterLink],
+  imports: [ReactiveFormsModule, LucideAngularModule],
   templateUrl: './custom-events.page.html',
 })
 export class CustomEventsPageComponent {

@@ -174,17 +174,6 @@ export const userRoutes: Routes = [
           ),
       },
       {
-        // Custom events — org-defined named triggers staff log against
-        // a contact to fire workflows / templates. Owner + Admin can
-        // manage; every role that touches contacts sees the picker.
-        path: 'settings/custom-events',
-        canActivate: [permissionGuard('custom_events.read')],
-        loadComponent: () =>
-          import('./core/settings/custom-events/custom-events.page').then(
-            (m) => m.CustomEventsPageComponent,
-          ),
-      },
-      {
         // E.16 / F1 — Lead routing config. Backend endpoints are
         // gated on `settings.read` / `settings.write`; the guard here
         // uses `settings.write` so read-only Admins can still land on

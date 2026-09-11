@@ -64,7 +64,8 @@ import {
             <div class="p-4 text-center">
               <p class="text-xs text-muted">No custom events yet.</p>
               <a
-                routerLink="/user/settings/custom-events"
+                routerLink="/user/settings"
+                [queryParams]="{ tab: 'custom-events' }"
                 (click)="close()"
                 class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"
               >
@@ -93,7 +94,8 @@ import {
             </div>
             <div class="border-t border-subtle p-2">
               <a
-                routerLink="/user/settings/custom-events"
+                routerLink="/user/settings"
+                [queryParams]="{ tab: 'custom-events' }"
                 (click)="close()"
                 class="flex items-center justify-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-2 hover:text-default"
               >
