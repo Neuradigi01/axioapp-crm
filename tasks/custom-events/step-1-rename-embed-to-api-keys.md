@@ -3,16 +3,26 @@
 **Goal:** rename the existing multi-resource embed-keys table, add the columns Track B needs (`auto_create_contacts`, `default_owner_user_id`, `hmac_required`, `mode`, `key_lookup_hash`, `old_key_hash`, `old_key_expires_at`, `hmac_secret_encrypted`, `rate_limit_per_minute`). Extend the `resource_type` CHECK constraint to include `'events'`. Repoint the two existing callers.
 **Phase:** Custom Events track — step 1/17
 **Depends on:** Step 0 (or verification that dry_run exists)
-**Status:** COMPLETED (additive-only scope; rename deferred to Step 2)
+**Status:** COMPLETED (full original scope — additive columns + table rename)
 
-## Implementation note — scope split during execution
+## Implementation summary
 
-Per Rule 8 (~10 files / ~400 lines split), Step 1 shipped **additive-only**:
-- Migration `0224_api_keys_events_scope` adds the 9 new columns + `ck_embed_keys_mode` CHECK + extends `ck_embed_keys_resource_type` to include `'events'` + partial-unique `ix_embed_keys_lookup_hash`.
-- Model `EmbedKey` exposes the 9 columns.
-- `config.env` gains `TRUSTED_PROXIES=` placeholder.
+Shipped as two migrations for reviewer-friendly diffs:
 
-The **rename `tbl_embed_keys → tbl_api_keys` (+ model rename + caller repointing)** was deferred to Step 2, where it happens atomically with the code fold into `core/public_ingest/`. Rationale: renaming touches 6 caller files across `core/embed/*` + `core/ai_assistants/janitor.py` + RLS policy + index names, doubling the blast radius during a cosmetic reorganization. Grouping rename with the module fold keeps Step 1 at 4 files and Step 2 at its planned scope.
+- **Migration `0224_api_keys_events_scope`** (additive) — adds 9 events-scope columns (`auto_create_contacts`, `default_owner_user_id`, `hmac_required`, `mode`, `key_lookup_hash`, `old_key_hash`, `old_key_expires_at`, `hmac_secret_encrypted`, `rate_limit_per_minute`) + `ck_embed_keys_mode` CHECK + extends `ck_embed_keys_resource_type` to include `'events'` + partial-unique `ix_embed_keys_lookup_hash`.
+- **Migration `0225_rename_embed_to_api_keys`** (rename) — `ALTER TABLE tbl_embed_keys RENAME TO tbl_api_keys` + renames 5 non-PK indexes and both CHECK constraints to `*_api_keys_*`. RLS policy `org_isolation` attached by relation OID — survives the rename automatically (verified by round-trip test).
+
+Model + callers:
+- `EmbedKey` class renamed to `ApiKey`; `__tablename__ = "tbl_api_keys"`. `EmbedKey = ApiKey` backward-compat alias kept for one release (retired in Step 2 fold).
+- Raw SQL in `core/ai_assistants/janitor.py` updated (`DELETE FROM tbl_api_keys`).
+- Test `tests/ai_assistants/test_schema.py::test_embed_keys_extension_backfilled` updated to new table + constraint names.
+
+Config:
+- `TRUSTED_PROXIES=` placeholder added to `config.env` for Step 3's XFF chain parsing.
+
+**Secret still to add via `run secrets-edit`** (user runs manually): `HMAC_KEY_PEPPER` — needed by Step 4's HMAC-of-full-key prefilter. Suggested value: `openssl rand -base64 32`.
+
+**PK constraint name cosmetic remnant:** `tbl_embed_keys_pkey` and `tbl_embed_keys_org_id_fkey` still carry their old names (Postgres doesn't auto-rename constraint symbols on `ALTER TABLE RENAME`). Not runtime-critical — they still enforce their invariants. Cleanup deferred to a future housekeeping step if it becomes annoying.
 
 **Secret to add via `run secrets-edit`** (not committed here — user runs manually): `HMAC_KEY_PEPPER` for the Fernet-encrypted HMAC-of-full-key prefilter used by Step 4. Suggested value: `openssl rand -base64 32`.
 

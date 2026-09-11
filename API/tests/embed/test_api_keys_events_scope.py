@@ -1,6 +1,6 @@
 """Migration + model contract for ``tasks/custom-events`` Step 1.
 
-Additive column set on ``tbl_embed_keys`` + extended ``resource_type``
+Additive column set on ``tbl_api_keys`` + extended ``resource_type``
 CHECK constraint. Pure-Python model check + DB-dependent assertions
 guarded by env-var check (skip when compose stack isn't up), matching
 the pattern in ``tests/ai_assistants/test_schema.py``.
@@ -93,7 +93,7 @@ def test_columns_exist_with_expected_defaults(sync_engine) -> None:
         """
         SELECT column_name, column_default, is_nullable, data_type
         FROM information_schema.columns
-        WHERE table_name = 'tbl_embed_keys'
+        WHERE table_name = 'tbl_api_keys'
           AND column_name IN (
             'auto_create_contacts',
             'default_owner_user_id',
@@ -140,13 +140,13 @@ def test_check_constraint_accepts_all_three_resource_types(sync_engine) -> None:
         """
         SELECT pg_get_constraintdef(oid) AS defn
         FROM pg_constraint
-        WHERE conname = 'ck_embed_keys_resource_type'
+        WHERE conname = 'ck_api_keys_resource_type'
         """
     )
     with sync_engine.connect() as conn:
         row = conn.execute(query).fetchone()
 
-    assert row is not None, "ck_embed_keys_resource_type constraint missing"
+    assert row is not None, "ck_api_keys_resource_type constraint missing"
     defn = row.defn
     assert "lead_form" in defn
     assert "ai_assistant" in defn
@@ -154,38 +154,38 @@ def test_check_constraint_accepts_all_three_resource_types(sync_engine) -> None:
 
 
 def test_mode_check_constraint_present(sync_engine) -> None:
-    """New ``ck_embed_keys_mode`` CHECK restricts ``mode`` to
+    """New ``ck_api_keys_mode`` CHECK restricts ``mode`` to
     ``live`` / ``test``."""
     query = text(
         """
         SELECT pg_get_constraintdef(oid) AS defn
         FROM pg_constraint
-        WHERE conname = 'ck_embed_keys_mode'
+        WHERE conname = 'ck_api_keys_mode'
         """
     )
     with sync_engine.connect() as conn:
         row = conn.execute(query).fetchone()
 
-    assert row is not None, "ck_embed_keys_mode constraint missing"
+    assert row is not None, "ck_api_keys_mode constraint missing"
     assert "live" in row.defn
     assert "test" in row.defn
 
 
 def test_lookup_hash_index_is_partial_unique(sync_engine) -> None:
-    """``ix_embed_keys_lookup_hash`` is a partial UNIQUE index — the
+    """``ix_api_keys_lookup_hash`` is a partial UNIQUE index — the
     partial predicate matters because pre-Step-4 rows have NULL
     ``key_lookup_hash`` and a full UNIQUE would refuse them."""
     query = text(
         """
         SELECT indexdef
         FROM pg_indexes
-        WHERE indexname = 'ix_embed_keys_lookup_hash'
+        WHERE indexname = 'ix_api_keys_lookup_hash'
         """
     )
     with sync_engine.connect() as conn:
         row = conn.execute(query).fetchone()
 
-    assert row is not None, "ix_embed_keys_lookup_hash missing"
+    assert row is not None, "ix_api_keys_lookup_hash missing"
     idxdef = row.indexdef
     assert "UNIQUE" in idxdef, f"Not a unique index: {idxdef}"
     assert "key_lookup_hash IS NOT NULL" in idxdef, f"Not partial: {idxdef}"

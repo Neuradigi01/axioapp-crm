@@ -1,13 +1,29 @@
-"""`EmbedKey` model — per-org public API key for the widget endpoint.
+"""`ApiKey` model — per-org public API key for any public-authed
+surface. Historically named `EmbedKey` (widget-only); migration
+`0201_ai_assistants_schema` retrofitted `resource_type` + `resource_id`
+so the same table serves the lead-form widget AND the AI-assistants
+public router. Migration `0225_rename_embed_to_api_keys` renamed the
+table itself + the model class to reflect the multi-resource reality;
+`EmbedKey` remains as a backward-compat alias for one release, retired
+in `tasks/custom-events` Step 2's fold.
 
-Plaintext key (`pk_live_<32-base62>`) is never persisted. We store
-the bcrypt hash + an 11-char display prefix. Lookup at submission
-time scans the partial index over non-revoked rows by prefix then
-bcrypt-verifies the candidate(s).
+`tasks/custom-events` Step 1 added the events-scope columns (see
+migration `0224_api_keys_events_scope` — `auto_create_contacts`,
+`default_owner_user_id`, `hmac_required`, `mode`, `key_lookup_hash`,
+`old_key_hash`, `old_key_expires_at`, `hmac_secret_encrypted`,
+`rate_limit_per_minute`).
+
+Plaintext key (`pk_live_<32-base62>` / `pk_test_<32-base62>`) is never
+persisted. We store the bcrypt hash + an 11-char display prefix.
+Lookup at submission time scans the partial index over non-revoked
+rows by prefix then bcrypt-verifies the candidate(s). Step 4's
+hardening adds an HMAC-of-full-key O(1) prefilter via
+`key_lookup_hash` to defeat the ~100 ms Argon-verify DoS surface.
 
 Tenant-scoped (RLS on + ORM tenant filter via `TenantScoped`). The
 auto-filter is fine here — every read/write is for the active org.
-`created_by` / `revoked_by` are plain UUIDs (post-0037 convention).
+`created_by` / `revoked_by` / `default_owner_user_id` are plain UUIDs
+(post-0037 convention).
 """
 
 from __future__ import annotations
@@ -25,8 +41,8 @@ from src.app.shared.db import Base
 from src.app.shared.orm import TenantScoped
 
 
-class EmbedKey(Base, TenantScoped):
-    __tablename__ = "tbl_embed_keys"
+class ApiKey(Base, TenantScoped):
+    __tablename__ = "tbl_api_keys"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -292,8 +308,15 @@ class EmbedSubmissionLog(Base, TenantScoped):
     )
 
 
+# Backward-compat alias for callers still importing ``EmbedKey``.
+# Retired in ``tasks/custom-events`` Step 2 alongside the module fold
+# into ``core/public_ingest/``. New code MUST import ``ApiKey``.
+EmbedKey = ApiKey
+
+
 __all__ = [
-    "EmbedKey",
+    "ApiKey",
+    "EmbedKey",  # deprecated alias
     "EmbedSubmissionLog",
     "EmbedSubmissionOutcome",
     "WidgetConfig",

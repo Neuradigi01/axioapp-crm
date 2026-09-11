@@ -158,8 +158,10 @@ async def cleanup_orphan_chunks() -> dict[str, int]:
 
 
 async def expire_embed_key_grace() -> dict[str, int]:
-    """Hard-delete revoked embed keys whose grace period has elapsed.
-    Uses grace_expires_at column on tbl_embed_keys.
+    """Hard-delete revoked API keys whose grace period has elapsed.
+    Uses grace_expires_at column on ``tbl_api_keys`` (renamed from
+    ``tbl_embed_keys`` in migration ``0225_rename_embed_to_api_keys``,
+    ``tasks/custom-events`` Step 1).
 
     Returns: ``{"deleted_count": N}``.
     """
@@ -170,7 +172,7 @@ async def expire_embed_key_grace() -> dict[str, int]:
             result = await session.execute(
                 text(
                     """
-                    DELETE FROM tbl_embed_keys
+                    DELETE FROM tbl_api_keys
                      WHERE revoked_at IS NOT NULL
                        AND grace_expires_at IS NOT NULL
                        AND grace_expires_at < now()

@@ -296,7 +296,7 @@ Phase 5 was restructured to gather **all core CRM v1 work** (features + polish +
 
 ### Custom Events (side track — user-defined event triggers + public `POST /events/track`; specced 2026-09-11)
 - [Step 0: Minimal `core/workflows/dry_run.py` engine (conditional — skip if exists)](custom-events/step-0-workflow-dry-run-engine.md) — Pending
-- [Step 1: Rename `tbl_embed_keys` → `tbl_api_keys` + add events-scope columns](custom-events/step-1-rename-embed-to-api-keys.md) — **COMPLETED** (additive-only; rename deferred to Step 2)
+- [Step 1: Rename `tbl_embed_keys` → `tbl_api_keys` + add events-scope columns](custom-events/step-1-rename-embed-to-api-keys.md) — **COMPLETED** (migrations `0224` + `0225`)
 - [Step 2: Fold `core/embed/` + `ai_assistants/public_context.py` into `core/public_ingest/`](custom-events/step-2-fold-public-ingest-module.md) — Pending
 - [Step 3: Redis-backed rate-limit + idempotency + HMAC nonce cache in `api/src/app/shared/`](custom-events/step-3-redis-shared-infra.md) — Pending
 - [Step 4: API-keys hardening — HMAC prefilter, rotate-with-grace, live/test modes, separate rate buckets](custom-events/step-4-api-keys-hardening.md) — Pending
