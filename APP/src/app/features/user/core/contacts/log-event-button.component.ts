@@ -153,7 +153,7 @@ export class LogEventButtonComponent {
   }
 
   @HostListener('document:click', ['$event'])
-  private onDocumentClick(evt: MouseEvent): void {
+  protected onDocumentClick(evt: MouseEvent): void {
     if (!this.open()) return;
     const target = evt.target as Node | null;
     if (target && !this.elementRef.nativeElement.contains(target)) {
