@@ -104,14 +104,14 @@ def _render_trial_ending_soon(
     body_html = _shell(
         f"Your trial ends in {days} days",
         f"<p>{_greeting(context)}</p>"
-        f"<p>Your free 14-day {_PRODUCT_NAME} trial{org_line} ends in "
+        f"<p>Your free {_PRODUCT_NAME} trial{org_line} ends in "
         f"<strong>{days} days</strong>. Upgrade now to keep your team's "
         "data, automations, and integrations active.</p>"
         + _button(f"Upgrade {_PRODUCT_NAME}", upgrade_url),
     )
     body_text = (
         f"{_greeting(context)}\n\n"
-        f"Your free 14-day {_PRODUCT_NAME} trial{org_line} ends in {days} days.\n"
+        f"Your free {_PRODUCT_NAME} trial{org_line} ends in {days} days.\n"
         "Upgrade to keep your team's data, automations, and integrations active.\n\n"
         f"Upgrade: {upgrade_url}\n\n"
         f"Questions? Email {_SUPPORT_EMAIL}.\n"

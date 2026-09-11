@@ -1,6 +1,6 @@
 """Hook called inside the new-org transaction to seed a trial subscription.
 
-Every new org created via self-signup gets a 14-day trial. The handler
+Every new org created via self-signup gets a 100-day trial. The handler
 in `core/auth/service.py` (both `register_with_new_org` and
 `register_user_only`) calls `create_trial_subscription` AFTER the
 organization is inserted but BEFORE the parent transaction commits.
@@ -22,9 +22,9 @@ from src.app.core import audit
 from src.app.core.subscriptions.models import Subscription
 
 # Length of the free trial granted to every new org. Mirrored in
-# `plans.yaml` (`trial.trial_duration_days = 14`) — keep in sync if one
-# changes.
-TRIAL_DURATION = timedelta(days=14)
+# `plans.yaml` (`trial.trial_duration_days = 100`) — keep in sync if
+# one changes.
+TRIAL_DURATION = timedelta(days=100)
 
 # Seats allocated to a trial. Matches `trial.pricing.included_seats` in
 # `plans.yaml`. Trial seats are not purchasable separately — to add
