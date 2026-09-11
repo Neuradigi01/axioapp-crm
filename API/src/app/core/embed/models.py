@@ -17,7 +17,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, CHAR, DateTime, Enum, Index, Integer, String, Text, text
+from sqlalchemy import Boolean, CHAR, DateTime, Enum, Index, Integer, LargeBinary, String, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -83,6 +83,66 @@ class EmbedKey(Base, TenantScoped):
         Integer,
         nullable=False,
         server_default=text("300"),
+    )
+    # Migration 0224 (tasks/custom-events Step 1) — columns needed by
+    # the events public surface. Existing embed / ai_assistant rows
+    # keep their defaults; events keys populate these at create time
+    # in Step 4's hardening.
+    auto_create_contacts: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+    )
+    # Plain UUID (no FK) — post-0037 convention. Step 7b's contact
+    # resolution validates it's an active in-org user at ingest time
+    # and falls back to round-robin (never org Owner) on invalid.
+    default_owner_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+    # Events keys default TRUE at create (Step 4); column default FALSE
+    # so existing embed / ai_assistant rows stay unchanged.
+    hmac_required: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+    )
+    # ``pk_live_*`` → real workflows fire. ``pk_test_*`` → dry-run
+    # engine (existing at core/workflows/engine.py:_dry_run_walk).
+    # CHECK constraint restricts to these two values.
+    mode: Mapped[str] = mapped_column(
+        String(4),
+        nullable=False,
+        server_default=text("'live'"),
+    )
+    # Fernet-encrypted HMAC-of-full-key. Step 4's verify does O(1)
+    # lookup on this indexed column before the ~100ms Argon2id call
+    # (defeats DoS-by-random-tokens). NULL until Step 4 lazy-backfills
+    # on next successful Argon verify.
+    key_lookup_hash: Mapped[bytes | None] = mapped_column(
+        LargeBinary,
+        nullable=True,
+    )
+    # Rotate-with-24h-grace (Step 4). Both hashes accepted during
+    # ``old_key_expires_at`` window. Third simultaneous rotation with
+    # grace still active → 409.
+    old_key_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    old_key_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Fernet-encrypted HMAC signing secret. Reveal-once at create,
+    # NEVER re-revealable afterwards (Step 4 enforces at Pydantic
+    # response schema level). NULL for non-events keys.
+    hmac_secret_encrypted: Mapped[bytes | None] = mapped_column(
+        LargeBinary, nullable=True
+    )
+    # Events keys default 100/min. Coexists with ``rate_limit_per_hour``
+    # so embed / ai_assistant surfaces keep their existing semantics —
+    # consumers pick which unit to enforce.
+    rate_limit_per_minute: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("100"),
     )
 
     @property
