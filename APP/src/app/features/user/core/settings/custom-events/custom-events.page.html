@@ -1,0 +1,200 @@
+<div class="mx-auto max-w-5xl p-4 md:p-6 space-y-5">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
+        Custom events
+      </h1>
+      <p class="mt-1 text-[14px] text-muted">
+        {{ totalEvents() }} event{{ totalEvents() === 1 ? '' : 's' }} · {{ totalFires() }} fires in
+        the last 30 days. Staff logs these on a contact to trigger workflows and send templates.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a
+        routerLink="/user/settings"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+      >
+        <lucide-icon name="arrow-left" class="h-4 w-4" />
+        Back to settings
+      </a>
+      <button
+        type="button"
+        (click)="openAdd()"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
+      >
+        <lucide-icon name="plus" class="h-4 w-4" />
+        Create event
+      </button>
+    </div>
+  </header>
+
+  <!-- Inline add / edit form -->
+  @if (addingOpen() || editingId()) {
+    <form
+      [formGroup]="form"
+      (ngSubmit)="onSubmit()"
+      class="space-y-4 rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle"
+    >
+      <h2 class="text-sm font-semibold text-default">
+        {{ editingId() ? 'Edit custom event' : 'New custom event' }}
+      </h2>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label for="ce_key" class="block text-xs font-medium text-default">
+            Event key <span class="text-red-600">*</span>
+          </label>
+          <input
+            id="ce_key"
+            type="text"
+            formControlName="event_key"
+            placeholder="visa_expired"
+            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 font-mono text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          />
+          @if (editingId()) {
+            <p class="mt-1 text-xs text-muted">
+              Event key is immutable — renaming would break subscribed workflows.
+            </p>
+          } @else if (form.controls.event_key.touched && form.controls.event_key.errors) {
+            <p class="mt-1 text-xs text-red-600">
+              Lowercase snake_case starting with a letter (e.g. visa_expired). Max 64 chars.
+            </p>
+          } @else {
+            <p class="mt-1 text-xs text-muted">
+              Publishes as
+              <span class="font-mono"
+                >custom.{{ form.controls.event_key.value || 'your_key' }}</span
+              >
+            </p>
+          }
+        </div>
+        <div>
+          <label for="ce_name" class="block text-xs font-medium text-default">
+            Display name <span class="text-red-600">*</span>
+          </label>
+          <input
+            id="ce_name"
+            type="text"
+            formControlName="name"
+            placeholder="Visa expired"
+            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
+      </div>
+      <div>
+        <label for="ce_desc" class="block text-xs font-medium text-default">Description</label>
+        <textarea
+          id="ce_desc"
+          rows="2"
+          formControlName="description"
+          placeholder="Fires when a customer's visa has expired and they need renewal."
+          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        ></textarea>
+      </div>
+      @if (saveError()) {
+        <div class="rounded-md border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-400">
+          {{ saveError() }}
+        </div>
+      }
+      <div class="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          (click)="cancelForm()"
+          class="rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          [disabled]="saving()"
+          class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95 disabled:opacity-60"
+        >
+          @if (saving()) {
+            <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
+          }
+          {{ editingId() ? 'Save changes' : 'Create event' }}
+        </button>
+      </div>
+    </form>
+  }
+
+  <!-- Load error banner -->
+  @if (loadError()) {
+    <div class="rounded-md border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-400">
+      {{ loadError() }}
+    </div>
+  }
+
+  <!-- Events table -->
+  <div class="overflow-hidden rounded-lg bg-surface shadow-sm ring-1 border-subtle">
+    @if (loading()) {
+      <div class="flex items-center gap-2 p-6 text-sm text-muted">
+        <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
+        Loading custom events…
+      </div>
+    } @else if (events().length === 0) {
+      <div class="p-8 text-center">
+        <lucide-icon name="zap" class="mx-auto h-8 w-8 text-muted" />
+        <p class="mt-2 text-sm font-medium text-default">No custom events yet</p>
+        <p class="mt-1 text-xs text-muted">
+          Create your first event (e.g. <span class="font-mono">visa_expired</span>) — staff can
+          then log it against a contact to fire a workflow.
+        </p>
+      </div>
+    } @else {
+      <table class="w-full text-left text-sm">
+        <thead
+          class="border-b border-subtle bg-surface-2 text-xs uppercase tracking-wider text-muted"
+        >
+          <tr>
+            <th class="px-4 py-3 font-medium">Event</th>
+            <th class="px-4 py-3 font-medium">Key</th>
+            <th class="px-4 py-3 text-right font-medium">Fires (30d)</th>
+            <th class="px-4 py-3 text-right font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-subtle">
+          @for (evt of events(); track evt.id) {
+            <tr class="hover:bg-surface-2">
+              <td class="px-4 py-3">
+                <div class="font-medium text-default">{{ evt.name }}</div>
+                @if (evt.description) {
+                  <div class="mt-0.5 text-xs text-muted">{{ evt.description }}</div>
+                }
+              </td>
+              <td class="px-4 py-3">
+                <code class="font-mono text-xs text-muted">custom.{{ evt.event_key }}</code>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <span
+                  class="inline-flex min-w-[2.5rem] justify-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default"
+                >
+                  {{ evt.fires_last_30d }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <div class="inline-flex items-center gap-1">
+                  <button
+                    type="button"
+                    (click)="openEdit(evt)"
+                    class="inline-flex items-center gap-1 rounded-md p-1.5 text-muted hover:bg-surface hover:text-default"
+                    title="Edit"
+                  >
+                    <lucide-icon name="pencil" class="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    (click)="onDelete(evt)"
+                    class="inline-flex items-center gap-1 rounded-md p-1.5 text-muted hover:bg-surface hover:text-red-600"
+                    title="Delete"
+                  >
+                    <lucide-icon name="trash-2" class="h-4 w-4" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+</div>

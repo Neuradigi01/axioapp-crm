@@ -32,6 +32,7 @@ import {
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { Contact, ContactCreate, ContactUpdate, ContactsApiService } from './contacts-api.service';
 import { ContactFormModalComponent } from './contact-form-modal.component';
+import { LogEventButtonComponent } from './log-event-button.component';
 import { MergeContactModalComponent } from './merge-contact-modal.component';
 import { OptInChipComponent } from './opt-in/opt-in-chip.component';
 import { OptInSectionComponent } from './opt-in/opt-in-section.component';
@@ -59,6 +60,7 @@ const TABS: ReadonlyArray<{ id: DetailTab; label: string }> = [
     RouterLink,
     LucideAngularModule,
     ContactFormModalComponent,
+    LogEventButtonComponent,
     MergeContactModalComponent,
     ActivityTimelineComponent,
     AddNoteComponent,

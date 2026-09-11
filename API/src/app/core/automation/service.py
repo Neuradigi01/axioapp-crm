@@ -535,6 +535,28 @@ async def list_event_types_with_custom_fields(
                 "pack_id": entry.pack_id,
             }
         )
+
+    # tasks/custom-events — append the org's own event definitions so
+    # they surface in the workflow trigger picker under the "Custom
+    # events" group. Custom events publish on the bus as
+    # ``custom.<event_key>`` so they route through the same dispatcher.
+    from src.app.core.custom_events import service as custom_events_service
+
+    custom_entries = await custom_events_service.list_for_workflow_picker(
+        session, org_id=org_id
+    )
+    for entry_dict in custom_entries:
+        out.append(
+            {
+                "event_type": entry_dict["event_type"],
+                "label": entry_dict["label"],
+                "description": entry_dict["description"],
+                "sample_payload": entry_dict["sample_payload"],
+                "condition_fields": [],
+                "pack_id": None,
+                "is_custom": True,
+            }
+        )
     return out
 
 

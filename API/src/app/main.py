@@ -34,6 +34,12 @@ import src.app.core.workflows.module  # noqa: F401
 # tasks/chatbot-builder Step 3 — chatbots MODULE descriptor.
 import src.app.core.chatbots.module  # noqa: F401
 
+# tasks/custom-events — side-effect imports so the two custom-event
+# tables register with Base.metadata + the MODULE descriptor lands
+# on the module registry before the lifespan permission-fanout sweep.
+import src.app.core.custom_events.models  # noqa: F401
+import src.app.core.custom_events.module  # noqa: F401
+
 # tasks/ai-assistants Step 1 — side-effect import so the two BYOK
 # tables (tbl_ai_provider_keys, tbl_org_ai_cost_budget) register with
 # `Base.metadata` before the FastAPI app's tables-create + Alembic
@@ -84,6 +90,7 @@ from src.app.core.conversations.router import (
     message_attachments_router,
     router as conversations_router,
 )
+from src.app.core.custom_events.router import router as custom_events_router
 from src.app.core.custom_fields.router import router as custom_fields_router
 from src.app.core.dashboard.router import router as dashboard_router
 from src.app.core.dev.router import router as dev_router
@@ -352,6 +359,7 @@ app.include_router(reporting_router, prefix="/api/v1")
 app.include_router(invitations_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
 app.include_router(custom_fields_router, prefix="/api/v1")
+app.include_router(custom_events_router, prefix="/api/v1")
 # `/contacts/imports` must be matched before `contacts_router`'s
 # `/contacts/{contact_id}` — otherwise `GET /contacts/imports` is
 # swallowed by the single-contact route and 422s on the UUID parse
