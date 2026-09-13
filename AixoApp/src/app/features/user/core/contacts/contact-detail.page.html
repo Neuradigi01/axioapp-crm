@@ -134,6 +134,7 @@
               Anonymised
             </span>
           } @else {
+            <app-log-event-button [contactId]="c.id" />
             <button
               type="button"
               (click)="openEdit()"

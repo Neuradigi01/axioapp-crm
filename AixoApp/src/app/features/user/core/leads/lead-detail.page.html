@@ -165,7 +165,7 @@
       @switch (activeTab()) {
         @case ('tasks') {
           <div class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
-            <app-tasks-panel [entityType]="'lead'" [entityId]="l.id" />
+            <app-tasks-panel [entityType]="'lead'" [entityId]="l.id" (created)="onTaskCreated()" />
           </div>
         }
         @case ('activities') {

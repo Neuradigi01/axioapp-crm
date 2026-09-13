@@ -18,26 +18,19 @@
       </div>
       <div>
         <label class="block text-xs font-medium text-default" for="tp_due">Due</label>
-        <input
-          id="tp_due"
-          type="datetime-local"
-          formControlName="due_at"
-          min="1900-01-01T00:00"
-          max="9999-12-31T23:59"
-          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-        />
+        <div class="mt-1">
+          <crm-mobile-datetime
+            formControlName="due_at"
+            [min]="dueMin"
+            placeholder="Pick date & time"
+          />
+        </div>
       </div>
       <div>
         <label class="block text-xs font-medium text-default" for="tp_priority">Priority</label>
-        <select
-          id="tp_priority"
-          formControlName="priority"
-          class="mt-1 block rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-        >
-          <option value="low">Low</option>
-          <option value="med">Medium</option>
-          <option value="high">High</option>
-        </select>
+        <div class="mt-1">
+          <crm-mobile-select [options]="priorityOptions" formControlName="priority" />
+        </div>
       </div>
       <button
         type="submit"

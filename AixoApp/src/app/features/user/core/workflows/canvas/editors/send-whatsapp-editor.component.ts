@@ -45,6 +45,17 @@ export class SendWhatsAppEditorComponent {
   readonly templates = signal<TemplateRead[] | null>(null);
   readonly loadError = signal<string | null>(null);
 
+  /** True when the stored `template_id` exists but isn't in the fetched
+   *  approved-templates list (paginated out, archived, or its Meta
+   *  approval was later revoked). Drives an "(unlisted template)" fallback
+   *  option in the picker so the operator sees the current selection
+   *  instead of an empty dropdown that reads as "unconfigured". */
+  readonly hasUnlistedTemplate = computed<boolean>(() => {
+    const id = this.state().templateId;
+    const tpls = this.templates();
+    return !!id && !!tpls && !tpls.some((t) => t.id === id);
+  });
+
   constructor() {
     effect(() => this.validityChange.emit(sendIsValid(this.state())));
     this._loadTemplates();

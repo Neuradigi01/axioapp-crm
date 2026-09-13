@@ -4,6 +4,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
+import { CustomEventsPageComponent } from './custom-events/custom-events.page';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { AutomationSettingsTabComponent } from './tabs/automation-settings-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
@@ -26,6 +27,7 @@ type SettingsTab =
   | 'roles'
   | 'notifications'
   | 'send-rules'
+  | 'custom-events'
   | 'custom-fields'
   | 'standard-fields'
   | 'embed';
@@ -85,6 +87,16 @@ const TABS: ReadonlyArray<TabDef> = [
     permission: 'settings.write',
   },
   {
+    // tasks/custom-events — org-defined named triggers. Everyone with
+    // a login sees the tab so they can also fire events from the
+    // contact page's dropdown; create / edit / delete is Owner+Admin
+    // by permission on the CRUD endpoints (custom_events.manage).
+    id: 'custom-events',
+    label: 'Custom Events',
+    group: 'automation',
+    permission: 'custom_events.read',
+  },
+  {
     id: 'custom-fields',
     label: 'Custom Fields',
     group: 'data',
@@ -121,6 +133,7 @@ const TABS: ReadonlyArray<TabDef> = [
     RolesTabComponent,
     NotificationsTabComponent,
     AutomationSettingsTabComponent,
+    CustomEventsPageComponent,
     CustomFieldsPageComponent,
     StandardFieldsTabComponent,
     EmbedIntegrationsTabComponent,

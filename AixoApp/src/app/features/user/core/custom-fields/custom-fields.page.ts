@@ -21,58 +21,9 @@ import {
 } from './custom-fields-api.service';
 import { FieldFormComponent } from './field-form.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { CORE_ENTITY_REGISTRY, EntityDescriptor } from '../shared/entity-registry/entity-registry';
 
-/**
- * Curated entity list for the picker. Each entry drives one card on
- * the entity selector at the top of the page — icon + label +
- * one-line description. Once the module registry exposes entity
- * discovery, this becomes ``registry.list().flatMap(m => m.entities)``.
- */
-interface EntityDescriptor {
-  value: string;
-  label: string;
-  icon: string;
-  description: string;
-}
-
-const ENTITY_TYPES: ReadonlyArray<EntityDescriptor> = [
-  {
-    value: 'contact',
-    label: 'Contacts',
-    icon: 'users',
-    description: 'People in your CRM',
-  },
-  {
-    value: 'lead',
-    label: 'Leads',
-    icon: 'target',
-    description: 'Sales opportunities',
-  },
-  {
-    value: 'walk_in',
-    label: 'Walk-ins',
-    icon: 'footprints',
-    description: 'In-store visits',
-  },
-  {
-    value: 'appointment',
-    label: 'Appointments',
-    icon: 'calendar',
-    description: 'Scheduled meetings',
-  },
-  {
-    value: 'task',
-    label: 'Tasks',
-    icon: 'check-square',
-    description: 'To-dos & follow-ups',
-  },
-  {
-    value: 'catalog_item',
-    label: 'Products',
-    icon: 'package',
-    description: 'Catalog items',
-  },
-];
+const ENTITY_TYPES = CORE_ENTITY_REGISTRY;
 
 @Component({
   selector: 'app-custom-fields-page',

@@ -245,6 +245,27 @@ export class ComposeBarComponent {
   }
 
   @ViewChild('fileInput') private readonly fileInput?: ElementRef<HTMLInputElement>;
+  /** Handle to the textarea for auto-grow. We start it at rows="1"
+   *  (~2rem) and expand as the user types up to a cap so long drafts
+   *  don't push the compose bar off the screen. */
+  @ViewChild('textareaEl') private readonly textareaEl?: ElementRef<HTMLTextAreaElement>;
+
+  /** Max height in px the textarea grows to before it turns into a
+   *  scroll surface. Keeps the compose bar bounded so a 40-line paste
+   *  can't hide the messages above. */
+  private static readonly TEXTAREA_MAX_HEIGHT_PX = 200;
+
+  /** Recompute the textarea's height so it fits its content. Called
+   *  after every `text()` mutation (typing, mention-picker rewrite,
+   *  template picker, reset-on-send). Uses ``height: auto`` first so
+   *  removing lines actually shrinks the box back down. */
+  private autoGrowTextarea(): void {
+    const el = this.textareaEl?.nativeElement;
+    if (!el) return;
+    el.style.height = 'auto';
+    const next = Math.min(el.scrollHeight, ComposeBarComponent.TEXTAREA_MAX_HEIGHT_PX);
+    el.style.height = next + 'px';
+  }
 
   protected readonly text = signal<string>('');
   protected readonly templateError = signal<string | null>(null);
@@ -313,6 +334,10 @@ export class ComposeBarComponent {
     if (this.isNoteMode()) {
       this.refreshMentionPicker(value);
     }
+    // Defer until Angular writes the new value to the DOM so
+    // ``scrollHeight`` reflects the just-typed content, not the
+    // previous frame.
+    queueMicrotask(() => this.autoGrowTextarea());
   }
 
   /** Reads the text buffer, opens the mention picker when the cursor
@@ -388,6 +413,7 @@ export class ComposeBarComponent {
       this.mentions.set([]);
       this.mentionOpen.set(false);
       this.mentionQuery.set('');
+      queueMicrotask(() => this.autoGrowTextarea());
       return;
     }
 
@@ -401,11 +427,13 @@ export class ComposeBarComponent {
       this.sendMedia.emit({ file, type, caption });
       this.clearStaged();
       this.text.set('');
+      queueMicrotask(() => this.autoGrowTextarea());
       return;
     }
     if (!trimmed) return;
     this.send.emit(trimmed);
     this.text.set('');
+    queueMicrotask(() => this.autoGrowTextarea());
   }
 
   protected onKey(event: KeyboardEvent): void {

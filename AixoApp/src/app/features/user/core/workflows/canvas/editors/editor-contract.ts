@@ -402,9 +402,246 @@ export const EVENT_TYPES: readonly EventTypeOption[] = [
     waitable: true,
   },
 
-  // Billing
+  // Additional lead events (backend catalog: lead.score_threshold,
+  // lead.assigned, lead.stale_*).
+  {
+    type: 'lead.score_threshold',
+    label: 'Lead score crosses threshold',
+    description: 'Lead score crossed a configured threshold.',
+    waitable: false,
+  },
+  {
+    type: 'lead.assigned',
+    label: 'Lead assigned',
+    description: 'Lead owner assignment changed.',
+    waitable: false,
+  },
+  {
+    type: 'lead.stale_7d',
+    label: 'Lead stale (7 days)',
+    description: 'Lead has had no activity for 7 days.',
+    waitable: false,
+  },
+  {
+    type: 'lead.stale_30d',
+    label: 'Lead stale (30 days)',
+    description: 'Lead has had no activity for 30 days.',
+    waitable: false,
+  },
+  {
+    type: 'lead.stale_90d',
+    label: 'Lead stale (90 days)',
+    description: 'Lead has had no activity for 90 days.',
+    waitable: false,
+  },
+
+  // Additional contact events (backend catalog).
+  {
+    type: 'contact.birthday',
+    label: 'Contact birthday',
+    description: 'Daily sweep finds a contact whose birthday is today.',
+    waitable: false,
+  },
+  {
+    type: 'contact.anniversary',
+    label: 'Contact anniversary',
+    description: 'Anniversary of contact becoming a customer.',
+    waitable: false,
+  },
+  {
+    type: 'contact.opt_in_changed',
+    label: 'Contact opt-in changed',
+    description: "Contact's marketing opt-in state changed.",
+    waitable: false,
+  },
+
+  // Additional appointment events — the reminder events are dispatched
+  // by the every-15-min appointments sweeper and drive most of the seed
+  // "Appointment Reminder 24h / 1h" workflows.
+  {
+    type: 'appointment.reminder_24h',
+    label: 'Appointment reminder — 24 hours',
+    description: '24 hours before the appointment.',
+    waitable: false,
+  },
+  {
+    type: 'appointment.reminder_1h',
+    label: 'Appointment reminder — 1 hour',
+    description: '1 hour before the appointment.',
+    waitable: false,
+  },
+
+  // Additional task events (backend catalog).
+  {
+    type: 'task.created',
+    label: 'Task created',
+    description: 'A task was created.',
+    waitable: false,
+  },
+  {
+    type: 'task.overdue',
+    label: 'Task overdue',
+    description: 'Daily sweep finds a task past its due date.',
+    waitable: false,
+  },
+
+  // Sales — quotes.
+  {
+    type: 'quote.sent',
+    label: 'Quote sent',
+    description: 'Quote dispatched to a contact.',
+    waitable: false,
+  },
+  {
+    type: 'quote.viewed',
+    label: 'Quote viewed',
+    description: 'Customer opened the quote via the public link.',
+    waitable: true,
+  },
+  {
+    type: 'quote.accepted',
+    label: 'Quote accepted',
+    description: 'Quote accepted (signature or portal action).',
+    waitable: true,
+  },
+  {
+    type: 'quote.rejected',
+    label: 'Quote rejected',
+    description: 'Quote explicitly rejected.',
+    waitable: true,
+  },
+  {
+    type: 'quote.expired',
+    label: 'Quote expired',
+    description: 'Quote validity window lapsed without action.',
+    waitable: false,
+  },
+
+  // Sales — orders.
+  {
+    type: 'order.placed',
+    label: 'Order placed',
+    description: 'Order checkout completed.',
+    waitable: false,
+  },
+  {
+    type: 'order.delivered',
+    label: 'Order delivered',
+    description: 'Order delivery confirmed.',
+    waitable: true,
+  },
+  {
+    type: 'order.refunded',
+    label: 'Order refunded',
+    description: 'Order refunded (full or partial).',
+    waitable: false,
+  },
+
+  // Billing — invoices.
   { type: 'invoice.sent', label: 'Invoice sent', description: 'Invoice issued.', waitable: false },
   { type: 'invoice.paid', label: 'Invoice paid', description: 'Payment received.', waitable: true },
+  {
+    type: 'invoice.overdue_7d',
+    label: 'Invoice overdue — 7 days',
+    description: 'Daily sweep finds an unpaid invoice 7 days overdue.',
+    waitable: false,
+  },
+  {
+    type: 'invoice.overdue_14d',
+    label: 'Invoice overdue — 14 days',
+    description: 'Daily sweep finds an unpaid invoice 14 days overdue.',
+    waitable: false,
+  },
+  {
+    type: 'invoice.overdue_30d',
+    label: 'Invoice overdue — 30 days',
+    description: 'Daily sweep finds an unpaid invoice 30 days overdue.',
+    waitable: false,
+  },
+
+  // Conversations — inbound email + WA template reply.
+  {
+    type: 'email.message_received',
+    label: 'Inbound email received',
+    description: 'Inbound email from a contact.',
+    waitable: true,
+  },
+  {
+    type: 'whatsapp.template_replied',
+    label: 'WhatsApp template reply',
+    description: 'Contact replied to a template-initiated WA conversation.',
+    waitable: true,
+  },
+
+  // Activities.
+  {
+    type: 'phone_call.logged',
+    label: 'Phone call logged',
+    description: 'Phone-call activity recorded against a contact.',
+    waitable: false,
+  },
+  {
+    type: 'meeting.booked',
+    label: 'Meeting booked',
+    description: "Meeting added to a contact's timeline.",
+    waitable: false,
+  },
+  {
+    type: 'note.added',
+    label: 'Note added',
+    description: 'A free-text note was added to a contact.',
+    waitable: false,
+  },
+
+  // Walk-ins.
+  {
+    type: 'walk_in.registered',
+    label: 'Walk-in registered',
+    description: 'A walk-in visitor is logged at reception.',
+    waitable: false,
+  },
+
+  // Forms.
+  {
+    type: 'form.submitted',
+    label: 'Form submitted',
+    description: 'An embedded form submission landed.',
+    waitable: true,
+  },
+  {
+    type: 'form.abandoned',
+    label: 'Form abandoned',
+    description: 'Form session abandoned (partial fill, timeout).',
+    waitable: false,
+  },
+
+  // Campaigns + sequences.
+  {
+    type: 'campaign.sent',
+    label: 'Campaign sent',
+    description: 'A campaign blast finished sending.',
+    waitable: false,
+  },
+  {
+    type: 'campaign.completed',
+    label: 'Campaign completed',
+    description: 'A campaign run completed (all chunks dispatched).',
+    waitable: false,
+  },
+  {
+    type: 'sequence.completed',
+    label: 'Sequence completed',
+    description: 'An email sequence enrolment reached the final step.',
+    waitable: false,
+  },
+
+  // Time-based.
+  {
+    type: 'time.daily_tick',
+    label: 'Daily midnight tick',
+    description: 'Org-local midnight tick — daily-cadence workflows hook here.',
+    waitable: false,
+  },
 ];
 
 export const WAITABLE_EVENT_TYPES = EVENT_TYPES.filter((e) => e.waitable);

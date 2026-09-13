@@ -153,8 +153,12 @@ export class ConversationListComponent {
   @Input() staffById: Map<string, StaffListItem> = new Map();
   /** Contact-name lookup keyed by `contact_id`. Parent hydrates it
    *  after each list load; the row falls back to `external_id` when
-   *  a contact hasn't been fetched yet (or is missing). */
-  @Input() contactsById: Record<string, { id: string; full_name: string }> = {};
+   *  a contact hasn't been fetched yet (or is missing). ``phone`` is
+   *  cached alongside the name so the row-handle line surfaces the
+   *  contact's *current* phone (post-operator-edit) instead of the
+   *  stale ``external_id`` snapshot on legacy rows. */
+  @Input() contactsById: Record<string, { id: string; full_name: string; phone: string | null }> =
+    {};
   /** UUID of the logged-in user — drives the "Mine" assignee chip.
    * Empty string means we don't yet know (auth still loading);
    * the "Mine" chip simply emits `undefined` in that case. */
@@ -230,10 +234,30 @@ export class ConversationListComponent {
    *  channel-specific id (phone / email) whenever the primary label
    *  falls back to "Unknown contact" so the operator still sees the
    *  channel handle they need to identify the customer. Empty
-   *  otherwise (avoids visual noise for named contacts). */
+   *  otherwise (avoids visual noise for named contacts).
+   *
+   *  For WhatsApp/SMS threads the linked contact's *current* phone is
+   *  preferred over the ``external_id`` snapshot so an operator's
+   *  "+91" edit on the Contacts page reflects in the inbox row even on
+   *  legacy rows whose snapshot pre-dates the backend cascade in
+   *  ``conversations.service.resync_external_id_for_contact_phone``. */
   protected rowHandle(c: Conversation): string {
     const name = this.rowName(c);
-    if (name === 'Unknown contact' || name === c.external_id) return '';
+    const handle = this.contactPhoneOr(c);
+    if (name === 'Unknown contact' || name === handle) return '';
+    return handle;
+  }
+
+  /** Contact's current phone when the thread is on a phone channel and
+   *  the linked contact carries a phone; else the raw ``external_id``.
+   *  Kept private-ish (protected) so both ``rowHandle`` and future call
+   *  sites read from a single source of truth. */
+  protected contactPhoneOr(c: Conversation): string {
+    if (c.channel === 'whatsapp' || c.channel === 'sms') {
+      const contact = c.contact_id ? this.contactsById[c.contact_id] : undefined;
+      const phone = contact?.phone?.trim();
+      if (phone && phone.length > 0) return phone;
+    }
     return c.external_id;
   }
 
