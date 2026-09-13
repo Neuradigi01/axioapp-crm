@@ -103,3 +103,9 @@ cython_debug/
 
 # Project-specific
 static/images/uploads/*
+
+# Generated at API startup by src/providers/route_provider.py from the routes
+# table, and served by GET /api/routes/config. Tracking it meant a committed
+# empty {} shadowed the real thing on a fresh clone, and the file churned on
+# every boot. It is regenerated on startup, so it never needs to be in git.
+data/routes.json

@@ -16,6 +16,17 @@
 x-local-env: &local-env
   IS_DEVELOPMENT: "true"
   DB_NULL_POOL: "1"
+  # Password for the local developer login seeded by
+  # src/app/scripts/seed_dev_user.py. Null = forward from the compose
+  # process environment, which run.cmd / run.sh populate via
+  # `sops exec-env secrets.local.enc.env`.
+  #
+  # Declared HERE and not in docker-compose.yml's shared x-secret-vars
+  # on purpose: a developer login must be impossible to create on a
+  # deployed box. Prod never loads this overlay, and .sops.yaml does not
+  # make prod servers recipients of secrets.local.enc.env, so a prod
+  # host could not decrypt the value even if the seed did run.
+  DEV_SEED_PASSWORD:
 
 services:
   api:
