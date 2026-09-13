@@ -12,6 +12,8 @@ import { UpperCasePipe } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { BrandService } from '@core/services/brand.service';
+
 import { FurnitureAuthService } from '../auth/auth.service';
 import { ModuleApiService, ModuleDescriptorOut } from '../services/module-api.service';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
@@ -28,6 +30,8 @@ export class SidebarComponent implements OnInit {
   private readonly auth = inject(FurnitureAuthService);
   private readonly notifications = inject(NotificationsApiService);
   private readonly router = inject(Router);
+  /** Shown when an org has no name yet — must read as the product, not a constant. */
+  protected readonly brand = inject(BrandService).brand;
 
   /** Desktop expand/collapse state. */
   readonly expanded = input.required<boolean>();

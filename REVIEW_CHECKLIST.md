@@ -1244,8 +1244,6 @@ The real-estate vertical: property listings with a full publish lifecycle and to
 
 - **Intentionally excluded — not part of Core CRM:**
   - `APP/src/app/features/admin/` — the legacy template's admin panel. `CLAUDE.md` marks it untouched indefinitely; it is not part of this product.
-  - `AixoApp/` — a rebranded white-label copy of the frontend. Development happens in `APP/` + `API/`; reviewing the fork would double every row.
-  - `Flutter/` — explicitly not part of this product.
   - The legacy **non-auth** template routers mounted at `/api/...` (app-config, routes/config, common scaffolding). The legacy **auth** endpoints *are* in scope, because they still back live login, 2FA, and login-history surfaces.
 - **Conventions are documented, not inferred.** The code-organization lens (§3.6) is judged against real rulebooks in this repo: [`CLAUDE.md`](CLAUDE.md), [`tasks/README.md`](tasks/README.md), and `API/docs/DATABASE_RULES.md`. Two of these are CI-enforced by pin-tests (the `tbl_` table-naming rule and the Router→Service→DAL layering rule), so drift is a build failure, not an opinion.
 - **The folder names in `CLAUDE.md` are aspirational.** That doc describes a post-rename layout (`api/`, `app/`); on disk the live folders are still `API/` and `APP/`. Trace against what exists, not what the doc predicts.

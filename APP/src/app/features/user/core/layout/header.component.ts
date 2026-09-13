@@ -10,6 +10,7 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { BrandService } from '@core/services/brand.service';
 import { ThemeChoice, ThemeService } from '@core/services/theme.service';
 
 import { FurnitureAuthService, MeResponse } from '../auth/auth.service';
@@ -34,6 +35,8 @@ export class HeaderComponent implements OnInit {
   private readonly notifications = inject(NotificationsApiService);
   private readonly router = inject(Router);
   private readonly themeService = inject(ThemeService);
+  /** Shown when an org has no name yet — must read as the product, not a constant. */
+  protected readonly brand = inject(BrandService).brand;
 
   /** Emitted when the header's search-pill is clicked. The shell owns
    *  the `CommandPaletteComponent` instance and toggles it in response. */

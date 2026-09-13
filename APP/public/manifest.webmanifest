@@ -1,6 +1,6 @@
 {
-  "name": "APP",
-  "short_name": "APP",
+  "name": "Neuradigi CRM",
+  "short_name": "Neuradigi",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",

@@ -19,7 +19,7 @@
       </span>
       <span class="flex min-w-0 flex-1 flex-col items-start" [class.md:hidden]="!expanded()">
         <span class="truncate font-display text-[13.5px] font-semibold leading-tight">
-          {{ org()?.name ?? 'Core CRM' }}
+          {{ org()?.name ?? brand().name }}
         </span>
         @if (org(); as o) {
           <span class="truncate text-[11px] leading-tight text-faint">
@@ -50,7 +50,7 @@
           </span>
           <div class="min-w-0 flex-1">
             <div class="truncate text-sm font-medium text-default">
-              {{ org()?.name ?? 'Core CRM' }}
+              {{ org()?.name ?? brand().name }}
             </div>
             @if (org(); as o) {
               <div class="truncate text-[11px] text-faint">{{ o.slug }}</div>

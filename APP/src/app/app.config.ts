@@ -14,6 +14,7 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 import { provideServiceWorker } from '@angular/service-worker';
 import {
   LucideAngularModule,
+  AlertCircle,
   AlertTriangle,
   Archive,
   Armchair,
@@ -56,6 +57,7 @@ import {
   ClipboardPaste,
   Clock,
   ClockAlert,
+  Code,
   Cog,
   Columns3,
   Copy,
@@ -64,6 +66,7 @@ import {
   Dot,
   Download,
   Dumbbell,
+  Edit3,
   ExternalLink,
   Eye,
   EyeOff,
@@ -71,6 +74,8 @@ import {
   FileSpreadsheet,
   FileText,
   Files,
+  Filter,
+  FilterX,
   Folder,
   FolderPlus,
   Footprints,
@@ -116,6 +121,7 @@ import {
   MoreVertical,
   NotebookPen,
   Package,
+  PanelRightOpen,
   Paperclip,
   PauseCircle,
   Pencil,
@@ -137,6 +143,7 @@ import {
   Scissors,
   Search,
   Send,
+  Settings,
   Shield,
   ShieldCheck,
   Shuffle,
@@ -151,6 +158,8 @@ import {
   Sun,
   Tag,
   Target,
+  ToggleLeft,
+  ToggleRight,
   Trash2,
   TrendingUp,
   Trophy,
@@ -171,6 +180,7 @@ import {
   Wallet,
   Warehouse,
   Webhook,
+  Wifi,
   Workflow,
   Wrench,
   X,
@@ -186,6 +196,7 @@ import { retryInterceptor } from '@core/interceptors/retry.interceptor';
 import { RoutesHelperService } from '@core/services/routes-helper.service';
 import { ThemeService } from '@core/services/theme.service';
 import { SwUpdateService } from '@core/services/sw-update.service';
+import { BrandService } from '@core/services/brand.service';
 import { AppConfigApiService } from '@app/services/app-config-api.service';
 import { jwtInterceptor } from './features/user/core/auth/jwt.interceptor';
 import { GlobalErrorHandler } from './features/user/core/error/global-error-handler';
@@ -199,6 +210,7 @@ export const appConfig: ApplicationConfig = {
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
     importProvidersFrom(
       LucideAngularModule.pick({
+        AlertCircle,
         AlertTriangle,
         Archive,
         Armchair,
@@ -241,6 +253,7 @@ export const appConfig: ApplicationConfig = {
         ClipboardPaste,
         Clock,
         ClockAlert,
+        Code,
         Cog,
         Columns3,
         Copy,
@@ -249,6 +262,7 @@ export const appConfig: ApplicationConfig = {
         Dot,
         Download,
         Dumbbell,
+        Edit3,
         ExternalLink,
         Eye,
         EyeOff,
@@ -256,6 +270,8 @@ export const appConfig: ApplicationConfig = {
         FileSpreadsheet,
         FileText,
         Files,
+        Filter,
+        FilterX,
         Folder,
         FolderPlus,
         Footprints,
@@ -301,6 +317,7 @@ export const appConfig: ApplicationConfig = {
         Music,
         NotebookPen,
         Package,
+        PanelRightOpen,
         Paperclip,
         PauseCircle,
         Pencil,
@@ -322,6 +339,7 @@ export const appConfig: ApplicationConfig = {
         Scissors,
         Search,
         Send,
+        Settings,
         Shield,
         ShieldCheck,
         Shuffle,
@@ -336,6 +354,8 @@ export const appConfig: ApplicationConfig = {
         Sun,
         Tag,
         Target,
+        ToggleLeft,
+        ToggleRight,
         Trash2,
         TrendingUp,
         Trophy,
@@ -356,6 +376,7 @@ export const appConfig: ApplicationConfig = {
         Wallet,
         Warehouse,
         Webhook,
+        Wifi,
         Workflow,
         Wrench,
         X,
@@ -377,7 +398,11 @@ export const appConfig: ApplicationConfig = {
       const theme = inject(ThemeService);
       const swUpdate = inject(SwUpdateService);
       const appConfigApi = inject(AppConfigApiService);
+      const brand = inject(BrandService);
 
+      // Before anything renders, so no component observes the default brand
+      // on a branded host and no branded tab flashes the wrong favicon.
+      brand.init();
       theme.init();
       swUpdate.init();
       await Promise.all([routesHelper.loadRoutes(), appConfigApi.load()]);

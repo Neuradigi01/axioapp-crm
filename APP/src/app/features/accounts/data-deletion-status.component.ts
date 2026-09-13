@@ -38,6 +38,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 
 import { environment } from '../../../environments/environment';
+import { BrandService } from '@core/services/brand.service';
 
 type DeletionStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'unknown';
 
@@ -64,6 +65,9 @@ const POLL_INTERVAL_MS = 3_000;
 })
 export class DataDeletionStatusComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
+  /** This page is shown to Meta users exercising data-deletion rights;
+   *  it must name the brand they actually signed up with. */
+  protected readonly brand = inject(BrandService).brand;
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 

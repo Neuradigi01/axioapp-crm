@@ -1,5 +1,0 @@
-/* No custom styles — Tailwind utility classes in the template carry
- * the full visual design. The file exists because Angular's
- * `styleUrl` declaration in `pricing.page.ts` references it; an
- * empty file is the cleanest way to keep the contract without
- * shipping unused selectors. */
