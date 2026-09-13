@@ -13,7 +13,7 @@ The single source of truth for the build is the master prompt at [`furniture-crm
 The repo is in the middle of a structural migration. As of this writing:
 
 - **Active workstream: Core CRM (Layer 1).** Backend modules under `api/src/app/core/` are being filled in one at a time following the layered Router → Service → DAL convention.
-- **Old template still in place** (`API/`, `APP/`, `Flutter/`) — the existing app this build is reusing auth from. Step 1.1 renames `API/` → `api/`, `APP/` → `app/`, deletes the non-auth scaffolding, and drops the new layered `core/`+`packs/furniture/` skeleton in place. **`Flutter/` is left untouched** (not part of this product).
+- **Old template still in place** (`API/`, `APP/`) — the existing app this build is reusing auth from. Step 1.1 renames `API/` → `api/`, `APP/` → `app/`, deletes the non-auth scaffolding, and drops the new layered `core/`+`packs/furniture/` skeleton in place.
 - **`packs/furniture/` is scaffolded but parked.** Layer 2 work is deferred until Layer 1 stabilises.
 - **`tasks/` already populated** with the full 76-step plan (Phase 1 → Phase 6). Current iteration is on Phase 1/2 Core work.
 - **Three-track plan COMPLETE (2026-06-30).** The manager-locked Templates → Automation → Workflows pipeline shipped end-to-end: `core/templates/` (central library) + `core/automation/` (single-step triggers) + `core/workflows/` (multi-step visual flowcharts) are all live. The workflows track closed with Step 20 — 15 default core workflows seed into every org as drafts, and `core/email_sequences/` is absorbed (Settings tab gone, `/user/settings/email-sequences/*` redirects to `/user/workflows?category=Marketing`, scheduler tick is a no-op, enrollments shim through `workflows.engine.start_run`). Vertical-pack workflows (Furniture) remain a future workstream.
@@ -65,7 +65,6 @@ furniture-crm/
 │       │       ├── layout/             ← FurnitureCRM main app shell (sidebar+header)
 │       │       └── user.routes.ts      ← thin route tree wiring core/ + packs/
 │       └── staff-portal/               ← Separate route tree (PIN tablet login, Phase 3)
-├── Flutter/                            ← UNTOUCHED (not part of this product)
 ├── tasks/                              ← 76-step build plan
 ├── furniture-crm-agent-prompt.md       ← master prompt (filename retained — do not rename)
 └── CLAUDE.md                           ← this file
@@ -172,7 +171,7 @@ These are project-specific deviations from a clean-slate build:
 - **`features/user/` hosts the Core CRM frontend.** All Layer 1 (`core/`) module code lives at `app/src/app/features/user/core/...`. Layer 2 pack code (`app/src/app/features/user/packs/furniture/...`) is scaffolded but not the current focus. Core CRM roles log in via the user-login button and land at `/user/...`.
 - **`staff-portal/` is a separate top-level route tree** at `app/src/app/staff-portal/` for PIN tablet login. NOT under `features/user/`.
 - **Auth pages were migrated to Tailwind** to match the Core CRM user app. The accounts pages (login, register, forgot/reset password, two-factor, verify-email, email-verification-notice), the shared accounts layout, and the shared captcha component were rebuilt in Tailwind (zinc palette, white `rounded-xl border border-zinc-200 shadow-sm` cards, `bg-zinc-900` primary button) so login no longer reads as a different product from the dashboard. **All auth/registration logic is unchanged** — only markup + styling. Notes: the accounts-layout theme toggle was removed (the user app is light-only with no toggle); register's country/state `mat-select` (with in-panel search) became a Tailwind-styled native `<select>` (native type-ahead, no search box); error toasts still use `MatSnackBar`. `features/admin/` is untouched and keeps its Material visuals. **All pages now use Tailwind only.**
-- **Folders renamed lowercase:** `API/` → `api/`, `APP/` → `app/`. **`Flutter/` untouched** (not part of this product).
+- **Folders renamed lowercase:** `API/` → `api/`, `APP/` → `app/`.
 - **Old template docs** under `api/docs/` and `app/docs/` remain as **reference** for the existing auth code's patterns. They describe the legacy template, not Core CRM, and should not drive new code.
 
 ## Gate 0 — Discovery before building something new

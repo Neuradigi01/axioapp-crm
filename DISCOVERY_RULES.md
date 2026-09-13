@@ -85,7 +85,7 @@ Each finding is **one sentence with a source**:
 
 > *"X is impossible / capped / requires approval, because `<provider>` `<rule>` — source: `<URL>`."*
 
-**What this looks like when it goes right and when it goes wrong.** [`WHATSAPP_CAMPAIGNS_PLAN.md:72`](WHATSAPP_CAMPAIGNS_PLAN.md#L72) records that business-initiated WhatsApp messages need pre-approved templates and free-form text only works inside the 24-hour customer-service window — a perfect constraint-sweep finding. It was found **reactively, mid-build**, and it still lives in a plan document rather than as an enforced rule. A message our own database accepts and queues can be permanently undeliverable at Meta. That is the exact shape of the fact this stage exists to find *first*.
+**What this looks like when it goes right and when it goes wrong.** [`WHATSAPP_CAMPAIGNS_PLAN.md:72`](docs/archive/WHATSAPP_CAMPAIGNS_PLAN.md#L72) records that business-initiated WhatsApp messages need pre-approved templates and free-form text only works inside the 24-hour customer-service window — a perfect constraint-sweep finding. It was found **reactively, mid-build**, and it still lives in a plan document rather than as an enforced rule. A message our own database accepts and queues can be permanently undeliverable at Meta. That is the exact shape of the fact this stage exists to find *first*.
 
 ### 4. Synthesise
 

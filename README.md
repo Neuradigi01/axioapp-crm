@@ -35,7 +35,6 @@ furniture-crm/
 │       │       ├── packs/furniture/    ← Layer 2: vertical pack UI
 │       │       └── layout/             ← FurnitureCRM main shell + home stub
 │       └── staff-portal/               ← Separate route tree (PIN tablet UI, Phase 3)
-├── Flutter/                            ← UNTOUCHED (not part of FurnitureCRM)
 ├── tasks/                              ← 76-step build plan (one phase per folder, one file per step)
 └── furniture-crm-agent-prompt.md       ← master agent prompt
 ```

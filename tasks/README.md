@@ -39,7 +39,7 @@ This folder is the **single source of truth for every step** of the FurnitureCRM
 - **Staff Portal at `/staff-portal`** is a separate top-level route tree, not under `features/user/`. Built in Phase 3, Step 3.7.
 - **Backend layout** stays as the master doc specifies: `api/src/app/core/...` and `api/src/app/packs/furniture/...`. No "user side" / "admin side" distinction on backend.
 - **Existing auth pages keep PrimeNG/Material visuals.** All new pages use Tailwind only.
-- **Folders renamed lowercase:** `API/` → `api/`, `APP/` → `app/`. `Flutter/` untouched.
+- **Folders renamed lowercase:** `API/` → `api/`, `APP/` → `app/`.
 - **CLAUDE.md** already updated to FurnitureCRM-specific rules.
 
 ---
