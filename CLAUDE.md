@@ -6,7 +6,7 @@ This is **Core CRM**, a multi-tenant SaaS CRM platform. It is being built increm
 
 In conversation, refer to the project as **"Core CRM"** (or plain "CRM"). Code, paths, and identifiers (e.g. `packs/furniture/`, `furnicrm` DOM classes, the master-prompt filename) stay as-is — renaming them is a breaking change.
 
-The single source of truth for the build is the master prompt at [`furniture-crm-agent-prompt.md`](furniture-crm-agent-prompt.md). The 76-step task tree under [`tasks/`](tasks/) breaks that prompt into self-contained, individually verifiable steps. Always start at [`tasks/README.md`](tasks/README.md).
+The master prompt that originally defined the build is [`furniture-crm-agent-prompt.md`](furniture-crm-agent-prompt.md); its 76-step tree has shipped and been removed. Active work now lives in the tracks under [`tasks/`](tasks/) — always start at [`tasks/README.md`](tasks/README.md), which also explains how to read a deleted track out of git history.
 
 ## Project status snapshot
 
@@ -15,7 +15,7 @@ The repo is in the middle of a structural migration. As of this writing:
 - **Active workstream: Core CRM (Layer 1).** Backend modules under `api/src/app/core/` are being filled in one at a time following the layered Router → Service → DAL convention.
 - **Old template still in place** (`API/`, `APP/`) — the existing app this build is reusing auth from. Step 1.1 renames `API/` → `api/`, `APP/` → `app/`, deletes the non-auth scaffolding, and drops the new layered `core/`+`packs/furniture/` skeleton in place.
 - **`packs/furniture/` is scaffolded but parked.** Layer 2 work is deferred until Layer 1 stabilises.
-- **`tasks/` already populated** with the full 76-step plan (Phase 1 → Phase 6). Current iteration is on Phase 1/2 Core work.
+- **`tasks/` holds only in-flight tracks.** The original 76-step plan (Phase 1 → Phase 6) and ~44 completed side tracks were deleted on 2026-09-13 once their work shipped; the code and `git log` are the record. See [`tasks/README.md`](tasks/README.md).
 - **Three-track plan COMPLETE (2026-06-30).** The manager-locked Templates → Automation → Workflows pipeline shipped end-to-end: `core/templates/` (central library) + `core/automation/` (single-step triggers) + `core/workflows/` (multi-step visual flowcharts) are all live. The workflows track closed with Step 20 — 15 default core workflows seed into every org as drafts, and `core/email_sequences/` is absorbed (Settings tab gone, `/user/settings/email-sequences/*` redirects to `/user/workflows?category=Marketing`, scheduler tick is a no-op, enrollments shim through `workflows.engine.start_run`). Vertical-pack workflows (Furniture) remain a future workstream.
 
 ## Target repository structure (after Step 1.1)
@@ -65,7 +65,7 @@ furniture-crm/
 │       │       ├── layout/             ← FurnitureCRM main app shell (sidebar+header)
 │       │       └── user.routes.ts      ← thin route tree wiring core/ + packs/
 │       └── staff-portal/               ← Separate route tree (PIN tablet login, Phase 3)
-├── tasks/                              ← 76-step build plan
+├── tasks/                              ← in-flight build tracks
 ├── furniture-crm-agent-prompt.md       ← master prompt (filename retained — do not rename)
 └── CLAUDE.md                           ← this file
 ```
@@ -88,7 +88,7 @@ furniture-crm/
 ## The 10 non-negotiable rules
 
 1. **`/core` never imports from `/packs`.** If something needs to, it belongs in `/core`. Stop and reorganize.
-2. **Every database table has `org_id`** (UUID FK to organizations) **and is named `tbl_<snake_name>`** (per [`API/docs/DATABASE_RULES.md`](API/docs/DATABASE_RULES.md) and [`tasks/rename-tbl-prefix/naming-map.md`](tasks/rename-tbl-prefix/naming-map.md); furniture-pack tables use `tbl_fp_<name>`). Every query filters by `org_id`. **Postgres Row-Level Security from day one.** New tables follow the `tbl_` convention from the first commit; no plain-named tables ever land again. The pin-test [`API/tests/test_table_name_convention.py`](API/tests/test_table_name_convention.py) fails CI on drift.
+2. **Every database table has `org_id`** (UUID FK to organizations) **and is named `tbl_<snake_name>`** (per [`API/docs/DATABASE_RULES.md`](API/docs/DATABASE_RULES.md) and [`API/docs/TABLE_NAMING_MAP.md`](API/docs/TABLE_NAMING_MAP.md); furniture-pack tables use `tbl_fp_<name>`). Every query filters by `org_id`. **Postgres Row-Level Security from day one.** New tables follow the `tbl_` convention from the first commit; no plain-named tables ever land again. The pin-test [`API/tests/test_table_name_convention.py`](API/tests/test_table_name_convention.py) fails CI on drift.
 3. **Custom fields use the layered model:** every entity that supports them has a `custom_data` JSONB column; `custom_field_definitions` has a `source` column (`system` | `pack` | `user`).
 4. **Forms render dynamically from field definitions.** Frontend asks `GET /api/{entity}/fields` and renders. Never hardcode form fields.
 5. **The sidebar/menu is a registry.** Modules register themselves; core does not know about furniture-specific menu items at compile time.
@@ -190,7 +190,7 @@ The brief is the reference every later plan is checked against. When discovery s
 
 **Before writing a track plan (`tasks/<track>/README.md`) or any step files, read [`PLANNING_RULES.md`](PLANNING_RULES.md)** — the design-time gate that must clear before step files are written.
 
-For every step (defined in `tasks/phase-X/step-X.Y-*.md`):
+For every step (defined in `tasks/<track>/step-*.md`):
 
 1. **Announce:** "Starting Step X.Y: <Title>. Goal: <one sentence>."
 2. **Plan briefly** (5–10 bullets, files you'll touch).
@@ -235,7 +235,7 @@ Linters and formatters run on this repo, so generated code should already match 
 | Need | Look here |
 |------|-----------|
 | Master build plan | [`furniture-crm-agent-prompt.md`](furniture-crm-agent-prompt.md) |
-| Per-step tasks | [`tasks/README.md`](tasks/README.md) → phase folder → step file |
+| Per-step tasks | [`tasks/README.md`](tasks/README.md) → track folder → step file |
 | The 10 rules | this file (above) and `tasks/README.md` |
 | Existing auth code (reference) | [`API/src/routers/auth/`](API/src/routers/auth/), [`API/src/services/auth/`](API/src/services/auth/), [`APP/src/app/features/accounts/`](APP/src/app/features/accounts/) |
 | Existing template docs (reference only) | [`API/docs/`](API/docs/), [`APP/docs/`](APP/docs/) — describe the legacy template, not Core CRM |

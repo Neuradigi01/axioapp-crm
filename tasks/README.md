@@ -1,376 +1,50 @@
-# FurnitureCRM — Task Plan
+# Core CRM — Task Tracks
 
-This folder is the **single source of truth for every step** of the FurnitureCRM build. The master agent prompt that defined the project lives at the repo root: [`furniture-crm-agent-prompt.md`](../furniture-crm-agent-prompt.md). This `tasks/` tree breaks that prompt into 76 individually verifiable step files across 6 phases.
+This folder holds the **in-flight build tracks**. One folder per track: a `README.md`
+carrying the plan, and one `step-*.md` per individually verifiable step.
 
-## How to use this folder
+Before writing a new track plan or any step files, read [`PLANNING_RULES.md`](../PLANNING_RULES.md).
+The rules every step is judged against live in [`CLAUDE.md`](../CLAUDE.md).
 
-1. **Always work the next pending step in order.** Never skip ahead, never batch.
-2. Open the step file. It is self-contained — goal, scope, files to touch, DB changes, tests, verification checklist, 10-rule self-check.
-3. Implement only what the step file says. Stop when done.
-4. Update the step's status in this README (Pending → In Progress → Done).
-5. Wait for the human to say "proceed" before opening the next step file.
+## History — read this before looking for a step file that isn't here
 
-## The 10 non-negotiable rules (from the master prompt)
+The original **76-step plan** (`phase-1-foundation/` … `phase-6-furniture-pack-features/`)
+and ~44 completed side tracks were removed on 2026-09-13 once their work had shipped.
+Core CRM is built: every Layer 1 module exists under `API/src/app/core/`, the staff
+portal is live, and the furniture pack has real modules under `API/src/app/packs/furniture/`.
 
-1. `app/core/` never imports from `app/packs/`.
-2. Every DB table has `org_id` (UUID FK to organizations). Every query filters by `org_id`. Postgres RLS from day one.
-3. Custom fields use the layered model — every entity that supports them has a `custom_data` JSONB column; `custom_field_definitions` has a `source` column (`system` | `pack` | `user`).
-4. Forms render dynamically from field definitions. Frontend asks `GET /api/{entity}/fields` and renders.
-5. Sidebar/menu is a registry — modules register themselves; core does not know about furniture-specific menu items at compile time.
-6. Permissions are a registry — each module registers its permissions; core RBAC composes them.
-7. Pack manifest (`pack.yaml`) is the source of truth for furniture defaults. Seed/install logic reads from it.
-8. Step size is small and human-verifiable — every step runnable, visually inspectable, reviewable in under 30 minutes. > ~10 files or > ~400 lines → split it.
-9. No skipping verification. After each step: stop, summary, checklist, wait for "proceed."
-10. No "I'll fix it later" — no TODOs, hardcoded shortcuts, or commented-out code.
+Those step files described work that is now **code**, and their status tables had drifted
+badly enough to be misleading — most shipped work was still labelled "Pending". The code,
+its tests, and `git log` are the accurate record now.
 
-## Locked stack
+To read a deleted track:
 
-- **Backend:** Python 3.13, FastAPI, SQLAlchemy 2.x async, Alembic async, Pydantic v2 + pydantic-settings, PostgreSQL 17 (JSONB, GIN, RLS), Celery + Redis, package manager `uv`.
-- **Frontend:** Angular 20+ standalone (signals, new control flow, `inject()`, typed reactive forms), TailwindCSS for new pages. Existing auth pages keep PrimeNG/Material per agreed exception.
-- **Auth:** JWT HS256 admin (existing) + short-lived staff PIN token (Phase 3).
-- **File storage:** Local filesystem under `./storage/{org_id}/{entity}/{file_id}` behind a `StorageBackend` interface. No S3/boto3 in this build.
-- **API:** REST, JSON, versioned at `/api/v1`.
-
-## Reuse-vs-restructure (agreed exceptions)
-
-- **Auth logic preserved:** existing JWT, password hashing, login history, refresh, forgot/reset password, and all three 2FA methods (Google Authenticator + Email OTP + SMS OTP) are kept and re-housed under `api/src/app/core/auth/` (backend). The Step 1.5 / 1.6 files describe the migration.
-- **`features/admin/` is UNTOUCHED indefinitely.** Legacy template admin panel; not part of FurnitureCRM. No step modifies, deletes, or repurposes anything inside `app/src/app/features/admin/`.
-- **`features/user/` hosts the FurnitureCRM frontend.** All Layer 1 (`core/`) and Layer 2 (`packs/furniture/`) frontend module code lives under `app/src/app/features/user/core/...` and `app/src/app/features/user/packs/furniture/...`. All seven FurnitureCRM roles (Owner, Store Manager, Senior/Sales/Junior Sales Executive, Design Consultant, Warehouse Manager) log in via the user-login button and land at `/user/...`.
-- **Staff Portal at `/staff-portal`** is a separate top-level route tree, not under `features/user/`. Built in Phase 3, Step 3.7.
-- **Backend layout** stays as the master doc specifies: `api/src/app/core/...` and `api/src/app/packs/furniture/...`. No "user side" / "admin side" distinction on backend.
-- **Existing auth pages keep PrimeNG/Material visuals.** All new pages use Tailwind only.
-- **Folders renamed lowercase:** `API/` → `api/`, `APP/` → `app/`.
-- **CLAUDE.md** already updated to FurnitureCRM-specific rules.
-
----
-
-## Phase index
-
-| Phase | Title | Steps | Track |
-|-------|-------|-------|--------|
-| 1 | [Foundation & Scaffolding](phase-1-foundation/README.md) | 10 | Core |
-| 2 | [Core CRM Engine](phase-2-core-crm/README.md) | 16 | Core |
-| 2.5 | [Core CRM Admin UI](phase-2.5-core-admin-ui/README.md) | 6 | Core (Done) |
-| 3 | [Communication & Staff](phase-3-communication-staff/README.md) | 17 | Core |
-| 4 | [Furniture Pack & First Modules](phase-4-furniture-pack/README.md) | 12 | Furniture pack |
-| 4.5 | [Demo Roles Setup + DR.6/7](phase-4.5-demo-roles-setup/README.md) | 7 | Core (Done) |
-| 5 | [Core CRM v1 Launch](phase-5-core-crm-launch/README.md) | 13 | **Core — current focus** |
-| 6 | [Furniture Pack Features (Layer 2)](phase-6-furniture-pack-features/README.md) | 8 | Furniture pack (post-launch) |
-| — | [Lead Infrastructure](lead-infrastructure/README.md) | 4 | Core (side track) |
-| — | [RBAC, Ownership & Self-Signup](rbac-ownership/README.md) | 5 | Core (side track) |
-| — | [Dev Tools UI](dev-tools-ui/README.md) | 1 | Dev-only (side track) |
-| — | [Dashboard](dashboard/README.md) | 3 | Core (side track) |
-| — | [Tasks page](tasks-page/README.md) | 2 | Core (side track) |
-| — | [Standard Field Overrides](standard-field-overrides/README.md) | 6 | Core (side track) |
-| — | [Manual Lead Entry](manual-lead-entry/README.md) | 2 | Core (Lead Capture, 1/4) |
-| — | [Bulk Import](bulk-import/README.md) | 6 | Core (Lead Capture, 2/4) |
-| — | [Embeddable Widget](embeddable-widget/README.md) | 9 | Core (Lead Capture, 3/4) |
-| — | [Ad Integrations](ad-integrations/README.md) | 8 | Core (Lead Capture, 4/4) |
-| — | [Pricing and Billing](pricing-and-billing/README.md) | 20 | Core (side track) |
-| — | [App Updates — Email + Reporting](app-updates/README.md) | 19 | Core (side track — closes 2 biggest gaps vs standard CRM) |
-| — | [Rename to `tbl_` Prefix](rename-tbl-prefix/README.md) | 5 | Core (side track — schema-wide convention alignment) |
-| — | [Update Conversations Page](update-conversations-page/README.md) | 3 | Core (side track — surface assignee + sender) |
-| — | [Promote Integrations to Sidebar](promote-integrations-to-sidebar/README.md) | 1 | Core (side track — sidebar promotion) |
-| — | [WhatsApp Platform Upgrade](whatsapp-platform-upgrade/README.md) | 29 | Core (side track — Embedded Signup + full WhatsApp UI uplift) |
-| — | [WhatsApp Unofficial (Baileys)](whatsapp-unofficial/README.md) | 8 | Core (side track — second provider via Baileys sidecar; coexists with Cloud) |
-| — | [Template Library](template-library/README.md) | 14 | Core (side track — central multi-channel template library; precursor to `automation-engine`) |
-| — | [Automation Engine](automation-engine/README.md) | 14 | Core (side track — event-triggered automation; depends on `template-library`) |
-| — | [DAL Backfill](dal-backfill/README.md) | 14 | Core (side track — align every module to Router → Service → DAL; manager spec 2026-06-25) |
-| — | [Chat Bot Builder](chatbot-builder/README.md) | 15 | Core (side track — Pabbly-Chatflow-style inbound-message bot module; manager spec 2026-08-13; **COMPLETED**) |
-| — | [Variables Unification](variables-unification/README.md) | 13 | Core (side track — one registry for every picker; promote `templates/variables.py` → `core/variables/`; specced 2026-09-11) |
-| — | [Custom Events](custom-events/README.md) | 17 | Core (side track — user-defined event triggers + public `POST /events/track`; fold into `core/public_ingest/`; specced 2026-09-11) |
-
-**Total: 169 step files** (76 original plan + DR.1–7 + Phase 2.5 + Lead Infrastructure + RBAC/Ownership + Dev Tools UI + Dashboard + Tasks-page + Standard-Field-Overrides + Lead-Capture (4 tracks) + Pricing-and-Billing side tracks).
-
-Phase 5 was restructured to gather **all core CRM v1 work** (features + polish + hardening) so the path to a shipped template is one phase. Phase 6 was reshaped to hold **all furniture-pack-specific work** that's irrelevant to a generic CRM template adopter.
-
-## All-steps quick index
-
-### Phase 1 — Foundation
-- [1.1 Repository skeleton](phase-1-foundation/step-1.1-repo-skeleton.md) — Pending
-- [1.2 Backend bootstrap](phase-1-foundation/step-1.2-backend-bootstrap.md) — Pending
-- [1.3 Database connection & Alembic](phase-1-foundation/step-1.3-db-alembic.md) — Pending
-- [1.4 Multi-tenancy primitives](phase-1-foundation/step-1.4-multi-tenancy.md) — Pending
-- [1.5 Users, Roles, Permissions](phase-1-foundation/step-1.5-users-roles-permissions.md) — Pending
-- [1.6 Auth (JWT) for admin login](phase-1-foundation/step-1.6-auth-jwt.md) — Pending
-- [1.7 Audit logs](phase-1-foundation/step-1.7-audit-logs.md) — Pending
-- [1.8 Module registry (backend)](phase-1-foundation/step-1.8-module-registry.md) — Pending
-- [1.9 Frontend bootstrap (Angular)](phase-1-foundation/step-1.9-frontend-bootstrap.md) — Pending
-- [1.10 App shell (sidebar + header)](phase-1-foundation/step-1.10-app-shell.md) — Pending
-
-### Phase 2 — Core CRM Engine
-- [2.1 Custom Fields engine: backend](phase-2-core-crm/step-2.1-custom-fields-backend.md) — Pending
-- [2.2 Custom Fields engine: frontend](phase-2-core-crm/step-2.2-custom-fields-frontend.md) — Pending
-- [2.3 Dynamic Form component](phase-2-core-crm/step-2.3-dynamic-form.md) — Pending
-- [2.4 Contacts: backend](phase-2-core-crm/step-2.4-contacts-backend.md) — Pending
-- [2.5 Contacts: frontend](phase-2-core-crm/step-2.5-contacts-frontend.md) — Pending
-- [2.6 Activities timeline: backend](phase-2-core-crm/step-2.6-activities-backend.md) — Pending
-- [2.7 Activities timeline: frontend](phase-2-core-crm/step-2.7-activities-frontend.md) — Pending
-- [2.8 Tasks: backend + frontend](phase-2-core-crm/step-2.8-tasks.md) — Pending
-- [2.9 Pipelines engine: backend](phase-2-core-crm/step-2.9-pipelines-backend.md) — Pending
-- [2.10 Pipelines engine: frontend](phase-2-core-crm/step-2.10-pipelines-frontend.md) — Pending
-- [2.11 Leads: backend](phase-2-core-crm/step-2.11-leads-backend.md) — Pending
-- [2.12 Leads: frontend](phase-2-core-crm/step-2.12-leads-frontend.md) — Pending
-- [2.13 Appointments: backend](phase-2-core-crm/step-2.13-appointments-backend.md) — Pending
-- [2.14 Appointments: frontend](phase-2-core-crm/step-2.14-appointments-frontend.md) — Pending
-- [2.15 Notifications: backend](phase-2-core-crm/step-2.15-notifications-backend.md) — Pending
-- [2.16 Notifications: frontend](phase-2-core-crm/step-2.16-notifications-frontend.md) — Pending
-
-### Phase 3 — Communication & Staff
-- [3.1 Walk-ins: backend](phase-3-communication-staff/step-3.1-walkins-backend.md) — Pending
-- [3.2 Walk-ins: frontend](phase-3-communication-staff/step-3.2-walkins-frontend.md) — Pending
-- [3.3 Catalog (basic)](phase-3-communication-staff/step-3.3-catalog.md) — Pending
-- [3.4 Staff module: backend](phase-3-communication-staff/step-3.4-staff-backend.md) — Pending
-- [3.5 Staff module: frontend](phase-3-communication-staff/step-3.5-staff-frontend.md) — Pending
-- [3.6 Staff Portal auth (PIN)](phase-3-communication-staff/step-3.6-staff-portal-auth.md) — Pending
-- [3.7 Staff Portal: frontend](phase-3-communication-staff/step-3.7-staff-portal-frontend.md) — Pending
-- [3.8 Conversations: backend (architecture)](phase-3-communication-staff/step-3.8-conversations-architecture.md) — Pending
-- [3.9 Conversations: WhatsApp adapter](phase-3-communication-staff/step-3.9-conversations-whatsapp.md) — Pending
-- [3.10 Conversations: frontend](phase-3-communication-staff/step-3.10-conversations-frontend.md) — Pending
-- [3.11 Call Center: backend](phase-3-communication-staff/step-3.11-call-center-backend.md) — Pending
-- [3.12 Call Center: frontend](phase-3-communication-staff/step-3.12-call-center-frontend.md) — Pending
-- [3.13 Reviews: backend](phase-3-communication-staff/step-3.13-reviews-backend.md) — Pending
-- [3.14 Reviews: frontend](phase-3-communication-staff/step-3.14-reviews-frontend.md) — Pending
-- [3.15 Campaigns: backend](phase-3-communication-staff/step-3.15-campaigns-backend.md) — Pending
-- [3.16 Campaigns: frontend](phase-3-communication-staff/step-3.16-campaigns-frontend.md) — Pending
-- [3.17 Settings module](phase-3-communication-staff/step-3.17-settings.md) — Pending
-
-### Phase 4 — Furniture Pack
-- [4.1 Pack manifest infrastructure](phase-4-furniture-pack/step-4.1-pack-manifest.md) — Pending
-- [4.2 Apply furniture pack to demo org](phase-4-furniture-pack/step-4.2-apply-pack.md) — Pending
-- [4.3 Inventory: backend (data)](phase-4-furniture-pack/step-4.3-inventory-data.md) — Pending
-- [4.4 Inventory: backend (registry)](phase-4-furniture-pack/step-4.4-inventory-registry.md) — Pending
-- [4.5 Inventory: Products tab](phase-4-furniture-pack/step-4.5-inventory-products.md) — Pending
-- [4.6 Inventory: Stock Alerts tab](phase-4-furniture-pack/step-4.6-inventory-alerts.md) — Pending
-- [4.7 Inventory: Add Product modal](phase-4-furniture-pack/step-4.7-inventory-add-product.md) — Pending
-- [4.8 Custom Orders: backend](phase-4-furniture-pack/step-4.8-custom-orders-backend.md) — Pending
-- [4.9 Custom Orders: frontend](phase-4-furniture-pack/step-4.9-custom-orders-frontend.md) — Pending
-- [4.10 Field Operations](phase-4-furniture-pack/step-4.10-field-ops.md) — Pending
-- [4.11 Billing/POS: backend](phase-4-furniture-pack/step-4.11-billing-backend.md) — Pending
-- [4.12 Billing/POS: frontend](phase-4-furniture-pack/step-4.12-billing-frontend.md) — Pending
-
-### Phase 5 — Core CRM v1 Launch (all core CRM: features + polish + ship-blockers)
-- [5.1 Admin Dashboard overview](phase-5-core-crm-launch/step-5.1-admin-dashboard.md) — Pending — SHOULD
-- [5.2 AI Chatbot in Conversations](phase-5-core-crm-launch/step-5.2-ai-chatbot.md) — Pending — NICE
-- [5.3 AI Auto Follow-up Schedule](phase-5-core-crm-launch/step-5.3-ai-followups.md) — Pending — NICE
-- [5.4 Reviews automation](phase-5-core-crm-launch/step-5.4-reviews-automation.md) — Pending — NICE
-- [5.5 Reporting/Analytics depth](phase-5-core-crm-launch/step-5.5-reporting.md) — Pending — NICE
-- [5.6 Global search](phase-5-core-crm-launch/step-5.6-search.md) — Pending — NICE
-- [5.7 Performance pass](phase-5-core-crm-launch/step-5.7-performance.md) — Pending — NICE
-- [5.8 RLS hardening](phase-5-core-crm-launch/step-5.8-rls-hardening.md) — Pending — **MUST**
-- [5.9 Tests](phase-5-core-crm-launch/step-5.9-tests.md) — Pending — **MUST**
-- [5.10 Observability](phase-5-core-crm-launch/step-5.10-observability.md) — Pending — **MUST**
-- [5.11 Deployment](phase-5-core-crm-launch/step-5.11-deployment.md) — Pending — **MUST**
-- [5.12 Documentation](phase-5-core-crm-launch/step-5.12-documentation.md) — Pending — **MUST**
-- [5.13 Beta cutover](phase-5-core-crm-launch/step-5.13-beta-cutover.md) — Pending — **MUST**
-
-### Phase 6 — Furniture Pack Features (Layer 2 — post-launch)
-- [6.1 Marketplace abstraction](phase-6-furniture-pack-features/step-6.1-marketplace-abstraction.md) — Pending
-- [6.2 Amazon adapter](phase-6-furniture-pack-features/step-6.2-marketplace-amazon.md) — Pending
-- [6.3 Flipkart adapter](phase-6-furniture-pack-features/step-6.3-marketplace-flipkart.md) — Pending
-- [6.4 Shopify adapter](phase-6-furniture-pack-features/step-6.4-marketplace-shopify.md) — Pending
-- [6.5 Marketplace frontend](phase-6-furniture-pack-features/step-6.5-marketplace-frontend.md) — Pending
-- [6.6 In-Store QR Marketing](phase-6-furniture-pack-features/step-6.6-qr-marketing.md) — Pending
-- [6.7 AI Virtual Staging: backend](phase-6-furniture-pack-features/step-6.7-virtual-staging-backend.md) — Pending
-- [6.8 AI Virtual Staging: frontend](phase-6-furniture-pack-features/step-6.8-virtual-staging-frontend.md) — Pending
-
-### Lead Infrastructure (side track — pipeline-stage CRUD on the Leads kanban)
-- [Step 1: Backend stage CRUD endpoints](lead-infrastructure/step-1-backend-stage-crud.md) — Pending
-- [Step 2: Frontend stage editor popover](lead-infrastructure/step-2-frontend-stage-editor.md) — Pending
-- [Step 3: Frontend add-stage popover](lead-infrastructure/step-3-frontend-add-stage.md) — Pending
-- [Step 4: Frontend board wiring](lead-infrastructure/step-4-frontend-board-wiring.md) — Pending
-
-### RBAC, Ownership & Self-Signup (side track — Owner-driven role management + signup branching)
-- [Step 1: Normal signup creates org + assigns Owner](rbac-ownership/step-1-normal-signup-creates-org.md) — Pending
-- [Step 2: Role-template registry + auto-seed on org creation](rbac-ownership/step-2-role-templates-auto-seed.md) — Pending
-- [Step 3: Ownership transfer (backend + UI)](rbac-ownership/step-3-ownership-transfer.md) — Pending
-- [Step 4: Frontend route guards + Access Denied page](rbac-ownership/step-4-route-guards-access-denied.md) — Pending
-- [Step 5: Security audit events wiring](rbac-ownership/step-5-security-audit-events.md) — Pending
-
-### Dev Tools UI (side track — dev-only UI affordances, env-gated)
-- [Step 1: Demo logins floating pill (replaces DR.2 dropdown)](dev-tools-ui/step-1-demo-logins-floating-pill.md) — Pending
-
-### Dashboard (side track — `/user/dashboard` landing page, role-adaptive via permissions)
-- [Step 1: Backend dashboard summary endpoint](dashboard/step-1-backend-summary-endpoint.md) — Pending
-- [Step 2: Frontend dashboard page](dashboard/step-2-frontend-dashboard-page.md) — Pending
-- [Step 3: Sidebar entry for Dashboard](dashboard/step-3-sidebar-entry.md) — Pending
-
-### Tasks page (side track — `/user/tasks` standalone list, permission-scoped)
-- [Step 1: Backend org-wide list endpoint + filter params](tasks-page/step-1-backend-org-list-endpoint.md) — Pending
-- [Step 2: Frontend tasks list page + create/edit modal](tasks-page/step-2-frontend-tasks-list-page.md) — Pending
-
-### Standard Field Overrides (side track — Owner/Admin can customise label/required/hidden/min/max of every standard form field per org)
-- [Step 1: Backend registry of overridable standard fields + permission key](standard-field-overrides/step-1-backend-registry.md) — Done
-- [Step 2: Backend `standard_field_overrides` table + CRUD endpoints](standard-field-overrides/step-2-backend-overrides-table-endpoints.md) — Done
-- [Step 3: Backend `/standard-fields/{entity}/render` merge endpoint](standard-field-overrides/step-3-backend-render-endpoint.md) — Done
-- [Step 4: Frontend Settings → Standard Fields tab](standard-field-overrides/step-4-frontend-settings-tab.md) — Done
-- [Step 5: Frontend wire overrides into Leads + Contacts modals](standard-field-overrides/step-5-frontend-wire-leads-contacts.md) — Done
-- [Step 6: Frontend wire overrides into remaining form modals](standard-field-overrides/step-6-frontend-wire-remaining-entities.md) — Done
-
-### Lead Capture & Ingestion (4 independent tracks — manager-specced 2026-05-22; build order: manual → bulk → widget → ads)
-
-#### Manual Lead Entry (Track 1/4 — half-day, unblocks demos)
-- [Step 1: Backend `lead.source` enum column + audit event](manual-lead-entry/step-1-backend-source-and-audit.md) — Done
-- [Step 2: Frontend quick-add floating button + source badge on list](manual-lead-entry/step-2-frontend-quick-add-and-badge.md) — Done
-
-#### Bulk Import (Track 2/4 — ~4½ days, unlocks competitor-CRM migrations)
-- [Step 1: Backend `lead_imports` table + upload endpoint](bulk-import/step-1-backend-imports-table-and-upload.md) — Done
-- [Step 2: Backend Celery import job (parse + validate + dedup + commit)](bulk-import/step-2-backend-celery-import-job.md) — Done
-- [Step 3: Backend `import_presets` per source platform](bulk-import/step-3-backend-source-platform-presets.md) — Done
-- [Step 4: Frontend upload page + source-platform selector](bulk-import/step-4-frontend-upload-page.md) — Done
-- [Step 5: Frontend column-mapping UI + preview](bulk-import/step-5-frontend-mapping-ui.md) — Done
-- [Step 6: Frontend import history + error-report download](bulk-import/step-6-frontend-import-history.md) — Done
-
-#### Embeddable Widget (Track 3/4 — ~6 days, customer-site lead capture)
-- [Step 1: Backend `embed_keys` table + key issuance/revocation](embeddable-widget/step-1-backend-embed-keys.md) — Done
-- [Step 2: Backend public `POST /embed/leads` + rate limit](embeddable-widget/step-2-backend-public-submission-endpoint.md) — Done
-- [Step 3: Backend per-org widget config](embeddable-widget/step-3-backend-widget-config.md) — Done
-- [Step 4: Frontend Settings Embed tab (keys + config + snippet)](embeddable-widget/step-4-frontend-settings-embed-tab.md) — Done
-- [Step 5: Widget build pipeline (Vite, vanilla TS)](embeddable-widget/step-5-widget-build-pipeline.md) — Done
-- [Step 6: Widget loader + form renderer](embeddable-widget/step-6-widget-loader-and-renderer.md) — Done
-- [Step 7: Widget CSS-variable theming + class-name override](embeddable-widget/step-7-widget-theming.md) — Pending
-- [Step 8: Widget spam protection (honeypot + min-time + reCAPTCHA hook)](embeddable-widget/step-8-widget-spam-protection.md) — Pending
-- [Step 9: Frontend submission log + abuse signals](embeddable-widget/step-9-frontend-submission-log.md) — Pending
-
-#### Ad Integrations (Track 4/4 — ~8 days code + 1–2 weeks of OAuth app review in parallel)
-- [Step 1: Backend `integrations` table + encrypted token storage](ad-integrations/step-1-backend-integrations-table.md) — Pending
-- [Step 2: Backend Google Ads OAuth flow](ad-integrations/step-2-backend-google-oauth.md) — Pending
-- [Step 3: Backend Google Ads webhook + signature + retry/DLQ](ad-integrations/step-3-backend-google-webhook.md) — Pending
-- [Step 4: Backend Meta OAuth + auto-subscription](ad-integrations/step-4-backend-meta-oauth-and-subscription.md) — Pending
-- [Step 5: Backend Meta Lead Ads webhook + signature verification](ad-integrations/step-5-backend-meta-webhook.md) — Pending
-- [Step 6: Backend cross-source dedup + lead routing (round-robin)](ad-integrations/step-6-backend-dedup-and-routing.md) — Pending
-- [Step 7: Frontend Settings Integrations page (connect/disconnect + form picker)](ad-integrations/step-7-frontend-settings-integrations-page.md) — Pending
-- [Step 8: Frontend field mapping editor + integration status + DLQ](ad-integrations/step-8-frontend-mapping-editor-and-status.md) — Pending
-
-### Pricing and Billing (side track — subscription plans, trial lifecycle, entitlements, Stripe, in-app billing UI)
-- [Step 1: Plan registry + public `/plans` API](pricing-and-billing/step-1-plan-registry.md) — Done
-- [Step 2: Subscription model + migration](pricing-and-billing/step-2-subscription-model.md) — Done
-- [Step 3: Entitlement service](pricing-and-billing/step-3-entitlement-service.md) — Done
-- [Step 4: API entitlement decorators](pricing-and-billing/step-4-api-entitlement-decorators.md) — Pending
-- [Step 5: Usage metering](pricing-and-billing/step-5-usage-metering.md) — Done
-- [Step 6: Trial state machine + signup hook](pricing-and-billing/step-6-trial-state-machine.md) — Done
-- [Step 7: Subscription read API](pricing-and-billing/step-7-subscription-read-api.md) — Pending
-- [Step 8: Plan change API](pricing-and-billing/step-8-plan-change-api.md) — Pending
-- [Step 9: Seat management API](pricing-and-billing/step-9-seat-management-api.md) — Pending
-- [Step 10: Read-only / archived mode enforcement](pricing-and-billing/step-10-read-only-mode.md) — Pending
-- [Step 11: Payment provider abstraction (Stripe)](pricing-and-billing/step-11-payment-provider-stripe.md) — Pending
-- [Step 12: Checkout session endpoint](pricing-and-billing/step-12-checkout-session.md) — Pending
-- [Step 13: Stripe webhook handler + invoice records](pricing-and-billing/step-13-stripe-webhooks-invoices.md) — Pending
-- [Step 14: Public `/pricing` page](pricing-and-billing/step-14-public-pricing-page.md) — Pending
-- [Step 15: Trial banner + countdown component](pricing-and-billing/step-15-trial-banner.md) — Pending
-- [Step 16: Billing settings page (read view)](pricing-and-billing/step-16-billing-settings-page.md) — Pending
-- [Step 17: Plan upgrade flow (modal + Stripe redirect)](pricing-and-billing/step-17-plan-upgrade-flow.md) — Pending
-- [Step 18: Locked feature tile pattern](pricing-and-billing/step-18-locked-feature-tile.md) — Pending
-- [Step 19: Owner-only RBAC + billing audit events](pricing-and-billing/step-19-billing-rbac-audit.md) — Pending
-- [Step 20: Email notifications for billing](pricing-and-billing/step-20-billing-emails.md) — Pending
-
-### Rename to `tbl_` Prefix (side track — schema-wide convention alignment; matches legacy template's documented `tbl_*` rule)
-- [Step 1: Inventory + naming-map decision](rename-tbl-prefix/step-1-inventory-and-naming-map.md) — Done (Option A picked)
-- [Step 2: Models + FK + relationship-string rewrite (Python source)](rename-tbl-prefix/step-2-models-and-fk-rewrite.md) — Done
-- [Step 3: Alembic rename migration + RLS policy rebuild](rename-tbl-prefix/step-3-alembic-rename-migration.md) — Done
-- [Step 4: Raw-SQL, seed, and `text(…)` sweep](rename-tbl-prefix/step-4-raw-sql-and-seed-sweep.md) — Done
-- [Step 5: Full test pass + frontend sweep + Ajay's Workspace smoke](rename-tbl-prefix/step-5-test-pass-and-smoke.md) — Done (pytest blocked on pre-existing infra issue, separately scoped)
-
-### Update Conversations Page (side track — surface the assignee + sender signals the backend already records)
-- [Step 1: Display-only — assignee badge on list + sender pill on outbound messages](update-conversations-page/step-1-assignee-badge-and-sender-pill.md) — Done
-- [Step 2: Assign / reassign from the thread header (reuse `shared/reassign-modal`)](update-conversations-page/step-2-assign-button-thread-header.md) — Done
-- [Step 3: Assignee filter chip — Mine / Unassigned / Specific staff](update-conversations-page/step-3-assignee-filter-chip.md) — Done
-
-### Promote Integrations to Sidebar (side track — registry flip + route + tab cleanup)
-- [Step 1: Promote Integrations module — backend descriptor + frontend route + tab cleanup + redirect](promote-integrations-to-sidebar/step-1-promote-and-cleanup.md) — Done
-
-### Variables Unification (side track — one shared picker + registry for Templates + Workflows + Chatbots + Automation Conditions; specced 2026-09-11)
-- [Step 1: Promote `core/templates/variables.py` → `core/variables/` (module skeleton + import repointing)](variables-unification/step-1-promote-variables-module.md) — Pending
-- [Step 2: Unify `VariableDef` shape (fold `Variable` + `FieldSpec`) + adapter shims](variables-unification/step-2-unify-variable-shape.md) — Pending
-- [Step 3: Extend `custom_field_bridge` + `list_fields_by_entities(org_id)` required kwarg](variables-unification/step-3-extend-custom-field-bridge.md) — Pending
-- [Step 4: `GET /api/v1/variables` router with composer-permission dispatch](variables-unification/step-4-unified-router-perms.md) — Pending
-- [Step 5: `{{event.*}}` handling (transition-only keys) + `is_visible_to` pack filtering](variables-unification/step-5-event-namespace-and-pack-visibility.md) — Pending
-- [Step 6: `tbl_variable_stale_refs` table + custom-field delete/rename subscriber](variables-unification/step-6-stale-reference-detector.md) — Pending
-- [Step 7a: Generalise `shared/variable-picker/` component (input+textarea+contenteditable; search; recently-used; fallback-at-insertion)](variables-unification/step-7a-frontend-shared-picker-component.md) — Pending
-- [Step 7b: `VariableRegistryService` (cache key incl user_permission_hash + BroadcastChannel opaque payload + org.switched)](variables-unification/step-7b-frontend-registry-service.md) — Pending
-- [Step 8: Migrate Templates editor to shared picker](variables-unification/step-8-frontend-migrate-templates.md) — Pending
-- [Step 9: Migrate Workflows editor + delete hardcoded map](variables-unification/step-9-frontend-migrate-workflows.md) — Pending
-- [Step 10a: Migrate Chatbots editor + "not resolvable here" badge](variables-unification/step-10a-frontend-migrate-chatbots.md) — Pending
-- [Step 10b: Migrate Automation Conditions builder + `/event-types` becomes view over shared catalog](variables-unification/step-10b-frontend-migrate-automation-conditions.md) — Pending
-- [Step 11: Name-based CI pin-test + deprecation calendar + Ajay's Workspace smoke](variables-unification/step-11-cleanup-pintest-smoke.md) — Pending
-
-### Custom Events (side track — user-defined event triggers + public `POST /events/track`; specced 2026-09-11)
-- [Step 0: Minimal `core/workflows/dry_run.py` engine (conditional — skip if exists)](custom-events/step-0-workflow-dry-run-engine.md) — Pending
-- [Step 1: Rename `tbl_embed_keys` → `tbl_api_keys` + add events-scope columns](custom-events/step-1-rename-embed-to-api-keys.md) — **COMPLETED** (migrations `0224` + `0225`)
-- [Step 2: Fold `core/embed/` + `ai_assistants/public_context.py` into `core/public_ingest/`](custom-events/step-2-fold-public-ingest-module.md) — **COMPLETED** (facade-only; physical fold deferred)
-- [Step 3: Redis-backed rate-limit + idempotency + HMAC nonce cache in `api/src/app/shared/`](custom-events/step-3-redis-shared-infra.md) — Pending
-- [Step 4: API-keys hardening — HMAC prefilter, rotate-with-grace, live/test modes, separate rate buckets](custom-events/step-4-api-keys-hardening.md) — Pending
-- [Step 5: `tbl_custom_events` + `_occurrences` (denormalised schema snapshot) + `_archive` + `_test_runs` schema](custom-events/step-5-custom-events-schema.md) — Pending
-- [Step 6: `core/public_ingest/custom_events/` CRUD + Owner-only edits + `add_prefix` publish helper](custom-events/step-6-custom-events-crud.md) — Pending
-- [Step 7a: `POST /events/track` auth pipeline (HMAC prefilter → Argon → HMAC verify → idempotency → rate limits)](custom-events/step-7a-public-ingest-auth-pipeline.md) — Pending
-- [Step 7b: `POST /events/track` payload validation + contact resolution via service layer](custom-events/step-7b-public-ingest-payload-contact.md) — Pending
-- [Step 7c: `POST /events/track` bus publish + occurrence persistence + response shaping](custom-events/step-7c-public-ingest-publish-persist.md) — Pending
-- [Step 8: Bridges — catalog merge (service layer), workflow trigger picker, variables registry payload-schema](custom-events/step-8-bridges-catalog-workflow-variables.md) — Pending
-- [Step 9: Workflow lifecycle — soft-delete auto-disables, re-activation prompt, schema-removal review flag, extended contact-merge cascade](custom-events/step-9-workflow-lifecycle-and-cascade.md) — Pending
-- [Step 10: Celery beat — occurrence archive (90d), partition rotation, test-runs cleanup (7d), key-rotation 12h alert](custom-events/step-10-retention-jobs.md) — Pending
-- [Step 11: Frontend `/user/settings/api-keys` (Owner-only) — CRUD + reveal (copy-only) + rotate-with-grace + live/test badges](custom-events/step-11-frontend-api-keys-page.md) — Pending
-- [Step 12: Frontend `/user/settings/custom-events` list page](custom-events/step-12-frontend-custom-events-list.md) — Pending
-- [Step 13: Frontend create/edit modal + payload schema builder + sample preview + reserved-name validation](custom-events/step-13-frontend-custom-events-modal.md) — Pending
-- [Step 14: Frontend detail page — Overview / Occurrences / Test fires / Workflows using this / How to fire tabs](custom-events/step-14-frontend-custom-events-detail.md) — Pending
-- [Step 15: Docs + smoke — OpenAPI events + quickstart + Zapier walkthrough + Ajay's Workspace end-to-end smoke](custom-events/step-15-docs-and-smoke.md) — Pending
-
-### DAL Backfill (side track — align every module to Router → Service → DAL; manager spec 2026-06-25)
-- [Step 1: Fix router transaction violations — inventory, leads, dev](dal-backfill/step-1-fix-router-transaction-violations.md) — Done
-- [Step 2: Flatten `data_access/` folder → `data_access.py` — auth, campaigns, contacts, email_sequences](dal-backfill/step-2-flatten-dal-folder-batch-1.md) — Done
-- [Step 3: Flatten `data_access/` folder → `data_access.py` — templates, tenants, users, integrations/whatsapp](dal-backfill/step-3-flatten-dal-folder-batch-2.md) — Done
-- [Step 4: Backfill DAL — activities, appointments, audit](dal-backfill/step-4-backfill-activities-appointments-audit.md) — Done
-- [Step 5: Backfill DAL — billing, calls, catalog](dal-backfill/step-5-backfill-billing-calls-catalog.md) — Done
-- [Step 6: Backfill DAL — custom_fields, email](dal-backfill/step-6-backfill-conversations-custom-fields-email.md) — Done
-- [Step 6a: Backfill DAL — conversations + its helper services](dal-backfill/step-6a-backfill-conversations.md) — Done
-- [Step 7: Backfill DAL — embed, integrations, invitations](dal-backfill/step-7-backfill-embed-integrations-invitations.md) — Done
-- [Step 8: Backfill DAL — leads, notifications, packs](dal-backfill/step-8-backfill-leads-notifications-packs.md) — Done
-- [Step 9: Backfill DAL — permissions, pipelines, reviews](dal-backfill/step-9-backfill-permissions-pipelines-reviews.md) — Done
-- [Step 10: Backfill DAL — saved_views, settings, staff](dal-backfill/step-10-backfill-saved-views-settings-staff.md) — Done
-- [Step 11: Backfill DAL — staff_portal, standard_fields, subscriptions](dal-backfill/step-11-backfill-staff-portal-standard-fields-subscriptions.md) — Done
-- [Step 12: Backfill DAL — tasks, walk_ins](dal-backfill/step-12-backfill-tasks-walkins.md) — Done
-- [Step 13: Backfill DAL — packs/custom_orders, packs/field_ops](dal-backfill/step-13-backfill-pack-modules.md) — Done
-- [Step 14: CI guard pin-test + final audit](dal-backfill/step-14-ci-guard-and-final-audit.md) — Done
-
----
-
-## Step file structure
-
-Every step file follows the same template:
-
+```bash
+git log --oneline --diff-filter=D -- 'tasks/phase-2-core-crm/*'   # find the removing commit
+git show <commit>^:tasks/phase-2-core-crm/README.md               # read a file from before it
 ```
-# Step X.Y — Title
 
-**Goal:** one sentence.
-**Phase:** X — <phase title>
-**Depends on:** prior step ids
-**Status:** Pending | In Progress | Done
+One artefact was kept rather than deleted because `CLAUDE.md` rule 2 cites it as
+normative: the `tbl_` naming map, now at [`API/docs/TABLE_NAMING_MAP.md`](../API/docs/TABLE_NAMING_MAP.md).
 
-## Scope
-In-scope: ...
-Out of scope: ...
+## Active tracks
 
-## Files to touch
-- path/to/file (created | modified)
+| Track | Steps | Last touched | What it is |
+|---|---|---|---|
+| [custom-events](custom-events/README.md) | 18 | 2026-09-11 | User-defined event triggers for workflows and templates; public `POST /events/track` folded into `core/public_ingest/` |
+| [variables-unification](variables-unification/README.md) | 13 | 2026-09-11 | One variable registry behind every template / workflow / chatbot / automation-condition picker |
+| [mailgun-inbound](mailgun-inbound/README.md) | 9 | 2026-09-10 | Reply-capture for SMTP senders via Mailgun inbound routing |
+| [ad-integrations](ad-integrations/README.md) | 13 | 2026-09-07 | Google Ads + Meta Ads lead ingestion |
+| [ai-assistants](ai-assistants/README.md) | 17 | 2026-08-19 | Org-scoped BYOK chat assistants |
+| [leads-update-status-flow](leads-update-status-flow/README.md) | 5 | 2026-08-17 | Lead status transition flow |
+| [workflow-scheduling](workflow-scheduling/README.md) | 7 | 2026-08-06 | Scheduled / time-based workflow runs |
+| [design-refresh](design-refresh/README.md) | 22 | 2026-07-27 | Adopt the AIXO visual system across every page; no business-logic changes |
 
-## Plan
-1. ...
+**Step statuses inside these track READMEs are not maintained and should not be trusted.**
+Check the code before assuming a step is outstanding.
 
-## DB changes / migrations
-...
+## Reference
 
-## Tests to add
-...
-
-## Verification checklist
-Backend: ...
-Frontend: ...
-Code review: ...
-
-## Self-check (10 rules)
-- [ ] Core didn't import packs
-- [ ] org_id present on all new tables
-- [ ] ...
-
-## Stop & report
-Use the master-prompt stop template; await "proceed".
-```
+[`CICD_BOOTSTRAP_PROMPT.md`](CICD_BOOTSTRAP_PROMPT.md) — the deployment design decisions
+and failure modes carried over from a sibling project. It is the spec for the
+environment-separation and CI/CD work, not a track of its own.
