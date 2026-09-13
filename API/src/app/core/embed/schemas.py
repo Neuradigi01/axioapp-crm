@@ -29,9 +29,17 @@ from src.app.shared.schemas import ORMModel
 
 class EmbedKeyIssue(BaseModel):
     """Body for `POST /embed/keys`. `name` is an optional friendly
-    label for the Owner to remember what the key is for."""
+    label for the Owner to remember what the key is for.
+
+    ``form_id`` pins the new key to a specific lead-form. Optional —
+    when omitted the service falls back to the org's default form so
+    scripts / older callers that don't specify a form keep working.
+    Rejected with 422 when the form belongs to a different org or is
+    soft-deleted.
+    """
 
     name: str | None = Field(default=None, max_length=128)
+    form_id: uuid.UUID | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -202,6 +210,10 @@ __all__ = [
     "WidgetConfigSpamProtectionPublic",
     "WidgetConfigUpdate",
     "WidgetFieldEntity",
+    "WidgetFormCreate",
+    "WidgetFormListItem",
+    "WidgetFormRead",
+    "WidgetFormUpdate",
 ]
 
 
@@ -474,6 +486,83 @@ class WidgetConfigPublic(BaseModel):
     """
 
     config: WidgetConfigPublicDocument
+
+
+# --- Multi-form CRUD (Step 2 of the multi-form track) ----------------------
+
+
+class WidgetFormListItem(ORMModel):
+    """Slim projection for ``GET /embed/forms`` — the Settings → Forms
+    list needs enough to render each row without hydrating every full
+    config document. ``key_count`` is the number of live (non-revoked)
+    embed keys pinned to this form; the service populates it via a
+    single aggregate query so the list stays a one-round-trip fetch.
+    """
+
+    id: uuid.UUID
+    name: str
+    slug: str
+    is_default: bool
+    key_count: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class WidgetFormRead(ORMModel):
+    """Full form read — includes the persisted config document. Used
+    by ``GET /embed/forms/{form_id}`` and echoed back from create /
+    update / set-default responses."""
+
+    id: uuid.UUID
+    org_id: uuid.UUID
+    name: str
+    slug: str
+    is_default: bool
+    config: WidgetConfigDocument
+    updated_by: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class WidgetFormCreate(BaseModel):
+    """Body for ``POST /embed/forms``. Name is the only required field.
+
+    ``slug`` is optional — the service derives one from ``name`` when
+    omitted (lowercase, non-alnum → ``-``, deduped against existing
+    live slugs on the org). Supplied slugs are validated against the
+    URL-safe pattern client-side too so a bad slug fails fast with a
+    422 rather than a 500 on the DB unique index.
+
+    Newly-created forms carry the same seed config document as the
+    legacy per-org widget — Owner edits it via
+    ``PUT /embed/forms/{form_id}``.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=255)
+    slug: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[a-z0-9-]+$")
+
+
+class WidgetFormUpdate(BaseModel):
+    """Body for ``PUT /embed/forms/{form_id}``. Patch-style — supplied
+    fields are updated, omitted fields stay as they are.
+
+    ``is_default`` intentionally lives on a dedicated
+    ``POST /embed/forms/{form_id}/set-default`` endpoint, NOT this
+    schema — setting a form as default is an atomic swap with the
+    previous default and the endpoint boundary makes that
+    transactional guarantee obvious to callers.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    slug: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[a-z0-9-]+$")
+    # Config patch — same shape as the legacy WidgetConfigUpdate. When
+    # None the config document is untouched; when present the patch is
+    # merged into the current document and re-validated.
+    config: WidgetConfigUpdate | None = None
 
 
 # --- Submission log (Step 9) ----------------------------------------------

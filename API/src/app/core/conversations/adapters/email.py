@@ -45,6 +45,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import API_BASE_URL
 from src.app.core import audit
 from src.app.core.activities.models import ActivityType
 from src.app.core.activities.service import log as activities_log
@@ -94,19 +95,21 @@ logger = logging.getLogger(__name__)
 
 # Local-part of `Message-ID` for outbound mail. Stays stable across
 # environments so a customer's reply (which echoes the value into
-# `In-Reply-To`) always threads back. Override per-deploy if the
-# product domain changes via `EMAIL_MESSAGE_ID_DOMAIN` env var.
-_MESSAGE_ID_DOMAIN = os.getenv("EMAIL_MESSAGE_ID_DOMAIN", "furnicrm.app")
+# `In-Reply-To`) always threads back. Set via `EMAIL_MESSAGE_ID_DOMAIN`
+# in the shared config.env — do NOT split across local/prod files.
+_MESSAGE_ID_DOMAIN = os.getenv("EMAIL_MESSAGE_ID_DOMAIN", "crm.aixoapp.com")
 
-# Step 8 — public tracking base URL. Defaults to local in dev; in
-# prod set via env. No trailing slash — pixel/link helpers append the
-# full `/api/v1/track/...` path themselves.
-_TRACKING_BASE_URL = os.getenv("TRACKING_BASE_URL", "http://localhost:8000").rstrip("/")
+# Step 8 — public tracking base URL for open-pixel + click-rewrite
+# links. Uses the env-selected API host (`config.API_BASE_URL`, set
+# per env in config.local.env / config.prod.env) so tracked links
+# always point at the same origin serving `/api/v1/track/...`.
+_TRACKING_BASE_URL = API_BASE_URL.rstrip("/")
 
 # `mailto:` target for the `List-Unsubscribe` header. The MIME
 # headers carry both the URL and a mailto so RFC 8058 one-click
-# unsubscribe works in Gmail / Outlook / Apple Mail.
-_LIST_UNSUB_MAILTO = os.getenv("LIST_UNSUBSCRIBE_MAILTO", "unsubscribe@furnicrm.app")
+# unsubscribe works in Gmail / Outlook / Apple Mail. Stable across
+# envs — same reasoning as `_MESSAGE_ID_DOMAIN` above.
+_LIST_UNSUB_MAILTO = os.getenv("LIST_UNSUBSCRIBE_MAILTO", "unsubscribe@crm.aixoapp.com")
 
 
 class EmailUseSendEmailEndpoint(HTTPException):
@@ -261,7 +264,8 @@ async def send_email(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    sender_user_id: uuid.UUID,
+    sender_user_id: uuid.UUID | None = None,
+    ai_assistant_id: uuid.UUID | None = None,
     account_id: uuid.UUID | None = None,
     smtp_sender_id: uuid.UUID | None = None,
     contact_id: uuid.UUID,
@@ -269,6 +273,8 @@ async def send_email(
     body_text: str,
     body_html: str | None = None,
     in_reply_to_message_id: uuid.UUID | None = None,
+    in_reply_to_raw: str | None = None,
+    references_chain_raw: str | None = None,
     conversation_id: uuid.UUID | None = None,
     reply_to: str | None = None,
 ) -> SendEmailResult:
@@ -281,17 +287,26 @@ async def send_email(
     SMTP dispatch is used by the campaigns engine when the operator
     picks an SMTP sender identity for the campaign row.
 
+    Exactly one of ``sender_user_id`` (human-authored) or
+    ``ai_assistant_id`` (AI-authored auto-reply) must be supplied. AI
+    sends persist with ``sender_user_id=NULL`` on the Message row and
+    stamp ``payload.author='ai' + payload.assistant_id=<uuid>`` so
+    the frontend + reporting queries can distinguish AI replies from
+    human sends without a schema change.
+
     Both paths share the compliance + tracking machinery below
     (contact opt-out check, CAN-SPAM footer, open-pixel injection,
     click-tracking link rewrite, unsubscribe token). Only the actual
     provider dispatch (Gmail API / Microsoft Graph vs raw SMTP AUTH)
     diverges at the end.
 
-    Threading only applies to the OAuth path (Gmail / Microsoft
-    surface RFC-5322 ``Message-Id`` headers we can echo). SMTP sends
-    still generate a Message-ID for the outbound row but don't
-    consume ``in_reply_to_message_id`` — campaign broadcasts don't
-    thread against a prior conversation anyway.
+    Threading has two entry points. Human compose flows pass
+    ``in_reply_to_message_id`` (a stored Message uuid); the parent's
+    ``channel_message_id`` becomes the ``In-Reply-To`` header. AI
+    auto-reply flows pass ``in_reply_to_raw`` + ``references_chain_raw``
+    directly from the inbound envelope's RFC-5322 headers so we don't
+    need to re-query the just-persisted inbound row. Callers pass at
+    most one; when neither is set the send goes out unthreaded.
 
     ``conversation_id`` may be passed when the caller already knows
     which conversation this belongs to (the typical compose path
@@ -303,6 +318,14 @@ async def send_email(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 "send_email requires exactly one of account_id (OAuth) or smtp_sender_id (SMTP)."
+            ),
+        )
+    if (sender_user_id is None) == (ai_assistant_id is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "send_email requires exactly one of sender_user_id (human) "
+                "or ai_assistant_id (AI)."
             ),
         )
 
@@ -399,9 +422,13 @@ async def send_email(
     )
 
     # Read the prior outbound message's channel_message_id when
-    # replying so we can stamp In-Reply-To + References.
+    # replying so we can stamp In-Reply-To + References. AI reply
+    # flows short-circuit the DB lookup by passing the inbound's raw
+    # RFC-5322 Message-ID directly via ``in_reply_to_raw``.
     parent_msg_id: str | None = None
-    if in_reply_to_message_id is not None:
+    if in_reply_to_raw is not None:
+        parent_msg_id = in_reply_to_raw
+    elif in_reply_to_message_id is not None:
         parent = (
             await session.execute(select(Message).where(Message.id == in_reply_to_message_id))
         ).scalar_one_or_none()
@@ -459,6 +486,7 @@ async def send_email(
         body_html=tracked_body_html,
         message_id=own_msg_id_raw,
         in_reply_to=parent_msg_id,
+        references_chain=references_chain_raw,
         reply_to=reply_to,
         list_unsubscribe_url=unsub_url,
         list_unsubscribe_mailto=_LIST_UNSUB_MAILTO,
@@ -549,6 +577,9 @@ async def send_email(
         "provider_message_id": provider_message_id,
         "body_html_present": body_html is not None,
     }
+    if ai_assistant_id is not None:
+        outbound_payload["author"] = "ai"
+        outbound_payload["assistant_id"] = str(ai_assistant_id)
     # Preserve any caller-supplied Reply-To that our SMTP-capture
     # rewrite overrode. Auditors + support engineers can see what the
     # send *would* have carried without the rewrite.
@@ -794,6 +825,43 @@ async def _persist_inbound_email(
         # SPF-DKIM fail) that no workflow events should fire.
         return msg
 
+    # Bot-vs-AI arbitration — mirrors the WhatsApp path in
+    # ``conversations/service.py::receive_webhook`` (Decision §12):
+    # a matching bot always takes precedence over the org's AI
+    # assistant. If a bot WILL fire (new trigger match) or an
+    # existing parked bot run is waiting on this conversation, do
+    # not invoke AI dispatch inline — the bot pipeline owns the
+    # reply. Fail-soft on pre-check errors (``bot_will_handle =
+    # False``): AI is the fallback, so a broken pre-check should
+    # never silence AI.
+    from src.app.core.conversations import data_access as _conv_da
+
+    bot_will_handle = False
+    is_first_message = True
+    try:
+        prior_inbound = await _conv_da.count_inbound_messages_before(
+            session,
+            conversation_id=conversation.id,
+            exclude_message_id=msg.id,
+        )
+        is_first_message = prior_inbound == 0
+
+        from src.app.core.chatbots.trigger_matcher import has_any_matching_bot
+
+        bot_will_handle = await has_any_matching_bot(
+            session,
+            org_id=org_id,
+            channel="email",
+            text=body_text,
+            is_first_message=is_first_message,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "chatbot.precedence_precheck_failed conv=%s",
+            conversation.id,
+        )
+        bot_will_handle = False
+
     await _publish_email_message_received(
         session,
         conversation=conversation,
@@ -812,6 +880,53 @@ async def _persist_inbound_email(
             text=body_text,
             subject=headers.get("subject", ""),
         )
+
+    # AI dispatch — only when the bot pipeline is not going to own
+    # this inbound. Same two skip signals the WhatsApp path uses:
+    # (1) a new trigger matches, (2) an existing parked bot run is
+    # waiting for the next inbound (Ask-Question, Assign-AI-Assistant,
+    # etc.). Route through the channel-agnostic entry point so the
+    # guardrail (``AI_EMAIL_INBOUND_ENABLED`` flag, role-account /
+    # bounce filter, ``ai_paused`` takeover) fires uniformly.
+    skip_ai_dispatch = bot_will_handle
+    if not skip_ai_dispatch:
+        try:
+            from src.app.core.chatbots import data_access as _chatbot_dal
+
+            parked_runs = await _chatbot_dal.list_parked_runs_for_conversation(
+                session, conversation_id=conversation.id
+            )
+            skip_ai_dispatch = bool(parked_runs)
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "chatbot.parked_run_check_failed conv=%s",
+                conversation.id,
+            )
+            skip_ai_dispatch = False
+
+    if not skip_ai_dispatch:
+        try:
+            from src.app.core.ai_assistants import dispatch as ai_dispatch
+            from src.app.core.ai_assistants.email_guardrails import InboundEmail
+
+            _, sender_addr = parseaddr(headers.get("from") or "")
+            inbound_envelope = InboundEmail(
+                sender_email=sender_addr or "",
+                subject=headers.get("subject"),
+                body_text=body_text or "",
+                headers=headers,
+            )
+            await ai_dispatch.route_email_inbound(
+                session,
+                conversation=conversation,
+                inbound_email=inbound_envelope,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "ai_dispatch.email_route_failed conv=%s",
+                conversation.id,
+            )
+
     return msg
 
 
@@ -1014,6 +1129,7 @@ def _build_outbound_mime(
     body_html: str | None,
     message_id: str,
     in_reply_to: str | None,
+    references_chain: str | None = None,
     reply_to: str | None = None,
     list_unsubscribe_url: str | None = None,
     list_unsubscribe_mailto: str | None = None,
@@ -1061,10 +1177,12 @@ def _build_outbound_mime(
         # stores the bare value.
         bracketed = in_reply_to if in_reply_to.startswith("<") else f"<{in_reply_to}>"
         msg["In-Reply-To"] = bracketed
-        # `References` should be a space-separated chain; for v1 we
-        # don't walk further back than the immediate parent. Step 8
-        # (tracking) will keep the chain growing properly.
-        msg["References"] = bracketed
+        # `References` should be a space-separated chain of every
+        # ancestor Message-ID. When the caller passes the full chain
+        # (AI reply flow — inbound envelope carried it) prefer that;
+        # human compose falls back to the single-parent shape kept
+        # from Step 8's original v1 behaviour.
+        msg["References"] = references_chain or bracketed
     if body_html:
         # Plain text first (most permissive), then HTML alternative.
         msg.set_content(body_text)

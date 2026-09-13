@@ -103,6 +103,10 @@ export class TasksPageComponent {
    *  the Assignee dropdown visibility in the task-form modal and hides
    *  bulk-reassign for users who lack delegation rights. */
   protected readonly canAssignOthers = signal<boolean>(false);
+  /** Does the current user have `tasks.delete`?  Owner / Admin only.
+   *  Hides row delete + bulk delete for Employee / Sales Manager /
+   *  Support Agent, whose backend calls would 403 anyway. */
+  protected readonly canDelete = signal<boolean>(false);
 
   protected readonly assignees = signal<TaskAssignee[]>([]);
   protected readonly assigneeMap = computed(() => {
@@ -289,7 +293,7 @@ export class TasksPageComponent {
         label: 'Delete',
         icon: 'trash-2',
         danger: true,
-        permissionKey: 'tasks.write',
+        permissionKey: 'tasks.delete',
       },
     ]);
     // Decide scope branch from /me, then load assignees + first page.
@@ -301,6 +305,7 @@ export class TasksPageComponent {
           const canView = me.permission_keys.includes('users.read');
           this.canViewAll.set(canView);
           this.canAssignOthers.set(me.permission_keys.includes('tasks.assign_others'));
+          this.canDelete.set(me.permission_keys.includes('tasks.delete'));
           this.callerUuid.set(me.id);
           this.activeChip.set(canView ? 'all' : 'mine');
           this.scope.set(canView ? 'all' : 'mine');

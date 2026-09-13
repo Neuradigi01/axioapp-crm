@@ -245,22 +245,24 @@ def test_embed_keys_extension_backfilled() -> None:
     try:
         with engine.connect() as conn:
             # Every existing row got the default 'lead_form' via server_default.
+            # Table renamed to ``tbl_api_keys`` in migration
+            # ``0225_rename_embed_to_api_keys`` (tasks/custom-events Step 1).
             missing = conn.execute(
                 text(
-                    "SELECT COUNT(*) FROM tbl_embed_keys WHERE resource_type IS NULL"
+                    "SELECT COUNT(*) FROM tbl_api_keys WHERE resource_type IS NULL"
                 )
             ).scalar_one()
             assert missing == 0
-            # CHECK constraint present.
+            # CHECK constraint present (also renamed to ``ck_api_keys_*``).
             check_rows = conn.execute(
                 text(
                     """
                     SELECT conname FROM pg_constraint
-                    WHERE conname = 'ck_embed_keys_resource_type'
+                    WHERE conname = 'ck_api_keys_resource_type'
                     """
                 )
             ).fetchall()
-            assert check_rows, "CHECK constraint ck_embed_keys_resource_type missing"
+            assert check_rows, "CHECK constraint ck_api_keys_resource_type missing"
     finally:
         engine.dispose()
 

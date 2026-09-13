@@ -229,18 +229,167 @@ async def clear_grace_expiry(session: AsyncSession, key_id: uuid.UUID) -> None:
 async def get_widget_config_for_org(
     session: AsyncSession, org_id: uuid.UUID
 ) -> WidgetConfig | None:
-    """Single-row widget config keyed by ``org_id``. Used by both the
-    authed Settings → Widget read AND the public submission path (the
-    public caller bypasses tenant context — the explicit
-    ``WHERE org_id = ...`` is the authorisation gate)."""
+    """Resolve the org's DEFAULT widget form.
+
+    Pre-0216 the table was one-row-per-org. Post-0216 an org may own
+    many forms; this helper resolves the single form flagged
+    ``is_default=true`` — the one every legacy embed snippet without
+    a ``data-form`` attribute continues to resolve to. Soft-deleted
+    rows are excluded so an admin who retires a default form doesn't
+    keep serving its config.
+
+    Used by both the authed Settings → Widget read (via
+    ``get_or_create``) AND the public submission / config endpoints
+    (the public caller bypasses tenant context — the explicit
+    ``WHERE org_id = ...`` is the authorisation gate).
+    """
     return (
-        await session.execute(select(WidgetConfig).where(WidgetConfig.org_id == org_id))
+        await session.execute(
+            select(WidgetConfig)
+            .where(WidgetConfig.org_id == org_id)
+            .where(WidgetConfig.is_default.is_(True))
+            .where(WidgetConfig.deleted_at.is_(None))
+            .limit(1)
+        )
     ).scalar_one_or_none()
 
 
 def insert_widget_config(session: AsyncSession, config: WidgetConfig) -> None:
     """Register an already-constructed WidgetConfig for INSERT."""
     session.add(config)
+
+
+# --- Multi-form CRUD (Step 2 of the multi-form track) ---------------------
+
+
+async def list_widget_forms_for_org(
+    session: AsyncSession, org_id: uuid.UUID
+) -> list[WidgetConfig]:
+    """Every LIVE form the org owns, default first then alphabetical
+    by name. Soft-deleted rows are excluded — retired forms are only
+    visible via a dedicated audit surface (not built in v1)."""
+    return list(
+        (
+            await session.execute(
+                select(WidgetConfig)
+                .where(WidgetConfig.org_id == org_id)
+                .where(WidgetConfig.deleted_at.is_(None))
+                .order_by(
+                    WidgetConfig.is_default.desc(),
+                    WidgetConfig.name.asc(),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+async def get_widget_form_by_id(
+    session: AsyncSession, form_id: uuid.UUID
+) -> WidgetConfig | None:
+    """Single form by PK. Tenant-scoped via the ORM listener so a
+    cross-org id resolves to ``None``. Soft-deleted rows are NOT
+    filtered here — callers that don't want them (e.g. update / set-
+    default) check ``deleted_at`` themselves so they can raise a
+    specific 410-Gone-style error instead of a generic 404."""
+    return (
+        await session.execute(select(WidgetConfig).where(WidgetConfig.id == form_id))
+    ).scalar_one_or_none()
+
+
+def insert_widget_form(session: AsyncSession, form: WidgetConfig) -> None:
+    """Register an already-constructed form for INSERT. Alias of
+    :func:`insert_widget_config` — kept named per-entity so the
+    service reads cleanly."""
+    session.add(form)
+
+
+async def existing_form_slugs_for_org(
+    session: AsyncSession, org_id: uuid.UUID
+) -> set[str]:
+    """Set of slugs currently held by LIVE forms on the org. The
+    service consults this to dedupe a proposed slug (``contact-us``
+    →   ``contact-us-2`` etc.) before the INSERT hits the partial
+    UNIQUE index. Cheap SELECT — one row per form."""
+    rows = (
+        await session.execute(
+            select(WidgetConfig.slug)
+            .where(WidgetConfig.org_id == org_id)
+            .where(WidgetConfig.deleted_at.is_(None))
+        )
+    ).all()
+    return {row[0] for row in rows}
+
+
+async def swap_default_form(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    new_default_id: uuid.UUID,
+) -> None:
+    """Atomically flip the org's default form to ``new_default_id``.
+    Exactly one live form ends up with ``is_default=true`` — both
+    UPDATEs run in the caller's transaction so a mid-flight crash
+    can't leave the org with zero (or two) defaults.
+
+    Caller commits."""
+    from sqlalchemy import update as sql_update
+
+    # Clear every existing default on this org (defensive — normally
+    # exactly one row is True, but a legacy import may have skipped
+    # the invariant).
+    await session.execute(
+        sql_update(WidgetConfig)
+        .where(WidgetConfig.org_id == org_id)
+        .where(WidgetConfig.is_default.is_(True))
+        .values(is_default=False)
+    )
+    # Set the new default. If the id doesn't belong to this org the
+    # WHERE clause matches zero rows — the service pre-checks so this
+    # is belt + suspenders.
+    await session.execute(
+        sql_update(WidgetConfig)
+        .where(WidgetConfig.id == new_default_id)
+        .where(WidgetConfig.org_id == org_id)
+        .values(is_default=True)
+    )
+
+
+async def count_live_keys_per_form(
+    session: AsyncSession, *, org_id: uuid.UUID
+) -> dict[uuid.UUID, int]:
+    """``{form_id: live_key_count}`` for every form on the org.
+
+    Live = ``revoked_at IS NULL``. Powers the ``key_count`` column
+    in the Forms list projection — one aggregate query keeps the
+    list endpoint at two round-trips (forms + key counts) instead
+    of N+1.
+    """
+    rows = (
+        await session.execute(
+            select(EmbedKey.resource_id, func.count(EmbedKey.id))
+            .where(EmbedKey.org_id == org_id)
+            .where(EmbedKey.resource_type == "lead_form")
+            .where(EmbedKey.revoked_at.is_(None))
+            .where(EmbedKey.resource_id.isnot(None))
+            .group_by(EmbedKey.resource_id)
+        )
+    ).all()
+    return {row[0]: int(row[1]) for row in rows}
+
+
+async def soft_delete_widget_form(
+    session: AsyncSession, *, form_id: uuid.UUID, deleted_at: datetime
+) -> None:
+    """Stamp ``deleted_at`` on the form. Callers commit."""
+    from sqlalchemy import update as sql_update
+
+    await session.execute(
+        sql_update(WidgetConfig)
+        .where(WidgetConfig.id == form_id)
+        .values(deleted_at=deleted_at)
+    )
 
 
 # --- Custom-field lookups (cross-module read) ---------------------------
@@ -398,12 +547,16 @@ async def delete_submission_logs_older_than(session: AsyncSession, cutoff: datet
 
 
 __all__ = [
+    "count_live_keys_per_form",
     "delete_submission_logs_older_than",
+    "existing_form_slugs_for_org",
     "get_embed_key_by_id",
     "get_widget_config_for_org",
+    "get_widget_form_by_id",
     "insert_embed_key",
     "insert_submission_log",
     "insert_widget_config",
+    "insert_widget_form",
     "list_custom_field_defs_by_keys",
     "clear_grace_expiry",
     "list_custom_fields_for_widget_entities",
@@ -413,8 +566,11 @@ __all__ = [
     "list_embed_keys_for_resource",
     "list_grace_expired",
     "list_submission_logs_query",
+    "list_widget_forms_for_org",
     "set_grace_expiry",
+    "soft_delete_widget_form",
     "submission_daily_outcome_buckets",
     "submission_outcome_totals",
+    "swap_default_form",
     "update_embed_key_last_used",
 ]

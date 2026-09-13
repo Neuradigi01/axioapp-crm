@@ -1,60 +1,89 @@
-"""Rate limiters for the public widget submission endpoint.
+"""Rate limiters for the public widget + AI-assistants public
+surfaces.
 
-Two limiters guard the submission hot path:
+The widget lead-form limiter (``check_per_key`` / ``check_per_ip``)
+sits on top of the shared Redis sliding window from
+``src.app.shared.rate_limit`` (Step 3 of tasks/custom-events). It
+preserves the LEGACY fail-open behaviour on Redis outage — a
+submission from a legit visitor MUST NOT be dropped just because
+Redis burped. The AI-assistants limiter below deliberately diverges:
+fail-CLOSED because a chat request spends real OpenAI money, and the
+failure mode we want under a Redis outage is "widget shows retry
+later", not "spend 10x the daily budget because the limiter is
+silently open".
 
-  - **per-key** — 100 req/hour: prevents a single org's embed key from
-    being weaponised to flood other orgs (it can't — keys are scoped)
-    or to flood this org's own kanban with junk leads.
-  - **per-IP** — 10 req/hour: prevents a single visitor (or bot) from
-    hammering the form regardless of which key they used.
-
-Spec calls for Redis-backed token buckets eventually. For v1 we use
-the existing in-process `InMemoryRateLimiter` from `shared/rate_limit.py`:
-
-  - Redis isn't installed in the API container today (only Celery
-    refers to it via env vars).
-  - In-memory is single-process — multi-worker prod will need Redis
-    to share state. Documented; not a blocker for v1.
-  - The limiter interface (`RateLimitResult`) is stable across both
-    backends, so swapping later is a one-file change.
-
-Both limiters are module-level singletons so all submission requests
-share the same counters per uvicorn worker.
+Both limiters share the same Redis backend and per-org keyspace so
+operators can inspect / flush from one place.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from src.app.shared.rate_limit import (
-    InMemoryRateLimiter,
+    InMemoryRateLimiter,  # noqa: F401 — kept for backwards compat callers
     RateLimitResult,
+    SharedRateLimitResult,
+    check_shared_sliding_window,
+    compose_bucket_key,
 )
 
 # 1 hour in seconds — both limiters use a 1-hour sliding window.
 _ONE_HOUR = 60 * 60
 
-# Per-key: 100/hour. Tolerant enough for a legit busy widget; tight
-# enough that a leaked key can't fire 10k requests before revocation.
-per_key_limiter = InMemoryRateLimiter(max_hits=100, window_seconds=_ONE_HOUR)
 
-# Per-IP: 10/hour. A single visitor submitting the form more than 10
-# times in an hour is almost certainly a bot or a stress-tester.
-per_ip_limiter = InMemoryRateLimiter(max_hits=10, window_seconds=_ONE_HOUR)
+@dataclass(frozen=True, slots=True)
+class EmbedLimitOutcome:
+    """Small facade so submissions.py doesn't need to know about the
+    shared limiter's dataclass shape. Boolean ``allowed`` + integer
+    seconds so the existing ``max(rl_key.retry_after, rl_ip.retry_after)``
+    call still works after the migration."""
+
+    allowed: bool
+    retry_after: int
 
 
-def check_per_key(prefix: str) -> RateLimitResult:
+def _to_outcome(result: SharedRateLimitResult) -> EmbedLimitOutcome:
+    return EmbedLimitOutcome(
+        allowed=result.allowed,
+        retry_after=result.retry_after_seconds,
+    )
+
+
+async def check_per_key(prefix: str) -> EmbedLimitOutcome:
     """Rate-limit by the issued key's display prefix.
 
     Using the prefix (not the full plaintext) avoids holding the
-    plaintext in module-level dicts. The prefix is unique enough at
-    the rate-limit grain — collision probability between live keys
-    is ~1 in 56B.
+    plaintext in Redis. The prefix is unique enough at the rate-limit
+    grain — collision probability between live keys is ~1 in 56B.
+
+    Fail-OPEN on Redis outage: preserves the legacy widget contract
+    that a Redis burp must not drop a legitimate visitor.
     """
-    return per_key_limiter.check(f"embed:key:{prefix}")
+    result = await check_shared_sliding_window(
+        bucket_key=compose_bucket_key(scope="embed", bucket_type="key", value=prefix),
+        limit=100,
+        window_seconds=_ONE_HOUR,
+        fail_mode="open",
+    )
+    return _to_outcome(result)
 
 
-def check_per_ip(ip: str) -> RateLimitResult:
+async def check_per_ip(ip: str) -> EmbedLimitOutcome:
     """Rate-limit by caller IP."""
-    return per_ip_limiter.check(f"embed:ip:{ip}")
+    result = await check_shared_sliding_window(
+        bucket_key=compose_bucket_key(scope="embed", bucket_type="ip", value=ip),
+        limit=10,
+        window_seconds=_ONE_HOUR,
+        fail_mode="open",
+    )
+    return _to_outcome(result)
+
+
+# Backwards-compat alias so older test imports (``from ... import
+# RateLimitResult``) keep resolving. New code should switch to
+# ``EmbedLimitOutcome`` or ``SharedRateLimitResult``.
+__all_legacy = RateLimitResult
 
 
 # --- AI-assistants public-router rate limiter (Step 14) -----------------
@@ -178,9 +207,8 @@ async def check_ai_public_rate_limits(
 
 __all__ = [
     "AiPublicRateLimitResult",
+    "EmbedLimitOutcome",
     "check_ai_public_rate_limits",
     "check_per_ip",
     "check_per_key",
-    "per_ip_limiter",
-    "per_key_limiter",
 ]

@@ -17,6 +17,7 @@ from typing import Any
 
 from sqlalchemy import (
     and_,
+    exists,
     func,
     or_,
     select,
@@ -32,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import ColumnElement, Select
 
 from src.app.core.contacts.models import Contact
+from src.app.core.leads.models import Lead
 from src.app.core.users.models import OrganizationMember, User
 
 
@@ -124,6 +126,10 @@ def _build_filters(
     assigned_to_ids: list[uuid.UUID] | None,
     custom_filters: Iterable[tuple[str, str]],
     exclude_anonymised: bool = False,
+    lead_statuses: list[str] | None = None,
+    lead_stages: list[str] | None = None,
+    lead_sources: list[str] | None = None,
+    lead_form_ids: list[uuid.UUID] | None = None,
 ) -> list[ColumnElement[bool]]:
     """Shared filter assembler used by list / export / count helpers.
 
@@ -158,6 +164,60 @@ def _build_filters(
         filters.append(Contact.anonymised_at.is_(None))
     for key, value in custom_filters:
         filters.append(Contact.custom_data[key].astext == value)
+
+    # Lead-linked filters — restrict to contacts that have at least one
+    # Lead row matching each requested predicate. Each filter emits an
+    # EXISTS subquery so tenant scoping (RLS) still applies on the
+    # inner Lead select via the ``do_orm_execute`` listener. Passing
+    # multiple lists is AND-across filters, OR-within each list (e.g.
+    # ``lead_statuses=[active,won]`` = "has an active OR won lead";
+    # combining with ``lead_stages=[negotiation]`` = "has an active OR
+    # won lead AND has a lead in negotiation" — semantically two
+    # separate leads may satisfy each, mirroring how the leads page's
+    # own filter combines).
+    if lead_statuses:
+        filters.append(
+            exists(
+                select(Lead.id)
+                .where(Lead.contact_id == Contact.id)
+                .where(Lead.status.in_(lead_statuses))
+            )
+        )
+    if lead_stages:
+        filters.append(
+            exists(
+                select(Lead.id)
+                .where(Lead.contact_id == Contact.id)
+                .where(Lead.pipeline_stage.in_(lead_stages))
+            )
+        )
+    if lead_form_ids:
+        # Multi-form (Step 4): every widget-sourced lead carries
+        # ``attribution.form_id`` — filter to contacts with at least
+        # one lead whose form id is in the requested set. Compares
+        # the JSONB path as text (uuid is stored as its string form
+        # in the widget submission handler). Only lead rows with
+        # ``source='widget'`` populate ``form_id`` today, so the
+        # extra source predicate short-circuits non-widget rows out
+        # of the EXISTS lookup and lets Postgres use the leads
+        # (contact_id, source) index.
+        form_id_strings = [str(fid) for fid in lead_form_ids]
+        filters.append(
+            exists(
+                select(Lead.id)
+                .where(Lead.contact_id == Contact.id)
+                .where(Lead.source == "widget")
+                .where(Lead.attribution["form_id"].astext.in_(form_id_strings))
+            )
+        )
+    if lead_sources:
+        filters.append(
+            exists(
+                select(Lead.id)
+                .where(Lead.contact_id == Contact.id)
+                .where(Lead.source.in_(lead_sources))
+            )
+        )
     return filters
 
 
@@ -172,6 +232,10 @@ def build_contact_list_query(
     sort: str,
     order: str,
     exclude_anonymised: bool = False,
+    lead_statuses: list[str] | None = None,
+    lead_stages: list[str] | None = None,
+    lead_sources: list[str] | None = None,
+    lead_form_ids: list[uuid.UUID] | None = None,
 ) -> Select[tuple[Contact]]:
     """Assemble the paginated list query with filter + sort applied.
 
@@ -187,6 +251,10 @@ def build_contact_list_query(
         assigned_to_ids=assigned_to_ids,
         custom_filters=custom_filters,
         exclude_anonymised=exclude_anonymised,
+        lead_statuses=lead_statuses,
+        lead_stages=lead_stages,
+        lead_sources=lead_sources,
+        lead_form_ids=lead_form_ids,
     )
     base = select(Contact)
     if filters:

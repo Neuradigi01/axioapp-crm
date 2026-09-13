@@ -16,6 +16,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 
 import { Schedule, WorkflowsApiService } from '../workflows-api.service';
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 
 /**
  * Right-side drawer for the workflow canvas — lists schedules
@@ -36,6 +37,7 @@ import { Schedule, WorkflowsApiService } from '../workflows-api.service';
 export class SchedulesDrawerComponent {
   private readonly api = inject(WorkflowsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly workflowId = input.required<string>();
   readonly defaultTimezone = input<string>('UTC');
@@ -93,10 +95,13 @@ export class SchedulesDrawerComponent {
     this.openConfig.emit(s);
   }
 
-  onDelete(s: Schedule): void {
-    const proceed = confirm(
-      `Delete schedule "${s.name}"? Its history stays but no future fires will happen.`,
-    );
+  async onDelete(s: Schedule): Promise<void> {
+    const proceed = await this.confirmDialog.ask({
+      title: `Delete schedule "${s.name}"?`,
+      body: 'Its run history is preserved, but no future fires will happen.',
+      confirmLabel: 'Delete schedule',
+      danger: true,
+    });
     if (!proceed) return;
     this.deletingId.set(s.id);
     this.api

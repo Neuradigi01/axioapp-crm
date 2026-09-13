@@ -168,6 +168,27 @@ _INVOICE_OVERDUE_BODY = (
     "— The {{ org.name }} team"
 )
 
+_LEAD_FOLLOW_UP_NAME = "Lead Follow-up Scheduled"
+_LEAD_FOLLOW_UP_SUBJECT = (
+    "Follow-up scheduled for {{ contact.full_name }} — due {{ task.due_at }}"
+)
+_LEAD_FOLLOW_UP_BODY = (
+    "Hi {{ assignee.full_name }},\n\n"
+    "A follow-up on one of your leads has been scheduled in "
+    "{{ org.name }}. Details:\n\n"
+    "  Lead:         {{ contact.full_name }}\n"
+    "  Phone:        {{ contact.phone }}\n"
+    "  Email:        {{ contact.email }}\n"
+    "  Pipeline:     {{ lead.pipeline_stage }}\n"
+    "  Follow-up:    {{ task.followup_type }}\n"
+    "  Due:          {{ task.due_at }}\n"
+    "  Notes:        {{ task.title }}\n\n"
+    "Open the CRM to review the full lead history and log the touchpoint "
+    "when you complete it.\n\n"
+    "— The {{ org.name }} team"
+)
+
+
 _TASK_ASSIGNED_NAME = "Task Assigned"
 _TASK_ASSIGNED_SUBJECT = "New task for you: {{ task.title }}"
 _TASK_ASSIGNED_BODY = (
@@ -641,6 +662,43 @@ async def seed_task_assigned_template(
     )
 
 
+async def seed_lead_follow_up_email_template(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> MessageTemplate:
+    """Email notification — fires from the "Lead Follow-up Scheduled"
+    preset workflow when a lead-related follow-up task is assigned
+    (from the Update-status modal or lead detail page).
+
+    Distinct from the generic "Task Assigned" template because a lead
+    follow-up carries lead + contact context the recipient needs to
+    prep the outreach (contact name / phone / stage / follow-up type).
+    The task.assigned payload carries ``lead`` + ``contact`` blocks for
+    lead-related tasks (``core.tasks.service._build_task_event_payload``),
+    so those variables resolve at render time without a second
+    lookup."""
+    return await _seed_email_invoice_template(
+        session,
+        org_id=org_id,
+        name=_LEAD_FOLLOW_UP_NAME,
+        subject=_LEAD_FOLLOW_UP_SUBJECT,
+        body=_LEAD_FOLLOW_UP_BODY,
+        variables=[
+            "assignee.full_name",
+            "contact.full_name",
+            "contact.phone",
+            "contact.email",
+            "lead.pipeline_stage",
+            "task.title",
+            "task.due_at",
+            "task.followup_type",
+            "org.name",
+        ],
+        change_note="seeded by lead-follow-up track (Lead Follow-up Scheduled)",
+    )
+
+
 async def seed_task_completed_template(
     session: AsyncSession,
     *,
@@ -698,6 +756,7 @@ __all__ = [
     "seed_invoice_paid_template",
     "seed_invoice_sent_template",
     "seed_lead_confirmation_template",
+    "seed_lead_follow_up_email_template",
     "seed_lead_stale_30d_template",
     "seed_task_assigned_template",
     "seed_task_completed_template",

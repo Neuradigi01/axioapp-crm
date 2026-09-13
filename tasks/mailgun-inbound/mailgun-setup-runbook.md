@@ -60,7 +60,7 @@ In `API/config.env` (or however prod env is delivered on your deploy):
 ```
 MAILGUN_DOMAIN=reply.neuradigi.com
 INBOUND_EMAIL_DOMAIN=reply.neuradigi.com
-MAILGUN_WEBHOOK_URL=https://crm-api.neuradigi.com/api/v1/webhooks/mailgun/inbound
+MAILGUN_WEBHOOK_URL=https://crm-api.aixoapp.com/api/v1/webhooks/mailgun/inbound
 ```
 
 Restart the API + Celery containers so the new env is loaded:
@@ -254,7 +254,7 @@ email and it disappeared."
 2. **Route configured?** Dashboard → Send → Receiving → Routes.
    Confirm one route exists with expression
    `match_recipient(".*@reply.neuradigi.com")` and action containing
-   `forward("https://crm-api.neuradigi.com/api/v1/webhooks/mailgun/inbound")`.
+   `forward("https://crm-api.aixoapp.com/api/v1/webhooks/mailgun/inbound")`.
    If missing → run `python -m src.app.scripts.mailgun_route_setup`.
 
 3. **Webhook receiving?** API server logs from the same window. Search

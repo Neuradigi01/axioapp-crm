@@ -179,6 +179,16 @@ export class LeadDetailPageComponent implements OnInit {
     this.timeline()?.prepend(activity);
   }
 
+  /** Fires when the Tasks-tab inline form creates a row. The
+   *  Follow-Up Status panel is a sibling on the Overview tab (a
+   *  separate `LeadFollowUpsPanel` instance) — without this reload
+   *  it stays stale until the user clicks Refresh, and in zoneless
+   *  mode the freshly-mounted panel on tab-switch can leave the new
+   *  row's cells unrendered until any user interaction triggers CD. */
+  protected onTaskCreated(): void {
+    this.followUpsPanel()?.reload();
+  }
+
   readonly customFields = computed(() => {
     const l = this.lead();
     if (l === null) return [] as { label: string; value: string }[];
@@ -196,16 +206,38 @@ export class LeadDetailPageComponent implements OnInit {
 
   /** Pretty-print the lead's attribution JSONB column. Each row is a
    *  key-value pair the operator can scan. Empty payload renders the
-   *  block as "Captured directly — no attribution metadata." */
+   *  block as "Captured directly — no attribution metadata."
+   *
+   *  Multi-form (Step 6): ``form_id`` is filtered out (it's a UUID,
+   *  useless to a human) and ``form_name`` is dropped from the raw
+   *  list because it's already surfaced above via
+   *  ``sourceDisplay().subtitle``. */
   readonly attributionEntries = computed(() => {
     const l = this.lead();
     if (!l || !l.attribution) return [] as { key: string; value: string }[];
     const out: { key: string; value: string }[] = [];
     for (const [k, v] of Object.entries(l.attribution)) {
       if (v === null || v === undefined || v === '') continue;
+      if (k === 'form_id' || k === 'form_name') continue;
       out.push({ key: k, value: String(v) });
     }
     return out;
+  });
+
+  /** Primary + optional subtitle for the lead's Source display.
+   *
+   *  Widget-sourced leads with ``attribution.form_name`` set render
+   *  the primary as "Forms" and the subtitle as "via <form_name>",
+   *  matching the leads-list source column + kanban card tooltip.
+   *  Every other source renders the raw enum value (existing behaviour). */
+  readonly sourceDisplay = computed<{ primary: string; subtitle: string | null }>(() => {
+    const l = this.lead();
+    if (!l) return { primary: '—', subtitle: null };
+    if (l.source !== 'widget') return { primary: l.source, subtitle: null };
+    const attribution = (l.attribution as { form_name?: unknown } | null) ?? null;
+    const formName = attribution?.form_name;
+    const subtitle = typeof formName === 'string' && formName.trim() ? `via ${formName}` : null;
+    return { primary: 'Forms', subtitle };
   });
 
   readonly stageTone = computed(() => {

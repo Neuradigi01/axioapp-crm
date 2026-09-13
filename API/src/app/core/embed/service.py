@@ -118,7 +118,14 @@ async def issue(
     public router can resolve the target assistant from just the
     bearer token. ``allowed_origins`` is an advisory ``Origin``-
     header allow-list; ``rate_limit_per_hour`` overrides the per-key
-    default (300)."""
+    default (300).
+
+    Multi-form binding (Step 3): for ``lead_form`` keys, ``resource_id``
+    is the id of a ``tbl_widget_configs`` row and MUST point at a live
+    form the caller's org owns. When omitted, we resolve the org's
+    default form so legacy callers that don't pass ``form_id`` still
+    produce a valid key (rejected with 422 if the org has no default —
+    only possible when the org has never opened Settings → Widget)."""
     if resource_type not in _ALLOWED_RESOURCE_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -128,6 +135,10 @@ async def issue(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"reason": "resource_id_required_for_ai_assistant"},
+        )
+    if resource_type == RESOURCE_TYPE_LEAD_FORM:
+        resource_id = await _resolve_lead_form_binding(
+            session, org_id=org_id, form_id=resource_id
         )
 
     plain = _generate_plain_key()
@@ -194,9 +205,67 @@ async def revoke(
 
 async def list_keys(
     session: AsyncSession,
+    *,
+    form_id: uuid.UUID | None = None,
 ) -> list[EmbedKey]:
-    """List all keys (live + revoked) for the active org."""
+    """List all keys (live + revoked) for the active org.
+
+    When ``form_id`` is supplied, only keys pinned to that form are
+    returned. Powers the per-form key panel on the Settings → Forms
+    edit page.
+    """
+    if form_id is not None:
+        return await _da.list_embed_keys_for_resource(
+            session,
+            resource_type=RESOURCE_TYPE_LEAD_FORM,
+            resource_id=form_id,
+        )
     return await _da.list_embed_keys(session)
+
+
+async def _resolve_lead_form_binding(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    form_id: uuid.UUID | None,
+) -> uuid.UUID:
+    """Resolve the ``form_id`` an issued lead_form key should point at.
+
+    * Explicit ``form_id`` — validated: must belong to caller's org
+      AND not be soft-deleted. 404 / 422 otherwise.
+    * ``None`` — fall back to the org's default form. 422 when the
+      org has no default (never opened Settings → Widget).
+
+    Returns the resolved form id; never None. Callers use the return
+    value as ``EmbedKey.resource_id``.
+    """
+    if form_id is not None:
+        form = await _da.get_widget_form_by_id(session, form_id)
+        if form is None or form.org_id != org_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"reason": "form_not_found"},
+            )
+        if form.deleted_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"reason": "form_deleted"},
+            )
+        return form.id
+
+    default_form = await _da.get_widget_config_for_org(session, org_id)
+    if default_form is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "reason": "no_default_form",
+                "message": (
+                    "Open Settings → Forms to create a form first, then "
+                    "issue an embed key for it."
+                ),
+            },
+        )
+    return default_form.id
 
 
 async def find_by_plain_key(plain: str, *, ip: str | None = None) -> EmbedKey | None:
@@ -468,6 +537,57 @@ async def list_keys_for_resource(
     )
 
 
+async def purge(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,  # noqa: ARG001 — tenant filter enforces scope on the DAL read
+    actor_id: uuid.UUID,
+    key_id: uuid.UUID,
+) -> None:
+    """Hard-delete a previously-revoked key.
+
+    Two-step-flow: an active key must be revoked first (``DELETE
+    /embed/keys/{id}``), then removed (``DELETE
+    /embed/keys/{id}/purge``). Active keys can't be purged so an
+    operator can't accidentally drop a key that's live on a customer
+    site — a single delete-click on a revoked row is a much safer
+    action, and the revoke has already stopped submissions.
+
+    Submission-log rows carry ``key_id`` as a plain UUID (no FK, per
+    the post-0037 convention) so the deletion leaves the audit trail
+    intact — the log still shows "invalid key" / "accepted" rows
+    against the purged key's id, just without a joined row on
+    ``tbl_embed_keys``.
+    """
+    row = await _da.get_embed_key_by_id(session, key_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="embed key not found"
+        )
+    if row.revoked_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "reason": "must_revoke_first",
+                "message": (
+                    "Revoke the key first, then remove it. This two-step "
+                    "flow prevents an accidental delete on a key that's "
+                    "live on a customer site."
+                ),
+            },
+        )
+    prefix = row.prefix
+    await session.delete(row)
+    await session.commit()
+
+    await audit.log(
+        "embed.key.purged",
+        entity_type="embed_key",
+        entity_id=key_id,
+        after={"key_id": str(key_id), "prefix": prefix},
+    )
+
+
 __all__ = [
     "RESOURCE_TYPE_AI_ASSISTANT",
     "RESOURCE_TYPE_LEAD_FORM",
@@ -477,6 +597,7 @@ __all__ = [
     "issue",
     "list_keys",
     "list_keys_for_resource",
+    "purge",
     "resolve_embed_key",
     "revoke",
     "revoke_now",

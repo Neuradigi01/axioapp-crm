@@ -197,6 +197,35 @@ async def _build_task_event_payload(
                 "phone": contact.phone,
             }
 
+    if task.related_entity_type == "lead" and task.related_entity_id:
+        # Lead-follow-up template variables ({{ lead.pipeline_stage }},
+        # {{ contact.full_name }}, {{ contact.phone }}). The lead's own
+        # contact is loaded so template authors can address the lead's
+        # customer directly without a second event lookup.
+        from src.app.core.leads.models import Lead
+
+        lead = (
+            await session.execute(_select(Lead).where(Lead.id == task.related_entity_id))
+        ).scalar_one_or_none()
+        if lead is not None:
+            payload["lead"] = {
+                "id": str(lead.id),
+                "pipeline_stage": lead.pipeline_stage,
+                "status": lead.status.value if hasattr(lead.status, "value") else str(lead.status),
+                "source": lead.source.value if hasattr(lead.source, "value") else str(lead.source),
+            }
+            if lead.contact_id:
+                contact = (
+                    await session.execute(_select(Contact).where(Contact.id == lead.contact_id))
+                ).scalar_one_or_none()
+                if contact is not None:
+                    payload["contact"] = {
+                        "id": str(contact.id),
+                        "full_name": contact.full_name,
+                        "email": contact.email,
+                        "phone": contact.phone,
+                    }
+
     org = (
         await session.execute(_select(Organization).where(Organization.id == org_id))
     ).scalar_one_or_none()

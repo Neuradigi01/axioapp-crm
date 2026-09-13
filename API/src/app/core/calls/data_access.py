@@ -17,6 +17,7 @@ Three concerns mirror the service layer:
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from datetime import date as Date
 from typing import Any
 
@@ -31,6 +32,8 @@ from src.app.core.calls.models import (
     CallOutcome,
     CallTranscript,
 )
+from src.app.core.contacts.models import Contact
+from src.app.core.users.models import User, UserInfo
 from src.app.shared.db.pagination import paginate
 
 # --- Outcomes -----------------------------------------------------------
@@ -81,6 +84,70 @@ async def get_call_by_id(session: AsyncSession, call_id: uuid.UUID) -> Call | No
     """Single-row read by PK."""
     result = await session.execute(select(Call).where(Call.id == call_id))
     return result.scalar_one_or_none()
+
+
+# --- Denormalised name lookups for the list view -----------------------
+#
+# Kept in the calls DAL rather than reaching into another module's DAL
+# because these are plain single-column reads with no business rules —
+# the layering rule permits DAL-to-DAL joins for lookup helpers of this
+# shape. Both helpers return empty dicts for empty input so the caller
+# can pass them unconditionally.
+
+
+async def get_contact_names_bulk(
+    session: AsyncSession,
+    *,
+    contact_ids: Iterable[uuid.UUID],
+) -> dict[uuid.UUID, str]:
+    """Resolve contact UUIDs to display names in one query.
+
+    Not org-scoped: the tenant filter on ``TenantScoped`` already
+    constrains the read to the calling org's rows, and a call row can
+    only reference contacts owned by the same org (FK + RLS)."""
+    ids = list({cid for cid in contact_ids if cid is not None})
+    if not ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(Contact.id, Contact.full_name).where(Contact.id.in_(ids))
+        )
+    ).all()
+    return {cid: name for cid, name in rows}
+
+
+async def get_user_display_names_bulk(
+    session: AsyncSession,
+    *,
+    user_uuids: Iterable[uuid.UUID],
+) -> dict[uuid.UUID, str]:
+    """Resolve user UUIDs (``User.legacy_uuid``) to display names.
+
+    Deliberately NOT filtered by ``is_active`` so historical rows still
+    render the original rep's name even if that rep has since been
+    removed from the org. Falls back to email when both name parts are
+    blank; falls back to the empty string when the row can't be found
+    (caller renders "—")."""
+    uuids = list({u for u in user_uuids if u is not None})
+    if not uuids:
+        return {}
+    rows = (
+        await session.execute(
+            select(
+                User.legacy_uuid,
+                UserInfo.first_name,
+                UserInfo.last_name,
+                UserInfo.email,
+            )
+            .join(UserInfo, UserInfo.member_id == User.id)
+            .where(User.legacy_uuid.in_(uuids))
+        )
+    ).all()
+    out: dict[uuid.UUID, str] = {}
+    for user_uuid, first, last, email in rows:
+        name = f"{(first or '').strip()} {(last or '').strip()}".strip()
+        out[user_uuid] = name or (email or "")
+    return out
 
 
 # --- Transcript ---------------------------------------------------------
@@ -187,8 +254,10 @@ __all__ = [
     "delete_outcome_row",
     "direction_split_query",
     "get_call_by_id",
+    "get_contact_names_bulk",
     "get_outcome_by_id",
     "get_transcript_for_call",
+    "get_user_display_names_bulk",
     "insert_call",
     "insert_outcome",
     "insert_transcript",

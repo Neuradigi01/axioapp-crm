@@ -84,33 +84,32 @@ def build_reply_thread(
     inbound_subject: str | None,
     inbound_message_id: str | None,
     inbound_references: str | None,
-    inbound_body_text: str,
+    inbound_body_text: str,  # noqa: ARG001 — kept for API stability; threading now header-only
 ) -> ReplyThread:
-    """Compose the full outbound envelope for an AI reply. Quotes the
-    inbound body under a divider so the customer sees which email
-    triggered the reply — mirrors the default Gmail / Outlook reply
-    format."""
+    """Compose the outbound envelope for an AI reply.
+
+    Threading is header-only (``In-Reply-To`` + ``References``) —
+    modern mail clients (Gmail / Outlook / Apple Mail) collapse
+    conversations on those alone, so we no longer append the inbound
+    body under a ``--- Original message ---`` divider. Reasons:
+
+      * The CRM stores the outbound body verbatim in ``tbl_messages``
+        and paints it as a chat bubble. The quoted block was rendering
+        as literal ``> Hello CRM How are you?`` text inside the bubble,
+        immediately below the customer's own bubble — visual duplication
+        of a message already on screen.
+      * Real inboxes still thread correctly by RFC 5322 headers alone,
+        which we've been sending since Step 6.
+    """
     subject = reply_subject(inbound_subject)
     references = references_chain(inbound_references, inbound_message_id)
-    quoted = _quote_body(inbound_body_text)
-    body = f"{ai_reply_text.rstrip()}\n\n--- Original message ---\n{quoted}"
+    body = ai_reply_text.rstrip()
     return ReplyThread(
         subject=subject,
         body=body,
         in_reply_to=inbound_message_id.strip() if inbound_message_id else None,
         references=references,
     )
-
-
-def _quote_body(body: str) -> str:
-    """Prefix each line of the inbound body with ``> `` so mail
-    clients render it as a quoted block. Empty / whitespace-only
-    lines pass through as a bare ``>`` to preserve paragraph
-    spacing inside the quote."""
-    if not body:
-        return ""
-    lines = body.splitlines()
-    return "\n".join((f"> {line}" if line.strip() else ">") for line in lines)
 
 
 __all__ = [

@@ -143,8 +143,14 @@ async def list_calls(
     assigned_to_id: uuid.UUID | None = None,
     page: int = 1,
     size: int = 50,
-) -> tuple[list[Call], int]:
-    return await _da.list_calls_query(
+) -> tuple[list[Call], int, dict[uuid.UUID, str], dict[uuid.UUID, str]]:
+    """Paginated calls list plus (contact_id → name) and
+    (created_by_id → name) maps for the returned page.
+
+    The name maps are batched — one query per map, regardless of page
+    size — so the router can render "Logged by Alice" / contact-name
+    cells without an N+1 fetch on the frontend."""
+    rows, total = await _da.list_calls_query(
         session,
         contact_id=contact_id,
         direction=direction,
@@ -152,6 +158,13 @@ async def list_calls(
         page=page,
         size=size,
     )
+    contact_names = await _da.get_contact_names_bulk(
+        session, contact_ids=[r.contact_id for r in rows if r.contact_id]
+    )
+    creator_names = await _da.get_user_display_names_bulk(
+        session, user_uuids=[r.created_by_id for r in rows if r.created_by_id]
+    )
+    return rows, total, contact_names, creator_names
 
 
 async def get_call(session: AsyncSession, call_id: uuid.UUID) -> Call:
@@ -175,6 +188,10 @@ async def create_call(
         notes=payload.notes,
         recording_url=payload.recording_url,
         assigned_to_id=payload.assigned_to_id,
+        # Stamp the caller so the Call Logs table can render "Logged by
+        # <rep>". Bypassable only by direct DB write — every code path
+        # into ``create_call`` comes from the authenticated router.
+        created_by_id=user_id,
         custom_data=payload.custom_data,
     )
     _da.insert_call(session, call)
@@ -493,6 +510,7 @@ def _call_snapshot(c: Call) -> dict[str, Any]:
         "duration_sec": c.duration_sec,
         "outcome_id": str(c.outcome_id) if c.outcome_id else None,
         "assigned_to_id": str(c.assigned_to_id) if c.assigned_to_id else None,
+        "created_by_id": str(c.created_by_id) if c.created_by_id else None,
         "has_recording_file": bool(c.recording_file_path),
     }
 

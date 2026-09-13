@@ -21,6 +21,16 @@ export interface Call {
    *  Playback URL is derived via `recordingStreamUrl(id)`. */
   has_recording: boolean;
   assigned_to_id: string | null;
+  /** User who logged the call. Stamped server-side from the JWT on
+   *  create; null for historical rows written before this field existed. */
+  created_by_id: string | null;
+  /** Denormalised display name for the linked contact — populated by
+   *  the list endpoint via a bulk lookup so the table renders without
+   *  N+1 fetches. Null for single-row reads (GET, POST). */
+  contact_name: string | null;
+  /** Denormalised display name for `created_by_id`. Same shape as
+   *  `contact_name`. Falls back to null when the user row is gone. */
+  created_by_name: string | null;
   custom_data: Record<string, unknown>;
   created_at: string;
 }

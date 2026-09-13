@@ -1,5 +1,6 @@
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   ViewChild,
@@ -36,6 +37,7 @@ import {
   ComposerMediaPayload,
   ComposerNotePayload,
 } from './compose-bar.component';
+import { ChatDetailsRailComponent } from './chat-details-rail.component';
 import { ConversationListComponent } from './conversation-list.component';
 import { InteractiveBuilderComponent, InteractivePayload } from './interactive-builder.component';
 import { NewConversationModalComponent } from './new-conversation-modal.component';
@@ -70,6 +72,7 @@ import { extractApiError } from '@core/services/api-error.util';
   imports: [
     ConversationListComponent,
     ChatThreadComponent,
+    ChatDetailsRailComponent,
     ComposeBarComponent,
     InteractiveBuilderComponent,
     NewConversationModalComponent,
@@ -90,6 +93,15 @@ export class ConversationsPageComponent {
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
+  /** Zoneless CD: signal writes that fire from `setTimeout` /
+   *  `setInterval` callbacks (the debounced WS reload + the 6-second
+   *  open-thread poll) are outside any tracked reactive context and
+   *  do not always wake the scheduler — the new detail lands in the
+   *  signal but the thread doesn't repaint until the operator clicks
+   *  or presses a key. `markForCheck()` after every async signal
+   *  mutation closes that race. Same belt-and-braces pattern applied
+   *  to the sibling `LeadFollowUpsPanel` / `TasksPanel`. */
+  private readonly cdr = inject(ChangeDetectorRef);
 
   /** Step 27b — handle to the compose-bar so we can read its
    *  current Send-From selection on send. The picker self-hides
@@ -142,8 +154,20 @@ export class ConversationsPageComponent {
   /** Contact-name lookup for the list rows — resolves each row's
    *  `contact_id` to a display name so the list shows "Ananya Rao"
    *  instead of the raw phone/email `external_id`. Hydrated lazily
-   *  after each `reloadList()`; already-fetched ids are skipped. */
-  protected readonly contactsById = signal<Record<string, { id: string; full_name: string }>>({});
+   *  after each `reloadList()`; already-fetched ids are skipped.
+   *
+   *  ``phone`` is cached here too so the chat header + details rail
+   *  can render the contact's *current* phone instead of the
+   *  ``external_id`` snapshot captured at inbound time — the raw
+   *  snapshot goes stale the moment an operator adds a country code
+   *  on the Contacts page (backend cascades the same edit onto live
+   *  WhatsApp/SMS threads via
+   *  ``conversations.service.resync_external_id_for_contact_phone``,
+   *  but the fallback keeps the UI in sync for older stale rows too).
+   */
+  protected readonly contactsById = signal<
+    Record<string, { id: string; full_name: string; phone: string | null }>
+  >({});
 
   /** Step 13 — flat staff array for the @-mention picker in the
    *  composer. Derived from `staffById` (single source of truth). */
@@ -161,6 +185,22 @@ export class ConversationsPageComponent {
    *  `+ New` button opens it; the modal emits `started` (route to the
    *  fresh thread) or `cancel` (dismiss). */
   protected readonly newConversationOpen = signal(false);
+
+  /** Mobile-only rail drawer. On <md screens the details rail
+   *  collapses to keep the message column full-width; a "Details"
+   *  button in the mobile back-strip flips this to render the rail
+   *  as an off-canvas drawer. Auto-closes when the operator picks
+   *  an action that opens a modal (reassign) or toggles AI, and on
+   *  deselect / thread switch. */
+  protected readonly mobileRailOpen = signal(false);
+
+  protected openMobileRail(): void {
+    this.mobileRailOpen.set(true);
+  }
+
+  protected closeMobileRail(): void {
+    this.mobileRailOpen.set(false);
+  }
 
   protected openNewConversation(): void {
     this.newConversationOpen.set(true);
@@ -200,14 +240,40 @@ export class ConversationsPageComponent {
     return this.items().find((c) => c.id === id) ?? null;
   });
 
+  /** Header/rail counterparty label. Prefers the linked contact's
+   *  *current* phone (kept fresh by the hydrated cache) over the
+   *  conversation's stored ``external_id`` snapshot so a "+91" the
+   *  operator just added on the Contacts page shows up here even on
+   *  legacy rows that pre-date the backend cascade. Falls back to
+   *  ``external_id`` for phone-less contacts (email threads, unlinked
+   *  rows, or phone channels where the contact record has no phone
+   *  yet). Only WhatsApp/SMS threads prefer the contact phone — email
+   *  conversations keep showing the email ``external_id`` unchanged. */
+  protected readonly selectedContactHandle = computed<string | null>(() => {
+    const conv = this.selectedConversation();
+    if (!conv) return null;
+    if (conv.channel !== 'whatsapp' && conv.channel !== 'sms') {
+      return conv.external_id ?? null;
+    }
+    const contact = conv.contact_id ? this.contactsById()[conv.contact_id] : undefined;
+    const phone = contact?.phone?.trim();
+    return phone && phone.length > 0 ? phone : (conv.external_id ?? null);
+  });
+
   /** View-only gate for the compose bar. Mirrors the backend
-   * `ensure_can_write_conversation` rule so the operator sees the
-   * disabled state instead of hitting a 403 after they try to send:
+   * `ensure_can_write_conversation` rule (locked 2026-09-10) so the
+   * operator sees the disabled state instead of hitting a 403 after
+   * they try to send:
    *   - Owner / Admin (`conversations.assign_others`) → always true.
-   *   - Chat unassigned → true (any employee can jump in and claim).
+   *   - Chat unassigned → true (anyone can jump in; the send auto-
+   *     claims the chat).
    *   - Caller is the current assignee → true.
-   *   - Otherwise → false; compose-bar hides and an inline banner
-   *     tells the operator who owns the chat + who can transfer it. */
+   *   - Chat owned by someone else → false; compose-bar hides and
+   *     the "assigned to X" view-only banner renders instead.
+   *
+   * The explicit "Take Over from AI" button in the chat-thread
+   * header is scoped tighter (Owner/Admin only) — that's the "steal
+   * another user's chat" motion the user restricted. */
   protected readonly canInteractWithSelected = computed(() => {
     const conv = this.selectedConversation();
     if (!conv) return false;
@@ -242,6 +308,36 @@ export class ConversationsPageComponent {
     timer: ReturnType<typeof setTimeout>;
   } | null = null;
 
+  /** Fallback poll for the open thread. The WS-driven refresh only
+   *  fires when `notify()` is called — the backend gates that behind
+   *  `conversation.assigned_to_id is not None` and targets the
+   *  assignee's user_id only. So an unassigned thread (or one owned
+   *  by a different user) never pushes anything to this browser and
+   *  inbound messages would sit invisible until manual refresh. This
+   *  interval silently re-fetches the currently-open conversation so
+   *  new inbound messages surface within one poll window regardless
+   *  of the assignee state. Also re-loads the list at a slower cadence
+   *  so row previews + unread badges keep pace. Pauses while the tab
+   *  is hidden to avoid burning requests. */
+  private static readonly OPEN_THREAD_POLL_MS = 6_000;
+  private static readonly LIST_POLL_EVERY_N_TICKS = 3; // ≈ every 18s
+  private openThreadPollTimer: ReturnType<typeof setInterval> | null = null;
+  private openThreadPollTicks = 0;
+  private readonly onVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible') {
+      this.startOpenThreadPolling();
+      // Regained focus — refresh immediately so the operator doesn't
+      // wait a full tick before seeing what landed while they were away.
+      const id = this.selectedId();
+      if (id) {
+        this._reloadDetail(id);
+        this.reloadList();
+      }
+    } else {
+      this.stopOpenThreadPolling();
+    }
+  };
+
   /** AI take-over / return-to-AI confirmations. When set, the shared
    *  ConfirmDialogComponent renders — replaces the native ``confirm()``
    *  popups so the destructive-prompt UX matches the rest of the CRM
@@ -273,6 +369,12 @@ export class ConversationsPageComponent {
       this.onIncomingNotification(head.payload);
     });
 
+    // Refresh whenever the browser tab regains focus. Even with the
+    // interval below, a laptop lid re-opened after 10 minutes should
+    // pull fresh state on the next paint rather than wait for the
+    // tick after `visibilitychange` re-arms the interval.
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
+
     // Clear any coalescing timers so we don't run a reload after the
     // component has been torn down (would leak subscriptions).
     this.destroyRef.onDestroy(() => {
@@ -284,6 +386,8 @@ export class ConversationsPageComponent {
         clearTimeout(this.pendingDetailReload.timer);
         this.pendingDetailReload = null;
       }
+      this.stopOpenThreadPolling();
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
     });
   }
 
@@ -298,6 +402,7 @@ export class ConversationsPageComponent {
           const map = new Map<string, StaffListItem>();
           for (const r of rows) map.set(r.id, r);
           this.staffById.set(map);
+          this.cdr.markForCheck();
         },
         error: () => {
           // Intentionally silent — page remains usable; the badge
@@ -434,6 +539,11 @@ export class ConversationsPageComponent {
   protected onSelect(id: string): void {
     this.selectedId.set(id);
     this.loadDetail(id);
+    this.startOpenThreadPolling();
+    // Close the mobile rail if the operator flips to a different
+    // conversation while it's open — the drawer is scoped to the
+    // currently-selected conv and would look stale otherwise.
+    this.mobileRailOpen.set(false);
   }
 
   /** Mobile back button — clears the selection so the list pane
@@ -442,6 +552,34 @@ export class ConversationsPageComponent {
   protected deselect(): void {
     this.selectedId.set(null);
     this.replyingTo.set(null);
+    this.mobileRailOpen.set(false);
+    this.stopOpenThreadPolling();
+  }
+
+  private startOpenThreadPolling(): void {
+    if (this.openThreadPollTimer !== null) return;
+    if (document.visibilityState !== 'visible') return;
+    this.openThreadPollTicks = 0;
+    this.openThreadPollTimer = setInterval(() => {
+      const id = this.selectedId();
+      if (!id) {
+        this.stopOpenThreadPolling();
+        return;
+      }
+      this._reloadDetail(id);
+      this.openThreadPollTicks += 1;
+      if (this.openThreadPollTicks % ConversationsPageComponent.LIST_POLL_EVERY_N_TICKS === 0) {
+        this.reloadList();
+      }
+    }, ConversationsPageComponent.OPEN_THREAD_POLL_MS);
+  }
+
+  private stopOpenThreadPolling(): void {
+    if (this.openThreadPollTimer !== null) {
+      clearInterval(this.openThreadPollTimer);
+      this.openThreadPollTimer = null;
+    }
+    this.openThreadPollTicks = 0;
   }
 
   protected onSendText(text: string): void {
@@ -496,6 +634,13 @@ export class ConversationsPageComponent {
         this.swapOptimisticMessage(id, optimistic.id, real);
         this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
         this.claimAssigneeOnSend(id);
+        // Refresh the thread so the ``ai_paused`` flip (backend
+        // auto-pauses on human reply when a bound assistant exists)
+        // + the "AI is paused" system marker land immediately in the
+        // UI. Without this the operator waits up to one poll window
+        // (~6s) for the banner to swap from "AI is handling / Take
+        // Over" to "You are handling / Return to AI".
+        this._reloadDetail(id);
       },
       error: (err: HttpErrorResponse) => {
         this.removeOptimisticMessage(id, optimistic.id);
@@ -943,7 +1088,33 @@ export class ConversationsPageComponent {
       .detail(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (fresh) => this.detail.set(fresh),
+        next: (fresh) => {
+          // Guard: thread switch mid-fetch. Drop the response so we
+          // don't paint stale content over the freshly-opened thread.
+          if (this.selectedId() !== id) return;
+          // MERGE — don't set(). A hard replace wipes any optimistic
+          // ``tmp-...`` bubbles that are mid-send when the poll (or
+          // WS-driven refresh) fires. The optimistic-swap that runs
+          // after the POST returns then can't find its placeholder
+          // and the sent message drops out of the UI until the next
+          // fetch. Merging keeps optimistic bubbles until the server
+          // supersedes them with a real row.
+          this.detail.update((current) => {
+            if (!current || current.conversation.id !== id) return fresh;
+            const freshIds = new Set(fresh.messages.map((m) => m.id));
+            const optimistic = current.messages.filter(
+              (m) => m.id.startsWith('tmp-') && !freshIds.has(m.id),
+            );
+            if (optimistic.length === 0) return fresh;
+            const merged = [...fresh.messages, ...optimistic].sort((a, b) => {
+              const at = a.sent_at ?? a.created_at ?? '';
+              const bt = b.sent_at ?? b.created_at ?? '';
+              return at.localeCompare(bt);
+            });
+            return { ...fresh, messages: merged };
+          });
+          this.cdr.markForCheck();
+        },
         error: () => {
           /* silent — the takeover succeeded; the thread just won't
              re-render the system message until manual refresh. */
@@ -990,30 +1161,38 @@ export class ConversationsPageComponent {
           this.items.set(resp.items);
           this.loading.set(false);
           this.hydrateContacts(resp.items);
+          this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
           this.items.set([]);
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load conversations.');
+          this.cdr.markForCheck();
         },
       });
   }
 
-  /** Fetch contact rows for any `contact_id` we haven't seen yet, so
+  /** Fetch contact rows for the currently-visible ``contact_id``s so
    *  the list can show the person's name instead of the raw
    *  `external_id`. Uses the batch ``POST /contacts/hydrate`` endpoint
    *  — one request for the whole page instead of one per row (the
    *  previous ``forkJoin(missing.map(get))`` fanned out 75+ XHRs on
    *  a full inbox and clogged the network waterfall). Failures are
    *  swallowed — missing contacts fall back to the external id in
-   *  the template. */
+   *  the template.
+   *
+   *  Refetches *every* visible contact each reload (not just uncached
+   *  ones) so a contact edit made from the Contacts page — most
+   *  commonly adding a "+91" prefix to a phone — propagates into the
+   *  header/rail/list handle labels the next time this page pulls the
+   *  inbox. The list is capped at ~50 rows so the one extra bulk POST
+   *  per reload is negligible. */
   private hydrateContacts(rows: Conversation[]): void {
     const ids = new Set<string>();
     for (const r of rows) {
       if (r.contact_id) ids.add(r.contact_id);
     }
-    const cache = this.contactsById();
-    const missing = [...ids].filter((id) => !cache[id]);
+    const missing = [...ids];
     if (missing.length === 0) return;
     this.contactsApi
       .hydrateByIds(missing)
@@ -1025,10 +1204,11 @@ export class ConversationsPageComponent {
         this.contactsById.update((current) => {
           const next = { ...current };
           for (const c of results) {
-            next[c.id] = { id: c.id, full_name: c.full_name };
+            next[c.id] = { id: c.id, full_name: c.full_name, phone: c.phone ?? null };
           }
           return next;
         });
+        this.cdr.markForCheck();
       });
   }
 
@@ -1041,6 +1221,7 @@ export class ConversationsPageComponent {
         next: (d) => {
           this.detail.set(d);
           this.threadLoading.set(false);
+          this.cdr.markForCheck();
           // If the row we just opened has an unread badge, clear it
           // server-side. The endpoint is idempotent so we don't need
           // to gate on the count locally — the backend no-ops when
@@ -1062,6 +1243,7 @@ export class ConversationsPageComponent {
           this.detail.set(null);
           this.threadLoading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load thread.');
+          this.cdr.markForCheck();
         },
       });
   }
@@ -1121,6 +1303,7 @@ export class ConversationsPageComponent {
       if (d.conversation.id !== conversationId) return d;
       return mutator(d);
     });
+    this.cdr.markForCheck();
   }
 
   /** Replace an optimistic (`tmp-…`) row with the server row. Skips the
@@ -1176,6 +1359,7 @@ export class ConversationsPageComponent {
         ? { ...d, conversation: { ...d.conversation, assigned_to_id: me } }
         : d,
     );
+    this.cdr.markForCheck();
   }
 
   private bumpListLastMessage(id: string, isoTs: string): void {
@@ -1195,5 +1379,6 @@ export class ConversationsPageComponent {
           return bv.localeCompare(av);
         }),
     );
+    this.cdr.markForCheck();
   }
 }

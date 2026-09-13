@@ -117,6 +117,14 @@ class Call(Base, TenantScoped):
         UUID(as_uuid=True),
         nullable=True,
     )
+    # Stamped by ``service.create_call`` with the caller's user id so
+    # the Call Logs UI can render "Logged by <rep>". Nullable forever so
+    # historical rows + system-generated calls (webhook ingest, later
+    # automation) can leave it unset.
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
     custom_data: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,

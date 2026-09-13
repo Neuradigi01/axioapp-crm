@@ -34,6 +34,12 @@ import src.app.core.workflows.module  # noqa: F401
 # tasks/chatbot-builder Step 3 — chatbots MODULE descriptor.
 import src.app.core.chatbots.module  # noqa: F401
 
+# tasks/custom-events — side-effect imports so the two custom-event
+# tables register with Base.metadata + the MODULE descriptor lands
+# on the module registry before the lifespan permission-fanout sweep.
+import src.app.core.custom_events.models  # noqa: F401
+import src.app.core.custom_events.module  # noqa: F401
+
 # tasks/ai-assistants Step 1 — side-effect import so the two BYOK
 # tables (tbl_ai_provider_keys, tbl_org_ai_cost_budget) register with
 # `Base.metadata` before the FastAPI app's tables-create + Alembic
@@ -75,6 +81,7 @@ from src.app.core.calls.router import (
     outcomes_router as call_outcomes_router,
 )
 from src.app.core.campaigns.router import router as campaigns_router
+from src.app.core.catalog.public_router import router as catalog_public_router
 from src.app.core.catalog.router import router as catalog_router
 from src.app.core.contacts.groups.router import router as contact_groups_router
 from src.app.core.contacts.imports.router import router as contact_imports_router
@@ -83,6 +90,7 @@ from src.app.core.conversations.router import (
     message_attachments_router,
     router as conversations_router,
 )
+from src.app.core.custom_events.router import router as custom_events_router
 from src.app.core.custom_fields.router import router as custom_fields_router
 from src.app.core.dashboard.router import router as dashboard_router
 from src.app.core.dev.router import router as dev_router
@@ -195,7 +203,8 @@ from src.app.packs.real_estate.modules.property.router import (
     router as rp_property_router,
 )
 from src.app.shared.db import async_session
-from src.app.shared.middleware import TenantContextMiddleware
+from src.app.shared.middleware import RawBodyCaptureMiddleware, TenantContextMiddleware
+from src.app.shared.startup_checks import run_all as run_startup_checks
 
 # Bind the configured Celery app at API startup so @shared_task tasks
 # (e.g. process_meta_lead, process_google_lead, campaign senders) route
@@ -211,6 +220,10 @@ from src.routers import router as legacy_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("FurnitureCRM API starting up...")
+    # tasks/custom-events Step 3 — fail-loud on missing TRUSTED_PROXIES
+    # in production so XFF parsing (and per-IP rate limiting behind it)
+    # cannot silently degrade to a single-bucket-for-everyone posture.
+    run_startup_checks()
     await generate_routes_json()
     initialize_firebase()
 
@@ -288,6 +301,20 @@ from src.app.core.subscriptions.middleware import SubscriptionStateMiddleware  #
 
 app.add_middleware(SubscriptionStateMiddleware)
 app.add_middleware(TenantContextMiddleware)
+# tasks/custom-events Step 3 — capture raw request bytes on public
+# HMAC-signed surfaces so downstream verifiers (Meta webhook, Twilio,
+# Stripe, upcoming /events/track ingest) can compare against exactly
+# what the caller signed. Path-scoped so unrelated JSON POSTs don't
+# pay the memory-copy cost.
+app.add_middleware(
+    RawBodyCaptureMiddleware,
+    path_prefixes=(
+        "/api/v1/events/",
+        "/api/v1/webhooks/",
+        "/api/v1/integrations/meta/webhook",
+        "/api/v1/integrations/google/webhook",
+    ),
+)
 app.add_middleware(BaseHTTPMiddleware, dispatch=catch_exceptions_middleware)
 app.add_middleware(
     CORSMiddleware,
@@ -332,9 +359,14 @@ app.include_router(reporting_router, prefix="/api/v1")
 app.include_router(invitations_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
 app.include_router(custom_fields_router, prefix="/api/v1")
+app.include_router(custom_events_router, prefix="/api/v1")
+# `/contacts/imports` must be matched before `contacts_router`'s
+# `/contacts/{contact_id}` — otherwise `GET /contacts/imports` is
+# swallowed by the single-contact route and 422s on the UUID parse
+# ("invalid character: found `i` at 1").
+app.include_router(contact_imports_router, prefix="/api/v1")
 app.include_router(contacts_router, prefix="/api/v1")
 app.include_router(contact_groups_router, prefix="/api/v1")
-app.include_router(contact_imports_router, prefix="/api/v1")
 app.include_router(activities_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(pipelines_router, prefix="/api/v1")
@@ -424,6 +456,12 @@ app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(notifications_ws_router, prefix="/api/v1")
 app.include_router(walk_ins_router, prefix="/api/v1")
 app.include_router(catalog_router, prefix="/api/v1")
+# tasks/catalog-share-link Step C — public (unauthenticated) product
+# detail + org grid. Path shape: /api/public/catalog/{token} and
+# /api/public/catalog?org=<slug>. Same "/api" prefix as the property
+# public router; both mount without a version segment so external URLs
+# stay stable across API-version bumps.
+app.include_router(catalog_public_router, prefix="/api")
 app.include_router(staff_router, prefix="/api/v1")
 app.include_router(staff_portal_router, prefix="/api/v1")
 app.include_router(conversations_router, prefix="/api/v1")

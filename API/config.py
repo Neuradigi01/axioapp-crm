@@ -202,6 +202,14 @@ TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY", "")
 # with a clear "not configured" message until the key is set.
 PROPERTY_LINK_ENCRYPTION_KEY = os.getenv("PROPERTY_LINK_ENCRYPTION_KEY", "")
 
+# Fernet key for Core Catalog's public product-link tokens
+# (`core/catalog/link_token.py`). Independent from the property key on
+# purpose — rotating one entity's share links never invalidates the
+# other. Same lazy-build behaviour: the app boots without the key set;
+# only the public-URL endpoints fail until it's populated. Generate
+# with the same one-liner as PROPERTY_LINK_ENCRYPTION_KEY.
+CATALOG_LINK_ENCRYPTION_KEY = os.getenv("CATALOG_LINK_ENCRYPTION_KEY", "")
+
 # Google Ads OAuth — Track 4 Step 2.
 # Provision these from Google Cloud Console; see
 # tasks/ad-integrations/manual-google-oauth-setup.md for full walkthrough.
@@ -312,3 +320,13 @@ REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+# Public-ingest — trusted-proxy allow-list for X-Forwarded-For parsing.
+# Comma-separated CIDR ranges (or plain IPs — auto-widened). Empty =
+# trust nothing (dev default; XFF is ignored + the per-IP rate limiter
+# indexes on the transport-level client). In production this MUST be
+# populated with the reverse-proxy IPs / pod CIDR, otherwise every
+# request appears from the proxy and per-IP throttling collapses
+# to one bucket. Startup validation (`src.app.shared.startup_checks`)
+# fail-loud when this is empty AND ``IS_DEVELOPMENT=false``.
+TRUSTED_PROXIES = os.getenv("TRUSTED_PROXIES", "")

@@ -1,14 +1,36 @@
 #!/bin/bash
-# Manage the API application stack (Linux / Mac, production compose files).
-# Secrets are decrypted in-memory by `sops exec-env` per command - never written to disk.
-# Run `./run.sh help` for the command list.
+# Manage the API application stack (Linux / Mac).
+#
+# The `.environment` file (one word: "local" or "prod") drives everything:
+#   local -> docker-compose.local.yml + secrets.local.enc.env
+#   prod  -> docker-compose.prod.yml  + secrets.prod.enc.env
+#
+# Secrets are decrypted in-memory by `sops exec-env` per command - never
+# written to disk. Run `./run.sh help` for the command list.
 
 set -e
 
-ENV_FILE_FLAGS="--env-file config.env"
-COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
+# ─── Environment marker ────────────────────────────────────────────────
+if [ ! -f ".environment" ]; then
+    echo "ERROR: .environment file missing. Create it with one word:"
+    echo "  echo local > .environment      (for local dev)"
+    echo "  echo prod  > .environment      (on the deployed server)"
+    exit 1
+fi
+APP_ENV=$(tr -d '[:space:]' < .environment)
+if [ "$APP_ENV" != "local" ] && [ "$APP_ENV" != "prod" ]; then
+    echo "ERROR: .environment must be 'local' or 'prod', got '$APP_ENV'"
+    exit 1
+fi
+export APP_ENV
+
+# ─── Compose + secrets file paths ─────────────────────────────────────
+# --env-file passes both configs so ${DB_USER}/${DB_PASSWORD} etc. resolve
+# at YAML parse time (needed for the local Postgres POSTGRES_* vars).
+ENV_FILE_FLAGS="--env-file config.env --env-file config.${APP_ENV}.env"
+COMPOSE_FILES="-f docker-compose.yml -f docker-compose.${APP_ENV}.yml"
 UV_IMAGE="ghcr.io/astral-sh/uv:0.5-python3.13-bookworm-slim"
-SECRETS_FILE="secrets.enc.env"
+SECRETS_FILE="secrets.${APP_ENV}.enc.env"
 AGE_KEY_DIR="$HOME/.config/sops/age"
 AGE_KEY_FILE="$AGE_KEY_DIR/keys.txt"
 export SOPS_AGE_KEY_FILE="$AGE_KEY_FILE"
@@ -25,12 +47,15 @@ else
 fi
 
 print_help() {
-    echo "${C_TITLE}FurnitureCRM API stack runner (production / Linux-Mac)${C_RESET}"
+    echo "${C_TITLE}CRM API stack runner (env: $APP_ENV, Linux/Mac)${C_RESET}"
     echo "${C_DIM}Usage: ./run.sh <command> [args]${C_RESET}"
     echo ""
+    echo "${C_SECTION}Environment${C_RESET}"
+    echo "  ${C_CMD}env local|prod${C_RESET}     Switch this machine's active env (writes .environment)"
+    echo ""
     echo "${C_SECTION}Stack${C_RESET}"
-    echo "  ${C_CMD}up${C_RESET}                 Start the full stack (api + redis + celery + beat + flower)"
-    echo "  ${C_CMD}up-api${C_RESET}             Start API + Redis only (no celery / beat / flower)"
+    echo "  ${C_CMD}up${C_RESET}                 Start the full stack (api + redis + celery + beat + flower [+ db if local])"
+    echo "  ${C_CMD}up-api${C_RESET}             Start API + Redis [+ db if local] only (no celery / beat / flower)"
     echo "  ${C_CMD}down${C_RESET}               Stop and remove the stack (with volumes)"
     echo "  ${C_CMD}restart${C_RESET}            Down then up (clean reload of code/config)"
     echo "  ${C_CMD}shell [service]${C_RESET}    Open a shell in a running service (default: api)"
@@ -53,18 +78,30 @@ print_help() {
     echo "  ${C_CMD}hooks-status${C_RESET}       Show the current git hooks path"
     echo ""
     echo "${C_SECTION}Secrets (SOPS + age)${C_RESET}"
-    echo "  ${C_CMD}secrets-install${C_RESET}    Install sops + age (brew on Mac, GitHub binaries on Linux)"
-    echo "  ${C_CMD}secrets-keygen${C_RESET}     Generate this machine's age key; print the public key"
-    echo "  ${C_CMD}secrets-edit${C_RESET}       Edit secrets.enc.env (decrypts in your editor)"
-    echo "  ${C_CMD}secrets-rekey${C_RESET}      Re-encrypt secrets.enc.env to current .sops.yaml recipients"
+    echo "  ${C_CMD}secrets-install${C_RESET}            Install sops + age (brew on Mac, GitHub binaries on Linux)"
+    echo "  ${C_CMD}secrets-keygen${C_RESET}             Generate this machine's age key; print the public key"
+    echo "  ${C_CMD}secrets-edit [local|prod]${C_RESET}   Edit secrets.<env>.enc.env (default: active env)"
+    echo "  ${C_CMD}secrets-rekey [local|prod]${C_RESET}  Re-encrypt to current .sops.yaml recipients"
+    echo "  ${C_CMD}secrets-encrypt-local${C_RESET}      One-shot: encrypt a plaintext secrets.local.enc.env (post-scaffold)"
     echo ""
     echo "  ${C_CMD}help${C_RESET}               Show this help (aliases: -h, --help)"
 }
 
-require_secrets() {
-    command -v sops >/dev/null 2>&1 || { echo "${C_ERR}Error: sops not installed. Run \"./run.sh secrets-install\" first.${C_RESET}"; exit 1; }
-    [ -f "$SECRETS_FILE" ] || { echo "${C_ERR}Error: $SECRETS_FILE not found. Run \"./run.sh secrets-keygen\" and get added to .sops.yaml.${C_RESET}"; exit 1; }
+resolve_secrets_target() {
+    local which="${1:-$APP_ENV}"
+    case "$which" in
+        local) TARGET_FILE="secrets.local.enc.env" ;;
+        prod)  TARGET_FILE="secrets.prod.enc.env" ;;
+        *) echo "${C_ERR}Error: secrets target must be 'local' or 'prod', got '$which'${C_RESET}"; return 1 ;;
+    esac
 }
+
+require_secrets_file() {
+    command -v sops >/dev/null 2>&1 || { echo "${C_ERR}Error: sops not installed. Run \"./run.sh secrets-install\" first.${C_RESET}"; exit 1; }
+    [ -f "$1" ] || { echo "${C_ERR}Error: $1 not found. Run \"./run.sh secrets-keygen\" and get added to .sops.yaml.${C_RESET}"; exit 1; }
+}
+
+require_secrets() { require_secrets_file "$SECRETS_FILE"; }
 
 # Run a compose command with secrets decrypted into its env in-memory (never to disk).
 dc() { require_secrets; sops exec-env "$SECRETS_FILE" "docker compose $ENV_FILE_FLAGS $COMPOSE_FILES $*"; }
@@ -106,6 +143,20 @@ ensure_dirs() {
     done
 }
 
+do_env() {
+    local target="${1:-}"
+    if [ -z "$target" ]; then
+        echo "Current env: $APP_ENV (from .environment). Pass 'local' or 'prod' to change."
+        return 0
+    fi
+    case "$target" in
+        local|prod) ;;
+        *) echo "${C_ERR}Error: env must be 'local' or 'prod', got '$target'${C_RESET}"; return 1 ;;
+    esac
+    printf '%s\n' "$target" > .environment
+    echo "Switched .environment to '$target'. Run \`./run.sh up\` to bring the stack up in the new env."
+}
+
 do_lint() {
     set +e; rc=0
     CID=$(api_cid)
@@ -113,7 +164,7 @@ do_lint() {
         echo "== ruff format --check (container) =="; docker exec "$CID" ruff format --check src tests || rc=1
         echo "== ruff check (container) ==";          docker exec "$CID" ruff check src tests || rc=1
     else
-        echo "Skipping Python lint: dev 'api' container not running (./run.sh up) or ruff not in image."
+        echo "Skipping Python lint: 'api' container not running (./run.sh up) or ruff not in image."
     fi
     if [ -d "$APP_DIR/node_modules" ]; then
         echo "== prettier --check (APP) =="; ( cd "$APP_DIR" && npx --no-install prettier --check "src/**/*.{ts,html,scss,css,json}" ) || rc=1
@@ -131,7 +182,7 @@ do_lint_fix() {
         echo "== ruff format (container) ==";    docker exec "$CID" ruff format src tests
         echo "== ruff check --fix (container) =="; docker exec "$CID" ruff check --fix src tests
     else
-        echo "Skipping Python autofix: dev 'api' container not running or ruff not in image."
+        echo "Skipping Python autofix: 'api' container not running or ruff not in image."
     fi
     if [ -d "$APP_DIR/node_modules" ]; then
         echo "== prettier --write (APP) =="; ( cd "$APP_DIR" && npx --no-install prettier --write "src/**/*.{ts,html,scss,css,json}" )
@@ -142,19 +193,20 @@ do_lint_fix() {
     set -e
 }
 
-do_up()     { require_secrets; ensure_hooks; ensure_dirs; echo "Starting the full API stack..."; dc --profile celery up --build -d; echo "Started."; }
-do_up_api() { require_secrets; ensure_hooks; ensure_dirs; echo "Starting the API stack (api + redis only)..."; dc up --build -d; echo "Started."; }
-do_down()   { require_secrets; echo "Stopping the full API stack..."; dc --profile celery down -v; echo "Stopped."; }
+do_up()     { require_secrets; ensure_hooks; ensure_dirs; echo "Starting the full API stack (env: $APP_ENV)..."; dc --profile celery up --build -d; echo "Started."; }
+do_up_api() { require_secrets; ensure_hooks; ensure_dirs; echo "Starting the API stack (env: $APP_ENV, api + redis [+ db if local] only)..."; dc up --build -d; echo "Started."; }
+do_down()   { require_secrets; echo "Stopping the full API stack (env: $APP_ENV)..."; dc --profile celery down -v; echo "Stopped."; }
 
 case "$1" in
     ""|help|-h|--help) print_help ;;
+    env) do_env "${2:-}" ;;
     up) do_up ;;
     up-api) do_up_api ;;
     down) do_down ;;
-    restart) echo "Restarting..."; do_down; do_up ;;
-    shell) SERVICE="${2:-api}"; echo "Opening a shell in '$SERVICE'..."; dc exec "$SERVICE" bash ;;
+    restart) echo "Restarting (env: $APP_ENV)..."; do_down; do_up ;;
+    shell) SERVICE="${2:-api}"; echo "Opening a shell in '$SERVICE' (env: $APP_ENV)..."; dc exec "$SERVICE" bash ;;
     migrate)
-        require_secrets; MSG="${2:-auto_migration}"; echo "Migration: $MSG"
+        require_secrets; MSG="${2:-auto_migration}"; echo "Migration (env: $APP_ENV): $MSG"
         dc run --rm --entrypoint alembic api revision --autogenerate -m "$MSG" ;;
     upgrade)
         require_secrets; STEPS="${2:-}"
@@ -216,15 +268,26 @@ case "$1" in
         else mkdir -p "$AGE_KEY_DIR"; age-keygen -o "$AGE_KEY_FILE"; echo "Key generated at $AGE_KEY_FILE. Keep the PRIVATE key safe - never commit or share it."; fi
         echo ""; echo "Your PUBLIC key - send it to whoever manages .sops.yaml:"; age-keygen -y "$AGE_KEY_FILE" ;;
     secrets-edit)
-        require_secrets
+        resolve_secrets_target "${2:-}" || exit 1
+        require_secrets_file "$TARGET_FILE"
         if command -v code >/dev/null 2>&1; then export EDITOR="code --wait"; fi
-        sops "$SECRETS_FILE"
-        echo "Saved and re-encrypted. Commit $SECRETS_FILE." ;;
+        sops "$TARGET_FILE"
+        echo "Saved and re-encrypted. Commit $TARGET_FILE." ;;
     secrets-rekey)
         command -v sops >/dev/null 2>&1 || { echo "${C_ERR}Error: sops not installed. Run \"./run.sh secrets-install\" first.${C_RESET}"; exit 1; }
-        [ -f "$SECRETS_FILE" ] || { echo "${C_ERR}Error: $SECRETS_FILE not found.${C_RESET}"; exit 1; }
-        echo "Re-encrypting $SECRETS_FILE to the recipients in .sops.yaml ..."
-        sops updatekeys -y "$SECRETS_FILE"
-        echo "Done. Commit $SECRETS_FILE." ;;
+        resolve_secrets_target "${2:-}" || exit 1
+        [ -f "$TARGET_FILE" ] || { echo "${C_ERR}Error: $TARGET_FILE not found.${C_RESET}"; exit 1; }
+        echo "Re-encrypting $TARGET_FILE to the recipients in .sops.yaml ..."
+        sops updatekeys -y "$TARGET_FILE"
+        echo "Done. Commit $TARGET_FILE." ;;
+    secrets-encrypt-local)
+        command -v sops >/dev/null 2>&1 || { echo "${C_ERR}Error: sops not installed. Run \"./run.sh secrets-install\" first.${C_RESET}"; exit 1; }
+        [ -f "secrets.local.enc.env" ] || { echo "${C_ERR}Error: secrets.local.enc.env not found.${C_RESET}"; exit 1; }
+        if grep -q "^sops_version" secrets.local.enc.env 2>/dev/null; then
+            echo "secrets.local.enc.env is already encrypted. Nothing to do."; exit 0
+        fi
+        echo "Encrypting secrets.local.enc.env in-place with SOPS..."
+        sops -e -i secrets.local.enc.env
+        echo "Done. Commit secrets.local.enc.env." ;;
     *) echo "${C_ERR}Error: Invalid command '$1'.${C_RESET}"; echo ""; print_help; exit 1 ;;
 esac

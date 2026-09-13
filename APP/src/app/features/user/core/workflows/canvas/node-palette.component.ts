@@ -21,6 +21,60 @@ import {
  * the type names by heart.
  */
 
+/** Per-category accent classes — surfaces the node's semantic role at
+ *  a glance (triggers=amber, send=sky, record=emerald, routing=violet,
+ *  tagging/lifecycle=rose, flow-control=slate). Kept in the component
+ *  (not the registry) so the registry stays styling-free. */
+interface CategoryAccent {
+  /** Section-header dot. */
+  dot: string;
+  /** Icon chip bg + text + ring. */
+  chip: string;
+  /** Left border tint on the palette card. */
+  border: string;
+  /** Hover background tint on the palette card. */
+  hoverBg: string;
+}
+
+const CATEGORY_ACCENT: Record<WorkflowNodeCategory, CategoryAccent> = {
+  trigger: {
+    dot: 'bg-amber-500',
+    chip: 'bg-amber-500/10 text-amber-600 ring-amber-500/20',
+    border: 'border-l-amber-500/40',
+    hoverBg: 'hover:bg-amber-500/5',
+  },
+  send: {
+    dot: 'bg-sky-500',
+    chip: 'bg-sky-500/10 text-sky-600 ring-sky-500/20',
+    border: 'border-l-sky-500/40',
+    hoverBg: 'hover:bg-sky-500/5',
+  },
+  record: {
+    dot: 'bg-emerald-500',
+    chip: 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20',
+    border: 'border-l-emerald-500/40',
+    hoverBg: 'hover:bg-emerald-500/5',
+  },
+  routing: {
+    dot: 'bg-violet-500',
+    chip: 'bg-violet-500/10 text-violet-600 ring-violet-500/20',
+    border: 'border-l-violet-500/40',
+    hoverBg: 'hover:bg-violet-500/5',
+  },
+  tag_lifecycle: {
+    dot: 'bg-rose-500',
+    chip: 'bg-rose-500/10 text-rose-600 ring-rose-500/20',
+    border: 'border-l-rose-500/40',
+    hoverBg: 'hover:bg-rose-500/5',
+  },
+  flow_control: {
+    dot: 'bg-slate-500',
+    chip: 'bg-slate-500/10 text-slate-600 ring-slate-500/20',
+    border: 'border-l-slate-500/40',
+    hoverBg: 'hover:bg-slate-500/5',
+  },
+};
+
 @Component({
   selector: 'app-node-palette',
   standalone: true,
@@ -32,6 +86,11 @@ export class NodePaletteComponent {
   readonly query = signal('');
 
   readonly sections = PALETTE_SECTIONS;
+
+  /** Template helper — accent class strings for a given category. */
+  protected accentFor(key: WorkflowNodeCategory): CategoryAccent {
+    return CATEGORY_ACCENT[key];
+  }
 
   /** Fires when the user taps a palette item (touch / accessibility
    *  fallback for the HTML5 drag/drop, which is mouse-only). The

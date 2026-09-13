@@ -376,3 +376,37 @@ class ChatbotImportResult(BaseModel):
 
     created_bot_id: uuid.UUID
     conflicts: list[ChatbotImportConflict]
+
+
+# --- Variable picker (Step 3a) --------------------------------------------
+
+
+class VariableRead(BaseModel):
+    """One entry in a picker group. ``path`` is what gets inserted
+    verbatim into the ``{{...}}`` interpolation at the cursor."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+    label: str
+    description: str | None = None
+    sample: str | None = None
+
+
+class VariableGroupRead(BaseModel):
+    """A labeled bucket of related variables. Rendered as a collapsible
+    section in the side panel + an option-group in the picker dropdown."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    label: str
+    variables: list[VariableRead]
+
+
+class VariablesListResponse(BaseModel):
+    """Response envelope for :http:get:`/api/v1/chatbots/variables`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    groups: list[VariableGroupRead]

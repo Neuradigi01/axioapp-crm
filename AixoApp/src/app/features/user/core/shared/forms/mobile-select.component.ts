@@ -16,6 +16,7 @@ import {
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
+import { FormsModule } from '@angular/forms';
 
 /**
  * Drop-in replacement for a native `<select>` where the OS-native
@@ -51,7 +52,7 @@ export interface MobileSelectOption {
   selector: 'crm-mobile-select',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, FormsModule],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -79,34 +80,51 @@ export interface MobileSelectOption {
         <div #backdrop class="fixed inset-0 z-[1000]" (click)="close()" aria-hidden="true"></div>
         <div
           #panel
-          class="fixed z-[1001] max-h-[60vh] overflow-y-auto rounded-md border border-subtle bg-surface p-1 shadow-lg"
+          class="fixed z-[1001] flex max-h-[60vh] flex-col rounded-md border border-subtle bg-surface shadow-lg"
           [style.top]="panelStyle()?.top"
           [style.left]="panelStyle()?.left"
           [style.width]="panelStyle()?.width"
           role="listbox"
         >
-          @for (opt of options(); track opt.value; let i = $index) {
-            @if (opt.group && opt.group !== options()[i - 1]?.group) {
-              <div
-                class="px-2 pt-2 pb-1 text-[10px] font-semibold tracking-[.06em] text-faint uppercase"
-              >
-                {{ opt.group }}
-              </div>
-            }
-            <button
-              type="button"
-              role="option"
-              [attr.aria-selected]="opt.value === currentValue()"
-              class="flex w-full items-center rounded px-2 py-1.5 text-left text-xs transition"
-              [class.bg-accent-soft]="opt.value === currentValue()"
-              [class.text-accent]="opt.value === currentValue()"
-              [class.text-default]="opt.value !== currentValue()"
-              [class.hover:bg-surface-2]="opt.value !== currentValue()"
-              (click)="pick(opt.value)"
-            >
-              {{ opt.label }}
-            </button>
+          @if (searchable()) {
+            <div class="border-b border-subtle p-1.5">
+              <input
+                #searchInput
+                type="text"
+                [ngModel]="searchQuery()"
+                (ngModelChange)="searchQuery.set($event)"
+                [placeholder]="searchPlaceholder()"
+                class="w-full rounded border border-subtle bg-surface px-2 py-1 text-xs text-default placeholder:text-faint focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                (click)="$event.stopPropagation()"
+              />
+            </div>
           }
+          <div class="overflow-y-auto p-1">
+            @for (opt of filteredOptions(); track opt.value; let i = $index) {
+              @if (opt.group && opt.group !== filteredOptions()[i - 1]?.group) {
+                <div
+                  class="px-2 pt-2 pb-1 text-[10px] font-semibold tracking-[.06em] text-faint uppercase"
+                >
+                  {{ opt.group }}
+                </div>
+              }
+              <button
+                type="button"
+                role="option"
+                [attr.aria-selected]="opt.value === currentValue()"
+                class="flex w-full items-center rounded px-2 py-1.5 text-left text-xs transition"
+                [class.bg-accent-soft]="opt.value === currentValue()"
+                [class.text-accent]="opt.value === currentValue()"
+                [class.text-default]="opt.value !== currentValue()"
+                [class.hover:bg-surface-2]="opt.value !== currentValue()"
+                (click)="pick(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+            } @empty {
+              <div class="px-2 py-3 text-center text-xs text-faint">No matches</div>
+            }
+          </div>
         </div>
       }
     </div>
@@ -117,11 +135,28 @@ export class MobileSelectComponent implements ControlValueAccessor {
   /** `[value]` binding — used by callers who don't want a FormControl. */
   readonly value = input<string>('');
   readonly placeholder = input<string>('Select…');
+  /** When true, renders a search box at the top of the panel that
+   *  filters options by (case-insensitive) substring match on label.
+   *  Off by default — small option lists don't need it. */
+  readonly searchable = input<boolean>(false);
+  readonly searchPlaceholder = input<string>('Search…');
+  /** Chip-based multi-select "pick to add" mode. When true, `pick()`
+   *  emits `valueChange` without retaining the picked value on the
+   *  trigger — the trigger keeps rendering the placeholder so the
+   *  operator can keep adding chips. The parent owns the chip strip. */
+  readonly pickToAdd = input<boolean>(false);
   readonly valueChange = output<string>();
   /** Also disable-able via a FormControl (`control.disable()`). */
   readonly disabled = signal(false);
 
   protected readonly open = signal(false);
+  protected readonly searchQuery = signal('');
+  protected readonly filteredOptions = computed<ReadonlyArray<MobileSelectOption>>(() => {
+    const q = this.searchQuery().trim().toLowerCase();
+    const all = this.options();
+    if (!q) return all;
+    return all.filter((o) => o.label.toLowerCase().includes(q));
+  });
   private readonly host = inject(ElementRef<HTMLElement>);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -152,6 +187,7 @@ export class MobileSelectComponent implements ControlValueAccessor {
 
   protected readonly panelRef = viewChild<ElementRef<HTMLElement>>('panel');
   protected readonly backdropRef = viewChild<ElementRef<HTMLElement>>('backdrop');
+  protected readonly searchInputRef = viewChild<ElementRef<HTMLInputElement>>('searchInput');
 
   /** Original parent of the panel/backdrop before we portal them to
    *  `document.body`. We put them back before the `@if` teardown so
@@ -175,9 +211,13 @@ export class MobileSelectComponent implements ControlValueAccessor {
     });
 
     // Refine the panel position once the actual panel is in the DOM.
+    // Also focus the search input on open (searchable variant).
     effect(() => {
       if (this.open() && this.panelRef()) {
-        queueMicrotask(() => this.refinePosition());
+        queueMicrotask(() => {
+          this.refinePosition();
+          if (this.searchable()) this.searchInputRef()?.nativeElement.focus();
+        });
       }
     });
 
@@ -259,13 +299,24 @@ export class MobileSelectComponent implements ControlValueAccessor {
     }
     this.open.set(false);
     this.panelStyle.set(null);
+    this.searchQuery.set('');
     this.onTouchedFn();
   }
 
   protected pick(v: string): void {
-    this.writtenValue.set(v);
-    this.valueChange.emit(v);
+    // Pick-to-add mode leaves `writtenValue` on '' so the trigger keeps
+    // rendering the placeholder (`activeLabel()` falls back when no
+    // option matches the current value). The parent's chip strip owns
+    // the picked-values state.
+    if (!this.pickToAdd()) {
+      this.writtenValue.set(v);
+    }
+    // Notify Angular Forms BEFORE emitting valueChange so a parent
+    // (valueChange) handler that reads the FormControl value sees the
+    // just-picked value, not the previous one. Register's onCountryChange
+    // relies on this to load states for the newly-selected country.
     this.onChangeFn(v);
+    this.valueChange.emit(v);
     this.close();
   }
 

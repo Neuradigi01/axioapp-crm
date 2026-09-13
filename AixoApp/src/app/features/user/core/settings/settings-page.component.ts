@@ -97,8 +97,11 @@ const TABS: ReadonlyArray<TabDef> = [
     permission: 'settings.standard_fields.manage',
   },
   {
+    // Multi-form track: the settings tab is now "Forms" and lists
+    // every widget form the org owns (Contact Us, Newsletter, etc.).
+    // Tab id stays `embed` so bookmarks + URL query params keep working.
     id: 'embed',
-    label: 'Embed Widget',
+    label: 'Forms',
     group: 'data',
     permission: 'settings.integrations.embed.manage',
   },

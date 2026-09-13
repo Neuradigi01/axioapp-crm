@@ -35,6 +35,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.catalog import data_access as _da
+from src.app.core.catalog import link_token as _lt
+from src.app.core.catalog.constants import ALLOWED_TRANSITIONS, CatalogStatus
 from src.app.core.catalog.models import CatalogCategory, CatalogItem
 from src.app.core.catalog.schemas import (
     CatalogCategoryCreate,
@@ -44,6 +46,9 @@ from src.app.core.catalog.schemas import (
     CatalogItemBulkImportRowError,
     CatalogItemCreate,
     CatalogItemUpdate,
+    PublicCatalogCardOut,
+    PublicCatalogDetailOut,
+    PublicUrlOut,
 )
 from src.app.shared import validators as shared_validators
 from src.app.shared.audit import log_entity_change, snapshot
@@ -58,7 +63,10 @@ from src.app.shared.storage import get_storage
 _log = logging.getLogger(__name__)
 
 _CATALOG_ENTITY = "catalog_item"
-_MAX_GALLERY = 8  # cover + up to 8 secondaries; a reasonable card-shape cap
+# Total per-product image cap = 5. Split as 1 primary cover + up to
+# 4 gallery secondaries. Manager-locked 2026-09-09 to keep product
+# cards scannable and storage usage predictable.
+_MAX_GALLERY = 4
 
 
 _SNAPSHOT_FIELDS = (
@@ -398,6 +406,38 @@ async def delete_item(session: AsyncSession, *, item_id: uuid.UUID) -> None:
     )
 
 
+async def remove_item_image(
+    session: AsyncSession,
+    *,
+    item_id: uuid.UUID,
+) -> CatalogItem:
+    """Clear the primary cover image on an item.
+
+    Idempotent — returns the item unchanged if no cover was set. Also
+    deletes the physical file (best-effort) so the storage volume
+    stays clean."""
+    item = ensure_found(await get_item(session, item_id), entity="catalog item")
+    if not item.image_url:
+        return item
+    before = _snapshot(item)
+    old_url = item.image_url
+    item.image_url = None
+    item.updated_at = datetime.now(timezone.utc)
+    await session.commit()
+    await session.refresh(item)
+
+    await _delete_stored_image(old_url)
+
+    await log_entity_change(
+        action="catalog.image_removed",
+        entity_type=_CATALOG_ENTITY,
+        entity_id=item.id,
+        before=before,
+        after=_snapshot(item),
+    )
+    return item
+
+
 async def set_item_image(
     session: AsyncSession,
     *,
@@ -712,6 +752,7 @@ async def list_items(
     category: str | None = None,
     category_id: uuid.UUID | None = None,
     active_only: bool = False,
+    statuses: list[str] | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[CatalogItem], int]:
@@ -722,24 +763,297 @@ async def list_items(
         category=category,
         category_id=category_id,
         active_only=active_only,
+        statuses=statuses,
         page=page,
         size=size,
     )
 
 
+async def count_status_histogram(
+    session: AsyncSession, *, org_id: uuid.UUID
+) -> dict[str, int]:
+    """Status histogram for the owner-dashboard tabs. Zeros the tabs
+    that the DB doesn't have rows for so the frontend can render every
+    tab even for an empty org."""
+    counts = await _da.count_catalog_items_by_status(session, org_id=org_id)
+    return {s.value: counts.get(s.value, 0) for s in CatalogStatus}
+
+
+# --- Lifecycle transitions ------------------------------------------------
+
+
+def _reject_transition(from_status: str, to_status: str) -> None:
+    """Same shape as property's guard: 409 with a readable message."""
+    if to_status not in ALLOWED_TRANSITIONS.get(from_status, set()):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"cannot transition from '{from_status}' to '{to_status}'",
+        )
+
+
+def _has_image(item: CatalogItem) -> bool:
+    """Publish precondition — the shareable link must render something.
+    Accepts either the primary cover or any gallery entry."""
+    if item.image_url:
+        return True
+    return bool(item.image_urls)
+
+
+async def publish_item(
+    session: AsyncSession,
+    *,
+    item_id: uuid.UUID,
+) -> CatalogItem:
+    """``draft`` / ``unpublished`` → ``published``. Requires ≥ 1 image.
+    ``published_at`` is set on the first publish and preserved on
+    subsequent re-publishes (matches property semantics)."""
+    item = ensure_found(await get_item(session, item_id), entity="catalog item")
+    _reject_transition(item.status, CatalogStatus.published.value)
+    if not _has_image(item):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="publish requires at least one image",
+        )
+    before = _snapshot(item)
+    item.status = CatalogStatus.published.value
+    if item.published_at is None:
+        item.published_at = datetime.now(timezone.utc)
+    await session.commit()
+    await session.refresh(item)
+    await log_entity_change(
+        action="catalog.published",
+        entity_type=_CATALOG_ENTITY,
+        entity_id=item.id,
+        before=before,
+        after=_snapshot(item),
+    )
+    return item
+
+
+async def unpublish_item(
+    session: AsyncSession,
+    *,
+    item_id: uuid.UUID,
+) -> CatalogItem:
+    """``published`` → ``unpublished``. Keeps ``published_at`` so
+    analytics can distinguish "never published" from "hidden after
+    publication"."""
+    item = ensure_found(await get_item(session, item_id), entity="catalog item")
+    _reject_transition(item.status, CatalogStatus.unpublished.value)
+    before = _snapshot(item)
+    item.status = CatalogStatus.unpublished.value
+    await session.commit()
+    await session.refresh(item)
+    await log_entity_change(
+        action="catalog.unpublished",
+        entity_type=_CATALOG_ENTITY,
+        entity_id=item.id,
+        before=before,
+        after=_snapshot(item),
+    )
+    return item
+
+
+async def archive_item(
+    session: AsyncSession,
+    *,
+    item_id: uuid.UUID,
+) -> CatalogItem:
+    """From ``draft`` / ``published`` / ``unpublished`` → ``archived``."""
+    item = ensure_found(await get_item(session, item_id), entity="catalog item")
+    _reject_transition(item.status, CatalogStatus.archived.value)
+    before = _snapshot(item)
+    item.status = CatalogStatus.archived.value
+    item.archived_at = datetime.now(timezone.utc)
+    await session.commit()
+    await session.refresh(item)
+    await log_entity_change(
+        action="catalog.archived",
+        entity_type=_CATALOG_ENTITY,
+        entity_id=item.id,
+        before=before,
+        after=_snapshot(item),
+    )
+    return item
+
+
+async def unarchive_item(
+    session: AsyncSession,
+    *,
+    item_id: uuid.UUID,
+) -> CatalogItem:
+    """``archived`` → ``draft``. Clears ``archived_at`` so re-archiving
+    later resets the timestamp."""
+    item = ensure_found(await get_item(session, item_id), entity="catalog item")
+    _reject_transition(item.status, CatalogStatus.draft.value)
+    before = _snapshot(item)
+    item.status = CatalogStatus.draft.value
+    item.archived_at = None
+    await session.commit()
+    await session.refresh(item)
+    await log_entity_change(
+        action="catalog.unarchived",
+        entity_type=_CATALOG_ENTITY,
+        entity_id=item.id,
+        before=before,
+        after=_snapshot(item),
+    )
+    return item
+
+
+# --- Public sharing — Fernet-tokened URLs ---------------------------------
+
+
+# Short-description cap used on the public grid card.
+_SHORT_DESC_LEN = 200
+
+
+def _short_description(text: str | None) -> str | None:
+    if not text:
+        return None
+    trimmed = text.strip()
+    if len(trimmed) <= _SHORT_DESC_LEN:
+        return trimmed
+    return trimmed[: _SHORT_DESC_LEN - 1].rstrip() + "…"
+
+
+def _public_url_for(host: str, token: str) -> str:
+    """Assemble the shareable URL. ``host`` is scheme+host
+    (``https://example.com``); trailing slash is stripped."""
+    return f"{host.rstrip('/')}/product/{token}"
+
+
+async def generate_public_link(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    item_id: uuid.UUID,
+    host: str,
+) -> PublicUrlOut:
+    """Owner-side: mint the shareable link for a published item.
+
+    Rejects with 409 if the item isn't ``published`` — links only
+    exist for content the viewer can actually see."""
+    item = ensure_found(await get_item(session, item_id), entity="catalog item")
+    if item.org_id != org_id:
+        # Cross-tenant. Same 404 shape the ORM tenant filter would give
+        # (item lookup is scoped) — but belt-and-braces here.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="catalog item not found"
+        )
+    if item.status != CatalogStatus.published.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"only published products get a shareable link (current: '{item.status}')",
+        )
+    try:
+        token = _lt.encode_catalog_token(item.id, item.org_id)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from None
+    return PublicUrlOut(url=_public_url_for(host, token), token=token)
+
+
+def _public_card(item: CatalogItem) -> PublicCatalogCardOut:
+    """Trim a CatalogItem to the public grid card shape (no UUIDs)."""
+    try:
+        token = _lt.encode_catalog_token(item.id, item.org_id)
+    except RuntimeError:
+        # Key not configured — surface no card at all rather than
+        # returning a broken URL. Public listing endpoint filters
+        # these out before returning.
+        raise
+    return PublicCatalogCardOut(
+        name=item.name,
+        sku=item.sku,
+        category=item.category,
+        price=item.price,
+        currency=item.currency,
+        short_description=_short_description(item.description),
+        tags=list(item.tags or []),
+        image_url=item.image_url,
+        public_url=f"/product/{token}",
+    )
+
+
+async def list_public_items(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> list[PublicCatalogCardOut]:
+    """Public grid: every ``published`` catalog item for one org."""
+    try:
+        _lt.encode_catalog_token(uuid.UUID(int=0), uuid.UUID(int=0))
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from None
+    rows = await _da.list_published_items(session, org_id=org_id)
+    # Extra defensive filter — the ORM tenant filter should already
+    # be pinned to org_id, but check anyway.
+    rows = [r for r in rows if r.org_id == org_id]
+    return [_public_card(r) for r in rows]
+
+
+def _public_detail(item: CatalogItem) -> PublicCatalogDetailOut:
+    return PublicCatalogDetailOut(
+        name=item.name,
+        sku=item.sku,
+        description=item.description,
+        category=item.category,
+        price=item.price,
+        currency=item.currency,
+        tags=list(item.tags or []),
+        image_url=item.image_url,
+        image_urls=list(item.image_urls or []),
+    )
+
+
+async def get_public_item(
+    session: AsyncSession,
+    *,
+    token: str,
+) -> PublicCatalogDetailOut | None:
+    """Decrypt ``token`` and return the item detail if it exists AND
+    is currently ``published``. Returns ``None`` for every failure mode
+    (bad token, wrong key, tampered, missing, non-published,
+    archived) — the router turns that into a uniform 404 with no
+    side channel."""
+    decoded = _lt.decode_catalog_token(token)
+    if decoded is None:
+        return None
+    item_id, expected_org_id = decoded
+    item = await _da.get_catalog_item_by_id(session, item_id)
+    if item is None or item.org_id != expected_org_id:
+        return None
+    if item.status != CatalogStatus.published.value:
+        return None
+    return _public_detail(item)
+
+
 __all__ = [
     "add_gallery_image",
+    "archive_item",
     "bulk_import_items",
+    "count_status_histogram",
     "create_category",
     "create_item",
     "delete_category",
     "delete_item",
+    "generate_public_link",
     "get_category",
     "get_item",
+    "get_public_item",
     "list_categories",
     "list_items",
+    "list_public_items",
+    "publish_item",
     "remove_gallery_image",
+    "remove_item_image",
     "set_item_image",
+    "unarchive_item",
+    "unpublish_item",
     "update_category",
     "update_item",
 ]

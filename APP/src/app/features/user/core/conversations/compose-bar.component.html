@@ -1,6 +1,6 @@
 <div
   [class]="
-    'border-t border-subtle px-4 py-1.5 transition-colors ' +
+    'border-t border-subtle px-4 py-1 transition-colors ' +
     (isNoteMode() ? 'bg-amber-500/10' : 'bg-surface')
   "
   (dragover)="onDragOver($event)"
@@ -77,14 +77,14 @@
        treatment (no pill fill) makes it read as a tab rather than
        an action button (which the old pill style did — it looked
        identical to the Send button). -->
-  <div class="mb-1.5 flex items-center gap-4 border-b border-subtle text-xs" role="tablist">
+  <div class="mb-1 flex items-center gap-4 border-b border-subtle text-xs" role="tablist">
     <button
       type="button"
       role="tab"
       [attr.aria-selected]="mode() === 'reply'"
       (click)="setMode('reply')"
       [class]="
-        'relative -mb-px flex items-center gap-1.5 border-b-2 px-1 pb-2 pt-1 font-medium transition ' +
+        'relative -mb-px flex items-center gap-1.5 border-b-2 px-1 pb-1 pt-0.5 font-medium transition ' +
         (mode() === 'reply'
           ? 'border-accent text-default'
           : 'border-transparent text-muted hover:text-default')
@@ -99,7 +99,7 @@
       [attr.aria-selected]="mode() === 'note'"
       (click)="setMode('note')"
       [class]="
-        'relative -mb-px flex items-center gap-1.5 border-b-2 px-1 pb-2 pt-1 font-medium transition ' +
+        'relative -mb-px flex items-center gap-1.5 border-b-2 px-1 pb-1 pt-0.5 font-medium transition ' +
         (mode() === 'note'
           ? 'border-amber-500 text-amber-500'
           : 'border-transparent text-muted hover:text-default')
@@ -233,14 +233,15 @@
         </div>
       }
       <textarea
+        #textareaEl
         [ngModel]="text()"
         (ngModelChange)="onTextChange($event)"
         (keydown)="onKey($event)"
-        rows="2"
+        rows="1"
         [attr.placeholder]="placeholder()"
         [disabled]="textareaDisabled()"
         [class]="
-          'block min-h-[2.5rem] w-full resize-none rounded-md border px-3 py-2 text-sm placeholder-zinc-400 shadow-sm focus:outline-none focus:ring-1 disabled:bg-surface-2 disabled:text-muted ' +
+          'block max-h-[12.5rem] min-h-[2rem] w-full resize-none overflow-y-auto rounded-md border px-3 py-1.5 text-sm placeholder-zinc-400 shadow-sm focus:outline-none focus:ring-1 disabled:bg-surface-2 disabled:text-muted ' +
           (isNoteMode()
             ? 'border-amber-300 bg-amber-500/10 focus:border-amber-500 focus:ring-amber-500'
             : 'border-subtle bg-surface focus:border-muted focus:ring-accent')
@@ -277,7 +278,7 @@
        The Reply/Note mode toggle now lives ABOVE the textarea as a
        tab bar — kept out of this row so operators don't confuse a
        mode switch with an action button. -->
-  <div class="mt-1.5 flex flex-wrap items-center justify-end gap-1.5">
+  <div class="mt-1 flex flex-wrap items-center justify-end gap-1.5">
     @if (channel === 'email') {
       <app-email-template-picker
         [contactId]="contactId"

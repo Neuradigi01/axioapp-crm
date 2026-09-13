@@ -43,6 +43,11 @@ export class IssueKeyModalComponent {
 
   /** Parent toggles this to control visibility. */
   readonly open = input.required<boolean>();
+  /** Multi-form Step 8 — the form the newly-issued key gets pinned
+   *  to via ``EmbedKey.resource_id``. Optional: when omitted the
+   *  backend falls back to the org's default form. Parent
+   *  (embed-integrations-tab) always passes the selected form id. */
+  readonly formId = input<string | null>(null);
   readonly issued = output<EmbedKeyIssueResponse>();
   readonly closed = output<void>();
 
@@ -70,7 +75,7 @@ export class IssueKeyModalComponent {
     this.submitting.set(true);
     this.error.set(null);
     this.api
-      .issueKey(this.name().trim() || null)
+      .issueKey(this.name().trim() || null, this.formId() ?? undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {

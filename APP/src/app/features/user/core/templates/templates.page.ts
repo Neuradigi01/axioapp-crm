@@ -42,6 +42,13 @@ import {
  */
 
 const PAGE_SIZE = 25;
+// External-status auto-refresh: silently re-fetch the list every 15s while
+// any visible row is still awaiting Meta review (`pending` / `paused`).
+// Terminal rows (approved / rejected / n_a) cause polling to stop — an
+// idle page issues zero requests. The backend also has a 2-min celery
+// sweep + webhook path; this poll bridges the gap so the operator sees
+// the badge flip without hitting refresh.
+const EXTERNAL_STATUS_POLL_MS = 15_000;
 
 const CHANNEL_OPTIONS: Array<{ value: '' | TemplateChannel; label: string }> = [
   { value: '', label: 'All channels' },
@@ -130,6 +137,14 @@ export class TemplatesPageComponent {
   protected readonly hasNext = computed(() => this.pageIndex() < this.totalPages() - 1);
 
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** True when at least one visible row is awaiting Meta review — drives
+   *  the silent auto-poll. Terminal-only lists (all approved / rejected /
+   *  n_a) return false and the poll stops. */
+  protected readonly hasInFlightExternal = computed(() =>
+    this.items().some((r) => r.external_status === 'pending' || r.external_status === 'paused'),
+  );
 
   constructor() {
     // Re-fetch whenever any filter or pagination state changes. `effect`
@@ -162,6 +177,18 @@ export class TemplatesPageComponent {
           // Silent — cells degrade gracefully.
         },
       });
+
+    // External-status auto-refresh — starts a silent 15s poll whenever a
+    // pending/paused row is visible, stops when every row is terminal.
+    effect(() => {
+      if (this.hasInFlightExternal()) {
+        this.startExternalStatusPoll();
+      } else {
+        this.stopExternalStatusPoll();
+      }
+    });
+
+    this.destroyRef.onDestroy(() => this.stopExternalStatusPoll());
   }
 
   // --- filters / search -----------------------------------------------
@@ -209,6 +236,18 @@ export class TemplatesPageComponent {
   private reload(): void {
     this.loading.set(true);
     this.loadError.set(null);
+    this.fetchPage({ silent: false });
+  }
+
+  /** Silent fetch used by the external-status poll — no loading spinner,
+   *  no error toast on transient failures (the next tick recovers). Row
+   *  updates flow through the same `items` signal so OnPush + trackById
+   *  only re-renders the cells whose external_status actually changed. */
+  private silentReload(): void {
+    this.fetchPage({ silent: true });
+  }
+
+  private fetchPage({ silent }: { silent: boolean }): void {
     const offset = this.pageIndex() * PAGE_SIZE;
     this.api
       .list({
@@ -223,15 +262,27 @@ export class TemplatesPageComponent {
         next: (res) => {
           this.items.set(res.items);
           this.total.set(res.total);
-          this.loading.set(false);
+          if (!silent) this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
+          if (silent) return;
           this.items.set([]);
           this.total.set(0);
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load templates.');
         },
       });
+  }
+
+  private startExternalStatusPoll(): void {
+    if (this.pollTimer !== null) return;
+    this.pollTimer = setInterval(() => this.silentReload(), EXTERNAL_STATUS_POLL_MS);
+  }
+
+  private stopExternalStatusPoll(): void {
+    if (this.pollTimer === null) return;
+    clearInterval(this.pollTimer);
+    this.pollTimer = null;
   }
 
   // Trackby helper for the template's @for loop.

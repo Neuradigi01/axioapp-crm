@@ -109,9 +109,7 @@ async def _contact_delete_conflict_detail(
                 session, ids=contact_ids, org_id=org_id
             )
         else:
-            counts = await data_access.count_delete_blockers_for_contact(
-                session, contact_ids[0]
-            )
+            counts = await data_access.count_delete_blockers_for_contact(session, contact_ids[0])
     except SQLAlchemyError:
         return _fallback_conflict_message(exc, plural=plural)
 
@@ -458,10 +456,26 @@ async def update_contact(
     # sets after the commit. Contact.tags is a list column — we treat
     # membership changes as set semantics (order changes don't count).
     tags_before: set[str] = {str(t) for t in (contact.tags or [])}
+    # Snapshot phone BEFORE mutation so the WhatsApp/SMS conversation
+    # cascade below can detect a real change. The conversation row
+    # snapshots ``external_id`` at inbound time; without a cascade the
+    # inbox header + next-inbound match go stale the moment an operator
+    # adds a country code here.
+    phone_before: str | None = contact.phone
     changed_fields = list(changes.keys())
 
     for key, value in changes.items():
         setattr(contact, key, value)
+
+    if "phone" in changes and contact.phone and contact.phone != phone_before:
+        from src.app.core.conversations import service as conversations_service
+
+        await conversations_service.resync_external_id_for_contact_phone(
+            session,
+            contact_id=contact.id,
+            new_phone=contact.phone,
+        )
+
     await session.commit()
     await session.refresh(contact)
 
@@ -1016,6 +1030,10 @@ async def list_contacts(
     page: int = 1,
     size: int = 50,
     exclude_anonymised: bool = False,
+    lead_statuses: list[str] | None = None,
+    lead_stages: list[str] | None = None,
+    lead_sources: list[str] | None = None,
+    lead_form_ids: list[uuid.UUID] | None = None,
 ) -> tuple[list[Contact], int]:
     """Paginated list with optional filters. Returns (rows, total).
 
@@ -1044,6 +1062,10 @@ async def list_contacts(
         sort=sort,
         order=order,
         exclude_anonymised=exclude_anonymised,
+        lead_statuses=lead_statuses,
+        lead_stages=lead_stages,
+        lead_sources=lead_sources,
+        lead_form_ids=lead_form_ids,
     )
     return await paginate(session, base, page=page, size=size)
 

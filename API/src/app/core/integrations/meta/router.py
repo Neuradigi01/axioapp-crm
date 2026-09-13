@@ -36,6 +36,7 @@ from src.app.core.integrations.meta.api_client import (
     MetaTokenExpiredError,
 )
 from src.app.core.integrations.models import IntegrationProvider
+from src.app.core.integrations.service import auto_attach_forms
 from src.app.core.integrations.service import get as get_integration
 from src.app.core.users.models import User
 from src.app.shared.context import (
@@ -185,7 +186,15 @@ async def list_lead_forms_endpoint(
             status_code=401,
             detail="Meta token expired — reconnect required.",
         ) from None
-    return [{"form_id": f.form_id, "name": f.name, "status": f.status} for f in forms]
+    return [
+        {
+            "form_id": f.form_id,
+            "name": f.name,
+            "status": f.status,
+            "questions": list(f.questions),
+        }
+        for f in forms
+    ]
 
 
 @router.post("/pages/{page_id}/subscribe")
@@ -273,10 +282,41 @@ async def subscribe_page_endpoint(
             page_name=(f"Instagram: @{linked_ig.username}" if linked_ig.username else "Instagram"),
             page_token=page.access_token,
         )
+    # Step 13 — CRM industry standard: subscribing a Page means "leads
+    # start flowing." Fetch every Lead Form on the Page and auto-attach
+    # a subscription row (with heuristic default field_mapping) for
+    # each form not already subscribed. Idempotent: operator edits on
+    # any existing row survive re-subscribe unchanged.
+    #
+    # Failures here MUST NOT roll back the Page subscription — Meta is
+    # already delivering, and per-form Attach in the Settings UI is the
+    # graceful fallback for the operator.
+    attached = 0
+    try:
+        forms_on_page = await subscriptions.list_lead_forms_for_page(
+            client, page_id=page_id, page_token=page.access_token
+        )
+        attached = await auto_attach_forms(
+            db,
+            org_id=integration.org_id,
+            integration_id=integration.id,
+            forms=[(f.form_id, f.name, list(f.questions)) for f in forms_on_page],
+        )
+    except Exception:
+        import logging as _logging
+
+        _logging.getLogger(__name__).warning(
+            "meta: page=%s subscribed but auto-attach failed — operator can use "
+            "per-form Attach in Settings",
+            page_id,
+            exc_info=True,
+        )
+
     return {
         "status": "subscribed",
         "page_id": page_id,
         "instagram_business_id": (linked_ig.ig_business_id if linked_ig else None),
+        "forms_auto_attached": attached,
     }
 
 

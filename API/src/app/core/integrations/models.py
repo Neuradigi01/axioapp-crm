@@ -167,6 +167,13 @@ class IntegrationSubscription(Base, TenantScoped):
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    # Per-form initial pipeline_stage override. NULL = fall back to the
+    # org's default first stage (unchanged pre-Step-10 behaviour). When
+    # set, holds a `PipelineStage.key` string that the ad-webhook worker
+    # passes through to `LeadCreate.pipeline_stage`. Validated at write
+    # time against the org's leads pipeline (service.py) — bad keys
+    # cannot land here even via a direct PUT.
+    pipeline_stage: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

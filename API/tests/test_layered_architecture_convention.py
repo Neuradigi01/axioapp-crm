@@ -184,6 +184,7 @@ _TRANSACTION_EXCEPTIONS: dict[str, str] = {
     # LLM completion; Step 10 heartbeats mid-ingest).
     "core/ai_assistants/runtime.py": "Chat runtime (own txn — cost outbox + SSE lifecycle)",
     "core/ai_assistants/ingest.py": "Celery knowledge ingest (own txn — heartbeat + chunk upserts)",
+    "core/ai_assistants/dispatch.py": "Channel-agnostic AI dispatch (own txn — handover-pause + WA/email reply pipelines)",
     # --- Pack billing module — router-only PDF generation shell, completion deferred
     "packs/furniture/modules/billing/router.py": "Pack billing PDF stub (Phase 4 follow-up)",
 }
@@ -339,6 +340,7 @@ _HELPER_CRUD_EXCEPTIONS: dict[str, str] = {
     # --- AI Assistants module helpers (Steps 9 + 10)
     "core/ai_assistants/runtime.py": "Chat runtime (retrieve + LLM stream + cost outbox)",
     "core/ai_assistants/ingest.py": "Celery knowledge ingest (chunk + embed + upsert)",
+    "core/ai_assistants/dispatch.py": "Channel-agnostic AI dispatch (session.add on outbound Message in WA reply pipeline)",
 }
 
 

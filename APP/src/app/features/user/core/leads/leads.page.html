@@ -633,7 +633,7 @@
                         </span>
                       }
                       @case ('source') {
-                        @if (contact?.source; as src) {
+                        @if (sourceCellLabel(lead, contact?.source); as src) {
                           <span
                             class="inline-flex items-center rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-default ring-1 border-subtle"
                           >

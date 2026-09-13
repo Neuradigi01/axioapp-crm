@@ -321,7 +321,40 @@ _PRESET_SPECS: list[_PresetSpec] = [
         # trigger payload at `assignee.email` by the tasks publisher.
         # `custom` walks the payload; no new resolver code needed.
         recipient={"kind": "custom", "path": "assignee.email"},
+        # Skip lead follow-ups — the dedicated "Lead Follow-up Scheduled"
+        # preset (below) handles those with a richer template that
+        # includes contact + lead context. Without this exclusion the
+        # assignee would receive both the generic Task Assigned email
+        # and the Lead Follow-up email for every lead follow-up they're
+        # given.
+        conditions={
+            "any": [
+                {"op": "neq", "path": "task.related_entity_type", "value": "lead"},
+                {"op": "is_null", "path": "task.followup_type"},
+            ]
+        },
         template_seeder="seed_task_assigned_template",
+    ),
+    _PresetSpec(
+        name="Lead Follow-up Scheduled",
+        event_type="task.assigned",
+        channel="email",
+        node_type="send.email",
+        # Same assignee-email resolver as Task Assigned — the follow-up
+        # ends up on the lead's owner (or the actor when unassigned),
+        # and either way the tasks publisher fills `assignee.email`.
+        recipient={"kind": "custom", "path": "assignee.email"},
+        # Mirror-image of Task Assigned's exclusion: fires only when the
+        # task IS a lead follow-up (related_entity_type='lead' AND a
+        # followup_type is set — distinguishes true follow-ups from
+        # generic lead-related tasks).
+        conditions={
+            "all": [
+                {"op": "eq", "path": "task.related_entity_type", "value": "lead"},
+                {"not": {"op": "is_null", "path": "task.followup_type"}},
+            ]
+        },
+        template_seeder="seed_lead_follow_up_email_template",
     ),
     _PresetSpec(
         name="Task Completed",

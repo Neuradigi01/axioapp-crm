@@ -25,9 +25,12 @@ require auth + permission (Step 19):
 
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import FRONTEND_URL
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.subscriptions import plans
 from src.app.core.subscriptions import service as subscription_service
@@ -53,21 +56,24 @@ from src.app.shared.db import get_db
 # Hosts the checkout URLs may redirect to. Anything outside this set
 # is rejected with 400 to prevent the endpoint from being used as an
 # open redirect — Stripe will gladly redirect anywhere the host gives
-# it. Localhost ports cover the dev workflow; production deployments
-# add their public host via a future config flag (out of scope for v1).
-_ALLOWED_REDIRECT_HOSTS: frozenset[str] = frozenset(
-    {
-        "localhost",
-        "127.0.0.1",
-    }
-)
+# it. `localhost` / `127.0.0.1` cover dev; the env-configured
+# `FRONTEND_URL` host covers the deployed frontend (crm.aixoapp.com
+# in prod, localhost in local).
+def _build_allowed_redirect_hosts() -> frozenset[str]:
+    hosts: set[str] = {"localhost", "127.0.0.1"}
+    frontend_host = urlparse(FRONTEND_URL).hostname
+    if frontend_host:
+        hosts.add(frontend_host)
+    return frozenset(hosts)
+
+
+_ALLOWED_REDIRECT_HOSTS: frozenset[str] = _build_allowed_redirect_hosts()
 
 
 def _validate_redirect_url(raw: str | None) -> None:
     """Reject off-domain redirects. Empty / `None` is OK — caller defaults it."""
     if not raw:
         return
-    from urllib.parse import urlparse
 
     parsed = urlparse(raw)
     if not parsed.scheme or not parsed.netloc:

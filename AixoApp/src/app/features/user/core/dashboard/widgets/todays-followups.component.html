@@ -286,3 +286,24 @@
     </ul>
   }
 </div>
+
+@if (completingRow(); as row) {
+  <app-confirm-dialog
+    [title]="'Mark “' + row.title + '” as complete?'"
+    [body]="'This closes the follow-up. You can reopen it from the Tasks page if you change your mind.'"
+    [confirmLabel]="'Mark as done'"
+    (confirm)="confirmComplete()"
+    (cancel)="closeCompleteConfirm()"
+  />
+}
+
+@if (missingRow(); as row) {
+  <app-confirm-dialog
+    [title]="'Mark “' + row.title + '” as missed?'"
+    [body]="'Missed is a terminal status — the follow-up drops out of the open list. You cannot undo this from the row; it stays visible under the Missed (7d) tab.'"
+    [confirmLabel]="'Mark missed'"
+    [danger]="true"
+    (confirm)="confirmMarkMissed()"
+    (cancel)="closeMarkMissedConfirm()"
+  />
+}

@@ -124,6 +124,40 @@ async def list_contacts_endpoint(
             "offer wiped records as merge / link targets."
         ),
     ),
+    lead_status: list[str] | None = Query(
+        default=None,
+        description=(
+            "Restrict to contacts that have at least one Lead with "
+            "``status`` in this set (active / won / lost). Repeatable — "
+            "OR-set semantics."
+        ),
+    ),
+    lead_stage: list[str] | None = Query(
+        default=None,
+        description=(
+            "Restrict to contacts that have at least one Lead in one of "
+            "these pipeline-stage keys. Repeatable — OR-set semantics."
+        ),
+    ),
+    lead_source: list[str] | None = Query(
+        default=None,
+        description=(
+            "Restrict to contacts that have at least one Lead with "
+            "``source`` in this set (manual / bulk_import / widget / "
+            "google_ads / meta_ads / whatsapp_flow / walk_in). "
+            "Repeatable — OR-set semantics."
+        ),
+    ),
+    lead_form_id: list[uuid.UUID] | None = Query(
+        default=None,
+        description=(
+            "Restrict to contacts that have at least one widget-sourced "
+            "Lead whose ``attribution.form_id`` matches. Powers the "
+            "'Form name' chip picker on the campaign audience filter "
+            "and the group-builder contact picker. Repeatable — "
+            "OR-set semantics."
+        ),
+    ),
     # Default matches the frontend list page (contacts-list.page.ts) so
     # first-load and URL-persistence-stripped calls see the same order —
     # otherwise the sort dropdown shows "Last activity" but the rows come
@@ -148,6 +182,10 @@ async def list_contacts_endpoint(
         page=page,
         size=size,
         exclude_anonymised=exclude_anonymised,
+        lead_statuses=lead_status,
+        lead_stages=lead_stage,
+        lead_sources=lead_source,
+        lead_form_ids=lead_form_id,
     )
     return ContactListResponse(
         items=[ContactListItem.model_validate(r) for r in rows],

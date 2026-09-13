@@ -288,6 +288,14 @@ async def process_meta_lead_async(
             # Route through the centralised ingest service so the
             # open-lead dedup + round-robin assignment apply uniformly
             # across all five channels.
+            #
+            # Per-form pipeline_stage override (Step 10): if the Owner
+            # set one on the subscription, pass it through. The shared
+            # `_resolve_initial_stage` in leads.service validates it
+            # against the org's leads pipeline (bad keys → 422 there
+            # too, defence-in-depth beyond the write-time check). When
+            # None, ingest falls back to the default first stage —
+            # unchanged pre-Step-10 behaviour.
             result = await ingest_lead(
                 session,
                 org_id=org_id,
@@ -298,6 +306,7 @@ async def process_meta_lead_async(
                     custom_data=_extract_custom(mapped),
                     source=LeadSource.meta_ads,
                     attribution=_build_attribution(payload, leadgen_id),
+                    pipeline_stage=subscription.pipeline_stage,
                 ),
             )
 

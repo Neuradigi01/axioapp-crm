@@ -63,7 +63,16 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(authedReq).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (error.status !== 401 || isRefreshCall || !access) {
+      if (error.status !== 401 || isRefreshCall) {
+        return throwError(() => error);
+      }
+      // No access token in storage but a 401 came back on one of our
+      // owned URLs — the session was cleared (another tab logged out,
+      // storage got wiped, etc). Send them to login instead of letting
+      // the caller surface a raw "Not authenticated" toast.
+      if (!access) {
+        storage.clear();
+        router.navigate(['/accounts/login']);
         return throwError(() => error);
       }
       return tryRefreshAndRetry(req, next, auth, storage, router);

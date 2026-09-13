@@ -78,6 +78,13 @@ class CallOut(ORMModel):
     # `GET /calls/{id}/recording`.
     has_recording: bool = False
     assigned_to_id: uuid.UUID | None
+    created_by_id: uuid.UUID | None
+    # Denormalised display names, populated by the list endpoint via
+    # bulk lookups so the Call Logs table can render contact + logger
+    # cells without an N+1 fetch. Single-row reads (GET, POST) leave
+    # them None — the caller already has that context.
+    contact_name: str | None = None
+    created_by_name: str | None = None
     custom_data: dict[str, Any]
     created_at: datetime
 

@@ -94,7 +94,12 @@ class IntegrationUpsert(BaseModel):
 class IntegrationSubscriptionRead(TimestampedOrgScopedOut):
     """Subscription row projection — what the Settings UI shows in the
     form-picker list. `field_mapping` is exposed in full so the editor
-    in Step 8 can drive its UI without a second fetch."""
+    in Step 8 can drive its UI without a second fetch.
+
+    `pipeline_stage` (Step 10) is the per-form initial-stage override.
+    NULL = fall back to the org's default first stage on ingest; set =
+    the ad-webhook worker passes it through as `LeadCreate.pipeline_stage`.
+    """
 
     id: uuid.UUID
     integration_id: uuid.UUID
@@ -102,6 +107,7 @@ class IntegrationSubscriptionRead(TimestampedOrgScopedOut):
     external_form_label: str | None
     field_mapping: dict
     enabled: bool
+    pipeline_stage: str | None = None
 
 
 class IntegrationSubscriptionCreate(BaseModel):
@@ -110,23 +116,33 @@ class IntegrationSubscriptionCreate(BaseModel):
     `field_mapping` is `{ad_field_name: "contact.full_name"}` /
     `"contact.phone"` / `"contact.email"` / `"custom_data.<key>"`
     — same target shape as the bulk-import mapping. Empty mapping is
-    allowed at create time; the editor in Step 8 fills it in."""
+    allowed at create time; the editor in Step 8 fills it in.
+
+    `pipeline_stage` (Step 10) is the per-form initial-stage override.
+    Length + shape match `LeadCreate.pipeline_stage`; the service layer
+    validates the key against the org's leads pipeline at write time."""
 
     integration_id: uuid.UUID
     external_form_id: str = Field(min_length=1, max_length=128)
     external_form_label: str | None = Field(default=None, max_length=255)
     field_mapping: dict = Field(default_factory=dict)
     enabled: bool = True
+    pipeline_stage: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class IntegrationSubscriptionUpdate(BaseModel):
     """Partial-update shape for the mapping editor + enable/disable
     toggle in the Settings UI. `external_form_id` is immutable — to
-    point at a different form, delete + recreate."""
+    point at a different form, delete + recreate.
+
+    `pipeline_stage` (Step 10): omit to leave unchanged; pass ``null``
+    explicitly to clear an existing override (Pydantic v2 distinguishes
+    absent-vs-null via `model_fields_set`; the service reads that)."""
 
     external_form_label: str | None = Field(default=None, max_length=255)
     field_mapping: dict | None = None
     enabled: bool | None = None
+    pipeline_stage: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class IntegrationDLQRead(ORMModel):

@@ -60,6 +60,27 @@
           </div>
         }
 
+        <div class="mb-4">
+          <label class="mb-1 block text-xs font-medium text-default" for="pipeline-stage-select">
+            Pipeline stage for new leads
+          </label>
+          <select
+            id="pipeline-stage-select"
+            class="w-full rounded-lg border border-subtle bg-surface px-2 py-1.5 text-sm"
+            [value]="pipelineStage()"
+            (change)="setPipelineStage($any($event.target).value)"
+          >
+            <option value="">(Org default — first stage)</option>
+            @for (stage of pipelineStages(); track stage.key) {
+              <option [value]="stage.key">{{ stage.name }}</option>
+            }
+          </select>
+          <p class="mt-1 text-xs text-muted">
+            Leads ingested through this form land in this stage. Leave on default to use the org's
+            first leads-pipeline stage.
+          </p>
+        </div>
+
         @if (formFields().length === 0) {
           <p class="py-4 md:py-6 text-center text-sm text-muted">
             No form fields detected. Confirm the form is published in Google Ads / Meta.

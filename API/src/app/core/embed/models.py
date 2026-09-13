@@ -1,13 +1,29 @@
-"""`EmbedKey` model — per-org public API key for the widget endpoint.
+"""`ApiKey` model — per-org public API key for any public-authed
+surface. Historically named `EmbedKey` (widget-only); migration
+`0201_ai_assistants_schema` retrofitted `resource_type` + `resource_id`
+so the same table serves the lead-form widget AND the AI-assistants
+public router. Migration `0225_rename_embed_to_api_keys` renamed the
+table itself + the model class to reflect the multi-resource reality;
+`EmbedKey` remains as a backward-compat alias for one release, retired
+in `tasks/custom-events` Step 2's fold.
 
-Plaintext key (`pk_live_<32-base62>`) is never persisted. We store
-the bcrypt hash + an 11-char display prefix. Lookup at submission
-time scans the partial index over non-revoked rows by prefix then
-bcrypt-verifies the candidate(s).
+`tasks/custom-events` Step 1 added the events-scope columns (see
+migration `0224_api_keys_events_scope` — `auto_create_contacts`,
+`default_owner_user_id`, `hmac_required`, `mode`, `key_lookup_hash`,
+`old_key_hash`, `old_key_expires_at`, `hmac_secret_encrypted`,
+`rate_limit_per_minute`).
+
+Plaintext key (`pk_live_<32-base62>` / `pk_test_<32-base62>`) is never
+persisted. We store the bcrypt hash + an 11-char display prefix.
+Lookup at submission time scans the partial index over non-revoked
+rows by prefix then bcrypt-verifies the candidate(s). Step 4's
+hardening adds an HMAC-of-full-key O(1) prefilter via
+`key_lookup_hash` to defeat the ~100 ms Argon-verify DoS surface.
 
 Tenant-scoped (RLS on + ORM tenant filter via `TenantScoped`). The
 auto-filter is fine here — every read/write is for the active org.
-`created_by` / `revoked_by` are plain UUIDs (post-0037 convention).
+`created_by` / `revoked_by` / `default_owner_user_id` are plain UUIDs
+(post-0037 convention).
 """
 
 from __future__ import annotations
@@ -17,7 +33,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CHAR, DateTime, Enum, Integer, String, Text, text
+from sqlalchemy import Boolean, CHAR, DateTime, Enum, Index, Integer, LargeBinary, String, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,8 +41,8 @@ from src.app.shared.db import Base
 from src.app.shared.orm import TenantScoped
 
 
-class EmbedKey(Base, TenantScoped):
-    __tablename__ = "tbl_embed_keys"
+class ApiKey(Base, TenantScoped):
+    __tablename__ = "tbl_api_keys"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -84,6 +100,66 @@ class EmbedKey(Base, TenantScoped):
         nullable=False,
         server_default=text("300"),
     )
+    # Migration 0224 (tasks/custom-events Step 1) — columns needed by
+    # the events public surface. Existing embed / ai_assistant rows
+    # keep their defaults; events keys populate these at create time
+    # in Step 4's hardening.
+    auto_create_contacts: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+    )
+    # Plain UUID (no FK) — post-0037 convention. Step 7b's contact
+    # resolution validates it's an active in-org user at ingest time
+    # and falls back to round-robin (never org Owner) on invalid.
+    default_owner_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+    # Events keys default TRUE at create (Step 4); column default FALSE
+    # so existing embed / ai_assistant rows stay unchanged.
+    hmac_required: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+    )
+    # ``pk_live_*`` → real workflows fire. ``pk_test_*`` → dry-run
+    # engine (existing at core/workflows/engine.py:_dry_run_walk).
+    # CHECK constraint restricts to these two values.
+    mode: Mapped[str] = mapped_column(
+        String(4),
+        nullable=False,
+        server_default=text("'live'"),
+    )
+    # Fernet-encrypted HMAC-of-full-key. Step 4's verify does O(1)
+    # lookup on this indexed column before the ~100ms Argon2id call
+    # (defeats DoS-by-random-tokens). NULL until Step 4 lazy-backfills
+    # on next successful Argon verify.
+    key_lookup_hash: Mapped[bytes | None] = mapped_column(
+        LargeBinary,
+        nullable=True,
+    )
+    # Rotate-with-24h-grace (Step 4). Both hashes accepted during
+    # ``old_key_expires_at`` window. Third simultaneous rotation with
+    # grace still active → 409.
+    old_key_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    old_key_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Fernet-encrypted HMAC signing secret. Reveal-once at create,
+    # NEVER re-revealable afterwards (Step 4 enforces at Pydantic
+    # response schema level). NULL for non-events keys.
+    hmac_secret_encrypted: Mapped[bytes | None] = mapped_column(
+        LargeBinary, nullable=True
+    )
+    # Events keys default 100/min. Coexists with ``rate_limit_per_hour``
+    # so embed / ai_assistant surfaces keep their existing semantics —
+    # consumers pick which unit to enforce.
+    rate_limit_per_minute: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("100"),
+    )
 
     @property
     def is_revoked(self) -> bool:
@@ -103,23 +179,61 @@ class EmbedKey(Base, TenantScoped):
 
 
 class WidgetConfig(Base, TenantScoped):
-    """Per-org widget configuration. UNIQUE on `org_id` — single
-    widget config per org for v1. The JSONB `config` document holds
-    the full shape (fields, branding, submit-button label, thank-you
-    copy); see `core/embed/schemas.py` for the typed projection.
+    """A single lead-capture form belonging to an org.
 
-    `updated_by` is a plain UUID (post-0037 convention).
+    Migration 0216 lifted the org-singleton cap from this table so an
+    org can own many forms — one per use case (Contact Us, Quote
+    Request, Newsletter, etc.). Each form carries its own JSONB
+    ``config`` document (fields, branding, submit-button label,
+    thank-you copy — see ``core/embed/schemas.py``) and is referenced
+    by an :class:`EmbedKey` (``resource_type='lead_form'`` +
+    ``resource_id=<this row's id>``).
+
+    ``is_default`` — the form the widget resolves to when the embed
+    snippet omits ``data-form``. Exactly one live form per org should
+    carry ``is_default=true`` (service layer enforces).
+
+    ``deleted_at`` — soft-delete stamp. Historical leads keep their
+    ``attribution.form_id`` pointing at the deleted row so the source
+    column still renders "Forms · <name>". A partial UNIQUE index on
+    ``(org_id, slug) WHERE deleted_at IS NULL`` means a deleted form's
+    slug is free to reuse.
+
+    ``updated_by`` is a plain UUID (post-0037 convention).
     """
 
     __tablename__ = "tbl_widget_configs"
+    __table_args__ = (
+        # Partial UNIQUE — one live form per (org, slug). Deleted rows
+        # are excluded so their slug frees up for a fresh form. Mirrors
+        # the DDL in migration 0216 exactly; SQLAlchemy needs the same
+        # shape declared so `create_all` in tests produces the index too.
+        Index(
+            "uq_widget_configs_org_slug_live",
+            "org_id",
+            "slug",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_default: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+    )
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -194,8 +308,15 @@ class EmbedSubmissionLog(Base, TenantScoped):
     )
 
 
+# Backward-compat alias for callers still importing ``EmbedKey``.
+# Retired in ``tasks/custom-events`` Step 2 alongside the module fold
+# into ``core/public_ingest/``. New code MUST import ``ApiKey``.
+EmbedKey = ApiKey
+
+
 __all__ = [
-    "EmbedKey",
+    "ApiKey",
+    "EmbedKey",  # deprecated alias
     "EmbedSubmissionLog",
     "EmbedSubmissionOutcome",
     "WidgetConfig",

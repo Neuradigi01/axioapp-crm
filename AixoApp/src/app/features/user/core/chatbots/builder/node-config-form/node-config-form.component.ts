@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { MobileSelectComponent } from '../../../shared/forms/mobile-select.component';
+import { BotVariable } from '../../../shared/variable-picker/variable-picker-api.service';
+import { VariablePickerComponent } from '../../../shared/variable-picker/variable-picker.component';
 import { FieldSchema } from '../node-type-registry';
 
 /**
@@ -26,7 +28,13 @@ interface ButtonRow {
 @Component({
   selector: 'app-node-config-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, MobileSelectComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    LucideAngularModule,
+    MobileSelectComponent,
+    VariablePickerComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './node-config-form.component.html',
 })
@@ -43,6 +51,11 @@ export class NodeConfigFormComponent {
   /** Whether the node this form belongs to is the current
    *  `pendingSourceId` — used with `pendingPortLabel` to highlight. */
   @Input() nodeIsPending = false;
+  /** Per-graph session variables — the paths of `answers.<node_id>` from
+   *  every Ask-* / Set-Custom-Field node upstream in the current bot.
+   *  Injected by the builder page so the variable picker can offer them
+   *  alongside the org-wide Contact / Lead / Runtime scopes. */
+  @Input() sessionVariables: BotVariable[] = [];
 
   @Output() readonly patch = new EventEmitter<Record<string, unknown>>();
   @Output() readonly portClick = new EventEmitter<{ label: string; event: MouseEvent }>();
@@ -117,6 +130,38 @@ export class NodeConfigFormComponent {
 
   onText(key: string, value: string): void {
     this.setValue(key, value);
+  }
+
+  /** Insert a `{{path}}` token into a textarea at the caret position
+   *  (or at the end if the textarea isn't focused). Preserves any
+   *  selected text by replacing it with the token — same behaviour as
+   *  HubSpot / Mailchimp merge-tag pickers.
+   *
+   *  Smart de-dupe: if the operator typed `{{` right before opening the
+   *  picker (a natural "I want to insert a variable here" gesture), we
+   *  swallow those two chars so the final text is a clean single-token
+   *  `{{contact.first_name}}` instead of a broken `{{{{contact.first_name}}`.
+   *
+   *  Re-focuses the textarea + repositions the caret after the inserted
+   *  token so the operator can keep typing without a click. */
+  insertToken(textarea: HTMLTextAreaElement, fieldKey: string, token: string): void {
+    const value = textarea.value ?? '';
+    let start = textarea.selectionStart ?? value.length;
+    const end = textarea.selectionEnd ?? value.length;
+    // If the two chars immediately before the caret are `{{`, back up
+    // and drop them — the token already carries its own leading `{{`.
+    if (start === end && start >= 2 && value.slice(start - 2, start) === '{{') {
+      start -= 2;
+    }
+    const nextValue = value.slice(0, start) + token + value.slice(end);
+    this.setValue(fieldKey, nextValue);
+    // Wait for Angular to flush the value update, then place the caret
+    // right after the inserted token so the next keystroke lands there.
+    setTimeout(() => {
+      textarea.focus();
+      const caret = start + token.length;
+      textarea.setSelectionRange(caret, caret);
+    }, 0);
   }
 
   onNumber(key: string, raw: string): void {

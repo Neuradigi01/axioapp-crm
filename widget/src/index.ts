@@ -92,6 +92,14 @@ export async function init(config: InitConfig): Promise<void> {
   // multiple widget instances on the same page).
   injectStyles();
 
+  // Multi-form Step 9: stamp the snippet's ``data-form`` slug onto
+  // the mount so the host page can target per-form CSS overrides
+  // (``[data-form-slug="contact-us"] .furnicrm-form__submit { … }``).
+  // Purely presentational — the API resolves the form via the key.
+  if (config.formSlug) {
+    mount.setAttribute("data-form-slug", config.formSlug);
+  }
+
   renderLoading(mount);
   const attribution = captureAttribution();
 
@@ -121,7 +129,7 @@ export async function init(config: InitConfig): Promise<void> {
 
   let widgetConfig: WidgetConfig;
   try {
-    widgetConfig = await getConfig(config.key, config.host);
+    widgetConfig = await getConfig(config.key, config.host, config.formSlug);
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) {
       // Bad / revoked key — the widget shouldn't render. Show a
@@ -160,7 +168,7 @@ export async function init(config: InitConfig): Promise<void> {
     }
 
     try {
-      await submitLead(config.key, config.host, payload);
+      await submitLead(config.key, config.host, payload, config.formSlug);
       // Success — wipe the form, paint the thank-you.
       renderSuccessState(mount, widgetConfig);
     } catch (err) {

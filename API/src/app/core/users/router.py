@@ -91,6 +91,17 @@ async def get_me(
 ) -> UserMe:
     role = await get_role_by_id(session, user.role_id)
     permissions = await list_permissions_for_role(session, user.role_id)
+    # Merge DB-granted keys with the role's template keys so newly-
+    # added permissions (e.g. custom_events.*) surface for Owner /
+    # Admin / Employee without a per-org DB backfill. Server-side
+    # gates use the same additive template-fallback via
+    # ``role_has_permission`` — keeping /me consistent means the
+    # frontend's ``hasPermission`` check matches what the API would
+    # actually authorise.
+    from src.app.core.permissions.service import template_keys_for_role
+
+    template_keys = await template_keys_for_role(session, user.role_id)
+    effective_keys = sorted({p.key for p in permissions} | template_keys)
     org = await tenants_service.get_organization_by_id(session, user.org_id)
     assert org is not None  # authed user implies their org exists
     return UserMe(
@@ -106,7 +117,7 @@ async def get_me(
         created_at=user.created_at,
         updated_at=user.updated_at,
         role_name=role.name if role else "",
-        permission_keys=[p.key for p in permissions],
+        permission_keys=effective_keys,
         org=OrgSummary.model_validate(org),
         needs_onboarding=(org.template_id == "pending"),
     )

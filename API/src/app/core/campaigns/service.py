@@ -804,10 +804,17 @@ async def resolve_audience(
             return []
         return await resolve_group_contacts(session, group_id=af.group_id)
 
-    # Filter mode (q / source / tag) — falls through to "" empty
-    # filter = "everyone" by intentional design.
+    # Filter mode (q / source / tag / lead_*) — falls through to ""
+    # empty filter = "everyone" by intentional design.
     return await campaigns_da.list_contact_ids_for_audience(
-        session, q=af.q, source=af.source, tag=af.tag
+        session,
+        q=af.q,
+        source=af.source,
+        tag=af.tag,
+        lead_statuses=af.lead_status,
+        lead_stages=af.lead_stage,
+        lead_sources=af.lead_source,
+        lead_form_ids=af.lead_form_id,
     )
 
 

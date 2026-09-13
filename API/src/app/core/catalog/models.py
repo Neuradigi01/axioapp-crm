@@ -83,6 +83,7 @@ class CatalogItem(Base, TenantScoped):
     __table_args__ = (
         UniqueConstraint("org_id", "sku", name="uq_catalog_items_org_sku"),
         Index("ix_catalog_items_org_category", "org_id", "category"),
+        Index("ix_catalog_items_org_status", "org_id", "status"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -125,6 +126,18 @@ class CatalogItem(Base, TenantScoped):
         server_default=text("'{}'::jsonb"),
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    # Publish state machine (migration 0223). Kept as plain VARCHAR;
+    # values validated against ``CatalogStatus`` at the service layer.
+    # ``is_active`` continues to govern whether the item shows in
+    # internal pickers (lead-interest, walk-in etc.); ``status`` gates
+    # the public share surface.
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        server_default=text("'draft'"),
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Primary cover image. Kept as a scalar for backwards compat and
     # because most cards render only one image; the gallery below is
     # additive.

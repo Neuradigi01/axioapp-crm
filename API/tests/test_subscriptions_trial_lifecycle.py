@@ -97,7 +97,7 @@ async def fresh_org(test_db):
 
 
 @pytest.mark.asyncio
-async def test_create_trial_subscription_inserts_14_day_trial(test_db, fresh_org):
+async def test_create_trial_subscription_inserts_100_day_trial(test_db, fresh_org):
     sub = await create_trial_subscription(test_db, org_id=fresh_org.id)
     # Hook does NOT commit; the caller does.
     await test_db.commit()
@@ -111,7 +111,7 @@ async def test_create_trial_subscription_inserts_14_day_trial(test_db, fresh_org
     assert sub.trial_started_at is not None
     assert sub.trial_ends_at is not None
     window = sub.trial_ends_at - sub.trial_started_at
-    assert timedelta(days=13, hours=23) < window < timedelta(days=14, hours=1)
+    assert timedelta(days=99, hours=23) < window < timedelta(days=100, hours=1)
 
 
 @pytest.mark.asyncio

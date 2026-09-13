@@ -10,6 +10,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { forkJoin } from 'rxjs';
+import { LucideAngularModule } from 'lucide-angular';
 
 import {
   CustomField,
@@ -19,28 +20,65 @@ import {
   FieldSource,
 } from './custom-fields-api.service';
 import { FieldFormComponent } from './field-form.component';
-import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * Curated entity list for the picker. Once the module registry exposes
- * entity discovery (planned with the broader contact / lead modules),
- * this becomes `registry.list().flatMap(m => m.entities)`. Keeping it
- * static here keeps Step 2.2 self-contained.
+ * Curated entity list for the picker. Each entry drives one card on
+ * the entity selector at the top of the page — icon + label +
+ * one-line description. Once the module registry exposes entity
+ * discovery, this becomes ``registry.list().flatMap(m => m.entities)``.
  */
-const ENTITY_TYPES: ReadonlyArray<{ value: string; label: string }> = [
-  { value: 'contact', label: 'Contacts' },
-  { value: 'lead', label: 'Leads' },
-  { value: 'walk_in', label: 'Walk-ins' },
-  { value: 'appointment', label: 'Appointments' },
-  { value: 'task', label: 'Tasks' },
+interface EntityDescriptor {
+  value: string;
+  label: string;
+  icon: string;
+  description: string;
+}
+
+const ENTITY_TYPES: ReadonlyArray<EntityDescriptor> = [
+  {
+    value: 'contact',
+    label: 'Contacts',
+    icon: 'users',
+    description: 'People in your CRM',
+  },
+  {
+    value: 'lead',
+    label: 'Leads',
+    icon: 'target',
+    description: 'Sales opportunities',
+  },
+  {
+    value: 'walk_in',
+    label: 'Walk-ins',
+    icon: 'footprints',
+    description: 'In-store visits',
+  },
+  {
+    value: 'appointment',
+    label: 'Appointments',
+    icon: 'calendar',
+    description: 'Scheduled meetings',
+  },
+  {
+    value: 'task',
+    label: 'Tasks',
+    icon: 'check-square',
+    description: 'To-dos & follow-ups',
+  },
+  {
+    value: 'catalog_item',
+    label: 'Products',
+    icon: 'package',
+    description: 'Catalog items',
+  },
 ];
 
 @Component({
   selector: 'app-custom-fields-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DragDropModule, FieldFormComponent, MobileSelectComponent],
+  imports: [DragDropModule, FieldFormComponent, LucideAngularModule],
   templateUrl: './custom-fields.page.html',
 })
 export class CustomFieldsPageComponent {
@@ -49,6 +87,12 @@ export class CustomFieldsPageComponent {
 
   readonly entityTypes = ENTITY_TYPES;
   readonly entityType = signal<string>(ENTITY_TYPES[0].value);
+
+  /** Metadata for the currently-selected entity card. Drives the
+   *  section heading + description below the picker. */
+  readonly selectedEntity = computed<EntityDescriptor>(
+    () => ENTITY_TYPES.find((e) => e.value === this.entityType()) ?? ENTITY_TYPES[0],
+  );
 
   readonly fields = signal<CustomField[]>([]);
   readonly loading = signal(false);

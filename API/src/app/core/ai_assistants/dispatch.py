@@ -18,15 +18,21 @@ through :class:`~core.ai_assistants.runtime.ChatRuntime` end-to-end
 with its own session semantics; unifying it here is a follow-up
 (refactor ``ChatRuntime`` to accept a ``ChannelContext``).
 
-Email inbound is stubbed here for Step 5 and picked up in Step 6
-(reply-worthiness guardrails must land before we auto-answer any
-email — otherwise the assistant tries to reply to Amazon shipping
-notifications).
+Email inbound was stubbed in Step 5 (guardrail-only), then wired
+end-to-end here: guardrail + bound-assistant resolution +
+:func:`_run_ai_email_reply` which invokes
+:func:`~core.ai_assistants.runtime.reply_once` for the LLM turn
+and hands the composed thread to
+:func:`~core.conversations.adapters.email.send_email` for outbound
+dispatch (SMTP or OAuth, whichever the org has configured). Gated
+by ``config.AI_EMAIL_INBOUND_ENABLED`` — keep off until an org
+binds an assistant to the ``email`` channel.
 """
 
 from __future__ import annotations
 
 import logging
+import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -285,30 +291,33 @@ async def route_email_inbound(
     before ever considering an AI reply, so newsletters / bounces /
     role-account mail never trigger the LLM.
 
-    Behaviour gate:
+    Gate order:
 
-      * ``config.AI_EMAIL_INBOUND_ENABLED`` false (default) → silent
-        return. Orgs upgrading without a bound email assistant see zero
-        behaviour change until ops flip the flag.
-      * ``conversation.ai_paused`` → silent return (human owns thread).
-      * Guardrail rejects → structured log line records the reason for
-        post-hoc analytics; no reply fires.
-      * Guardrail passes → currently logs "would-reply" pending the
-        ChannelContext outbound path (deferred alongside the
-        ``ChatRuntime`` refactor). Once wired, the same delegate hook
-        used by :func:`route_whatsapp_inbound` will send the reply
-        through the existing email outbound module using
-        :func:`~core.ai_assistants.email_threading.build_reply_thread`
-        for the ``In-Reply-To`` / ``Re:`` / quoted-body threading.
+      1. ``config.AI_EMAIL_INBOUND_ENABLED`` false → silent return.
+         Orgs upgrading without a bound email assistant see zero
+         behaviour change until ops flip the flag.
+      2. ``conversation.ai_paused`` → silent return (human owns thread).
+      3. ``inbound_email is None`` (legacy caller w/o envelope) →
+         fail-closed silent return.
+      4. Guardrail rejects → structured log line records the reason
+         for post-hoc analytics; no reply fires.
+      5. No assistant bound to the ``email`` channel for this org →
+         silent skip.
+      6. Otherwise → :func:`_run_ai_email_reply` composes the reply
+         via the shared LLM runtime + dispatches through
+         :func:`~core.conversations.adapters.email.send_email` (SMTP
+         or OAuth, resolved via
+         :func:`~core.shared.email.org_sender.resolve_org_sender`).
 
-    The ``inbound_email`` parameter is the guardrail input. Callers
-    on the future email-sync path build it from the raw MIME envelope
-    (``sender_email`` from ``From:``, ``headers`` from every mail
-    header, ``body_text`` from the plain-text alternative). The old
-    ``inbound_text``-only signature stays accepted for API stability
-    but skips the guardrail (no headers ⇒ no way to filter role mail
-    safely) — kept only so a caller that already exists doesn't crash
-    when the flag flips on before it's updated.
+    ``inbound_email`` is the guardrail input built by the caller from
+    the raw MIME envelope: ``sender_email`` from ``From:``, ``headers``
+    from every mail header, ``body_text`` from the plain-text
+    alternative. Mailgun's ingest task (:mod:`~core.email.mailgun.tasks`)
+    populates it before invoking us via
+    :func:`~core.conversations.adapters.email._persist_inbound_email`.
+    The old ``inbound_text``-only signature stays accepted for API
+    stability but fails closed (no headers ⇒ no way to filter role
+    mail safely).
     """
     from config import AI_EMAIL_INBOUND_ENABLED
 
@@ -338,17 +347,195 @@ async def route_email_inbound(
         )
         return None
 
-    # Email outbound send path lands in a follow-up step (needs the
-    # ChannelContext refactor of ``ChatRuntime``). Log a hint so ops
-    # can confirm the guardrail is picking real conversations before
-    # the reply pipeline is turned on.
-    logger.info(
-        "ai_dispatch.email guardrail_pass conv=%s sender=%s subject=%r",
-        conversation.id,
-        inbound_email.sender_email,
-        inbound_email.subject,
+    # Resolve the org's email-bound assistant. Unlike WhatsApp, email
+    # has no legacy per-conversation ``ai_handling`` flag — a bound
+    # assistant is the only route to an auto-reply.
+    bound = await _da.find_active_assistant_bound_to_channel(
+        session,
+        channel=AiAssistantChannel.email.value,
     )
+    if bound is None:
+        logger.info(
+            "ai_dispatch.email skipped conv=%s reason=no_bound_assistant",
+            conversation.id,
+        )
+        return None
+
+    try:
+        await _run_ai_email_reply(
+            session,
+            conversation=conversation,
+            assistant_id=bound.id,
+            inbound_email=inbound_email,
+        )
+    except Exception:  # pragma: no cover — defensive
+        logger.exception(
+            "ai_dispatch.email failed conv=%s assistant=%s",
+            conversation.id,
+            bound.id,
+        )
     return None
+
+
+async def _run_ai_email_reply(
+    session: AsyncSession,
+    *,
+    conversation: Conversation,
+    assistant_id: uuid.UUID,
+    inbound_email: email_guardrails.InboundEmail,
+) -> None:
+    """Generate + send an AI reply on an inbound email conversation.
+
+    Mirrors the shape of :func:`_run_byok_whatsapp_reply` but routes
+    the outbound through
+    :func:`core.conversations.adapters.email.send_email` (which owns
+    the SMTP / OAuth dispatch fork + compliance + tracking machinery)
+    with ``sender_user_id=None`` + ``ai_assistant_id=<uuid>`` so the
+    persisted row carries ``payload.author='ai'`` for the frontend
+    + reporting queries.
+
+    Threading headers derive from the inbound envelope directly
+    (RFC-5322 ``Message-ID`` + ``References``) rather than a stored
+    parent Message row — the guardrail input carries these already
+    and re-querying the DB would just add a round-trip.
+
+    Silent-skip cases (return None without raising):
+
+      * ``conversation.contact_id`` is None — Mailgun path can create
+        bare conversations for unknown senders. We won't auto-reply
+        to an unresolved identity.
+      * :func:`core.ai_assistants.runtime.reply_once` yielded empty
+        text (stop-keyword / budget-cap / empty-KB fallback).
+      * :func:`core.shared.email.org_sender.resolve_org_sender`
+        returns None — org has no verified SMTP sender AND no live
+        OAuth mailbox.
+      * Contact is ``email_opt_out=True`` — send_email raises
+        ``OptedOut``; caught here since AI replies must respect
+        opt-out.
+      * Org has no physical address configured — ``MissingCompanyAddress``
+        caught here (CAN-SPAM); logged so ops sees the gap.
+    """
+    from src.app.core.ai_assistants import email_threading
+    from src.app.core.ai_assistants.runtime import reply_once
+    from src.app.core.conversations.adapters.email import (
+        MissingCompanyAddress,
+        OptedOut,
+        send_email,
+    )
+    from src.app.shared.email.org_sender import (
+        OrgOauthBackend,
+        OrgSmtpBackend,
+        resolve_org_sender,
+    )
+
+    if conversation.contact_id is None:
+        logger.info(
+            "ai_dispatch.email skipped conv=%s reason=no_contact",
+            conversation.id,
+        )
+        return None
+
+    # 1. Generate the reply text via the shared runtime. ``reply_once``
+    #    mints its own runtime-side "widget"-shape conversation
+    #    (session_token ``email:<uuid>``) so ChatRuntime's own message
+    #    persistence never collides with the inbox conversation's
+    #    Message rows. Same isolation pattern chatbots use.
+    #    ``is_public=True`` matches the WhatsApp inbound reply — treats
+    #    the external sender as untrusted so the active-status gate +
+    #    output sanitiser both fire (URL / email allow-list, PII strip).
+    reply_text = await reply_once(
+        db=session,
+        org_id=conversation.org_id,
+        assistant_id=assistant_id,
+        user_message=inbound_email.body_text,
+        session_token=f"email:{conversation.id}",
+        is_public=True,
+    )
+    if not reply_text:
+        logger.info(
+            "ai_dispatch.email skipped conv=%s reason=empty_reply",
+            conversation.id,
+        )
+        return None
+
+    # 2. Compose the reply envelope (Re: subject, quoted body,
+    #    In-Reply-To, References chain). Header values from the
+    #    inbound guardrail envelope — lower-cased for case-insensitive
+    #    RFC-5322 lookup. The bare Message-ID (no angle brackets) is
+    #    what threading helpers + send_email consume; MIME builder
+    #    re-brackets on the way out.
+    hdrs_lower = {k.lower(): v for k, v in (inbound_email.headers or {}).items()}
+    inbound_msg_id = hdrs_lower.get("message-id")
+    if inbound_msg_id:
+        inbound_msg_id = inbound_msg_id.strip().lstrip("<").rstrip(">")
+    inbound_refs = hdrs_lower.get("references")
+    thread = email_threading.build_reply_thread(
+        ai_reply_text=reply_text,
+        inbound_subject=inbound_email.subject,
+        inbound_message_id=inbound_msg_id,
+        inbound_references=inbound_refs,
+        inbound_body_text=inbound_email.body_text,
+    )
+
+    # 3. Resolve which backend to send from. ``resolve_org_sender``
+    #    returns an ``OrgSmtpBackend`` (verified SMTP sender — the
+    #    Mailgun path) OR ``OrgOauthBackend`` (live Gmail / Microsoft
+    #    mailbox) OR None. Only two of the three concrete types exist;
+    #    fall through unconditionally when None.
+    backend = await resolve_org_sender(session, org_id=conversation.org_id)
+    if backend is None:
+        logger.info(
+            "ai_dispatch.email skipped conv=%s reason=no_org_sender",
+            conversation.id,
+        )
+        return None
+
+    account_id: uuid.UUID | None = None
+    smtp_sender_id: uuid.UUID | None = None
+    if isinstance(backend, OrgSmtpBackend):
+        smtp_sender_id = backend.sender.id
+    elif isinstance(backend, OrgOauthBackend):
+        account_id = backend.account.id
+
+    # 4. Dispatch through send_email — reuses opt-out, CAN-SPAM,
+    #    tracking, tokenised open/click/unsubscribe links, activities
+    #    + audit. Threading headers come in via the explicit-raw
+    #    params so send_email doesn't re-query for a parent Message.
+    try:
+        await send_email(
+            session,
+            org_id=conversation.org_id,
+            sender_user_id=None,
+            ai_assistant_id=assistant_id,
+            account_id=account_id,
+            smtp_sender_id=smtp_sender_id,
+            contact_id=conversation.contact_id,
+            subject=thread.subject,
+            body_text=thread.body,
+            body_html=None,
+            in_reply_to_raw=thread.in_reply_to,
+            references_chain_raw=thread.references,
+            conversation_id=conversation.id,
+        )
+    except OptedOut:
+        logger.info(
+            "ai_dispatch.email skipped conv=%s reason=contact_opted_out",
+            conversation.id,
+        )
+        return None
+    except MissingCompanyAddress:
+        logger.warning(
+            "ai_dispatch.email skipped conv=%s reason=org_missing_address",
+            conversation.id,
+        )
+        return None
+
+    logger.info(
+        "ai_dispatch.email sent conv=%s assistant=%s sender=%s",
+        conversation.id,
+        assistant_id,
+        inbound_email.sender_email,
+    )
 
 
 __all__ = ["route_email_inbound", "route_whatsapp_inbound"]

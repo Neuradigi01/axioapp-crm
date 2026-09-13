@@ -194,9 +194,20 @@ def _classify(
         user_msg,
         details,
     )
+    # Prefer Meta's operator-friendly `error_user_title` + `error_user_msg`
+    # when Meta supplies them — they explain the actual reason (e.g.
+    # "Invalid WhatsApp account usage — WhatsApp accounts cannot be
+    # used with this API"). Meta's top-level `message` is often the
+    # generic "Invalid parameter" which is useless to operators.
+    detail = message
+    if isinstance(user_msg, str) and user_msg.strip():
+        if isinstance(user_title, str) and user_title.strip():
+            detail = f"{user_title.strip()} — {user_msg.strip()}"
+        else:
+            detail = user_msg.strip()
     return MetaGraphError(
         http_status=502,
-        user_message=f"Meta API error during {stage}: {message}",
+        user_message=f"Meta API error during {stage}: {detail}",
         meta_code=code,
         meta_subcode=subcode,
         raw=raw,

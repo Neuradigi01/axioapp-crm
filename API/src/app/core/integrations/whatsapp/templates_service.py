@@ -173,10 +173,14 @@ def _components_from_record(row: WhatsAppTemplate) -> list[dict[str, Any]]:
         raw = list(row.body_components)
     else:
         raw = []
-        if row.header_type == "TEXT" and row.header_text:
+        # Central-library rows store header_type lowercase (`text`); the
+        # native-WA path stores uppercase (`TEXT`). Normalise before the
+        # branch so the fallback path works for both writers.
+        header_type_upper = (row.header_type or "").upper()
+        if header_type_upper == "TEXT" and row.header_text:
             raw.append({"type": "HEADER", "format": "TEXT", "text": row.header_text})
-        elif row.header_type in ("IMAGE", "VIDEO", "DOCUMENT"):
-            raw.append({"type": "HEADER", "format": row.header_type})
+        elif header_type_upper in ("IMAGE", "VIDEO", "DOCUMENT"):
+            raw.append({"type": "HEADER", "format": header_type_upper})
         raw.append({"type": "BODY", "text": row.body})
         if row.footer_text:
             raw.append({"type": "FOOTER", "text": row.footer_text})
@@ -316,6 +320,180 @@ def convert_components_for_meta(
 
         out.append(comp)
     return out
+
+
+# --- Meta submit-payload guard ---------------------------------------
+#
+# Central-library authored templates and native-WA authored templates
+# write the same row shape but with different case conventions (central
+# uses lowercase enums to match its JSON API contract; native uses
+# uppercase to match Meta's). Meta's `/{waba_id}/message_templates`
+# endpoint is strict: `Marketing`, `text`, `url` all come back as
+# `Invalid parameter` (code 100) with no useful detail. This helper is
+# the single choke-point every submit passes through — it uppercases
+# what Meta expects uppercase, strips null slots Meta rejects, and
+# validates operator-visible fields with actionable messages so we
+# don't ship Meta's cryptic error to the UI.
+
+_META_CATEGORIES = ("MARKETING", "UTILITY", "AUTHENTICATION")
+_META_HEADER_FORMATS = ("TEXT", "IMAGE", "VIDEO", "DOCUMENT", "LOCATION")
+_META_BUTTON_TYPES = ("URL", "PHONE_NUMBER", "QUICK_REPLY", "COPY_CODE")
+_META_NAME_RE = re.compile(r"^[a-z0-9_]+$")
+
+
+def _prepare_meta_payload(
+    *,
+    name: str,
+    language: str,
+    category: str,
+    components: list[dict[str, Any]],
+) -> tuple[str, str, str, list[dict[str, Any]]]:
+    """Normalise + validate the four Meta submit parameters.
+
+    Returns the cleaned tuple ready to hand to
+    ``MetaGraphClient.submit_template``. Raises ``HTTPException(422)``
+    with an operator-actionable message BEFORE Meta is called if any
+    parameter would be rejected — spares the UI Meta's opaque
+    ``Invalid parameter`` (code 100).
+    """
+    clean_name = (name or "").strip()
+    if not _META_NAME_RE.fullmatch(clean_name):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Template name must be lowercase letters, digits, and "
+                "underscores only (no spaces or capitals)."
+            ),
+        )
+    if len(clean_name) > 512:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Template name is too long — max 512 characters.",
+        )
+
+    clean_language = (language or "").strip()
+    if not clean_language:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Template language is required (e.g. en_US, hi, pt_BR).",
+        )
+
+    clean_category = (category or "").strip().upper()
+    if clean_category not in _META_CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Template category must be one of MARKETING, UTILITY, "
+                f"AUTHENTICATION (got {category!r})."
+            ),
+        )
+
+    clean_components: list[dict[str, Any]] = []
+    has_body = False
+    for original in components:
+        if not isinstance(original, dict):
+            continue
+        comp = dict(original)
+
+        ctype = str(comp.get("type", "")).strip().upper()
+        if not ctype:
+            continue
+        comp["type"] = ctype
+
+        if ctype == "HEADER":
+            fmt = str(comp.get("format", "")).strip().upper()
+            if fmt not in _META_HEADER_FORMATS:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Header format must be one of {', '.join(_META_HEADER_FORMATS)} "
+                        f"(got {comp.get('format')!r})."
+                    ),
+                )
+            comp["format"] = fmt
+            # Media headers must NOT carry a `text` key (Meta rejects
+            # `text: null`); TEXT headers require non-empty text.
+            if fmt == "TEXT":
+                header_text = comp.get("text")
+                if not (isinstance(header_text, str) and header_text.strip()):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="TEXT header requires non-empty header text.",
+                    )
+            else:
+                comp.pop("text", None)
+
+        elif ctype == "BODY":
+            body_text = comp.get("text")
+            if not (isinstance(body_text, str) and body_text.strip()):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Template body cannot be empty.",
+                )
+            has_body = True
+
+        elif ctype == "FOOTER":
+            footer_text = comp.get("text")
+            if not (isinstance(footer_text, str) and footer_text.strip()):
+                # Empty footer = drop it instead of shipping Meta an
+                # empty string that would trip its length validator.
+                continue
+
+        elif ctype == "BUTTONS":
+            raw_buttons = comp.get("buttons")
+            if not isinstance(raw_buttons, list) or not raw_buttons:
+                # Empty BUTTONS block is a Meta error; drop it.
+                continue
+            cleaned_buttons: list[dict[str, Any]] = []
+            for b in raw_buttons:
+                if not isinstance(b, dict):
+                    continue
+                btn = dict(b)
+                btype = str(btn.get("type", "")).strip().upper()
+                if btype not in _META_BUTTON_TYPES:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=(
+                            f"Button type must be one of {', '.join(_META_BUTTON_TYPES)} "
+                            f"(got {btn.get('type')!r})."
+                        ),
+                    )
+                btn["type"] = btype
+                btn_text = btn.get("text")
+                if not (isinstance(btn_text, str) and btn_text.strip()):
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="Every button requires non-empty text.",
+                    )
+                if btype == "URL" and not (btn.get("url") or "").strip():
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="URL buttons require a url.",
+                    )
+                if btype == "PHONE_NUMBER" and not (btn.get("phone_number") or "").strip():
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="Phone buttons require a phone_number.",
+                    )
+                # Drop empty companion keys Meta would reject.
+                if btype != "URL":
+                    btn.pop("url", None)
+                if btype != "PHONE_NUMBER":
+                    btn.pop("phone_number", None)
+                cleaned_buttons.append(btn)
+            if not cleaned_buttons:
+                continue
+            comp["buttons"] = cleaned_buttons
+
+        clean_components.append(comp)
+
+    if not has_body:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Template must include a BODY component.",
+        )
+
+    return clean_name, clean_language, clean_category, clean_components
 
 
 async def _resolve_active_bundle(session: AsyncSession):
@@ -624,13 +802,23 @@ async def submit_for_approval(
     # (so the editor + preview keep resolving human-readable names);
     # only the outbound Meta payload gets the transformation.
     components = convert_components_for_meta(_components_from_record(row))
+    # Single choke-point: normalise case + validate parameters so we
+    # surface actionable operator errors instead of Meta's opaque
+    # `Invalid parameter` (code 100). Central-library rows arrive with
+    # lowercase category/format/button type; Meta only accepts uppercase.
+    name, language, category, components = _prepare_meta_payload(
+        name=row.name,
+        language=row.language,
+        category=row.category,
+        components=components,
+    )
     try:
         meta_body = await client.submit_template(
             waba_id=config.waba_id,
             token=token,
-            name=row.name,
-            language=row.language,
-            category=row.category,
+            name=name,
+            language=language,
+            category=category,
             components=components,
         )
     except MetaGraphError as exc:

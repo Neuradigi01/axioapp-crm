@@ -17,6 +17,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 
 import { WorkflowFolder, WorkflowsApiService } from '../workflows-api.service';
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 
 /**
  * Folders sidebar. Drives the list page's folder filter. Top-level
@@ -38,6 +39,7 @@ import { WorkflowFolder, WorkflowsApiService } from '../workflows-api.service';
 export class FoldersSidebarComponent {
   private readonly api = inject(WorkflowsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly folders = input<WorkflowFolder[]>([]);
   readonly selectedFolderId = input<string | null>(null);
@@ -144,12 +146,16 @@ export class FoldersSidebarComponent {
     this.foldersReordered.emit(merged);
   }
 
-  protected onDelete(folder: WorkflowFolder, event: MouseEvent): void {
+  protected async onDelete(folder: WorkflowFolder, event: MouseEvent): Promise<void> {
     event.stopPropagation();
     if (!this.canWrite()) return;
-    if (!confirm(`Delete folder "${folder.name}"? It must be empty.`)) {
-      return;
-    }
+    const ok = await this.confirmDialog.ask({
+      title: `Delete folder "${folder.name}"?`,
+      body: 'The folder must be empty. Any workflows inside will need to be moved out first.',
+      confirmLabel: 'Delete folder',
+      danger: true,
+    });
+    if (!ok) return;
     this.api
       .deleteFolder(folder.id)
       .pipe(takeUntilDestroyed(this.destroyRef))

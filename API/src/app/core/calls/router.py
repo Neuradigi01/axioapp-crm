@@ -102,7 +102,7 @@ async def list_calls_endpoint(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("calls.read")),
 ) -> CallListResponse:
-    rows, total = await list_calls(
+    rows, total, contact_names, creator_names = await list_calls(
         db,
         contact_id=contact_id,
         direction=direction,
@@ -110,12 +110,15 @@ async def list_calls_endpoint(
         page=page,
         size=size,
     )
-    return CallListResponse(
-        items=[CallOut.model_validate(r) for r in rows],
-        total=total,
-        page=page,
-        size=size,
-    )
+    items: list[CallOut] = []
+    for r in rows:
+        out = CallOut.model_validate(r)
+        if r.contact_id is not None:
+            out.contact_name = contact_names.get(r.contact_id)
+        if r.created_by_id is not None:
+            out.created_by_name = creator_names.get(r.created_by_id)
+        items.append(out)
+    return CallListResponse(items=items, total=total, page=page, size=size)
 
 
 @calls_router.post("", response_model=CallOut, status_code=status.HTTP_201_CREATED)

@@ -38,7 +38,18 @@ async def load_contact_data(
     session: AsyncSession, *, contact_id: uuid.UUID | None
 ) -> dict[str, Any] | None:
     """Minimal contact dict for variable rendering. Kept small so we
-    don't leak the whole contact ORM object into templates."""
+    don't leak the whole contact ORM object into templates.
+
+    The ``custom_data`` slot carries the contact's ``JSONB custom_data``
+    column verbatim so :func:`channel_bridge.render_variables` can
+    resolve ``{{contact.custom.<key>}}`` at render time. Absent keys
+    render as empty strings — same fallback the rest of the renderer
+    already applies for unknown paths.
+
+    The ``_lead`` slot (nullable) carries the contact's most recent
+    ACTIVE lead — see :func:`load_lead_data` for the pick rule —
+    which powers ``{{lead.<field>}}`` and ``{{lead.custom.<key>}}``
+    interpolation. Empty when the contact has no lead."""
     if contact_id is None:
         return None
     from src.app.core.contacts import service as contacts_service
@@ -54,6 +65,68 @@ async def load_contact_data(
         "full_name": full_name,
         "email": contact.email or "",
         "phone": contact.phone or "",
+        "custom_data": dict(contact.custom_data or {}),
+        "_lead": await load_lead_data(session, contact_id=contact_id),
+    }
+
+
+async def load_lead_data(
+    session: AsyncSession, *, contact_id: uuid.UUID | None
+) -> dict[str, Any] | None:
+    """Minimal lead dict for variable rendering.
+
+    **Pick rule**: the contact's most recent ACTIVE lead
+    (``status='active'``, ordered ``created_at DESC``). Falls back to
+    the most recent lead of ANY status when the contact has no active
+    lead — so a bot that renders ``{{lead.won_value}}`` on a follow-up
+    to a WON deal still resolves the value instead of rendering blank.
+
+    Multi-lead contacts (e.g. real estate: same buyer for 3 properties)
+    pick the freshest deal by convention. Operators who need a
+    different lead (older deal, specific pipeline) should ``Set Custom
+    Field`` the values they need onto ``answers.*`` earlier in the
+    flow. Changing the pick rule is a one-line change here.
+
+    Returns ``None`` when the contact has zero leads. Enum values are
+    unwrapped to their string form so ``{{lead.status}}`` renders
+    ``"active"`` not ``"LeadStatus.active"``.
+    """
+    if contact_id is None:
+        return None
+    from sqlalchemy import case, select
+
+    from src.app.core.leads.models import Lead, LeadStatus
+
+    stmt = (
+        select(Lead)
+        .where(Lead.contact_id == contact_id)
+        .order_by(
+            # Active leads first, then most-recent-first within each
+            # bucket. `case` returns 0 for active, 1 otherwise so the
+            # ORDER BY sorts active leads to the top.
+            case((Lead.status == LeadStatus.active, 0), else_=1).asc(),
+            Lead.created_at.desc(),
+        )
+        .limit(1)
+    )
+    lead = (await session.execute(stmt)).scalar_one_or_none()
+    if lead is None:
+        return None
+    return {
+        "id": str(lead.id),
+        "status": (
+            lead.status.value if hasattr(lead.status, "value") else str(lead.status)
+        ),
+        "source": (
+            lead.source.value if hasattr(lead.source, "value") else str(lead.source)
+        ),
+        "pipeline_stage": lead.pipeline_stage or "",
+        "budget": str(lead.budget) if lead.budget is not None else "",
+        "currency": lead.currency or "",
+        "won_value": str(lead.won_value) if lead.won_value is not None else "",
+        "lead_score": lead.lead_score,
+        "lost_reason": lead.lost_reason or "",
+        "custom_data": dict(lead.custom_data or {}),
     }
 
 
@@ -147,6 +220,7 @@ __all__ = [
     "is_resumed_from_park",
     "load_conversation",
     "load_contact_data",
+    "load_lead_data",
     "match_button_reply",
     "wa_window_open_or_take_session_expired",
 ]

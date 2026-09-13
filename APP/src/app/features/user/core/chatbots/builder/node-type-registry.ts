@@ -33,7 +33,8 @@ export type FieldType =
   | 'boolean'
   | 'string_list'
   | 'button_list'
-  | 'json';
+  | 'json'
+  | 'variable';
 
 export interface FieldSchema {
   key: string;
@@ -207,9 +208,9 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
     configSchema: [
       { key: 'prompt', label: 'Question', type: 'textarea', rows: 2, maxLength: 1024,
         placeholder: "e.g. What's your name?", required: true },
-      { key: 'save_to', label: 'Save answer to', type: 'text',
+      { key: 'save_to', label: 'Save answer to', type: 'variable',
         placeholder: 'contact.full_name', required: true,
-        help: 'Field path: contact.<field> or lead.<field> or contact.custom.<key>.' },
+        help: 'Pick from the variable list, or type a custom path (contact.<field> / lead.<field> / contact.custom.<key>).' },
       { key: 'expected_format', label: 'Expected format', type: 'select', options: [
         { value: 'text', label: 'Free text' }, { value: 'email', label: 'Email' },
         { value: 'phone', label: 'Phone number' }, { value: 'number', label: 'Number' },
@@ -233,7 +234,7 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
     },
     configSchema: [
       { key: 'prompt', label: 'Question', type: 'textarea', rows: 2, maxLength: 1024 },
-      { key: 'save_to', label: 'Save address to', type: 'text',
+      { key: 'save_to', label: 'Save address to', type: 'variable',
         placeholder: 'contact.custom.address',
         help: 'Parsed street / city / postal are written under this key.' },
       { key: 'timeout_seconds', label: 'Timeout (seconds)', type: 'number', min: 30, step: 60 },
@@ -250,7 +251,7 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
     },
     configSchema: [
       { key: 'prompt', label: 'Question', type: 'textarea', rows: 2, maxLength: 1024 },
-      { key: 'save_to', label: 'Save location to', type: 'text',
+      { key: 'save_to', label: 'Save location to', type: 'variable',
         placeholder: 'contact.custom.location',
         help: '{lat, lng} object is written under this key.' },
       { key: 'max_retries', label: 'Max retries on invalid', type: 'number', min: 0, max: 5, step: 1 },
@@ -270,7 +271,7 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
     },
     configSchema: [
       { key: 'prompt', label: 'Question', type: 'textarea', rows: 2, maxLength: 1024 },
-      { key: 'save_to', label: 'Save file ID to', type: 'text',
+      { key: 'save_to', label: 'Save file ID to', type: 'variable',
         placeholder: 'contact.custom.uploaded_file_id' },
       { key: 'allowed_types', label: 'Allowed types', type: 'string_list',
         placeholder: 'image / video / document / audio, press Enter',
@@ -294,7 +295,7 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
       },
     },
     configSchema: [
-      { key: 'condition.left.path', label: 'Left side (path)', type: 'text',
+      { key: 'condition.left.path', label: 'Left side (path)', type: 'variable',
         placeholder: 'answers.email',
         help: 'Read a value from: answers.<key>, contact.<field>, lead.<field>, run.<field>.' },
       { key: 'condition.op', label: 'Operator', type: 'select', options: [
@@ -347,7 +348,7 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
     hint: 'Write a static or templated value to a field.',
     defaultConfig: { save_to: 'contact.custom.', value: '' },
     configSchema: [
-      { key: 'save_to', label: 'Save to field', type: 'text',
+      { key: 'save_to', label: 'Save to field', type: 'variable',
         placeholder: 'contact.custom.lead_score',
         help: 'Format: contact.<field>, lead.<field>, or contact.custom.<key>.' },
       { key: 'value', label: 'Value', type: 'textarea', rows: 2,
@@ -439,10 +440,10 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
       { key: 'pipeline_stage', label: 'Pipeline stage', type: 'text',
         placeholder: 'stage-id or blank for org default',
         help: 'Pipeline stage ID from /user/settings → Pipelines. Blank = default entry stage.' },
-      { key: 'budget_from', label: 'Budget from (answers path)', type: 'text',
+      { key: 'budget_from', label: 'Budget from (answers path)', type: 'variable',
         placeholder: 'answers.budget',
         help: 'Read budget from a prior Ask Question answer, or a contact.custom.<key>.' },
-      { key: 'expected_close_date_from', label: 'Expected close date from', type: 'text',
+      { key: 'expected_close_date_from', label: 'Expected close date from', type: 'variable',
         placeholder: 'answers.close_date' },
       { key: 'custom_field_map', label: 'Custom field map', type: 'json',
         help: 'Object mapping lead custom-field keys to answers/contact paths or literals.' },
@@ -463,7 +464,7 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
         placeholder: 'Bot appointment for {{contact.full_name}}',
         help: '{{expressions}} allowed — contact / answers / lead paths.' },
       { key: 'duration_minutes', label: 'Duration (minutes)', type: 'number', min: 5, max: 480, step: 5 },
-      { key: 'scheduled_at_from', label: 'Slot from (answers path)', type: 'text',
+      { key: 'scheduled_at_from', label: 'Slot from (answers path)', type: 'variable',
         placeholder: 'answers.slot',
         help: 'Path to an ISO-8601 timestamp captured earlier in the flow.' },
       { key: 'assigned_to_user_id', label: 'Assigned to (user ID)', type: 'text',
@@ -531,7 +532,7 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
       { key: 'max_tokens', label: 'Max tokens', type: 'number', min: 32, max: 4000, step: 32 },
       { key: 'temperature', label: 'Temperature', type: 'number', min: 0, max: 2, step: 0.1,
         help: '0 = deterministic, 1 = creative, 2 = wild.' },
-      { key: 'save_reply_to', label: 'Save reply to', type: 'text',
+      { key: 'save_reply_to', label: 'Save reply to', type: 'variable',
         placeholder: 'answers.ai_reply',
         help: 'Path to save the model output — use in later Ask Question / Send Message nodes.' },
     ],

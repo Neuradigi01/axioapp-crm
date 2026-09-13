@@ -115,27 +115,30 @@ def validate_phone(value: str) -> str:
 
 
 def coerce_phone_prefix(value: str | None) -> str | None:
-    """Bulk-import helper — add the leading `+` when a spreadsheet
-    cell has dropped it.
+    """Bulk-import helper — fix the two ways Excel/CSV corrupts phone
+    cells before the shape validator sees them.
 
-    Excel silently strips the `+` off `+919876543210` when the cell
-    is typed as Number and re-saves it as `919876543210`; operators
-    then upload the CSV/XLSX and every row fails `validate_phone`
-    (E.164 requires the `+`). This helper re-adds the missing prefix
-    so downstream validation + persistence see a well-formed E.164
-    number.
+    1. Missing ``+`` — Excel drops the leading sign when the cell is
+       typed as Number, so ``+919876543210`` re-saves as
+       ``919876543210``. This helper re-adds it.
+    2. Trailing fractional zeros — a cell formatted as Number with
+       decimals (or stored as float) exports as ``918087646727.00`` /
+       ``918087646727.0``. Phones never carry fractional digits, so a
+       trailing ``.0+`` is always Excel display corruption; strip it.
 
     Blank / None → None (kept nullable so the import treats it as
-    "no phone provided"). Any other value is trimmed of surrounding
-    whitespace; if the first non-whitespace char isn't `+`, one is
-    prepended. Separators inside the number (spaces, dashes, parens)
-    are left alone — `validate_phone` strips them at validation time.
+    "no phone provided"). Non-zero fractions (``.5``, ``.25``) are
+    left alone so ``validate_phone`` still rejects them as malformed
+    rather than silently truncating real data. Separators inside the
+    number (spaces, dashes, parens) are left alone — ``validate_phone``
+    strips them at validation time.
     """
     if value is None:
         return None
     trimmed = str(value).strip()
     if not trimmed:
         return None
+    trimmed = re.sub(r"\.0+$", "", trimmed)
     if trimmed.startswith("+"):
         return trimmed
     return "+" + trimmed

@@ -39,6 +39,7 @@ import { forkJoin } from 'rxjs';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { PipelineStage, PipelinesApiService } from '../../pipelines/pipelines-api.service';
 import {
   IntegrationSubscription,
   IntegrationsApiService,
@@ -85,10 +86,20 @@ export class FieldMappingEditorComponent {
   readonly saved = output<void>();
 
   private readonly api = inject(IntegrationsApiService);
+  private readonly pipelinesApi = inject(PipelinesApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly targets = signal<MappingTarget[]>([]);
   protected readonly mapping = signal<Record<string, string>>({});
+  /** Leads pipeline stages loaded alongside the mapping targets. Feeds
+   *  the "Pipeline stage for new leads" dropdown at the top of the
+   *  modal (Step 12). Empty when the pipeline call errors — the
+   *  dropdown then shows only the default option. */
+  protected readonly pipelineStages = signal<PipelineStage[]>([]);
+  /** Current dropdown selection. Empty string = the "org default first
+   *  stage" option, which on save translates to `pipeline_stage: null`
+   *  on the PATCH body (clears any existing override). */
+  protected readonly pipelineStage = signal<string>('');
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -117,6 +128,10 @@ export class FieldMappingEditorComponent {
     this.mapping.update((m) => ({ ...m, [field]: target }));
   }
 
+  setPipelineStage(stageKey: string): void {
+    this.pipelineStage.set(stageKey);
+  }
+
   /** Reset every field to the heuristic default (or empty / Ignore
    *  when no rule matches). Doesn't save — the operator confirms
    *  with the Save button. */
@@ -134,20 +149,47 @@ export class FieldMappingEditorComponent {
     const filtered = Object.fromEntries(Object.entries(this.mapping()).filter(([, v]) => v));
     this.saving.set(true);
     this.error.set(null);
-    this.api
-      .updateSubscriptionMapping(sub.id, filtered)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => {
-          this.saving.set(false);
-          this.saved.emit();
-          this.closed.emit();
-        },
-        error: (err: HttpErrorResponse) => {
-          this.saving.set(false);
-          this.error.set(extractApiError(err));
-        },
-      });
+
+    // Sequenced save: PATCH pipeline_stage first (validated at the
+    // service layer against the org's leads pipeline; bad key → 422
+    // surfaces here BEFORE the mapping lands, so the row's mapping and
+    // stage stay in a coherent state). PUT the mapping second.
+    //
+    // The PATCH is skipped when the selection matches the row's
+    // current value, saving one round-trip on mapping-only edits.
+    const currentStage = sub.pipeline_stage ?? '';
+    const nextStage = this.pipelineStage();
+    const stageDirty = currentStage !== nextStage;
+    const persistMapping = () => {
+      this.api
+        .updateSubscriptionMapping(sub.id, filtered)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: () => {
+            this.saving.set(false);
+            this.saved.emit();
+            this.closed.emit();
+          },
+          error: (err: HttpErrorResponse) => {
+            this.saving.set(false);
+            this.error.set(extractApiError(err));
+          },
+        });
+    };
+    if (stageDirty) {
+      this.api
+        .updateSubscription(sub.id, { pipeline_stage: nextStage || null })
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: persistMapping,
+          error: (err: HttpErrorResponse) => {
+            this.saving.set(false);
+            this.error.set(extractApiError(err));
+          },
+        });
+    } else {
+      persistMapping();
+    }
   }
 
   cancel(): void {
@@ -177,13 +219,21 @@ export class FieldMappingEditorComponent {
   private _load(sub: IntegrationSubscription, fields: ReadonlyArray<string>): void {
     this.loading.set(true);
     this.error.set(null);
+    // Fetch targets + leads pipeline in parallel. Pipeline failure is
+    // non-fatal — the dropdown just collapses to the default option so
+    // an org without a leads pipeline still gets a usable editor.
     forkJoin({
       targets: this.api.listMappingTargets(),
+      pipeline: this.pipelinesApi.getByKey('leads'),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: ({ targets }) => {
+        next: ({ targets, pipeline }) => {
           this.targets.set(targets);
+          this.pipelineStages.set(
+            [...pipeline.stages].sort((a, b) => a.display_order - b.display_order),
+          );
+          this.pipelineStage.set(sub.pipeline_stage ?? '');
           // Seed mapping from existing row; fields not present get
           // the heuristic default (or Ignore).
           const existing = sub.field_mapping ?? {};

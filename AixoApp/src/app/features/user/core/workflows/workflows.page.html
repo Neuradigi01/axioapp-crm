@@ -13,16 +13,34 @@
 <div class="flex min-h-full flex-col bg-app">
   <header class="border-b border-subtle bg-surface px-4 py-4 md:px-6 md:py-5">
     <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-6">
-      <div class="min-w-0 flex-1">
-        <h1
-          class="font-display text-[22px] font-bold leading-tight tracking-[-0.02em] text-default md:text-[26px]"
+      <div class="flex min-w-0 flex-1 items-center gap-3">
+        <!-- Accent-tinted avatar chip — visual match with the editor
+             toolbar so the list and canvas read as one product. -->
+        <div
+          class="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/15 md:flex"
+          aria-hidden="true"
         >
-          Workflows
-        </h1>
-        <p class="mt-1 hidden text-[13px] leading-snug text-muted md:block">
-          Multi-step visual flows. Trigger on an event, branch on contact attributes, send across
-          channels, and route work to the right team.
-        </p>
+          <lucide-icon name="workflow" size="20" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <h1
+              class="font-display text-[22px] font-bold leading-tight tracking-[-0.02em] text-default md:text-[26px]"
+            >
+              Workflows
+            </h1>
+            <span
+              class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[11px] font-semibold text-muted ring-1 ring-inset ring-subtle"
+              title="Total workflows in this view"
+            >
+              {{ total() }}
+            </span>
+          </div>
+          <p class="mt-1 hidden text-[13px] leading-snug text-muted md:block">
+            Multi-step visual flows. Trigger on an event, branch on contact attributes, send across
+            channels, and route work to the right team.
+          </p>
+        </div>
       </div>
       <div class="flex flex-wrap items-center gap-2 md:shrink-0">
         <a
@@ -146,10 +164,6 @@
           Clear
         </button>
       }
-
-      <span class="ml-auto text-xs text-muted">
-        {{ total() }} workflow{{ total() === 1 ? '' : 's' }}
-      </span>
     </div>
 
     @if (bulkScheduleMessage(); as msg) {
@@ -220,39 +234,59 @@
         Loading workflows…
       </div>
     } @else if (items().length === 0) {
+      <!-- Empty state — matches the canvas empty-state design language:
+           big accent-tinted icon circle inside a dashed accent-tinted
+           card. Same visual system across editor + list. -->
       <div
-        class="mx-auto mt-12 max-w-md rounded-xl border border-dashed border-subtle bg-surface p-6 text-center md:p-8"
+        class="mx-auto mt-12 flex max-w-lg flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-subtle bg-surface px-6 py-10 text-center shadow-sm"
       >
-        <lucide-icon name="workflow" size="32" class="mx-auto text-faint" />
-        <h2 class="mt-4 text-sm font-semibold text-default">
+        <span
+          class="flex h-14 w-14 items-center justify-center rounded-full bg-accent/10 text-accent ring-1 ring-accent/15"
+          aria-hidden="true"
+        >
+          <lucide-icon name="workflow" size="24" />
+        </span>
+        <h2 class="text-sm font-semibold text-default">
           @if (hasFilters()) {
             No workflows match these filters
           } @else {
             No workflows yet
           }
         </h2>
-        <p class="mt-1 text-[13px] text-muted">
+        <p class="max-w-[380px] text-[12.5px] text-muted">
           @if (hasFilters()) {
-            Clear filters to see the full list.
+            Clear filters to see the full list, or refine to a different combination.
           } @else {
-            Start from a template, or build your own. Workflows automate the entire customer
-            journey: enroll on an event, branch on attributes, send messages, and update records.
+            Automate the customer journey — enrol on an event, branch on attributes, send messages
+            across channels, update records, and route work to the right team.
           }
         </p>
         @if (canWrite() && !hasFilters()) {
-          <div class="mt-4 flex justify-center gap-2">
+          <div class="mt-2 flex flex-wrap justify-center gap-2">
             <a
               routerLink="/user/workflows/gallery"
-              class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+              class="inline-flex h-9 items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 text-xs font-medium text-default hover:bg-surface-2"
             >
               <lucide-icon name="file-text" size="14" />
               Start from template
             </a>
-            <a routerLink="/user/workflows/new" class="btn btn-primary">
+            <a
+              routerLink="/user/workflows/new"
+              class="inline-flex h-9 items-center gap-1.5 rounded-md bg-accent px-3 text-xs font-semibold text-white shadow-sm hover:brightness-95"
+            >
               <lucide-icon name="plus" size="14" />
               New workflow
             </a>
           </div>
+        } @else if (hasFilters()) {
+          <button
+            type="button"
+            (click)="clearFilters()"
+            class="mt-1 inline-flex h-9 items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 text-xs font-medium text-default hover:bg-surface-2"
+          >
+            <lucide-icon name="x" size="14" />
+            Clear filters
+          </button>
         }
       </div>
     } @else {
@@ -304,7 +338,9 @@
             </thead>
             <tbody class="divide-y divide-subtle">
               @for (row of items(); track trackById($index, row)) {
-                <tr class="transition-colors hover:bg-surface-2">
+                <tr
+                  class="border-l-2 border-transparent transition-colors hover:border-l-accent/60 hover:bg-surface-2"
+                >
                   @if (canActivate()) {
                     <td class="px-3 py-3 align-middle">
                       <input
@@ -473,7 +509,7 @@
                             <button
                               type="button"
                               (click)="onArchiveRow(row, $event)"
-                              class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-default hover:bg-surface-2"
+                              class="flex w-full items-center gap-2 border-t border-subtle px-3 py-1.5 text-left text-red-500 hover:bg-red-500/10"
                             >
                               <lucide-icon name="archive" size="13" />
                               Archive
@@ -579,7 +615,7 @@
                       <button
                         type="button"
                         (click)="onArchiveRow(row, $event)"
-                        class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-default hover:bg-surface-2"
+                        class="flex w-full items-center gap-2 border-t border-subtle px-3 py-1.5 text-left text-red-500 hover:bg-red-500/10"
                       >
                         <lucide-icon name="archive" size="13" />
                         Archive

@@ -17,7 +17,7 @@
 #     `KNOWN_FEATURE_KEYS`. Adding a new feature requires updating both
 #     this file and that set.
 #   - `code: trial` deliberately mirrors `code: basic`'s feature flags
-#     (founder decision: the 14-day trial gives a taste of Basic, not
+#     (founder decision: the trial gives a taste of Basic, not
 #     Standard). The caps differ — trial is tighter.
 #
 # Last reviewed: 2026-06-05. INR prices added 2026-07-02
@@ -39,10 +39,10 @@ annual_discount_pct: 20
 plans:
   # -------------------------------------------------------------------
   - code: trial
-    name: 14-day Trial
+    name: 100-day Trial
     display_order: 0
     is_public: false               # not listed on /pricing; assigned at signup
-    trial_duration_days: 14
+    trial_duration_days: 100
     pricing:
       monthly_bundle_usd: 0
       annual_bundle_usd: 0

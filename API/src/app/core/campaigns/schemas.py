@@ -17,8 +17,9 @@ class AudienceFilter(BaseModel):
     """Campaign audience target — four mutually-exclusive modes:
 
       1. **Empty** (`{}`): "Everyone in the org". The default.
-      2. **Filter**: any of `q` / `source` / `tag` — same shape as the
-         `/contacts` list query. Dynamic resolution at send time.
+      2. **Filter**: any of `q` / `source` / `tag` / lead-linked
+         (`lead_status` / `lead_stage` / `lead_source`) — same shape
+         as the `/contacts` list query. Dynamic resolution at send time.
       3. **Group**: `group_id` references a saved `contact_groups` row
          (Step 3.5.7). Dynamic groups re-resolve at send time; static
          groups send to their frozen member list.
@@ -33,18 +34,40 @@ class AudienceFilter(BaseModel):
     q: str | None = None
     source: str | None = None
     tag: str | None = None
+    # Lead-linked filters — restrict to contacts that have at least
+    # one Lead row matching each list. Same semantics as the
+    # ``/contacts?lead_status=...&lead_stage=...&lead_source=...``
+    # multi-value params: OR-within, AND-across.
+    lead_status: list[str] | None = None
+    lead_stage: list[str] | None = None
+    lead_source: list[str] | None = None
+    # Multi-form (Step 7): narrow the "Forms" bucket to specific
+    # form ids. Same OR-within / AND-across semantics as the lists
+    # above; applied via an EXISTS subquery on
+    # ``tbl_leads.attribution->>'form_id'`` at dispatch time.
+    lead_form_id: list[uuid.UUID] | None = None
     group_id: uuid.UUID | None = None
     contact_ids: list[uuid.UUID] | None = None
 
     @model_validator(mode="after")
     def _no_mixed_modes(self) -> AudienceFilter:
-        has_filter = bool(self.q or self.source or self.tag)
+        has_filter = bool(
+            self.q
+            or self.source
+            or self.tag
+            or self.lead_status
+            or self.lead_stage
+            or self.lead_source
+            or self.lead_form_id
+        )
         has_group = self.group_id is not None
         has_ids = self.contact_ids is not None and len(self.contact_ids) > 0
         active = int(has_filter) + int(has_group) + int(has_ids)
         if active > 1:
             raise ValueError(
-                "Use exactly one of: filter fields (q/source/tag), group_id, or contact_ids."
+                "Use exactly one of: filter fields "
+                "(q/source/tag/lead_status/lead_stage/lead_source/lead_form_id), "
+                "group_id, or contact_ids."
             )
         if self.contact_ids is not None and len(self.contact_ids) == 0:
             raise ValueError("contact_ids must be a non-empty list when set.")

@@ -75,12 +75,15 @@
               </div>
               <div class="flex items-center gap-1">
                 <dt class="font-medium text-muted">Source</dt>
-                <dd>
+                <dd class="flex items-center gap-1.5">
                   <span
                     class="inline-flex items-center rounded-md bg-surface-2 px-1.5 py-0.5 text-xs font-medium text-default ring-1 border-subtle"
                   >
-                    {{ l.source }}
+                    {{ sourceDisplay().primary }}
                   </span>
+                  @if (sourceDisplay().subtitle; as sub) {
+                    <span class="text-[11px] text-muted">{{ sub }}</span>
+                  }
                 </dd>
               </div>
               <div class="flex items-center gap-1">
@@ -162,7 +165,7 @@
       @switch (activeTab()) {
         @case ('tasks') {
           <div class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
-            <app-tasks-panel [entityType]="'lead'" [entityId]="l.id" />
+            <app-tasks-panel [entityType]="'lead'" [entityId]="l.id" (created)="onTaskCreated()" />
           </div>
         }
         @case ('activities') {
@@ -203,7 +206,12 @@
                   </div>
                   <div class="flex justify-between gap-3">
                     <dt class="text-muted">Source</dt>
-                    <dd class="text-default">{{ l.source }}</dd>
+                    <dd class="flex flex-col items-end text-default">
+                      <span>{{ sourceDisplay().primary }}</span>
+                      @if (sourceDisplay().subtitle; as sub) {
+                        <span class="text-[11px] text-muted">{{ sub }}</span>
+                      }
+                    </dd>
                   </div>
                   <div class="flex justify-between gap-3">
                     <dt class="text-muted">Budget</dt>

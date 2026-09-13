@@ -29,6 +29,8 @@ import { ChatbotStatsModalComponent } from './stats-modal/stats-modal.component'
 import { ChatbotPaletteComponent } from './palette/palette.component';
 import { ChatbotTestFireModalComponent } from './test-fire-modal/test-fire-modal.component';
 import { TriggerConfigModalComponent } from './trigger-modal/trigger-config.modal';
+import { VariablesPanelComponent } from './variables-panel/variables-panel.component';
+import { BotVariable } from '../../shared/variable-picker/variable-picker-api.service';
 
 /**
  * Chatbot builder canvas page (tasks/chatbot-builder Step 13).
@@ -64,6 +66,7 @@ import { TriggerConfigModalComponent } from './trigger-modal/trigger-config.moda
     ChatbotMinimapComponent,
     ChatbotHistoryModalComponent,
     ChatbotStatsModalComponent,
+    VariablesPanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './builder.page.html',
@@ -86,6 +89,33 @@ export class ChatbotBuilderPageComponent {
   readonly renaming = signal<boolean>(false);
   readonly historyModalOpen = signal<boolean>(false);
   readonly statsModalOpen = signal<boolean>(false);
+  readonly variablesPanelOpen = signal<boolean>(false);
+
+  /** Session variables — every `save_to` in the current graph that
+   *  writes to `answers.<key>` becomes a session variable operators
+   *  can reference from downstream nodes. Contact / lead / custom
+   *  save_targets aren't session vars — they're already listed under
+   *  the Contact / Lead groups the API endpoint returns. */
+  readonly sessionVariables = computed<BotVariable[]>(() => {
+    const seen = new Set<string>();
+    const out: BotVariable[] = [];
+    for (const node of this.canvas.nodes()) {
+      const cfg = (node.config ?? {}) as Record<string, unknown>;
+      const candidates = [cfg['save_to'], cfg['save_reply_to']];
+      for (const raw of candidates) {
+        if (typeof raw !== 'string') continue;
+        const path = raw.trim();
+        if (!path.startsWith('answers.') || seen.has(path)) continue;
+        seen.add(path);
+        out.push({
+          path,
+          label: path.slice('answers.'.length) || path,
+          description: `Answer captured earlier in this bot (from node "${node.type}").`,
+        });
+      }
+    }
+    return out;
+  });
 
   /** Right-click node menu — the id of the node whose context menu
    *  is open, plus screen coordinates where the operator clicked. */

@@ -75,6 +75,11 @@ _CORE_ADMIN_KEYS: list[str] = [
     "walk_ins.write",
     "catalog.read",
     "catalog.write",
+    # tasks/catalog-share-link — publish state machine + public share.
+    # Owner + Admin can flip a product between draft / published /
+    # unpublished / archived; Employees stay read-only.
+    "catalog.publish",
+    "catalog.archive",
     "conversations.read",
     "conversations.write",
     # whatsapp-platform-upgrade Step 14 — tag CRUD. Owner + Admin only.
@@ -124,6 +129,10 @@ _CORE_ADMIN_KEYS: list[str] = [
     # Delegate tasks to other users. Owner + Admin get this by default;
     # Employees can create tasks only for themselves.
     "tasks.assign_others",
+    # Delete tasks (single + bulk). Owner + Admin only — Employee /
+    # Support Agent / Sales Manager can create + edit + complete their
+    # own tasks but cannot remove them from the system.
+    "tasks.delete",
     "pipelines.read",
     "pipelines.manage",
     "pipelines.write",
@@ -196,6 +205,13 @@ _CORE_ADMIN_KEYS: list[str] = [
     # _CORE_EMPLOYEE_KEYS) so the sidebar entry renders read-only.
     "ai_assistants.view",
     "ai_assistants.manage",
+    # tasks/custom-events — org-defined named triggers. Admin can
+    # create/edit/delete definitions (manage), see the picker (read),
+    # and fire on a contact (fire). Employee gets read + fire only —
+    # see _CORE_EMPLOYEE_KEYS below.
+    "custom_events.read",
+    "custom_events.manage",
+    "custom_events.fire",
 ]
 
 
@@ -285,6 +301,11 @@ _CORE_EMPLOYEE_KEYS: list[str] = [
     # Mutation, knowledge upload, embed-key issuance stay Owner/Admin
     # unless the Owner explicitly grants `.manage` on a custom role.
     "ai_assistants.view",
+    # tasks/custom-events — Employees can see the list of custom
+    # events (so the "Log event" dropdown on the contact page renders)
+    # AND fire them against a contact. Definition CRUD stays Admin/Owner.
+    "custom_events.read",
+    "custom_events.fire",
 ]
 
 

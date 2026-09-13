@@ -279,18 +279,64 @@
               } @else {
                 <ul class="divide-y divide-subtle">
                   @for (form of formsByPage()[page.page_id]; track form.form_id) {
-                    <li class="flex items-center justify-between py-2">
-                      <div>
-                        <p class="text-sm text-default">{{ form.name }}</p>
-                        <p class="text-xs text-muted font-mono">
+                    <li class="flex items-center justify-between gap-3 py-2">
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm text-default">{{ form.name }}</p>
+                        <p class="truncate font-mono text-xs text-muted">
                           {{ form.form_id }}
                         </p>
                       </div>
-                      <span
-                        class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted ring-1 border-subtle"
-                      >
-                        {{ form.status }}
-                      </span>
+                      <div class="flex shrink-0 items-center gap-2">
+                        <span
+                          class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted ring-1 border-subtle"
+                        >
+                          {{ form.status }}
+                        </span>
+                        @if (subscriptionsByForm()[form.form_id]) {
+                          <button
+                            type="button"
+                            class="rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
+                            (click)="openMapping(form)"
+                          >
+                            Edit mapping
+                          </button>
+                          <button
+                            type="button"
+                            class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
+                            [disabled]="toggleInFlightFor() === form.form_id"
+                            (click)="toggleSubscribe(form)"
+                          >
+                            @if (toggleInFlightFor() === form.form_id) {
+                              <lucide-icon
+                                name="loader-2"
+                                size="12"
+                                class="animate-spin"
+                                aria-hidden="true"
+                              ></lucide-icon>
+                            } @else {
+                              Detach
+                            }
+                          </button>
+                        } @else {
+                          <button
+                            type="button"
+                            class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+                            [disabled]="toggleInFlightFor() === form.form_id"
+                            (click)="toggleSubscribe(form)"
+                          >
+                            @if (toggleInFlightFor() === form.form_id) {
+                              <lucide-icon
+                                name="loader-2"
+                                size="12"
+                                class="animate-spin"
+                                aria-hidden="true"
+                              ></lucide-icon>
+                            } @else {
+                              Attach
+                            }
+                          </button>
+                        }
+                      </div>
                     </li>
                   }
                 </ul>

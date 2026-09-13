@@ -70,6 +70,14 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
   /** Single source of truth — written by either `[value]` (via effect)
    *  or `writeValue()` (from Angular Forms). */
   private readonly writtenValue = signal<string | null>(null);
+  /** Flips true the first time Angular Forms calls `writeValue`. Once
+   *  set, the `[value]` input sync effect stops writing so a
+   *  form-control-owned value can't be clobbered by the input's default
+   *  empty string on the effect's first run (which fires AFTER
+   *  writeValue during CVA setup — the same bug `crm-mobile-select`
+   *  already had to solve, which blanked the Edit Lead's expected-close
+   *  date on open). */
+  private readonly formControlOwned = signal(false);
   protected readonly currentValue = computed<string>(() => {
     const w = this.writtenValue();
     return w !== null ? w : this.value();
@@ -89,8 +97,12 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
     // `pickDay()` (which sets writtenValue) would re-trigger the effect
     // and get clobbered back to the input's default (empty), breaking
     // `formControlName` callers where `[value]` is never bound.
+    // Skipped entirely once a FormControl has taken ownership so
+    // Angular Forms's writeValue isn't overwritten by the input's
+    // default '' on the effect's first pass.
     effect(() => {
       const v = this.value();
+      if (untracked(() => this.formControlOwned())) return;
       if (v !== untracked(() => this.writtenValue())) this.writtenValue.set(v);
     });
 
@@ -141,6 +153,7 @@ export class MobileDateTimeComponent implements ControlValueAccessor {
 
   // --- ControlValueAccessor ------------------------------------------
   writeValue(value: string | null | undefined): void {
+    this.formControlOwned.set(true);
     this.writtenValue.set(value ?? '');
   }
 

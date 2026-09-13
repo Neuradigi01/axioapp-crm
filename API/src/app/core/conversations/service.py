@@ -98,6 +98,9 @@ async def list_conversations(
                     detail="assigned_to must be a UUID or 'unassigned'",
                 ) from exc
 
+    # Visibility is org-wide — every user with ``conversations.read``
+    # sees every chat. Ownership (take-over) is what's restricted;
+    # see ``ensure_can_write_conversation``.
     return await _da.list_conversations_query(
         session,
         channel=channel,
@@ -175,17 +178,25 @@ async def ensure_can_write_conversation(
 ) -> None:
     """Guard for reply / react / tag / mark-read / close / take-over-AI.
 
-    Read paths (list + detail) stay org-wide via `conversations.read`
-    — this gate is only for state-changing operations. Rules:
+    Product rule (locked 2026-09-10):
 
-    * Chat unassigned (``assigned_to_id IS NULL``) → any writer with
-      ``conversations.write`` passes (the compose bar auto-take-over
-      flow relies on this).
+    * **Unassigned chats** — any user with ``conversations.write`` can
+      jump in and reply. The reply auto-claims the chat for the
+      sender (mirror of ``send_outbound`` / ``send_email_reply``
+      auto-assign). No admin gate — unassigned = free-for-all pool.
+    * **Assigned chats** — only the current assignee can act.
+      *Other* employees viewing the chat get 403 and see the view-
+      only banner. Only Owner / Admin (``conversations.assign_others``)
+      can "take over" someone else's chat by reassigning or by
+      hitting the Take Over from AI button.
+
+    Rules:
+
+    * Chat unassigned → passes (anyone with write can jump in).
     * Caller is the current assignee → passes.
     * Caller has ``conversations.assign_others`` (Owner / Admin) →
       passes regardless of assignment.
-    * Otherwise → 403 with a helpful message so the frontend can
-      render the view-only banner instead of a generic error.
+    * Otherwise → 403.
     """
     if conv.assigned_to_id is None:
         return
@@ -321,6 +332,31 @@ async def send_email_reply(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email conversation has no linked contact — cannot reply.",
         )
+
+    # tasks/ai-assistants-omnichannel Step 5 — mirror of the WhatsApp
+    # ``send_outbound`` auto-pause. A human replying on an AI-handled
+    # email thread implicitly claims the conversation from the AI, so
+    # the next inbound doesn't trigger another AI reply that stomps
+    # over the human's answer. Intercom / Wati semantics: one implicit
+    # takeover, no extra button. Guarded by the same bound-assistant
+    # lookup ``send_outbound`` uses so the pause fires only for orgs
+    # that actually have AI wired on the email channel.
+    if not conv.ai_paused:
+        from src.app.core.ai_assistants import data_access as _ai_da
+        from src.app.core.ai_assistants.models import AiAssistantChannel
+
+        bound = await _ai_da.find_active_assistant_bound_to_channel(
+            session, channel=AiAssistantChannel.email.value
+        )
+        if bound is not None:
+            await apply_auto_pause(
+                session,
+                conversation=conv,
+                actor_user_id=user_id,
+                reason="human_reply",
+            )
+            await session.commit()
+            await session.refresh(conv)
 
     # Default sender: the org's SHARED sender identity from Settings →
     # Integrations → Email Sender. Preference matches
@@ -1869,6 +1905,53 @@ async def _resolve_or_create_contact_by_phone(
     return contact.id
 
 
+async def resync_external_id_for_contact_phone(
+    session: AsyncSession,
+    *,
+    contact_id: uuid.UUID,
+    new_phone: str,
+) -> int:
+    """Cascade a contact-side phone edit onto every WhatsApp/SMS
+    conversation linked to that contact.
+
+    The conversation row snapshots the counterparty phone into
+    ``external_id`` at inbound time (see ``_find_or_create_conversation``)
+    and never updated it. Result: an operator adds a country code on the
+    Contacts page → the inbox header keeps rendering the old raw phone
+    AND the next inbound spawns a *second* conversation (Meta's E.164
+    matches nothing on ``ix_conversations_channel_external_id``).
+    This function is called from ``contacts.service.update_contact``
+    when ``phone`` changes so both problems disappear at edit time.
+
+    Duplicate-safe: if another live conversation already owns
+    ``(channel, new_external_id)`` — the common case when the customer
+    already messaged after the edit, spawning the second row — the
+    stale row is left alone rather than renamed into a hard conflict.
+    Merging the two threads is a separate operator-driven action.
+
+    Returns the number of conversation rows actually renamed. Caller
+    owns the transaction — this function only stages the UPDATE(s)."""
+    if not new_phone:
+        return 0
+    normalised = new_phone if new_phone.startswith("+") else "+" + new_phone
+    linked = await _da.list_phone_conversations_for_contact(session, contact_id=contact_id)
+    renamed = 0
+    for conv in linked:
+        if conv.external_id == normalised:
+            continue
+        conflict = await _da.conversation_exists_for_channel_external(
+            session,
+            channel=conv.channel,
+            external_id=normalised,
+            exclude_id=conv.id,
+        )
+        if conflict:
+            continue
+        conv.external_id = normalised
+        renamed += 1
+    return renamed
+
+
 def _snapshot(c: Conversation) -> dict[str, Any]:
     return {
         "id": str(c.id),
@@ -2082,6 +2165,14 @@ async def resume_ai(
             status_code=status.HTTP_409_CONFLICT,
             detail={"reason": "not_paused"},
         )
+    # Ownership handshake: handing the thread back to AI drops the
+    # human assignee. Product model: "AI is handling" == no human
+    # owner. Keeping the ex-holder assigned would misroute the next
+    # inbound notification to someone who's already stepped away.
+    # The bound assistant answers the next inbound; if a human needs
+    # to jump back in, ``send_outbound`` / ``send_email_reply`` will
+    # implicit-claim the thread again.
+    conv.assigned_to_id = None
     actor_name = await _display_name_for(session, actor_user_id)
     _insert_takeover_system_message(
         session,
@@ -2104,6 +2195,7 @@ async def resume_ai(
 
 __all__ = [
     "apply_auto_pause",
+    "ensure_can_write_conversation",
     "get_conversation",
     "list_conversations",
     "list_messages",

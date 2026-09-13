@@ -57,12 +57,20 @@ class MetaPage:
 class MetaLeadForm:
     """One entry from `/{page_id}/leadgen_forms`. `status` is
     typically `ACTIVE` or `ARCHIVED` — Owner pickers should default
-    to filtering out archived forms but we don't enforce it here."""
+    to filtering out archived forms but we don't enforce it here.
+
+    `questions` holds the form's question keys — the same string that
+    later arrives as `field_data[].name` in webhook payloads. Standard
+    fields (`full_name`, `email`, `phone_number`, …) and custom
+    questions (`what_service_are_you_interested_in`, …) both live in
+    this list. The Settings-page mapping editor uses it as the left-
+    hand dropdown column."""
 
     form_id: str
     name: str
     status: str
     page_id: str
+    questions: tuple[str, ...] = ()
 
 
 async def list_pages(client: MetaGraphClient) -> list[MetaPage]:
@@ -108,9 +116,14 @@ async def list_lead_forms_for_page(
     """Lead Forms on a single Page. `page_token` is the Page-scoped
     access_token from `list_pages` (NOT the user token) — Meta
     requires it for this endpoint."""
+    # `questions{key}` is a Graph API field expansion that returns the
+    # form's question keys inline — same round-trip as fetching the
+    # form list, no per-form follow-up call needed. Each `key` matches
+    # the string later delivered as `field_data[].name` in webhook
+    # payloads, which is what the Settings mapping editor keys off.
     body = await client.get(
         f"/{page_id}/leadgen_forms",
-        params={"fields": "id,name,status"},
+        params={"fields": "id,name,status,questions{key}"},
         access_token=page_token,
     )
     raw = body.get("data") or []
@@ -121,12 +134,21 @@ async def list_lead_forms_for_page(
         form_id = item.get("id")
         if not form_id:
             continue
+        questions_raw = item.get("questions") or []
+        question_keys: list[str] = []
+        for q in questions_raw:
+            if not isinstance(q, dict):
+                continue
+            key = q.get("key")
+            if key:
+                question_keys.append(str(key))
         forms.append(
             MetaLeadForm(
                 form_id=str(form_id),
                 name=str(item.get("name") or ""),
                 status=str(item.get("status") or "UNKNOWN"),
                 page_id=page_id,
+                questions=tuple(question_keys),
             )
         )
     return forms

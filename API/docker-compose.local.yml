@@ -1,0 +1,93 @@
+# LOCAL overrides (non-secret). Adds a local Postgres 17 container so
+# your machine can run entirely offline — no dependency on the remote
+# prod DB. Shared infra (redis) is defined once in docker-compose.yml.
+# Secrets come from secrets.local.enc.env via `sops exec-env`.
+#
+# The `db` service is Docker-DNS resolvable at hostname `db` from every
+# service on the compose network. From your host machine (DBeaver /
+# psql), connect via 127.0.0.1:5434 — that avoids clashing with a
+# native Postgres install on port 5432.
+#
+# PROPERTY_LINK_ENCRYPTION_KEY now lives in secrets.local.enc.env like
+# every other crypto key — the compose file no longer inlines it.
+x-local-env: &local-env
+  IS_DEVELOPMENT: "true"
+  DB_NULL_POOL: "1"
+
+services:
+  api:
+    build:
+      args:
+        - is_development=true
+    ports:
+      - "5682:5678"
+    volumes:
+      - .:/app
+    environment:
+      <<: *local-env
+    command: ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "-m", "uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  celery:
+    volumes:
+      - .:/app
+    environment:
+      <<: *local-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  celery-beat:
+    volumes:
+      - .:/app
+    environment:
+      <<: *local-env
+    depends_on:
+      db:
+        condition: service_healthy
+      celery:
+        condition: service_started
+
+  flower:
+    volumes:
+      - .:/app
+    environment:
+      <<: *local-env
+
+  # Local Postgres 17 with pgvector. `pgvector/pgvector:pg17` is the
+  # official pgvector image — identical to postgres:17 except it ships
+  # the pgvector extension (needed by migration 0200_install_pgvector
+  # and the AI-assistants embedding tables). Prod has the same
+  # extension on its managed Postgres.
+  #
+  # `postgres` user + password come from the same env vars the API
+  # reads (DB_USER, DB_PASSWORD, DB_NAME) — one source of truth,
+  # sourced from config.local.env + secrets.local.enc.env. Published on
+  # 127.0.0.1:5434 (loopback only, so nothing off this machine can
+  # reach it). Data persists in the `db_data` named volume; `run.cmd
+  # down` removes it (uses `-v`).
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  db_data:

@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 
 import { ToastHostComponent } from '../notifications/toast-host.component';
 import { CommandPaletteComponent } from '../shared/command-palette/command-palette.component';
+import { ConfirmDialogHostComponent } from '../shared/confirm-dialog/confirm-dialog-host.component';
 import { TrialBannerComponent } from '../billing/components/trial-banner/trial-banner.component';
 import { UpgradeModalComponent } from '../billing/components/upgrade-modal/upgrade-modal.component';
 import { BottomNavComponent } from './bottom-nav.component';
@@ -22,6 +23,7 @@ const SIDEBAR_STORAGE_KEY = 'furniturecrm:sidebar-open';
     FooterComponent,
     BottomNavComponent,
     ToastHostComponent,
+    ConfirmDialogHostComponent,
     CommandPaletteComponent,
     TrialBannerComponent,
     UpgradeModalComponent,
