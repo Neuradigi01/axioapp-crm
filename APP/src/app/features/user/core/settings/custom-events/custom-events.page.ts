@@ -249,7 +249,8 @@ export class CustomEventsPageComponent {
    *  the catalog. */
   protected onEntityChange(next: EntityType): void {
     if (this.form.controls.entity_type.disabled) return;
-    this.form.controls.entity_type.setValue(next);
+    // `formControlName` on the crm-mobile-select already wrote the
+    // value via ControlValueAccessor — we only side-effect here.
     // Clear the field pick — a field valid for Contact is not valid
     // for Lead so we must force a re-selection.
     this.form.controls.schedule_field.setValue('');

@@ -95,8 +95,7 @@
             <div class="mt-1">
               <crm-mobile-select
                 [options]="entitySelectOptions()"
-                [value]="form.controls.entity_type.value"
-                [disabled]="form.controls.entity_type.disabled"
+                formControlName="entity_type"
                 (valueChange)="onEntityChange($any($event))"
                 placeholder="Pick an entity…"
               />
