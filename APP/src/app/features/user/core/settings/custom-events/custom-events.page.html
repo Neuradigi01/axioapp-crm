@@ -81,6 +81,146 @@
           class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         ></textarea>
       </div>
+
+      <!-- Fire schedule -->
+      <fieldset class="space-y-3 rounded-lg border border-subtle bg-surface-2 p-4">
+        <legend class="px-1 text-xs font-semibold uppercase tracking-wider text-muted">
+          When does this fire?
+        </legend>
+        <div class="flex flex-col gap-2 sm:flex-row sm:gap-4">
+          <label
+            class="flex flex-1 cursor-pointer items-start gap-2 rounded-md border border-subtle bg-surface p-3 text-sm"
+          >
+            <input
+              type="radio"
+              name="ce_schedule_type"
+              value="manual"
+              class="mt-0.5"
+              [checked]="form.controls.schedule_type.value === 'manual'"
+              (change)="onScheduleTypeChange('manual')"
+            />
+            <span class="flex flex-col">
+              <span class="font-medium text-default">Manual only</span>
+              <span class="text-xs text-muted">
+                Staff clicks the "Log event" button on a contact to fire.
+              </span>
+            </span>
+          </label>
+          <label
+            class="flex flex-1 cursor-pointer items-start gap-2 rounded-md border border-subtle bg-surface p-3 text-sm"
+          >
+            <input
+              type="radio"
+              name="ce_schedule_type"
+              value="date_field"
+              class="mt-0.5"
+              [checked]="form.controls.schedule_type.value === 'date_field'"
+              (change)="onScheduleTypeChange('date_field')"
+            />
+            <span class="flex flex-col">
+              <span class="font-medium text-default">Automatic on a date field</span>
+              <span class="text-xs text-muted">
+                Daily sweep fires on contacts whose date matches.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        @if (form.controls.schedule_type.value === 'date_field') {
+          @if (catalogLoading()) {
+            <div class="flex items-center gap-2 text-sm text-muted">
+              <lucide-icon name="loader-2" class="h-4 w-4 animate-spin" />
+              Loading date fields…
+            </div>
+          } @else if (catalogError()) {
+            <div class="rounded-md border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-400">
+              {{ catalogError() }}
+            </div>
+          } @else {
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div class="sm:col-span-2">
+                <label for="ce_sched_field" class="block text-xs font-medium text-default">
+                  Watch date field <span class="text-red-600">*</span>
+                </label>
+                <select
+                  id="ce_sched_field"
+                  formControlName="schedule_field"
+                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  <option value="">Pick a date field…</option>
+                  @for (group of catalogGrouped(); track group.label) {
+                    <optgroup [label]="group.label">
+                      @for (opt of group.options; track opt.field_ref) {
+                        <option [value]="opt.source + '::' + opt.field_ref">
+                          {{ opt.label }}
+                        </option>
+                      }
+                    </optgroup>
+                  }
+                </select>
+                <p class="mt-1 text-xs text-muted">
+                  Custom fields must be of type "date". Add more via Settings → Custom Fields.
+                </p>
+              </div>
+              <div>
+                <label for="ce_sched_offset" class="block text-xs font-medium text-default">
+                  Fire
+                </label>
+                <select
+                  id="ce_sched_offset"
+                  formControlName="schedule_offset_days"
+                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  @for (opt of OFFSET_OPTIONS; track opt.value) {
+                    <option [value]="opt.value">{{ opt.label }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label for="ce_sched_hour" class="block text-xs font-medium text-default">
+                  At (org-local time)
+                </label>
+                <select
+                  id="ce_sched_hour"
+                  formControlName="schedule_hour_local"
+                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  @for (hour of HOURS_OF_DAY; track hour.value) {
+                    <option [value]="hour.value">{{ hour.label }}</option>
+                  }
+                </select>
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-medium text-default">Frequency</label>
+                <div class="mt-1 flex flex-wrap gap-2">
+                  <label
+                    class="flex cursor-pointer items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
+                  >
+                    <input type="radio" formControlName="schedule_recurring" value="none" />
+                    One-shot
+                  </label>
+                  <label
+                    class="flex cursor-pointer items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
+                  >
+                    <input type="radio" formControlName="schedule_recurring" value="yearly" />
+                    Yearly (like a birthday)
+                  </label>
+                  <label
+                    class="flex cursor-pointer items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
+                  >
+                    <input type="radio" formControlName="schedule_recurring" value="monthly" />
+                    Monthly
+                  </label>
+                </div>
+                <p class="mt-1 text-xs text-muted">
+                  One-shot fires exactly once per contact ever (e.g. visa expiry). Yearly fires once
+                  per year (e.g. birthday). Monthly fires once per year-month.
+                </p>
+              </div>
+            </div>
+          }
+        }
+      </fieldset>
       @if (saveError()) {
         <div class="rounded-md border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-400">
           {{ saveError() }}
@@ -147,7 +287,30 @@
           @for (evt of events(); track evt.id) {
             <tr class="hover:bg-surface-2">
               <td class="px-4 py-3">
-                <div class="font-medium text-default">{{ evt.name }}</div>
+                <div class="flex items-center gap-2">
+                  <span class="font-medium text-default">{{ evt.name }}</span>
+                  @if (evt.schedule_type === 'date_field' && evt.schedule) {
+                    <span
+                      class="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-500"
+                      [title]="
+                        'Auto-fires ' +
+                        (evt.schedule.offset_days === 0
+                          ? 'on the day of'
+                          : evt.schedule.offset_days < 0
+                            ? -evt.schedule.offset_days + 'd before'
+                            : evt.schedule.offset_days + 'd after') +
+                        ' ' +
+                        evt.schedule.field_ref +
+                        ' at ' +
+                        evt.schedule.hour_local +
+                        ':00 org-local'
+                      "
+                    >
+                      <lucide-icon name="clock" class="h-3 w-3" />
+                      Auto · {{ evt.schedule.field_ref }}
+                    </span>
+                  }
+                </div>
                 @if (evt.description) {
                   <div class="mt-0.5 text-xs text-muted">{{ evt.description }}</div>
                 }

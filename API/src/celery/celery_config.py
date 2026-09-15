@@ -172,6 +172,15 @@ beat_schedule = {
         "task": "src.app.core.automation.tasks.daily_time_based_scan",
         "schedule": crontab(hour=3, minute=30),
     },
+    # tasks/custom-events — hourly sweep at :05 that fires date-
+    # triggered custom events for whichever orgs have their configured
+    # ``schedule_hour_local`` matching the current local hour. The
+    # partial unique index ``ux_custom_event_occ_dedup`` absorbs
+    # replays across ticks + worker restarts.
+    "custom-events-hourly-sweep": {
+        "task": "src.app.core.custom_events.tasks.sweep_date_triggered_events",
+        "schedule": crontab(minute=5),
+    },
     # tasks/workflows Step 4 — every-60s sweep that re-dispatches
     # parked wait-node runs whose next_step_at <= now(). Matches the
     # email-sequences-tick cadence (60s) — same operator-visible

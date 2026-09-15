@@ -4,6 +4,28 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
 
+export type ScheduleType = 'manual' | 'date_field';
+export type ScheduleSource = 'system' | 'custom';
+export type RecurringMode = 'none' | 'yearly' | 'monthly';
+
+/** Sub-payload present when `schedule_type === 'date_field'`. */
+export interface ScheduleConfig {
+  source: ScheduleSource;
+  field_ref: string;
+  offset_days: number;
+  recurring: RecurringMode;
+  hour_local: number;
+}
+
+/** Row from GET /custom-events/date-field-catalog. */
+export interface DateFieldCatalogEntry {
+  source: ScheduleSource;
+  field_ref: string;
+  label: string;
+  group: 'System fields' | 'Custom fields';
+  recurring_hint: RecurringMode;
+}
+
 /** Row projection returned by GET /custom-events. */
 export interface CustomEvent {
   id: string;
@@ -15,6 +37,8 @@ export interface CustomEvent {
   updated_at: string;
   fires_last_30d: number;
   workflows_using_count: number;
+  schedule_type: ScheduleType;
+  schedule: ScheduleConfig | null;
 }
 
 /** Payload for POST /custom-events. `event_key` is immutable after
@@ -24,11 +48,15 @@ export interface CustomEventCreate {
   event_key: string;
   name: string;
   description?: string | null;
+  schedule_type?: ScheduleType;
+  schedule?: ScheduleConfig | null;
 }
 
 export interface CustomEventUpdate {
   name?: string;
   description?: string | null;
+  schedule_type?: ScheduleType;
+  schedule?: ScheduleConfig | null;
 }
 
 export interface CustomEventFireRequest {
@@ -103,5 +131,12 @@ export class CustomEventsApiService {
     return this.http.get<ContactCustomEventOccurrence[]>(`${this.base}/by-contact/${contactId}`, {
       params: { limit: String(limit) },
     });
+  }
+
+  /** Every date/datetime field an event can subscribe to, grouped
+   *  by source ('System fields' | 'Custom fields'). Feeds the
+   *  create-event modal's fire-schedule picker. */
+  listDateFieldCatalog(): Observable<DateFieldCatalogEntry[]> {
+    return this.http.get<DateFieldCatalogEntry[]>(`${this.base}/date-field-catalog`);
   }
 }

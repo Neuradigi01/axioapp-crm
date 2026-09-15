@@ -20,6 +20,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     text,
@@ -74,6 +75,26 @@ class CustomEvent(Base, TenantScoped):
         DateTime(timezone=True),
         nullable=True,
     )
+    # --- Schedule (migration 0227) --------------------------------------
+    # 'manual' = staff clicks Log Event to fire (default; legacy behaviour).
+    # 'date_field' = daily Celery beat sweeps the referenced date field
+    # and auto-fires on matching contacts.
+    schedule_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'manual'")
+    )
+    # 'system' = physical column on tbl_contacts (e.g. date_of_birth).
+    # 'custom' = JSONB path in tbl_contacts.custom_data.
+    # NULL for manual events.
+    schedule_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # For system: the column name (e.g. 'date_of_birth').
+    # For custom: the definition's field_key (e.g. 'visa_expiry_date').
+    schedule_field_ref: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Signed offset in days: 0 = on the day, -7 = 7d before, +7 = 7d after.
+    schedule_offset_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # 'none' (one-shot ever), 'yearly' (like a birthday), 'monthly'.
+    schedule_recurring: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Hour of day (0..23) in the org's timezone when the sweeper fires.
+    schedule_hour_local: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class CustomEventOccurrence(Base, TenantScoped):
@@ -116,6 +137,19 @@ class CustomEventOccurrence(Base, TenantScoped):
         DateTime(timezone=True),
         nullable=False,
         server_default=text("now()"),
+    )
+    # Snapshot of the event's recurring mode at fire time (migration 0227).
+    # 'none' = one-shot (dedup permanent); 'yearly' = one per year; 'monthly'
+    # = one per year-month.
+    recurring_mode: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'none'")
+    )
+    # Dedup grain for the partial unique index. Service writes:
+    #   'none'    → ''       (single fire per contact per event ever)
+    #   'yearly'  → 'YYYY'
+    #   'monthly' → 'YYYY-MM'
+    period_key: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("''")
     )
 
 

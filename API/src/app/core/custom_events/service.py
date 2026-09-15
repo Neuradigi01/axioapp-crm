@@ -27,10 +27,12 @@ from __future__ import annotations
 
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
@@ -42,6 +44,7 @@ from src.app.core.custom_events.schemas import (
     CustomEventListItem,
     CustomEventRead,
     CustomEventUpdate,
+    ScheduleConfig,
 )
 from src.app.core.events import bus
 
@@ -71,7 +74,131 @@ _RESERVED_KEY_PREFIXES: tuple[str, ...] = (
 
 
 def _to_read(row: CustomEvent) -> CustomEventRead:
-    return CustomEventRead.model_validate(row)
+    schedule: ScheduleConfig | None = None
+    if row.schedule_type == "date_field":
+        schedule = ScheduleConfig(
+            source=row.schedule_source,  # type: ignore[arg-type]
+            field_ref=row.schedule_field_ref or "",
+            offset_days=row.schedule_offset_days or 0,
+            recurring=row.schedule_recurring or "none",  # type: ignore[arg-type]
+            hour_local=row.schedule_hour_local or 9,
+        )
+    return CustomEventRead(
+        id=row.id,
+        event_key=row.event_key,
+        name=row.name,
+        description=row.description,
+        created_by_user_id=row.created_by_user_id,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        schedule_type=row.schedule_type,  # type: ignore[arg-type]
+        schedule=schedule,
+    )
+
+
+# --- System date-field catalog ------------------------------------------
+#
+# The set of `tbl_contacts` columns an admin may point a date-triggered
+# event at. Kept as a code-owned tuple (not DB-driven) so the sweeper's
+# raw-SQL branch has an allowlist to check against — SQL-injection
+# defense for the column name that lands inline in the WHERE clause.
+
+
+_SYSTEM_CONTACT_DATE_FIELDS: tuple[dict[str, Any], ...] = (
+    {
+        "column": "date_of_birth",
+        "label": "Date of birth",
+        "sql_type": "date",
+        "recurring_hint": "yearly",
+    },
+    {
+        "column": "created_at",
+        "label": "Created date",
+        "sql_type": "timestamp",
+        "recurring_hint": "none",
+    },
+    {
+        "column": "last_activity_at",
+        "label": "Last activity date",
+        "sql_type": "timestamp",
+        "recurring_hint": "none",
+    },
+)
+
+
+async def list_date_field_catalog(
+    session: AsyncSession, *, org_id: uuid.UUID
+) -> list[dict[str, Any]]:
+    """Return every date/datetime-typed field an event can subscribe to,
+    grouped by source. Backs the create-event modal's field picker.
+
+    * ``group='System fields'`` — physical columns on tbl_contacts
+      (from ``_SYSTEM_CONTACT_DATE_FIELDS``). Always shown.
+    * ``group='Custom fields'`` — this org's ``custom_field_definitions``
+      of type ``date`` or ``datetime``, entity=``contact``.
+
+    Sorted alphabetically inside each group.
+    """
+    from src.app.core.custom_fields import data_access as cf_da
+    from src.app.core.custom_fields.models import FieldType
+
+    entries: list[dict[str, Any]] = []
+    for spec in _SYSTEM_CONTACT_DATE_FIELDS:
+        entries.append(
+            {
+                "source": "system",
+                "field_ref": spec["column"],
+                "label": spec["label"],
+                "group": "System fields",
+                "recurring_hint": spec["recurring_hint"],
+            }
+        )
+
+    definitions = await cf_da.list_fields_query(
+        session, entity_type="contact", include_hidden=False
+    )
+    for definition in definitions:
+        if definition.field_type not in (FieldType.date, FieldType.datetime):
+            continue
+        entries.append(
+            {
+                "source": "custom",
+                "field_ref": definition.field_key,
+                "label": definition.field_label or definition.field_key,
+                "group": "Custom fields",
+                "recurring_hint": "none",
+            }
+        )
+    entries.sort(key=lambda e: (e["group"] != "System fields", e["label"].lower()))
+    return entries
+
+
+def _validate_field_ref(
+    source: str,
+    field_ref: str,
+    catalog: list[dict[str, Any]],
+) -> None:
+    """Ensure the caller's (source, field_ref) pair is a real entry in
+    the catalog. Guards against a client sending a stale or fabricated
+    field key that would either 500 the sweeper or (worse) inject SQL
+    when the sweeper substitutes ``schedule_field_ref`` into its WHERE
+    clause on the system branch."""
+    match = next(
+        (
+            e
+            for e in catalog
+            if e["source"] == source and e["field_ref"] == field_ref
+        ),
+        None,
+    )
+    if match is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Date field {field_ref!r} (source={source!r}) is not available "
+                f"on contacts. Refresh the field picker and pick again."
+            ),
+        )
 
 
 def _snapshot(row: CustomEvent) -> dict[str, Any]:
@@ -156,6 +283,16 @@ async def create_event(
         description=payload.description,
         created_by_user_id=actor_id,
     )
+    if payload.schedule_type == "date_field":
+        assert payload.schedule is not None  # validator guarantees this
+        catalog = await list_date_field_catalog(session, org_id=org_id)
+        _validate_field_ref(payload.schedule.source, payload.schedule.field_ref, catalog)
+        row.schedule_type = "date_field"
+        row.schedule_source = payload.schedule.source
+        row.schedule_field_ref = payload.schedule.field_ref
+        row.schedule_offset_days = payload.schedule.offset_days
+        row.schedule_recurring = payload.schedule.recurring
+        row.schedule_hour_local = payload.schedule.hour_local
     _da.insert_event(session, row)
     await session.commit()
     await session.refresh(row)
@@ -184,8 +321,31 @@ async def update_event(
         )
     before = _snapshot(row)
     changes = payload.model_dump(exclude_unset=True)
-    for key, value in changes.items():
-        setattr(row, key, value)
+    # Apply plain-scalar edits first (name, description).
+    for key in ("name", "description"):
+        if key in changes:
+            setattr(row, key, changes[key])
+    # Schedule mutation: only when the caller supplied schedule_type
+    # (Pydantic's coupling validator has already enforced schedule
+    # presence/absence matches the type).
+    if payload.schedule_type is not None:
+        if payload.schedule_type == "manual":
+            row.schedule_type = "manual"
+            row.schedule_source = None
+            row.schedule_field_ref = None
+            row.schedule_offset_days = None
+            row.schedule_recurring = None
+            row.schedule_hour_local = None
+        else:
+            assert payload.schedule is not None
+            catalog = await list_date_field_catalog(session, org_id=org_id)
+            _validate_field_ref(payload.schedule.source, payload.schedule.field_ref, catalog)
+            row.schedule_type = "date_field"
+            row.schedule_source = payload.schedule.source
+            row.schedule_field_ref = payload.schedule.field_ref
+            row.schedule_offset_days = payload.schedule.offset_days
+            row.schedule_recurring = payload.schedule.recurring
+            row.schedule_hour_local = payload.schedule.hour_local
     row.updated_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(row)
@@ -265,15 +425,35 @@ async def fire_event(
                 detail="Contact not found in this workspace.",
             )
 
+    recurring = event.schedule_recurring or "none"
+    period_key = _period_key_for(recurring, datetime.now(UTC))
     occurrence = CustomEventOccurrence(
         org_id=org_id,
         event_id=event.id,
         contact_id=contact_id,
         fired_by_user_id=actor_id,
         payload=payload or {},
+        recurring_mode=recurring,
+        period_key=period_key,
     )
     _da.insert_occurrence(session, occurrence)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Dedup index tripped — this (event, contact, period) already
+        # fired. For MANUAL fires that's a race between two staffers
+        # clicking the button simultaneously, which is rare enough to
+        # surface as 409 rather than silently swallow. For the sweeper's
+        # `_fire_scheduled_for_contact` helper we short-circuit before
+        # this path.
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This event has already fired for this contact in the current "
+                f"period ({period_key!r})."
+            ),
+        )
     await session.refresh(occurrence)
 
     # Publish AFTER commit so a workflow never sees an event whose
@@ -386,12 +566,253 @@ async def list_for_workflow_picker(
     return entries
 
 
+def _period_key_for(recurring: str, when: datetime) -> str:
+    """Compute the dedup grain key that lands in
+    ``tbl_custom_event_occurrences.period_key`` — matches the
+    ``ux_custom_event_occ_dedup`` partial unique index (migration 0227).
+
+    * ``'none'``    → empty string (single fire per contact per event ever)
+    * ``'yearly'``  → ``'YYYY'`` (birthdays, anniversaries)
+    * ``'monthly'`` → ``'YYYY-MM'`` (rent reminders, subscription refreshes)
+    """
+    if recurring == "yearly":
+        return f"{when.year:04d}"
+    if recurring == "monthly":
+        return f"{when.year:04d}-{when.month:02d}"
+    return ""
+
+
+async def sweep_and_fire_for_org(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    org_hour_local: int,
+    today_local: "date_type",
+) -> dict[str, int]:
+    """Run the date-triggered sweep for a single org.
+
+    For every ``date_field`` event on this org whose
+    ``schedule_hour_local`` matches ``org_hour_local``:
+
+      1. Compute the target date = ``today_local - offset_days``.
+      2. Find every contact in this org whose watched date field
+         matches the target (system column OR JSONB custom-field
+         value). For yearly recurring events we match on
+         ``(month, day)`` only; monthly on ``(day)``; none on the
+         full date.
+      3. Fire the event for each match. The occurrence table's
+         partial unique index absorbs re-runs (double-tick, worker
+         restart, retry) so at most one row per contact per period.
+
+    Returns per-event fire counts for logging / metrics.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import Date, cast, extract, select, text as _text
+
+    from src.app.core.contacts.models import Contact
+
+    events = await _da.list_scheduled_events_for_hour(
+        session, org_id=org_id, hour_local=org_hour_local
+    )
+    fire_counts: dict[str, int] = {}
+    for event in events:
+        # Cache scalar attributes off the ORM row up-front — the
+        # ``_fire_scheduled_occurrence`` helper does its own
+        # ``session.commit()`` which expires every attached instance's
+        # attributes. Subsequent per-loop access would trigger a lazy
+        # reload outside the greenlet context. Caching sidesteps it.
+        event_key = event.event_key
+        offset = event.schedule_offset_days or 0
+        target = today_local - timedelta(days=offset)
+        recurring = event.schedule_recurring or "none"
+
+        stmt = select(Contact).where(Contact.org_id == org_id)
+        if event.schedule_source == "system":
+            column_name = event.schedule_field_ref or ""
+            # Allowlist check — only known system columns are allowed
+            # (defence in depth; the validator at create/update already
+            # gated the input).
+            known_columns = {
+                spec["column"] for spec in _SYSTEM_CONTACT_DATE_FIELDS
+            }
+            if column_name not in known_columns:
+                logger.warning(
+                    "custom_events.sweep: skipping event %s — unknown system "
+                    "column %r",
+                    event.id,
+                    column_name,
+                )
+                continue
+            column = getattr(Contact, column_name)
+            if recurring == "yearly":
+                stmt = stmt.where(
+                    extract("month", column) == target.month,
+                    extract("day", column) == target.day,
+                )
+            elif recurring == "monthly":
+                stmt = stmt.where(extract("day", column) == target.day)
+            else:
+                stmt = stmt.where(cast(column, Date) == target)
+        else:
+            # Custom field lives at contacts.custom_data->>'<field_ref>'.
+            # Cast to date once, then match per recurring mode.
+            field_ref = event.schedule_field_ref or ""
+            date_expr = cast(
+                Contact.custom_data.op("->>")(field_ref),
+                Date,
+            )
+            if recurring == "yearly":
+                stmt = stmt.where(
+                    extract("month", date_expr) == target.month,
+                    extract("day", date_expr) == target.day,
+                )
+            elif recurring == "monthly":
+                stmt = stmt.where(extract("day", date_expr) == target.day)
+            else:
+                stmt = stmt.where(date_expr == target)
+
+        result = await session.execute(stmt)
+        matches = list(result.scalars().all())
+        # Snapshot everything the fire helper needs; the commits inside
+        # the loop expire the ORM row otherwise.
+        event_snapshot = _EventSnapshot(
+            id=event.id,
+            org_id=event.org_id,
+            event_key=event_key,
+            name=event.name,
+            description=event.description,
+            schedule_source=event.schedule_source,
+            schedule_field_ref=event.schedule_field_ref,
+            schedule_offset_days=event.schedule_offset_days,
+            schedule_recurring=recurring,
+        )
+        fired = 0
+        for contact in matches:
+            try:
+                await _fire_scheduled_occurrence(
+                    session,
+                    event=event_snapshot,
+                    contact=contact,
+                    fired_at=datetime.now(UTC),
+                )
+                fired += 1
+            except IntegrityError:
+                # Already fired this contact for this period — that's
+                # the whole point of the dedup index. Silent skip.
+                await session.rollback()
+        fire_counts[event_key] = fired
+    return fire_counts
+
+
+@dataclass(frozen=True, slots=True)
+class _EventSnapshot:
+    """Detached snapshot of an event definition — sidesteps
+    session-expiration on the ORM row after per-iteration commits."""
+
+    id: uuid.UUID
+    org_id: uuid.UUID
+    event_key: str
+    name: str
+    description: str | None
+    schedule_source: str | None
+    schedule_field_ref: str | None
+    schedule_offset_days: int | None
+    schedule_recurring: str
+
+
+async def _fire_scheduled_occurrence(
+    session: AsyncSession,
+    *,
+    event: "_EventSnapshot",
+    contact: Any,
+    fired_at: datetime,
+) -> None:
+    """Persist an occurrence + publish on the bus for a sweeper-driven
+    fire. Isolated from :func:`fire_event` so the sweeper doesn't have
+    to fake an ``actor_id`` or re-run the manual-fire's cross-org
+    contact validation (the sweeper already has both loaded)."""
+    recurring = event.schedule_recurring
+    period_key = _period_key_for(recurring, fired_at)
+    payload = {
+        "scheduled": True,
+        "field_source": event.schedule_source,
+        "field_ref": event.schedule_field_ref,
+        "offset_days": event.schedule_offset_days,
+        "recurring": recurring,
+    }
+    # Cache contact fields BEFORE commit — same expiration risk as
+    # events. Read whatever the envelope needs into locals now.
+    contact_id = contact.id
+    contact_full_name = getattr(contact, "full_name", None)
+    contact_email = getattr(contact, "email", None)
+    contact_phone = getattr(contact, "phone", None)
+    contact_custom_data = getattr(contact, "custom_data", None) or {}
+    occurrence = CustomEventOccurrence(
+        org_id=event.org_id,
+        event_id=event.id,
+        contact_id=contact_id,
+        fired_by_user_id=None,  # system-fire — not a human actor
+        payload=payload,
+        recurring_mode=recurring,
+        period_key=period_key,
+    )
+    _da.insert_occurrence(session, occurrence)
+    await session.commit()  # raises IntegrityError → dedup skip in caller
+    occurrence_id = occurrence.id
+    occurrence_fired_at = occurrence.fired_at
+
+    envelope: dict[str, Any] = {
+        "event_key": event.event_key,
+        "event_definition": {
+            "id": str(event.id),
+            "key": event.event_key,
+            "name": event.name,
+            "description": event.description,
+        },
+        "occurrence_id": str(occurrence_id),
+        "contact_id": str(contact_id),
+        "fired_by_user_id": None,
+        "fired_at": occurrence_fired_at.isoformat(),
+        "payload": payload,
+        "contact": {
+            "id": str(contact_id),
+            "full_name": contact_full_name,
+            "email": contact_email,
+            "phone": contact_phone,
+            "custom_data": contact_custom_data,
+        },
+    }
+    event_type = f"custom.{event.event_key}"
+    try:
+        await bus.publish(
+            event_type,
+            envelope,
+            org_id=event.org_id,
+            event_id=str(occurrence_id),
+        )
+    except Exception:
+        logger.exception(
+            "custom_events.scheduled_fire: bus.publish failed event_type=%s "
+            "occurrence_id=%s",
+            event_type,
+            occurrence_id,
+        )
+
+
+# --- Types (imported here to keep the sweeper signature readable) --------
+
+from datetime import date as date_type  # noqa: E402
+
+
 __all__ = [
     "create_event",
     "delete_event",
     "fire_event",
     "get_event",
+    "list_date_field_catalog",
     "list_events",
     "list_for_workflow_picker",
+    "sweep_and_fire_for_org",
     "update_event",
 ]

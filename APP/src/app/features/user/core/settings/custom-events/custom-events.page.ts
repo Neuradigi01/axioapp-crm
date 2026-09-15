@@ -14,7 +14,13 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 import { nullableTrim } from '@core/services/form.util';
 
-import { CustomEvent, CustomEventsApiService } from './custom-events-api.service';
+import {
+  CustomEvent,
+  CustomEventsApiService,
+  DateFieldCatalogEntry,
+  RecurringMode,
+  ScheduleType,
+} from './custom-events-api.service';
 
 /**
  * `/user/settings/custom-events` — CRUD list for org-defined event
@@ -65,7 +71,54 @@ export class CustomEventsPageComponent {
       nonNullable: true,
       validators: [Validators.maxLength(2000)],
     }),
+    schedule_type: this.fb.control<ScheduleType>('manual', { nonNullable: true }),
+    // Composite value: `${source}::${field_ref}` so a single <select>
+    // can group both source families under one option list.
+    schedule_field: this.fb.control<string>('', { nonNullable: true }),
+    schedule_offset_days: this.fb.control<number>(0, { nonNullable: true }),
+    schedule_recurring: this.fb.control<RecurringMode>('none', { nonNullable: true }),
+    schedule_hour_local: this.fb.control<number>(9, { nonNullable: true }),
   });
+
+  /** Loaded lazily the first time the schedule_type toggles to
+   *  'date_field' — no round-trip when the admin sticks to manual. */
+  protected readonly dateFieldCatalog = signal<DateFieldCatalogEntry[] | null>(null);
+  protected readonly catalogLoading = signal(false);
+  protected readonly catalogError = signal<string | null>(null);
+
+  /** Group the catalog by the label used in the <optgroup>. */
+  protected readonly catalogGrouped = computed(() => {
+    const rows = this.dateFieldCatalog() ?? [];
+    const groups = new Map<string, DateFieldCatalogEntry[]>();
+    for (const row of rows) {
+      const bucket = groups.get(row.group) ?? [];
+      bucket.push(row);
+      groups.set(row.group, bucket);
+    }
+    return Array.from(groups.entries()).map(([label, options]) => ({ label, options }));
+  });
+
+  protected readonly HOURS_OF_DAY: ReadonlyArray<{ value: number; label: string }> = Array.from(
+    { length: 24 },
+    (_v, i) => ({
+      value: i,
+      label: `${String(i).padStart(2, '0')}:00`,
+    }),
+  );
+
+  protected readonly OFFSET_OPTIONS: ReadonlyArray<{ value: number; label: string }> = [
+    { value: -30, label: '30 days before' },
+    { value: -14, label: '14 days before' },
+    { value: -7, label: '7 days before' },
+    { value: -3, label: '3 days before' },
+    { value: -1, label: '1 day before' },
+    { value: 0, label: 'On the day' },
+    { value: 1, label: '1 day after' },
+    { value: 3, label: '3 days after' },
+    { value: 7, label: '7 days after' },
+    { value: 14, label: '14 days after' },
+    { value: 30, label: '30 days after' },
+  ];
 
   protected readonly totalEvents = computed(() => this.events().length);
   protected readonly totalFires = computed(() =>
@@ -98,7 +151,16 @@ export class CustomEventsPageComponent {
     this.editingId.set(null);
     this.addingOpen.set(true);
     this.saveError.set(null);
-    this.form.reset({ event_key: '', name: '', description: '' });
+    this.form.reset({
+      event_key: '',
+      name: '',
+      description: '',
+      schedule_type: 'manual',
+      schedule_field: '',
+      schedule_offset_days: 0,
+      schedule_recurring: 'none',
+      schedule_hour_local: 9,
+    });
     this.form.controls.event_key.enable();
   }
 
@@ -110,9 +172,45 @@ export class CustomEventsPageComponent {
       event_key: evt.event_key,
       name: evt.name,
       description: evt.description ?? '',
+      schedule_type: evt.schedule_type,
+      schedule_field: evt.schedule ? `${evt.schedule.source}::${evt.schedule.field_ref}` : '',
+      schedule_offset_days: evt.schedule?.offset_days ?? 0,
+      schedule_recurring: evt.schedule?.recurring ?? 'none',
+      schedule_hour_local: evt.schedule?.hour_local ?? 9,
     });
     // event_key is immutable after creation.
     this.form.controls.event_key.disable();
+    if (evt.schedule_type === 'date_field') {
+      this.ensureCatalogLoaded();
+    }
+  }
+
+  protected onScheduleTypeChange(next: ScheduleType): void {
+    this.form.controls.schedule_type.setValue(next);
+    if (next === 'date_field') {
+      this.ensureCatalogLoaded();
+    }
+  }
+
+  private ensureCatalogLoaded(): void {
+    if (this.dateFieldCatalog() !== null || this.catalogLoading()) return;
+    this.catalogLoading.set(true);
+    this.catalogError.set(null);
+    this.api
+      .listDateFieldCatalog()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          this.dateFieldCatalog.set(rows);
+          this.catalogLoading.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.catalogError.set(
+            extractApiError(err) ?? 'Could not load date fields for scheduling.',
+          );
+          this.catalogLoading.set(false);
+        },
+      });
   }
 
   protected cancelForm(): void {
@@ -128,6 +226,18 @@ export class CustomEventsPageComponent {
       return;
     }
     const raw = this.form.getRawValue();
+
+    // Schedule-specific guard: if the admin picked 'date_field' but
+    // didn't select a field, block the submit with an inline error
+    // rather than letting the API 422 out.
+    if (raw.schedule_type === 'date_field' && !raw.schedule_field) {
+      this.saveError.set('Pick a date field to watch — or switch back to manual.');
+      return;
+    }
+
+    const schedulePayload =
+      raw.schedule_type === 'date_field' ? this.buildSchedulePayload(raw.schedule_field) : null;
+
     this.saving.set(true);
     this.saveError.set(null);
 
@@ -137,6 +247,17 @@ export class CustomEventsPageComponent {
         .update(editingId, {
           name: raw.name.trim(),
           description: nullableTrim(raw.description),
+          schedule_type: raw.schedule_type,
+          schedule:
+            raw.schedule_type === 'date_field'
+              ? {
+                  source: schedulePayload!.source,
+                  field_ref: schedulePayload!.field_ref,
+                  offset_days: raw.schedule_offset_days,
+                  recurring: raw.schedule_recurring,
+                  hour_local: raw.schedule_hour_local,
+                }
+              : null,
         })
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
@@ -156,6 +277,17 @@ export class CustomEventsPageComponent {
           event_key: raw.event_key.trim(),
           name: raw.name.trim(),
           description: nullableTrim(raw.description),
+          schedule_type: raw.schedule_type,
+          schedule:
+            raw.schedule_type === 'date_field'
+              ? {
+                  source: schedulePayload!.source,
+                  field_ref: schedulePayload!.field_ref,
+                  offset_days: raw.schedule_offset_days,
+                  recurring: raw.schedule_recurring,
+                  hour_local: raw.schedule_hour_local,
+                }
+              : null,
         })
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
@@ -170,6 +302,19 @@ export class CustomEventsPageComponent {
           },
         });
     }
+  }
+
+  /** Parse the composite `${source}::${field_ref}` value coming out
+   *  of the grouped <select>. */
+  private buildSchedulePayload(composite: string): {
+    source: 'system' | 'custom';
+    field_ref: string;
+  } {
+    const [source, ...rest] = composite.split('::');
+    return {
+      source: source === 'custom' ? 'custom' : 'system',
+      field_ref: rest.join('::'),
+    };
   }
 
   protected onDelete(evt: CustomEvent): void {

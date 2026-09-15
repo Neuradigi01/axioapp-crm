@@ -39,6 +39,7 @@ import src.app.core.chatbots.module  # noqa: F401
 # on the module registry before the lifespan permission-fanout sweep.
 import src.app.core.custom_events.models  # noqa: F401
 import src.app.core.custom_events.module  # noqa: F401
+import src.app.core.custom_events.tasks  # noqa: F401
 
 # tasks/ai-assistants Step 1 — side-effect import so the two BYOK
 # tables (tbl_ai_provider_keys, tbl_org_ai_cost_budget) register with

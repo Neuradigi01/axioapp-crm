@@ -175,13 +175,53 @@ async def list_occurrences_for_contact(
     return rows
 
 
+async def list_scheduled_events_for_hour(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    hour_local: int,
+) -> list[CustomEvent]:
+    """Return every live ``date_field``-scheduled event on this org
+    whose ``schedule_hour_local`` matches ``hour_local``.
+
+    Backs the Celery beat sweeper — called once per (org, hour) tick.
+    The sweeper knows the org's timezone + current local hour and
+    invokes this for exactly that hour.
+    """
+    stmt = select(CustomEvent).where(
+        CustomEvent.org_id == org_id,
+        CustomEvent.schedule_type == "date_field",
+        CustomEvent.schedule_hour_local == hour_local,
+        CustomEvent.deleted_at.is_(None),
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def list_all_scheduled_events(session: AsyncSession) -> list[CustomEvent]:
+    """Cross-tenant read for the Celery beat sweeper's per-org loop.
+
+    Callers set no tenant context so the ORM-level tenant filter
+    doesn't apply — the sweeper needs to iterate every org's
+    scheduled events in one pass, then bucket by ``(org_id,
+    schedule_hour_local)`` and sweep each bucket at its local hour."""
+    stmt = select(CustomEvent).where(
+        CustomEvent.schedule_type == "date_field",
+        CustomEvent.deleted_at.is_(None),
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
 __all__ = [
     "count_fires_last_30d",
     "get_event",
     "get_event_by_key",
     "insert_event",
     "insert_occurrence",
+    "list_all_scheduled_events",
     "list_events",
     "list_occurrences",
     "list_occurrences_for_contact",
+    "list_scheduled_events_for_hour",
 ]

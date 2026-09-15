@@ -59,6 +59,20 @@ async def list_custom_events_endpoint(
     return await service.list_events(db, org_id=user.org_id)
 
 
+@router.get("/date-field-catalog")
+async def list_date_field_catalog_endpoint(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("custom_events.manage")),
+) -> list[dict]:
+    """Return every date/datetime field an event can subscribe to,
+    grouped by source (System fields / Custom fields). Feeds the
+    create-event modal's date-field picker.
+
+    Gated on ``custom_events.manage`` — only Owner/Admin ever needs
+    this endpoint (staff-visible pickers don't need it)."""
+    return await service.list_date_field_catalog(db, org_id=user.org_id)
+
+
 @router.post(
     "",
     response_model=CustomEventRead,

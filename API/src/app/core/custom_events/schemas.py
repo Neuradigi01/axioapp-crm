@@ -5,12 +5,42 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 _EVENT_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_FIELD_REF_RE = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
+
+
+ScheduleType = Literal["manual", "date_field"]
+ScheduleSource = Literal["system", "custom"]
+RecurringMode = Literal["none", "yearly", "monthly"]
+
+
+class ScheduleConfig(BaseModel):
+    """Fire-schedule sub-payload for a date-triggered event.
+
+    Only present when the parent's ``schedule_type='date_field'``.
+    Every field is required in that case; the pydantic model_validator
+    on the parent (Create/Update) enforces the coupling.
+    """
+
+    source: ScheduleSource
+    field_ref: str = Field(min_length=1, max_length=128)
+    offset_days: int = Field(ge=-365, le=365)
+    recurring: RecurringMode
+    hour_local: int = Field(ge=0, le=23)
+
+    @field_validator("field_ref")
+    @classmethod
+    def _ref_shape(cls, v: str) -> str:
+        if not _FIELD_REF_RE.match(v):
+            raise ValueError(
+                "field_ref must be lowercase snake_case (e.g. visa_expiry_date)."
+            )
+        return v
 
 
 class CustomEventCreate(BaseModel):
@@ -21,11 +51,17 @@ class CustomEventCreate(BaseModel):
     (``custom.<event_key>``); once created it cannot be changed
     (rename would silently break every workflow that subscribed to
     the old name). Owners can edit ``name`` + ``description`` freely.
+
+    ``schedule_type`` defaults to ``'manual'`` (staff clicks Log Event
+    to fire). Set to ``'date_field'`` + supply ``schedule`` to have
+    the daily sweeper auto-fire on matching contacts.
     """
 
     event_key: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=128)
     description: str | None = Field(default=None, max_length=2000)
+    schedule_type: ScheduleType = "manual"
+    schedule: ScheduleConfig | None = None
 
     @field_validator("event_key")
     @classmethod
@@ -37,12 +73,36 @@ class CustomEventCreate(BaseModel):
             )
         return v
 
+    @model_validator(mode="after")
+    def _schedule_matches_type(self) -> "CustomEventCreate":
+        if self.schedule_type == "date_field" and self.schedule is None:
+            raise ValueError("schedule payload required when schedule_type='date_field'.")
+        if self.schedule_type == "manual" and self.schedule is not None:
+            raise ValueError("schedule payload must be omitted when schedule_type='manual'.")
+        return self
+
 
 class CustomEventUpdate(BaseModel):
-    """Patch-style update. Only ``name`` + ``description`` are editable."""
+    """Patch-style update. ``name`` + ``description`` are editable; the
+    fire schedule can be changed too (switching manual↔date_field or
+    tweaking any schedule sub-field). Omit ``schedule_type`` to leave
+    the current setting untouched.
+    """
 
     name: str | None = Field(default=None, min_length=1, max_length=128)
     description: str | None = Field(default=None, max_length=2000)
+    schedule_type: ScheduleType | None = None
+    schedule: ScheduleConfig | None = None
+
+    @model_validator(mode="after")
+    def _schedule_matches_type(self) -> "CustomEventUpdate":
+        # Only enforce coupling when the caller supplied schedule_type
+        # — a bare name/description patch is allowed to skip both.
+        if self.schedule_type == "date_field" and self.schedule is None:
+            raise ValueError("schedule payload required when switching to 'date_field'.")
+        if self.schedule_type == "manual" and self.schedule is not None:
+            raise ValueError("schedule payload must be omitted when switching to 'manual'.")
+        return self
 
 
 class CustomEventRead(BaseModel):
@@ -57,6 +117,8 @@ class CustomEventRead(BaseModel):
     created_by_user_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
+    schedule_type: ScheduleType = "manual"
+    schedule: ScheduleConfig | None = None
 
 
 class CustomEventListItem(CustomEventRead):
