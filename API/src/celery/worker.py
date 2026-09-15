@@ -20,6 +20,7 @@ celery.autodiscover_tasks(
     [
         "src.celery.tasks",
         "src.app.core.leads.imports.tasks",
+        "src.app.core.contacts.imports.tasks",
         "src.app.core.integrations.google.tasks",
         # tasks/google-calendar-sync Step 4 — per-user Google Calendar
         # sync tasks (hook-triggered sync_appointment_task + 30-min beat
