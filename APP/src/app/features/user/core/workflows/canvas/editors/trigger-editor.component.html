@@ -8,13 +8,7 @@
       (valueChange)="onEventTypeChange($event)"
     />
     @if (eventType()) {
-      <p class="text-[10px] text-muted mt-1">
-        @for (e of eventTypes; track e.type) {
-          @if (e.type === eventType()) {
-            {{ e.description }}
-          }
-        }
-      </p>
+      <p class="text-[10px] text-muted mt-1">{{ selectedEventDescription() }}</p>
     } @else {
       <p class="text-[10px] text-red-500 mt-1">Event type is required.</p>
     }

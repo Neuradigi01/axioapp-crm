@@ -1,8 +1,10 @@
 """Bus → engine bridge for the workflows module.
 
-Registers one universal handler (:func:`_on_event`) against every
-event type in :mod:`core.events.event_catalog`. On every published
-event the handler walks the org's ``active`` workflows whose
+Registers one universal handler (:func:`_on_event`) as a wildcard
+subscriber via :func:`core.events.bus.subscribe_all`. On every
+published event — whether a built-in catalog string or an org's
+``custom.<key>`` fire from ``POST /custom-events/{id}/fire`` — the
+handler walks the org's ``active`` workflows whose
 ``enabled_event_types`` includes the event type, evaluates the
 re-enrollment rule, and calls :func:`core.workflows.engine.start_run`
 for each match.
@@ -11,9 +13,10 @@ Subscriber registration happens at module import time via
 :func:`register_subscribers` — see :mod:`core.workflows.__init__`
 for the side-effect import.
 
-Per-event-type dispatch via the bus means the subscriber count
-stays constant (~30 events) regardless of how many workflows the
-org has defined. The matcher's array filter on
+Wildcard dispatch keeps custom events working without a
+per-event subscription bootstrap: the org creates ``custom.foo`` at
+runtime and the very next fire routes into this handler without any
+subscriber-registry mutation. The matcher's array filter on
 ``enabled_event_types`` then narrows from "every active workflow"
 to "every active workflow that listens on this event" in one
 indexed SQL hit per published event.
@@ -53,7 +56,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.events import bus as events_bus
 from src.app.core.events.conditions import evaluate_safe
-from src.app.core.events.event_catalog import ALL_EVENTS
 from src.app.core.workflows import data_access as _da
 from src.app.core.workflows.models import (
     Workflow,
@@ -310,23 +312,20 @@ async def _split_for_ab(
 
 
 def register_subscribers() -> None:
-    """Subscribe :func:`_on_event` to every event in the catalog.
-    Idempotent — re-running the registration is a no-op via the
-    bus's idempotency check on ``(event_type, handler)``."""
-    for event_type in ALL_EVENTS:
-        events_bus.subscribe(event_type, _on_event)
-    logger.info(
-        "workflows.trigger_handlers registered handler for %d events",
-        len(ALL_EVENTS),
-    )
+    """Register :func:`_on_event` as a wildcard bus subscriber.
+    Idempotent — the bus's ``subscribe_all`` guards against duplicate
+    handler references. Wildcard is required so per-org custom events
+    (published as ``custom.<key>``) route into the workflow matcher
+    without a per-event subscription bootstrap."""
+    events_bus.subscribe_all(_on_event)
+    logger.info("workflows.trigger_handlers registered wildcard handler")
 
 
 def unregister_subscribers() -> None:
-    """Test helper — drop every subscription. Production never
+    """Test helper — drop the wildcard subscription. Production never
     calls this; subscribers register at app-start and stay
     registered for the process lifetime."""
-    for event_type in ALL_EVENTS:
-        events_bus.unsubscribe(event_type, _on_event)
+    events_bus.unsubscribe_all(_on_event)
 
 
 async def _resume_matching_waits(

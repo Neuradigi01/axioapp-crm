@@ -497,6 +497,15 @@ export interface ABStatsResponse {
   min_runs_per_variant: number;
 }
 
+/** One org-defined event returned by `GET /workflows/custom-event-types`.
+ *  Merged with the frontend's static built-in list at render time
+ *  (grouped under "Custom events" in the trigger picker). */
+export interface CustomEventTypeOption {
+  event_type: string;
+  label: string;
+  description: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class WorkflowsApiService {
   private readonly http = inject(HttpClient);
@@ -551,6 +560,12 @@ export class WorkflowsApiService {
 
   testFire(id: string, payload: WorkflowTestFireRequest): Observable<WorkflowTestFireResponse> {
     return this.http.post<WorkflowTestFireResponse>(`${this.base}/${id}/test-fire`, payload);
+  }
+
+  // --- Custom events (trigger picker merge) ------------------------
+
+  listCustomEventTypes(): Observable<CustomEventTypeOption[]> {
+    return this.http.get<CustomEventTypeOption[]>(`${this.base}/custom-event-types`);
   }
 
   // --- Step 16: gallery + clone-from-gallery -----------------------

@@ -487,6 +487,27 @@ async def list_folders(session: AsyncSession, *, org_id: uuid.UUID) -> list[Work
     return await _da.list_folders(session, org_id=org_id)
 
 
+async def list_custom_event_types_for_picker(
+    session: AsyncSession, *, org_id: uuid.UUID
+) -> list[dict[str, str]]:
+    """Return the org's live custom events shaped for the trigger
+    picker: ``{event_type, label, description}``. Merged into the
+    built-in catalog by the frontend so a workflow can trigger on any
+    ``custom.<key>`` event fired via ``POST /custom-events/{id}/fire``.
+    """
+    from src.app.core.custom_events import service as custom_events_service
+
+    entries = await custom_events_service.list_for_workflow_picker(session, org_id=org_id)
+    return [
+        {
+            "event_type": entry["event_type"],
+            "label": entry["label"],
+            "description": entry["description"],
+        }
+        for entry in entries
+    ]
+
+
 async def patch_folder(
     session: AsyncSession,
     *,
@@ -2588,6 +2609,7 @@ __all__ = [
     "get_workflow",
     "get_workflow_version",
     "import_workflow",
+    "list_custom_event_types_for_picker",
     "list_folders",
     "list_workflow_versions",
     "list_workflows",

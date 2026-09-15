@@ -371,6 +371,32 @@ async def list_workflow_gallery_endpoint(
     )
 
 
+class CustomEventTypeOut(BaseModel):
+    """One row in the trigger picker's Custom events group. Merged
+    with the frontend's static built-in list at render time."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    event_type: str
+    label: str
+    description: str
+
+
+@router.get("/custom-event-types", response_model=list[CustomEventTypeOut])
+async def list_custom_event_types_endpoint(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_permissions(PERM_READ)),
+) -> list[CustomEventTypeOut]:
+    """Return the caller org's live custom events shaped as trigger
+    picker rows. Each row's ``event_type`` is the ``custom.<key>``
+    string that ``POST /custom-events/{id}/fire`` publishes on the
+    bus, so a workflow whose trigger config's ``event_type`` matches
+    will enrol on fire."""
+    org_id = _require_org_id()
+    entries = await workflows_service.list_custom_event_types_for_picker(db, org_id=org_id)
+    return [CustomEventTypeOut(**entry) for entry in entries]
+
+
 # --- workflow CRUD --------------------------------------------------------
 
 
