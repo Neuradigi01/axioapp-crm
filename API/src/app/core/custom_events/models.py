@@ -57,6 +57,12 @@ class CustomEvent(Base, TenantScoped):
     event_key: Mapped[str] = mapped_column(String(64), nullable=False)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 'contact' | 'lead' | 'appointment' (migration 0228). Default
+    # 'contact' — matches the pre-multi-entity default so historical
+    # events keep firing against contact date fields.
+    entity_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default=text("'contact'")
+    )
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         nullable=True,
@@ -137,6 +143,20 @@ class CustomEventOccurrence(Base, TenantScoped):
         DateTime(timezone=True),
         nullable=False,
         server_default=text("now()"),
+    )
+    # 'contact' | 'lead' | 'appointment' (migration 0228). Denormalised
+    # from the event definition at fire time so the timeline query can
+    # render "was fired against your Lead X" without a join.
+    entity_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default=text("'contact'")
+    )
+    # PK of the entity row that owned the date match. For contact-
+    # scoped events == contact_id. For lead/appointment events, this
+    # is the lead/appointment PK and contact_id is hydrated from that
+    # row so workflow templates still see the contact fields.
+    entity_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
     )
     # Snapshot of the event's recurring mode at fire time (migration 0227).
     # 'none' = one-shot (dedup permanent); 'yearly' = one per year; 'monthly'

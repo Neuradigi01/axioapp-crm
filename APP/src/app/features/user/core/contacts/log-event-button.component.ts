@@ -164,8 +164,11 @@ export class LogEventButtonComponent {
   private loadOnce(): void {
     this.loading.set(true);
     this.loadError.set(null);
+    // Filter to contact-scoped events only — lead/appointment events
+    // fire against a different entity and can't be manually triggered
+    // from the contact page (they auto-fire via their own date field).
     this.api
-      .list()
+      .list('contact')
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => {

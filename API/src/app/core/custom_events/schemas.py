@@ -17,6 +17,7 @@ _FIELD_REF_RE = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
 ScheduleType = Literal["manual", "date_field"]
 ScheduleSource = Literal["system", "custom"]
 RecurringMode = Literal["none", "yearly", "monthly"]
+EntityType = Literal["contact", "lead", "appointment"]
 
 
 class ScheduleConfig(BaseModel):
@@ -60,6 +61,7 @@ class CustomEventCreate(BaseModel):
     event_key: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=128)
     description: str | None = Field(default=None, max_length=2000)
+    entity_type: EntityType = "contact"
     schedule_type: ScheduleType = "manual"
     schedule: ScheduleConfig | None = None
 
@@ -87,6 +89,12 @@ class CustomEventUpdate(BaseModel):
     fire schedule can be changed too (switching manual↔date_field or
     tweaking any schedule sub-field). Omit ``schedule_type`` to leave
     the current setting untouched.
+
+    ``entity_type`` is INTENTIONALLY not editable — flipping an
+    event's entity mid-flight would invalidate the field binding, the
+    workflow envelope shape, and every occurrence's ``entity_id``.
+    Create a fresh event with a different key if you need a different
+    entity.
     """
 
     name: str | None = Field(default=None, min_length=1, max_length=128)
@@ -117,6 +125,7 @@ class CustomEventRead(BaseModel):
     created_by_user_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
+    entity_type: EntityType = "contact"
     schedule_type: ScheduleType = "manual"
     schedule: ScheduleConfig | None = None
 

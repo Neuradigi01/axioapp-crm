@@ -53,24 +53,54 @@ router = APIRouter(prefix="/custom-events", tags=["Custom Events"])
 
 @router.get("", response_model=list[CustomEventListItem])
 async def list_custom_events_endpoint(
+    entity: str | None = Query(
+        default=None,
+        description=(
+            "Optional entity filter — 'contact' | 'lead' | 'appointment'. "
+            "When set, only events whose entity_type matches are returned. "
+            "Used by the contact-detail 'Log event' dropdown to hide "
+            "events tied to other entities."
+        ),
+    ),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("custom_events.read")),
 ) -> list[CustomEventListItem]:
-    return await service.list_events(db, org_id=user.org_id)
+    return await service.list_events(db, org_id=user.org_id, entity_type=entity)
 
 
 @router.get("/date-field-catalog")
 async def list_date_field_catalog_endpoint(
+    entity: str = Query(default="contact"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("custom_events.manage")),
 ) -> list[dict]:
-    """Return every date/datetime field an event can subscribe to,
-    grouped by source (System fields / Custom fields). Feeds the
+    """Return every date/datetime field an event can subscribe to on
+    ``entity``, grouped by source (System / Custom). Feeds the
     create-event modal's date-field picker.
+
+    ``entity`` is one of ``contact`` (default), ``lead``,
+    ``appointment``. Unsupported values 422.
 
     Gated on ``custom_events.manage`` — only Owner/Admin ever needs
     this endpoint (staff-visible pickers don't need it)."""
-    return await service.list_date_field_catalog(db, org_id=user.org_id)
+    return await service.list_date_field_catalog(
+        db, org_id=user.org_id, entity_type=entity
+    )
+
+
+@router.get("/entities")
+async def list_supported_entities_endpoint(
+    _user: User = Depends(require_permissions("custom_events.manage")),
+) -> list[dict]:
+    """Return the entity types a custom event can bind to
+    (``contact`` / ``lead`` / ``appointment``) with their human labels.
+    Feeds the create-event modal's entity picker."""
+    from src.app.core.custom_events.entity_registry import ENTITY_REGISTRY
+
+    return [
+        {"key": key, "label": spec.label}
+        for key, spec in ENTITY_REGISTRY.items()
+    ]
 
 
 @router.post(

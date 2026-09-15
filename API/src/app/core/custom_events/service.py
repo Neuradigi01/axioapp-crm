@@ -37,6 +37,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core import audit
 from src.app.core.custom_events import data_access as _da
+from src.app.core.custom_events.entity_registry import (
+    ENTITY_REGISTRY,
+    SUPPORTED_ENTITY_TYPES,
+    entity_or_400,
+)
 from src.app.core.custom_events.models import CustomEvent, CustomEventOccurrence
 from src.app.core.custom_events.schemas import (
     CustomEventCreate,
@@ -91,71 +96,62 @@ def _to_read(row: CustomEvent) -> CustomEventRead:
         created_by_user_id=row.created_by_user_id,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        entity_type=row.entity_type,  # type: ignore[arg-type]
         schedule_type=row.schedule_type,  # type: ignore[arg-type]
         schedule=schedule,
     )
 
 
-# --- System date-field catalog ------------------------------------------
-#
-# The set of `tbl_contacts` columns an admin may point a date-triggered
-# event at. Kept as a code-owned tuple (not DB-driven) so the sweeper's
-# raw-SQL branch has an allowlist to check against — SQL-injection
-# defense for the column name that lands inline in the WHERE clause.
-
-
-_SYSTEM_CONTACT_DATE_FIELDS: tuple[dict[str, Any], ...] = (
-    {
-        "column": "date_of_birth",
-        "label": "Date of birth",
-        "sql_type": "date",
-        "recurring_hint": "yearly",
-    },
-    {
-        "column": "created_at",
-        "label": "Created date",
-        "sql_type": "timestamp",
-        "recurring_hint": "none",
-    },
-    {
-        "column": "last_activity_at",
-        "label": "Last activity date",
-        "sql_type": "timestamp",
-        "recurring_hint": "none",
-    },
-)
-
-
 async def list_date_field_catalog(
-    session: AsyncSession, *, org_id: uuid.UUID
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    entity_type: str = "contact",
 ) -> list[dict[str, Any]]:
-    """Return every date/datetime-typed field an event can subscribe to,
-    grouped by source. Backs the create-event modal's field picker.
+    """Return every date/datetime-typed field an event can subscribe
+    to on the requested entity. Backs the create-event modal's
+    field picker.
 
-    * ``group='System fields'`` — physical columns on tbl_contacts
-      (from ``_SYSTEM_CONTACT_DATE_FIELDS``). Always shown.
-    * ``group='Custom fields'`` — this org's ``custom_field_definitions``
-      of type ``date`` or ``datetime``, entity=``contact``.
+    * ``group=f"{Entity} · System fields"`` — physical columns
+      declared in :data:`ENTITY_REGISTRY[entity_type].system_date_fields`.
+    * ``group=f"{Entity} · Custom fields"`` — the org's
+      ``custom_field_definitions`` of type ``date``/``datetime`` for
+      the entity's ``custom_fields_entity_key``.
 
-    Sorted alphabetically inside each group.
+    Raises ``HTTPException(422)`` if ``entity_type`` isn't in the
+    supported set — routes catch this via FastAPI's default handler.
     """
     from src.app.core.custom_fields import data_access as cf_da
     from src.app.core.custom_fields.models import FieldType
 
+    if entity_type not in SUPPORTED_ENTITY_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Unsupported entity_type {entity_type!r}. Supported: "
+                f"{sorted(SUPPORTED_ENTITY_TYPES)}."
+            ),
+        )
+    spec = ENTITY_REGISTRY[entity_type]
+
     entries: list[dict[str, Any]] = []
-    for spec in _SYSTEM_CONTACT_DATE_FIELDS:
+    system_group = f"{spec.label} · System fields"
+    custom_group = f"{spec.label} · Custom fields"
+    for sys_field in spec.system_date_fields:
         entries.append(
             {
                 "source": "system",
-                "field_ref": spec["column"],
-                "label": spec["label"],
-                "group": "System fields",
-                "recurring_hint": spec["recurring_hint"],
+                "field_ref": sys_field.column,
+                "label": sys_field.label,
+                "group": system_group,
+                "recurring_hint": sys_field.recurring_hint,
             }
         )
 
     definitions = await cf_da.list_fields_query(
-        session, entity_type="contact", include_hidden=False
+        session,
+        entity_type=spec.custom_fields_entity_key,
+        include_hidden=False,
     )
     for definition in definitions:
         if definition.field_type not in (FieldType.date, FieldType.datetime):
@@ -165,11 +161,12 @@ async def list_date_field_catalog(
                 "source": "custom",
                 "field_ref": definition.field_key,
                 "label": definition.field_label or definition.field_key,
-                "group": "Custom fields",
+                "group": custom_group,
                 "recurring_hint": "none",
             }
         )
-    entries.sort(key=lambda e: (e["group"] != "System fields", e["label"].lower()))
+    # System group first, then custom, then alphabetical by label.
+    entries.sort(key=lambda e: (e["group"] != system_group, e["label"].lower()))
     return entries
 
 
@@ -214,14 +211,22 @@ async def list_events(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
+    entity_type: str | None = None,
 ) -> list[CustomEventListItem]:
     """Return every live event definition for the org, enriched with
     per-event fire counts for the last 30 days.
+
+    ``entity_type`` — when set, only events whose ``entity_type``
+    matches are returned. The contact-detail Log Event dropdown
+    passes ``'contact'`` here to hide lead/appointment-scoped events
+    that wouldn't fit that surface's context.
 
     Workflow-usage counts are stubbed at 0 for v1 — a follow-up wires
     the workflows-service lookup (small round-trip, keeps this method
     signature stable)."""
     rows = await _da.list_events(session, org_id=org_id)
+    if entity_type is not None:
+        rows = [r for r in rows if r.entity_type == entity_type]
     ids = [r.id for r in rows]
     fires = await _da.count_fires_last_30d(session, org_id=org_id, event_ids=ids)
     return [
@@ -282,10 +287,13 @@ async def create_event(
         name=payload.name,
         description=payload.description,
         created_by_user_id=actor_id,
+        entity_type=payload.entity_type,
     )
     if payload.schedule_type == "date_field":
         assert payload.schedule is not None  # validator guarantees this
-        catalog = await list_date_field_catalog(session, org_id=org_id)
+        catalog = await list_date_field_catalog(
+            session, org_id=org_id, entity_type=payload.entity_type
+        )
         _validate_field_ref(payload.schedule.source, payload.schedule.field_ref, catalog)
         row.schedule_type = "date_field"
         row.schedule_source = payload.schedule.source
@@ -338,7 +346,9 @@ async def update_event(
             row.schedule_hour_local = None
         else:
             assert payload.schedule is not None
-            catalog = await list_date_field_catalog(session, org_id=org_id)
+            catalog = await list_date_field_catalog(
+                session, org_id=org_id, entity_type=row.entity_type
+            )
             _validate_field_ref(payload.schedule.source, payload.schedule.field_ref, catalog)
             row.schedule_type = "date_field"
             row.schedule_source = payload.schedule.source
@@ -413,6 +423,21 @@ async def fire_event(
             status_code=status.HTTP_404_NOT_FOUND, detail="Custom event not found."
         )
 
+    # Manual fire is contact-scoped by design (the Log Event dropdown
+    # only appears on the Contact detail page). Reject the call when
+    # the event is bound to a different entity — the operator should
+    # fire it from the Lead / Appointment page (or wait for the
+    # scheduled sweep to fire it automatically).
+    if event.entity_type != "contact":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"This event is bound to {event.entity_type!r}. Manual "
+                f"'Log event' is only available for contact-scoped events. "
+                f"Automatic firing on a date field still works."
+            ),
+        )
+
     resolved_contact = None
     if contact_id is not None:
         # Lazy import — avoids a hard dependency cycle at module load.
@@ -431,6 +456,8 @@ async def fire_event(
         org_id=org_id,
         event_id=event.id,
         contact_id=contact_id,
+        entity_type="contact",  # manual fires are contact-scoped
+        entity_id=contact_id,
         fired_by_user_id=actor_id,
         payload=payload or {},
         recurring_mode=recurring,
@@ -608,9 +635,7 @@ async def sweep_and_fire_for_org(
     """
     from datetime import timedelta
 
-    from sqlalchemy import Date, cast, extract, select, text as _text
-
-    from src.app.core.contacts.models import Contact
+    from sqlalchemy import Date, cast, extract, select
 
     events = await _da.list_scheduled_events_for_hour(
         session, org_id=org_id, hour_local=org_hour_local
@@ -623,28 +648,38 @@ async def sweep_and_fire_for_org(
         # attributes. Subsequent per-loop access would trigger a lazy
         # reload outside the greenlet context. Caching sidesteps it.
         event_key = event.event_key
+        entity_type = event.entity_type
         offset = event.schedule_offset_days or 0
         target = today_local - timedelta(days=offset)
         recurring = event.schedule_recurring or "none"
 
-        stmt = select(Contact).where(Contact.org_id == org_id)
+        spec = ENTITY_REGISTRY.get(entity_type)
+        if spec is None:
+            logger.warning(
+                "custom_events.sweep: skipping event %s — unknown entity_type %r",
+                event.id,
+                entity_type,
+            )
+            continue
+        Model = spec.model_getter()
+
+        stmt = select(Model).where(Model.org_id == org_id)
         if event.schedule_source == "system":
             column_name = event.schedule_field_ref or ""
             # Allowlist check — only known system columns are allowed
             # (defence in depth; the validator at create/update already
             # gated the input).
-            known_columns = {
-                spec["column"] for spec in _SYSTEM_CONTACT_DATE_FIELDS
-            }
+            known_columns = {sd.column for sd in spec.system_date_fields}
             if column_name not in known_columns:
                 logger.warning(
-                    "custom_events.sweep: skipping event %s — unknown system "
-                    "column %r",
+                    "custom_events.sweep: skipping event %s — unknown %s "
+                    "system column %r",
                     event.id,
+                    entity_type,
                     column_name,
                 )
                 continue
-            column = getattr(Contact, column_name)
+            column = getattr(Model, column_name)
             if recurring == "yearly":
                 stmt = stmt.where(
                     extract("month", column) == target.month,
@@ -655,11 +690,10 @@ async def sweep_and_fire_for_org(
             else:
                 stmt = stmt.where(cast(column, Date) == target)
         else:
-            # Custom field lives at contacts.custom_data->>'<field_ref>'.
-            # Cast to date once, then match per recurring mode.
+            # Custom field lives at <entity>.custom_data->>'<field_ref>'.
             field_ref = event.schedule_field_ref or ""
             date_expr = cast(
-                Contact.custom_data.op("->>")(field_ref),
+                Model.custom_data.op("->>")(field_ref),
                 Date,
             )
             if recurring == "yearly":
@@ -682,18 +716,20 @@ async def sweep_and_fire_for_org(
             event_key=event_key,
             name=event.name,
             description=event.description,
+            entity_type=entity_type,
+            contact_id_ref=spec.contact_id_ref,
             schedule_source=event.schedule_source,
             schedule_field_ref=event.schedule_field_ref,
             schedule_offset_days=event.schedule_offset_days,
             schedule_recurring=recurring,
         )
         fired = 0
-        for contact in matches:
+        for row in matches:
             try:
                 await _fire_scheduled_occurrence(
                     session,
                     event=event_snapshot,
-                    contact=contact,
+                    entity_row=row,
                     fired_at=datetime.now(UTC),
                 )
                 fired += 1
@@ -715,6 +751,11 @@ class _EventSnapshot:
     event_key: str
     name: str
     description: str | None
+    entity_type: str
+    # Attribute name to reach the related contact from the entity row.
+    # 'id' for contact (the row IS the contact), 'contact_id' for
+    # lead / appointment.
+    contact_id_ref: str
     schedule_source: str | None
     schedule_field_ref: str | None
     schedule_offset_days: int | None
@@ -725,33 +766,55 @@ async def _fire_scheduled_occurrence(
     session: AsyncSession,
     *,
     event: "_EventSnapshot",
-    contact: Any,
+    entity_row: Any,
     fired_at: datetime,
 ) -> None:
     """Persist an occurrence + publish on the bus for a sweeper-driven
     fire. Isolated from :func:`fire_event` so the sweeper doesn't have
     to fake an ``actor_id`` or re-run the manual-fire's cross-org
-    contact validation (the sweeper already has both loaded)."""
+    contact validation (the sweeper already has both loaded).
+
+    ``entity_row`` is whatever the sweeper's SELECT returned — a
+    Contact for entity_type='contact', a Lead for 'lead', an
+    Appointment for 'appointment'. We use ``event.contact_id_ref`` to
+    reach the related contact so the workflow envelope always carries
+    contact-shaped variables (``{{ contact.email }}`` etc.).
+    """
     recurring = event.schedule_recurring
     period_key = _period_key_for(recurring, fired_at)
     payload = {
         "scheduled": True,
+        "entity_type": event.entity_type,
         "field_source": event.schedule_source,
         "field_ref": event.schedule_field_ref,
         "offset_days": event.schedule_offset_days,
         "recurring": recurring,
     }
-    # Cache contact fields BEFORE commit — same expiration risk as
-    # events. Read whatever the envelope needs into locals now.
-    contact_id = contact.id
+    # Cache entity + contact fields BEFORE commit — same expiration
+    # risk as events. Read whatever the envelope needs into locals.
+    entity_id = entity_row.id
+    entity_custom_data = getattr(entity_row, "custom_data", None) or {}
+    contact_id = getattr(entity_row, event.contact_id_ref, None)
+    if event.entity_type == "contact":
+        contact = entity_row
+    else:
+        # Fetch the related contact so the envelope's ``contact`` block
+        # is populated for lead/appointment fires.
+        from src.app.core.contacts.data_access import get_contact
+
+        contact = await get_contact(session, contact_id) if contact_id else None
+
     contact_full_name = getattr(contact, "full_name", None)
     contact_email = getattr(contact, "email", None)
     contact_phone = getattr(contact, "phone", None)
     contact_custom_data = getattr(contact, "custom_data", None) or {}
+
     occurrence = CustomEventOccurrence(
         org_id=event.org_id,
         event_id=event.id,
         contact_id=contact_id,
+        entity_type=event.entity_type,
+        entity_id=entity_id,
         fired_by_user_id=None,  # system-fire — not a human actor
         payload=payload,
         recurring_mode=recurring,
@@ -769,18 +832,32 @@ async def _fire_scheduled_occurrence(
             "key": event.event_key,
             "name": event.name,
             "description": event.description,
+            "entity_type": event.entity_type,
         },
         "occurrence_id": str(occurrence_id),
-        "contact_id": str(contact_id),
+        "entity_type": event.entity_type,
+        "entity_id": str(entity_id),
+        "contact_id": str(contact_id) if contact_id else None,
         "fired_by_user_id": None,
         "fired_at": occurrence_fired_at.isoformat(),
         "payload": payload,
+        # ``contact`` is always populated when we could resolve one (the
+        # sweeper only fires on rows with a contact_id-ref present) so
+        # workflow templates can read ``{{ contact.email }}`` regardless
+        # of whether the event was contact/lead/appointment scoped.
         "contact": {
-            "id": str(contact_id),
+            "id": str(contact_id) if contact_id else None,
             "full_name": contact_full_name,
             "email": contact_email,
             "phone": contact_phone,
             "custom_data": contact_custom_data,
+        },
+        # Also expose the source entity block (contact / lead /
+        # appointment) so templates that want entity-specific fields
+        # (like a Lead's expected_close_date) can reach them.
+        event.entity_type: {
+            "id": str(entity_id),
+            "custom_data": entity_custom_data,
         },
     }
     event_type = f"custom.{event.event_key}"

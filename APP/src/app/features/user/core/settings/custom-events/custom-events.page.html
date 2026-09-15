@@ -82,6 +82,44 @@
         ></textarea>
       </div>
 
+      <!-- Entity picker -->
+      <fieldset class="space-y-3 rounded-lg border border-subtle bg-surface-2 p-4">
+        <legend class="px-1 text-xs font-semibold uppercase tracking-wider text-muted">
+          Fires against which entity?
+        </legend>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label class="block text-xs font-medium text-default">
+              Entity <span class="text-red-600">*</span>
+            </label>
+            <div class="mt-1">
+              <crm-mobile-select
+                [options]="entitySelectOptions()"
+                [value]="form.controls.entity_type.value"
+                [disabled]="form.controls.entity_type.disabled"
+                (valueChange)="onEntityChange($any($event))"
+                placeholder="Pick an entity…"
+              />
+            </div>
+            @if (editingId()) {
+              <p class="mt-1 text-xs text-muted">
+                Entity is immutable — switching would invalidate the field binding.
+              </p>
+            } @else {
+              <p class="mt-1 text-xs text-muted">
+                The event fires against a
+                <span class="font-semibold text-default">{{
+                  form.controls.entity_type.value
+                }}</span>
+                row. Manual "Log event" is only available for
+                <span class="font-mono">contact</span> events; other entities auto-fire via a date
+                field.
+              </p>
+            }
+          </div>
+        </div>
+      </fieldset>
+
       <!-- Fire schedule -->
       <fieldset class="space-y-3 rounded-lg border border-subtle bg-surface-2 p-4">
         <legend class="px-1 text-xs font-semibold uppercase tracking-wider text-muted">
@@ -90,6 +128,7 @@
         <div class="flex flex-col gap-2 sm:flex-row sm:gap-4">
           <label
             class="flex flex-1 cursor-pointer items-start gap-2 rounded-md border border-subtle bg-surface p-3 text-sm"
+            [class.opacity-50]="form.controls.entity_type.value !== 'contact'"
           >
             <input
               type="radio"
@@ -97,12 +136,17 @@
               value="manual"
               class="mt-0.5"
               [checked]="form.controls.schedule_type.value === 'manual'"
+              [disabled]="form.controls.entity_type.value !== 'contact'"
               (change)="onScheduleTypeChange('manual')"
             />
             <span class="flex flex-col">
               <span class="font-medium text-default">Manual only</span>
               <span class="text-xs text-muted">
-                Staff clicks the "Log event" button on a contact to fire.
+                @if (form.controls.entity_type.value === 'contact') {
+                  Staff clicks the "Log event" button on a contact to fire.
+                } @else {
+                  Manual firing is only available for Contact events.
+                }
               </span>
             </span>
           </label>
@@ -139,56 +183,41 @@
           } @else {
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div class="sm:col-span-2">
-                <label for="ce_sched_field" class="block text-xs font-medium text-default">
+                <label class="block text-xs font-medium text-default">
                   Watch date field <span class="text-red-600">*</span>
                 </label>
-                <select
-                  id="ce_sched_field"
-                  formControlName="schedule_field"
-                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-                >
-                  <option value="">Pick a date field…</option>
-                  @for (group of catalogGrouped(); track group.label) {
-                    <optgroup [label]="group.label">
-                      @for (opt of group.options; track opt.field_ref) {
-                        <option [value]="opt.source + '::' + opt.field_ref">
-                          {{ opt.label }}
-                        </option>
-                      }
-                    </optgroup>
-                  }
-                </select>
+                <div class="mt-1">
+                  <crm-mobile-select
+                    [options]="fieldOptions()"
+                    formControlName="schedule_field"
+                    placeholder="Pick a date field…"
+                    searchPlaceholder="Search date fields…"
+                    [searchable]="true"
+                  />
+                </div>
                 <p class="mt-1 text-xs text-muted">
                   Custom fields must be of type "date". Add more via Settings → Custom Fields.
                 </p>
               </div>
               <div>
-                <label for="ce_sched_offset" class="block text-xs font-medium text-default">
-                  Fire
-                </label>
-                <select
-                  id="ce_sched_offset"
-                  formControlName="schedule_offset_days"
-                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-                >
-                  @for (opt of OFFSET_OPTIONS; track opt.value) {
-                    <option [value]="opt.value">{{ opt.label }}</option>
-                  }
-                </select>
+                <label class="block text-xs font-medium text-default"> Fire </label>
+                <div class="mt-1">
+                  <crm-mobile-select
+                    [options]="offsetOptions"
+                    formControlName="schedule_offset_days"
+                    placeholder="Pick an offset…"
+                  />
+                </div>
               </div>
               <div>
-                <label for="ce_sched_hour" class="block text-xs font-medium text-default">
-                  At (org-local time)
-                </label>
-                <select
-                  id="ce_sched_hour"
-                  formControlName="schedule_hour_local"
-                  class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-                >
-                  @for (hour of HOURS_OF_DAY; track hour.value) {
-                    <option [value]="hour.value">{{ hour.label }}</option>
-                  }
-                </select>
+                <label class="block text-xs font-medium text-default"> At (org-local time) </label>
+                <div class="mt-1">
+                  <crm-mobile-select
+                    [options]="hourOptions"
+                    formControlName="schedule_hour_local"
+                    placeholder="Pick an hour…"
+                  />
+                </div>
               </div>
               <div class="sm:col-span-2">
                 <label class="block text-xs font-medium text-default">Frequency</label>
@@ -287,8 +316,17 @@
           @for (evt of events(); track evt.id) {
             <tr class="hover:bg-surface-2">
               <td class="px-4 py-3">
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                   <span class="font-medium text-default">{{ evt.name }}</span>
+                  <!-- Entity chip — always shown so operators instantly
+                       see whether the event fires against a
+                       Contact / Lead / Appointment row. -->
+                  <span
+                    class="inline-flex items-center gap-1 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-indigo-500"
+                    [title]="'Fires against a ' + evt.entity_type + ' row'"
+                  >
+                    {{ evt.entity_type }}
+                  </span>
                   @if (evt.schedule_type === 'date_field' && evt.schedule) {
                     <span
                       class="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-500"
