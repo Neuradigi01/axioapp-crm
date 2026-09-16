@@ -313,6 +313,15 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
     const phone = phoneTrimmed === '' || phoneTrimmed === '+' ? null : phoneTrimmed;
     const email = basics.email.trim() || null;
 
+    // Stamp the picked source onto the CONTACT too when we create a
+    // fresh stub. Without this, contacts created via the Add Lead
+    // modal land with `source=null` on the contact row (the value
+    // stays on the LEAD only), which makes the Contacts list Source
+    // column render `—` and the Source column-header filter miss
+    // rows that clearly have a known origin. Existing / matched
+    // contacts don't get their source overwritten — first-touch wins.
+    const contactSource = raw.source || null;
+
     this._submitting.set(true);
     this.contactsApi
       .checkDuplicate({ phone, email })
@@ -338,13 +347,15 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
               })),
             );
           }
-          return this.contactsApi.createStub({ full_name, phone, email }).pipe(
-            map((c) => ({
-              id: c.id,
-              action: 'created' as const,
-              name: c.full_name,
-            })),
-          );
+          return this.contactsApi
+            .createStub({ full_name, phone, email, source: contactSource })
+            .pipe(
+              map((c) => ({
+                id: c.id,
+                action: 'created' as const,
+                name: c.full_name,
+              })),
+            );
         }),
         catchError((err: HttpErrorResponse) => {
           this._submitting.set(false);

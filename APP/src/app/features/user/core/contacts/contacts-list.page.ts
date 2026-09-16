@@ -133,16 +133,26 @@ export class ContactsListPageComponent {
    *  show the same source twice. `value` is the original raw string
    *  of the first occurrence (what the backend filter matches on);
    *  `label` is the display-only prettified version. */
-  readonly sourceOptions = computed<ColumnFilterOption[]>(() => {
-    const byKey = new Map<string, ColumnFilterOption>();
-    for (const item of this.state.items()) {
-      if (!item.source) continue;
-      const key = item.source.trim().toLowerCase();
-      if (!key || byKey.has(key)) continue;
-      byKey.set(key, { value: item.source, label: this.prettifySource(item.source) });
-    }
-    return [...byKey.values()].sort((a, b) => a.label.localeCompare(b.label));
-  });
+  /** Source column-filter options. Fixed list mirroring the Add Lead
+   *  modal + Contact create form, so every canonical source shows up
+   *  in the popover regardless of what data currently exists.
+   *
+   *  Previously derived from `state.items()`, but that had two bugs:
+   *  contacts created via the Add Lead modal don't have `source`
+   *  populated (source lives on the LEAD row), so the popover came
+   *  back empty for orgs whose contacts came in through that path.
+   *  Second, filtering to a source that no live contact matched hid
+   *  it from the popover entirely — no way to switch back off the
+   *  filter without a page reload. */
+  readonly sourceOptions = computed<ColumnFilterOption[]>(() => [
+    { value: 'manual', label: 'Manual' },
+    { value: 'walk_in', label: 'Walk-in' },
+    { value: 'widget', label: 'Forms' },
+    { value: 'google_ads', label: 'Google Ads' },
+    { value: 'meta_ads', label: 'Meta Ads' },
+    { value: 'whatsapp_flow', label: 'WhatsApp' },
+    { value: 'bulk_import', label: 'Bulk import' },
+  ]);
 
   /** Prettify a raw source token ("google_ads" → "Google Ads"). Same
    *  logic as leads.page.ts; kept local so contacts doesn't take a
