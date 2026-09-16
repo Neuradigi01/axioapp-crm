@@ -16,6 +16,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService } from '../auth/auth.service';
+import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
@@ -62,6 +63,7 @@ export class TasksPanelComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(FurnitureAuthService);
   private readonly usersDir = inject(UsersDirectoryService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
   /** Zoneless: HTTP subscribe callbacks fire outside any tracked
    *  execution context; signal writes should schedule CD on their own
    *  but explicit `markForCheck()` is belt-and-braces after every async
@@ -69,7 +71,8 @@ export class TasksPanelComponent {
   private readonly cdr = inject(ChangeDetectorRef);
 
   // T6 — Edit + delete on the panel. Edit reuses the shared
-  // TaskFormModal; delete uses a native confirm to stay lightweight.
+  // TaskFormModal; delete goes through the app-wide confirm dialog
+  // so the destructive prompt matches the rest of the UI.
   protected readonly editingTask = signal<Task | null>(null);
   protected readonly callerUuid = signal<string | null>(null);
   /** Populated on mount from the session-cached UsersDirectoryService.
@@ -176,8 +179,14 @@ export class TasksPanelComponent {
     this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
   }
 
-  protected onDelete(task: Task): void {
-    if (!confirm(`Delete task “${task.title}”?`)) return;
+  protected async onDelete(task: Task): Promise<void> {
+    const ok = await this.confirmDialog.ask({
+      title: `Delete task “${task.title}”?`,
+      body: 'This will remove the task for everyone assigned to it. This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     this.api
       .delete(task.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
