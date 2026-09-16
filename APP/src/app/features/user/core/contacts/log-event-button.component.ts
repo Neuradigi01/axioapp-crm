@@ -84,9 +84,17 @@ import {
                 >
                   <span class="flex w-full items-center justify-between gap-2">
                     <span class="font-medium text-default">{{ evt.name }}</span>
-                    @if (firingId() === evt.id) {
-                      <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />
-                    }
+                    <span class="flex items-center gap-1">
+                      @if (evt.entity_type !== 'contact') {
+                        <span
+                          class="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted"
+                          >{{ evt.entity_type }}</span
+                        >
+                      }
+                      @if (firingId() === evt.id) {
+                        <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />
+                      }
+                    </span>
                   </span>
                   <span class="font-mono text-[11px] text-muted"> custom.{{ evt.event_key }} </span>
                 </button>
@@ -164,11 +172,13 @@ export class LogEventButtonComponent {
   private loadOnce(): void {
     this.loading.set(true);
     this.loadError.set(null);
-    // Filter to contact-scoped events only — lead/appointment events
-    // fire against a different entity and can't be manually triggered
-    // from the contact page (they auto-fire via their own date field).
+    // Show every live event regardless of entity_type. Lead/appointment
+    // events normally auto-fire via their date_field schedule, but
+    // staff can force-fire them from any contact page — the occurrence
+    // is recorded against the contact and the workflow bus publish
+    // still happens.
     this.api
-      .list('contact')
+      .list()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => {

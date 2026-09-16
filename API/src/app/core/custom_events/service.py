@@ -423,21 +423,11 @@ async def fire_event(
             status_code=status.HTTP_404_NOT_FOUND, detail="Custom event not found."
         )
 
-    # Manual fire is contact-scoped by design (the Log Event dropdown
-    # only appears on the Contact detail page). Reject the call when
-    # the event is bound to a different entity — the operator should
-    # fire it from the Lead / Appointment page (or wait for the
-    # scheduled sweep to fire it automatically).
-    if event.entity_type != "contact":
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                f"This event is bound to {event.entity_type!r}. Manual "
-                f"'Log event' is only available for contact-scoped events. "
-                f"Automatic firing on a date field still works."
-            ),
-        )
-
+    # Manual fire is allowed for events of any entity_type — staff on
+    # a Contact page can force-fire a lead/appointment event without
+    # waiting for the scheduled sweep. The occurrence is recorded
+    # against the contact (that's the surface the fire happened on);
+    # subscribed workflows still receive the bus publish and run.
     resolved_contact = None
     if contact_id is not None:
         # Lazy import — avoids a hard dependency cycle at module load.
