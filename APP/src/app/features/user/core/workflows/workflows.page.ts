@@ -35,11 +35,10 @@ import {
  * Workflows list — Step 13's first frontend surface.
  *
  * Two-column layout: folder sidebar + filtered grid. Filters are
- * channel-derived from `enabled_event_types` (e.g. event types
- * starting with `email.` / `whatsapp.`), category, status, and a
- * 300ms-debounced search. Bulk select supports activate / pause /
- * archive in one POST per row. "New workflow" + per-row mutation
- * affordances are hidden when the user lacks `workflows.write`.
+ * category, status, and a 300ms-debounced search. Bulk select
+ * supports activate / pause / archive in one POST per row.
+ * "New workflow" + per-row mutation affordances are hidden when the
+ * user lacks `workflows.write`.
  *
  * Step 14 will wire the row CTA to `/user/workflows/{id}` canvas;
  * for Step 13 the row click opens the canvas placeholder route via
@@ -68,16 +67,6 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'Custom', label: 'Custom' },
 ];
 
-const CHANNEL_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: '', label: 'All channels' },
-  { value: 'email', label: 'Email' },
-  { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'sms', label: 'SMS' },
-  { value: 'facebook', label: 'Facebook' },
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'push', label: 'Push' },
-];
-
 @Component({
   selector: 'app-workflows-page',
   standalone: true,
@@ -104,7 +93,6 @@ export class WorkflowsPageComponent {
 
   protected readonly STATUS_OPTIONS = STATUS_OPTIONS;
   protected readonly CATEGORY_OPTIONS = CATEGORY_OPTIONS;
-  protected readonly CHANNEL_OPTIONS = CHANNEL_OPTIONS;
   protected readonly PAGE_SIZE = PAGE_SIZE;
 
   // List state.
@@ -122,7 +110,6 @@ export class WorkflowsPageComponent {
   // Filters.
   protected readonly statusFilter = signal<'' | WorkflowStatus>('');
   protected readonly categoryFilter = signal<string>('');
-  protected readonly channelFilter = signal<string>('');
   protected readonly searchQuery = signal<string>('');
   protected readonly debouncedSearch = signal<string>('');
   // tasks/workflow-scheduling Step 5 — three-state chip: null=any,
@@ -183,7 +170,6 @@ export class WorkflowsPageComponent {
     () =>
       !!this.statusFilter() ||
       !!this.categoryFilter() ||
-      !!this.channelFilter() ||
       !!this.debouncedSearch() ||
       this.scheduledFilter() !== null ||
       this.selectedFolderId() !== null,
@@ -207,14 +193,12 @@ export class WorkflowsPageComponent {
     effect(() => {
       const status = this.statusFilter();
       const category = this.categoryFilter();
-      const channel = this.channelFilter();
       const folder = this.selectedFolderId();
       const q = this.debouncedSearch();
       const scheduled = this.scheduledFilter();
       const page = this.pageIndex();
       void status;
       void category;
-      void channel;
       void folder;
       void q;
       void scheduled;
@@ -235,11 +219,6 @@ export class WorkflowsPageComponent {
     this.pageIndex.set(0);
   }
 
-  protected onChannelChange(value: string): void {
-    this.channelFilter.set(value);
-    this.pageIndex.set(0);
-  }
-
   protected onSearchInput(value: string): void {
     this.searchQuery.set(value);
     if (this.searchTimer) clearTimeout(this.searchTimer);
@@ -253,7 +232,6 @@ export class WorkflowsPageComponent {
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.statusFilter.set('');
     this.categoryFilter.set('');
-    this.channelFilter.set('');
     this.searchQuery.set('');
     this.debouncedSearch.set('');
     this.selectedFolderId.set(null);
@@ -641,17 +619,7 @@ export class WorkflowsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res) => {
-          // Client-side channel filter — backend doesn't filter on
-          // enabled_event_types directly. Cheap because we paginate
-          // server-side first.
-          let rows = res.items;
-          const channel = this.channelFilter();
-          if (channel) {
-            rows = rows.filter((r) =>
-              r.enabled_event_types.some((evt) => evt.toLowerCase().startsWith(`${channel}.`)),
-            );
-          }
-          this.items.set(rows);
+          this.items.set(res.items);
           this.total.set(res.total);
           this.loading.set(false);
         },

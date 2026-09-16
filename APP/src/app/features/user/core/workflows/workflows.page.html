@@ -114,14 +114,6 @@
 
       <div class="min-w-[9rem] flex-1 md:flex-initial">
         <crm-mobile-select
-          [options]="CHANNEL_OPTIONS"
-          [value]="channelFilter()"
-          (valueChange)="onChannelChange($event)"
-        />
-      </div>
-
-      <div class="min-w-[9rem] flex-1 md:flex-initial">
-        <crm-mobile-select
           [options]="CATEGORY_OPTIONS"
           [value]="categoryFilter()"
           (valueChange)="onCategoryChange($event)"
