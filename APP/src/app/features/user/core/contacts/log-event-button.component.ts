@@ -41,7 +41,7 @@ import {
       <button
         type="button"
         (click)="toggleOpen()"
-        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+        class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
         [attr.aria-expanded]="open()"
       >
         <lucide-icon name="zap" class="h-4 w-4" />
