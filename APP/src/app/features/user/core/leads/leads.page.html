@@ -281,11 +281,21 @@
       </div>
     </div>
 
-    <!-- Row 1: Date · Between · Order By/As · Data Search.
-         Source + Status filters moved to their column headers as
-         `app-column-filter` popovers, matching the Contacts / Templates
-         pattern. -->
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+    <!-- Row 1: Date · Between · Order By/As · Data Search
+         (+ Source Wise + Status ON PIPELINE VIEW ONLY).
+
+         List view hides these two dropdowns because they moved to
+         the table's column headers as `app-column-filter` popovers.
+         Pipeline view has no column headers to attach filters to, so
+         the dropdowns stay in the toolbar there.
+
+         Grid grows to 6 columns on pipeline view so all 6 fields fit
+         in one row on wide screens; list view stays at 4. -->
+    <div
+      class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3"
+      [class.lg:grid-cols-4]="view() === 'list'"
+      [class.lg:grid-cols-6]="view() === 'pipeline'"
+    >
       <label class="block">
         <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Date (from)</span>
         <div class="mt-1">
@@ -337,6 +347,28 @@
           />
         </div>
       </label>
+      @if (view() === 'pipeline') {
+        <div class="block">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-muted">
+            Source Wise
+          </span>
+          <crm-mobile-select
+            class="mt-1 block"
+            [options]="sourceSelectOptions()"
+            [value]="sourceControl.value"
+            (valueChange)="sourceControl.setValue($event)"
+          />
+        </div>
+        <div class="block">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Status</span>
+          <crm-mobile-select
+            class="mt-1 block"
+            [options]="stageSelectOptions()"
+            [value]="stageControlValue()"
+            (valueChange)="onToolbarStageChange($event)"
+          />
+        </div>
+      }
     </div>
 
     <!-- Cross-field validation for the Date (from) / Between (to) pair.
