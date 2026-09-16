@@ -281,8 +281,11 @@
       </div>
     </div>
 
-    <!-- Row 1: Date · Between · Order By/As · Source · Data Search · [spacer] -->
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+    <!-- Row 1: Date · Between · Order By/As · Data Search.
+         Source + Status filters moved to their column headers as
+         `app-column-filter` popovers, matching the Contacts / Templates
+         pattern. -->
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       <label class="block">
         <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Date (from)</span>
         <div class="mt-1">
@@ -317,15 +320,6 @@
           (valueChange)="setSortField($event)"
         />
       </div>
-      <div class="block">
-        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Source Wise</span>
-        <crm-mobile-select
-          class="mt-1 block"
-          [options]="sourceSelectOptions()"
-          [value]="sourceControl.value"
-          (valueChange)="sourceControl.setValue($event)"
-        />
-      </div>
       <label class="block">
         <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Data Search</span>
         <div class="relative mt-1">
@@ -343,15 +337,6 @@
           />
         </div>
       </label>
-      <div class="block">
-        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Status</span>
-        <crm-mobile-select
-          class="mt-1 block"
-          [options]="stageSelectOptions()"
-          [value]="stageControlValue()"
-          (valueChange)="onToolbarStageChange($event)"
-        />
-      </div>
     </div>
 
     <!-- Cross-field validation for the Date (from) / Between (to) pair.
@@ -583,6 +568,22 @@
                           />
                         }
                       </button>
+                    }
+                    @case ('source') {
+                      <app-column-filter
+                        [label]="col.label"
+                        [options]="sourceColumnOptions()"
+                        [value]="sourceColumnValue()"
+                        (valueChange)="onSourceColumnFilterChange($event)"
+                      />
+                    }
+                    @case ('status') {
+                      <app-column-filter
+                        [label]="col.label"
+                        [options]="stageColumnOptions()"
+                        [value]="stageColumnValue()"
+                        (valueChange)="onStageColumnFilterChange($event)"
+                      />
                     }
                     @default {
                       {{ col.label }}

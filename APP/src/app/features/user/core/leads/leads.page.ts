@@ -45,6 +45,8 @@ import {
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { ListPageState } from '../shared/services/list-page.service';
+import { ColumnFilterComponent } from '../shared/table-filters/column-filter.component';
+import { ColumnFilterOption } from '../shared/table-filters/column-filter.types';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import { AdvancedFilterModalComponent } from './advanced-filter-modal.component';
 import { ColumnCustomizationMenuComponent } from './column-customization-menu.component';
@@ -145,6 +147,7 @@ class LeadsListState extends ListPageState<Lead> {}
     PhoneLinkDirective,
     WhatsappLinkDirective,
     ColumnCustomizationMenuComponent,
+    ColumnFilterComponent,
     AdvancedFilterModalComponent,
     MobileSelectComponent,
     MobileDateTimeComponent,
@@ -474,6 +477,47 @@ export class LeadsPageComponent {
       .sort((a, b) => a.display_order - b.display_order)
       .map((s) => ({ value: s.key, label: s.name })),
   ]);
+
+  /** `app-column-filter` shape for the Source column-header popover —
+   *  same option data as `sourceOptions()` (no sentinel row; empty
+   *  selection = no filter). */
+  readonly sourceColumnOptions = computed<readonly ColumnFilterOption[]>(() =>
+    this.sourceOptions().map((o) => ({ value: o.value, label: o.label })),
+  );
+
+  /** `app-column-filter` shape for the Status column-header popover —
+   *  one entry per pipeline stage in display order. Same underlying
+   *  data as the (now-removed) toolbar Status dropdown; no sentinel
+   *  row because the column-filter treats an empty array as no filter. */
+  readonly stageColumnOptions = computed<readonly ColumnFilterOption[]>(() =>
+    [...this.pipelineStages()]
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((s) => ({ value: s.key, label: s.name })),
+  );
+
+  /** Signal mirror of `sourceControl.value` — the FormControl's own
+   *  `.value` isn't reactive in a signal-tracked context, so we wire
+   *  a `toSignal` on `valueChanges` (seeded with the current value) so
+   *  the column-filter's `[value]` binding recomputes when the FormControl
+   *  changes for any reason (URL sync, reset button, etc.). */
+  private readonly sourceControlValue = toSignal(this.sourceControl.valueChanges, {
+    initialValue: this.sourceControl.value,
+  });
+
+  /** Column-filter emits `string[]`; the leads-list backend takes
+   *  scalar `source` and `stage` params. Adapt with a first-of-array
+   *  read/write pair so the popover UI works without a backend
+   *  widening — future work: extend the backend to accept lists and
+   *  drop the [0] projection. */
+  protected readonly sourceColumnValue = computed<string[]>(() => {
+    const raw = this.sourceControlValue();
+    return raw ? [raw] : [];
+  });
+
+  protected readonly stageColumnValue = computed<string[]>(() => {
+    const raw = this.stageControlValue();
+    return raw ? [raw] : [];
+  });
 
   /** `crm-mobile-select` options for the sort field. Kept in sync with
    *  the backend's `sort` enum + the two `next_follow_up_due` entries
@@ -879,6 +923,23 @@ export class LeadsPageComponent {
     this.sortKey.set('created_at');
     this.sortOrder.set('desc');
     this.resetCursorAndReload();
+  }
+
+  /** Column-header filter change — Source column. Column-filter is
+   *  multi-select-shaped; the leads-list backend takes a scalar, so we
+   *  pick the first checked value (or clear on empty array). Also
+   *  clears the previous value first so a "switch source" click doesn't
+   *  emit two intermediate reloads. */
+  protected onSourceColumnFilterChange(values: string[]): void {
+    const next = values[values.length - 1] ?? '';
+    this.sourceControl.setValue(next);
+  }
+
+  /** Column-header filter change — Status column. Backed by pipeline
+   *  stages (same data the removed toolbar Status dropdown drove). */
+  protected onStageColumnFilterChange(values: string[]): void {
+    const next = values[values.length - 1] ?? '';
+    this.onToolbarStageChange(next);
   }
 
   /** Toolbar Status cell handler — writes to the same `statusControl`
