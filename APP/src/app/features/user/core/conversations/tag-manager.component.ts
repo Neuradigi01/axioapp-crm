@@ -46,116 +46,145 @@ import { TagChipComponent } from './tag-chip.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, LucideAngularModule, TagChipComponent],
   template: `
+    <!-- Fixed-position modal — matches the Block Number + Export
+         actions so the picker is never clipped by the details-rail's
+         overflow-y:auto ancestor. Backdrop click closes; inner card
+         stops propagation. Mobile-friendly: w-full max-w-md + p-4
+         backdrop + max-h-[85vh] on the card so it fits any viewport. -->
     <div
-      class="absolute right-0 top-full z-30 mt-1 w-72 rounded-md border border-subtle bg-surface shadow-lg"
-      (click)="$event.stopPropagation()"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      (click)="close.emit()"
     >
-      <div class="border-b border-subtle p-2">
-        <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">Applied</p>
-        @if (assignedTags.length === 0) {
-          <p class="text-xs text-muted">No tags yet.</p>
-        } @else {
-          <div class="flex flex-wrap gap-1">
-            @for (t of assignedTags; track t.id) {
-              <app-tag-chip [tag]="t" [removable]="true" (remove)="onUnassign($event)" />
-            }
-          </div>
-        }
-      </div>
+      <div
+        class="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-lg border-subtle bg-surface shadow-xl ring-1"
+        (click)="$event.stopPropagation()"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tag-manager-title"
+      >
+        <header class="border-b border-subtle px-4 py-3 md:px-6 md:py-4">
+          <h2 id="tag-manager-title" class="text-base font-semibold text-default">Manage tags</h2>
+          <p class="mt-1 text-[13px] text-muted">
+            Assign existing tags or create new ones. Tags apply to the whole conversation and are
+            visible in the inbox list.
+          </p>
+        </header>
 
-      <div class="border-b border-subtle p-2">
-        <div class="relative mb-1">
-          <lucide-icon
-            name="search"
-            class="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-faint"
-          />
-          <input
-            type="search"
-            [ngModel]="query()"
-            (ngModelChange)="onQueryChange($event)"
-            placeholder="Search or create…"
-            class="w-full rounded-md border border-subtle py-1 pl-7 pr-2 text-xs focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          />
+        <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6">
+          <section class="mb-4">
+            <p class="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+              Applied
+            </p>
+            @if (assignedTags.length === 0) {
+              <p class="text-xs text-muted">No tags yet.</p>
+            } @else {
+              <div class="flex flex-wrap gap-1">
+                @for (t of assignedTags; track t.id) {
+                  <app-tag-chip [tag]="t" [removable]="true" (remove)="onUnassign($event)" />
+                }
+              </div>
+            }
+          </section>
+
+          <section>
+            <div class="relative mb-2">
+              <lucide-icon
+                name="search"
+                class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint"
+              />
+              <input
+                type="search"
+                [ngModel]="query()"
+                (ngModelChange)="onQueryChange($event)"
+                placeholder="Search or create…"
+                class="w-full rounded-md border border-subtle bg-surface py-1.5 pl-8 pr-2 text-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+
+            @if (loadError(); as err) {
+              <p class="mb-2 text-[11px] text-red-500">{{ err }}</p>
+            }
+
+            <ul class="max-h-48 space-y-0.5 overflow-y-auto">
+              @for (t of filteredTags(); track t.id) {
+                <li
+                  class="flex items-center justify-between gap-1 rounded px-1.5 py-1 hover:bg-surface-2"
+                >
+                  <button
+                    type="button"
+                    (click)="onAssign(t)"
+                    [disabled]="isAssigned(t.id) || busyTagId() === t.id"
+                    class="flex flex-1 items-center gap-2 text-left text-xs disabled:opacity-40"
+                  >
+                    <span
+                      [class]="
+                        'inline-block h-2.5 w-2.5 rounded-full ring-1 ' + swatchClass(t.color)
+                      "
+                    ></span>
+                    <span class="flex-1 truncate text-default">{{ t.name }}</span>
+                    <span class="text-[10px] text-faint">
+                      {{ t.usage_count }}
+                    </span>
+                  </button>
+                  @if (canManage()) {
+                    <button
+                      type="button"
+                      (click)="onDelete(t)"
+                      [disabled]="busyTagId() === t.id"
+                      class="rounded p-1 text-faint hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
+                      title="Delete tag"
+                      aria-label="Delete tag"
+                    >
+                      <lucide-icon name="trash-2" size="12" />
+                    </button>
+                  }
+                </li>
+              }
+            </ul>
+
+            @if (canManage() && query().trim().length > 0 && !hasExactMatch()) {
+              <div class="mt-3 rounded-md border border-dashed border-subtle p-3">
+                <p class="mb-1.5 text-[10px] uppercase tracking-wide text-muted">
+                  Create "{{ query().trim() }}"
+                </p>
+                <div class="mb-2 flex flex-wrap gap-1">
+                  @for (c of TAG_PALETTE; track c) {
+                    <button
+                      type="button"
+                      (click)="newColor.set(c)"
+                      [class]="
+                        'h-4 w-4 rounded-full ring-1 ' +
+                        swatchClass(c) +
+                        (newColor() === c ? ' ring-zinc-900 ring-offset-1' : '')
+                      "
+                      [attr.aria-label]="'Color ' + c"
+                    ></button>
+                  }
+                </div>
+                <button
+                  type="button"
+                  (click)="onCreate()"
+                  [disabled]="creating()"
+                  class="w-full rounded-md bg-accent px-2 py-1.5 text-xs font-semibold text-white hover:brightness-95 disabled:opacity-50"
+                >
+                  {{ creating() ? 'Creating…' : 'Create + apply' }}
+                </button>
+              </div>
+            }
+          </section>
         </div>
 
-        @if (loadError(); as err) {
-          <p class="mb-1 text-[10px] text-red-500">{{ err }}</p>
-        }
-
-        <ul class="max-h-48 space-y-0.5 overflow-y-auto">
-          @for (t of filteredTags(); track t.id) {
-            <li
-              class="flex items-center justify-between gap-1 rounded px-1 py-0.5 hover:bg-surface-2"
-            >
-              <button
-                type="button"
-                (click)="onAssign(t)"
-                [disabled]="isAssigned(t.id) || busyTagId() === t.id"
-                class="flex flex-1 items-center gap-2 text-left text-xs disabled:opacity-40"
-              >
-                <span
-                  [class]="'inline-block h-2.5 w-2.5 rounded-full ring-1 ' + swatchClass(t.color)"
-                ></span>
-                <span class="flex-1 truncate text-default">{{ t.name }}</span>
-                <span class="text-[10px] text-faint">
-                  {{ t.usage_count }}
-                </span>
-              </button>
-              @if (canManage()) {
-                <button
-                  type="button"
-                  (click)="onDelete(t)"
-                  [disabled]="busyTagId() === t.id"
-                  class="rounded p-0.5 text-faint hover:bg-red-500/10 hover:text-red-500 disabled:opacity-40"
-                  title="Delete tag"
-                  aria-label="Delete tag"
-                >
-                  <lucide-icon name="trash-2" size="10" />
-                </button>
-              }
-            </li>
-          }
-        </ul>
-
-        @if (canManage() && query().trim().length > 0 && !hasExactMatch()) {
-          <div class="mt-2 rounded-md border border-dashed border-subtle p-2">
-            <p class="mb-1 text-[10px] uppercase tracking-wide text-muted">
-              Create "{{ query().trim() }}"
-            </p>
-            <div class="mb-1 flex flex-wrap gap-1">
-              @for (c of TAG_PALETTE; track c) {
-                <button
-                  type="button"
-                  (click)="newColor.set(c)"
-                  [class]="
-                    'h-4 w-4 rounded-full ring-1 ' +
-                    swatchClass(c) +
-                    (newColor() === c ? ' ring-zinc-900 ring-offset-1' : '')
-                  "
-                  [attr.aria-label]="'Color ' + c"
-                ></button>
-              }
-            </div>
-            <button
-              type="button"
-              (click)="onCreate()"
-              [disabled]="creating()"
-              class="w-full rounded-md bg-accent px-2 py-1 text-xs font-semibold text-white hover:brightness-95 disabled:opacity-50"
-            >
-              {{ creating() ? 'Creating…' : 'Create + apply' }}
-            </button>
-          </div>
-        }
-      </div>
-
-      <div class="flex justify-end p-2">
-        <button
-          type="button"
-          (click)="close.emit()"
-          class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2"
+        <footer
+          class="flex items-center justify-end gap-2 border-t border-subtle px-4 py-3 md:px-6"
         >
-          Close
-        </button>
+          <button
+            type="button"
+            (click)="close.emit()"
+            class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+          >
+            Done
+          </button>
+        </footer>
       </div>
     </div>
   `,
