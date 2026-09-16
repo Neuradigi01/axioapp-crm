@@ -6,6 +6,7 @@ import {
   EventEmitter,
   Output,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -61,6 +62,14 @@ export class NewConversationModalComponent {
    *  per-row "Starting…" state and disables all rows during the POST. */
   protected readonly submittingId = signal<string | null>(null);
   protected readonly error = signal<string | null>(null);
+  /** Map of `contact_id → existing conversation` on the currently-selected
+   *  channel. Populated by a scoped list fetch when the modal opens and
+   *  refetched on every channel switch. Drives the "Continue chat"
+   *  affordance so the operator can see up-front which contacts already
+   *  have an open thread — WhatsApp keys off phone / email keys off the
+   *  address, so a "new" thread on the same identifier lands on the
+   *  same conversation row (backend is idempotent by design). */
+  protected readonly existingByContactId = signal<Map<string, Conversation>>(new Map());
 
   /** Channel pill labels. WhatsApp / Email are the only manual-start
    *  channels the backend accepts; SMS / IG / FB / web / push are
@@ -84,6 +93,13 @@ export class NewConversationModalComponent {
 
   constructor() {
     this.loadContacts('');
+    // Refetch the existing-conversations index whenever the channel
+    // toggle flips. Runs immediately on mount too (effect fires once
+    // for the initial 'whatsapp' value).
+    effect(() => {
+      const ch = this.channel();
+      this.loadExistingConversations(ch);
+    });
     this.search$
       .pipe(
         debounceTime(200),
@@ -126,6 +142,13 @@ export class NewConversationModalComponent {
     return (this.channel() === 'whatsapp' ? c.phone : c.email) ?? '';
   }
 
+  /** Existing thread for this contact on the current channel, or null.
+   *  Consumed by the row template to swap "Start" → "Continue chat" +
+   *  render a small last-activity hint. */
+  protected existingConversation(c: ContactListItem): Conversation | null {
+    return this.existingByContactId().get(c.id) ?? null;
+  }
+
   protected start(c: ContactListItem): void {
     if (!this.hasIdentifier(c)) return;
     if (this.submittingId() !== null) return;
@@ -161,6 +184,26 @@ export class NewConversationModalComponent {
       .subscribe((resp) => {
         this.contacts.set(resp.items);
         this.loading.set(false);
+      });
+  }
+
+  /** Pull the org's open conversations on `channel` and index them by
+   *  contact id. Runs once per channel switch — cheap best-effort call:
+   *  a failure just leaves the map empty and every row renders the
+   *  regular "Start" label rather than blocking the picker. */
+  private loadExistingConversations(channel: PickerChannel): void {
+    this.conversationsApi
+      .list({ channel, page: 1, size: 500 })
+      .pipe(
+        catchError(() => of({ items: [], total: 0, page: 1, size: 0 })),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((resp) => {
+        const map = new Map<string, Conversation>();
+        for (const conv of resp.items) {
+          if (conv.contact_id) map.set(conv.contact_id, conv);
+        }
+        this.existingByContactId.set(map);
       });
   }
 }

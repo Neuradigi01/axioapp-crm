@@ -218,6 +218,16 @@ class ChatRuntime:
         self._assistant_message_id: uuid.UUID | None = None
         self._retrieved_chunk_ids: list[uuid.UUID] = []
 
+    @property
+    def assistant_message_id(self) -> uuid.UUID | None:
+        """The Message row id the runtime persisted for the assistant
+        turn (populated after step 6 of ``stream_reply``). Exposed so
+        the omnichannel dispatcher (WhatsApp / Email) can patch the
+        row with channel-transport metadata (wamid, adapter_ref, AI
+        author payload) after ``adapter.send`` returns, instead of
+        inserting a second outbound row and duplicating the bubble."""
+        return self._assistant_message_id
+
     # --- Guards ------------------------------------------------------
 
     def _disconnect_reason(self) -> str:
@@ -277,6 +287,17 @@ class ChatRuntime:
 
     async def _persist_user_turn(self) -> None:
         assert self._conversation_id is not None
+        # When the caller passed an existing conversation (WhatsApp /
+        # Email inbound path), the inbound customer message has ALREADY
+        # been persisted upstream by ``conversations.service.receive_
+        # webhook``. Re-inserting it here creates a duplicate row with
+        # channel_message_id=NULL — the wamid-populated row and the
+        # NULL-wamid row coexist and the AI ends up firing one reply
+        # per duplicate on subsequent turns. Skip the write in that
+        # mode; runtime still builds context from the existing rows
+        # via the conversation-history query.
+        if self._existing_conversation_id is not None:
+            return
         await _da.insert_user_message(
             self._db,
             org_id=self._org_id,

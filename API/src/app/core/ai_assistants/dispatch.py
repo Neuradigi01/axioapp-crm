@@ -192,10 +192,7 @@ async def _run_byok_whatsapp_reply(
         WhatsAppNotConnected,
         resolve_whatsapp_adapter,
     )
-    from src.app.core.conversations.models import (
-        Message,
-        MessageDirection,
-    )
+    from src.app.core.conversations.models import Message, MessageDirection
 
     runtime = ChatRuntime(
         db=session,
@@ -234,23 +231,54 @@ async def _run_byok_whatsapp_reply(
     )
     now = datetime.now(UTC)
     sent_at = ref.sent_at or now
-    outbound = Message(
-        org_id=conversation.org_id,
-        conversation_id=conversation.id,
-        direction=MessageDirection.out,
-        sender_user_id=None,
-        text=text,
-        attachments=[],
-        channel_message_id=ref.channel_message_id,
-        payload={
-            "author": "ai",
-            "assistant_id": str(assistant_id),
-            "adapter_ref": ref.channel_message_id,
-            "source": "byok_whatsapp",
-        },
-        sent_at=sent_at,
-    )
-    session.add(outbound)
+    # Patch the runtime's assistant message row with WhatsApp transport
+    # metadata (wamid, adapter_ref, AI author payload) instead of
+    # inserting a second outbound. Two writes were producing duplicate
+    # bubbles ("Hello! How can I assist you today?" appeared twice) —
+    # once from the runtime's empty-then-UPDATE-with-text row, once
+    # from this insert. The runtime's row already carries the final
+    # rendered text (runtime step 10); we just need to attach the
+    # transport receipt.
+    from sqlalchemy import update as _update
+
+    assistant_msg_id = runtime.assistant_message_id
+    if assistant_msg_id is None:
+        # Defensive — the runtime always populates this after a
+        # successful stream. If ever None, fall back to inserting the
+        # row so we don't lose the outbound bubble.
+        session.add(
+            Message(
+                org_id=conversation.org_id,
+                conversation_id=conversation.id,
+                direction=MessageDirection.out,
+                sender_user_id=None,
+                text=text,
+                attachments=[],
+                channel_message_id=ref.channel_message_id,
+                payload={
+                    "author": "ai",
+                    "assistant_id": str(assistant_id),
+                    "adapter_ref": ref.channel_message_id,
+                    "source": "byok_whatsapp",
+                },
+                sent_at=sent_at,
+            )
+        )
+    else:
+        await session.execute(
+            _update(Message)
+            .where(Message.id == assistant_msg_id)
+            .values(
+                channel_message_id=ref.channel_message_id,
+                payload={
+                    "author": "ai",
+                    "assistant_id": str(assistant_id),
+                    "adapter_ref": ref.channel_message_id,
+                    "source": "byok_whatsapp",
+                },
+                sent_at=sent_at,
+            )
+        )
     conversation.last_message_at = sent_at
     await session.commit()
 

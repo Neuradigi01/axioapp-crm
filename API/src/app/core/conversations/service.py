@@ -904,6 +904,24 @@ async def receive_webhook(
         external_id=parsed.external_id,
         received_via_phone_id=received_via_phone_id,
     )
+
+    # Serialize concurrent intake on the same conversation. Meta
+    # retries webhooks for up to 7 days on any non-2xx / slow response,
+    # and the WhatsApp Web sidecar can independently forward the same
+    # event; without a lock, two async workers both pass the
+    # channel_message_id dedup check (their SELECTs see each other's
+    # uncommitted inserts as absent under READ COMMITTED), both persist
+    # the inbound, and both dispatch an AI reply → duplicate bubbles.
+    # ``pg_advisory_xact_lock`` is transaction-scoped so it releases on
+    # commit / rollback with no cleanup path. Cross-conversation
+    # parallelism is unaffected — the lock key is per-conversation.
+    from sqlalchemy import text as _sql_text
+
+    await session.execute(
+        _sql_text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+        {"key": f"conv:{conv.id}"},
+    )
+
     sent_at = parsed.sent_at or datetime.now(UTC)
 
     # whatsapp-platform-upgrade Step 24 — click-to-WhatsApp ad
