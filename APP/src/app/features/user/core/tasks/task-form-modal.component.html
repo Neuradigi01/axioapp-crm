@@ -150,7 +150,7 @@
           <div class="mt-1">
             <crm-mobile-select
               [options]="followupSelectOptions"
-              [value]="form.controls.followup_type.value ?? ''"
+              [value]="form.controls.followup_type.value"
               (valueChange)="form.controls.followup_type.setValue($any($event) || null)"
             />
           </div>

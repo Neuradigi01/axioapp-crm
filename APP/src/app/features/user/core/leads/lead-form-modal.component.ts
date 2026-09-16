@@ -307,6 +307,7 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
    * clobbered). */
   private resolveContactThenEmit(): void {
     const basics = this.contactBasics.getRawValue();
+    const raw = this.standard.getRawValue();
     const full_name = basics.full_name.trim();
     const phoneTrimmed = basics.phone.trim();
     // A lone `+` (from the country-code prefill) means no phone entered.
@@ -367,7 +368,6 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
       .subscribe((resolved) => {
         this._submitting.set(false);
         if (!resolved) return;
-        const raw = this.standard.getRawValue();
         const payload: LeadCreate = {
           contact_id: resolved.id,
           pipeline_stage: raw.pipeline_stage || null,

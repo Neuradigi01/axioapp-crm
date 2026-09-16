@@ -16,7 +16,6 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../auth/auth.service';
-import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
 
 import { ColumnFilterComponent } from '../shared/table-filters/column-filter.component';
@@ -87,7 +86,6 @@ const STATUS_OPTIONS: readonly ColumnFilterOption[] = [
     ChannelChipComponent,
     ColumnFilterComponent,
     TemplateStatusBadgeComponent,
-    MobileSelectComponent,
   ],
   templateUrl: './templates.page.html',
 })
