@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   EventEmitter,
@@ -50,6 +51,12 @@ export class NewConversationModalComponent {
   private readonly contactsApi = inject(ContactsApiService);
   private readonly conversationsApi = inject(ConversationsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  /** OnPush + HTTP subscribe callbacks fire outside any tracked
+   *  execution context. Signal writes usually schedule CD on their own
+   *  but explicit `markForCheck()` is belt-and-braces after every
+   *  async state mutation — matches the pattern used across the
+   *  contacts / tasks panels. */
+  private readonly cdr = inject(ChangeDetectorRef);
 
   @Output() readonly started = new EventEmitter<Conversation>();
   @Output() readonly cancel = new EventEmitter<void>();
@@ -192,8 +199,14 @@ export class NewConversationModalComponent {
    *  a failure just leaves the map empty and every row renders the
    *  regular "Start" label rather than blocking the picker. */
   private loadExistingConversations(channel: PickerChannel): void {
+    // 200 is the backend's hard cap on `size` — passing more 422s the
+    // request. Orgs with >200 open threads per channel won't get the
+    // Continue-chat hint on rows beyond the cap; picking such a
+    // contact still lands them in the existing thread (backend is
+    // idempotent) — worst case is a missed visual affordance, not a
+    // duplicate row.
     this.conversationsApi
-      .list({ channel, page: 1, size: 500 })
+      .list({ channel, page: 1, size: 200 })
       .pipe(
         catchError(() => of({ items: [], total: 0, page: 1, size: 0 })),
         takeUntilDestroyed(this.destroyRef),
@@ -204,6 +217,7 @@ export class NewConversationModalComponent {
           if (conv.contact_id) map.set(conv.contact_id, conv);
         }
         this.existingByContactId.set(map);
+        this.cdr.markForCheck();
       });
   }
 }
