@@ -504,11 +504,17 @@ export class LeadsPageComponent {
     initialValue: this.sourceControl.value,
   });
 
+  /** Signal mirror of `assigneeControl.value` — same reactivity reason
+   *  as `sourceControlValue` (FormControl isn't signal-tracked). */
+  private readonly assigneeControlValue = toSignal(this.assigneeControl.valueChanges, {
+    initialValue: this.assigneeControl.value,
+  });
+
   /** Column-filter emits `string[]`; the leads-list backend takes
-   *  scalar `source` and `stage` params. Adapt with a first-of-array
-   *  read/write pair so the popover UI works without a backend
-   *  widening — future work: extend the backend to accept lists and
-   *  drop the [0] projection. */
+   *  scalar `source`, `stage`, and `assigned_to` params. Adapt with a
+   *  first-of-array read/write pair so the popover UI works without a
+   *  backend widening — future work: extend the backend to accept
+   *  lists and drop the [0] projection. */
   protected readonly sourceColumnValue = computed<string[]>(() => {
     const raw = this.sourceControlValue();
     return raw ? [raw] : [];
@@ -518,6 +524,22 @@ export class LeadsPageComponent {
     const raw = this.stageControlValue();
     return raw ? [raw] : [];
   });
+
+  protected readonly assigneeColumnValue = computed<string[]>(() => {
+    const raw = this.assigneeControlValue();
+    return raw ? [raw] : [];
+  });
+
+  /** `app-column-filter` shape for the Owner column-header popover —
+   *  same option data as `assigneeSelectOptions()` minus the sentinel
+   *  "All owners" row (empty selection = no filter). Keeps the "Me"
+   *  and "Unassigned" pseudo-values so the operator can filter to
+   *  their own book or to the unassigned queue from the column header. */
+  readonly assigneeColumnOptions = computed<readonly ColumnFilterOption[]>(() =>
+    this.assigneeSelectOptions()
+      .filter((o) => o.value !== '')
+      .map((o) => ({ value: o.value, label: o.label })),
+  );
 
   /** `crm-mobile-select` options for the sort field. Kept in sync with
    *  the backend's `sort` enum + the two `next_follow_up_due` entries
@@ -940,6 +962,14 @@ export class LeadsPageComponent {
   protected onStageColumnFilterChange(values: string[]): void {
     const next = values[values.length - 1] ?? '';
     this.onToolbarStageChange(next);
+  }
+
+  /** Column-header filter change — Owner column. Same backend as the
+   *  toolbar "User" dropdown; single-value semantics because
+   *  `assigned_to` is scalar on the wire. */
+  protected onAssigneeColumnFilterChange(values: string[]): void {
+    const next = values[values.length - 1] ?? '';
+    this.assigneeControl.setValue(next);
   }
 
   /** Toolbar Status cell handler — writes to the same `statusControl`
