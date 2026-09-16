@@ -101,6 +101,14 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
    *  ``conversation.external_id`` when null. */
   @Input() displayHandle: string | null = null;
 
+  /** Linked contact's full name (when the conversation is joined to a
+   *  contact). Rendered as the primary line in the thread header; the
+   *  phone / email handle drops to the secondary line beneath it so
+   *  the operator sees who they're talking to before what channel it
+   *  came in on. Null when no contact is linked — in that case the
+   *  handle is promoted back to the primary line. */
+  @Input() contactName: string | null = null;
+
   /** tasks/ai-assistants-omnichannel Step 4 — user clicked the Take
    *  Over button on the AI-status banner. The page owns the POST +
    *  optimistic-flip semantics. Emitted only when ``ai_paused === false``

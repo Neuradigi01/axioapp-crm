@@ -260,6 +260,17 @@ export class ConversationsPageComponent {
     return phone && phone.length > 0 ? phone : (conv.external_id ?? null);
   });
 
+  /** Linked contact's full name for the thread header. Null when the
+   *  conversation isn't joined to a contact yet. Feeds the chat-thread
+   *  header so the operator sees "Ajay" on top and
+   *  "+91… · Whatsapp · Open" on the meta line beneath it. */
+  protected readonly selectedContactName = computed<string | null>(() => {
+    const conv = this.selectedConversation();
+    if (!conv || !conv.contact_id) return null;
+    const name = this.contactsById()[conv.contact_id]?.full_name?.trim();
+    return name && name.length > 0 ? name : null;
+  });
+
   /** View-only gate for the compose bar. Mirrors the backend
    * `ensure_can_write_conversation` rule (locked 2026-09-10) so the
    * operator sees the disabled state instead of hitting a 403 after

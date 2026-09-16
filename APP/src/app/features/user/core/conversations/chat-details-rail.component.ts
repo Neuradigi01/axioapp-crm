@@ -62,6 +62,12 @@ export class ChatDetailsRailComponent {
    *  backend cascade. Falls back to ``conversation.external_id``. */
   @Input() displayHandle: string | null = null;
 
+  /** Linked contact's full name — rendered as the rail's primary
+   *  heading with the handle demoted to the secondary line. Null when
+   *  the conversation isn't joined to a contact; in that case the
+   *  handle is promoted back to the primary heading. */
+  @Input() contactName: string | null = null;
+
   @Output() readonly reassign = new EventEmitter<void>();
   @Output() readonly tagsChanged = new EventEmitter<ConversationTagRef[]>();
   @Output() readonly statusChange = new EventEmitter<ConversationStatus>();

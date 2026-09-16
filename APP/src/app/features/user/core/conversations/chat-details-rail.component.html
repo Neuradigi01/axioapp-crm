@@ -5,10 +5,15 @@
     <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">Conversation</p>
     <p
       class="truncate text-sm font-semibold text-default"
-      [title]="displayHandle || conversation.external_id"
+      [title]="contactName || displayHandle || conversation.external_id"
     >
-      {{ displayHandle || conversation.external_id }}
+      {{ contactName || displayHandle || conversation.external_id }}
     </p>
+    @if (contactName && (displayHandle || conversation.external_id)) {
+      <p class="truncate font-mono text-xs text-muted">
+        {{ displayHandle || conversation.external_id }}
+      </p>
+    }
     <p class="flex items-center gap-2 text-xs text-muted capitalize">
       <span>{{ conversation.channel }} · {{ conversation.status }}</span>
       @if (conversation.acquisition_source === 'ad') {
