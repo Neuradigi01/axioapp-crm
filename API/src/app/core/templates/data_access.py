@@ -36,6 +36,20 @@ from src.app.core.templates.models import (
 )
 from src.app.core.templates.sms_extension import SMSDLTTemplate
 
+
+def _as_list(v):
+    """Normalise a single-or-list filter param to a list. ``None`` and
+    empty lists both collapse to ``[]`` so callers can just check
+    truthiness. Used by :func:`list_templates` so the router / service
+    can accept either shape for ``channel`` / ``internal_status``
+    without the DAL needing two branches per predicate."""
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return v
+    return [v]
+
+
 # --- tbl_message_templates ----------------------------------------------
 
 
@@ -107,8 +121,8 @@ async def list_templates(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    channel: ConversationChannel | None = None,
-    internal_status: TemplateInternalStatus | None = None,
+    channel: ConversationChannel | list[ConversationChannel] | None = None,
+    internal_status: TemplateInternalStatus | list[TemplateInternalStatus] | None = None,
     external_status: TemplateExternalStatus | None = None,
     is_active: bool | None = None,
     q: str | None = None,
@@ -123,11 +137,18 @@ async def list_templates(
     is ``(MessageTemplate, external_rejection_reason)`` — the reason
     is a LEFT OUTER JOIN onto the WhatsApp extension so Meta-rejected
     rows carry their reason without an N+1 fetch. Non-WA rows always
-    come back with reason=None."""
+    come back with reason=None.
+
+    ``channel`` and ``internal_status`` accept either a single value or
+    a list of values (OR-semantics) so the library page's column-header
+    filters can send multi-selects."""
+    channels = _as_list(channel)
+    internal_statuses = _as_list(internal_status)
+
     base = select(MessageTemplate).where(MessageTemplate.org_id == org_id)
 
-    if channel is not None:
-        base = base.where(MessageTemplate.channel == channel)
+    if channels:
+        base = base.where(MessageTemplate.channel.in_(channels))
     else:
         # `ai_prompt` is an internal channel used exclusively by the
         # AI Assistants editor's "Preset" dropdown — the rows are
@@ -138,8 +159,8 @@ async def list_templates(
         # ``channel=ai_prompt`` explicitly and the branch above kicks
         # in.
         base = base.where(MessageTemplate.channel != ConversationChannel.ai_prompt)
-    if internal_status is not None:
-        base = base.where(MessageTemplate.internal_status == internal_status)
+    if internal_statuses:
+        base = base.where(MessageTemplate.internal_status.in_(internal_statuses))
     if external_status is not None:
         base = base.where(MessageTemplate.external_status == external_status)
     if is_active is not None:
@@ -166,15 +187,15 @@ async def list_templates(
         )
         .where(MessageTemplate.org_id == org_id)
     )
-    if channel is not None:
-        listing = listing.where(MessageTemplate.channel == channel)
+    if channels:
+        listing = listing.where(MessageTemplate.channel.in_(channels))
     else:
         # Mirror the count-query exclusion above so listing + total
         # stay in lockstep (otherwise `total` and `len(items)` diverge
         # on a page where `ai_prompt` rows would have appeared).
         listing = listing.where(MessageTemplate.channel != ConversationChannel.ai_prompt)
-    if internal_status is not None:
-        listing = listing.where(MessageTemplate.internal_status == internal_status)
+    if internal_statuses:
+        listing = listing.where(MessageTemplate.internal_status.in_(internal_statuses))
     if external_status is not None:
         listing = listing.where(MessageTemplate.external_status == external_status)
     if is_active is not None:

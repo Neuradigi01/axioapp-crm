@@ -182,8 +182,12 @@ export interface TemplateUpdatePayload {
 }
 
 export interface TemplateListQuery {
-  channel?: TemplateChannel;
-  internal_status?: TemplateInternalStatus;
+  /** Either a single channel or a list — the column-header filter emits
+   *  a `string[]`, the toolbar dropdowns pass a scalar, both work
+   *  because `buildHttpParams` serializes arrays as repeated keys and
+   *  the backend router accepts `list[ConversationChannel] | None`. */
+  channel?: TemplateChannel | TemplateChannel[];
+  internal_status?: TemplateInternalStatus | TemplateInternalStatus[];
   external_status?: TemplateExternalStatus;
   /** Activation toggle filter. Pickers pass `true` so operators never
    *  see inactive templates; the library page omits the field to

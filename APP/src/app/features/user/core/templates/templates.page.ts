@@ -19,6 +19,9 @@ import { FurnitureAuthService } from '../auth/auth.service';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
 
+import { ColumnFilterComponent } from '../shared/table-filters/column-filter.component';
+import { ColumnFilterOption } from '../shared/table-filters/column-filter.types';
+
 import { ChannelChipComponent } from './channel-chip.component';
 import { TemplateStatusBadgeComponent } from './template-status-badge.component';
 import {
@@ -50,8 +53,9 @@ const PAGE_SIZE = 25;
 // the badge flip without hitting refresh.
 const EXTERNAL_STATUS_POLL_MS = 15_000;
 
-const CHANNEL_OPTIONS: Array<{ value: '' | TemplateChannel; label: string }> = [
-  { value: '', label: 'All channels' },
+/** Column-filter options for the Channel <th>. Multi-select; empty
+ *  selection means "no filter" (all channels). */
+const CHANNEL_OPTIONS: readonly ColumnFilterOption[] = [
   { value: 'whatsapp', label: 'WhatsApp' },
   { value: 'email', label: 'Email' },
   { value: 'sms', label: 'SMS' },
@@ -60,11 +64,9 @@ const CHANNEL_OPTIONS: Array<{ value: '' | TemplateChannel; label: string }> = [
   { value: 'push', label: 'Push notification' },
 ];
 
-const STATUS_OPTIONS: Array<{
-  value: '' | TemplateInternalStatus;
-  label: string;
-}> = [
-  { value: '', label: 'All statuses' },
+/** Column-filter options for the Status <th>. Multi-select; empty
+ *  selection means "no filter" (all statuses). */
+const STATUS_OPTIONS: readonly ColumnFilterOption[] = [
   { value: 'draft', label: 'Draft' },
   { value: 'in_review', label: 'In review' },
   { value: 'approved', label: 'Ready to publish' },
@@ -83,6 +85,7 @@ const STATUS_OPTIONS: Array<{
     DatePipe,
     LucideAngularModule,
     ChannelChipComponent,
+    ColumnFilterComponent,
     TemplateStatusBadgeComponent,
     MobileSelectComponent,
   ],
@@ -118,9 +121,11 @@ export class TemplatesPageComponent {
   protected readonly loadError = signal<string | null>(null);
   protected readonly pageIndex = signal<number>(0);
 
-  // Filters.
-  protected readonly channelFilter = signal<'' | TemplateChannel>('');
-  protected readonly statusFilter = signal<'' | TemplateInternalStatus>('');
+  // Filters. Column-header multi-select filters emit `string[]`; empty
+  // array = no filter. The API service serializes each element as a
+  // repeated query param, which FastAPI binds to `list[T] | None`.
+  protected readonly channelFilter = signal<string[]>([]);
+  protected readonly statusFilter = signal<string[]>([]);
   protected readonly searchQuery = signal<string>('');
   // Debounced version of `searchQuery` — what actually drives the API.
   protected readonly debouncedSearch = signal<string>('');
@@ -193,13 +198,13 @@ export class TemplatesPageComponent {
 
   // --- filters / search -----------------------------------------------
 
-  protected onChannelChange(value: string): void {
-    this.channelFilter.set(value as '' | TemplateChannel);
-    this.pageIndex.set(0);
-  }
-
-  protected onStatusChange(value: string): void {
-    this.statusFilter.set(value as '' | TemplateInternalStatus);
+  /** Column-header filter change handler. Both channel + status share
+   *  the same signature (values: string[]) so one method keeps the
+   *  bindings compact and easy to extend when a third column-filter
+   *  column lands. */
+  protected onColumnFilterChange(target: 'channel' | 'status', values: string[]): void {
+    if (target === 'channel') this.channelFilter.set(values);
+    else this.statusFilter.set(values);
     this.pageIndex.set(0);
   }
 
@@ -214,12 +219,21 @@ export class TemplatesPageComponent {
 
   protected clearFilters(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.channelFilter.set('');
-    this.statusFilter.set('');
+    this.channelFilter.set([]);
+    this.statusFilter.set([]);
     this.searchQuery.set('');
     this.debouncedSearch.set('');
     this.pageIndex.set(0);
   }
+
+  /** Any active filter — drives the empty-state copy + the "Clear
+   *  filters" chip in the toolbar. */
+  protected readonly hasActiveFilters = computed(
+    () =>
+      this.channelFilter().length > 0 ||
+      this.statusFilter().length > 0 ||
+      this.debouncedSearch().length > 0,
+  );
 
   // --- pagination -----------------------------------------------------
 
@@ -249,10 +263,12 @@ export class TemplatesPageComponent {
 
   private fetchPage({ silent }: { silent: boolean }): void {
     const offset = this.pageIndex() * PAGE_SIZE;
+    const channels = this.channelFilter();
+    const statuses = this.statusFilter();
     this.api
       .list({
-        channel: this.channelFilter() || undefined,
-        internal_status: this.statusFilter() || undefined,
+        channel: channels.length > 0 ? (channels as TemplateChannel[]) : undefined,
+        internal_status: statuses.length > 0 ? (statuses as TemplateInternalStatus[]) : undefined,
         q: this.debouncedSearch() || undefined,
         limit: PAGE_SIZE,
         offset,

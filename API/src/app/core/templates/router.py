@@ -151,8 +151,8 @@ def _to_variable_out(defn: VariableDef) -> VariableDefOut:
 
 @router.get("", response_model=TemplateListResponse)
 async def list_endpoint(
-    channel: ConversationChannel | None = Query(default=None),
-    internal_status: TemplateInternalStatus | None = Query(default=None),
+    channel: list[ConversationChannel] | None = Query(default=None),
+    internal_status: list[TemplateInternalStatus] | None = Query(default=None),
     external_status: TemplateExternalStatus | None = Query(default=None),
     is_active: bool | None = Query(
         default=None,

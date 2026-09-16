@@ -31,7 +31,10 @@
     }
   </header>
 
-  <section class="border-b border-subtle bg-surface px-4 md:px-6 py-3">
+  <!-- Search is the only above-table control. Channel + Status filters
+       moved to their column headers as `app-column-filter` popovers,
+       matching the Contacts / Walk-ins page pattern. -->
+  <section class="border-b border-subtle bg-surface px-4 py-3 md:px-6">
     <div class="flex flex-wrap items-center gap-2">
       <div class="relative">
         <lucide-icon
@@ -48,27 +51,7 @@
         />
       </div>
 
-      <!-- Channel + Status filters — crm-mobile-select instead of
-           native <select> so the picker renders in-DOM (dark theme,
-           readable at every viewport size, no OS-picker overflow on
-           mobile emulation). -->
-      <div class="min-w-[10rem]">
-        <crm-mobile-select
-          [options]="CHANNEL_OPTIONS"
-          [value]="channelFilter()"
-          (valueChange)="onChannelChange($event)"
-        />
-      </div>
-
-      <div class="min-w-[9rem]">
-        <crm-mobile-select
-          [options]="STATUS_OPTIONS"
-          [value]="statusFilter()"
-          (valueChange)="onStatusChange($event)"
-        />
-      </div>
-
-      @if (channelFilter() || statusFilter() || debouncedSearch()) {
+      @if (hasActiveFilters()) {
         <button
           type="button"
           (click)="clearFilters()"
@@ -97,21 +80,21 @@
       >
         <lucide-icon name="file-text" size="32" class="mx-auto text-faint" />
         <h2 class="mt-4 text-sm font-semibold text-default">
-          @if (channelFilter() || statusFilter() || debouncedSearch()) {
+          @if (hasActiveFilters()) {
             No templates match these filters
           } @else {
             No templates yet
           }
         </h2>
         <p class="mt-1 text-[14px] text-muted">
-          @if (channelFilter() || statusFilter() || debouncedSearch()) {
+          @if (hasActiveFilters()) {
             Clear filters to see the full list.
           } @else {
             Reusable message bodies for WhatsApp, Email, SMS and more — author once, reuse across
             campaigns and automations.
           }
         </p>
-        @if (canWrite() && !channelFilter() && !statusFilter() && !debouncedSearch()) {
+        @if (canWrite() && !hasActiveFilters()) {
           <a routerLink="/user/templates/new" class="mt-4 btn btn-primary">
             <lucide-icon name="plus" size="14" />
             Create your first template
@@ -131,12 +114,22 @@
               <th
                 class="w-[26%] overflow-hidden px-1 py-2 text-left font-medium sm:w-[16%] md:w-auto md:px-4"
               >
-                Channel
+                <app-column-filter
+                  label="Channel"
+                  [options]="CHANNEL_OPTIONS"
+                  [value]="channelFilter()"
+                  (valueChange)="onColumnFilterChange('channel', $event)"
+                />
               </th>
               <th
                 class="w-[24%] overflow-hidden px-1 py-2 text-left font-medium sm:w-[18%] md:w-auto md:px-4"
               >
-                Status
+                <app-column-filter
+                  label="Status"
+                  [options]="STATUS_OPTIONS"
+                  [value]="statusFilter()"
+                  (valueChange)="onColumnFilterChange('status', $event)"
+                />
               </th>
               <th
                 class="w-[24%] overflow-hidden px-1 py-2 text-left font-medium sm:w-[18%] md:w-auto md:px-4"
