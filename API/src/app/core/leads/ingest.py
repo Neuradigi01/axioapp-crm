@@ -140,11 +140,20 @@ async def ingest(
         )
 
     # 2. Fresh lead — pick an assignee, then create.
-    # Manual entries belong to the human who typed them in — no
-    # round-robin. Every other channel (widget, ad webhooks, bulk
-    # import, whatsapp flow, ai assistant) is data-from-outside and
-    # goes through round-robin so no single rep drowns.
-    if source == LeadSource.manual and actor_user_id is not None:
+    # Any authenticated caller (JWT user) who creates a lead through
+    # the app owns that lead, regardless of the `source` label they
+    # picked in the "Add Lead" modal. Manual, WhatsApp Flow,
+    # Referral, Ad — if a signed-in operator hit the "Add Lead"
+    # button, they're the owner. This closes the "I created a lead
+    # and it landed as Unassigned" surprise where a rep picks
+    # ``source=whatsapp_flow`` in the modal and the lead falls back
+    # to round-robin.
+    #
+    # Public / server-to-server paths that lack an ``actor_user_id``
+    # (embed widget, ad-form webhooks, bulk imports, workflow
+    # ingest) still go through round-robin so no single rep drowns
+    # in cold inbound.
+    if actor_user_id is not None:
         assignee_id: uuid.UUID | None = actor_user_id
     else:
         assignee_id = await pick_assignee(session, org_id=org_id, source=source.value)

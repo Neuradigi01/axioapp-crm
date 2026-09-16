@@ -400,25 +400,33 @@ export class LeadsPageComponent {
 
   readonly contactsById = signal<Record<string, ContactSummary>>({});
 
-  /** Source dropdown options. Contacts store `source` as free-form
-   *  text — some rows have raw enum keys ("google_ads"), others have
-   *  human labels ("Google Ads"), and casing varies ("facebook" vs
-   *  "Facebook Ads"). We collapse everything to a single canonical
-   *  label per lowercase key so the dropdown doesn't render the
-   *  same source twice under different spellings. `value` is the
-   *  ORIGINAL (raw) source string of the first occurrence — that's
-   *  what the backend filter matches on. `label` is a display-only
-   *  prettified version for the option text. */
-  readonly sourceOptions = computed<{ value: string; label: string }[]>(() => {
-    const byKey = new Map<string, { value: string; label: string }>();
-    for (const c of Object.values(this.contactsById())) {
-      if (!c.source) continue;
-      const key = c.source.trim().toLowerCase();
-      if (!key || byKey.has(key)) continue;
-      byKey.set(key, { value: c.source, label: this.prettifySource(c.source) });
-    }
-    return [...byKey.values()].sort((a, b) => a.label.localeCompare(b.label));
-  });
+  /** Source dropdown options — the same fixed enum list the Add Lead
+   *  modal offers, so the toolbar filter (pipeline view) and the
+   *  Source column-header filter (list view) show every possible
+   *  source regardless of what data currently exists.
+   *
+   *  Previously this was derived from `contactsById()`, but that
+   *  surfaced two bugs:
+   *    1. Contacts created via the Add Lead modal don't get their
+   *       `source` field populated — the source lives on the LEAD
+   *       row, not the contact — so the filter dropdown came back
+   *       empty for orgs whose contacts were all created via
+   *       Add Lead.
+   *    2. Filtering to a source that no active lead matched hid the
+   *       chip entirely, leaving no path to switch back once a rep
+   *       moved a lead off it.
+   *
+   *  The fixed list mirrors `LeadSource` on the backend so
+   *  ``sourceControl.value`` always maps 1:1 to a valid API filter. */
+  readonly sourceOptions = computed<{ value: string; label: string }[]>(() => [
+    { value: 'manual', label: 'Manual' },
+    { value: 'walk_in', label: 'Walk-in' },
+    { value: 'widget', label: 'Forms' },
+    { value: 'google_ads', label: 'Google Ads' },
+    { value: 'meta_ads', label: 'Meta Ads' },
+    { value: 'whatsapp_flow', label: 'WhatsApp' },
+    { value: 'bulk_import', label: 'Bulk import' },
+  ]);
 
   /** Turn a raw source token like "google_ads" or "walk_in" into a
    *  human-readable label ("Google Ads", "Walk-in"). If the input
@@ -434,12 +442,22 @@ export class LeadsPageComponent {
 
   /** Rendered text for the leads-list Source column.
    *
-   *  Multi-form track (Step 6): for widget-sourced leads, override the
-   *  free-text contact.source with the enum-driven "Forms" label, plus
-   *  the specific form name from ``lead.attribution.form_name`` when
-   *  set. Every other lead source keeps rendering the contact's
-   *  free-text source (unchanged behaviour). */
-  protected sourceCellLabel(lead: Lead, contactSource: string | null | undefined): string | null {
+   *  Reads the source from the LEAD row itself (the value the operator
+   *  picked in the Add Lead modal or that the ingest path set) —
+   *  previously this fell back to `contact.source`, but contacts
+   *  created via the Add Lead modal don't have that field populated,
+   *  so the cell rendered `—` for every lead the operator had just
+   *  entered.
+   *
+   *  Multi-form track (Step 6): for widget-sourced leads, replace the
+   *  bare "Forms" label with the specific form name from
+   *  ``lead.attribution.form_name`` when set, so the operator can
+   *  tell which embed / landing form the lead came in on.
+   *
+   *  ``contactSource`` is still accepted (called from the template with
+   *  ``contact?.source ?? null``) for backwards compat with the
+   *  existing binding shape, but is now unused. */
+  protected sourceCellLabel(lead: Lead, _contactSource: string | null | undefined): string | null {
     if (lead.source === 'widget') {
       const attribution = (lead.attribution as { form_name?: unknown } | null) ?? null;
       const formName = attribution?.form_name;
@@ -448,7 +466,8 @@ export class LeadsPageComponent {
       }
       return 'Forms';
     }
-    return contactSource ?? null;
+    if (!lead.source) return null;
+    return this.prettifySource(lead.source);
   }
 
   /** `crm-mobile-select` shape for the source filter — same data as
