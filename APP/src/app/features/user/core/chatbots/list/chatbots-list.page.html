@@ -38,10 +38,20 @@
 
   <!-- Filter bar — wraps to two rows on mobile; search grows to full
        width so operators can actually type on a phone keyboard. -->
+  <!-- Chips + search toolbar. Chips on the left, search on the right
+       (via `justify-between`). On mobile the row wraps so the search
+       drops to a new line beneath the chips.
+
+       Previously used an empty `flex-1` spacer between the two, but
+       its implicit `order-0` was smaller than the chips' `order-1`
+       and the search's `order-2`, which floated the spacer to the
+       very start of the row and pushed BOTH chips + search to the
+       right on wide viewports. `justify-between` removes the need
+       for the spacer entirely and behaves correctly at every width. -->
   <div
-    class="flex flex-wrap items-center gap-3 px-4 md:px-6 py-3 border-b border-subtle bg-surface flex-shrink-0"
+    class="flex flex-wrap items-center justify-between gap-3 px-4 md:px-6 py-3 border-b border-subtle bg-surface flex-shrink-0"
   >
-    <div class="flex items-center gap-2 flex-wrap order-2 sm:order-1">
+    <div class="flex items-center gap-2 flex-wrap">
       @for (filter of statusFilters; track filter.value) {
         <button
           type="button"
@@ -58,9 +68,7 @@
       }
     </div>
 
-    <div class="hidden sm:block flex-1"></div>
-
-    <div class="relative w-full sm:w-auto order-1 sm:order-2">
+    <div class="relative w-full sm:w-auto">
       <lucide-icon
         name="search"
         size="14"

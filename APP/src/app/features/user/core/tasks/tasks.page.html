@@ -33,13 +33,19 @@
   <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
     <div class="flex flex-wrap items-center gap-2">
       @for (c of chips(); track c.key) {
+        <!-- Active state uses a single mutually-exclusive class string
+             so a Tailwind compile-order collision can't leave the
+             base `bg-surface` beating `bg-accent` (produced an
+             invisible "All" chip in light mode: text-white on a
+             white pill). -->
         <button
           type="button"
           (click)="selectChip(c.key)"
-          [class.bg-accent]="activeChip() === c.key"
-          [class.text-white]="activeChip() === c.key"
-          [class.border-accent]="activeChip() === c.key"
-          class="rounded-full border border-subtle bg-surface px-3 py-1 text-xs font-medium text-default hover:bg-surface-2"
+          [class]="
+            activeChip() === c.key
+              ? 'rounded-full border border-accent bg-accent px-3 py-1 text-xs font-medium text-white'
+              : 'rounded-full border border-subtle bg-surface px-3 py-1 text-xs font-medium text-default hover:bg-surface-2'
+          "
         >
           {{ c.label }}
         </button>
