@@ -24,6 +24,7 @@ import {
 import { BaseChartDirective } from 'ng2-charts';
 import { extractApiError } from '@core/services/api-error.util';
 
+import { MobileDateTimeComponent } from '../../shared/forms/mobile-datetime.component';
 import { CallAnalytics, CallsApiService } from '../calls-api.service';
 
 // Register only the chart pieces we actually use. Tree-shaking-friendly.
@@ -51,7 +52,7 @@ Chart.register(
   selector: 'app-call-analytics-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, BaseChartDirective],
+  imports: [ReactiveFormsModule, BaseChartDirective, MobileDateTimeComponent],
   templateUrl: './analytics.component.html',
 })
 export class CallAnalyticsTabComponent {
