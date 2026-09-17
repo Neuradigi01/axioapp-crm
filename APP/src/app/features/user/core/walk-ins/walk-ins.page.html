@@ -162,10 +162,11 @@
       In-store now
     </button>
 
-    <!-- Sort dropdown — crm-mobile-select for in-DOM picker (dark
-         theme, readable options at every viewport size, no OS-picker
-         full-screen overflow on mobile emulation). -->
-    <div class="min-w-[9rem]">
+    <!-- Sort dropdown sits at the far right of the chip row.
+         ``ml-auto`` pushes it into the trailing whitespace so the
+         chips stay left-aligned; ``w-max`` sizes to the label so it
+         doesn't hog width the chips could use before wrapping. -->
+    <div class="ml-auto w-max">
       <crm-mobile-select
         [options]="sortSelectOptions"
         [value]="sortKey() + ':' + sortOrder()"
