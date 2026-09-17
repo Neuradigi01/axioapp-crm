@@ -333,6 +333,11 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
             const patch: Record<string, string> = {};
             if (!match.phone && phone) patch['phone'] = phone;
             if (!match.email && email) patch['email'] = email;
+            // First-touch source enrichment. The lead modal already picks
+            // a source, so if the matched contact still has NULL source
+            // (walk-in / widget / import path never stamped it) fill it
+            // in now. Existing non-empty sources are never clobbered.
+            if (!match.source && contactSource) patch['source'] = contactSource;
             if (Object.keys(patch).length === 0) {
               return of({
                 id: match.id,

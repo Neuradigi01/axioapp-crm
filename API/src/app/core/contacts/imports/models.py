@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -89,6 +90,13 @@ class ContactImport(Base, TenantScoped):
     # means "operator didn't pick" — commit falls back to the default
     # `never_contacted` status on each contact created.
     opt_in_source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Batch-level fallback for `contact.source` — used when a row's
+    # mapped `source` cell is missing or blank. Wizard's map step lets
+    # the operator pick "Default source for this import" so contacts
+    # imported from a channel-specific CSV (e.g. "walk-in list") get
+    # their origin stamped even when the sheet has no source column.
+    # NULL preserves prior behaviour (blank stays blank).
+    default_source: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
     status: Mapped[ContactImportStatus] = mapped_column(
         Enum(
             ContactImportStatus,

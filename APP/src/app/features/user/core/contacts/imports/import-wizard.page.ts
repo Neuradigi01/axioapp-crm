@@ -146,6 +146,25 @@ export class ContactImportWizardPageComponent implements OnInit {
   protected readonly mapping = signal<Record<string, ContactFieldTarget>>({});
   protected readonly createGroup = signal(false);
   protected readonly groupName = signal('');
+  /** Batch-level fallback for `contact.source`. Applied by the backend
+   *  to any row whose mapped source cell is empty (or when the operator
+   *  didn't map a source column at all). Defaults to `'bulk_import'`
+   *  so imported rows always land with an origin instead of "—" on
+   *  the Contacts list Source column. Empty string = "none" — the
+   *  operator opted out of the fallback and rows without a source
+   *  cell stay NULL. Mirror of the canonical source options rendered
+   *  on the contacts list header filter. */
+  protected readonly defaultSource = signal<string>('bulk_import');
+  protected readonly defaultSourceOptions: ReadonlyArray<{ value: string; label: string }> = [
+    { value: '', label: 'None — leave source blank' },
+    { value: 'bulk_import', label: 'Bulk import' },
+    { value: 'manual', label: 'Manual' },
+    { value: 'walk_in', label: 'Walk-in' },
+    { value: 'widget', label: 'Forms' },
+    { value: 'google_ads', label: 'Google Ads' },
+    { value: 'meta_ads', label: 'Meta Ads' },
+    { value: 'whatsapp_flow', label: 'WhatsApp' },
+  ];
 
   // --- Step 3 ---------------------------------------------------------
   protected readonly dryRunRunning = signal(false);
@@ -625,7 +644,14 @@ export class ContactImportWizardPageComponent implements OnInit {
       // DPDP: opt-in provenance picked on the map step. Persists on
       // every contact this import inserts (backend Step 0164).
       opt_in_source: this.optInSource(),
+      // Batch-level fallback for `contact.source`. Empty string means
+      // "no fallback" — send null so the backend keeps blanks blank.
+      default_source: this.defaultSource() || null,
     };
+  }
+
+  protected onDefaultSourceChange(event: Event): void {
+    this.defaultSource.set((event.target as HTMLSelectElement).value);
   }
 
   private formatBytes(bytes: number): string {

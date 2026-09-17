@@ -277,6 +277,34 @@
         </div>
       }
 
+      <!-- Default source picker. Applied to any row whose mapped
+           source cell is empty (or when no column is mapped to
+           Source). Defaults to "Bulk import" so imported contacts
+           always land with an origin instead of "—" on the Contacts
+           list Source column. -->
+      <div class="rounded-md border border-subtle bg-surface-2 p-4">
+        <label
+          for="contact-import-default-source"
+          class="mb-1 block text-sm font-medium text-default"
+        >
+          Default source for this import
+        </label>
+        <p class="mb-2 text-xs text-muted">
+          Used when a row's mapped source cell is empty (or you didn't map a source column).
+          Existing values from the CSV are never overwritten.
+        </p>
+        <select
+          id="contact-import-default-source"
+          [value]="defaultSource()"
+          (change)="onDefaultSourceChange($event)"
+          class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        >
+          @for (opt of defaultSourceOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </div>
+
       <!-- Group toggle -->
       <div class="rounded-md border border-subtle bg-surface-2 p-4">
         <label class="flex items-start gap-2 text-sm text-default">

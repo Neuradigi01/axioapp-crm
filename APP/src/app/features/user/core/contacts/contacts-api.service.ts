@@ -135,6 +135,11 @@ export interface ContactDuplicateMatch {
   full_name: string;
   phone: string | null;
   email: string | null;
+  /** Current `source` on the matched contact. Exposed so the Add Lead
+   *  modal can enrich a NULL source with the picked value (first-touch
+   *  attribution wins — a matched contact with an existing source is
+   *  never overwritten). */
+  source: string | null;
 }
 
 export interface ContactListQuery {
@@ -203,6 +208,11 @@ export interface ContactImportRunIn {
    *  Backend Step 0164 persists it onto every contact this import
    *  inserts (whatsapp_opt_in_status='opted_in' + source=…). */
   opt_in_source?: WhatsAppOptInSource | null;
+  /** Batch-level fallback for `contact.source`. Applied to any row whose
+   *  mapped source cell is empty (or when the CSV has no source column
+   *  mapped at all), so channel-specific imports (e.g. a walk-in list)
+   *  don't land with the Contacts list Source column stuck on "—". */
+  default_source?: string | null;
 }
 
 export interface ContactImportRowError {

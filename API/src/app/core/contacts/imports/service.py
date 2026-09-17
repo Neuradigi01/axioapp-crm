@@ -261,6 +261,7 @@ async def dry_run_import(
     import_id: uuid.UUID,
     mapping: dict[str, str],
     opt_in_source: str | None = None,
+    default_source: str | None = None,
 ) -> ImportDryRunOut:
     """Walk the file without writing. Reports per-row errors + dupe
     counts so the operator can decide whether to commit.
@@ -369,6 +370,11 @@ async def dry_run_import(
     row.warning_log = [w.model_dump() for w in warnings[:MAX_STORED_ERRORS]]
     if opt_in_source is not None:
         row.opt_in_source = opt_in_source
+    # Stash the batch-level source fallback so the commit step can
+    # rehydrate without the wizard re-sending it. Empty string collapses
+    # to NULL (the operator cleared the picker after dry-run).
+    if default_source is not None:
+        row.default_source = default_source or None
     await session.commit()
 
     return ImportDryRunOut(
@@ -396,6 +402,7 @@ async def commit_import(
     create_group: bool = False,
     group_name: str | None = None,
     opt_in_source: str | None = None,
+    default_source: str | None = None,
 ) -> ContactImport:
     """Validate the request, persist the operator's intent, and hand
     the row loop off to Celery.
@@ -439,6 +446,11 @@ async def commit_import(
     effective_opt_in_source = opt_in_source or row.opt_in_source
     if effective_opt_in_source:
         row.opt_in_source = effective_opt_in_source
+    # Batch-level source fallback for rows whose CSV cell is empty.
+    # Persist so the worker rehydrates from the row without needing
+    # the wizard body a second time.
+    if default_source is not None:
+        row.default_source = default_source or None
     row.status = ContactImportStatus.processing
     await session.commit()
     await session.refresh(row)
@@ -495,6 +507,11 @@ async def _run_commit(
 
     mapping = dict(row.applied_mapping or {})
     effective_opt_in_source = row.opt_in_source
+    # Batch-level source fallback picked at map step. Applied when a
+    # row's mapped ``source`` cell is empty or the column wasn't mapped
+    # at all — the resulting contact still gets the operator-chosen
+    # origin instead of NULL.
+    effective_default_source = (row.default_source or "").strip() or None
     custom_defs = await _load_contact_custom_field_defs(session)
 
     storage = get_storage()
@@ -597,7 +614,7 @@ async def _run_commit(
             full_name=full_name,
             phone=mapped.get("phone") or None,
             email=mapped.get("email") or None,
-            source=mapped.get("source") or None,
+            source=(mapped.get("source") or "").strip() or effective_default_source,
             tags=tags,
             custom_data=cleaned_custom,
         )

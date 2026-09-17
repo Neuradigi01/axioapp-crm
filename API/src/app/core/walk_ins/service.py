@@ -297,6 +297,15 @@ async def quick_register(
     was_created = False
     if existing is not None:
         contact = existing
+        # First-touch source enrichment. The reception-desk form always
+        # picks a source (defaults to "walk_in"), but if this contact
+        # was previously created by a channel that didn't stamp source,
+        # the Contacts list Source column stays "—" forever. Fill it in
+        # only when currently NULL — never overwrite an existing
+        # attribution (a widget-born contact walking in later shouldn't
+        # lose its "widget" origin).
+        if not contact.source and payload.source:
+            contact.source = payload.source
     else:
         contact = Contact(
             org_id=org_id,

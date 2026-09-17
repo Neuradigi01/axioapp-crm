@@ -143,6 +143,7 @@ async def dry_run_endpoint(
         import_id=import_id,
         mapping=payload.mapping,
         opt_in_source=payload.opt_in_source,
+        default_source=payload.default_source,
     )
 
 
@@ -165,6 +166,7 @@ async def commit_endpoint(
         create_group=payload.create_group,
         group_name=payload.group_name,
         opt_in_source=payload.opt_in_source,
+        default_source=payload.default_source,
     )
     return ImportCommitOut(
         id=row.id,

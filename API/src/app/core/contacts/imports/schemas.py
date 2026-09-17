@@ -55,7 +55,11 @@ class ImportDryRunIn(BaseModel):
     the commit step (separate endpoint) will create a static group from
     the successfully-inserted contacts.
     `opt_in_source` is the DPDP provenance the operator picks on the
-    mapping step — persisted onto every contact this import inserts."""
+    mapping step — persisted onto every contact this import inserts.
+    `default_source` is the batch-level fallback for `contact.source`:
+    when the CSV row's mapped source cell is empty (or the column isn't
+    mapped at all), each inserted contact gets this value. NULL keeps
+    the prior behaviour (empty stays empty)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -63,6 +67,7 @@ class ImportDryRunIn(BaseModel):
     create_group: bool = False
     group_name: str | None = Field(default=None, max_length=255)
     opt_in_source: OptInSource | None = None
+    default_source: str | None = Field(default=None, max_length=64)
 
 
 class RowError(BaseModel):

@@ -280,14 +280,19 @@ class ContactHydrateRequest(BaseModel):
 class ContactDuplicateMatch(ORMModel):
     """One existing row that matched the create-modal's dup check.
 
-    Slim shape (`id` + name + phone + email) so the FE can render a
+    Slim shape (`id` + name + phone + email + source) so the FE can render a
     yellow banner with a "view" link without an extra round-trip.
+
+    ``source`` is exposed so callers (Add Lead modal, walk-in registration)
+    can enrich the matched contact's source when it's currently NULL
+    without needing a second read — first-touch attribution wins.
     """
 
     id: uuid.UUID
     full_name: str
     phone: str | None
     email: str | None
+    source: str | None = None
 
 
 class ContactDuplicateCheckResponse(BaseModel):
