@@ -109,7 +109,12 @@ async def quick_register_endpoint(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("walkins.write")),
 ) -> QuickRegisterResponse:
-    walk_in, contact, was_created = await quick_register(db, org_id=user.org_id, payload=payload)
+    walk_in, contact, was_created = await quick_register(
+        db,
+        org_id=user.org_id,
+        payload=payload,
+        caller_user_id=user.legacy_uuid,
+    )
     return QuickRegisterResponse(
         walk_in=WalkInOut.model_validate(walk_in),
         contact=ContactOut.model_validate(contact),

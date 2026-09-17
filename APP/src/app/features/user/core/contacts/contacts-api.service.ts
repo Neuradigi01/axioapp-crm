@@ -140,6 +140,10 @@ export interface ContactDuplicateMatch {
    *  attribution wins — a matched contact with an existing source is
    *  never overwritten). */
   source: string | null;
+  /** Current owner on the matched contact. Exposed so the Add Lead
+   *  modal can enrich a NULL owner with the caller's uuid — same
+   *  first-touch rule as `source`. */
+  assigned_to_id: string | null;
 }
 
 export interface ContactListQuery {

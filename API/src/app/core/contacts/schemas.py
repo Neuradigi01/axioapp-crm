@@ -293,6 +293,7 @@ class ContactDuplicateMatch(ORMModel):
     phone: str | None
     email: str | None
     source: str | None = None
+    assigned_to_id: uuid.UUID | None = None
 
 
 class ContactDuplicateCheckResponse(BaseModel):

@@ -215,6 +215,11 @@ async def create_contact_endpoint(
         org_id=user.org_id,
         payload=payload,
         require_all_required=not stub,
+        # For stub creates (lead-modal auto-create, etc.) the caller is
+        # the natural first-touch owner — stamp them so the Contacts
+        # list Owner filter surfaces the row under their name. Direct
+        # POST /contacts payloads that specify assigned_to_id still win.
+        default_owner_id=user.legacy_uuid if stub else None,
     )
     return ContactOut.model_validate(contact)
 

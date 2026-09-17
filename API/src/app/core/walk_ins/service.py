@@ -284,8 +284,15 @@ async def quick_register(
     *,
     org_id: uuid.UUID,
     payload: QuickRegisterPayload,
+    caller_user_id: uuid.UUID | None = None,
 ) -> tuple[WalkIn, Contact, bool]:
-    """Reception-desk one-shot. Returns (walk_in, contact, was_created)."""
+    """Reception-desk one-shot. Returns (walk_in, contact, was_created).
+
+    ``caller_user_id`` is stamped as the contact's ``assigned_to_id``
+    (owner) for a freshly-created contact and back-fills a matched
+    contact whose owner is currently NULL — same first-touch rule as
+    ``source``. Optional so existing internal callers keep working.
+    """
     cleaned_custom = await validate_custom_data(
         session,
         entity_type=_WALK_IN_ENTITY,
@@ -306,6 +313,11 @@ async def quick_register(
         # lose its "widget" origin).
         if not contact.source and payload.source:
             contact.source = payload.source
+        # Owner enrichment follows the same first-touch rule so the
+        # Contacts list Owner filter starts returning meaningful counts
+        # instead of "No contacts found" for every user pick.
+        if contact.assigned_to_id is None and caller_user_id is not None:
+            contact.assigned_to_id = caller_user_id
     else:
         contact = Contact(
             org_id=org_id,
@@ -315,6 +327,7 @@ async def quick_register(
             source=payload.source,
             tags=[],
             custom_data={},
+            assigned_to_id=caller_user_id,
         )
         contacts_service.insert_contact(session, contact)
         await session.flush()

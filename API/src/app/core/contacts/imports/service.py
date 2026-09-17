@@ -617,6 +617,13 @@ async def _run_commit(
             source=(mapped.get("source") or "").strip() or effective_default_source,
             tags=tags,
             custom_data=cleaned_custom,
+            # Uploader becomes the first-touch owner so the operator
+            # sees their imported contacts under their own Owner filter.
+            # The wizard doesn't (yet) let a user map an owner column
+            # from the CSV, so this is unconditional — a later
+            # per-row owner column would take precedence via a mapped
+            # `assigned_to_id` target (not currently supported).
+            assigned_to_id=user_id,
         )
         if effective_opt_in_source:
             # DPDP: stamp the operator-chosen provenance on each row.

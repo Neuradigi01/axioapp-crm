@@ -14,6 +14,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 
+import { FurnitureAuthService } from '../auth/auth.service';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
@@ -59,6 +60,7 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
   private readonly api = inject(LeadsApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly pipelinesApi = inject(PipelinesApiService);
+  private readonly auth = inject(FurnitureAuthService);
 
   /** Today in local `YYYY-MM-DD` shape — bound to `[min]` on the
    *  expected-close-date picker so the browser also refuses past
@@ -338,6 +340,13 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
             // (walk-in / widget / import path never stamped it) fill it
             // in now. Existing non-empty sources are never clobbered.
             if (!match.source && contactSource) patch['source'] = contactSource;
+            // Owner enrichment — same first-touch rule. When the matched
+            // contact has no owner yet (all historical rows before the
+            // creator-stamp fix landed), attribute it to the operator
+            // doing the Add-Lead so the Contacts list Owner filter
+            // starts returning something.
+            const meId = this.auth.currentUserId();
+            if (!match.assigned_to_id && meId) patch['assigned_to_id'] = meId;
             if (Object.keys(patch).length === 0) {
               return of({
                 id: match.id,

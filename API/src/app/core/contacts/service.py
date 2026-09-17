@@ -304,6 +304,7 @@ async def create_contact(
     org_id: uuid.UUID,
     payload: ContactCreate,
     require_all_required: bool = True,
+    default_owner_id: uuid.UUID | None = None,
 ) -> Contact:
     """Create a contact.
 
@@ -315,6 +316,12 @@ async def create_contact(
     imports of unknown shape) pass `False` because the submitter
     can't possibly know the org's custom-field requirements;
     staff fill in the blanks afterwards via the edit form.
+
+    ``default_owner_id`` is the fallback ``assigned_to_id`` applied when
+    the payload doesn't specify one — used by indirect create paths
+    (lead-modal stub creates) to attribute a fresh contact to the
+    caller so it shows up under their Owner filter. Explicit
+    ``payload.assigned_to_id`` still wins when provided.
     """
     cleaned_custom = await validate_custom_data(
         session,
@@ -331,7 +338,7 @@ async def create_contact(
         source=payload.source,
         tags=payload.cleaned_tags(),
         custom_data=cleaned_custom,
-        assigned_to_id=payload.assigned_to_id,
+        assigned_to_id=payload.assigned_to_id or default_owner_id,
     )
     data_access.insert_contact(session, contact)
     await session.commit()
