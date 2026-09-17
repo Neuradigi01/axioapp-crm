@@ -14,6 +14,7 @@ Items:
   POST   /api/v1/catalog/{id}/image                (primary cover — multipart)
   POST   /api/v1/catalog/{id}/images               (gallery add — multipart)
   DELETE /api/v1/catalog/{id}/images?index=N       (gallery remove)
+  POST   /api/v1/catalog/{id}/images/promote       (swap gallery[N] with cover)
   POST   /api/v1/catalog/{id}/publish              (draft/unpublished → published)
   POST   /api/v1/catalog/{id}/unpublish            (published → unpublished)
   POST   /api/v1/catalog/{id}/archive              (any → archived)
@@ -74,6 +75,7 @@ from src.app.core.catalog.service import (
     get_item,
     list_categories,
     list_items,
+    promote_gallery_image_to_cover,
     publish_item,
     remove_gallery_image,
     remove_item_image,
@@ -295,6 +297,20 @@ async def remove_gallery_image_endpoint(
     stored file too. Returns the updated item so the FE can re-render
     the strip without re-fetching."""
     item = await remove_gallery_image(db, item_id=item_id, index=index)
+    return CatalogItemOut.model_validate(item)
+
+
+@router.post("/{item_id}/images/promote", response_model=CatalogItemOut)
+async def promote_gallery_image_endpoint(
+    item_id: uuid.UUID,
+    index: int = Query(..., ge=0),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("catalog.write")),
+) -> CatalogItemOut:
+    """Promote gallery image at ``index`` to primary cover. The prior
+    cover slots back into the vacated gallery position — nothing is
+    deleted, so the operator can revert by promoting again."""
+    item = await promote_gallery_image_to_cover(db, item_id=item_id, index=index)
     return CatalogItemOut.model_validate(item)
 
 

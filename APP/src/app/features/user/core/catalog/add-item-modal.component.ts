@@ -266,6 +266,42 @@ export class AddItemModalComponent {
     this.isEdit() ? (this._item()?.image_urls?.length ?? 0) : this.stagedGallery().length,
   );
 
+  /** Hard cap on total images per product = 1 cover + MAX_GALLERY. */
+  readonly MAX_TOTAL_IMAGES = 5;
+
+  /** Unified grid feed — cover first (with a ★ badge), gallery next.
+   *  Each entry carries its origin (staged local file vs. persisted
+   *  server URL) and its role (cover vs. gallery + index) so the
+   *  template can route delete + set-as-cover to the right handler
+   *  without a second lookup. */
+  readonly unifiedImages = computed<
+    { url: string; isCover: boolean; isStaged: boolean; index: number | null }[]
+  >(() => {
+    const rows: { url: string; isCover: boolean; isStaged: boolean; index: number | null }[] = [];
+    const coverPreview = this.previewUrl();
+    const item = this._item();
+    if (coverPreview) {
+      // Freshly picked file — an ObjectURL. Treated as staged so
+      // delete goes through `clearImage()`, not the server.
+      rows.push({ url: coverPreview, isCover: true, isStaged: true, index: null });
+    } else if (item?.image_url) {
+      rows.push({
+        url: buildCatalogImageHref(this.apiOrigin, item.image_url, item),
+        isCover: true,
+        isStaged: false,
+        index: null,
+      });
+    }
+    for (const g of this.galleryEntries()) {
+      rows.push({ url: g.url, isCover: false, isStaged: g.isStaged, index: g.index });
+    }
+    return rows;
+  });
+
+  /** Whether the "+ add image" tile should render — hidden once the
+   *  grid hits the total cap. */
+  readonly canAddMoreImages = computed(() => this.unifiedImages().length < this.MAX_TOTAL_IMAGES);
+
   protected readonly form = this.fb.group({
     sku: this.fb.control('', {
       nonNullable: true,
@@ -415,6 +451,138 @@ export class AddItemModalComponent {
     input.value = '';
     if (!file) return;
     this.uploadGalleryImage(file);
+  }
+
+  /** Unified add path — first image slots into the cover, subsequent
+   *  ones append to the gallery. Same "+" tile handles both cases so
+   *  the operator doesn't have to think about primary vs. gallery on
+   *  the initial upload. Once a cover exists, "Set as cover" on any
+   *  gallery thumbnail promotes it (see ``promoteToCover``). */
+  protected onUnifiedFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    if (!file) return;
+    this.addUnifiedImage(file);
+  }
+
+  protected onUnifiedFileDropped(event: DragEvent): void {
+    event.preventDefault();
+    const file = event.dataTransfer?.files?.[0] ?? null;
+    if (!file) return;
+    this.addUnifiedImage(file);
+  }
+
+  private addUnifiedImage(file: File): void {
+    // Total-cap guard runs before anything else so a "+ tile" click
+    // that races the cap check gets a clean error, not a 400.
+    if (this.unifiedImages().length >= this.MAX_TOTAL_IMAGES) {
+      this.galleryError.set(`Up to ${this.MAX_TOTAL_IMAGES} images per product.`);
+      return;
+    }
+    const item = this._item();
+    const hasCover = item ? !!item.image_url : !!this.selectedFile();
+    if (!hasCover) {
+      // No cover yet — file becomes the cover (create: staged
+      // ObjectURL, edit: hits /image straight away below).
+      this.acceptFile(file);
+      if (item) {
+        // Edit mode — user just picked their first cover on an
+        // existing item. Upload it right away so the grid reflects
+        // the saved state and refreshes with the server response.
+        this.uploadCoverFile(item.id, file);
+      }
+      return;
+    }
+    this.uploadGalleryImage(file);
+  }
+
+  private uploadCoverFile(itemId: string, file: File): void {
+    this.galleryBusy.set(true);
+    this.imageError.set(null);
+    this.api
+      .uploadImage(itemId, file)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.galleryBusy.set(false);
+          this._item.set(updated);
+          this.revokePreview();
+          this.selectedFile.set(null);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.galleryBusy.set(false);
+          this.imageError.set(this.errorFor(err) ?? 'Could not upload cover image.');
+        },
+      });
+  }
+
+  /** Promote a gallery entry into the primary-cover slot. Create mode
+   *  swaps local state (the previously-picked cover file drops back
+   *  into the gallery position the promoted entry vacated). Edit mode
+   *  hits the /images/promote endpoint which does the same swap
+   *  server-side. */
+  protected promoteToCover(index: number, isStaged: boolean): void {
+    if (isStaged) {
+      const staged = this.stagedGallery()[index];
+      if (!staged) return;
+      const prevFile = this.selectedFile();
+      const prevPreview = this.previewUrl();
+      // Reuse the promoted entry's ObjectURL as the new cover
+      // preview — do NOT revoke it, we're re-parenting it, not
+      // replacing.
+      this.selectedFile.set(staged.file);
+      this.previewUrl.set(staged.previewUrl);
+      this.stagedGallery.update((rows) => {
+        const next = [...rows];
+        if (prevFile && prevPreview) {
+          next[index] = { file: prevFile, previewUrl: prevPreview };
+        } else {
+          next.splice(index, 1);
+        }
+        return next;
+      });
+      this.imageError.set(null);
+      this.galleryError.set(null);
+      return;
+    }
+    const item = this._item();
+    if (!item) return;
+    this.galleryBusy.set(true);
+    this.galleryError.set(null);
+    this.api
+      .promoteGalleryImage(item.id, index)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.galleryBusy.set(false);
+          this._item.set(updated);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.galleryBusy.set(false);
+          this.galleryError.set(this.errorFor(err) ?? 'Could not set as cover.');
+        },
+      });
+  }
+
+  /** Delete a thumbnail — cover or gallery entry, staged or persisted.
+   *  Bridges the four existing removal paths behind one entry point so
+   *  the unified grid template only has to bind one click handler. */
+  protected deleteUnifiedImage(row: {
+    isCover: boolean;
+    isStaged: boolean;
+    index: number | null;
+  }): void {
+    if (row.isCover) {
+      if (row.isStaged) {
+        this.clearImage();
+      } else {
+        this.removeSavedCover();
+      }
+      return;
+    }
+    if (row.index === null) return;
+    this.removeGalleryEntry(row.index, row.isStaged);
   }
 
   private uploadGalleryImage(file: File): void {

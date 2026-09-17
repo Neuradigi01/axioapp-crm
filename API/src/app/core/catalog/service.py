@@ -588,6 +588,58 @@ async def remove_gallery_image(
     return item
 
 
+async def promote_gallery_image_to_cover(
+    session: AsyncSession,
+    *,
+    item_id: uuid.UUID,
+    index: int,
+) -> CatalogItem:
+    """Swap the gallery entry at ``index`` with the current primary
+    cover. The old cover falls back into the gallery at the same
+    slot — no files are deleted, so the operator can revert with
+    another promote call.
+
+    When the item has no cover yet, the gallery entry is simply
+    moved into the cover slot (gallery shrinks by one).
+    """
+    item = ensure_found(await get_item(session, item_id), entity="catalog item")
+
+    urls = list(item.image_urls or [])
+    if index < 0 or index >= len(urls):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"gallery index {index} out of range (0..{max(len(urls) - 1, 0)})",
+        )
+
+    before = _snapshot(item)
+    incoming_cover = urls[index]
+    outgoing_cover = item.image_url
+
+    item.image_url = incoming_cover
+    if outgoing_cover:
+        # Preserve the old cover by dropping it back into the slot
+        # the gallery entry just vacated — order stays stable so
+        # thumbnails don't visually jump around after a swap.
+        urls[index] = outgoing_cover
+    else:
+        # No prior cover — just remove the promoted entry from the
+        # gallery so it doesn't appear twice.
+        urls.pop(index)
+    item.image_urls = urls
+
+    await session.commit()
+    await session.refresh(item)
+
+    await log_entity_change(
+        action="catalog.cover_promoted",
+        entity_type="catalog_item",
+        entity_id=item.id,
+        before=before,
+        after=_snapshot(item),
+    )
+    return item
+
+
 # --- Bulk import (C8) -----------------------------------------------------
 
 # Shape constraints applied per-row in `bulk_import_items` on top of the

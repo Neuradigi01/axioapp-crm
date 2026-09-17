@@ -266,6 +266,14 @@ export class CatalogApiService extends BaseCrudApiService<
     return this.http.delete<CatalogItem>(`${this.base}/${itemId}/images`, { params });
   }
 
+  /** Swap gallery[`index`] with the current cover. Old cover slots
+   *  back into the vacated gallery position — nothing is deleted, so
+   *  the operator can un-promote by calling again with the new slot. */
+  promoteGalleryImage(itemId: string, index: number): Observable<CatalogItem> {
+    const params = new HttpParams().set('index', String(index));
+    return this.http.post<CatalogItem>(`${this.base}/${itemId}/images/promote`, null, { params });
+  }
+
   /** C8 — Bulk-import rows. Set `dry_run=true` for the wizard's
    *  preview step. */
   bulkImport(payload: CatalogBulkImportRequest): Observable<CatalogBulkImportResult> {

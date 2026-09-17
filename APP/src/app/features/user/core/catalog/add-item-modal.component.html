@@ -16,111 +16,87 @@
     </header>
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-5 px-4 md:px-6 py-5">
-      <!-- Primary cover image -->
-      <div>
-        <label class="block text-xs font-medium text-default">Primary cover image</label>
-        <div class="mt-1 flex items-start gap-3">
-          @if (displayImage(); as src) {
-            <img
-              [src]="src"
-              alt="Product preview"
-              class="h-20 w-20 shrink-0 rounded-md object-cover ring-1 border-subtle"
-            />
-          } @else {
-            <div
-              class="flex h-20 w-20 shrink-0 items-center justify-center rounded-md bg-surface-2 text-xs text-faint ring-1 ring-dashed border-subtle"
-            >
-              No image
-            </div>
-          }
-          <div
-            class="flex-1 rounded-md border border-dashed border-subtle px-3 py-3 text-center text-xs text-muted hover:border-subtle"
-            (drop)="onFileDropped($event)"
-            (dragover)="onDragOver($event)"
-          >
-            <label class="cursor-pointer">
-              <span class="font-medium text-default">Click to upload</span>
-              <span> or drag &amp; drop</span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                class="hidden"
-                (change)="onFileSelected($event)"
-              />
-            </label>
-            <p class="mt-1 text-[11px] text-faint">JPEG, PNG, or WebP · up to 5 MB</p>
-            @if (selectedFile(); as f) {
-              <button
-                type="button"
-                (click)="clearImage()"
-                class="mt-1 text-[11px] font-medium text-red-600 hover:underline"
-              >
-                Remove "{{ f.name }}"
-              </button>
-            } @else if (hasSavedCover()) {
-              <button
-                type="button"
-                (click)="removeSavedCover()"
-                class="mt-1 text-[11px] font-medium text-red-600 hover:underline"
-              >
-                Remove cover image
-              </button>
-            }
-          </div>
-        </div>
-        @if (imageError(); as err) {
-          <p class="mt-1 text-xs text-red-600">{{ err }}</p>
-        }
-      </div>
-
-      <!-- Additional images. Available in both create and edit modes.
-           In create mode files are staged locally with ObjectURL
-           previews; on save they upload one-by-one via the /images
-           endpoint. In edit mode add/remove hits the server directly. -->
+      <!-- Product images — unified cover + gallery grid. First image
+           becomes the cover automatically; the ★ badge marks it.
+           Click "Set as cover" on any other thumb to promote it. Up
+           to MAX_TOTAL_IMAGES (5) per product. Create mode stages
+           local ObjectURL previews and uploads them on save; edit
+           mode goes to /image, /images, /images/promote directly. -->
       <div>
         <label class="block text-xs font-medium text-default">
-          Additional images
-          <span class="text-faint">({{ galleryCount() }}/{{ MAX_GALLERY }})</span>
+          Product images
+          <span class="text-faint">({{ unifiedImages().length }}/{{ MAX_TOTAL_IMAGES }})</span>
         </label>
         <p class="mt-0.5 text-[11px] text-faint">
-          Extra photos shown alongside the cover on the public product page.
+          The first image is the primary cover shown on cards and the public product page. JPEG,
+          PNG, or WebP · up to 5 MB each.
         </p>
-        <div class="mt-1 flex flex-wrap items-start gap-2">
-          @for (entry of galleryEntries(); track entry.url) {
-            <div class="relative">
+        <div
+          class="mt-1 flex flex-wrap items-start gap-2"
+          (drop)="onUnifiedFileDropped($event)"
+          (dragover)="onDragOver($event)"
+        >
+          @for (row of unifiedImages(); track row.url) {
+            <div class="group relative">
               <img
-                [src]="entry.url"
-                [alt]="'Product image ' + (entry.index + 1)"
-                class="h-16 w-16 rounded-md object-cover ring-1 border-subtle"
+                [src]="row.url"
+                [alt]="row.isCover ? 'Primary cover' : 'Product image ' + ((row.index ?? 0) + 1)"
+                class="h-20 w-20 rounded-md object-cover ring-1 border-subtle"
+                [class.ring-2]="row.isCover"
+                [class.ring-accent]="row.isCover"
               />
+              @if (row.isCover) {
+                <span
+                  class="absolute -left-1.5 -top-1.5 inline-flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white shadow ring-1 ring-white/20"
+                  title="Primary cover"
+                >
+                  <lucide-icon name="star" class="h-2.5 w-2.5" />
+                  Cover
+                </span>
+              }
               <button
                 type="button"
-                (click)="removeGalleryEntry(entry.index, entry.isStaged)"
+                (click)="deleteUnifiedImage(row)"
                 [disabled]="galleryBusy()"
                 class="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-surface text-red-600 shadow ring-1 border-subtle hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-                title="Remove"
+                title="Remove image"
               >
                 <lucide-icon name="x" class="h-3 w-3" />
               </button>
+              @if (!row.isCover && row.index !== null) {
+                <button
+                  type="button"
+                  (click)="promoteToCover(row.index, row.isStaged)"
+                  [disabled]="galleryBusy()"
+                  class="absolute inset-x-0 bottom-0 hidden translate-y-0 rounded-b-md bg-black/60 px-1 py-0.5 text-[10px] font-medium text-white group-hover:block hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Set as primary cover"
+                >
+                  ★ Set as cover
+                </button>
+              }
             </div>
           }
-          @if (galleryCount() < MAX_GALLERY) {
+          @if (canAddMoreImages()) {
             <label
-              class="flex h-16 w-16 cursor-pointer items-center justify-center rounded-md border border-dashed border-subtle text-faint hover:border-muted hover:text-muted"
+              class="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-subtle text-faint hover:border-muted hover:text-muted"
               [class.pointer-events-none]="galleryBusy()"
               [class.opacity-50]="galleryBusy()"
               title="Add image"
             >
               <lucide-icon name="plus" class="h-5 w-5" />
+              <span class="text-[10px]">Add image</span>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 class="hidden"
-                (change)="onGalleryFileSelected($event)"
+                (change)="onUnifiedFileSelected($event)"
               />
             </label>
           }
         </div>
+        @if (imageError(); as err) {
+          <p class="mt-1 text-xs text-red-600">{{ err }}</p>
+        }
         @if (galleryError(); as err) {
           <p class="mt-1 text-xs text-red-600">{{ err }}</p>
         }
