@@ -581,7 +581,9 @@
         } @else if (selectedNode(); as node) {
           <app-node-editor [node]="node" (close)="state.selectNode(null)" />
         } @else {
-          <header class="px-4 py-3 border-b border-subtle flex items-center justify-between">
+          <header
+            class="px-4 md:pl-10 py-3 border-b border-subtle flex items-center justify-between"
+          >
             <h3 class="text-sm font-semibold text-default">
               @if (testFireTrace()) {
                 Test fire trace
