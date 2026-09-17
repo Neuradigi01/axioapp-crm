@@ -1139,6 +1139,18 @@ async def reassign_contact(
     before = _snapshot(contact)
     contact.assigned_to_id = assigned_to_id
 
+    # Follow-the-pack cascade — reassign related walk-ins, leads,
+    # appointments, and tasks whose current owner matches the
+    # contact's previous owner. Skipped when the contact had no
+    # owner (nothing was "following" it) or when nothing to update.
+    if before_id is not None:
+        await data_access.cascade_owner_to_related(
+            session,
+            contact_id=contact.id,
+            from_owner_id=before_id,
+            to_owner_id=assigned_to_id,
+        )
+
     await activities_service.record_in_session(
         session,
         org_id=org_id,
@@ -1193,6 +1205,15 @@ async def bulk_reassign_contacts(
             continue
         before_id = contact.assigned_to_id
         contact.assigned_to_id = assigned_to_id
+        # Follow-the-pack cascade for every contact whose owner changed
+        # (same rule as single reassign — see `reassign_contact`).
+        if before_id is not None:
+            await data_access.cascade_owner_to_related(
+                session,
+                contact_id=contact.id,
+                from_owner_id=before_id,
+                to_owner_id=assigned_to_id,
+            )
         await activities_service.record_in_session(
             session,
             org_id=org_id,
