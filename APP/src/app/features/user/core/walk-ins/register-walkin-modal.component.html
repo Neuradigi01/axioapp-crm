@@ -132,15 +132,9 @@
                   <span class="text-red-600">*</span>
                 }
               </label>
-              <select
-                id="rw_source"
-                formControlName="source"
-                class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-              >
-                @for (opt of sourceOptions; track opt.value) {
-                  <option [value]="opt.value">{{ opt.label }}</option>
-                }
-              </select>
+              <div class="mt-1">
+                <crm-mobile-select [options]="sourceOptions" formControlName="source" />
+              </div>
               @if (stdField('source')?.help_text; as help) {
                 <p class="mt-1 text-xs text-muted">{{ help }}</p>
               }

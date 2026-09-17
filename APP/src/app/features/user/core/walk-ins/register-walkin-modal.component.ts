@@ -18,6 +18,7 @@ import { BaseFormModalComponent } from '../shared/components/base-form-modal.com
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
+import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
 import { commonValidators } from '../shared/validators';
 import { extractApiError } from '@core/services/api-error.util';
@@ -40,7 +41,12 @@ import { QuickRegisterResponse, WalkInsApiService } from './walk-ins-api.service
   selector: 'app-register-walkin-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, DynamicFormComponent, MobileDateTimeComponent],
+  imports: [
+    ReactiveFormsModule,
+    DynamicFormComponent,
+    MobileDateTimeComponent,
+    MobileSelectComponent,
+  ],
   templateUrl: './register-walkin-modal.component.html',
 })
 export class RegisterWalkinModalComponent extends BaseFormModalComponent {
@@ -51,7 +57,7 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
    *  filter without renaming. Bulk-import is omitted (never a walk-in
    *  origin). Referral / Phone added because reception commonly logs
    *  those alongside the raw walk-in. */
-  protected readonly sourceOptions: ReadonlyArray<{ value: string; label: string }> = [
+  protected readonly sourceOptions: ReadonlyArray<MobileSelectOption> = [
     { value: 'walk_in', label: 'Walk-in' },
     { value: 'referral', label: 'Referral' },
     { value: 'phone', label: 'Phone' },
