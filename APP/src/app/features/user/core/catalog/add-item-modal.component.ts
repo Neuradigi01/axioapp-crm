@@ -16,6 +16,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { nullableTrim } from '@core/services/form.util';
+import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { StandardFieldsApiService } from '../standard-fields/standard-fields-api.service';
@@ -60,6 +61,7 @@ export class AddItemModalComponent {
   private readonly stdApi = inject(StandardFieldsApiService);
   private readonly stdSignals = inject(StandardFieldsSignalsService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   protected readonly stdFields = signal<Record<string, StandardFieldRendered>>({});
 
@@ -402,10 +404,16 @@ export class AddItemModalComponent {
    *  ``clearImage()`` which only drops the freshly-picked file that
    *  hasn't been uploaded yet. Only available in edit mode (need
    *  an existing item id) and when a saved cover actually exists. */
-  protected removeSavedCover(): void {
+  protected async removeSavedCover(): Promise<void> {
     const item = this._item();
     if (!item?.image_url) return;
-    if (!confirm('Remove the primary cover image?')) return;
+    const ok = await this.confirmDialog.ask({
+      title: 'Remove primary cover image?',
+      body: "The image is deleted from storage — this can't be undone. You can upload a new one anytime.",
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
     this.imageError.set(null);
     this.api
       .removeImage(item.id)
@@ -568,21 +576,21 @@ export class AddItemModalComponent {
   /** Delete a thumbnail — cover or gallery entry, staged or persisted.
    *  Bridges the four existing removal paths behind one entry point so
    *  the unified grid template only has to bind one click handler. */
-  protected deleteUnifiedImage(row: {
+  protected async deleteUnifiedImage(row: {
     isCover: boolean;
     isStaged: boolean;
     index: number | null;
-  }): void {
+  }): Promise<void> {
     if (row.isCover) {
       if (row.isStaged) {
         this.clearImage();
       } else {
-        this.removeSavedCover();
+        await this.removeSavedCover();
       }
       return;
     }
     if (row.index === null) return;
-    this.removeGalleryEntry(row.index, row.isStaged);
+    await this.removeGalleryEntry(row.index, row.isStaged);
   }
 
   private uploadGalleryImage(file: File): void {
@@ -624,8 +632,16 @@ export class AddItemModalComponent {
       });
   }
 
-  protected removeGalleryEntry(index: number, isStaged: boolean): void {
-    if (!confirm('Remove this image?')) return;
+  protected async removeGalleryEntry(index: number, isStaged: boolean): Promise<void> {
+    const ok = await this.confirmDialog.ask({
+      title: 'Remove this image?',
+      body: isStaged
+        ? 'The image drops out of the upload queue — nothing has been saved yet.'
+        : 'The image is deleted from storage. You can upload another one anytime.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
     if (isStaged) {
       this.stagedGallery.update((rows) => {
         const target = rows[index];
