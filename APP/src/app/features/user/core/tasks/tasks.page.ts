@@ -518,9 +518,6 @@ export class TasksPageComponent {
   }
 
   protected assigneeName(task: Task): string {
-    if (this.callerUuid() && task.assigned_to_id === this.callerUuid()) {
-      return 'You';
-    }
     return this.assigneeMap().get(task.assigned_to_id) ?? '—';
   }
 
