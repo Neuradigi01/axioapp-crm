@@ -32,10 +32,8 @@ from sqlalchemy import (
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import ColumnElement, Select
 
-from src.app.core.appointments.models import Appointment
 from src.app.core.contacts.models import Contact
 from src.app.core.leads.models import Lead
-from src.app.core.tasks.models import Task
 from src.app.core.users.models import OrganizationMember, User
 from src.app.core.walk_ins.models import WalkIn
 
@@ -776,23 +774,23 @@ async def cascade_owner_to_related(
 ) -> dict[str, int]:
     """Follow-the-pack cascade for contact reassignment.
 
-    When a contact's owner changes from ``from_owner_id`` to
-    ``to_owner_id``, this helper reassigns every walk-in, lead,
-    appointment, and task belonging to the contact **whose current
-    owner still equals ``from_owner_id``**. Records intentionally
-    reassigned to a different user (reception rep vs. sales rep)
-    are respected — the WHERE clause only touches rows that were
-    following the contact's owner in the first place.
+    Scope is intentionally narrow: only walk-ins and leads follow the
+    contact's owner. Tasks and appointments stay per-record — an
+    assignee on a task or a meeting is a work assignment that a
+    contact-level ownership shuffle shouldn't blindly rewrite.
 
-    Tasks and appointments have NOT-NULL ``assigned_to_id`` columns,
-    so when ``to_owner_id`` is ``None`` (unassigning the contact)
-    the cascade skips those two tables and only unassigns walk-ins
-    + leads. The service commits.
+    When a contact's owner changes from ``from_owner_id`` to
+    ``to_owner_id``, this helper reassigns every walk-in and lead
+    belonging to the contact **whose current owner still equals
+    ``from_owner_id``**. Records intentionally reassigned to a
+    different user (reception rep vs. sales rep) are respected —
+    the WHERE clause only touches rows that were following the
+    contact's owner in the first place.
 
     Returns per-entity rowcounts so the caller can include them in
     the reassign audit payload / API response.
     """
-    counts: dict[str, int] = {"walk_ins": 0, "leads": 0, "appointments": 0, "tasks": 0}
+    counts: dict[str, int] = {"walk_ins": 0, "leads": 0}
 
     walk_in_result = await session.execute(
         sa_update(WalkIn)
@@ -807,28 +805,6 @@ async def cascade_owner_to_related(
         .values(assigned_to_id=to_owner_id)
     )
     counts["leads"] = int(lead_result.rowcount or 0)
-
-    if to_owner_id is not None:
-        appt_result = await session.execute(
-            sa_update(Appointment)
-            .where(
-                Appointment.contact_id == contact_id,
-                Appointment.assigned_to_id == from_owner_id,
-            )
-            .values(assigned_to_id=to_owner_id)
-        )
-        counts["appointments"] = int(appt_result.rowcount or 0)
-
-        task_result = await session.execute(
-            sa_update(Task)
-            .where(
-                Task.related_entity_type == "contact",
-                Task.related_entity_id == contact_id,
-                Task.assigned_to_id == from_owner_id,
-            )
-            .values(assigned_to_id=to_owner_id)
-        )
-        counts["tasks"] = int(task_result.rowcount or 0)
 
     return counts
 
