@@ -2,6 +2,10 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { CanvasNode } from '../canvas-state.service';
 import { WAITABLE_EVENT_TYPES } from './editor-contract';
 
@@ -14,7 +18,7 @@ const UNITS = [
 @Component({
   selector: 'app-wait-for-event-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './wait-for-event-editor.component.html',
 })
@@ -25,6 +29,13 @@ export class WaitForEventEditorComponent {
 
   readonly waitableEvents = WAITABLE_EVENT_TYPES;
   readonly units = UNITS;
+
+  readonly waitableEventOptions = computed<MobileSelectOption[]>(() =>
+    this.waitableEvents.map((e) => ({ value: e.type, label: e.label })),
+  );
+  readonly unitOptions = computed<MobileSelectOption[]>(() =>
+    this.units.map((u) => ({ value: u.value, label: u.label })),
+  );
 
   readonly eventType = computed<string>(() => (this.node().config?.['event_type'] as string) ?? '');
   readonly amount = computed<number>(

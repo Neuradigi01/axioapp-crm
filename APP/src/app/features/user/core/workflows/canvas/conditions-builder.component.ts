@@ -4,6 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
 import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../shared/forms/mobile-select.component';
+import {
   CONDITION_OPS,
   ConditionAnd,
   ConditionLeaf,
@@ -32,7 +36,7 @@ import {
 @Component({
   selector: 'app-conditions-builder',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './conditions-builder.component.html',
 })
@@ -42,6 +46,11 @@ export class ConditionsBuilderComponent {
   readonly treeChange = output<ConditionNode | null>();
 
   readonly ops = CONDITION_OPS;
+
+  readonly opOptions: ReadonlyArray<MobileSelectOption> = CONDITION_OPS.map((op) => ({
+    value: op.value,
+    label: op.label,
+  }));
 
   readonly suggestedPaths = computed<string[]>(() => {
     const out: string[] = [];

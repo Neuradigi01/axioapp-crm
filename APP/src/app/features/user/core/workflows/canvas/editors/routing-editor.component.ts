@@ -2,7 +2,28 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { CanvasNode } from '../canvas-state.service';
+
+const POOL_TYPE_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'role', label: 'By role' },
+  { value: 'team', label: 'By team' },
+  { value: 'explicit', label: 'Explicit user list' },
+];
+
+const TARGET_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'lead.assigned_to', label: 'Lead owner' },
+  { value: 'contact.assigned_to', label: 'Contact owner' },
+];
+
+const FALLBACK_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'workflow.owner', label: 'Workflow owner' },
+  { value: 'leave_unassigned', label: 'Leave unassigned' },
+  { value: 'skip', label: 'Skip the run' },
+];
 
 /**
  * Handles every `routing.*` node — the dispatcher passes the node and
@@ -14,7 +35,7 @@ import { CanvasNode } from '../canvas-state.service';
 @Component({
   selector: 'app-routing-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './routing-editor.component.html',
 })
@@ -22,6 +43,10 @@ export class RoutingEditorComponent {
   readonly node = input.required<CanvasNode>();
   readonly configChange = output<Record<string, unknown>>();
   readonly validityChange = output<boolean>();
+
+  readonly poolTypeOptions = POOL_TYPE_OPTIONS;
+  readonly targetOptions = TARGET_OPTIONS;
+  readonly fallbackOptions = FALLBACK_OPTIONS;
 
   readonly mode = computed<string>(() => this.node().type.replace('routing.', ''));
 

@@ -18,6 +18,10 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 
 import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../shared/forms/mobile-select.component';
+import {
   ConcurrencyPolicy,
   OnMissedPolicy,
   Schedule,
@@ -66,6 +70,24 @@ const SCHEDULE_KIND_OPTIONS: ReadonlyArray<{ value: ScheduleKind; label: string 
   { value: 'cron', label: 'Advanced (cron expression)' },
 ];
 
+const INTERVAL_UNIT_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'minutes', label: 'minutes' },
+  { value: 'hours', label: 'hours' },
+  { value: 'days', label: 'days' },
+];
+
+const ON_MISSED_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'skip', label: 'Skip missed — resume on next scheduled fire' },
+  { value: 'run_once', label: 'Run once on recovery' },
+  { value: 'backfill_all', label: 'Backfill every missed fire (rate-limited)' },
+];
+
+const CONCURRENCY_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'forbid', label: 'Skip new fire (default — prevents double-send)' },
+  { value: 'allow', label: 'Fire anyway (parallel runs allowed)' },
+  { value: 'replace', label: 'Cancel in-flight run and start new' },
+];
+
 function localIsoNowPlus(minutes: number): string {
   // <input type="datetime-local"> is naive-local time (no tz). Build
   // in local time so the display matches the operator's wall clock —
@@ -103,6 +125,7 @@ function fromIsoToLocalInput(iso: string | null): string {
     ReactiveFormsModule,
     LucideAngularModule,
     ScheduleCronPreviewComponent,
+    MobileSelectComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './schedule-config-modal.component.html',
@@ -131,6 +154,12 @@ export class ScheduleConfigModalComponent {
   readonly kindOptions = SCHEDULE_KIND_OPTIONS;
   readonly weekdayOptions = WEEKDAY_OPTIONS;
   readonly timezoneOptions = signal<string[]>([]);
+  readonly intervalUnitOptions = INTERVAL_UNIT_OPTIONS;
+  readonly onMissedOptions = ON_MISSED_OPTIONS;
+  readonly concurrencyOptions = CONCURRENCY_OPTIONS;
+  readonly kindSelectOptions = computed<MobileSelectOption[]>(() =>
+    this.kindOptions.map((o) => ({ value: o.value, label: o.label })),
+  );
 
   readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(200)]],

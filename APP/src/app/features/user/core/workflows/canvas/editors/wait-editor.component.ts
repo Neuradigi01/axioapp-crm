@@ -2,6 +2,10 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { CanvasNode } from '../canvas-state.service';
 
 const UNITS = [
@@ -13,7 +17,7 @@ const UNITS = [
 @Component({
   selector: 'app-wait-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './wait-editor.component.html',
 })
@@ -23,6 +27,10 @@ export class WaitEditorComponent {
   readonly validityChange = output<boolean>();
 
   readonly units = UNITS;
+
+  readonly unitOptions = computed<MobileSelectOption[]>(() =>
+    this.units.map((u) => ({ value: u.value, label: u.label })),
+  );
 
   readonly amount = computed<number>(() => (this.node().config?.['amount'] as number) ?? 1);
   readonly unit = computed<string>(() => (this.node().config?.['unit'] as string) ?? 'hours');

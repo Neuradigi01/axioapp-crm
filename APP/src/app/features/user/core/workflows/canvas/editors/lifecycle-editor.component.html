@@ -2,15 +2,12 @@
   @if (isConvert()) {
     <div>
       <label class="block text-[11px] font-medium text-muted mb-1">Conversion reason</label>
-      <select
-        [ngModel]="conversionReason()"
-        (ngModelChange)="onConversionReasonChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-      >
-        <option value="won">Won (deal closed)</option>
-        <option value="qualified">Qualified</option>
-        <option value="other">Other</option>
-      </select>
+      <crm-mobile-select
+        [options]="conversionReasonOptions"
+        [value]="conversionReason()"
+        (valueChange)="onConversionReasonChange($event)"
+        placeholder="Select…"
+      />
     </div>
   }
 

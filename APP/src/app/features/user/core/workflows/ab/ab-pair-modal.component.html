@@ -26,17 +26,12 @@
         <label class="block text-[11px] font-medium text-muted mb-1">
           Sibling workflow (variant B)
         </label>
-        <select
-          [ngModel]="siblingId()"
-          (ngModelChange)="siblingId.set($event)"
-          name="siblingId"
-          class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-        >
-          <option value="">— pick a draft —</option>
-          @for (d of eligibleDrafts(); track d.id) {
-            <option [value]="d.id">{{ d.name }}</option>
-          }
-        </select>
+        <crm-mobile-select
+          [options]="siblingSelectOptions()"
+          [value]="siblingId()"
+          (valueChange)="siblingId.set($event)"
+          placeholder="— pick a draft —"
+        />
         @if (eligibleDrafts().length === 0) {
           <p class="text-[10px] text-red-500 mt-1">
             No eligible drafts found. The sibling must be a draft whose trigger event matches this
@@ -76,16 +71,12 @@
 
       <div>
         <label class="block text-[11px] font-medium text-muted mb-1"> Winner metric </label>
-        <select
-          [ngModel]="metric()"
-          (ngModelChange)="metric.set($event)"
-          name="metric"
-          class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-        >
-          @for (m of metrics; track m.value) {
-            <option [value]="m.value">{{ m.label }}</option>
-          }
-        </select>
+        <crm-mobile-select
+          [options]="metricSelectOptions"
+          [value]="metric()"
+          (valueChange)="metric.set($any($event))"
+          placeholder="Select…"
+        />
       </div>
 
       <div>

@@ -2,6 +2,10 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { CanvasNode } from '../canvas-state.service';
 import { PHONE_RECIPIENTS, SEND_CATEGORIES } from './editor-contract';
 import { readSendState, sendIsValid } from './send-editor-shared';
@@ -9,7 +13,7 @@ import { readSendState, sendIsValid } from './send-editor-shared';
 @Component({
   selector: 'app-send-sms-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './send-sms-editor.component.html',
 })
@@ -19,6 +23,12 @@ export class SendSmsEditorComponent {
   readonly validityChange = output<boolean>();
   readonly recipientOptions = PHONE_RECIPIENTS;
   readonly categoryOptions = SEND_CATEGORIES;
+  readonly recipientSelectOptions = computed<MobileSelectOption[]>(() =>
+    this.recipientOptions.map((r) => ({ value: r.value, label: r.label })),
+  );
+  readonly categorySelectOptions = computed<MobileSelectOption[]>(() =>
+    this.categoryOptions.map((c) => ({ value: c.value, label: c.label })),
+  );
   readonly state = computed(() => readSendState(this.node()));
   constructor() {
     effect(() => this.validityChange.emit(sendIsValid(this.state())));

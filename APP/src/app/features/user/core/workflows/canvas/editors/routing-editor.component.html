@@ -9,15 +9,12 @@
   @if (!isSpecificUser()) {
     <div>
       <label class="block text-[11px] font-medium text-muted mb-1">Pool type</label>
-      <select
-        [ngModel]="poolType()"
-        (ngModelChange)="onPoolTypeChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-      >
-        <option value="role">By role</option>
-        <option value="team">By team</option>
-        <option value="explicit">Explicit user list</option>
-      </select>
+      <crm-mobile-select
+        [options]="poolTypeOptions"
+        [value]="poolType()"
+        (valueChange)="onPoolTypeChange($event)"
+        placeholder="Select…"
+      />
     </div>
 
     <div>
@@ -62,26 +59,21 @@
 
   <div>
     <label class="block text-[11px] font-medium text-muted mb-1">Attach to</label>
-    <select
-      [ngModel]="target()"
-      (ngModelChange)="onTargetChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-    >
-      <option value="lead.assigned_to">Lead owner</option>
-      <option value="contact.assigned_to">Contact owner</option>
-    </select>
+    <crm-mobile-select
+      [options]="targetOptions"
+      [value]="target()"
+      (valueChange)="onTargetChange($event)"
+      placeholder="Select…"
+    />
   </div>
 
   <div>
     <label class="block text-[11px] font-medium text-muted mb-1">Fallback</label>
-    <select
-      [ngModel]="fallback()"
-      (ngModelChange)="onFallbackChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-    >
-      <option value="workflow.owner">Workflow owner</option>
-      <option value="leave_unassigned">Leave unassigned</option>
-      <option value="skip">Skip the run</option>
-    </select>
+    <crm-mobile-select
+      [options]="fallbackOptions"
+      [value]="fallback()"
+      (valueChange)="onFallbackChange($event)"
+      placeholder="Select…"
+    />
   </div>
 </div>

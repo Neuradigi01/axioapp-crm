@@ -29,15 +29,12 @@
 
   <div>
     <label class="block text-[11px] font-medium text-muted mb-1">Value source</label>
-    <select
-      [ngModel]="valueSource()"
-      (ngModelChange)="onValueSourceChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-    >
-      @for (s of valueSources; track s.value) {
-        <option [value]="s.value">{{ s.label }}</option>
-      }
-    </select>
+    <crm-mobile-select
+      [options]="valueSourceOptions()"
+      [value]="valueSource()"
+      (valueChange)="onValueSourceChange($event)"
+      placeholder="Select…"
+    />
   </div>
 
   <div>

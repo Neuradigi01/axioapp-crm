@@ -14,17 +14,12 @@
   </div>
   <div>
     <label class="block text-[11px] font-medium text-muted mb-1">Target user</label>
-    <select
-      [ngModel]="state().recipient"
-      (ngModelChange)="onRecipientChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-    >
-      <option value="">— pick —</option>
-      <option value="lead.owner">Lead owner</option>
-      <option value="contact.assigned_to">Contact's assigned rep</option>
-      <option value="workflow.owner">Workflow owner</option>
-      <option value="custom">Custom path…</option>
-    </select>
+    <crm-mobile-select
+      [options]="recipientOptions"
+      [value]="state().recipient"
+      (valueChange)="onRecipientChange($event)"
+      placeholder="— pick —"
+    />
     @if (state().recipient === 'custom') {
       <input
         type="text"
@@ -37,14 +32,11 @@
   </div>
   <div>
     <label class="block text-[11px] font-medium text-muted mb-1">Category</label>
-    <select
-      [ngModel]="state().category"
-      (ngModelChange)="onCategoryChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-    >
-      @for (c of categoryOptions; track c.value) {
-        <option [value]="c.value">{{ c.label }}</option>
-      }
-    </select>
+    <crm-mobile-select
+      [options]="categorySelectOptions()"
+      [value]="state().category"
+      (valueChange)="onCategoryChange($event)"
+      placeholder="Select…"
+    />
   </div>
 </div>

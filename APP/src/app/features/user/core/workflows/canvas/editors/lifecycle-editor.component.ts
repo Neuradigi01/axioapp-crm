@@ -2,7 +2,17 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { CanvasNode } from '../canvas-state.service';
+
+const CONVERSION_REASON_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'won', label: 'Won (deal closed)' },
+  { value: 'qualified', label: 'Qualified' },
+  { value: 'other', label: 'Other' },
+];
 
 /**
  * Covers 4 lifecycle node types: `lifecycle.mark_converted`,
@@ -14,7 +24,7 @@ import { CanvasNode } from '../canvas-state.service';
 @Component({
   selector: 'app-lifecycle-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './lifecycle-editor.component.html',
 })
@@ -22,6 +32,8 @@ export class LifecycleEditorComponent {
   readonly node = input.required<CanvasNode>();
   readonly configChange = output<Record<string, unknown>>();
   readonly validityChange = output<boolean>();
+
+  readonly conversionReasonOptions = CONVERSION_REASON_OPTIONS;
 
   readonly type = computed(() => this.node().type);
 

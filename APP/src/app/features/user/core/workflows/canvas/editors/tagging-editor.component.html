@@ -30,15 +30,12 @@
   } @else if (isScore()) {
     <div>
       <label class="block text-[11px] font-medium text-muted mb-1">Mode</label>
-      <select
-        [ngModel]="scoreMode()"
-        (ngModelChange)="onScoreModeChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-      >
-        <option value="set">Set to literal</option>
-        <option value="add">Add delta</option>
-        <option value="subtract">Subtract delta</option>
-      </select>
+      <crm-mobile-select
+        [options]="scoreModeOptions"
+        [value]="scoreMode()"
+        (valueChange)="onScoreModeChange($event)"
+        placeholder="Select…"
+      />
     </div>
     <div>
       <label class="block text-[11px] font-medium text-muted mb-1">Value</label>

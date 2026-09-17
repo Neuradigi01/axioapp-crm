@@ -2,7 +2,17 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { CanvasNode } from '../canvas-state.service';
+
+const SCORE_MODE_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'set', label: 'Set to literal' },
+  { value: 'add', label: 'Add delta' },
+  { value: 'subtract', label: 'Subtract delta' },
+];
 
 /**
  * Handles 5 nodes that share the same "pick a label, optionally a delta"
@@ -14,7 +24,7 @@ import { CanvasNode } from '../canvas-state.service';
 @Component({
   selector: 'app-tagging-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './tagging-editor.component.html',
 })
@@ -22,6 +32,8 @@ export class TaggingEditorComponent {
   readonly node = input.required<CanvasNode>();
   readonly configChange = output<Record<string, unknown>>();
   readonly validityChange = output<boolean>();
+
+  readonly scoreModeOptions = SCORE_MODE_OPTIONS;
 
   readonly type = computed(() => this.node().type);
 

@@ -54,14 +54,11 @@
           </label>
           <label class="block">
             <span class="mb-1 block text-[11px] font-medium text-muted">Recurrence</span>
-            <select
+            <crm-mobile-select
+              [options]="kindSelectOptions()"
               formControlName="schedule_kind"
-              class="w-full rounded border border-subtle bg-surface px-2 py-1.5 text-sm text-default"
-            >
-              @for (opt of kindOptions; track opt.value) {
-                <option [value]="opt.value">{{ opt.label }}</option>
-              }
-            </select>
+              placeholder="Select…"
+            />
           </label>
         </div>
 
@@ -155,14 +152,11 @@
               </label>
               <label class="block">
                 <span class="mb-1 block text-[11px] font-medium text-muted">Unit</span>
-                <select
+                <crm-mobile-select
+                  [options]="intervalUnitOptions"
                   formControlName="interval_unit"
-                  class="rounded border border-subtle bg-surface px-2 py-1.5 text-sm text-default"
-                >
-                  <option value="minutes">minutes</option>
-                  <option value="hours">hours</option>
-                  <option value="days">days</option>
-                </select>
+                  placeholder="Select…"
+                />
               </label>
             </div>
             <p class="text-[10px] text-faint">Minimum inter-fire interval is 5 minutes.</p>
@@ -261,27 +255,21 @@
               <span class="mb-1 block text-[11px] font-medium text-muted"
                 >If a fire was missed</span
               >
-              <select
+              <crm-mobile-select
+                [options]="onMissedOptions"
                 formControlName="on_missed"
-                class="w-full rounded border border-subtle bg-surface px-2 py-1.5 text-sm text-default"
-              >
-                <option value="skip">Skip missed — resume on next scheduled fire</option>
-                <option value="run_once">Run once on recovery</option>
-                <option value="backfill_all">Backfill every missed fire (rate-limited)</option>
-              </select>
+                placeholder="Select…"
+              />
             </label>
             <label class="block">
               <span class="mb-1 block text-[11px] font-medium text-muted"
                 >If a run is still going</span
               >
-              <select
+              <crm-mobile-select
+                [options]="concurrencyOptions"
                 formControlName="concurrency_policy"
-                class="w-full rounded border border-subtle bg-surface px-2 py-1.5 text-sm text-default"
-              >
-                <option value="forbid">Skip new fire (default — prevents double-send)</option>
-                <option value="allow">Fire anyway (parallel runs allowed)</option>
-                <option value="replace">Cancel in-flight run and start new</option>
-              </select>
+                placeholder="Select…"
+              />
             </label>
           </div>
         </details>

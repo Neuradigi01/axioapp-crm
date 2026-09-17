@@ -14,6 +14,10 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { TemplateRead, TemplatesApiService } from '../../../templates/templates-api.service';
 import { CanvasNode } from '../canvas-state.service';
 import { PHONE_RECIPIENTS, SEND_CATEGORIES } from './editor-contract';
@@ -22,7 +26,7 @@ import { readSendState, sendIsValid } from './send-editor-shared';
 @Component({
   selector: 'app-send-whatsapp-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './send-whatsapp-editor.component.html',
 })
@@ -36,6 +40,13 @@ export class SendWhatsAppEditorComponent {
 
   readonly recipientOptions = PHONE_RECIPIENTS;
   readonly categoryOptions = SEND_CATEGORIES;
+
+  readonly recipientSelectOptions = computed<MobileSelectOption[]>(() =>
+    this.recipientOptions.map((r) => ({ value: r.value, label: r.label })),
+  );
+  readonly categorySelectOptions = computed<MobileSelectOption[]>(() =>
+    this.categoryOptions.map((c) => ({ value: c.value, label: c.label })),
+  );
 
   readonly state = computed(() => readSendState(this.node()));
 
@@ -54,6 +65,19 @@ export class SendWhatsAppEditorComponent {
     const id = this.state().templateId;
     const tpls = this.templates();
     return !!id && !!tpls && !tpls.some((t) => t.id === id);
+  });
+
+  readonly templateOptions = computed<MobileSelectOption[]>(() => {
+    const tpls = this.templates() ?? [];
+    const opts: MobileSelectOption[] = tpls.map((t) => ({
+      value: t.id,
+      label: `${t.name} · ${t.language}`,
+    }));
+    if (this.hasUnlistedTemplate()) {
+      const id = this.state().templateId;
+      opts.push({ value: id, label: `(unlisted template · ${id.slice(0, 8)}…)` });
+    }
+    return opts;
   });
 
   constructor() {

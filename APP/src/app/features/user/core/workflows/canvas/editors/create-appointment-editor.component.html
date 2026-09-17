@@ -14,15 +14,12 @@
   </div>
   <div>
     <label class="block text-[11px] font-medium text-muted mb-1">Assignee</label>
-    <select
-      [ngModel]="assignee()"
-      (ngModelChange)="onAssigneeChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-    >
-      <option value="lead.owner">Lead owner</option>
-      <option value="contact.assigned_to">Contact's assigned rep</option>
-      <option value="workflow.owner">Workflow owner</option>
-    </select>
+    <crm-mobile-select
+      [options]="assigneeOptions"
+      [value]="assignee()"
+      (valueChange)="onAssigneeChange($event)"
+      placeholder="Select…"
+    />
   </div>
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
     <div>

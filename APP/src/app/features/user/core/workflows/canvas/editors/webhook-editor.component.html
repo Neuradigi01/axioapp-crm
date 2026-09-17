@@ -18,27 +18,21 @@
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
     <div>
       <label class="block text-[11px] font-medium text-muted mb-1">Method</label>
-      <select
-        [ngModel]="method()"
-        (ngModelChange)="onMethodChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-      >
-        <option value="POST">POST</option>
-        <option value="GET">GET</option>
-        <option value="PUT">PUT</option>
-        <option value="PATCH">PATCH</option>
-      </select>
+      <crm-mobile-select
+        [options]="methodOptions"
+        [value]="method()"
+        (valueChange)="onMethodChange($event)"
+        placeholder="Select…"
+      />
     </div>
     <div>
       <label class="block text-[11px] font-medium text-muted mb-1">On failure</label>
-      <select
-        [ngModel]="onFailure()"
-        (ngModelChange)="onFailureChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-      >
-        <option value="skip">Skip step</option>
-        <option value="error">Error the run</option>
-      </select>
+      <crm-mobile-select
+        [options]="onFailureOptions"
+        [value]="onFailure()"
+        (valueChange)="onFailureChange($event)"
+        placeholder="Select…"
+      />
     </div>
   </div>
 

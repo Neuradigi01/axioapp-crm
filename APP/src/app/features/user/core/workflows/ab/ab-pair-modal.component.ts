@@ -18,6 +18,10 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 
 import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../shared/forms/mobile-select.component';
+import {
   ABWinnerMetric,
   PairABRequest,
   WorkflowRead,
@@ -52,7 +56,7 @@ const METRICS: Array<{ value: ABWinnerMetric; label: string }> = [
 @Component({
   selector: 'app-ab-pair-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './ab-pair-modal.component.html',
 })
@@ -76,6 +80,14 @@ export class ABPairModalComponent {
 
   readonly holdbackPresets = HOLDBACK_PRESETS;
   readonly metrics = METRICS;
+
+  readonly siblingSelectOptions = computed<MobileSelectOption[]>(() =>
+    this.eligibleDrafts().map((d) => ({ value: d.id, label: d.name })),
+  );
+  readonly metricSelectOptions: ReadonlyArray<MobileSelectOption> = METRICS.map((m) => ({
+    value: m.value,
+    label: m.label,
+  }));
 
   readonly eligibleDrafts = computed(() => {
     const me = this.primary();

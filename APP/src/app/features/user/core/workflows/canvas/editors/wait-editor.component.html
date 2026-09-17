@@ -12,15 +12,12 @@
     </div>
     <div>
       <label class="block text-[11px] font-medium text-muted mb-1">Unit</label>
-      <select
-        [ngModel]="unit()"
-        (ngModelChange)="onUnitChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-      >
-        @for (u of units; track u.value) {
-          <option [value]="u.value">{{ u.label }}</option>
-        }
-      </select>
+      <crm-mobile-select
+        [options]="unitOptions()"
+        [value]="unit()"
+        (valueChange)="onUnitChange($event)"
+        placeholder="Select…"
+      />
     </div>
   </div>
   <p class="text-[10px] text-muted">

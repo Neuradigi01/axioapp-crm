@@ -4,6 +4,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  computed,
   inject,
   input,
   output,
@@ -15,6 +16,10 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../shared/forms/mobile-select.component';
 import { WorkflowFolder, WorkflowsApiService } from '../workflows-api.service';
 
 /**
@@ -29,7 +34,7 @@ import { WorkflowFolder, WorkflowsApiService } from '../workflows-api.service';
   selector: 'app-workflow-folder-create-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule, LucideAngularModule],
+  imports: [CommonModule, ReactiveFormsModule, LucideAngularModule, MobileSelectComponent],
   templateUrl: './folder-create.modal.component.html',
 })
 export class FolderCreateModalComponent {
@@ -63,6 +68,16 @@ export class FolderCreateModalComponent {
   protected get parentCandidates(): WorkflowFolder[] {
     return this.folders().filter((f) => f.parent_folder_id === null);
   }
+
+  protected readonly parentSelectOptions = computed<MobileSelectOption[]>(() => {
+    const opts: MobileSelectOption[] = [{ value: '', label: '— No parent —' }];
+    for (const f of this.folders()) {
+      if (f.parent_folder_id === null) {
+        opts.push({ value: f.id, label: f.name });
+      }
+    }
+    return opts;
+  });
 
   protected save(): void {
     if (this.form.invalid || this.saving()) return;

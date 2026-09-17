@@ -14,21 +14,12 @@
         and submit to Meta first.
       </div>
     } @else {
-      <select
-        [ngModel]="state().templateId"
-        (ngModelChange)="onTemplateChange($event)"
-        class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-      >
-        <option value="">— pick a template —</option>
-        @for (t of templates(); track t.id) {
-          <option [value]="t.id">{{ t.name }} · {{ t.language }}</option>
-        }
-        @if (hasUnlistedTemplate()) {
-          <option [value]="state().templateId">
-            (unlisted template · {{ state().templateId.slice(0, 8) }}…)
-          </option>
-        }
-      </select>
+      <crm-mobile-select
+        [options]="templateOptions()"
+        [value]="state().templateId"
+        (valueChange)="onTemplateChange($event)"
+        placeholder="— pick a template —"
+      />
       @if (hasUnlistedTemplate()) {
         <p class="mt-1 text-[10px] text-amber-400">
           The selected template is no longer Meta-approved (archived, revoked, or pending). Re-pick
@@ -46,16 +37,12 @@
 
   <div>
     <label class="block text-[11px] font-medium text-muted mb-1">Recipient phone</label>
-    <select
-      [ngModel]="state().recipient"
-      (ngModelChange)="onRecipientChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-    >
-      <option value="">— pick a recipient —</option>
-      @for (r of recipientOptions; track r.value) {
-        <option [value]="r.value">{{ r.label }}</option>
-      }
-    </select>
+    <crm-mobile-select
+      [options]="recipientSelectOptions()"
+      [value]="state().recipient"
+      (valueChange)="onRecipientChange($event)"
+      placeholder="— pick a recipient —"
+    />
     @if (state().recipient === 'custom') {
       <input
         type="text"
@@ -74,14 +61,11 @@
 
   <div>
     <label class="block text-[11px] font-medium text-muted mb-1">Category</label>
-    <select
-      [ngModel]="state().category"
-      (ngModelChange)="onCategoryChange($event)"
-      class="w-full text-xs px-2 py-1.5 rounded border border-subtle focus:outline-none focus:border-muted"
-    >
-      @for (c of categoryOptions; track c.value) {
-        <option [value]="c.value">{{ c.label }}</option>
-      }
-    </select>
+    <crm-mobile-select
+      [options]="categorySelectOptions()"
+      [value]="state().category"
+      (valueChange)="onCategoryChange($event)"
+      placeholder="Select…"
+    />
   </div>
 </div>

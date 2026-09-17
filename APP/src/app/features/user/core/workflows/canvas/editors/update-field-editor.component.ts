@@ -2,6 +2,10 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { CanvasNode } from '../canvas-state.service';
 
 /** Handles all three `record.update_contact` / `record.update_lead` /
@@ -17,7 +21,7 @@ const VALUE_SOURCES = [
 @Component({
   selector: 'app-update-field-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './update-field-editor.component.html',
 })
@@ -27,6 +31,10 @@ export class UpdateFieldEditorComponent {
   readonly validityChange = output<boolean>();
 
   readonly valueSources = VALUE_SOURCES;
+
+  readonly valueSourceOptions = computed<MobileSelectOption[]>(() =>
+    this.valueSources.map((s) => ({ value: s.value, label: s.label })),
+  );
 
   readonly entity = computed<string>(() => {
     const type = this.node().type;

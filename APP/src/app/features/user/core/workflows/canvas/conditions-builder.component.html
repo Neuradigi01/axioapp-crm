@@ -123,15 +123,12 @@
         placeholder="path (e.g. lead.score)"
         class="flex-1 text-xs px-2 py-1 rounded border border-subtle focus:outline-none focus:border-muted min-w-0"
       />
-      <select
+      <crm-mobile-select
+        [options]="opOptions"
         [value]="node.op"
-        (change)="onLeafOpChange(path, $any($event.target).value)"
-        class="text-xs px-1.5 py-1 rounded border border-subtle"
-      >
-        @for (op of ops; track op.value) {
-          <option [value]="op.value">{{ op.label }}</option>
-        }
-      </select>
+        (valueChange)="onLeafOpChange(path, $any($event))"
+        placeholder="Select…"
+      />
       @if (needsValueInput(node.op)) {
         <input
           type="text"

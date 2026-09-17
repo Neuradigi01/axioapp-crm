@@ -2,16 +2,35 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { CanvasNode } from '../canvas-state.service';
+
+const METHOD_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'POST', label: 'POST' },
+  { value: 'GET', label: 'GET' },
+  { value: 'PUT', label: 'PUT' },
+  { value: 'PATCH', label: 'PATCH' },
+];
+
+const ON_FAILURE_OPTIONS: ReadonlyArray<MobileSelectOption> = [
+  { value: 'skip', label: 'Skip step' },
+  { value: 'error', label: 'Error the run' },
+];
 
 @Component({
   selector: 'app-webhook-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './webhook-editor.component.html',
 })
 export class WebhookEditorComponent {
+  readonly methodOptions = METHOD_OPTIONS;
+  readonly onFailureOptions = ON_FAILURE_OPTIONS;
+
   readonly node = input.required<CanvasNode>();
   readonly configChange = output<Record<string, unknown>>();
   readonly validityChange = output<boolean>();
