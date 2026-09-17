@@ -117,14 +117,12 @@
                     </label>
                     <label class="block text-sm">
                       <span class="block text-xs font-medium text-muted">Status</span>
-                      <select
-                        formControlName="employment_status"
-                        class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-                      >
-                        <option value="active">Active</option>
-                        <option value="leave">On Leave</option>
-                        <option value="terminated">Terminated</option>
-                      </select>
+                      <div class="mt-1">
+                        <crm-mobile-select
+                          [options]="employmentStatusOptions"
+                          formControlName="employment_status"
+                        />
+                      </div>
                     </label>
                   </div>
                   @if (submitError(); as err) {

@@ -13,6 +13,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { RelativeTimePipe } from '../../activities/relative-time.pipe';
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../shared/forms/mobile-select.component';
 import type { LucideIconName } from '../../shared/icons';
 import { extractApiError } from '@core/services/api-error.util';
 import { StaffActivity, StaffApiService, StaffWithPerformance } from '../staff-api.service';
@@ -78,7 +82,7 @@ interface DayGroup {
   selector: 'app-staff-activity-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, RelativeTimePipe],
+  imports: [LucideAngularModule, RelativeTimePipe, MobileSelectComponent],
   templateUrl: './activity.component.html',
 })
 export class StaffActivityTabComponent {
@@ -91,6 +95,10 @@ export class StaffActivityTabComponent {
   protected readonly activities = signal<StaffActivity[]>([]);
   protected readonly loading = signal(false);
   protected readonly loadError = signal<string | null>(null);
+
+  protected readonly staffOptions = computed<MobileSelectOption[]>(() =>
+    this.rows().map((r) => ({ value: r.staff.id, label: r.staff.full_name })),
+  );
 
   protected readonly groups = computed<DayGroup[]>(() => {
     const byKey = new Map<string, DayGroup>();
@@ -120,9 +128,8 @@ export class StaffActivityTabComponent {
     });
   }
 
-  protected pickStaff(event: Event): void {
-    const id = (event.target as HTMLSelectElement).value;
-    this.selectedUserId.set(id || null);
+  protected pickStaff(value: string): void {
+    this.selectedUserId.set(value || null);
   }
 
   protected metaFor(type: string): TypeMeta {

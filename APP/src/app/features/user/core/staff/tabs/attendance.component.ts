@@ -13,6 +13,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import { CalendarComponent } from '../../shared/calendar/calendar.component';
 import { CalendarEvent } from '../../shared/calendar/calendar.component';
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../shared/forms/mobile-select.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { StaffApiService, AttendanceOut, StaffWithPerformance } from '../staff-api.service';
 
@@ -30,7 +34,7 @@ import { StaffApiService, AttendanceOut, StaffWithPerformance } from '../staff-a
   selector: 'app-staff-attendance-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CalendarComponent],
+  imports: [CalendarComponent, MobileSelectComponent],
   templateUrl: './attendance.component.html',
 })
 export class StaffAttendanceTabComponent {
@@ -49,6 +53,10 @@ export class StaffAttendanceTabComponent {
     const id = this.selectedUserId();
     return this.rows().find((r) => r.staff.id === id) ?? null;
   });
+
+  protected readonly staffOptions = computed<MobileSelectOption[]>(() =>
+    this.rows().map((r) => ({ value: r.staff.id, label: r.staff.full_name })),
+  );
 
   protected readonly events = computed<CalendarEvent[]>(() =>
     this.attendance().map((a) => ({
@@ -81,9 +89,8 @@ export class StaffAttendanceTabComponent {
     });
   }
 
-  protected pickStaff(event: Event): void {
-    const id = (event.target as HTMLSelectElement).value;
-    this.selectedUserId.set(id || null);
+  protected pickStaff(value: string): void {
+    this.selectedUserId.set(value || null);
   }
 
   protected onViewMonthChange(d: Date): void {

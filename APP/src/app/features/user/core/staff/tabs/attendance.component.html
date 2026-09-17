@@ -9,16 +9,12 @@
     <!-- Staff picker -->
     <div class="flex items-center gap-3">
       <label class="text-sm font-medium text-default">Staff member</label>
-      <select
-        (change)="pickStaff($event)"
-        class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-      >
-        @for (row of rows(); track row.staff.id) {
-          <option [value]="row.staff.id" [selected]="row.staff.id === selectedUserId()">
-            {{ row.staff.full_name }}
-          </option>
-        }
-      </select>
+      <crm-mobile-select
+        [options]="staffOptions()"
+        [value]="selectedUserId() ?? ''"
+        (valueChange)="pickStaff($event)"
+        placeholder="Pick staff…"
+      />
       @if (selectedStaff(); as sel) {
         <span class="text-xs text-muted">{{ sel.staff.email }}</span>
       }

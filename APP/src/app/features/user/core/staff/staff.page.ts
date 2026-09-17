@@ -80,6 +80,11 @@ export class StaffPageComponent {
 
   protected readonly activeTab = signal<StaffTabId>('overview');
 
+  // Stock Updates and Store Marketing tabs are hidden — the underlying
+  // modules aren't built yet (were referenced by the deleted master-
+  // prompt Phase 4.4 / 5.6). Leave the tab-id enum in place so the
+  // template's @switch keeps compiling until the modules ship; then
+  // just re-add the entries here.
   protected readonly tabs: ReadonlyArray<{ id: StaffTabId; label: string }> = [
     { id: 'overview', label: 'Overview' },
     { id: 'leaderboard', label: 'Leaderboard' },
@@ -87,8 +92,6 @@ export class StaffPageComponent {
     { id: 'attendance', label: 'Attendance' },
     { id: 'activity', label: 'Activity Log' },
     { id: 'field-ops', label: 'Field Operations' },
-    { id: 'stock-updates', label: 'Stock Updates' },
-    { id: 'store-marketing', label: 'Store Marketing' },
   ];
 
   // --- KPI header (computed from the joined rows) ---

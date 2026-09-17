@@ -13,6 +13,10 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { FieldErrorComponent } from '../../shared/forms/field-error.component';
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../shared/forms/mobile-select.component';
 import { InrPipe } from '../../shared/pipes/inr.pipe';
 import { extractApiError } from '@core/services/api-error.util';
 import { StaffApiService, StaffWithPerformance } from '../staff-api.service';
@@ -32,7 +36,7 @@ import { StaffApiService, StaffWithPerformance } from '../staff-api.service';
   selector: 'app-staff-targets-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, InrPipe, FieldErrorComponent],
+  imports: [ReactiveFormsModule, InrPipe, FieldErrorComponent, MobileSelectComponent],
   templateUrl: './targets.component.html',
 })
 export class StaffTargetsTabComponent {
@@ -46,6 +50,12 @@ export class StaffTargetsTabComponent {
   protected readonly editingId = signal<string | null>(null);
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
+
+  protected readonly employmentStatusOptions: readonly MobileSelectOption[] = [
+    { value: 'active', label: 'Active' },
+    { value: 'leave', label: 'On Leave' },
+    { value: 'terminated', label: 'Terminated' },
+  ];
 
   protected readonly form = this.fb.group({
     commission_rate: this.fb.control('0', {

@@ -212,6 +212,13 @@ _CORE_ADMIN_KEYS: list[str] = [
     "custom_events.read",
     "custom_events.manage",
     "custom_events.fire",
+    # Field visits inspector — surfaces on the Staff page's "Field
+    # Operations" tab even in orgs without the furniture pack (the
+    # tab is a core UI surface, the underlying module is packed).
+    # Owner + Admin default so the manager can review their team's
+    # site visits without a per-role permission edit.
+    "field_visits.read",
+    "field_visits.write",
 ]
 
 

@@ -281,16 +281,20 @@ export class UpdateStatusModalComponent {
   private autoRemarksSeed = '';
 
   /** True when the currently-selected pipeline_stage is a Lost stage —
-   *  the reason picker + free-text row become required. Read from the
-   *  form so the template can toggle visibility with a single `@if`. */
+   *  the reason picker + free-text row become required. Reads
+   *  ``formValue()`` (a real signal bridged from ``form.valueChanges``)
+   *  rather than ``form.controls.pipeline_stage.value`` directly —
+   *  FormControl values aren't signals, so the computed would go stale
+   *  between validator flips and the Lost-reason field would never
+   *  render when the operator moved into a Lost stage. */
   protected readonly stageIsLost = computed<boolean>(() => {
-    const key = this.formStatus() ? this.form.controls.pipeline_stage.value : '';
+    const key = this.formValue()?.pipeline_stage ?? '';
     const stage = this.pipelineStages().find((s) => s.key === key);
     return !!stage?.is_lost;
   });
 
   protected readonly stageIsWon = computed<boolean>(() => {
-    const key = this.formStatus() ? this.form.controls.pipeline_stage.value : '';
+    const key = this.formValue()?.pipeline_stage ?? '';
     const stage = this.pipelineStages().find((s) => s.key === key);
     return !!stage?.is_won;
   });
