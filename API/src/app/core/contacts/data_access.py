@@ -261,15 +261,16 @@ def build_contact_list_query(
         base = base.where(and_(*filters))
 
     if sort == "last_activity_at":
-        primary = (
-            sort_column.asc().nulls_last() if order == "asc" else sort_column.desc().nulls_last()
-        )
-        # Rows with no activity yet fall back to newest-created — the
-        # standard CRM "recency wins" ordering that the frontend list
-        # relies on to surface just-added contacts near the top even
-        # before their first touch. ``Contact.id`` stays as a final
-        # deterministic tie for absolute stability.
-        return base.order_by(primary, Contact.created_at.desc(), Contact.id.desc())
+        # Fold `created_at` into the sort key via COALESCE so a
+        # never-touched contact ranks by its creation time — a
+        # just-added contact (last_activity_at NULL, created_at =
+        # now) lands at the top instead of being pushed to the
+        # bottom by NULLS LAST. Contacts with real activity still
+        # rank by their most recent touch. ``Contact.id`` stays as
+        # a final deterministic tie for absolute stability.
+        activity_or_created = func.coalesce(Contact.last_activity_at, Contact.created_at)
+        primary = activity_or_created.asc() if order == "asc" else activity_or_created.desc()
+        return base.order_by(primary, Contact.id.desc())
     primary = sort_column.asc() if order == "asc" else sort_column.desc()
     return base.order_by(primary, Contact.id.desc())
 
