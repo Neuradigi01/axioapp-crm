@@ -338,7 +338,10 @@ async def quick_register(
         contact_id=contact.id,
         requirement=payload.requirement,
         budget=payload.budget,
-        assigned_to_id=payload.assigned_to_id,
+        # Reception rep owns the walk-in by default. Payload picker
+        # still wins when the operator explicitly assigns to someone
+        # else on the modal.
+        assigned_to_id=payload.assigned_to_id or caller_user_id,
         notes=payload.notes,
         status=WalkInStatus.browsing,
         custom_data=cleaned_custom,

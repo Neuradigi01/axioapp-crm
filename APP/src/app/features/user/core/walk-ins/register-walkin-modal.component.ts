@@ -46,6 +46,22 @@ import { QuickRegisterResponse, WalkInsApiService } from './walk-ins-api.service
 export class RegisterWalkinModalComponent extends BaseFormModalComponent {
   protected readonly entityType = 'walk_in';
 
+  /** Canonical source options — mirror of the Contacts list Source
+   *  column filter so a walk-in-picked source shows up under that
+   *  filter without renaming. Bulk-import is omitted (never a walk-in
+   *  origin). Referral / Phone added because reception commonly logs
+   *  those alongside the raw walk-in. */
+  protected readonly sourceOptions: ReadonlyArray<{ value: string; label: string }> = [
+    { value: 'walk_in', label: 'Walk-in' },
+    { value: 'referral', label: 'Referral' },
+    { value: 'phone', label: 'Phone' },
+    { value: 'widget', label: 'Forms' },
+    { value: 'google_ads', label: 'Google Ads' },
+    { value: 'meta_ads', label: 'Meta Ads' },
+    { value: 'whatsapp_flow', label: 'WhatsApp' },
+    { value: 'manual', label: 'Manual' },
+  ];
+
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(WalkInsApiService);
   private readonly contactsApi = inject(ContactsApiService);
