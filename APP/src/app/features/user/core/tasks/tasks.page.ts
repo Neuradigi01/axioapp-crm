@@ -121,8 +121,8 @@ export class TasksPageComponent {
   protected readonly dueFilter = signal<TaskDueFilter | undefined>(undefined);
   protected readonly priorityFilter = signal<TaskPriority | undefined>(undefined);
   protected readonly q = signal<string>('');
-  protected readonly sortBy = signal<TaskSortBy>('due_at');
-  protected readonly sortDir = signal<TaskSortDir>('asc');
+  protected readonly sortBy = signal<TaskSortBy>('created_at');
+  protected readonly sortDir = signal<TaskSortDir>('desc');
 
   protected readonly searchCtrl = new FormControl('', { nonNullable: true });
   protected readonly chipBusy = signal<Chip | null>(null);
