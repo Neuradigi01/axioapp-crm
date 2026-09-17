@@ -578,6 +578,7 @@
   <app-reassign-modal
     [entityLabel]="'walk-in'"
     [count]="state.selectedCount()"
+    [currentOwnerId]="bulkReassignPresetOwnerId()"
     [submitting]="state.bulkSubmitting()"
     [error]="state.bulkError()"
     (confirm)="onBulkReassign($event)"

@@ -556,6 +556,7 @@
   <app-reassign-modal
     [entityLabel]="'task'"
     [count]="state.selectedCount()"
+    [currentOwnerId]="bulkReassignPresetOwnerId()"
     [submitting]="state.bulkSubmitting()"
     [error]="state.bulkError()"
     (confirm)="onBulkReassign($event)"

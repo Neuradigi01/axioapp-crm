@@ -230,6 +230,19 @@ export class WalkInsPageComponent {
   readonly singleReassignSubmitting = signal(false);
   readonly singleReassignError = signal<string | null>(null);
 
+  /** Current owner to preselect in the bulk reassign modal — only
+   *  resolvable when exactly one row is selected (mixed selections
+   *  have mixed owners, so the modal keeps its Unassigned default).
+   *  Lets a "reassign this one row via the checkbox" flow open with
+   *  the existing owner already picked, matching the single-row
+   *  pencil experience. */
+  readonly bulkReassignPresetOwnerId = computed<string | null>(() => {
+    const ids = this.state.selectedIds();
+    if (ids.size !== 1) return null;
+    const [only] = ids;
+    return this.state.items().find((w) => w.id === only)?.assigned_to_id ?? null;
+  });
+
   /** Convert-to-lead modal state. */
   readonly convertWalkIn = signal<WalkIn | null>(null);
   readonly convertSubmitting = signal(false);

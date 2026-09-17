@@ -131,6 +131,17 @@ export class TasksPageComponent {
   protected readonly modalOpen = signal(false);
   protected readonly editingTask = signal<Task | null>(null);
 
+  /** Current owner to preselect in the bulk reassign modal — only
+   *  resolvable when exactly one row is selected. Mixed selections
+   *  keep the modal's Unassigned default because different rows
+   *  can have different owners. */
+  protected readonly bulkReassignPresetOwnerId = computed<string | null>(() => {
+    const ids = this.state.selectedIds();
+    if (ids.size !== 1) return null;
+    const [only] = ids;
+    return this.state.items().find((t) => t.id === only)?.assigned_to_id ?? null;
+  });
+
   // T2 — single-row delete confirmation.
   protected readonly deletingTask = signal<Task | null>(null);
   protected readonly deleteSubmitting = signal(false);
