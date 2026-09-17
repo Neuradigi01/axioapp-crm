@@ -69,6 +69,14 @@ class StandardFieldDef:
     Default False so new fields are opt-in; sensitive columns
     (``role``, ``owner_id``, ``balance``, verification timestamps,
     ``pin_hash``) are never listed and therefore never bot-writable.
+
+    ``source`` marks whether the field belongs to Core CRM (``"core"``)
+    or a vertical pack (``"pack:<name>"`` — e.g. ``"pack:furniture"``).
+    Core-only surfaces filter to ``source="core"`` so pack entities
+    (custom_order, field_visit, property, …) don't bleed into the Core
+    Standard Fields settings, permission pickers, or entity catalog.
+    Pack UIs pass their own source to see their subset. Every pack's
+    ``__init__.py`` must set this on every ``register(...)`` call.
     """
 
     entity: str
@@ -86,6 +94,7 @@ class StandardFieldDef:
     backend_validators: tuple[str, ...]
     overridable_props: frozenset[str]
     bot_writable: bool = False
+    source: str = "core"
 
     def __post_init__(self) -> None:
         if not self.entity or not self.entity.replace("_", "").isalnum():
@@ -166,9 +175,18 @@ def list_bot_writable(entity: str) -> list[StandardFieldDef]:
     )
 
 
-def list_entities() -> list[str]:
-    """Distinct entity names registered."""
-    return sorted({e for (e, _) in _REGISTRY.keys()})
+def list_entities(source: str | None = None) -> list[str]:
+    """Distinct entity names registered.
+
+    ``source`` filters to entries whose ``StandardFieldDef.source``
+    matches (e.g. ``"core"`` for Core CRM only, ``"pack:furniture"``
+    for a specific pack). Omit to get every registered entity — that
+    matches the pre-source-tagging behaviour and is used by internal
+    diagnostics only.
+    """
+    if source is None:
+        return sorted({e for (e, _) in _REGISTRY.keys()})
+    return sorted({d.entity for d in _REGISTRY.values() if d.source == source})
 
 
 def get_overridable_props(entity: str, field_key: str) -> frozenset[str]:

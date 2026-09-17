@@ -15,12 +15,28 @@ overrides on the basics step of the create wizard.
 """
 
 from src.app.core.pipelines.service import register_pipeline_table
+from dataclasses import replace as _dc_replace
+
 from src.app.core.standard_fields import (
     StandardFieldDef,
 )
 from src.app.core.standard_fields import (
-    register as register_standard_field,
+    register as _register_standard_field,
 )
+
+
+# Pack-wide source tag — stamped on every StandardFieldDef this module
+# registers so the Core Standard Fields settings page filters these
+# out. Pack UIs pass ``source="pack:furniture"`` to see them.
+_PACK_SOURCE = "pack:furniture"
+
+
+def register_standard_field(definition: StandardFieldDef) -> None:
+    """Thin wrapper that stamps ``source=_PACK_SOURCE`` before
+    delegating to the core registry — guarantees no
+    ``custom_order`` field accidentally lands as ``source="core"``
+    and leaks into Core CRM surfaces."""
+    _register_standard_field(_dc_replace(definition, source=_PACK_SOURCE))
 from src.app.packs.furniture.modules.custom_orders.service import (
     add_measurement,
     add_photo,

@@ -14,7 +14,7 @@ authenticated user since every form modal calls it on open.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import get_current_user, require_permissions
@@ -106,6 +106,16 @@ async def reset_override(
 
 @router.get("/entities", response_model=StandardFieldEntitiesResponse)
 async def list_entities(
+    source: str = Query(
+        default="core",
+        description=(
+            "Filter to a registration source: ``core`` (default — Core "
+            "CRM entities only) or ``pack:<name>`` for a specific "
+            "vertical pack (e.g. ``pack:furniture``). Pack UIs pass "
+            "their own source to see their subset; the Core Settings "
+            "page uses the default and never sees pack entities."
+        ),
+    ),
     _user: User = Depends(get_current_user),
 ) -> StandardFieldEntitiesResponse:
     """Registered entities + their overridable-field counts.
@@ -119,7 +129,7 @@ async def list_entities(
             entity=name,
             field_count=len(field_registry.list_for_entity(name)),
         )
-        for name in field_registry.list_entities()
+        for name in field_registry.list_entities(source=source)
     ]
     return StandardFieldEntitiesResponse(items=items)
 

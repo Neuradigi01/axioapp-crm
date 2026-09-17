@@ -14,12 +14,28 @@ with the `core.standard_fields` registry so the Settings page's
 overrides on the schedule-visit modal.
 """
 
+from dataclasses import replace as _dc_replace
+
 from src.app.core.standard_fields import (
     StandardFieldDef,
 )
 from src.app.core.standard_fields import (
-    register as register_standard_field,
+    register as _register_standard_field,
 )
+
+
+# Pack-wide source tag — stamped on every StandardFieldDef this module
+# registers so the Core Standard Fields settings page filters these
+# out. Pack UIs pass ``source="pack:furniture"`` to see them.
+_PACK_SOURCE = "pack:furniture"
+
+
+def register_standard_field(definition: StandardFieldDef) -> None:
+    """Thin wrapper that stamps ``source=_PACK_SOURCE`` before
+    delegating to the core registry — guarantees no ``field_visit``
+    field accidentally lands as ``source="core"`` and leaks into
+    Core CRM surfaces."""
+    _register_standard_field(_dc_replace(definition, source=_PACK_SOURCE))
 from src.app.packs.furniture.modules.field_ops.service import (
     add_photo,
     complete_visit,
