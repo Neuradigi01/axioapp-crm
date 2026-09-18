@@ -86,10 +86,13 @@ async def refresh_modules(
     registry.clear()
     discover_modules()
 
-    all_permission_keys: list[str] = []
+    # Per-module registration so ``source`` tag is applied — mirror of
+    # the startup pass in ``main.lifespan``. Refreshing keeps existing
+    # pack-owned rows tagged correctly (upsert path updates source).
     for module in registry.list():
-        all_permission_keys.extend(module.permissions)
-    if all_permission_keys:
-        await register_permissions(db, all_permission_keys)
+        if not module.permissions:
+            continue
+        source = f"pack:{module.pack_id}" if module.pack_id else "core"
+        await register_permissions(db, module.permissions, source=source)
 
     return RefreshModulesResponse(discovered=[m.id for m in registry.list()])

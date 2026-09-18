@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -102,10 +102,20 @@ async def delete_role_endpoint(
 
 @permissions_router.get("", response_model=list[PermissionOut])
 async def list_permissions_endpoint(
+    source: str = Query(
+        default="core",
+        description=(
+            "Filter to a registration source: ``core`` (default — Core "
+            "CRM keys only) or ``pack:<name>`` for a specific vertical "
+            "pack (e.g. ``pack:furniture``). Pack UIs pass their own "
+            "source to see their subset; the Core role editor uses the "
+            "default so pack keys never appear in the grant matrix."
+        ),
+    ),
     _user: User = Depends(require_permissions("roles.read")),
     session: AsyncSession = Depends(get_db),
 ) -> list[PermissionOut]:
-    rows = await list_all_permissions(session)
+    rows = await list_all_permissions(session, source=source)
     return [PermissionOut.model_validate(p) for p in rows]
 
 

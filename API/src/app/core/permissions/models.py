@@ -53,6 +53,15 @@ class Permission(Base):
     key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     module: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    # Registration source — `"core"` for Core CRM keys, `"pack:<name>"`
+    # for pack-registered keys (e.g. `"pack:furniture"`). The role
+    # editor filters to `source="core"` so pack keys never appear in
+    # Core UI grant matrices unless the caller explicitly asks. Set on
+    # every upsert by the startup registration pass, which derives it
+    # from `ModuleDescriptor.pack_id`.
+    source: Mapped[str] = mapped_column(
+        String(64), nullable=False, server_default=text("'core'"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

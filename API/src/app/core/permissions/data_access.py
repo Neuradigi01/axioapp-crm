@@ -43,12 +43,17 @@ async def get_permission_by_key(session: AsyncSession, key: str) -> Permission |
 
 async def list_all_permissions(
     session: AsyncSession,
+    *,
+    source: str | None = None,
 ) -> list[Permission]:
     """Global registry list — ordered by module then key for stable UI
-    grouping."""
-    result = await session.execute(
-        select(Permission).order_by(Permission.module.asc(), Permission.key.asc())
-    )
+    grouping. ``source`` filters to a single registration source
+    (``"core"`` for Core CRM keys, ``"pack:<name>"`` for a specific
+    pack); ``None`` returns everything (internal / diagnostics use)."""
+    stmt = select(Permission).order_by(Permission.module.asc(), Permission.key.asc())
+    if source is not None:
+        stmt = stmt.where(Permission.source == source)
+    result = await session.execute(stmt)
     return list(result.scalars().all())
 
 
@@ -81,24 +86,50 @@ async def upsert_permission_key(
     *,
     key: str,
     module: str,
+    source: str = "core",
     description: str | None = None,
 ) -> None:
-    """``INSERT ... ON CONFLICT DO NOTHING`` on the unique ``key``
-    column. Caller commits + re-reads via ``get_permission_by_key``."""
+    """``INSERT ... ON UPDATE`` on the unique ``key`` column — inserts a
+    new row if the key is new, or updates ``source`` / ``module`` /
+    ``description`` on an existing row. The source update is what lets
+    the startup registration pass move a permission from ``core`` to
+    ``pack:<name>`` after the 0230 migration lands (or vice-versa if a
+    pack module is retired). Caller commits + re-reads via
+    ``get_permission_by_key``."""
+    stmt = pg_insert(Permission).values(
+        key=key, module=module, source=source, description=description
+    )
     await session.execute(
-        pg_insert(Permission)
-        .values(key=key, module=module, description=description)
-        .on_conflict_do_nothing(index_elements=["key"])
+        stmt.on_conflict_do_update(
+            index_elements=["key"],
+            set_={
+                "module": stmt.excluded.module,
+                "source": stmt.excluded.source,
+                "description": stmt.excluded.description,
+            },
+        )
     )
 
 
 async def bulk_upsert_permission_keys(session: AsyncSession, rows: list[dict]) -> None:
-    """Bulk ``INSERT ... ON CONFLICT DO NOTHING`` for a list of
-    ``{key, module, description}`` dicts. Caller commits."""
+    """Bulk ``INSERT ... ON UPDATE`` for a list of ``{key, module,
+    source, description}`` dicts. Rows without ``source`` default to
+    ``"core"`` for backwards-compat with callers pre-dating the source
+    column (currently none — every registration path passes it
+    explicitly). Caller commits."""
     if not rows:
         return
+    normalised = [{**row, "source": row.get("source", "core")} for row in rows]
+    stmt = pg_insert(Permission).values(normalised)
     await session.execute(
-        pg_insert(Permission).values(rows).on_conflict_do_nothing(index_elements=["key"])
+        stmt.on_conflict_do_update(
+            index_elements=["key"],
+            set_={
+                "module": stmt.excluded.module,
+                "source": stmt.excluded.source,
+                "description": stmt.excluded.description,
+            },
+        )
     )
 
 

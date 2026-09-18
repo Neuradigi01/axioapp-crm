@@ -233,12 +233,19 @@ async def lifespan(app: FastAPI):
     discovered_ids = [m.id for m in registry.list()]
     logger.info("discovered modules: %s", discovered_ids)
 
-    all_permission_keys: list[str] = []
-    for module in registry.list():
-        all_permission_keys.extend(module.permissions)
-    if all_permission_keys:
+    # Register per module (not one flat batch) so each key inherits the
+    # right ``source`` tag — Core UI filters ``source="core"`` and pack
+    # keys (``field_visits.*``, ``custom_orders.*``, ``properties.*``,
+    # ``inventory.*``, ``fp_billing.*``) never leak into the role
+    # editor's grant matrix. On the first boot after migration 0230
+    # every existing row gets its source overwritten via the ON UPDATE
+    # upsert path.
+    modules_with_perms = [m for m in registry.list() if m.permissions]
+    if modules_with_perms:
         async with async_session() as session:
-            await register_permissions(session, all_permission_keys)
+            for module in modules_with_perms:
+                source = f"pack:{module.pack_id}" if module.pack_id else "core"
+                await register_permissions(session, module.permissions, source=source)
 
     # Step 3.5.12 — WhatsApp no longer needs a startup adapter
     # registration. Outbound is per-org via `resolve_whatsapp_adapter`

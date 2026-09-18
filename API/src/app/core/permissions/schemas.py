@@ -15,6 +15,7 @@ class PermissionOut(ORMModel):
     key: str
     description: str | None
     module: str
+    source: str
 
 
 class RoleOut(ORMModel):

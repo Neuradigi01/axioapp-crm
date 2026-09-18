@@ -76,17 +76,28 @@ async def register_permission(
     *,
     key: str,
     module: str,
+    source: str = "core",
     description: str | None = None,
 ) -> Permission:
     """Idempotently insert a permission row into the global registry."""
-    await _da.upsert_permission_key(session, key=key, module=module, description=description)
+    await _da.upsert_permission_key(
+        session, key=key, module=module, source=source, description=description
+    )
     result = await _da.get_permission_by_key(session, key)
     assert result is not None  # upsert just ensured the row exists
     return result
 
 
-async def register_permissions(session: AsyncSession, keys: list[str]) -> list[Permission]:
-    """Bulk-upsert permission keys into the global registry."""
+async def register_permissions(
+    session: AsyncSession, keys: list[str], *, source: str = "core"
+) -> list[Permission]:
+    """Bulk-upsert permission keys into the global registry.
+
+    ``source`` tags every row so Core UI surfaces (the role editor) can
+    filter to ``source="core"`` and never surface pack-owned keys like
+    ``field_visits.*``. Callers should derive source from the module's
+    ``pack_id`` — see ``main.startup``.
+    """
     if not keys:
         return []
 
@@ -95,7 +106,9 @@ async def register_permissions(session: AsyncSession, keys: list[str]) -> list[P
         module_prefix, _, _ = key.partition(".")
         if not module_prefix:
             raise ValueError(f"permission key {key!r} must be '<module>.<action>'")
-        rows.append({"key": key, "module": module_prefix, "description": None})
+        rows.append(
+            {"key": key, "module": module_prefix, "source": source, "description": None}
+        )
 
     await _da.bulk_upsert_permission_keys(session, rows)
     await session.commit()
@@ -124,9 +137,13 @@ async def list_roles_in_org(session: AsyncSession, *, org_id: uuid.UUID) -> list
     ]
 
 
-async def list_all_permissions(session: AsyncSession) -> list[Permission]:
-    """Global registry list — ordered by module then key."""
-    return await _da.list_all_permissions(session)
+async def list_all_permissions(
+    session: AsyncSession, *, source: str | None = None
+) -> list[Permission]:
+    """Global registry list — ordered by module then key. ``source``
+    filters to a single registration source (Core UI passes ``"core"``
+    so pack keys never leak into the grant matrix)."""
+    return await _da.list_all_permissions(session, source=source)
 
 
 # --- admin writes (create / update / delete custom roles) ---------------
