@@ -18,11 +18,11 @@
         {{ wsInitial() }}
       </span>
       <span class="flex min-w-0 flex-1 flex-col items-start" [class.md:hidden]="!expanded()">
-        <span class="truncate font-display text-[13.5px] font-semibold leading-tight">
+        <span class="block w-full truncate font-display text-[13.5px] font-semibold leading-tight">
           {{ org()?.name ?? brand().name }}
         </span>
         @if (org(); as o) {
-          <span class="truncate text-[11px] leading-tight text-faint">
+          <span class="block w-full truncate text-[11px] leading-tight text-faint">
             {{ workspaceLabel() }}
           </span>
         }
@@ -49,11 +49,11 @@
             {{ wsInitial() }}
           </span>
           <div class="min-w-0 flex-1">
-            <div class="truncate text-sm font-medium text-default">
+            <div class="w-full truncate text-sm font-medium text-default">
               {{ org()?.name ?? brand().name }}
             </div>
             @if (org(); as o) {
-              <div class="truncate text-[11px] text-faint">{{ o.slug }}</div>
+              <div class="w-full truncate text-[11px] text-faint">{{ o.slug }}</div>
             }
           </div>
           <lucide-icon name="check" class="h-3.5 w-3.5 text-accent" />
