@@ -18,6 +18,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import { ConfirmDialogService } from '../../../core/shared/confirm-dialog/confirm-dialog.service';
 import { assetUrl } from './asset-url.util';
 import { PropertyApiService } from './property-api.service';
 import {
@@ -53,11 +54,11 @@ export class PropertyGalleryComponent {
   private readonly api = inject(PropertyApiService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   protected readonly images = signal<PropertyImage[]>([]);
   protected readonly uploading = signal(false);
   protected readonly dragOver = signal(false);
-  protected readonly pendingDeleteId = signal<string | null>(null);
 
   protected imgSrc(img: PropertyImage): string {
     return assetUrl(img.image_url);
@@ -113,7 +114,7 @@ export class PropertyGalleryComponent {
     this.upload(Array.from(dt.files));
   }
 
-  protected setFeatured(image: PropertyImage): void {
+  protected setAsCover(image: PropertyImage): void {
     if (image.is_featured) return;
     this.api
       .setFeaturedImage(this.propertyId(), image.id)
@@ -122,43 +123,31 @@ export class PropertyGalleryComponent {
         next: () => {
           this.images.update((all) => all.map((i) => ({ ...i, is_featured: i.id === image.id })));
           this.imagesChanged.emit(this.images());
-          this.snackBar.open('Featured image updated.', 'Dismiss', { duration: 2500 });
+          this.snackBar.open('Cover image updated.', 'Dismiss', { duration: 2500 });
         },
-        error: (err: HttpErrorResponse) => this.showError(err, 'Could not set featured image'),
+        error: (err: HttpErrorResponse) => this.showError(err, 'Could not set cover image'),
       });
   }
 
-  protected requestDelete(image: PropertyImage): void {
-    this.pendingDeleteId.set(image.id);
-  }
-
-  protected cancelDelete(): void {
-    this.pendingDeleteId.set(null);
-  }
-
-  protected confirmDelete(): void {
-    const id = this.pendingDeleteId();
-    if (!id) return;
-    this.pendingDeleteId.set(null);
+  protected async requestDelete(image: PropertyImage): Promise<void> {
+    const ok = await this.confirmDialog.ask({
+      title: 'Remove this image?',
+      body: 'The image is deleted from storage — this cannot be undone. You can upload another anytime.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
     this.api
-      .deleteImage(this.propertyId(), id)
+      .deleteImage(this.propertyId(), image.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.images.update((all) => all.filter((i) => i.id !== id));
+          this.images.update((all) => all.filter((i) => i.id !== image.id));
           this.imagesChanged.emit(this.images());
           this.snackBar.open('Image removed.', 'Dismiss', { duration: 2500 });
         },
         error: (err: HttpErrorResponse) => this.showError(err, 'Could not delete image'),
       });
-  }
-
-  /** Delete confirmation lookup — used by the template to render the
-   * modal for the specific pending image. */
-  protected imageForConfirm(): PropertyImage | null {
-    const id = this.pendingDeleteId();
-    if (!id) return null;
-    return this.images().find((i) => i.id === id) ?? null;
   }
 
   private upload(files: File[]): void {

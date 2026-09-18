@@ -61,13 +61,16 @@
             class="h-full w-full object-cover"
           />
 
-          <!-- Featured badge -->
+          <!-- Cover badge (called "featured" in the DB — surfaced as
+               "Cover" in the UI so it matches every other image
+               manager in the app, e.g. Catalog). -->
           @if (img.is_featured) {
             <span
-              class="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-amber-200"
+              class="absolute -left-1.5 -top-1.5 inline-flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white shadow ring-1 ring-white/20"
+              title="Primary cover"
             >
-              <lucide-icon name="star" class="h-3 w-3"></lucide-icon>
-              Featured
+              <lucide-icon name="star" class="h-2.5 w-2.5"></lucide-icon>
+              Cover
             </span>
           }
 
@@ -90,11 +93,12 @@
               @if (!img.is_featured) {
                 <button
                   type="button"
-                  (click)="setFeatured(img)"
+                  (click)="setAsCover(img)"
                   class="pointer-events-auto inline-flex items-center gap-1 rounded-md bg-surface/95 px-2 py-1 text-xs font-medium text-default shadow-sm hover:bg-surface"
+                  title="Set as primary cover"
                 >
                   <lucide-icon name="star" class="h-3 w-3"></lucide-icon>
-                  Feature
+                  Set as cover
                 </button>
               }
               <button
@@ -109,36 +113,6 @@
           }
         </div>
       }
-    </div>
-  }
-
-  <!-- Delete confirmation modal -->
-  @if (imageForConfirm() !== null) {
-    <div
-      class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div class="w-full max-w-sm rounded-xl bg-surface p-5 shadow-xl">
-        <h3 class="text-sm font-semibold text-default">Delete this image?</h3>
-        <p class="mt-1 text-xs text-muted">This cannot be undone.</p>
-        <div class="mt-4 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            (click)="cancelDelete()"
-            class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            (click)="confirmDelete()"
-            class="rounded-md bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-400"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
     </div>
   }
 </section>

@@ -23,6 +23,10 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../core/shared/forms/mobile-select.component';
 import { AmenitiesInputComponent } from './amenities-input.component';
 import { PropertyApiService } from './property-api.service';
 import { PropertyGalleryComponent } from './property-gallery.component';
@@ -85,6 +89,7 @@ interface PropertyFormControls {
     LucideAngularModule,
     RouterLink,
     AmenitiesInputComponent,
+    MobileSelectComponent,
     PropertyGalleryComponent,
     PropertyRowMenuComponent,
   ],
@@ -101,6 +106,20 @@ export class PropertyFormPageComponent {
   protected readonly TYPE_OPTIONS = PROPERTY_TYPE_OPTIONS;
   protected readonly CATEGORY_OPTIONS = PROPERTY_CATEGORY_OPTIONS;
   protected readonly UNIT_OPTIONS = AREA_UNIT_OPTIONS;
+
+  // Mapped to `crm-mobile-select` shape ({value, label}). The
+  // canonical option arrays keep the `key` field name because a
+  // handful of non-picker call-sites read it — mapping in the
+  // component beats renaming everywhere.
+  protected readonly typeSelectOptions: readonly MobileSelectOption[] = PROPERTY_TYPE_OPTIONS.map(
+    (o) => ({ value: o.key, label: o.label }),
+  );
+  protected readonly categorySelectOptions: readonly MobileSelectOption[] =
+    PROPERTY_CATEGORY_OPTIONS.map((o) => ({ value: o.key, label: o.label }));
+  protected readonly unitSelectOptions: readonly MobileSelectOption[] = [
+    { value: '', label: '—' },
+    ...AREA_UNIT_OPTIONS.map((o) => ({ value: o.key, label: o.label })),
+  ];
 
   protected readonly propertyId = signal<string | null>(null);
   protected readonly loading = signal(false);

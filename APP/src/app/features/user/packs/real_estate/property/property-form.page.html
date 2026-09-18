@@ -57,15 +57,11 @@
             <span class="mb-1 block text-xs font-medium text-muted">
               Type <span class="text-red-500">*</span>
             </span>
-            <select
+            <crm-mobile-select
+              [options]="typeSelectOptions"
               formControlName="property_type"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
-            >
-              <option value="" disabled>Select a type…</option>
-              @for (opt of TYPE_OPTIONS; track opt.key) {
-                <option [value]="opt.key">{{ opt.label }}</option>
-              }
-            </select>
+              placeholder="Select a type…"
+            />
             @if (fieldError('property_type'); as msg) {
               <span class="mt-1 block text-xs text-red-500">{{ msg }}</span>
             }
@@ -75,15 +71,11 @@
             <span class="mb-1 block text-xs font-medium text-muted">
               Category <span class="text-red-500">*</span>
             </span>
-            <select
+            <crm-mobile-select
+              [options]="categorySelectOptions"
               formControlName="category"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
-            >
-              <option value="" disabled>Select a category…</option>
-              @for (opt of CATEGORY_OPTIONS; track opt.key) {
-                <option [value]="opt.key">{{ opt.label }}</option>
-              }
-            </select>
+              placeholder="Select a category…"
+            />
             @if (fieldError('category'); as msg) {
               <span class="mt-1 block text-xs text-red-500">{{ msg }}</span>
             }
@@ -213,15 +205,7 @@
           </label>
           <label class="block">
             <span class="mb-1 block text-xs font-medium text-muted">Area unit</span>
-            <select
-              formControlName="area_unit"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
-            >
-              <option value="">—</option>
-              @for (opt of UNIT_OPTIONS; track opt.key) {
-                <option [value]="opt.key">{{ opt.label }}</option>
-              }
-            </select>
+            <crm-mobile-select [options]="unitSelectOptions" formControlName="area_unit" />
           </label>
         </div>
 
@@ -279,7 +263,7 @@
         <div>
           <h2 class="text-sm font-semibold text-default">Images</h2>
           <p class="text-xs text-muted">
-            Multiple photos, drag to reorder, click to feature one on the public listing.
+            Add multiple photos, drag to reorder, and pick one as the cover for the public listing.
           </p>
         </div>
 
