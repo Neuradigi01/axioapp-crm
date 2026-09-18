@@ -14,7 +14,8 @@
  *                            with the provider's message).
  *   - `verify(id, code)`   — `POST /email-senders/smtp/{id}/verify`.
  *   - `resendCode(id)`     — `POST /email-senders/smtp/{id}/resend-code`.
- *   - `setDefault(id)`     — `POST /email-senders/smtp/{id}/set-default`.
+ *   - `setDefault(id)`     — `POST /email-senders/{id}/set-default`
+ *                            (polymorphic — SMTP or OAuth mailbox).
  *   - `delete(id)`         — `DELETE /email-senders/{id}` (SMTP only;
  *                            OAuth deletion continues to use the
  *                            existing `/email/accounts/{id}` endpoint).
@@ -112,8 +113,11 @@ export class EmailSendersApiService {
     return this.http.post<SmtpSender>(`${this.base}/smtp/${id}/resend-code`, {});
   }
 
-  setDefault(id: string): Observable<SmtpSender> {
-    return this.http.post<SmtpSender>(`${this.base}/smtp/${id}/set-default`, {});
+  /** Mark this sender — SMTP or OAuth (Gmail / Microsoft) — as the
+   *  org's default. Backend returns 204; the caller re-fetches the
+   *  unified list to pick up the new default badge. */
+  setDefault(id: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/${id}/set-default`, {});
   }
 
   delete(id: string): Observable<void> {

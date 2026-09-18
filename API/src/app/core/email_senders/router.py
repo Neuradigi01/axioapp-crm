@@ -88,17 +88,29 @@ async def resend_code_endpoint(
     return _to_out(row)
 
 
-@router.post("/smtp/{sender_id}/set-default", response_model=SmtpSenderOut)
+@router.post("/{sender_id}/set-default", status_code=status.HTTP_204_NO_CONTENT)
 async def set_default_sender_endpoint(
     sender_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("email.accounts.manage")),
-) -> SmtpSenderOut:
-    """Mark this verified SMTP sender as the org's default."""
-    row = await service.set_default_sender(
+) -> Response:
+    """Mark this sender — SMTP or OAuth — as the org's default.
+
+    Polymorphic: ``sender_id`` may point to a row in
+    ``tbl_email_smtp_senders`` OR ``tbl_email_accounts``. The service
+    resolves which table, validates sendability (verified SMTP OR
+    connected OAuth), and atomically clears the flag on both tables
+    before flipping the winner.
+
+    Returns 204 rather than the row because the two return types
+    would need a discriminated response schema for a single UI-only
+    action; the frontend re-fetches the unified list after this
+    fires anyway.
+    """
+    await service.set_default_sender(
         db, org_id=user.org_id, sender_id=sender_id
     )
-    return _to_out(row)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch("/smtp/{sender_id}/capture-toggle", response_model=SmtpSenderOut)

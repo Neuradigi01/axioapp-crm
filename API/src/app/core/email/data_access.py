@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.email.models import (
@@ -129,10 +129,55 @@ def insert_account(session: AsyncSession, account: EmailAccount) -> None:
     session.add(account)
 
 
+async def find_default_sendable(
+    session: AsyncSession, *, org_id: uuid.UUID
+) -> EmailAccount | None:
+    """The org's ``is_default=True`` OAuth mailbox, or ``None``.
+
+    Also gates on ``sync_state != disconnected`` and a non-null
+    ``refresh_token_enc`` so a stale ``is_default=True`` flag on a
+    revoked mailbox never wins the resolver — ``service.disconnect``
+    auto-demotes on the way out, but this guard makes the resolver
+    robust to any future path that flips ``sync_state`` without
+    demoting.
+    """
+    result = await session.execute(
+        select(EmailAccount).where(
+            EmailAccount.org_id == org_id,
+            EmailAccount.is_default.is_(True),
+            EmailAccount.sync_state != EmailAccountSyncState.disconnected,
+            EmailAccount.refresh_token_enc.is_not(None),
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def clear_all_defaults(
+    session: AsyncSession, *, org_id: uuid.UUID
+) -> None:
+    """Reset ``is_default=false`` on every OAuth mailbox in the org.
+    Caller commits — used as the OAuth half of the polymorphic
+    :func:`email_senders.service.set_default_sender` flip so exactly
+    one row across both tables carries the flag."""
+    await session.execute(
+        update(EmailAccount)
+        .where(EmailAccount.org_id == org_id)
+        .values(is_default=False)
+    )
+
+
+def set_default(row: EmailAccount) -> None:
+    """Mutate the row in-place: ``is_default=True``. Caller commits."""
+    row.is_default = True
+
+
 __all__ = [
+    "clear_all_defaults",
     "find_account_for_external",
+    "find_default_sendable",
     "get_account_by_id",
     "get_account_by_id_unscoped",
     "insert_account",
     "list_accounts_query",
+    "set_default",
 ]

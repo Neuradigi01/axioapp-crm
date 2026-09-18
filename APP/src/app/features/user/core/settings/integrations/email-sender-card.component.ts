@@ -178,7 +178,10 @@ export class EmailSenderCardComponent implements OnInit {
   }
 
   setDefault(row: UnifiedSender): void {
-    if (row.kind !== 'smtp') return;
+    // Any verified/connected sender can be the default — SMTP, Gmail,
+    // or Microsoft. `row.verified` doubles as the sendability gate:
+    // SMTP → verified_at is set; OAuth → refresh_token present AND
+    // sync_state != disconnected (see list_unified_senders).
     if (row.is_default || !row.verified) return;
     this.settingDefaultId.set(row.id);
     this.rowError.set(null);

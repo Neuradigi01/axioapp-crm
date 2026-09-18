@@ -21,7 +21,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, Integer, Text, text
+from sqlalchemy import Boolean, DateTime, Enum, Integer, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -127,6 +127,17 @@ class EmailAccount(Base, TenantScoped):
     )
     disconnected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     disconnected_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    # `is_default=True` marks this mailbox as the org's outbound sender
+    # for automations, workflows, templates, and conversation replies.
+    # Enforced at the service layer alongside `EmailSmtpSender.is_default`
+    # so exactly one row across BOTH tables holds the flag per org — see
+    # `email_senders.service.set_default_sender`. Auto-demoted on
+    # `disconnect()` so a revoked grant can't stay wired as the default.
+    is_default: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+    )
 
     @property
     def is_connected(self) -> bool:

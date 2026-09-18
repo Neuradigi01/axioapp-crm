@@ -12,22 +12,34 @@ the recipient sees the org's brand instead of the platform's.
 
 Preference order:
 
-  1. Verified :class:`core.email_senders.models.EmailSmtpSender` with
-     ``is_default=True`` for the org → :class:`OrgSmtpBackend`.
-  2. Any verified :class:`EmailSmtpSender` for the org (oldest first)
-     → :class:`OrgSmtpBackend`.
+  1. Whichever row across ``tbl_email_smtp_senders`` +
+     ``tbl_email_accounts`` carries ``is_default=True`` for the org.
+     Operator's explicit pick — SMTP wins → :class:`OrgSmtpBackend`,
+     OAuth wins → :class:`OrgOauthBackend`. Set via
+     :func:`core.email_senders.service.set_default_sender`, which
+     clears the flag on both tables before flipping the winner so
+     exactly one row ever holds it.
+  2. Any verified :class:`core.email_senders.models.EmailSmtpSender`
+     for the org (oldest first) → :class:`OrgSmtpBackend`. Fallback
+     for orgs that never picked an explicit default (verify auto-
+     flips ``is_default`` on the first SMTP sender, so this branch
+     only ever fires for orgs where the default was cleared
+     manually).
   3. Any :class:`core.email.models.EmailAccount` whose
      ``sync_state != 'disconnected'`` for the org (oldest first) →
-     :class:`OrgOauthBackend`. The OAuth gate is deliberately loose:
-     ``sync_state`` describes the *inbound* sync lifecycle
-     (pending → backfilling → live [→ error]) but outbound send only
-     needs a live refresh_token, which is nulled at the same instant
-     as the ``disconnected`` flip in :func:`core.email.service.disconnect_account`.
-     Requiring ``sync_state='live'`` here made every workflow email
-     wait on the 30-day backfill task to complete after OAuth — and
-     stay silently broken forever if that task got killed mid-run.
+     :class:`OrgOauthBackend`. Same last-resort role — kicks in when
+     no SMTP exists AND no explicit OAuth default was set. The OAuth
+     gate is deliberately loose: ``sync_state`` describes the
+     *inbound* sync lifecycle (pending → backfilling → live [→ error])
+     but outbound send only needs a live refresh_token, which is
+     nulled at the same instant as the ``disconnected`` flip in
+     :func:`core.email.service.disconnect`. Requiring
+     ``sync_state='live'`` here made every workflow email wait on
+     the 30-day backfill task to complete after OAuth — and stay
+     silently broken forever if that task got killed mid-run.
      Ordering by ``connected_at`` gives the oldest-connected mailbox
-     first pick, matching the SMTP branch's "first-verified wins" bias.
+     first pick, matching the SMTP branch's "first-verified wins"
+     bias.
   4. ``None`` — caller decides how to skip (never silently falls
      back to the platform Brevo sender).
 """
@@ -48,6 +60,7 @@ import aiosmtplib
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.email import data_access as accounts_da
 from src.app.core.email.models import EmailAccount, EmailAccountSyncState
 from src.app.core.email_senders import data_access as senders_da
 from src.app.core.email_senders.models import EmailSmtpSender
@@ -199,6 +212,10 @@ class OrgOauthBackend:
 async def resolve_org_sender(session: AsyncSession, *, org_id: uuid.UUID) -> EmailBackend | None:
     """Pick the outbound backend for org-originated mail.
 
+    Explicit default wins first — SMTP or OAuth, whichever the
+    operator picked. Falls through to the legacy "oldest verified /
+    connected" branches for orgs that never set one.
+
     Returns ``None`` when the org has no verified SMTP sender AND no
     live OAuth mailbox — the caller must skip the send with a
     ``org_sender_not_configured`` reason rather than falling back to
@@ -207,6 +224,10 @@ async def resolve_org_sender(session: AsyncSession, *, org_id: uuid.UUID) -> Ema
     default_smtp = await senders_da.find_default_verified(session, org_id=org_id)
     if default_smtp is not None:
         return OrgSmtpBackend(sender=default_smtp)
+
+    default_oauth = await accounts_da.find_default_sendable(session, org_id=org_id)
+    if default_oauth is not None:
+        return OrgOauthBackend(account=default_oauth, session=session)
 
     any_smtp = await senders_da.find_any_verified(session, org_id=org_id)
     if any_smtp is not None:

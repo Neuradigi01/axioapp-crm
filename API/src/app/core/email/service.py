@@ -267,6 +267,13 @@ async def disconnect(
     row.sync_state = EmailAccountSyncState.disconnected
     row.disconnected_at = datetime.now(UTC)
     row.disconnected_by = actor_id
+    # Auto-demote so a revoked mailbox can never stay wired as the
+    # org's default sender. The resolver in
+    # :mod:`shared.email.org_sender` also guards on ``sync_state`` +
+    # ``refresh_token_enc``, but clearing the flag here keeps the
+    # unified-sender list honest and matches the SMTP-side "verify
+    # auto-flips default, disconnect clears it" behavior.
+    row.is_default = False
 
     await session.commit()
     await session.refresh(row)

@@ -37,6 +37,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.email import data_access as accounts_da
 from src.app.core.email.models import EmailAccount, EmailAccountSyncState
 from src.app.core.email_senders import data_access
 from src.app.core.email_senders.models import EmailSmtpSender
@@ -361,25 +362,53 @@ async def set_default_sender(
     *,
     org_id: uuid.UUID,
     sender_id: uuid.UUID,
-) -> EmailSmtpSender:
-    """Mark one SMTP sender as the org's default; unset any prior
-    default. Only verified rows can hold the default flag."""
-    row = await data_access.get_by_id(session, org_id=org_id, sender_id=sender_id)
-    if row is None:
+) -> EmailSmtpSender | EmailAccount:
+    """Mark one sender — SMTP or OAuth (Gmail / Microsoft) — as the
+    org's default; unset any prior default across BOTH tables.
+
+    Only sendable rows can hold the flag:
+      - SMTP: ``verified_at`` must be non-null.
+      - OAuth: ``sync_state != disconnected`` AND
+        ``refresh_token_enc`` non-null (same gate the resolver uses).
+
+    Cross-table clearing runs before the winner flips, so at commit
+    time exactly one row across ``tbl_email_smtp_senders`` +
+    ``tbl_email_accounts`` carries ``is_default=true`` for the org.
+    """
+    smtp_row = await data_access.get_by_id(session, org_id=org_id, sender_id=sender_id)
+    if smtp_row is not None:
+        if smtp_row.verified_at is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verify the sender before making it default.",
+            )
+        await data_access.clear_all_defaults(session, org_id=org_id)
+        await accounts_da.clear_all_defaults(session, org_id=org_id)
+        data_access.set_default(smtp_row)
+        await session.commit()
+        await session.refresh(smtp_row)
+        return smtp_row
+
+    oauth_row = await accounts_da.get_account_by_id(session, account_id=sender_id)
+    if oauth_row is None or oauth_row.org_id != org_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="SMTP sender not found.",
+            detail="Sender not found.",
         )
-    if row.verified_at is None:
+    if (
+        oauth_row.sync_state == EmailAccountSyncState.disconnected
+        or oauth_row.refresh_token_enc is None
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verify the sender before making it default.",
+            detail="Reconnect the mailbox before making it default.",
         )
     await data_access.clear_all_defaults(session, org_id=org_id)
-    data_access.set_default(row)
+    await accounts_da.clear_all_defaults(session, org_id=org_id)
+    accounts_da.set_default(oauth_row)
     await session.commit()
-    await session.refresh(row)
-    return row
+    await session.refresh(oauth_row)
+    return oauth_row
 
 
 async def set_capture_toggle(
@@ -514,10 +543,11 @@ async def list_unified_senders(
                 from_address=r.email_address,
                 display_name=r.display_name,
                 verified=sendable,
-                # OAuth mailboxes don't carry a default flag today —
-                # the resolver falls through to them only when no
-                # verified SMTP sender exists.
-                is_default=False,
+                # ``is_default`` on OAuth rows is set by the operator
+                # via :func:`set_default_sender`; the resolver in
+                # :mod:`shared.email.org_sender` honors it before
+                # falling back to the "oldest connected" branch.
+                is_default=r.is_default,
                 # Health fields — the frontend card uses these to
                 # render a countdown + a red "reconnect required"
                 # banner. `token_expires_at` is the short-lived
