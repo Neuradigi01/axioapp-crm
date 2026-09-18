@@ -54,6 +54,15 @@ export interface PublicPropertyDetail {
   featured_image_url: string | null;
 }
 
+/** Wire shape for `GET /api/public/listings/{token}` — the whole-org
+ *  listings view. Wraps grid cards with the org's display name so the
+ *  page hero can render "<Org Name>'s listings" without a second
+ *  lookup. */
+export interface PublicPropertyStore {
+  org_name: string;
+  items: PublicPropertyCard[];
+}
+
 /**
  * HTTP client for the public property endpoints (`/api/public/*`).
  *
@@ -77,5 +86,11 @@ export class PublicPropertyApiService {
 
   getByToken(token: string): Observable<PublicPropertyDetail> {
     return this.http.get<PublicPropertyDetail>(`${this.base}/property/${token}`);
+  }
+
+  /** Fetch the whole-org listings by its Fernet token — one call
+   *  returns the org name + every currently-published property. */
+  getListingsByToken(token: string): Observable<PublicPropertyStore> {
+    return this.http.get<PublicPropertyStore>(`${this.base}/listings/${token}`);
   }
 }

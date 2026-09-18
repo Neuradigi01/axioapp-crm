@@ -287,9 +287,11 @@
         </div>
       }
 
-      <!-- Sticky footer with status pill + row action menu (edit only) -->
+      <!-- Footer with status pill + row action menu (edit only). Sits
+           at the natural end of the form (not sticky) so it never
+           overlaps other sections while the operator scrolls. -->
       <div
-        class="sticky bottom-4 flex items-center justify-between gap-2 rounded-xl border border-subtle bg-surface/95 p-3 shadow-lg backdrop-blur"
+        class="flex items-center justify-between gap-2 rounded-xl border border-subtle bg-surface p-3 shadow-sm"
       >
         <div class="flex items-center gap-3">
           @if (currentProperty(); as p) {

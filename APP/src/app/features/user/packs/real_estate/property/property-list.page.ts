@@ -12,6 +12,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
@@ -56,6 +57,11 @@ export class PropertyListPageComponent {
   private readonly api = inject(PropertyApiService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly snackBar = inject(MatSnackBar);
+
+  /** True while the "Share Listings" button is minting a token —
+   *  disables the button and shows a "Copying…" label. */
+  readonly listingsShareBusy = signal(false);
 
   protected readonly TABS = PROPERTY_TABS;
 
@@ -95,6 +101,41 @@ export class PropertyListPageComponent {
     this.activeTab.set(tab);
     this.page.set(1);
     this.reload();
+  }
+
+  /** Mint the whole-listings share URL and copy it to the clipboard.
+   *  Fernet-encrypted (same key scheme as per-property share) so it
+   *  doesn't leak the org slug; rotating the property link key
+   *  invalidates every outstanding listings URL at once. Falls back
+   *  to a native prompt if the clipboard API isn't available. */
+  protected shareListings(): void {
+    if (this.listingsShareBusy()) return;
+    this.listingsShareBusy.set(true);
+    this.api
+      .generateStorePublicUrl()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: async (resp) => {
+          this.listingsShareBusy.set(false);
+          const url = `${window.location.origin}/listings/${resp.token}`;
+          try {
+            await navigator.clipboard.writeText(url);
+            this.snackBar.open('Listings URL copied to clipboard.', 'Dismiss', {
+              duration: 2500,
+            });
+          } catch {
+            window.prompt('Copy your public listings URL:', url);
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.listingsShareBusy.set(false);
+          this.snackBar.open(
+            extractApiError(err) ?? 'Could not generate listings URL.',
+            'Dismiss',
+            { duration: 3500 },
+          );
+        },
+      });
   }
 
   protected countForTab(tab: PropertyTabKey): number {

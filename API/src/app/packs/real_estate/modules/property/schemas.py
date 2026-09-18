@@ -289,6 +289,18 @@ class PublicUrlOut(BaseModel):
     token: str
 
 
+class PublicPropertyStoreOut(BaseModel):
+    """Response for ``GET /api/public/listings/{token}`` — the whole-org
+    listings view. Wraps the grid cards in a minimal envelope that
+    also carries the org's display name so the customer-facing page
+    can render a "<Org Name>'s listings" hero without a second
+    round-trip. Slug is deliberately omitted — the Fernet token is
+    the only identifier the customer ever sees."""
+
+    org_name: str
+    items: list[PublicPropertyCardOut]
+
+
 __all__ = [
     "PropertyCreate",
     "PropertyImageOut",
@@ -300,5 +312,6 @@ __all__ = [
     "PublicPropertyCardOut",
     "PublicPropertyDetailOut",
     "PublicPropertyImageOut",
+    "PublicPropertyStoreOut",
     "PublicUrlOut",
 ]

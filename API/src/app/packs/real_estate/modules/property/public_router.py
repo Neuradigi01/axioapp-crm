@@ -28,9 +28,11 @@ from src.app.core.tenants import data_access as tenants_da
 from src.app.packs.real_estate.modules.property.schemas import (
     PublicPropertyCardOut,
     PublicPropertyDetailOut,
+    PublicPropertyStoreOut,
 )
 from src.app.packs.real_estate.modules.property.service import (
     get_public_property,
+    get_public_property_store,
     list_public_properties,
 )
 from src.app.shared.db import get_db
@@ -74,5 +76,28 @@ async def get_public_property_endpoint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="property not available",
+        )
+    return detail
+
+
+@router.get(
+    "/listings/{token}",
+    response_model=PublicPropertyStoreOut,
+    include_in_schema=True,
+)
+async def get_public_property_store_endpoint(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+) -> PublicPropertyStoreOut:
+    """Public whole-org listings view — decrypts the Fernet listings
+    token to an org id and returns the org's display name plus every
+    currently-published property. 404 on every failure mode (bad
+    token, wrong key, tampered, per-property token fed here, unknown
+    org) — no side channel."""
+    detail = await get_public_property_store(db, token=token)
+    if detail is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="listings not available",
         )
     return detail

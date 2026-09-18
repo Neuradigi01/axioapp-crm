@@ -51,6 +51,11 @@ export const PUBLIC_ROUTES: Routes = [
         path: 'store/:token',
         loadComponent: () => import('./store/store.component').then((m) => m.PublicStoreComponent),
       },
+      {
+        path: 'listings/:token',
+        loadComponent: () =>
+          import('./listings/listings.component').then((m) => m.PublicListingsComponent),
+      },
     ],
   },
 ];

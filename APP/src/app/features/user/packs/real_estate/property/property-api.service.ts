@@ -96,6 +96,14 @@ export class PropertyApiService {
     return this.http.post<PublicUrlResponse>(`${this.base}/${id}/public-url`, {});
   }
 
+  /** Mint the shareable whole-org listings URL — one link that opens
+   *  the public grid of every published property for the caller's
+   *  org. Always succeeds (unlike ``generatePublicUrl``, which
+   *  requires the property to be published). */
+  generateStorePublicUrl(): Observable<PublicUrlResponse> {
+    return this.http.post<PublicUrlResponse>(`${this.base}/store/public-url`, {});
+  }
+
   // ---------------------------------------------------------------------
   // Gallery — multipart upload, delete, reorder, set featured.
   // ---------------------------------------------------------------------

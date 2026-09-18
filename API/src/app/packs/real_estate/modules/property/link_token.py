@@ -82,4 +82,37 @@ def decode_property_token(token: str) -> tuple[uuid.UUID, uuid.UUID] | None:
         return None
 
 
-__all__ = ["decode_property_token", "encode_property_token", "reset_cache"]
+def encode_property_store_token(org_id: uuid.UUID) -> str:
+    """Encrypt just ``org_id`` into an opaque URL-safe string.
+
+    Used by the "share all my listings" flow — one link that opens
+    the org's public grid of every published property. The
+    ``listings:`` prefix disambiguates from per-property tokens so
+    a leaked or reused store token can never decode as a property
+    token (the router-side decoder rejects the wrong prefix)."""
+    payload = f"listings:{org_id}".encode("utf-8")
+    return _get_fernet().encrypt(payload).decode("utf-8")
+
+
+def decode_property_store_token(token: str) -> uuid.UUID | None:
+    """Decrypt a store token into ``org_id``. Returns ``None`` on any
+    failure — invalid Fernet token, wrong key, malformed payload,
+    or wrong prefix (i.e. someone tried to feed a per-property token
+    to the listings endpoint). Callers translate ``None`` into a 404."""
+    try:
+        decrypted = _get_fernet().decrypt(token.encode("utf-8")).decode("utf-8")
+        prefix, _, oid_str = decrypted.partition(":")
+        if prefix != "listings":
+            return None
+        return uuid.UUID(oid_str)
+    except (InvalidToken, ValueError):
+        return None
+
+
+__all__ = [
+    "decode_property_store_token",
+    "decode_property_token",
+    "encode_property_store_token",
+    "encode_property_token",
+    "reset_cache",
+]

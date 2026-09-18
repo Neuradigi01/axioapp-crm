@@ -36,6 +36,7 @@ from src.app.packs.real_estate.modules.property.schemas import (
     PublicPropertyCardOut,
     PublicPropertyDetailOut,
     PublicPropertyImageOut,
+    PublicPropertyStoreOut,
     PublicUrlOut,
 )
 from src.app.shared.files.image import ImageValidationError, validate_image_upload
@@ -883,6 +884,55 @@ def _public_detail(prop: Property) -> PublicPropertyDetailOut:
     )
 
 
+def _store_url_for(host: str, token: str) -> str:
+    """Assemble the shareable whole-org listings URL. ``host`` is
+    scheme+host (``https://example.com``); trailing slash is stripped."""
+    return f"{host.rstrip('/')}/listings/{token}"
+
+
+async def generate_public_store_link(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    host: str,
+) -> PublicUrlOut:
+    """Owner-side: mint the shareable link for the whole listings view.
+
+    Unlike the per-property variant, this always succeeds — there's no
+    ``status=published`` gate on a "browse all" URL. If the org has
+    zero published listings the storefront just renders its empty
+    state."""
+    try:
+        token = _lt.encode_property_store_token(org_id)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from None
+    return PublicUrlOut(url=_store_url_for(host, token), token=token)
+
+
+async def get_public_property_store(
+    session: AsyncSession,
+    *,
+    token: str,
+) -> PublicPropertyStoreOut | None:
+    """Decrypt a listings token and return the whole-org view — org
+    display name + every currently-published property as public
+    cards. Returns ``None`` on any failure (bad token, wrong key,
+    tampered, per-property token fed here, unknown org) — the router
+    turns that into a uniform 404."""
+    org_id = _lt.decode_property_store_token(token)
+    if org_id is None:
+        return None
+    from src.app.core.tenants import data_access as _tenants_da
+
+    org = await _tenants_da.get_organization_by_id(session, org_id)
+    if org is None:
+        return None
+    cards = await list_public_properties(session, org_id=org_id)
+    return PublicPropertyStoreOut(org_name=org.name, items=cards)
+
+
 async def get_public_property(
     session: AsyncSession,
     *,
@@ -913,8 +963,10 @@ __all__ = [
     "delete_property",
     "delete_property_image",
     "generate_public_link",
+    "generate_public_store_link",
     "get_property",
     "get_public_property",
+    "get_public_property_store",
     "list_properties",
     "list_public_properties",
     "mark_sold",

@@ -19,7 +19,7 @@ import {
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -100,7 +100,7 @@ export class PropertyFormPageComponent {
   private readonly api = inject(PropertyApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly TYPE_OPTIONS = PROPERTY_TYPE_OPTIONS;
@@ -310,7 +310,12 @@ export class PropertyFormPageComponent {
         .subscribe({
           next: (created) => {
             this.saving.set(false);
-            this.snackBar.open('Property saved as draft.', 'Dismiss', { duration: 2500 });
+            // Show the toast BEFORE navigating so it renders against
+            // the current page paint; the shared toast overlay is
+            // document-root and persists across the route change.
+            this.toast.success('Draft saved', {
+              subtitle: 'You can add images once the page reloads.',
+            });
             this.router.navigate(['/user/properties', created.id, 'edit']);
           },
           error: (err: HttpErrorResponse) => this.handleError(err, 'Could not create property'),
@@ -322,7 +327,7 @@ export class PropertyFormPageComponent {
         .subscribe({
           next: (_updated) => {
             this.saving.set(false);
-            this.snackBar.open('Property saved.', 'Dismiss', { duration: 2500 });
+            this.toast.success('Property saved');
             // Close edit mode → back to list. Owners save + move on; if
             // they want to keep editing they click the row again.
             this.router.navigate(['/user/properties']);
@@ -362,7 +367,7 @@ export class PropertyFormPageComponent {
     this.saving.set(false);
     const message = extractApiError(err) ?? fallback;
     this.submitError.set(message);
-    this.snackBar.open(message, 'Dismiss', { duration: 4000 });
+    this.toast.error(message);
   }
 
   protected fieldError(control: keyof PropertyFormControls): string | null {

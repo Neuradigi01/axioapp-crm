@@ -7,13 +7,25 @@
         Manage your real-estate listings — draft, publish, archive, share.
       </p>
     </div>
-    <a
-      [routerLink]="['/user/properties/new']"
-      class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:brightness-95"
-    >
-      <lucide-icon name="plus" class="h-4 w-4"></lucide-icon>
-      New Property
-    </a>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        (click)="shareListings()"
+        [disabled]="listingsShareBusy()"
+        class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+        title="Copy a public link to your whole listings page"
+      >
+        <lucide-icon name="link" class="h-4 w-4"></lucide-icon>
+        {{ listingsShareBusy() ? 'Copying…' : 'Share Listings' }}
+      </button>
+      <a
+        [routerLink]="['/user/properties/new']"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:brightness-95"
+      >
+        <lucide-icon name="plus" class="h-4 w-4"></lucide-icon>
+        New Property
+      </a>
+    </div>
   </header>
 
   <!-- Tab bar -->
