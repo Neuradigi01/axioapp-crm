@@ -17,6 +17,7 @@ import { RouterLink } from '@angular/router';
 
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { InrPipe } from '../shared/pipes/inr.pipe';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 import {
   CATALOG_STATUSES,
   CatalogApiService,
@@ -73,6 +74,11 @@ export class CatalogPageComponent {
   private readonly api = inject(CatalogApiService);
   private readonly categoriesApi = inject(CatalogCategoriesApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
+
+  /** True while the "Share Store" button is minting a token — disables
+   *  the button and shows a "Copying…" label. */
+  readonly storeShareBusy = signal(false);
 
   /** C2 — Server-managed categories. Replaces the previous client-
    *  derived dropdown that could only see categories on the loaded
@@ -276,6 +282,37 @@ export class CatalogPageComponent {
 
   protected openCreate(): void {
     this.modalState.set(undefined);
+  }
+
+  /** Mint the whole-store share URL and copy to clipboard. One click
+   *  per share — the token is Fernet-encrypted so it doesn't expose
+   *  the org slug and rotating the key invalidates every outstanding
+   *  storefront link. Falls back to an alert with the URL if the
+   *  clipboard API is unavailable (e.g. non-HTTPS local network). */
+  protected shareStore(): void {
+    if (this.storeShareBusy()) return;
+    this.storeShareBusy.set(true);
+    this.api
+      .generateStorePublicUrl()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: async (resp) => {
+          this.storeShareBusy.set(false);
+          const url = `${window.location.origin}/store/${resp.token}`;
+          try {
+            await navigator.clipboard.writeText(url);
+            this.toast.success('Store URL copied to clipboard.');
+          } catch {
+            // Clipboard write blocked (HTTP over LAN, missing perms, …).
+            // Surface the URL so the operator can still copy manually.
+            window.prompt('Copy your public store URL:', url);
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.storeShareBusy.set(false);
+          this.toast.error(extractApiError(err) ?? 'Could not generate store URL.');
+        },
+      });
   }
 
   protected openEdit(item: CatalogItem): void {

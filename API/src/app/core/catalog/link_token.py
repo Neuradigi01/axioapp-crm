@@ -86,4 +86,37 @@ def decode_catalog_token(token: str) -> tuple[uuid.UUID, uuid.UUID] | None:
         return None
 
 
-__all__ = ["decode_catalog_token", "encode_catalog_token", "reset_cache"]
+def encode_catalog_store_token(org_id: uuid.UUID) -> str:
+    """Encrypt just ``org_id`` into an opaque URL-safe string.
+
+    Used by the "share the whole storefront" flow — one link that
+    opens the org's public grid of every published product. The
+    ``store:`` prefix disambiguates from per-item tokens so a leaked
+    or reused store token can never decode as an item token (the
+    router-side decoder rejects the wrong prefix)."""
+    payload = f"store:{org_id}".encode("utf-8")
+    return _get_fernet().encrypt(payload).decode("utf-8")
+
+
+def decode_catalog_store_token(token: str) -> uuid.UUID | None:
+    """Decrypt a store token into ``org_id``. Returns ``None`` on any
+    failure — invalid Fernet token, wrong key, malformed payload,
+    or wrong prefix (i.e. someone tried to feed a per-item token
+    to the store endpoint). Callers translate ``None`` into a 404."""
+    try:
+        decrypted = _get_fernet().decrypt(token.encode("utf-8")).decode("utf-8")
+        prefix, _, oid_str = decrypted.partition(":")
+        if prefix != "store":
+            return None
+        return uuid.UUID(oid_str)
+    except (InvalidToken, ValueError):
+        return None
+
+
+__all__ = [
+    "decode_catalog_store_token",
+    "decode_catalog_token",
+    "encode_catalog_store_token",
+    "encode_catalog_token",
+    "reset_cache",
+]

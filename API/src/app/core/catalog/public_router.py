@@ -27,8 +27,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core.catalog.schemas import (
     PublicCatalogCardOut,
     PublicCatalogDetailOut,
+    PublicStoreOut,
 )
-from src.app.core.catalog.service import get_public_item, list_public_items
+from src.app.core.catalog.service import (
+    get_public_item,
+    get_public_store,
+    list_public_items,
+)
 from src.app.core.tenants import data_access as tenants_da
 from src.app.shared.db import get_db
 
@@ -71,5 +76,28 @@ async def get_public_catalog_item_endpoint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="product not available",
+        )
+    return detail
+
+
+@router.get(
+    "/store/{token}",
+    response_model=PublicStoreOut,
+    include_in_schema=True,
+)
+async def get_public_store_endpoint(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+) -> PublicStoreOut:
+    """Public storefront view — decrypts the Fernet store token to an
+    org id and returns the org's display name plus every currently-
+    published catalog item. 404 on every failure mode (bad token,
+    wrong key, tampered, per-item token fed here, unknown org) — no
+    side channel."""
+    detail = await get_public_store(db, token=token)
+    if detail is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="store not available",
         )
     return detail

@@ -28,6 +28,16 @@
       </a>
       <button
         type="button"
+        (click)="shareStore()"
+        [disabled]="storeShareBusy()"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+        title="Copy a public link to your whole catalog"
+      >
+        <lucide-icon name="link" class="h-4 w-4" />
+        {{ storeShareBusy() ? 'Copying…' : 'Share Store' }}
+      </button>
+      <button
+        type="button"
         (click)="openCreate()"
         class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:brightness-95"
       >

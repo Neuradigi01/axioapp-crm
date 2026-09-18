@@ -233,6 +233,14 @@ export class CatalogApiService extends BaseCrudApiService<
     return this.http.post<CatalogPublicUrl>(`${this.base}/${itemId}/public-url`, {});
   }
 
+  /** Mint the shareable whole-store URL — one link that opens the
+   *  public grid of every published product for the caller's org.
+   *  Always succeeds (unlike ``generatePublicUrl``, which requires
+   *  the item to be published). */
+  generateStorePublicUrl(): Observable<CatalogPublicUrl> {
+    return this.http.post<CatalogPublicUrl>(`${this.base}/store/public-url`, {});
+  }
+
   /** C3 — Field defs for `entity_type='catalog_item'`. Feeds the
    *  dynamic-form renderer in the add/edit modal. */
   renderFields(): Observable<FieldDef[]> {

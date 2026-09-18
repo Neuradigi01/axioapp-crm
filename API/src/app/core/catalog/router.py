@@ -72,6 +72,7 @@ from src.app.core.catalog.service import (
     delete_category,
     delete_item,
     generate_public_link,
+    generate_public_store_link,
     get_item,
     list_categories,
     list_items,
@@ -198,6 +199,23 @@ async def create_item_endpoint(
 ) -> CatalogItemOut:
     item = await create_item(db, org_id=user.org_id, payload=payload)
     return CatalogItemOut.model_validate(item)
+
+
+# Mounted ABOVE the `/{item_id}/*` routes so FastAPI matches the
+# literal `store` segment instead of treating it as a UUID and 422-ing.
+@router.post("/store/public-url", response_model=PublicUrlOut)
+async def generate_public_store_url_endpoint(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("catalog.read")),
+) -> PublicUrlOut:
+    """Mint the whole-org storefront URL — one link that opens the
+    public grid of every currently-published item for the caller's
+    org. Unlike ``POST /{item_id}/public-url`` this always succeeds:
+    if the org has zero published items, the storefront just renders
+    its empty state."""
+    host = f"{request.url.scheme}://{request.url.netloc}"
+    return await generate_public_store_link(db, org_id=user.org_id, host=host)
 
 
 @router.get("/{item_id}", response_model=CatalogItemOut)
@@ -376,3 +394,5 @@ async def generate_public_url_endpoint(
     return await generate_public_link(
         db, org_id=user.org_id, item_id=item_id, host=host
     )
+
+

@@ -48,6 +48,7 @@ from src.app.core.catalog.schemas import (
     CatalogItemUpdate,
     PublicCatalogCardOut,
     PublicCatalogDetailOut,
+    PublicStoreOut,
     PublicUrlOut,
 )
 from src.app.shared import validators as shared_validators
@@ -1062,6 +1063,58 @@ def _public_detail(item: CatalogItem) -> PublicCatalogDetailOut:
     )
 
 
+def _store_url_for(host: str, token: str) -> str:
+    """Assemble the shareable storefront URL (whole-org view). Host is
+    scheme+host (``https://example.com``); trailing slash is stripped."""
+    return f"{host.rstrip('/')}/store/{token}"
+
+
+async def generate_public_store_link(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    host: str,
+) -> PublicUrlOut:
+    """Owner-side: mint the shareable link for the whole storefront.
+
+    Unlike the per-item variant, this always succeeds — there's no
+    ``status=published`` gate on a "browse all" URL. If the org has
+    zero published items the storefront just renders its empty state.
+    """
+    try:
+        token = _lt.encode_catalog_store_token(org_id)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from None
+    return PublicUrlOut(url=_store_url_for(host, token), token=token)
+
+
+async def get_public_store(
+    session: AsyncSession,
+    *,
+    token: str,
+) -> PublicStoreOut | None:
+    """Decrypt a store token and return the storefront view — org
+    display name + every currently-published item as public cards.
+
+    Returns ``None`` on any failure (bad token, wrong key, tampered,
+    per-item token fed to store endpoint, unknown org) — the router
+    turns that into a uniform 404.
+    """
+    org_id = _lt.decode_catalog_store_token(token)
+    if org_id is None:
+        return None
+    from src.app.core.tenants import data_access as _tenants_da
+
+    org = await _tenants_da.get_organization_by_id(session, org_id)
+    if org is None:
+        return None
+    rows = await _da.list_published_items(session, org_id=org_id)
+    rows = [r for r in rows if r.org_id == org_id]
+    return PublicStoreOut(org_name=org.name, items=[_public_card(r) for r in rows])
+
+
 async def get_public_item(
     session: AsyncSession,
     *,
@@ -1094,12 +1147,15 @@ __all__ = [
     "delete_category",
     "delete_item",
     "generate_public_link",
+    "generate_public_store_link",
     "get_category",
     "get_item",
     "get_public_item",
+    "get_public_store",
     "list_categories",
     "list_items",
     "list_public_items",
+    "promote_gallery_image_to_cover",
     "publish_item",
     "remove_gallery_image",
     "remove_item_image",
