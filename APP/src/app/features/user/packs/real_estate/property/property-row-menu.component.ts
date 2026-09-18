@@ -83,6 +83,14 @@ export class PropertyRowMenuComponent {
   protected readonly open = signal(false);
   protected readonly pending = signal<'delete' | 'archive' | null>(null);
   protected readonly clipboardFallbackUrl = signal<string | null>(null);
+  /** Menu coordinates in viewport space. Populated when the trigger
+   *  opens so the popover can render with ``position: fixed`` and
+   *  escape every ``overflow-hidden`` ancestor in the table. Cleared
+   *  on close / scroll / resize so we never render a stale position. */
+  protected readonly menuPos = signal<{ top: number; right: number } | null>(null);
+  /** Menu width — kept in sync with the Tailwind ``w-56`` on the
+   *  popover so the right-edge computation matches the rendered box. */
+  private static readonly MENU_WIDTH_PX = 224;
 
   protected readonly canWrite = computed(() => this.auth.hasPermission('property.write'));
   protected readonly canPublish = computed(() => this.auth.hasPermission('property.publish'));
@@ -193,11 +201,37 @@ export class PropertyRowMenuComponent {
 
   protected toggle(event: MouseEvent): void {
     event.stopPropagation();
-    this.open.update((v) => !v);
+    const nextOpen = !this.open();
+    if (nextOpen) {
+      // Capture the trigger button's viewport rect and translate into
+      // ``top`` (below the button) + ``right`` (distance from the
+      // viewport's right edge). Using ``right`` instead of ``left``
+      // keeps the popover flush with the trigger's right edge, so it
+      // won't overflow on rows near the viewport's right side.
+      const btn = event.currentTarget as HTMLElement;
+      const rect = btn.getBoundingClientRect();
+      const rightPx = Math.max(0, window.innerWidth - rect.right);
+      this.menuPos.set({
+        top: rect.bottom + 4,
+        right: rightPx,
+      });
+    } else {
+      this.menuPos.set(null);
+    }
+    this.open.set(nextOpen);
   }
 
   protected close(): void {
     this.open.set(false);
+    this.menuPos.set(null);
+  }
+
+  /** Close on scroll / resize — the ``fixed`` popover is anchored
+   *  to a captured rect that goes stale the moment layout shifts. */
+  @HostListener('window:scroll')
+  @HostListener('window:resize')
+  protected onLayoutShift(): void {
+    if (this.open()) this.close();
   }
 
   @HostListener('document:click', ['$event'])

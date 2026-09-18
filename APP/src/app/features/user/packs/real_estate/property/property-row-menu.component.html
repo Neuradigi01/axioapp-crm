@@ -10,11 +10,16 @@
     <lucide-icon name="more-vertical" class="h-4 w-4"></lucide-icon>
   </button>
 
-  @if (open()) {
+  @if (open() && menuPos(); as pos) {
+    <!-- ``position: fixed`` so ``overflow-hidden`` ancestors in the
+         table can't clip the popover. Coordinates come from the
+         trigger's bounding rect, captured on toggle. -->
     <div
       role="menu"
       (click)="$event.stopPropagation()"
-      class="absolute right-0 z-30 mt-1 w-56 origin-top-right rounded-md border border-subtle bg-surface shadow-lg ring-1 ring-black/5"
+      [style.top.px]="pos.top"
+      [style.right.px]="pos.right"
+      class="fixed z-50 w-56 origin-top-right rounded-md border border-subtle bg-surface shadow-lg ring-1 ring-black/5"
     >
       <ul class="py-1 text-sm">
         @for (action of actions(); track action.key) {
