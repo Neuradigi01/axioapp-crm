@@ -24,18 +24,20 @@
       <ul class="py-1 text-sm">
         @for (action of actions(); track action.key) {
           <li>
+            <!-- Publish stays CLICKABLE even when images are missing so
+                 the toast in ``run()`` can tell the operator why it
+                 won't go through. HTML ``disabled`` swallows the click
+                 event, so we dim the row visually instead of blocking
+                 it. -->
+            @let dimmed = action.key === 'publish' && !hasImages();
             <button
               type="button"
               (click)="run(action, $event)"
-              [attr.disabled]="action.key === 'publish' && !hasImages() ? true : null"
-              [title]="
-                action.key === 'publish' && !hasImages()
-                  ? 'Add at least one image to publish.'
-                  : action.label
-              "
+              [title]="dimmed ? 'Add at least one image to publish.' : action.label"
               [class.text-red-400]="action.destructive"
               [class.hover:bg-red-500/10]="action.destructive"
-              class="flex w-full items-center gap-2 px-3 py-2 text-left text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              [class.opacity-60]="dimmed"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left text-default hover:bg-surface-2"
             >
               <lucide-icon [name]="action.icon" class="h-4 w-4"></lucide-icon>
               {{ action.label }}

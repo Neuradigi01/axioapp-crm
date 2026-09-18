@@ -14,7 +14,7 @@ import { CommonModule } from '@angular/common';
 import { CdkDrag, CdkDragDrop, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -53,7 +53,7 @@ export class PropertyGalleryComponent {
 
   private readonly api = inject(PropertyApiService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
   private readonly confirmDialog = inject(ConfirmDialogService);
 
   protected readonly images = signal<PropertyImage[]>([]);
@@ -123,7 +123,7 @@ export class PropertyGalleryComponent {
         next: () => {
           this.images.update((all) => all.map((i) => ({ ...i, is_featured: i.id === image.id })));
           this.imagesChanged.emit(this.images());
-          this.snackBar.open('Cover image updated.', 'Dismiss', { duration: 2500 });
+          this.toast.success('Cover image updated');
         },
         error: (err: HttpErrorResponse) => this.showError(err, 'Could not set cover image'),
       });
@@ -144,7 +144,7 @@ export class PropertyGalleryComponent {
         next: () => {
           this.images.update((all) => all.filter((i) => i.id !== image.id));
           this.imagesChanged.emit(this.images());
-          this.snackBar.open('Image removed.', 'Dismiss', { duration: 2500 });
+          this.toast.success('Image removed');
         },
         error: (err: HttpErrorResponse) => this.showError(err, 'Could not delete image'),
       });
@@ -153,25 +153,21 @@ export class PropertyGalleryComponent {
   private upload(files: File[]): void {
     if (files.length === 0) return;
     if (files.length > MAX_UPLOAD_BATCH) {
-      this.snackBar.open(`Please upload at most ${MAX_UPLOAD_BATCH} files at a time.`, 'Dismiss', {
-        duration: 3500,
-      });
+      this.toast.warn(`Please upload at most ${MAX_UPLOAD_BATCH} files at a time.`);
       return;
     }
 
     const validated: File[] = [];
     for (const f of files) {
       if (!ALLOWED_IMAGE_MIME.has(f.type)) {
-        this.snackBar.open(
-          `Skipped “${f.name}” — only JPEG, PNG, or WebP images are allowed.`,
-          'Dismiss',
-          { duration: 3500 },
-        );
+        this.toast.warn(`Skipped “${f.name}”`, {
+          subtitle: 'Only JPEG, PNG, or WebP images are allowed.',
+        });
         continue;
       }
       if (f.size > MAX_IMAGE_BYTES) {
-        this.snackBar.open(`Skipped “${f.name}” — file exceeds the 5 MB cap.`, 'Dismiss', {
-          duration: 3500,
+        this.toast.warn(`Skipped “${f.name}”`, {
+          subtitle: 'File exceeds the 5 MB cap.',
         });
         continue;
       }
@@ -188,10 +184,8 @@ export class PropertyGalleryComponent {
           this.images.update((all) => [...all, ...inserted]);
           this.imagesChanged.emit(this.images());
           this.uploading.set(false);
-          this.snackBar.open(
-            `Uploaded ${inserted.length} image${inserted.length === 1 ? '' : 's'}.`,
-            'Dismiss',
-            { duration: 2500 },
+          this.toast.success(
+            `Uploaded ${inserted.length} image${inserted.length === 1 ? '' : 's'}`,
           );
         },
         error: (err: HttpErrorResponse) => {
@@ -215,6 +209,6 @@ export class PropertyGalleryComponent {
   }
 
   private showError(err: HttpErrorResponse, fallback: string): void {
-    this.snackBar.open(extractApiError(err) ?? fallback, 'Dismiss', { duration: 4000 });
+    this.toast.error(extractApiError(err) ?? fallback);
   }
 }

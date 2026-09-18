@@ -15,7 +15,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 
 import { extractApiError } from '@core/services/api-error.util';
 
@@ -76,7 +76,7 @@ export class PropertyRowMenuComponent {
   private readonly api = inject(PropertyApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly router = inject(Router);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
   private readonly hostRef = inject(ElementRef<HTMLElement>);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -204,17 +204,26 @@ export class PropertyRowMenuComponent {
     const nextOpen = !this.open();
     if (nextOpen) {
       // Capture the trigger button's viewport rect and translate into
-      // ``top`` (below the button) + ``right`` (distance from the
-      // viewport's right edge). Using ``right`` instead of ``left``
-      // keeps the popover flush with the trigger's right edge, so it
-      // won't overflow on rows near the viewport's right side.
+      // ``top`` (below the button, or above when there's not enough
+      // room) + ``right`` (distance from the viewport's right edge).
+      // ``right`` instead of ``left`` keeps the popover flush with
+      // the trigger's right edge so it never overflows the right side.
       const btn = event.currentTarget as HTMLElement;
       const rect = btn.getBoundingClientRect();
       const rightPx = Math.max(0, window.innerWidth - rect.right);
-      this.menuPos.set({
-        top: rect.bottom + 4,
-        right: rightPx,
-      });
+
+      // Rough menu height: ~40px per action row + ~16px for the ``ul``
+      // top/bottom padding. Accurate to within a few pixels of the
+      // actual rendered box — we only need it to decide up-vs-down,
+      // not to lay out pixel-perfect. Flip to open ABOVE the trigger
+      // when the space below can't hold the menu + a small margin,
+      // so the last visible row never has its Delete row clipped.
+      const estHeight = 16 + this.actions().length * 40;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUpward = spaceBelow < estHeight + 12;
+      const topPx = openUpward ? Math.max(8, rect.top - estHeight - 4) : rect.bottom + 4;
+
+      this.menuPos.set({ top: topPx, right: rightPx });
     } else {
       this.menuPos.set(null);
     }
@@ -254,8 +263,8 @@ export class PropertyRowMenuComponent {
     event.stopPropagation();
     this.close();
     if (action.key === 'publish' && !this.hasImages()) {
-      this.snackBar.open('Add at least one image to publish this property.', 'Dismiss', {
-        duration: 3500,
+      this.toast.warn('Add at least one image to publish', {
+        subtitle: 'Buyers need to see the property before it goes live.',
       });
       return;
     }
@@ -369,7 +378,7 @@ export class PropertyRowMenuComponent {
           .subscribe({
             next: () => {
               this.removed.emit(p.id);
-              this.snackBar.open('Property deleted.', 'Dismiss', { duration: 2500 });
+              this.toast.success('Property deleted');
             },
             error: (err: HttpErrorResponse) => this.showError(err, 'Delete failed'),
           });
@@ -388,7 +397,7 @@ export class PropertyRowMenuComponent {
   }
 
   private done(message: string): void {
-    this.snackBar.open(message, 'Dismiss', { duration: 2500 });
+    this.toast.success(message);
     this.refresh.emit();
   }
 
@@ -398,7 +407,7 @@ export class PropertyRowMenuComponent {
   }
 
   private showError(err: HttpErrorResponse, fallback: string): void {
-    this.snackBar.open(extractApiError(err) ?? fallback, 'Dismiss', { duration: 4000 });
+    this.toast.error(extractApiError(err) ?? fallback);
   }
 
   /** Assemble the public URL from the browser's own origin + the
@@ -419,7 +428,7 @@ export class PropertyRowMenuComponent {
           const url = this.publicUrlFromToken(resp.token);
           try {
             await navigator.clipboard.writeText(url);
-            this.snackBar.open('Public URL copied to clipboard.', 'Dismiss', { duration: 2500 });
+            this.toast.success('Public URL copied to clipboard');
           } catch {
             // Older browser / permission blocked — reveal a fallback
             // modal with the URL in a read-only field.

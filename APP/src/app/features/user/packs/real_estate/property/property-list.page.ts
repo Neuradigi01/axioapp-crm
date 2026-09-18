@@ -12,7 +12,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
@@ -57,7 +57,7 @@ export class PropertyListPageComponent {
   private readonly api = inject(PropertyApiService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly toast = inject(ToastService);
 
   /** True while the "Share Listings" button is minting a token —
    *  disables the button and shows a "Copying…" label. */
@@ -120,20 +120,14 @@ export class PropertyListPageComponent {
           const url = `${window.location.origin}/listings/${resp.token}`;
           try {
             await navigator.clipboard.writeText(url);
-            this.snackBar.open('Listings URL copied to clipboard.', 'Dismiss', {
-              duration: 2500,
-            });
+            this.toast.success('Listings URL copied to clipboard');
           } catch {
             window.prompt('Copy your public listings URL:', url);
           }
         },
         error: (err: HttpErrorResponse) => {
           this.listingsShareBusy.set(false);
-          this.snackBar.open(
-            extractApiError(err) ?? 'Could not generate listings URL.',
-            'Dismiss',
-            { duration: 3500 },
-          );
+          this.toast.error(extractApiError(err) ?? 'Could not generate listings URL.');
         },
       });
   }
