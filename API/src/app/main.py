@@ -41,6 +41,12 @@ import src.app.core.custom_events.models  # noqa: F401
 import src.app.core.custom_events.module  # noqa: F401
 import src.app.core.custom_events.tasks  # noqa: F401
 
+# tasks/email-endpoint-abstraction Step 1 — side-effect import so the
+# two channel-endpoint tables (tbl_channel_endpoints,
+# tbl_email_endpoint_details) register with `Base.metadata` before the
+# FastAPI app's tables-create + Alembic autogenerate sweep run.
+import src.app.core.channel_endpoints.models  # noqa: F401
+
 # tasks/ai-assistants Step 1 — side-effect import so the two BYOK
 # tables (tbl_ai_provider_keys, tbl_org_ai_cost_budget) register with
 # `Base.metadata` before the FastAPI app's tables-create + Alembic

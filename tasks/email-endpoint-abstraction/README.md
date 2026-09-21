@@ -142,7 +142,7 @@ The Prativani spec's `tbl_channel_endpoints` + `tbl_email_endpoint_details` coll
 
 | # | Title | Status | Est files | Est effort |
 |---|---|---|---|---|
-| 1 | Migration: create `tbl_channel_endpoints` + `tbl_email_endpoint_details` + backfill from SMTP senders + OAuth accounts | Pending | 3 (migration + probe test + models.py) | ~0.5 day |
+| 1 | Migration: create `tbl_channel_endpoints` + `tbl_email_endpoint_details` + backfill from SMTP senders + OAuth accounts | **COMPLETED** (2026-09-21, migration `0232` applied; 1 SMTP + 1 OAuth backfilled; downgrade + re-upgrade round-trip clean) | 4 (migration + models + `__init__` + probe test + main.py side-effect import) | ~0.5 day |
 | 2 | Backend: `core/channel_endpoints/` module (models, schemas, DAL, service, router) | Pending | 6 | ~0.75 day |
 | 3 | Refactor: mailgun webhook uses `find_by_reply_token()` from new DAL; golden byte-identical DB test | Pending | 3 (service.py + tasks.py + test) | ~0.5 day |
 | 4 | Refactor: OAuth ingest (`receive_email`) records `endpoint_id` in message payload; golden byte-identical DB test | Pending | 2 | ~0.5 day |

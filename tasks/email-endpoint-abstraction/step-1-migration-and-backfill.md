@@ -1,6 +1,6 @@
 # Step 1: Migration — create `tbl_channel_endpoints` + `tbl_email_endpoint_details` + backfill
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — migration `0232_channel_endpoints` applied against `crm_local`; 1 SMTP sender + 1 OAuth account backfilled (1 `smtp_reply_capture` endpoint + 1 `oauth_mailbox` endpoint + 2 details rows); downgrade + re-upgrade round-trip verified clean; legacy `tbl_email_smtp_senders.inbound_token` preserved.
 
 ## Goal
 
