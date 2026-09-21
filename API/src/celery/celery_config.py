@@ -317,4 +317,15 @@ beat_schedule = {
         "task": "src.app.core.email.mailgun.orphan_cleanup.sweep_messages_orphans",
         "schedule": crontab(hour=4, minute=0),
     },
+    # tasks/email-endpoint-abstraction Step 5 — nightly 03:15 UTC sweep
+    # across tbl_channel_endpoints. Two passes: orphan endpoints (no
+    # details row after 24h) + oauth_mailbox endpoints whose backing
+    # tbl_email_accounts has been disconnected for 7 days. Both are
+    # soft-deleted so operators can inspect afterward. Offset from
+    # tenants/pending-orgs sweep (03:45) and workflows orphan sweep
+    # (Sunday 03:00) so DB pool isn't contended.
+    "channel-endpoints-sweep-orphans-nightly": {
+        "task": "src.app.core.channel_endpoints.tasks.sweep_orphan_endpoints",
+        "schedule": crontab(hour=3, minute=15),
+    },
 }

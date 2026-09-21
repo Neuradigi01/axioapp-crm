@@ -109,6 +109,13 @@ celery.autodiscover_tasks(
         # for staging (15-min cadence) + messages/ (daily). Beat
         # entries in celery_config.py.
         "src.app.core.email.mailgun.orphan_cleanup",
+        # tasks/email-endpoint-abstraction Step 5 — nightly 03:15 UTC
+        # sweep across tbl_channel_endpoints. Soft-deletes rows with
+        # no matching details row after 24h and oauth_mailbox rows
+        # whose backing tbl_email_accounts has been disconnected for
+        # 7d. Without this entry the beat scheduler can't find
+        # ``sweep_orphan_endpoints`` and orphan rows accumulate.
+        "src.app.core.channel_endpoints.tasks",
     ]
 )
 

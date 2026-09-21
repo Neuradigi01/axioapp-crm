@@ -312,12 +312,53 @@ async def soft_delete_orphans_older_than(
     return len(orphans)
 
 
+async def list_oauth_endpoints_backed_by_disconnected_accounts(
+    session: AsyncSession,
+    *,
+    disconnected_since: datetime,
+) -> list[ChannelEndpoint]:
+    """OAuth-mailbox endpoints whose backing ``tbl_email_accounts`` row
+    has been ``disconnected_at <= disconnected_since`` for the whole
+    grace window.
+
+    Consumed by the Step 5 sweeper. Cross-tenant (system-actor beat).
+    Uses raw SQL so the ORM tenant filter doesn't scope the read to
+    ``NULL org`` and drop every row.
+    """
+    from sqlalchemy import text
+
+    result = await session.execute(
+        text(
+            """
+            SELECT e.id
+              FROM tbl_channel_endpoints e
+              JOIN tbl_email_endpoint_details d ON d.endpoint_id = e.id
+              JOIN tbl_email_accounts a ON a.id = d.oauth_account_id
+             WHERE e.is_active = true
+               AND e.endpoint_type = 'oauth_mailbox'
+               AND a.sync_state = 'disconnected'
+               AND a.disconnected_at IS NOT NULL
+               AND a.disconnected_at <= :cutoff
+            """
+        ),
+        {"cutoff": disconnected_since},
+    )
+    ids = [row[0] for row in result.all()]
+    if not ids:
+        return []
+    rows = await session.execute(
+        select(ChannelEndpoint).where(ChannelEndpoint.id.in_(ids))
+    )
+    return list(rows.scalars().all())
+
+
 __all__ = [
     "find_by_reply_token",
     "find_by_forwarding_token",
     "find_active_for_org",
     "get_by_id",
     "list_orphan_endpoints",
+    "list_oauth_endpoints_backed_by_disconnected_accounts",
     "add_endpoint",
     "add_details",
     "create_smtp_reply_capture",

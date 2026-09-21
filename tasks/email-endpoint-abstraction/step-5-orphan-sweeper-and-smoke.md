@@ -1,6 +1,6 @@
 # Step 5: Orphan-endpoint sweeper + admin overview smoke
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — `sweep_orphan_endpoints` Celery task ships two passes (orphan endpoints > 24h old, OAuth-mailbox endpoints backed by 7d-disconnected accounts); registered under autodiscover; beat entry `channel-endpoints-sweep-orphans-nightly` at 03:15 UTC; dry-run against live `crm_local` returns `{orphan_swept: 0, oauth_swept: 0, failed: 0}` (all shipped endpoints healthy); SMOKE.md documents the 4-check manual browser flow. **Track 1 COMPLETE.**
 
 ## Goal
 
