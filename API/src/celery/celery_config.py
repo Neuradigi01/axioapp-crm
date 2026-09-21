@@ -348,4 +348,28 @@ beat_schedule = {
         "task": "src.app.core.email_sender_setup.tasks.sweep_demoted_domains_hourly",
         "schedule": crontab(minute=0),
     },
+    # tasks/email-reputation-warmup Step 4 — 4h evaluator sweep.
+    # Runs shed evaluation (before warmup, so a same-tick breach
+    # doesn't advance) + warmup ladder advance. Cadence matches
+    # Prativani spec: fast enough to catch a same-day breach, slow
+    # enough that the shed doesn't oscillate.
+    "reputation-evaluate-warmup-and-shed-4h": {
+        "task": "src.app.core.email.reputation.tasks.evaluate_warmup_and_shed_4h",
+        "schedule": crontab(minute=10, hour="*/4"),
+    },
+    # tasks/email-reputation-warmup Step 4 — hourly recovery. Flips
+    # rows whose ``blocked_until`` has passed back to ``ok`` +
+    # notifies Owner. Cheap query (partial index on state='blocked'
+    # + blocked_until).
+    "reputation-check-blocked-until-expiry-hourly": {
+        "task": "src.app.core.email.reputation.tasks.check_blocked_until_expiry_hourly",
+        "schedule": crontab(minute=5),
+    },
+    # tasks/email-reputation-warmup Step 4 — defensive Redis sweep.
+    # Redis TTL already expires stale bucket keys; this catch-net
+    # exists for rogue writes without TTL (crash mid-INCR).
+    "reputation-trim-buckets-hourly": {
+        "task": "src.app.core.email.reputation.tasks.trim_reputation_buckets_hourly",
+        "schedule": crontab(minute=15),
+    },
 }

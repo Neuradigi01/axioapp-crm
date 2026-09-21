@@ -347,6 +347,11 @@ async def send_email(
     envelope_from_address: str | None = None
     envelope_reply_to: str | None = None
     endpoint_created_this_call = False
+    # tasks/email-reputation-warmup Step 5 — resolved own-domain UUID
+    # kept so the send-gate can key its ceiling/reputation lookup on
+    # the specific verified domain row (not just the string dispatch
+    # domain).
+    resolved_domain_id: uuid.UUID | None = None
 
     if account_id is None and smtp_sender_id is None:
         # Late import — resolver lives in a peer module, and importing
@@ -378,6 +383,7 @@ async def send_email(
             dispatch_domain = envelope.dispatch_domain
             envelope_from_address = envelope.from_address
             envelope_reply_to = envelope.reply_to
+            resolved_domain_id = envelope.own_domain_id
         elif envelope_kind == "platform_from":
             # Mint / reuse a platform reply-capture endpoint so the
             # ``r-<token>@<inbound>`` Reply-To lands somewhere real.
@@ -461,6 +467,28 @@ async def send_email(
         sender_email = envelope_from_address
         sender_display = None
         sender_provider_label = f"mailgun_{envelope_kind}"
+
+    # tasks/email-reputation-warmup Step 5 — send-gate chain. No-op
+    # for oauth_account / smtp_sender (reputation tracks only
+    # mailgun-mediated envelopes). Raises ``SendGateSkipped`` (or
+    # subclass) which we map to a 429 with the skip code so
+    # campaign/sequence callers can log + move on. Ordered
+    # cheapest-fail-first: reputation → ceiling → wallet → rate.
+    from src.app.core.email.reputation.exceptions import SendGateSkipped
+    from src.app.core.email.reputation.gates import run_send_gate
+
+    try:
+        await run_send_gate(
+            session,
+            org_id=org_id,
+            envelope_type=envelope_kind,
+            domain_id=resolved_domain_id,
+        )
+    except SendGateSkipped as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"skip_code": exc.code.value, "reason": str(exc)},
+        ) from exc
 
     # mailgun-inbound track: rewrite `Reply-To` on SMTP-only outbound.
     original_reply_to = reply_to

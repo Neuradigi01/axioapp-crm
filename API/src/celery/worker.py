@@ -107,6 +107,13 @@ celery.autodiscover_tasks(
         # JSON payload to disk. Without this entry the worker drops the
         # task with a KeyError and 24h counters stop advancing.
         "src.app.core.email.mailgun.events_webhook",
+        # tasks/email-reputation-warmup Step 4 — three beats:
+        # ``evaluate_warmup_and_shed_4h`` (advance + shed evaluate),
+        # ``check_blocked_until_expiry_hourly`` (auto-recovery),
+        # ``trim_reputation_buckets_hourly`` (Redis TTL catch-net).
+        # Missing entry = beat can't find the tasks and reputation
+        # state gets frozen at whatever the events-webhook left behind.
+        "src.app.core.email.reputation.tasks",
         # tasks/mailgun-inbound Step 3 — 5-min sweeper that re-enqueues
         # any pending-inbound directory left behind by a broker outage
         # at delivery time. Beat entry lives in celery_config.py.

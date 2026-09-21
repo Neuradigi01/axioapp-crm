@@ -277,8 +277,8 @@ Marked **unsourced** at plan time. Discovery is Step 1 of this track and is non-
 | 1 | **Discovery**: fetch Mailgun reputation + rate limits + events + `v:` docs; confirm ISP thresholds; document find-vs-Prativani deltas | Pending | 1 (discovery notes) | ~0.75 day |
 | 2 | Backend: migration + reputation table + counters (Redis helpers) | COMPLETED | 3 | ~0.75 day |
 | 3 | Backend: events webhook + attribution via `v:` + dedup + retry | COMPLETED | 3 | ~1 day |
-| 4 | Backend: warmup evaluator (4h beat) + shed evaluator + owner notifications | Pending | 3 | ~1 day |
-| 5 | Backend: send-gate chain refactor in `send_email()` — ceiling/wallet/rate/dispatch + skip codes | Pending | 2 | ~1 day |
+| 4 | Backend: warmup evaluator (4h beat) + shed evaluator + owner notifications | COMPLETED | 3 | ~1 day |
+| 5 | Backend: send-gate chain refactor in `send_email()` — ceiling/wallet/rate/dispatch + skip codes | COMPLETED | 2 | ~1 day |
 | 6 | Backend: `v:` stamping in Mailgun API client + campaign integration | Pending | 2 | ~0.5 day |
 | 7 | Frontend: Reputation dashboard tab + per-envelope cards + amber banner + email notifications wiring | Pending | 4 | ~1 day |
 
