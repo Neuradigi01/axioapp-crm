@@ -1,6 +1,6 @@
 # Step 1: Discovery — Mailgun reputation + rate limits + events + `v:` docs (MANDATORY)
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — with 6 gaps flagged for follow-up smoke / manager decision. Docs fetched: Mailgun webhook event types (8), retry policy (8h backoff), rate-limit headers (no numeric cap published); Gmail 0.1%/0.3% + 5000/day bulk def + 7-day recovery band + Feb 2024 / Nov 2025 timeline; Yahoo 0.3% + auth alignment; Microsoft May-2025 auth-only enforcement. Gaps: Mailgun reputation article (403 CDN block) → reputation-scope stays provisional (per-domain assumption locked); Mailgun `v:` custom-var limits (all URLs 404) → pin empirically at Step 6 smoke; Mailgun signature-verify page (404) → cite shipped code as source-of-truth; SendGrid / Mailchimp / Klaviyo warmup ladders → deferred (rule zero). Two output docs shipped: [`DISCOVERY-NOTES.md`](DISCOVERY-NOTES.md) + [`THRESHOLDS-LOCKED.md`](THRESHOLDS-LOCKED.md).
 
 ## Goal
 

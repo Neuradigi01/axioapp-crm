@@ -350,6 +350,22 @@ async def deactivate(
         endpoint.deactivation_reason = reason
 
 
+async def delete_endpoint(session: AsyncSession, *, endpoint: ChannelEndpoint) -> None:
+    """Hard-delete a :class:`ChannelEndpoint`.
+
+    The ``tbl_email_endpoint_details.endpoint_id`` FK cascades on
+    DELETE (Step 1 migration) so the details row goes with the
+    parent. Caller commits.
+
+    Used by ``tasks/email-inbound-forwarding`` Step 5's hard-delete
+    path — operator explicitly chose "delete forever" over
+    "deactivate". Historical messages on the conversation stay
+    intact (they point at ``payload.endpoint_id`` as a string, not
+    an FK).
+    """
+    await session.delete(endpoint)
+
+
 async def soft_delete_orphans_older_than(
     session: AsyncSession,
     *,

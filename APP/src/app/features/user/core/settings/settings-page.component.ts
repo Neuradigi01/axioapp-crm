@@ -5,6 +5,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { CustomEventsPageComponent } from './custom-events/custom-events.page';
+import { InboundAddressesTabComponent } from './email/inbound-addresses-tab.component';
 import { SendingDomainsTabComponent } from './email/sending-domains-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { AutomationSettingsTabComponent } from './tabs/automation-settings-tab.component';
@@ -28,6 +29,7 @@ type SettingsTab =
   | 'roles'
   | 'notifications'
   | 'sending-domains'
+  | 'inbound-addresses'
   | 'send-rules'
   | 'custom-events'
   | 'custom-fields'
@@ -83,6 +85,16 @@ const TABS: ReadonlyArray<TabDef> = [
     label: 'Sending Domains',
     group: 'workspace',
     permission: 'email.sending_domains.manage',
+  },
+  {
+    // tasks/email-inbound-forwarding Step 5 — Owner+Admin forwarded-
+    // address list. Same permission gate as the shipped email-senders /
+    // email-accounts surfaces (``email.accounts.manage``) — this is
+    // an admin inbox-config concern, not an ownership decision.
+    id: 'inbound-addresses',
+    label: 'Inbound Addresses',
+    group: 'workspace',
+    permission: 'email.accounts.manage',
   },
   // Email Accounts + Sender Setup tabs were consolidated into the
   // per-org Email Sender card on Settings → Integrations.
@@ -145,6 +157,7 @@ const TABS: ReadonlyArray<TabDef> = [
     RolesTabComponent,
     NotificationsTabComponent,
     SendingDomainsTabComponent,
+    InboundAddressesTabComponent,
     AutomationSettingsTabComponent,
     CustomEventsPageComponent,
     CustomFieldsPageComponent,

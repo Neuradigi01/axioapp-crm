@@ -158,6 +158,38 @@ class ForwardedAddressOut(ORMModel):
     created_at: datetime
 
 
+class TestInboundStatusOut(BaseModel):
+    """Response for ``GET /channel-endpoints/{id}/test-inbound-status``.
+
+    ``status='waiting'`` while no message has landed at this endpoint
+    (``last_inbound_at`` is NULL). ``status='received'`` as soon as
+    the first inbound bumps ``last_inbound_at``. The wizard uses this
+    to flip its Step-3 badge from "Waiting for test" to "Received!".
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["waiting", "received"]
+    last_inbound_at: datetime | None = None
+
+
+class UpdateForwardedAddressIn(BaseModel):
+    """Partial-update payload for a ``forwarded_address`` endpoint.
+
+    Every field optional so the inbox-settings row-inline toggles can
+    PATCH one attribute without re-sending the whole endpoint. Server
+    treats missing fields as "unchanged" (Pydantic ``model_dump(exclude_unset=True)``
+    in the service layer). ``default_assignee_user_id`` accepts NULL
+    to clear the assignee back to round-robin.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    label: str | None = Field(default=None, min_length=1, max_length=128)
+    auto_create_contact: bool | None = None
+    default_assignee_user_id: uuid.UUID | None = None
+
+
 __all__ = [
     "AssigneeRef",
     "ChannelEndpointListOut",
@@ -167,4 +199,6 @@ __all__ = [
     "EmailEndpointDetailsOut",
     "EndpointType",
     "ForwardedAddressOut",
+    "TestInboundStatusOut",
+    "UpdateForwardedAddressIn",
 ]

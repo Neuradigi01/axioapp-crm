@@ -59,3 +59,41 @@ export interface ClaimDomainRequest {
   domain: string;
   region: 'us' | 'eu';
 }
+
+// ---------------------------------------------------------------------------
+// tasks/email-inbound-forwarding Step 5 — Inbound Addresses tab.
+//
+// Mirrors the backend ``ForwardedAddressOut`` / ``CreateForwardedAddressIn``
+// / ``UpdateForwardedAddressIn`` schemas from
+// ``core/channel_endpoints/schemas.py``. The raw ``forwarding_token``
+// deliberately does NOT appear here — frontends see only the composed
+// ``forwarding_address`` (``f-<token>@<inbound-domain>``).
+// ---------------------------------------------------------------------------
+
+export interface AssigneeRef {
+  id: string;
+  name: string;
+}
+
+export interface ForwardedAddress {
+  id: string;
+  label: string;
+  forwarding_address: string;
+  auto_create_contact: boolean;
+  default_assignee: AssigneeRef | null;
+  is_active: boolean;
+  last_inbound_at: string | null;
+  created_at: string;
+}
+
+export interface CreateForwardedAddressRequest {
+  label: string;
+  auto_create_contact?: boolean;
+  default_assignee_user_id?: string | null;
+}
+
+export interface UpdateForwardedAddressRequest {
+  label?: string;
+  auto_create_contact?: boolean;
+  default_assignee_user_id?: string | null;
+}

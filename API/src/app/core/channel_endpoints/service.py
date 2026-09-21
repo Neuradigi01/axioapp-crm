@@ -26,6 +26,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +39,7 @@ from src.app.core.channel_endpoints.schemas import (
     ChannelEndpointOut,
     EmailEndpointDetailsOut,
     ForwardedAddressOut,
+    TestInboundStatusOut,
 )
 
 logger = logging.getLogger(__name__)
@@ -119,6 +121,37 @@ async def deactivate_endpoint(
 # ---------------------------------------------------------------------------
 
 
+async def list_forwarded_addresses_for_org(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+) -> list[ForwardedAddressOut]:
+    """List every active ``forwarded_address`` endpoint the org has,
+    composed into the response shape.
+
+    Different from :func:`list_endpoints_for_org` in one important
+    way: this ships the raw ``forwarding_token`` composed into the
+    ``forwarding_address`` string, matching what the create response
+    returns. The generic listing endpoint deliberately omits the
+    token because :class:`EmailEndpointDetailsOut` doesn't model it;
+    surfacing the composed address here (in a purpose-built response)
+    lets the inbox-settings UI display the copy-paste address without
+    needing to store the create-response client-side.
+    """
+    rows = await data_access.find_active_for_org(
+        db, org_id=org_id, endpoint_type="forwarded_address"
+    )
+    out: list[ForwardedAddressOut] = []
+    for endpoint, details in rows:
+        if details is None:
+            continue
+        assignee_ref = await _resolve_assignee_ref(
+            db, assignee_uuid=details.default_assignee_user_id
+        )
+        out.append(_to_forwarded_address_out(endpoint, details, assignee_ref))
+    return out
+
+
 async def create_forwarded_address_endpoint(
     db: AsyncSession,
     *,
@@ -176,6 +209,177 @@ async def create_forwarded_address_endpoint(
     )
 
     return _to_forwarded_address_out(endpoint, details, assignee_ref)
+
+
+async def update_forwarded_address_endpoint(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    endpoint_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+    label: str | None = None,
+    auto_create_contact: bool | None = None,
+    default_assignee_user_id: uuid.UUID | None = None,
+    unset_assignee: bool = False,
+) -> ForwardedAddressOut:
+    """Partial-update a ``forwarded_address`` endpoint's config.
+
+    Every mutable field is optional so the inbox-settings row-inline
+    toggles PATCH one attribute at a time. Cross-org / unknown id →
+    404; wrong endpoint_type → 404 (surface indistinguishable from
+    "not found" so this endpoint can't be used to probe endpoint
+    types). Cross-org assignee → 400.
+
+    ``unset_assignee=True`` explicitly clears the assignee back to
+    round-robin. This distinguishes "user didn't send the field"
+    (leave it alone) from "user chose 'no assignee'" (set to NULL).
+
+    Audit event ``forwarded_address_endpoint.updated`` fires with the
+    diff of changed fields.
+    """
+    pair = await data_access.get_by_id(db, org_id=org_id, endpoint_id=endpoint_id)
+    if pair is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="channel endpoint not found",
+        )
+    endpoint, details = pair
+    if endpoint.endpoint_type != "forwarded_address" or details is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="channel endpoint not found",
+        )
+
+    changes: dict[str, Any] = {}
+    if label is not None and label != endpoint.label:
+        changes["label"] = {"before": endpoint.label, "after": label}
+        endpoint.label = label
+    if auto_create_contact is not None and (auto_create_contact != details.auto_create_contact):
+        changes["auto_create_contact"] = {
+            "before": details.auto_create_contact,
+            "after": auto_create_contact,
+        }
+        details.auto_create_contact = auto_create_contact
+    if unset_assignee:
+        if details.default_assignee_user_id is not None:
+            changes["default_assignee_user_id"] = {
+                "before": str(details.default_assignee_user_id),
+                "after": None,
+            }
+            details.default_assignee_user_id = None
+    elif (
+        default_assignee_user_id is not None
+        and default_assignee_user_id != details.default_assignee_user_id
+    ):
+        await _validate_assignee_in_org(db, org_id=org_id, assignee_uuid=default_assignee_user_id)
+        changes["default_assignee_user_id"] = {
+            "before": (
+                str(details.default_assignee_user_id) if details.default_assignee_user_id else None
+            ),
+            "after": str(default_assignee_user_id),
+        }
+        details.default_assignee_user_id = default_assignee_user_id
+
+    if changes:
+        await db.commit()
+        await db.refresh(endpoint)
+        await db.refresh(details)
+        await audit.log(
+            "forwarded_address_endpoint.updated",
+            entity_type="channel_endpoint",
+            entity_id=endpoint.id,
+            org_id=org_id,
+            user_id=actor_user_id,
+            after=changes,
+        )
+
+    assignee_ref = await _resolve_assignee_ref(db, assignee_uuid=details.default_assignee_user_id)
+    return _to_forwarded_address_out(endpoint, details, assignee_ref)
+
+
+async def get_test_inbound_status(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    endpoint_id: uuid.UUID,
+) -> TestInboundStatusOut:
+    """Return the "did a test email arrive yet?" state for a
+    ``forwarded_address`` endpoint.
+
+    Consumed by the Step 6 wizard's Step 3 polling loop. Returns
+    ``status='received'`` as soon as ``details.last_inbound_at`` is
+    non-null (Step 3 ingest stamps it on every successful message).
+    Cross-org / unknown id → 404; non-forwarded_address → 404 (same
+    info-leak posture as :func:`update_forwarded_address_endpoint`).
+    """
+    pair = await data_access.get_by_id(db, org_id=org_id, endpoint_id=endpoint_id)
+    if pair is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="channel endpoint not found",
+        )
+    endpoint, details = pair
+    if endpoint.endpoint_type != "forwarded_address" or details is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="channel endpoint not found",
+        )
+    return TestInboundStatusOut(
+        status="received" if details.last_inbound_at is not None else "waiting",
+        last_inbound_at=details.last_inbound_at,
+    )
+
+
+async def delete_forwarded_address_endpoint(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    endpoint_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+) -> None:
+    """Hard-delete a ``forwarded_address`` endpoint.
+
+    Removes both the endpoint row and its details row via cascade FK.
+    Historical messages persisted with this endpoint's id in their
+    ``payload.endpoint_id`` stay intact — they carry the id as a
+    string, not an FK, so the deletion doesn't cascade into
+    conversations.
+
+    Cross-org / unknown id → 404. Wrong endpoint_type → 404 (same
+    info-leak reasoning as ``update_``). Audit
+    ``forwarded_address_endpoint.deleted`` fires before the DELETE
+    lands so an aborted commit doesn't lose the audit trail.
+    """
+    pair = await data_access.get_by_id(db, org_id=org_id, endpoint_id=endpoint_id)
+    if pair is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="channel endpoint not found",
+        )
+    endpoint, details = pair
+    if endpoint.endpoint_type != "forwarded_address":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="channel endpoint not found",
+        )
+
+    forwarding_token = details.forwarding_token if details else None
+    await audit.log(
+        "forwarded_address_endpoint.deleted",
+        entity_type="channel_endpoint",
+        entity_id=endpoint.id,
+        org_id=org_id,
+        user_id=actor_user_id,
+        after={
+            "label": endpoint.label,
+            # Include the token here so an operator can trace which
+            # inbound address was killed. Frontends never see this
+            # payload (audit-logs router gates on ``audit.read``).
+            "forwarding_token": forwarding_token,
+        },
+    )
+    await data_access.delete_endpoint(db, endpoint=endpoint)
+    await db.commit()
 
 
 async def _validate_assignee_in_org(
@@ -279,5 +483,9 @@ def _to_out(endpoint, details) -> ChannelEndpointOut:
 __all__ = [
     "create_forwarded_address_endpoint",
     "deactivate_endpoint",
+    "delete_forwarded_address_endpoint",
+    "get_test_inbound_status",
     "list_endpoints_for_org",
+    "list_forwarded_addresses_for_org",
+    "update_forwarded_address_endpoint",
 ]

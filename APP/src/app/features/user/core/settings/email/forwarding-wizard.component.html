@@ -1,0 +1,205 @@
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+  data-testid="forwarding-wizard-backdrop"
+>
+  <div
+    class="w-full max-w-2xl rounded-xl border border-subtle bg-surface p-4 md:p-6 shadow-xl"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="fw-title"
+  >
+    <div class="flex items-start justify-between gap-3">
+      <div class="min-w-0">
+        <h2 id="fw-title" class="text-base font-semibold text-default">Set up email forwarding</h2>
+        <p class="mt-1 text-sm text-muted">Step {{ step() }} of 3</p>
+      </div>
+      <button
+        type="button"
+        class="rounded-md p-1 text-muted hover:bg-surface-2"
+        (click)="close()"
+        data-testid="wizard-close"
+        aria-label="Close wizard"
+      >
+        <lucide-icon name="x" size="16"></lucide-icon>
+      </button>
+    </div>
+
+    <!-- Step 1 — pick provider -->
+    @if (step() === 1) {
+      <div class="mt-4" data-testid="wizard-step-1">
+        <p class="text-sm text-muted">
+          Pick the mail provider your support inbox lives at. We'll show you how to point it at the
+          CRM in the next step.
+        </p>
+        <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          @for (key of providerOrder; track key) {
+            <button
+              type="button"
+              class="flex items-center gap-3 rounded-lg border border-subtle bg-surface p-3 text-left hover:bg-surface-2"
+              (click)="pickProvider(key)"
+              [attr.data-testid]="'wizard-provider-' + key"
+            >
+              <lucide-icon name="mail" size="18" class="text-muted"></lucide-icon>
+              <span class="text-sm font-medium text-default">
+                {{ guides[key].title }}
+              </span>
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Step 2 — copy address -->
+    @if (step() === 2) {
+      <div class="mt-4 space-y-4" data-testid="wizard-step-2">
+        <div>
+          <label class="block text-sm">
+            <span class="block text-xs font-medium text-muted">Label</span>
+            <input
+              type="text"
+              [formControl]="form.label"
+              placeholder="Support inbox"
+              class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              [class.border-red-500/30]="form.label.touched && form.label.invalid"
+              data-testid="wizard-label"
+            />
+          </label>
+          @if (form.label.touched && form.label.invalid) {
+            <p class="mt-1 text-xs text-red-500">Label is required.</p>
+          }
+        </div>
+
+        <div class="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            class="inline-flex items-center rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+            [disabled]="creating()"
+            (click)="backToStep1()"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95 disabled:opacity-50"
+            [disabled]="creating() || form.label.invalid"
+            (click)="createAndAdvance()"
+            data-testid="wizard-next"
+          >
+            @if (creating()) {
+              <lucide-icon name="loader-2" size="14" class="animate-spin"></lucide-icon>
+              Creating…
+            } @else {
+              Next
+            }
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Step 3 — follow guide + wait for test -->
+    @if (step() === 3 && created() as row) {
+      <div class="mt-4 space-y-4" data-testid="wizard-step-3">
+        <div class="rounded-lg border border-subtle bg-surface-2 p-3">
+          <p class="text-xs font-medium text-muted">Your forwarding address</p>
+          <div class="mt-1 flex items-center justify-between gap-2">
+            <p class="truncate font-mono text-sm text-default" data-testid="wizard-address">
+              {{ row.forwarding_address }}
+            </p>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-surface"
+              (click)="copyAddress()"
+              data-testid="wizard-copy"
+            >
+              <lucide-icon name="copy" size="12"></lucide-icon>
+              Copy
+            </button>
+          </div>
+        </div>
+
+        @if (activeGuide(); as guide) {
+          <div>
+            <p class="text-sm font-semibold text-default">{{ guide.title }} — setup steps</p>
+            @if (guide.placeholder) {
+              <div
+                class="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-amber-400"
+              >
+                <p class="text-sm">
+                  Detailed steps for this provider are catching up — the notes below are a starting
+                  point. Reach out to CRM support if you get stuck.
+                </p>
+              </div>
+            }
+            <ol
+              class="mt-2 list-decimal space-y-1 pl-5 text-sm text-default"
+              data-testid="wizard-steps"
+            >
+              @for (step of guide.steps; track step) {
+                <li>{{ step }}</li>
+              }
+            </ol>
+            @if (guide.docsUrl) {
+              <a
+                [href]="guide.docsUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="mt-2 inline-block text-xs text-accent hover:underline"
+              >
+                Open the {{ guide.title }} docs
+              </a>
+            }
+          </div>
+        }
+
+        <div class="rounded-lg border border-subtle bg-surface p-3">
+          <p class="text-sm text-default">
+            Once forwarding is on, send a test email to
+            <span class="font-mono">{{ row.forwarding_address }}</span> from your support mailbox.
+          </p>
+          <div class="mt-2 flex items-center gap-2" data-testid="wizard-status-line">
+            @if (status() === 'waiting') {
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full border border-zinc-400/20 bg-zinc-400/15 px-2 py-0.5 text-[11px] font-medium text-zinc-400"
+                data-testid="wizard-badge-waiting"
+              >
+                <lucide-icon name="loader-2" size="10" class="animate-spin"></lucide-icon>
+                Waiting for test
+              </span>
+            } @else if (status() === 'received') {
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-500"
+                data-testid="wizard-badge-received"
+              >
+                <lucide-icon name="check" size="10"></lucide-icon>
+                Received!
+              </span>
+            } @else {
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-400"
+                data-testid="wizard-badge-timeout"
+              >
+                <lucide-icon name="alert-triangle" size="10"></lucide-icon>
+                Not received. Recheck settings.
+              </span>
+            }
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end">
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+            (click)="close()"
+            data-testid="wizard-done"
+          >
+            @if (status() === 'received') {
+              Done
+            } @else {
+              Close
+            }
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>

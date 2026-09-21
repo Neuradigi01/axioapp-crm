@@ -1,6 +1,6 @@
 # Step 6: Frontend — 3-step forwarding wizard + test-inbound watcher + provider guides
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21, backend: new `GET /channel-endpoints/forwarded-address/{id}/test-inbound-status` + `TestInboundStatusOut` schema + `get_test_inbound_status` service function; frontend: `provider-guides.ts` (6 provider guides — Gmail / Google Workspace / Outlook 365 / Zoho verbatim from Step 1 discovery; Outlook.com + Custom carry placeholder banners per gaps #2/#3), `test-inbound-status.service.ts` (5s poll cadence, 5min ceiling), `ForwardingWizardComponent` (3-step: pick → label + create → guide + polling), wired into `InboundAddressesTab`; 4 backend tests appended to test_forwarded_address_endpoint.py + 9 Karma tests in `forwarding-wizard.component.spec.ts`; prettier-clean + ruff-clean)
 
 ## Goal
 

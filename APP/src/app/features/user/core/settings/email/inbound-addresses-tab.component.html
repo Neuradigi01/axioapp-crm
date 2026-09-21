@@ -1,0 +1,136 @@
+<section class="space-y-4">
+  <header class="flex items-start justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-semibold text-default">Inbound addresses</h2>
+      <p class="mt-0.5 text-sm text-muted">
+        Point your own support mailbox at one of these addresses to receive customer mail as CRM
+        conversations. Set the forwarding rule at your mail provider (Gmail / Outlook / Zoho / …) —
+        replies stay in your inbox and land in the CRM at the same time.
+      </p>
+    </div>
+    <button
+      type="button"
+      class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+      (click)="launchWizard()"
+      data-testid="inbound-add-cta"
+    >
+      <lucide-icon name="plus" size="14"></lucide-icon>
+      Add forwarding address
+    </button>
+  </header>
+
+  @if (loading()) {
+    <div class="flex items-center gap-2 text-sm text-muted">
+      <lucide-icon name="loader-2" size="14" class="animate-spin"></lucide-icon>
+      Loading inbound addresses…
+    </div>
+  } @else if (loadError()) {
+    <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
+      {{ loadError() }}
+    </div>
+  } @else if (sortedAddresses().length === 0) {
+    <div
+      class="rounded-xl border border-dashed border-subtle bg-surface p-8 text-center"
+      data-testid="inbound-empty"
+    >
+      <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-2">
+        <lucide-icon name="mail" size="20" class="text-muted"></lucide-icon>
+      </div>
+      <h3 class="mt-3 text-sm font-semibold text-default">No forwarding addresses yet</h3>
+      <p class="mt-1 text-sm text-muted">
+        Set up a forwarding address to receive mail sent to your existing support inbox.
+      </p>
+      <button
+        type="button"
+        class="mt-4 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+        (click)="launchWizard()"
+        data-testid="inbound-empty-cta"
+      >
+        <lucide-icon name="plus" size="14"></lucide-icon>
+        Add forwarding address
+      </button>
+    </div>
+  } @else {
+    <ul class="space-y-2">
+      @for (row of sortedAddresses(); track row.id) {
+        <li
+          class="rounded-xl border border-subtle bg-surface p-4 shadow-sm"
+          data-testid="inbound-row"
+          [attr.data-endpoint-id]="row.id"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="truncate text-sm font-semibold text-default">{{ row.label }}</h3>
+                @if (!row.is_active) {
+                  <span
+                    class="inline-flex items-center rounded-full border border-zinc-500/20 bg-zinc-500/15 px-2 py-0.5 text-[11px] font-medium text-zinc-500"
+                  >
+                    Inactive
+                  </span>
+                }
+              </div>
+              <div class="mt-1 flex items-center gap-2">
+                <p class="truncate font-mono text-xs text-muted" data-testid="inbound-address">
+                  {{ row.forwarding_address }}
+                </p>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-surface-2"
+                  (click)="copyAddress(row)"
+                  data-testid="inbound-copy"
+                >
+                  <lucide-icon name="copy" size="12"></lucide-icon>
+                  Copy
+                </button>
+              </div>
+              <p class="mt-1 text-xs text-muted">
+                Last inbound: {{ lastInboundLabel(row.last_inbound_at) }}
+              </p>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <label class="inline-flex items-center gap-1.5 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-subtle bg-surface"
+                  [checked]="row.auto_create_contact"
+                  [disabled]="busyId() === row.id"
+                  (change)="toggleAutoCreate(row)"
+                  data-testid="inbound-auto-create-toggle"
+                />
+                Auto-create contact
+              </label>
+
+              @if (row.is_active) {
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                  [disabled]="busyId() === row.id"
+                  (click)="deactivate(row)"
+                  data-testid="inbound-deactivate"
+                >
+                  Deactivate
+                </button>
+              }
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                [disabled]="busyId() === row.id"
+                (click)="remove(row)"
+                data-testid="inbound-delete"
+              >
+                <lucide-icon name="trash-2" size="12"></lucide-icon>
+                Delete
+              </button>
+            </div>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+
+  @if (showWizard()) {
+    <app-forwarding-wizard (closed)="onWizardClose()" />
+  }
+</section>

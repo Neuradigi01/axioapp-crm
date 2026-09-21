@@ -385,3 +385,112 @@ async def test_create_forwarded_address_accepts_valid_same_org_assignee(test_db,
     assert out.default_assignee is not None
     assert out.default_assignee.id == assignee_uuid
     assert "Rep" in out.default_assignee.name
+
+
+# ---------------------------------------------------------------------------
+# Step 6 — GET /channel-endpoints/{id}/test-inbound-status
+# ---------------------------------------------------------------------------
+
+
+async def _make_forwarded_endpoint_raw(
+    session,
+    *,
+    org_id: uuid.UUID,
+    last_inbound_at=None,
+):
+    """Seed a bare ``forwarded_address`` endpoint + details row and
+    return ``endpoint_id``. Independent of the create-service so the
+    Step-6 tests don't accidentally verify the wrong side effect."""
+    from src.app.core.channel_endpoints.models import (
+        CHANNEL_EMAIL,
+        ChannelEndpoint,
+        EmailEndpointDetails,
+    )
+
+    endpoint = ChannelEndpoint(
+        org_id=org_id,
+        channel=CHANNEL_EMAIL,
+        endpoint_type="forwarded_address",
+        label="Support",
+    )
+    session.add(endpoint)
+    await session.flush()
+    details = EmailEndpointDetails(
+        endpoint_id=endpoint.id,
+        org_id=org_id,
+        forwarding_token=uuid.uuid4().hex[:12],
+        last_inbound_at=last_inbound_at,
+    )
+    session.add(details)
+    await session.flush()
+    return endpoint.id
+
+
+@pytest.mark.asyncio
+async def test_test_inbound_status_endpoint_returns_waiting_when_null(test_db):
+    """Fresh endpoint (never received a message) → ``status='waiting'``."""
+    org = await _make_org(test_db)
+    endpoint_id = await _make_forwarded_endpoint_raw(
+        test_db, org_id=org.id, last_inbound_at=None
+    )
+    await test_db.commit()
+
+    result = await service.get_test_inbound_status(
+        test_db, org_id=org.id, endpoint_id=endpoint_id
+    )
+    assert result.status == "waiting"
+    assert result.last_inbound_at is None
+
+
+@pytest.mark.asyncio
+async def test_test_inbound_status_endpoint_returns_received_after_bump(test_db):
+    """Endpoint whose details row has ``last_inbound_at`` set →
+    ``status='received'`` with the timestamp echoed back."""
+    from datetime import UTC, datetime
+
+    org = await _make_org(test_db)
+    when = datetime.now(UTC)
+    endpoint_id = await _make_forwarded_endpoint_raw(
+        test_db, org_id=org.id, last_inbound_at=when
+    )
+    await test_db.commit()
+
+    result = await service.get_test_inbound_status(
+        test_db, org_id=org.id, endpoint_id=endpoint_id
+    )
+    assert result.status == "received"
+    assert result.last_inbound_at is not None
+
+
+@pytest.mark.asyncio
+async def test_test_inbound_status_scoped_by_org_id(test_db):
+    """A caller's org sees ONLY its own endpoints — a matching id in
+    another org returns 404 (info-leak posture)."""
+    from fastapi import HTTPException
+
+    org_a = await _make_org(test_db, "A")
+    org_b = await _make_org(test_db, "B")
+    endpoint_a = await _make_forwarded_endpoint_raw(test_db, org_id=org_a.id)
+    await test_db.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        await service.get_test_inbound_status(
+            test_db, org_id=org_b.id, endpoint_id=endpoint_a
+        )
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_test_inbound_status_cross_org_returns_404(test_db):
+    """Unknown / non-forwarded_address id → 404 rather than a subtle
+    error surface that would leak the endpoint's existence."""
+    from fastapi import HTTPException
+
+    org = await _make_org(test_db)
+    await test_db.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        await service.get_test_inbound_status(
+            test_db, org_id=org.id, endpoint_id=uuid.uuid4()
+        )
+    assert exc.value.status_code == 404

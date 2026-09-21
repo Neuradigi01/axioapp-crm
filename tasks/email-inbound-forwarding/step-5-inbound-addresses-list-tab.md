@@ -1,6 +1,6 @@
 # Step 5: Frontend — Inbound addresses list tab + endpoint CRUD
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21, backend: new `GET/POST/PATCH/DELETE /channel-endpoints/forwarded-address` endpoints + `list_forwarded_addresses_for_org` / `update_forwarded_address_endpoint` / `delete_forwarded_address_endpoint` service functions + `delete_endpoint` DAL helper + `UpdateForwardedAddressIn` schema; frontend: new `email/models.ts` types (ForwardedAddress, CreateForwardedAddressRequest, UpdateForwardedAddressRequest, AssigneeRef) + `inbound-addresses.service.ts` + `inbound-addresses-tab.component` (list, copy, auto-create toggle, deactivate + delete confirms, wizard-launch stub); tab registered under Workspace group gated by `email.accounts.manage`; 7 Karma tests; prettier-clean)
 
 ## Goal
 
