@@ -328,4 +328,24 @@ beat_schedule = {
         "task": "src.app.core.channel_endpoints.tasks.sweep_orphan_endpoints",
         "schedule": crontab(hour=3, minute=15),
     },
+    # tasks/email-sending-domains Step 6 — nightly 04:00 UTC re-verify
+    # of every ``pending`` / ``verified`` row in
+    # tbl_organization_email_domains against Mailgun's /v4/verify.
+    # Bumps ``consecutive_failed_checks`` on drift, demotes past the
+    # ``EMAIL_DOMAIN_DEMOTE_AFTER_FAILED_CHECKS`` threshold (default
+    # 3), and fires an in-app + email nudge to the org's Owner on
+    # every state transition.
+    "email-domains-sweep-nightly": {
+        "task": "src.app.core.email_sender_setup.tasks.sweep_email_domain_claims_nightly",
+        "schedule": crontab(hour=4, minute=0),
+    },
+    # tasks/email-sending-domains Step 6 — hourly (top-of-hour)
+    # re-verify of ``demoted`` rows only. Faster cadence than the
+    # nightly sweep so recovery lands within an hour of DNS being
+    # restored. Auto-releases rows stuck in demoted longer than
+    # ``EMAIL_DOMAIN_RELEASE_AFTER_FAILED_DAYS`` (default 14 days).
+    "email-domains-sweep-demoted-hourly": {
+        "task": "src.app.core.email_sender_setup.tasks.sweep_demoted_domains_hourly",
+        "schedule": crontab(minute=0),
+    },
 }

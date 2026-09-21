@@ -140,6 +140,11 @@ _TRANSACTION_EXCEPTIONS: dict[str, str] = {
         "Platform-from helper — token-collision retry loop needs "
         "session.flush + rollback, mirrors channel_endpoints.data_access"
     ),
+    # --- Email sending-domains sweep (Step 6)
+    "core/email_sender_setup/tasks.py": (
+        "Nightly + hourly beat sweeps — session.commit after mark_demoted "
+        "before firing the owner notify; mirrors campaigns/tasks + email/tasks"
+    ),
     # --- Integrations DLQ
     "core/integrations/dlq.py": "Webhook DLQ writer",
     # --- WhatsApp integration sub-modules
@@ -261,6 +266,11 @@ _HELPER_CRUD_EXCEPTIONS: dict[str, str] = {
     "core/conversations/adapters/email_platform_from.py": (
         "Platform-from helper — token-collision retry loop mirrors "
         "channel_endpoints.data_access"
+    ),
+    # --- Email sending-domains sweep (Step 6)
+    "core/email_sender_setup/tasks.py": (
+        "Nightly + hourly beat sweeps — session.execute for the "
+        "owner-lookup join; mirrors campaigns/tasks + email/tasks"
     ),
     # --- Email module helpers
     "core/email/gmail/push.py": "Gmail push subscriptions",

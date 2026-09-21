@@ -116,6 +116,13 @@ celery.autodiscover_tasks(
         # 7d. Without this entry the beat scheduler can't find
         # ``sweep_orphan_endpoints`` and orphan rows accumulate.
         "src.app.core.channel_endpoints.tasks",
+        # tasks/email-sending-domains Step 6 — nightly 04:00 UTC
+        # re-verify of pending/verified rows + hourly re-verify of
+        # demoted rows in tbl_organization_email_domains. Owner is
+        # notified on state transitions (verified/demoted/recovered/
+        # released). Without this entry both beat sweeps drop with a
+        # KeyError and DNS drift goes undetected.
+        "src.app.core.email_sender_setup.tasks",
     ]
 )
 

@@ -273,6 +273,38 @@ async def mark_released(session: AsyncSession, *, id: uuid.UUID) -> None:
     )
 
 
+async def lock_rows_for_sweep(
+    session: AsyncSession,
+    *,
+    statuses: list[str],
+    limit: int = 200,
+) -> list[OrganizationEmailDomain]:
+    """Claim a batch of rows for the nightly / hourly re-verify sweeps.
+
+    Uses ``SELECT ... FOR UPDATE SKIP LOCKED`` so two beat workers
+    running the same sweep don't fight over the same domain — each
+    worker only sees rows it can lock. Ordering by ``updated_at ASC
+    NULLS FIRST`` means the least-recently-touched row is picked
+    first, spreading Mailgun API load evenly across the sweep window.
+
+    Caller holds the transaction; the row lock releases when the
+    caller commits. Because :func:`service.verify_organization_email_domain`
+    commits its own passed-in session, the lock effectively covers
+    only the initial "claim" before the first per-row commit inside
+    the sweep loop — good enough to prevent two workers from
+    processing the same row in the same tick.
+    """
+    stmt = (
+        select(OrganizationEmailDomain)
+        .where(OrganizationEmailDomain.verification_status.in_(statuses))
+        .order_by(OrganizationEmailDomain.updated_at.asc().nulls_first())
+        .limit(limit)
+        .with_for_update(skip_locked=True)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
 async def null_endpoint_details_domain_fk(session: AsyncSession, *, domain_id: uuid.UUID) -> int:
     """Set ``tbl_email_endpoint_details.domain_id = NULL`` for every row
     referencing this domain. Returns the row count.
@@ -303,6 +335,7 @@ __all__ = [
     "get_domain_by_name",
     "list_domains",
     "list_organization_domains_for_org",
+    "lock_rows_for_sweep",
     "mark_demoted",
     "mark_released",
     "mark_verified",
