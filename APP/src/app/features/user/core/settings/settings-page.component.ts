@@ -6,6 +6,7 @@ import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { CustomEventsPageComponent } from './custom-events/custom-events.page';
 import { InboundAddressesTabComponent } from './email/inbound-addresses-tab.component';
+import { ReputationDashboardTabComponent } from './email/reputation-dashboard-tab.component';
 import { SendingDomainsTabComponent } from './email/sending-domains-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { AutomationSettingsTabComponent } from './tabs/automation-settings-tab.component';
@@ -30,6 +31,7 @@ type SettingsTab =
   | 'notifications'
   | 'sending-domains'
   | 'inbound-addresses'
+  | 'reputation'
   | 'send-rules'
   | 'custom-events'
   | 'custom-fields'
@@ -96,6 +98,17 @@ const TABS: ReadonlyArray<TabDef> = [
     group: 'workspace',
     permission: 'email.accounts.manage',
   },
+  {
+    // tasks/email-reputation-warmup Step 7 — Owner-only reputation
+    // dashboard. Same permission gate as Sending Domains — an
+    // "am I about to get shed?" surface belongs to the owner. Sits
+    // right after Inbound Addresses so the three Mailgun-adjacent
+    // surfaces cluster together in the sidebar.
+    id: 'reputation',
+    label: 'Reputation',
+    group: 'workspace',
+    permission: 'email.sending_domains.manage',
+  },
   // Email Accounts + Sender Setup tabs were consolidated into the
   // per-org Email Sender card on Settings → Integrations.
   // tasks/workflows Step 20 — the Email Sequences tab was absorbed
@@ -158,6 +171,7 @@ const TABS: ReadonlyArray<TabDef> = [
     NotificationsTabComponent,
     SendingDomainsTabComponent,
     InboundAddressesTabComponent,
+    ReputationDashboardTabComponent,
     AutomationSettingsTabComponent,
     CustomEventsPageComponent,
     CustomFieldsPageComponent,

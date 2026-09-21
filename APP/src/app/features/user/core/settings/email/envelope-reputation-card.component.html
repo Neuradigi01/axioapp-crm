@@ -1,0 +1,118 @@
+<div
+  class="rounded-lg border border-subtle bg-surface-2 p-4"
+  data-testid="reputation-card"
+  [attr.data-envelope]="row().envelope_type"
+>
+  <div class="flex items-start justify-between gap-3">
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-2">
+        <p class="truncate text-sm font-semibold text-default">
+          {{ cardTitle() }}
+        </p>
+        <span class="rounded-md border border-subtle bg-surface px-1.5 py-0.5 text-xs text-muted">
+          {{ envelopeLabel() }}
+        </span>
+      </div>
+      <p class="mt-0.5 text-xs text-muted">
+        Warmup stage {{ row().warmup_stage }} — cap {{ row().stage_cap }} msgs/day
+      </p>
+    </div>
+    <span
+      class="rounded-md px-2 py-0.5 text-xs font-medium"
+      [class]="stateBadgeClasses()"
+      data-testid="reputation-state-badge"
+    >
+      {{ stateLabel() }}
+    </span>
+  </div>
+
+  @if (row().reputation_state === 'warned') {
+    <div
+      class="mt-3 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-amber-400"
+      data-testid="reputation-warning-banner"
+    >
+      <p class="text-xs">
+        Complaint or bounce rate is approaching the shed threshold. Pause large sends until the
+        ratios drop back below 80% of the cap.
+      </p>
+    </div>
+  }
+  @if (row().reputation_state === 'blocked') {
+    <div
+      class="mt-3 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-red-400"
+      data-testid="reputation-blocked-banner"
+    >
+      <p class="text-xs">
+        Sending paused. Resumes in
+        <span class="font-mono" data-testid="reputation-blocked-countdown">
+          {{ blockedCountdown() }}
+        </span>
+        — warmup restarts at stage 0.
+      </p>
+    </div>
+  }
+
+  <!-- Warmup progress bar -->
+  <div class="mt-4">
+    <div class="mb-1 flex items-center justify-between text-xs">
+      <span class="text-muted">Warmup progress</span>
+      <span class="text-muted">
+        {{ row().stage_cap }} → {{ row().next_stage_cap }} at next rung
+      </span>
+    </div>
+    <div class="h-1.5 w-full overflow-hidden rounded-full bg-surface">
+      <div
+        class="h-full transition-all"
+        [class]="warmupBarClass()"
+        [style.width.%]="row().stage_progress_pct"
+        data-testid="reputation-warmup-bar"
+      ></div>
+    </div>
+  </div>
+
+  <!-- Daily sent progress bar -->
+  <div class="mt-3">
+    <div class="mb-1 flex items-center justify-between text-xs">
+      <span class="text-muted">Daily sent</span>
+      <span class="text-default font-medium"> {{ row().daily_sent }} / {{ row().daily_cap }} </span>
+    </div>
+    <div class="h-1.5 w-full overflow-hidden rounded-full bg-surface">
+      <div
+        class="h-full transition-all"
+        [class]="dailySentBarClass()"
+        [style.width.%]="dailySentPct()"
+        data-testid="reputation-daily-bar"
+      ></div>
+    </div>
+  </div>
+
+  <!-- Metric tiles -->
+  <div class="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4" data-testid="reputation-metric-tiles">
+    <div class="rounded-md border border-subtle bg-surface p-2">
+      <p class="text-xs text-muted">Delivered 24h</p>
+      <p class="mt-0.5 text-sm font-semibold text-default" data-testid="reputation-delivered">
+        {{ row().delivered_24h }}
+      </p>
+    </div>
+    <div class="rounded-md border border-subtle bg-surface p-2">
+      <p class="text-xs text-muted">Bounced 24h</p>
+      <p class="mt-0.5 text-sm font-semibold text-default" data-testid="reputation-bounced">
+        {{ row().bounced_24h }}
+        <span class="ml-1 text-xs font-normal text-muted">({{ bounceRateLabel() }})</span>
+      </p>
+    </div>
+    <div class="rounded-md border border-subtle bg-surface p-2">
+      <p class="text-xs text-muted">Complained 24h</p>
+      <p class="mt-0.5 text-sm font-semibold text-default" data-testid="reputation-complained">
+        {{ row().complained_24h }}
+        <span class="ml-1 text-xs font-normal text-muted">({{ complaintRateLabel() }})</span>
+      </p>
+    </div>
+    <div class="rounded-md border border-subtle bg-surface p-2">
+      <p class="text-xs text-muted">Unsubscribed 24h</p>
+      <p class="mt-0.5 text-sm font-semibold text-default" data-testid="reputation-unsubscribed">
+        {{ row().unsubscribed_24h }}
+      </p>
+    </div>
+  </div>
+</div>

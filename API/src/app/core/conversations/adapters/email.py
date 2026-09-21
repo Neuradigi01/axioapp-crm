@@ -688,11 +688,25 @@ async def send_email(
         from src.app.core.email.mailgun.api_client import MailgunApiClient
         from src.app.core.email.mailgun.api_client_errors import MailgunApiError
 
+        # tasks/email-reputation-warmup Step 6 — attribution stamps.
+        # The events webhook (Step 3) reads these back to route
+        # delivered / bounced / complained events to the right
+        # ``tbl_organization_email_reputation`` row. ``org`` and
+        # ``envelope`` are the minimum needed to key the (org, envelope,
+        # domain) tuple; ``domain_id`` disambiguates own_domain rows.
+        # Charset locked at ``[A-Za-z0-9_-]`` — UUIDs are hex + dashes,
+        # and both envelope enum values are alphanumeric+underscore.
+        custom_variables: dict[str, str] = {
+            "org": str(org_id),
+            "envelope": envelope_kind,
+            "domain_id": str(resolved_domain_id) if resolved_domain_id else "none",
+        }
         try:
             send_result = await MailgunApiClient().send_mime(
                 dispatch_domain,
                 to=contact.email,
                 raw_mime=raw_bytes,
+                custom_variables=custom_variables,
             )
         except MailgunApiError as exc:
             raise HTTPException(

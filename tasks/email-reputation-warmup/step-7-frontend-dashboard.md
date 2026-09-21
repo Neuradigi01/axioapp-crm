@@ -1,6 +1,6 @@
 # Step 7: Frontend — Reputation dashboard tab + per-envelope cards
 
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Goal
 

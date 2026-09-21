@@ -1,6 +1,6 @@
 # Step 6: `v:` variable stamping in Mailgun API client + campaign integration
 
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Goal
 

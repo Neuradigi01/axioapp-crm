@@ -1485,13 +1485,28 @@ async def dispatch_chunk(
                         reply_to=campaign.reply_to,
                     )
             except _HTTPExc as exc:
-                logger.info("campaign email send rejected", extra={"contact_id": str(cid)})
+                # tasks/email-reputation-warmup Step 6 — reputation
+                # gate raises 429 with a structured
+                # ``{skip_code, reason}`` detail. Prefix the error
+                # with the skip code so campaign progress logs can
+                # split by ``SKIPPED_*`` vs. other failure reasons.
+                # No new enum value — a skip counts as a soft failure
+                # that keeps the campaign moving through the batch.
+                skip_code = ""
+                if isinstance(exc.detail, dict):
+                    raw_code = exc.detail.get("skip_code") if exc.detail else None
+                    if raw_code:
+                        skip_code = f"{raw_code}: "
+                logger.info(
+                    "campaign email send rejected",
+                    extra={"contact_id": str(cid), "skip_code": skip_code.rstrip(": ") or None},
+                )
                 await _mark_message(
                     session,
                     campaign_id=campaign_id,
                     contact_id=cid,
                     new_status=CampaignMessageStatus.failed,
-                    error=str(exc.detail or "email send failed")[:512],
+                    error=(skip_code + str(exc.detail or "email send failed"))[:512],
                 )
                 continue
             except Exception as exc:  # provider-side transient failure

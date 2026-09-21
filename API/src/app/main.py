@@ -129,6 +129,9 @@ from src.app.core.email.mailgun.router import (
 from src.app.core.email.mailgun.router import (
     router as mailgun_inbound_router,
 )
+from src.app.core.email.reputation.router import (
+    router as reputation_router,
+)
 from src.app.core.email.router import router as email_router
 from src.app.core.email.tracking.router import router as email_tracking_router
 from src.app.core.email_sender_setup.router import (
@@ -531,6 +534,9 @@ app.include_router(mailgun_inbound_router, prefix="/api/v1/webhooks")
 # Path shape: POST /api/v1/webhooks/mailgun/events. Signed by the same
 # Mailgun HMAC key as inbound; unauthenticated at the FastAPI layer.
 app.include_router(mailgun_events_router, prefix="/api/v1/webhooks")
+# tasks/email-reputation-warmup Step 7 — Owner-only reputation
+# dashboard. Path shape: GET /api/v1/reputation/dashboard.
+app.include_router(reputation_router, prefix="/api/v1")
 # mailgun-inbound Step 5 — attachment download endpoint. JWT-auth'd
 # via ``conversations.read`` inside the endpoint. Mounted at /api/v1
 # so the path shape is GET /api/v1/messages/{id}/attachments/{key}.

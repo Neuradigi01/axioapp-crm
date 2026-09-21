@@ -2,7 +2,7 @@
 
 Track sending reputation per-org (verified own-domain **and** platform-from separately), enforce daily ceilings that grow via a **warmup ladder climbed by sending** (not by calendar time), and shed sending when complaint/bounce rates cross thresholds. Wire the whole chain into the outbound send path: **ceiling → wallet debit → rate limit → dispatch**.
 
-**Status:** Pending — plan drafted 2026-09-21. Depends on Tracks 1 + 2. Discovery **required and non-negotiable** — the shared-quota question (is Mailgun's reputation account-wide across all our tenants, or per-domain?) determines the entire design.
+**Status:** COMPLETED (2026-09-21) — all 7 steps shipped end-to-end. Discovery locked at THRESHOLDS-LOCKED.md; migration `0235_email_reputation` applied inline; events webhook + evaluators + send gate + `v:` stamping + reputation dashboard all live.
 
 ## Why this track exists
 
@@ -279,8 +279,8 @@ Marked **unsourced** at plan time. Discovery is Step 1 of this track and is non-
 | 3 | Backend: events webhook + attribution via `v:` + dedup + retry | COMPLETED | 3 | ~1 day |
 | 4 | Backend: warmup evaluator (4h beat) + shed evaluator + owner notifications | COMPLETED | 3 | ~1 day |
 | 5 | Backend: send-gate chain refactor in `send_email()` — ceiling/wallet/rate/dispatch + skip codes | COMPLETED | 2 | ~1 day |
-| 6 | Backend: `v:` stamping in Mailgun API client + campaign integration | Pending | 2 | ~0.5 day |
-| 7 | Frontend: Reputation dashboard tab + per-envelope cards + amber banner + email notifications wiring | Pending | 4 | ~1 day |
+| 6 | Backend: `v:` stamping in Mailgun API client + campaign integration | COMPLETED | 2 | ~0.5 day |
+| 7 | Frontend: Reputation dashboard tab + per-envelope cards + amber banner + email notifications wiring | COMPLETED | 4 | ~1 day |
 
 **Total: 7 steps, ~6 days active dev + Mailgun account-side validation time for real events.**
 

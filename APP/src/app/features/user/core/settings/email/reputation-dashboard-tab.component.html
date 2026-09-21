@@ -1,0 +1,34 @@
+<div class="space-y-4" data-testid="reputation-dashboard-tab">
+  <div>
+    <h2 class="text-lg font-semibold text-default">Sending reputation</h2>
+    <p class="mt-0.5 text-sm text-muted">
+      Per-envelope 24 h delivery health. Rows enter warmup at stage 0 and climb through the ladder
+      as clean deliveries accumulate. A row crossing the shed thresholds pauses sending for a
+      cooldown window; the sweeper flips it back automatically.
+    </p>
+  </div>
+
+  @if (loading()) {
+    <div class="flex items-center gap-2 text-sm text-muted">
+      <lucide-icon name="loader-2" class="animate-spin" size="14"></lucide-icon>
+      Loading reputation…
+    </div>
+  } @else if (loadError()) {
+    <div
+      class="rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-amber-400"
+      data-testid="reputation-load-error"
+    >
+      <p class="text-sm">{{ loadError() }}</p>
+    </div>
+  } @else if (rows().length === 0) {
+    <div class="rounded-md border border-subtle bg-surface-2 p-4 text-sm text-muted">
+      No reputation rows yet — send a batch of emails and this page will populate as events arrive.
+    </div>
+  } @else {
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+      @for (row of rows(); track row.domain_id ?? row.envelope_type) {
+        <app-envelope-reputation-card [row]="row" [nowMs]="nowMs()" />
+      }
+    </div>
+  }
+</div>

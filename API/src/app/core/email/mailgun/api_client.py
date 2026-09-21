@@ -31,6 +31,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 from typing import Any, Literal
 
 import httpx
@@ -65,6 +66,14 @@ _REGION_TO_BASE = {
 _RETRYABLE_STATUS_CODES = frozenset({502, 503})
 _MAX_RETRIES = 2
 _RETRY_BACKOFF_SECONDS = (0.5, 1.0)
+
+# tasks/email-reputation-warmup Step 6 — allowed charset for ``v:*``
+# custom-variable keys + values. Locked at ``[A-Za-z0-9_-]`` per
+# THRESHOLDS-LOCKED.md § 4 for provider portability — Mailgun accepts
+# looser values on ``v:`` but SES imposes this restriction on
+# equivalent tag-values, so we hold to the tighter rule defensively.
+_CUSTOM_VAR_KEY_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+_CUSTOM_VAR_VALUE_RE = _CUSTOM_VAR_KEY_RE
 
 # Hard timeout per request. Mailgun's median latency on GET/POST
 # /v4/domains sits comfortably under 2s; 10s catches the tail without
@@ -236,6 +245,7 @@ class MailgunApiClient:
         raw_mime: bytes,
         tags: list[str] | None = None,
         tracking: bool = True,
+        custom_variables: dict[str, str] | None = None,
     ) -> MailgunSendResult:
         """Ship a pre-built MIME message via ``POST /v3/{domain}/messages.mime``.
 
@@ -275,6 +285,26 @@ class MailgunApiClient:
             # a list value as one field per element.
             data["o:tag"] = ",".join(tags)
         data["o:tracking"] = "yes" if tracking else "no"
+        # tasks/email-reputation-warmup Step 6 — stamp ``v:*`` custom
+        # variables so the Mailgun events webhook (Step 3) can attribute
+        # every delivered / bounced / complained event back to the
+        # (org, envelope, domain, endpoint, campaign) tuple. Charset
+        # locked at ``[A-Za-z0-9_-]`` for provider portability — SES
+        # imposes it defensively and Mailgun's ``v:`` accepts looser
+        # values, so we hold to the tighter rule on our side.
+        if custom_variables:
+            for var_key, var_value in custom_variables.items():
+                if not _CUSTOM_VAR_KEY_RE.match(var_key):
+                    raise ValueError(
+                        f"custom_variables key {var_key!r} contains chars outside [A-Za-z0-9_-]"
+                    )
+                value_str = str(var_value)
+                if not _CUSTOM_VAR_VALUE_RE.match(value_str):
+                    raise ValueError(
+                        f"custom_variables[{var_key!r}] value {value_str!r} "
+                        "contains chars outside [A-Za-z0-9_-]"
+                    )
+                data[f"v:{var_key}"] = value_str
         files = {"message": ("message.mime", raw_mime, "message/rfc822")}
         body = await self._request(
             "POST",
