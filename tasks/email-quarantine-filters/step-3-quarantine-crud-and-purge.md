@@ -1,6 +1,6 @@
 # Step 3: Quarantine DAL + service (release, discard, bulk) + auto-purge beat
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — quarantine DAL (list, find-by-id, find-by-delivery-id, list-held-older-than, mark_released/discarded/auto_purged) + service (release, discard, bulk-release with `rate_capped`-only safety, auto-purge, enqueue_quarantine helper used by gate chain) + router (4 endpoints: `GET /email-quarantine`, `POST /{id}/release`, `POST /{id}/discard`, `POST /bulk-release`); weekly auto-purge Celery beat at Mon 04:00 UTC (`email-quarantine-auto-purge-weekly`) with `EMAIL_QUARANTINE_AUTO_PURGE_DAYS=30`; on-disk MIME dir cleanup on discard/purge; virus_verdict rows enqueue with `blocked_release=True` and cannot be released.
 
 ## Goal
 

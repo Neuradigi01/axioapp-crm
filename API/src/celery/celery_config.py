@@ -372,4 +372,13 @@ beat_schedule = {
         "task": "src.app.core.email.reputation.tasks.trim_reputation_buckets_hourly",
         "schedule": crontab(minute=15),
     },
+    # tasks/email-quarantine-filters Step 3 — weekly Monday 04:00 UTC
+    # auto-purge of held quarantine rows older than
+    # EMAIL_QUARANTINE_AUTO_PURGE_DAYS (default 30). Placed on Monday
+    # so operators returning to the office see the digest of the
+    # weekend's automated cleanup rather than a mid-week surprise.
+    "email-quarantine-auto-purge-weekly": {
+        "task": "src.app.core.email.quarantine.tasks.auto_purge_quarantine",
+        "schedule": crontab(hour=4, minute=0, day_of_week="mon"),
+    },
 }

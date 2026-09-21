@@ -1,0 +1,121 @@
+<div class="space-y-4" data-testid="quarantine-tab">
+  <header class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-default">Quarantine</h2>
+      <p class="mt-0.5 text-xs text-muted">Held inbound mail — release to inbox or discard.</p>
+    </div>
+    <button
+      type="button"
+      class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs text-default hover:bg-surface-2"
+      (click)="load()"
+      data-testid="quarantine-refresh"
+    >
+      <lucide-icon name="refresh-cw" size="12"></lucide-icon>
+      Refresh
+    </button>
+  </header>
+
+  <!-- Reason filter chips -->
+  <div class="flex flex-wrap gap-1.5" data-testid="quarantine-chips">
+    @for (chip of reasonChips; track chip.code) {
+      <button
+        type="button"
+        class="rounded-full border px-2.5 py-0.5 text-xs transition"
+        [class.border-blue-500]="selectedReason() === chip.code"
+        [class.bg-blue-500]="selectedReason() === chip.code"
+        [class.text-white]="selectedReason() === chip.code"
+        [class.border-subtle]="selectedReason() !== chip.code"
+        [class.text-muted]="selectedReason() !== chip.code"
+        (click)="selectReason(chip.code)"
+      >
+        {{ chip.label }}
+      </button>
+    }
+  </div>
+
+  @if (errorMessage()) {
+    <div
+      class="rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400"
+      data-testid="quarantine-error"
+    >
+      {{ errorMessage() }}
+    </div>
+  }
+
+  <!-- Bulk-release toolbar -->
+  @if (selectedIds().size > 0) {
+    <div
+      class="flex items-center justify-between rounded-md border border-subtle bg-surface-2 px-3 py-2"
+      data-testid="quarantine-bulk-toolbar"
+    >
+      <span class="text-xs text-default">{{ selectedIds().size }} selected</span>
+      <button
+        type="button"
+        class="rounded-md bg-blue-500 px-3 py-1 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+        [disabled]="!canBulkRelease()"
+        (click)="bulkRelease()"
+        data-testid="quarantine-bulk-release"
+      >
+        Release rate-capped
+      </button>
+    </div>
+  }
+
+  <!-- Rows -->
+  @if (loading()) {
+    <p class="text-xs text-muted" data-testid="quarantine-loading">Loading…</p>
+  } @else if (rows().length === 0) {
+    <p class="text-xs text-muted" data-testid="quarantine-empty">
+      No held messages. Suspicious inbound will show up here.
+    </p>
+  } @else {
+    <div class="divide-y divide-subtle rounded-md border border-subtle">
+      @for (row of rows(); track row.id) {
+        <div
+          class="grid grid-cols-[auto_1fr_auto] items-center gap-3 p-3"
+          [attr.data-testid]="'quarantine-row-' + row.id"
+        >
+          <input
+            type="checkbox"
+            [checked]="isSelected(row.id)"
+            (change)="toggleSelected(row.id)"
+            class="h-4 w-4"
+            data-testid="quarantine-row-checkbox"
+          />
+          <div class="min-w-0">
+            <p class="truncate text-xs text-default">
+              <span class="font-mono">{{ row.from_address }}</span>
+              <span class="ml-2 text-muted">→ {{ row.to_recipient }}</span>
+            </p>
+            <p class="mt-0.5 truncate text-xs text-muted">
+              {{ row.subject || '(no subject)' }}
+            </p>
+            <p class="mt-0.5 text-[10px] text-muted">
+              {{ reasonLabel(row.reason_code) }} · held {{ formatHeldAt(row.held_at) }}
+            </p>
+          </div>
+          <div class="flex gap-1">
+            @if (!row.blocked_release) {
+              <button
+                type="button"
+                class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default hover:bg-surface-2"
+                (click)="release(row)"
+                data-testid="quarantine-row-release"
+              >
+                Release
+              </button>
+            }
+            <button
+              type="button"
+              class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-red-500 hover:bg-red-500/10"
+              (click)="discard(row)"
+              data-testid="quarantine-row-discard"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>

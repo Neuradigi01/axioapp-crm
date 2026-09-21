@@ -1,6 +1,6 @@
 # Step 5: Frontend — Quarantine tab + Blocklist tab + modal + service
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — `QuarantineService` (Angular HTTP wrapper for 7 endpoints across filter-rules + quarantine) + two standalone components: `QuarantineTabComponent` (filter chips by reason_code, row-inline Release/Discard with spam-verdict confirm + virus-verdict release-hidden, bulk-release toolbar enabled ONLY when every selected row is `rate_capped` per plan) + `BlocklistTabComponent` (rule list with allow/block filter chips, add-rule modal with segment controls for type/kind + per-kind placeholder hint, delete confirmation). Amber warning banner pattern reused per memory. Standalone components use signals + `@if`/`@for`/`ChangeDetection.OnPush` per Angular 20+ conventions.
 
 ## Goal
 

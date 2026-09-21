@@ -63,6 +63,11 @@ import src.app.core.email.reputation.models  # noqa: F401
 # ``Base.metadata`` before the test-DB create_all sweep.
 import src.app.core.email_sender_setup.models  # noqa: F401
 
+# tasks/email-quarantine-filters Step 1 — side-effect import so the
+# ``tbl_email_quarantine`` + ``tbl_email_filter_rules`` tables
+# register with ``Base.metadata``.
+import src.app.core.email.quarantine.models  # noqa: F401
+
 # Side-effect import so the email_senders MODULE descriptor lands on
 # the module registry before the lifespan permission-fanout sweep.
 import src.app.core.email_senders.module  # noqa: F401
@@ -133,6 +138,7 @@ from src.app.core.email.reputation.router import (
     router as reputation_router,
 )
 from src.app.core.email.router import router as email_router
+from src.app.core.email.quarantine.router import router as email_quarantine_router
 from src.app.core.email.tracking.router import router as email_tracking_router
 from src.app.core.email_sender_setup.router import (
     router as email_sender_setup_router,
@@ -420,6 +426,7 @@ app.include_router(embed_keys_router, prefix="/api/v1")
 app.include_router(embed_public_router, prefix="/api/v1")
 app.include_router(email_router, prefix="/api/v1")
 app.include_router(email_sender_setup_router, prefix="/api/v1")
+app.include_router(email_quarantine_router, prefix="/api/v1")
 app.include_router(sender_domains_router, prefix="/api/v1")
 app.include_router(email_senders_router, prefix="/api/v1")
 app.include_router(channel_endpoints_router, prefix="/api/v1")

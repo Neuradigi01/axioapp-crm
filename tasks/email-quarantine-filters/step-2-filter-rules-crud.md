@@ -1,6 +1,6 @@
 # Step 2: Filter-rules DAL + service + router + validation + per-org cap
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — filter-rules DAL (list, create, delete, count, dedupe-lookup) + service (create with cap + dedupe check, delete with 404) + router (3 endpoints: `GET/POST/DELETE /api/v1/email-filter-rules`) + Pydantic schemas with per-kind regex validation (email address / RFC domain / contact flag key); per-org cap `EMAIL_FILTER_RULES_MAX_PER_ORG=500`; Owner/Admin only via `email.accounts.manage`; router registered in main.py.
 
 ## Goal
 

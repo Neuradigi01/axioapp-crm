@@ -136,6 +136,12 @@ celery.autodiscover_tasks(
         # released). Without this entry both beat sweeps drop with a
         # KeyError and DNS drift goes undetected.
         "src.app.core.email_sender_setup.tasks",
+        # tasks/email-quarantine-filters Step 3 — weekly Monday 04:00
+        # UTC auto-purge of held quarantine rows older than
+        # EMAIL_QUARANTINE_AUTO_PURGE_DAYS (default 30). Without this
+        # entry the beat scheduler can't find
+        # ``auto_purge_quarantine`` and held rows accumulate forever.
+        "src.app.core.email.quarantine.tasks",
     ]
 )
 

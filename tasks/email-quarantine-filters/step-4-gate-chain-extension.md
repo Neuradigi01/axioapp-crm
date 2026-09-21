@@ -1,6 +1,6 @@
 # Step 4: Gate-chain extension — blocklist gate + rate cap gate + reroute size/spam/virus to quarantine
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — new `gates.py` module in `core/email/quarantine/` ships `decide_filter_action` (allow > block precedence; address > contact-flag > domain specificity within same rule_type) + `check_sender_rate_cap` (Redis time-bucketed hourly counter; first over-cap quarantines, subsequent silently drop; fail-open on Redis outage). Mailgun Celery task (`process_mailgun_inbound` inside `tasks.py`) extended with `_apply_extended_gates()` helper — runs after sender-email + contact resolution, BEFORE SPF/DKIM spoof policy, so blocked senders never spam `sender_auth_failed` audit rows. Delivery-ID dedupe short-circuit prevents double-quarantine on retries. Extended chain drops directly to `enqueue_quarantine` service (transactions live there); on quarantine or silent drop, task returns after `_cleanup(pending_dir)`.
 
 ## Goal
 

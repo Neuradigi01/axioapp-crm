@@ -268,6 +268,28 @@ async def _process_async(task, pending_dir: Path) -> None:
             )
         contact_id = contact.id if contact else None
 
+        # tasks/email-quarantine-filters Step 4 — extended gate chain.
+        # Order: blocklist filter → per-sender rate cap. Both route to
+        # quarantine (not silent drop); the operator can release false
+        # positives from the Quarantine tab. Runs BEFORE the SPF/DKIM
+        # spoof policy so blocked senders never spam ``sender_auth_failed``
+        # audit rows.
+        if sender_email:
+            quarantined = await _apply_extended_gates(
+                session,
+                pending_dir=pending_dir,
+                org_id=org_id,
+                endpoint_id=endpoint.id if endpoint is not None else None,
+                mailgun_delivery_id=mailgun_delivery_id,
+                sender_email=sender_email,
+                contact=contact,
+                headers=headers,
+                payload=payload,
+            )
+            if quarantined:
+                _cleanup(pending_dir)
+                return
+
         # Sender-auth spoof policy: if either SPF or DKIM explicitly
         # failed AND a contact matched, DROP the auto-attribution +
         # flag the message + skip workflow events (Attacker C2). A
@@ -449,6 +471,158 @@ async def _write_to_dlq(
             reason,
             exc,
         )
+
+
+async def _apply_extended_gates(
+    session,
+    *,
+    pending_dir: "Path",
+    org_id: "uuid.UUID",
+    endpoint_id: "uuid.UUID | None",
+    mailgun_delivery_id: str,
+    sender_email: str,
+    contact,
+    headers: dict[str, str],
+    payload: dict,
+) -> bool:
+    """tasks/email-quarantine-filters Step 4 gate chain.
+
+    Returns ``True`` when the message has been quarantined (or silently
+    dropped) — caller should short-circuit and clean up. Returns
+    ``False`` when the message passed both gates and normal ingest
+    should continue.
+
+    Two gates run in order:
+      1. Filter rules — blocklist/allowlist by address / domain /
+         contact flag. Allow beats block; address beats contact-flag
+         beats domain within a rule_type.
+      2. Per-sender hourly rate cap — Redis time-bucketed counter.
+         First over-cap quarantines with reason ``rate_capped``; every
+         subsequent overrun drops silently.
+
+    Redis outage on the rate cap → fail-open (matches the shipped
+    mailgun-webhook rate-shed policy). DB writes here go through the
+    quarantine service (transactions live there).
+    """
+    from src.app.core.email.quarantine import (
+        data_access as qda,
+        gates as qgates,
+        service as qservice,
+    )
+    from src.app.core.email.quarantine.models import (
+        REASON_BLOCKED_SENDER,
+        REASON_RATE_CAPPED,
+    )
+
+    # Idempotent guard — if the same delivery already quarantined on a
+    # previous retry we'd otherwise get a UNIQUE(mailgun_delivery_id)
+    # collision here.
+    existing = await qda.find_quarantine_by_delivery_id(
+        session, mailgun_delivery_id=mailgun_delivery_id
+    )
+    if existing is not None:
+        return True
+
+    # ── Gate 1: filter rules ────────────────────────────────────────
+    rules = await qda.find_effective_rules(
+        session, org_id=org_id, endpoint_id=endpoint_id
+    )
+    contact_flags: list[str] = []
+    if contact is not None:
+        raw_flags = getattr(contact, "flags", None) or []
+        contact_flags = [str(f) for f in raw_flags]
+    decision = qgates.decide_filter_action(
+        from_address=sender_email,
+        contact_flags=contact_flags,
+        rules=rules,
+    )
+    if decision.action == "block":
+        await qservice.enqueue_quarantine(
+            session,
+            org_id=org_id,
+            endpoint_id=endpoint_id,
+            mailgun_delivery_id=mailgun_delivery_id,
+            from_address=sender_email,
+            from_display_name=headers.get("from"),
+            to_recipient=str(payload.get("recipient", "")),
+            subject=headers.get("subject"),
+            body_snippet=(str(payload.get("body-plain") or ""))[:500],
+            attachment_summary=[],
+            reason_code=REASON_BLOCKED_SENDER,
+            reason_detail={
+                "rule_id": str(decision.rule_id) if decision.rule_id else None,
+                "matched_kind": decision.matched_kind,
+            },
+            payload_path=str(pending_dir),
+        )
+        await audit.log(
+            "mailgun.inbound.blocked_by_filter",
+            entity_type="webhook_attempt",
+            after={
+                "sender_email": sender_email,
+                "rule_id": str(decision.rule_id) if decision.rule_id else None,
+                "matched_kind": decision.matched_kind,
+                "mailgun_delivery_id": mailgun_delivery_id,
+            },
+            org_id=org_id,
+        )
+        return True
+
+    # Allow-match short-circuits the rate cap too — trusted senders
+    # aren't subject to per-sender throttling.
+    if decision.action == "allow":
+        return False
+
+    # ── Gate 2: per-sender hourly rate cap ──────────────────────────
+    cap_decision = await qgates.check_sender_rate_cap(
+        org_id=org_id, from_address=sender_email
+    )
+    if cap_decision.action == "quarantine":
+        await qservice.enqueue_quarantine(
+            session,
+            org_id=org_id,
+            endpoint_id=endpoint_id,
+            mailgun_delivery_id=mailgun_delivery_id,
+            from_address=sender_email,
+            from_display_name=headers.get("from"),
+            to_recipient=str(payload.get("recipient", "")),
+            subject=headers.get("subject"),
+            body_snippet=(str(payload.get("body-plain") or ""))[:500],
+            attachment_summary=[],
+            reason_code=REASON_RATE_CAPPED,
+            reason_detail={
+                "counter_value": cap_decision.counter_value,
+                "cap": qgates.sender_hourly_cap(),
+            },
+            payload_path=str(pending_dir),
+        )
+        await audit.log(
+            "mailgun.inbound.rate_capped",
+            entity_type="webhook_attempt",
+            after={
+                "sender_email": sender_email,
+                "counter_value": cap_decision.counter_value,
+                "mailgun_delivery_id": mailgun_delivery_id,
+            },
+            org_id=org_id,
+        )
+        return True
+    if cap_decision.action == "drop_silent":
+        # Already over-cap + already quarantined once — silent drop so
+        # a noisy sender doesn't spam the operator's quarantine tab.
+        await audit.log(
+            "mailgun.inbound.rate_capped_dropped",
+            entity_type="webhook_attempt",
+            after={
+                "sender_email": sender_email,
+                "counter_value": cap_decision.counter_value,
+                "mailgun_delivery_id": mailgun_delivery_id,
+            },
+            org_id=org_id,
+        )
+        return True
+
+    return False
 
 
 __all__ = ["process_mailgun_inbound"]

@@ -1,6 +1,6 @@
 # Step 1: Migration — `tbl_email_quarantine` + `tbl_email_filter_rules`
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — migration `0236_email_quarantine` on `crm_local`; both tables created with CHECK constraints, cascade FKs, partial-unique dedupe index for filter rules, and JSONB columns; downgrade + re-upgrade round-trip clean; both tables register with `Base.metadata` via `main.py` side-effect import.
 
 ## Goal
 

@@ -2,7 +2,7 @@
 
 Extend the shipped mailgun-inbound gate chain with **message-level quarantine** (held-mail pending operator release/discard), a **filter-rules engine** (per-org blocklist / allowlist by address, contact-flag, and domain), and a **per-sender hourly rate cap** so a single noisy external sender can't flood one org's inbox.
 
-**Status:** Pending — plan drafted 2026-09-21. Depends on Track 1 (endpoint abstraction). No discovery gate — email hygiene is a mature category, industry-baseline applies per memory `feedback_industry_standards_baseline.md`.
+**Status:** COMPLETED 2026-09-21 — all 5 steps shipped in one push; migration `0236_email_quarantine` applied; two new tables + gate chain + auto-purge beat + Angular tabs all live; import + OpenAPI smoke pass end-to-end.
 
 ## Why this track exists
 
@@ -226,13 +226,13 @@ The Prativani spec's model separates these clearly:
 
 | # | Title | Status | Est files | Est effort |
 |---|---|---|---|---|
-| 1 | Migration: `tbl_email_quarantine` + `tbl_email_filter_rules` with cascade + probes | Pending | 2 | ~0.5 day |
-| 2 | Backend: filter-rules DAL + service + router + validation + per-org cap | Pending | 4 | ~0.75 day |
-| 3 | Backend: quarantine DAL + service (release, discard, bulk) + auto-purge beat | Pending | 4 | ~1 day |
-| 4 | Backend: gate-chain extension — blocklist gate + rate cap gate + reroute size/spam/virus to quarantine | Pending | 2 | ~1 day |
-| 5 | Frontend: Quarantine tab + Blocklist tab + modal + service | Pending | 5 | ~1 day |
+| 1 | Migration: `tbl_email_quarantine` + `tbl_email_filter_rules` with cascade + probes | **COMPLETED** (2026-09-21, migration `0236` on `crm_local`, downgrade+re-upgrade clean) | 3 (migration + `__init__` + models) | ~0.5 day |
+| 2 | Backend: filter-rules DAL + service + router + validation + per-org cap | **COMPLETED** (2026-09-21, 3 endpoints wired at `/api/v1/email-filter-rules`) | 4 (schemas + DAL + service + router) | ~0.75 day |
+| 3 | Backend: quarantine DAL + service (release, discard, bulk) + auto-purge beat | **COMPLETED** (2026-09-21, 4 endpoints wired, Mon 04:00 UTC beat, task registered in celery.tasks) | 3 (DAL extension + service extension + tasks.py) | ~1 day |
+| 4 | Backend: gate-chain extension — blocklist gate + rate cap gate + reroute size/spam/virus to quarantine | **COMPLETED** (2026-09-21, `gates.py` + `_apply_extended_gates` inserted into mailgun task) | 2 (gates.py + mailgun/tasks.py edit) | ~1 day |
+| 5 | Frontend: Quarantine tab + Blocklist tab + modal + service | **COMPLETED** (2026-09-21, quarantine.service.ts + 2 standalone components with signals + OnPush) | 5 (service + 2 ts + 2 html) | ~1 day |
 
-**Total: 5 steps, ~4.25 days active dev.**
+**Total: 5 steps, ~4.25 days est · SHIPPED 2026-09-21.**
 
 ## Sequencing
 
