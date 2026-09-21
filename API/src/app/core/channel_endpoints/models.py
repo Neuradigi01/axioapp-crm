@@ -41,7 +41,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.app.shared.db import Base
 from src.app.shared.orm import TenantScoped
 
-
 # Channel discriminator values kept as module-level constants so callers
 # never spell them wrong. Enum types deliberately not used — channel
 # values grow as we add providers (WhatsApp, SMS), and the CHECK
@@ -88,9 +87,7 @@ class ChannelEndpoint(Base, TenantScoped):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sql_text("true")
     )
-    deactivated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deactivation_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -152,12 +149,8 @@ class EmailEndpointDetails(Base, TenantScoped):
         nullable=False,
         index=True,
     )
-    forwarding_token: Mapped[str | None] = mapped_column(
-        String(32), nullable=True, unique=True
-    )
-    reply_token: Mapped[str | None] = mapped_column(
-        String(32), nullable=True, unique=True
-    )
+    forwarding_token: Mapped[str | None] = mapped_column(String(32), nullable=True, unique=True)
+    reply_token: Mapped[str | None] = mapped_column(String(32), nullable=True, unique=True)
     # Track 2 adds FK reference to tbl_organization_email_domains(id).
     # Unconstrained here to keep this migration ordering-safe.
     domain_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -175,8 +168,21 @@ class EmailEndpointDetails(Base, TenantScoped):
         nullable=True,
         index=True,
     )
-    last_inbound_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+    last_inbound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # tasks/email-inbound-forwarding Step 2 — ``forwarded_address``
+    # endpoint config. Both columns default to a sensible "on" state so
+    # unrelated endpoint types keep working without a backfill (the
+    # unused columns just sit at their default on every non-forwarded
+    # row). Track 3 Step 3 reads these on the inbound ingest path.
+    auto_create_contact: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sql_text("true")
+    )
+    # Plain UUID with no FK to users — matches the post-0037 convention
+    # for user-side references (see ``tbl_contacts.assigned_to_id``,
+    # ``tbl_leads.assigned_to_id``). Staff-offboarding is responsible
+    # for nulling references on user deactivation, not the DB.
+    default_assignee_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
     )
 
     __table_args__ = (
@@ -190,6 +196,13 @@ class EmailEndpointDetails(Base, TenantScoped):
         UniqueConstraint(
             "oauth_account_id",
             name="uq_email_endpoint_details_oauth_account",
+        ),
+        # Partial index — inbox-triage lookups only scan rows with an
+        # assignee set. Matches the migration's DDL exactly.
+        Index(
+            "ix_email_endpoint_details_default_assignee",
+            "default_assignee_user_id",
+            postgresql_where=sql_text("default_assignee_user_id IS NOT NULL"),
         ),
     )
 

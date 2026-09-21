@@ -1,6 +1,6 @@
 # Step 2: Backend — schema extension + `create_forwarded_address_endpoint()`
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21, migration `0234_forwarded_address` adds `auto_create_contact` + `default_assignee_user_id` on `tbl_email_endpoint_details` with partial index; DAL `create_forwarded_address` mirrors `create_smtp_reply_capture` retry loop; service `create_forwarded_address_endpoint` validates cross-org assignees + fires `forwarded_address_endpoint.created` audit; token never leaks via `ForwardedAddressOut`; 7 tests in `test_forwarded_address_endpoint.py`; layered pin-test exceptions unchanged (service was already an approved caller))
 
 ## Goal
 

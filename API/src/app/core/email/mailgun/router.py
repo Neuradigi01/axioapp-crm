@@ -52,9 +52,7 @@ router = APIRouter(prefix="/mailgun", tags=["Mailgun Inbound"])
 # a different path (``/admin/email-inbound-dlq``) so it can be gated
 # on a per-request permission dependency without leaking into the
 # webhook router's unauthenticated surface.
-dlq_admin_router = APIRouter(
-    prefix="/admin/email-inbound-dlq", tags=["Email Inbound DLQ"]
-)
+dlq_admin_router = APIRouter(prefix="/admin/email-inbound-dlq", tags=["Email Inbound DLQ"])
 
 
 def _dlq_row_to_out(row) -> DlqRowOut:
@@ -87,15 +85,11 @@ async def list_email_inbound_dlq(
     surfacing NULL-org rows to any tenant would leak sender emails
     across orgs.
     """
-    rows = await data_access.list_dlq_rows(
-        db, org_id=user.org_id, limit=limit, offset=offset
-    )
+    rows = await data_access.list_dlq_rows(db, org_id=user.org_id, limit=limit, offset=offset)
     return [_dlq_row_to_out(r) for r in rows]
 
 
-@dlq_admin_router.post(
-    "/{dlq_id}/reprocess", response_model=DlqReprocessResponse
-)
+@dlq_admin_router.post("/{dlq_id}/reprocess", response_model=DlqReprocessResponse)
 async def reprocess_email_inbound_dlq(
     dlq_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -122,7 +116,8 @@ async def reprocess_email_inbound_dlq(
         raise HTTPException(status_code=404, detail="dlq row not found")
     if row.org_id is None:
         raise HTTPException(
-            status_code=403, detail="system-level DLQ rows aren't reprocessable via tenant admin",
+            status_code=403,
+            detail="system-level DLQ rows aren't reprocessable via tenant admin",
         )
 
     pending_path = _Path(row.pending_inbound_path)
@@ -134,12 +129,14 @@ async def reprocess_email_inbound_dlq(
 
     reprocessed = service.enqueue_process_task(pending_path)
     if reprocessed:
-        from datetime import UTC, datetime as _dt
+        from datetime import UTC
+        from datetime import datetime as _dt
 
         row.resolved_at = _dt.now(UTC)
         await db.commit()
 
     return DlqReprocessResponse(id=str(row.id), reprocessed=reprocessed)
+
 
 _FAIL_RATE_KEY_PREFIX = "mgw:fail:"
 _FAIL_RATE_LIMIT = 20
@@ -173,9 +170,7 @@ async def mailgun_inbound(request: Request) -> JSONResponse:
     token = str(form.get("token", ""))
     signature = str(form.get("signature", ""))
 
-    if not service.verify_signature(
-        timestamp=timestamp, token=token, signature=signature
-    ):
+    if not service.verify_signature(timestamp=timestamp, token=token, signature=signature):
         # Rate-limit ONLY signature failures — signed traffic is
         # trusted Mailgun and we don't want to shed legit deliveries
         # during a reply-storm because of shared egress IPs.

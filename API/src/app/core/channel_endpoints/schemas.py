@@ -24,10 +24,9 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.app.shared.schemas.base import ORMModel
-
 
 EndpointType = Literal[
     "smtp_reply_capture",
@@ -52,6 +51,12 @@ class EmailEndpointDetailsOut(ORMModel):
     smtp_sender_id: uuid.UUID | None = None
     oauth_account_id: uuid.UUID | None = None
     last_inbound_at: datetime | None = None
+    # tasks/email-inbound-forwarding Step 2 — forwarded-address config.
+    # Both columns exist on every row (server-defaulted); surfaced here
+    # so a mixed list of endpoints renders the two forwarded-address
+    # fields per row without a separate call.
+    auto_create_contact: bool = True
+    default_assignee_user_id: uuid.UUID | None = None
 
 
 class ChannelEndpointOut(ORMModel):
@@ -93,10 +98,73 @@ class DeactivateEndpointIn(BaseModel):
     reason: str | None = None
 
 
+# ---------------------------------------------------------------------------
+# tasks/email-inbound-forwarding Step 2 — forwarded-address create + read.
+#
+# The ``forwarding_token`` never appears on any response schema —
+# frontends see only the composed address (``f-<token>@<domain>``).
+# Enforced by omitting the field here; mass-assign on the request side
+# is blocked by ``extra="forbid"`` + the field not existing on any
+# request model.
+# ---------------------------------------------------------------------------
+
+
+class CreateForwardedAddressIn(BaseModel):
+    """Payload for ``POST /api/v1/channel-endpoints/forwarded-address``.
+
+    ``label`` is the operator-facing name for the endpoint (rendered
+    in the inbox-settings list). ``auto_create_contact`` defaults to
+    the industry-baseline "auto-create" (matches HubSpot / Front). A
+    ``default_assignee_user_id`` of None means round-robin at inbox-
+    triage time.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    label: str = Field(min_length=1, max_length=128)
+    auto_create_contact: bool = True
+    default_assignee_user_id: uuid.UUID | None = None
+
+
+class AssigneeRef(BaseModel):
+    """Minimal user reference embedded in :class:`ForwardedAddressOut`.
+
+    Only what the inbox-settings UI needs — a full user response would
+    leak profile fields the settings-page doesn't render. Populated by
+    the service layer via a join against ``tbl_user_info``.
+    """
+
+    id: uuid.UUID
+    name: str
+
+
+class ForwardedAddressOut(ORMModel):
+    """Response shape for a ``forwarded_address`` endpoint.
+
+    ``forwarding_address`` is composed server-side from
+    ``INBOUND_EMAIL_DOMAIN`` + the raw ``forwarding_token`` — the raw
+    token is NEVER surfaced to the client. Copy-paste flows show the
+    full ``f-<token>@<domain>`` address; the token itself stays
+    internal.
+    """
+
+    id: uuid.UUID
+    label: str
+    forwarding_address: str
+    auto_create_contact: bool
+    default_assignee: AssigneeRef | None = None
+    is_active: bool
+    last_inbound_at: datetime | None = None
+    created_at: datetime
+
+
 __all__ = [
-    "EndpointType",
-    "EmailEndpointDetailsOut",
-    "ChannelEndpointOut",
+    "AssigneeRef",
     "ChannelEndpointListOut",
+    "ChannelEndpointOut",
+    "CreateForwardedAddressIn",
     "DeactivateEndpointIn",
+    "EmailEndpointDetailsOut",
+    "EndpointType",
+    "ForwardedAddressOut",
 ]

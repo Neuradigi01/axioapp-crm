@@ -115,9 +115,7 @@ def verify_signature(*, timestamp: str, token: str, signature: str) -> bool:
         if not key:
             continue
         try:
-            expected = hmac.new(
-                key.encode("utf-8"), signed, hashlib.sha256
-            ).hexdigest()
+            expected = hmac.new(key.encode("utf-8"), signed, hashlib.sha256).hexdigest()
         except Exception:  # pragma: no cover — defensive
             continue
         if hmac.compare_digest(expected, signature):
@@ -201,8 +199,7 @@ def enqueue_process_task(pending_path: Path) -> bool:
         return True
     except Exception as exc:  # pragma: no cover — broker outage path
         logger.warning(
-            "mailgun.enqueue_process_task failed for %s: %s — "
-            "sweeper will pick up",
+            "mailgun.enqueue_process_task failed for %s: %s — sweeper will pick up",
             pending_path,
             exc,
         )
@@ -295,10 +292,7 @@ def parse_dkim_result(payload: dict[str, Any]) -> str | None:
     Older deliveries may omit the header — treat as ``None`` (unknown,
     not fail) so we don't drop legitimate mail on incomplete metadata.
     """
-    value = _lc(
-        payload.get("X-Mailgun-Dkim-Signature")
-        or payload.get("x-mailgun-dkim-signature")
-    )
+    value = _lc(payload.get("X-Mailgun-Dkim-Signature") or payload.get("x-mailgun-dkim-signature"))
     return value if value in _DKIM_VALUES else None
 
 
@@ -321,21 +315,87 @@ def detect_auto_responder(headers: dict[str, str]) -> bool:
 def extract_recipient_token(recipient: str) -> str | None:
     """Pull the opaque token out of ``in_<token>@<domain>``. Returns
     None if the recipient shape doesn't match — the ingest task then
-    audits ``mailgun.inbound.unknown_recipient`` + drops."""
+    audits ``mailgun.inbound.unknown_recipient`` + drops.
+
+    Reply-capture prefix only. For the two-prefix dispatch used by the
+    Celery task (reply-capture vs forwarded-address), call
+    :func:`parse_recipient_kind` instead.
+    """
     if not recipient:
         return None
     local_part = recipient.split("@", 1)[0]
     if not local_part.startswith("in_"):
         return None
-    token = local_part[len("in_"):]
+    token = local_part[len("in_") :]
     if not token:
         return None
     return token
 
 
+# ---------------------------------------------------------------------------
+# tasks/email-inbound-forwarding Step 3 — prefix dispatch.
+#
+# Two customer-facing address prefixes at the CRM's inbound domain:
+#
+#   * ``in_<token>@<inbound>`` — reply-capture for SMTP-sender outbound
+#     (mailgun-inbound track). Token maps to
+#     ``tbl_email_endpoint_details.reply_token``.
+#
+#   * ``f-<token>@<inbound>`` — customer-forwarded mail from their
+#     support mailbox (this track). Token maps to
+#     ``tbl_email_endpoint_details.forwarding_token``.
+#
+# The Mailgun-side Route already catches every local part at the
+# inbound domain (shipped ``match_recipient(".*@<domain>")``) — no
+# new route needed. The dispatch lives here in Python.
+# ---------------------------------------------------------------------------
+
+
+RECIPIENT_KIND_REPLY_CAPTURE = "reply_capture"
+RECIPIENT_KIND_FORWARDED_ADDRESS = "forwarded_address"
+
+
+def extract_forwarding_token(recipient: str) -> str | None:
+    """Mirror of :func:`extract_recipient_token` for the ``f-<token>@…``
+    prefix. Returns None on shape mismatch (the caller then falls
+    through to the reply-capture prefix or the drop path)."""
+    if not recipient:
+        return None
+    local_part = recipient.split("@", 1)[0]
+    if not local_part.startswith("f-"):
+        return None
+    token = local_part[len("f-") :]
+    if not token:
+        return None
+    return token
+
+
+def parse_recipient_kind(recipient: str) -> tuple[str, str] | None:
+    """Return ``(kind, token)`` for a recipient the CRM recognises, or
+    ``None`` for anything else.
+
+    ``kind`` is one of :data:`RECIPIENT_KIND_REPLY_CAPTURE` /
+    :data:`RECIPIENT_KIND_FORWARDED_ADDRESS`. Callers dispatch on the
+    kind — reply-capture routes to ``find_by_reply_token``,
+    forwarded-address routes to ``find_by_forwarding_token``.
+
+    Unknown-prefix returns (audited + dropped upstream) are the
+    ``None`` case — no partial match, no fall-through.
+    """
+    if not recipient:
+        return None
+    reply_token = extract_recipient_token(recipient)
+    if reply_token is not None:
+        return (RECIPIENT_KIND_REPLY_CAPTURE, reply_token)
+    fwd_token = extract_forwarding_token(recipient)
+    if fwd_token is not None:
+        return (RECIPIENT_KIND_FORWARDED_ADDRESS, fwd_token)
+    return None
+
+
 def extract_all_our_recipients(payload: dict[str, Any]) -> list[str]:
     """Return every recipient in the delivery that resolves to one of
-    our ``in_<token>@…`` addresses. Used by the ingest task's
+    our known prefixes (``in_*`` or ``f-*``). Used by the ingest task's
     multi-recipient guard — deliveries with >1 of our tokens are
     ambiguous and get rejected + audited (rare in practice)."""
     hits: list[str] = []
@@ -349,8 +409,9 @@ def extract_all_our_recipients(payload: dict[str, Any]) -> list[str]:
         values.extend(str(v) for v in raw)
     for v in values:
         for candidate in v.split(","):
-            if extract_recipient_token(candidate.strip()) is not None:
-                hits.append(candidate.strip())
+            trimmed = candidate.strip()
+            if parse_recipient_kind(trimmed) is not None:
+                hits.append(trimmed)
     return hits
 
 
@@ -531,9 +592,7 @@ def commit_attachments(
 def parse_sender_email(payload: dict[str, Any]) -> str:
     """Return the lowercase envelope sender (``sender`` field, falling
     back to ``From`` header). Used for contact matching."""
-    raw = str(
-        payload.get("sender") or payload.get("From") or payload.get("from") or ""
-    ).strip()
+    raw = str(payload.get("sender") or payload.get("From") or payload.get("from") or "").strip()
     if "<" in raw and ">" in raw:
         # ``"Alice" <alice@ex.com>`` shape from the From header.
         raw = raw[raw.index("<") + 1 : raw.index(">")]
@@ -547,7 +606,11 @@ __all__ = [
     "extract_all_our_recipients",
     "extract_and_stage_attachments",
     "extract_headers",
+    "RECIPIENT_KIND_FORWARDED_ADDRESS",
+    "RECIPIENT_KIND_REPLY_CAPTURE",
+    "extract_forwarding_token",
     "extract_recipient_token",
+    "parse_recipient_kind",
     "parse_dkim_result",
     "parse_sender_email",
     "parse_spf_result",

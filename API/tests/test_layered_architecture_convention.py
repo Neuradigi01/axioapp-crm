@@ -145,6 +145,12 @@ _TRANSACTION_EXCEPTIONS: dict[str, str] = {
         "Nightly + hourly beat sweeps — session.commit after mark_demoted "
         "before firing the owner notify; mirrors campaigns/tasks + email/tasks"
     ),
+    # --- Email inbound forwarding ingest (Track 3 Step 3)
+    "core/email/mailgun/ingest_forwarded.py": (
+        "Forwarded-address ingest branch — session.commit after "
+        "assignee-set + last_inbound_at stamp; mirrors reply-capture "
+        "path in email/mailgun/tasks.py"
+    ),
     # --- Integrations DLQ
     "core/integrations/dlq.py": "Webhook DLQ writer",
     # --- WhatsApp integration sub-modules
@@ -271,6 +277,12 @@ _HELPER_CRUD_EXCEPTIONS: dict[str, str] = {
     "core/email_sender_setup/tasks.py": (
         "Nightly + hourly beat sweeps — session.execute for the "
         "owner-lookup join; mirrors campaigns/tasks + email/tasks"
+    ),
+    # --- Email inbound forwarding ingest (Track 3 Step 3)
+    "core/email/mailgun/ingest_forwarded.py": (
+        "Forwarded-address ingest branch — session.execute for the "
+        "``SET LOCAL app.current_org_id`` GUC; mirrors the shipped "
+        "reply-capture path in email/mailgun/tasks.py"
     ),
     # --- Email module helpers
     "core/email/gmail/push.py": "Gmail push subscriptions",

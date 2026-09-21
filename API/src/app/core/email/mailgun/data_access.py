@@ -51,9 +51,7 @@ async def check_and_record_replay(token: str) -> bool:
         return False
     client = _redis()
     if client is None:
-        logger.error(
-            "mailgun.replay check: redis client unavailable — failing closed"
-        )
+        logger.error("mailgun.replay check: redis client unavailable — failing closed")
         return False
     try:
         # SET NX PX = atomic "set if not exists with TTL in ms".
@@ -111,13 +109,9 @@ async def list_dlq_rows(
     return list(result.scalars().all())
 
 
-async def get_dlq_row(
-    session: AsyncSession, *, dlq_id: uuid.UUID
-) -> EmailInboundDlq | None:
+async def get_dlq_row(session: AsyncSession, *, dlq_id: uuid.UUID) -> EmailInboundDlq | None:
     """Point read used by the reprocess endpoint (Step 5)."""
-    result = await session.execute(
-        select(EmailInboundDlq).where(EmailInboundDlq.id == dlq_id)
-    )
+    result = await session.execute(select(EmailInboundDlq).where(EmailInboundDlq.id == dlq_id))
     return result.scalar_one_or_none()
 
 

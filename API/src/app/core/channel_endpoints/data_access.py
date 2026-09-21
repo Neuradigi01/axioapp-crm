@@ -19,7 +19,7 @@ import secrets
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,7 +28,6 @@ from src.app.core.channel_endpoints.models import (
     ChannelEndpoint,
     EmailEndpointDetails,
 )
-
 
 # Token length matches the shipped mailgun-inbound ``inbound_token``
 # generator so backfilled rows and freshly-created rows are
@@ -189,9 +188,7 @@ def add_endpoint(session: AsyncSession, row: ChannelEndpoint) -> ChannelEndpoint
     return row
 
 
-def add_details(
-    session: AsyncSession, row: EmailEndpointDetails
-) -> EmailEndpointDetails:
+def add_details(session: AsyncSession, row: EmailEndpointDetails) -> EmailEndpointDetails:
     """Stage a details INSERT — commit belongs to the caller."""
     session.add(row)
     return row
@@ -245,6 +242,66 @@ async def create_smtp_reply_capture(
 
     raise RuntimeError(
         "channel_endpoints.create_smtp_reply_capture: token collision retry "
+        f"limit exceeded ({_TOKEN_COLLISION_MAX_RETRIES})"
+    )
+
+
+async def create_forwarded_address(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    label: str,
+    auto_create_contact: bool = True,
+    default_assignee_user_id: uuid.UUID | None = None,
+) -> tuple[ChannelEndpoint, EmailEndpointDetails]:
+    """Stage a new ``forwarded_address`` endpoint + its details row.
+
+    Generates a fresh ``forwarding_token``; on UNIQUE collision,
+    regenerates up to :data:`_TOKEN_COLLISION_MAX_RETRIES` times. Same
+    shape as :func:`create_smtp_reply_capture` — the two callers stage
+    matching pairs so the sweeper never sees a details-less orphan
+    beyond the flush-race window.
+
+    ``auto_create_contact`` and ``default_assignee_user_id`` are
+    forwarded-address-specific config (Track 3 Step 3 reads them on
+    the ingest path). Both are safe defaults so a caller that doesn't
+    pass them lands on the industry-baseline "auto-create contact,
+    round-robin assignee".
+
+    Caller commits.
+    """
+    for _ in range(_TOKEN_COLLISION_MAX_RETRIES):
+        token = _generate_token()
+        endpoint = ChannelEndpoint(
+            org_id=org_id,
+            channel=CHANNEL_EMAIL,
+            endpoint_type="forwarded_address",
+            label=label,
+        )
+        add_endpoint(session, endpoint)
+        try:
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            continue
+
+        details = EmailEndpointDetails(
+            endpoint_id=endpoint.id,
+            org_id=org_id,
+            forwarding_token=token,
+            auto_create_contact=auto_create_contact,
+            default_assignee_user_id=default_assignee_user_id,
+        )
+        add_details(session, details)
+        try:
+            await session.flush()
+            return endpoint, details
+        except IntegrityError:
+            await session.rollback()
+            continue
+
+    raise RuntimeError(
+        "channel_endpoints.create_forwarded_address: token collision retry "
         f"limit exceeded ({_TOKEN_COLLISION_MAX_RETRIES})"
     )
 
@@ -346,9 +403,7 @@ async def list_oauth_endpoints_backed_by_disconnected_accounts(
     ids = [row[0] for row in result.all()]
     if not ids:
         return []
-    rows = await session.execute(
-        select(ChannelEndpoint).where(ChannelEndpoint.id.in_(ids))
-    )
+    rows = await session.execute(select(ChannelEndpoint).where(ChannelEndpoint.id.in_(ids)))
     return list(rows.scalars().all())
 
 
@@ -361,6 +416,7 @@ __all__ = [
     "list_oauth_endpoints_backed_by_disconnected_accounts",
     "add_endpoint",
     "add_details",
+    "create_forwarded_address",
     "create_smtp_reply_capture",
     "create_oauth_mailbox",
     "deactivate",

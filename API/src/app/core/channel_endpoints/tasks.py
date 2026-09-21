@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -73,13 +72,9 @@ async def _sweep_orphan_endpoints_async() -> dict[str, Any]:
     async with async_session() as session:
         # --- Orphan endpoints (no details row after grace window) ---
         try:
-            orphans = await endpoints_da.list_orphan_endpoints(
-                session, cutoff_dt=orphan_cutoff
-            )
+            orphans = await endpoints_da.list_orphan_endpoints(session, cutoff_dt=orphan_cutoff)
             for e in orphans:
-                await endpoints_da.deactivate(
-                    session, endpoint=e, reason="orphan_sweeper"
-                )
+                await endpoints_da.deactivate(session, endpoint=e, reason="orphan_sweeper")
                 orphan_swept += 1
                 swept_ids.append(str(e.id))
         except Exception:  # noqa: BLE001 — surface + continue
@@ -88,10 +83,8 @@ async def _sweep_orphan_endpoints_async() -> dict[str, Any]:
 
         # --- OAuth endpoints backed by long-disconnected accounts ---
         try:
-            oauth_orphans = await (
-                endpoints_da.list_oauth_endpoints_backed_by_disconnected_accounts(
-                    session, disconnected_since=disconnected_cutoff
-                )
+            oauth_orphans = await endpoints_da.list_oauth_endpoints_backed_by_disconnected_accounts(
+                session, disconnected_since=disconnected_cutoff
             )
             for e in oauth_orphans:
                 await endpoints_da.deactivate(
@@ -102,9 +95,7 @@ async def _sweep_orphan_endpoints_async() -> dict[str, Any]:
                 oauth_swept += 1
                 swept_ids.append(str(e.id))
         except Exception:  # noqa: BLE001
-            logger.exception(
-                "sweep_orphan_endpoints: oauth-disconnected pass failed"
-            )
+            logger.exception("sweep_orphan_endpoints: oauth-disconnected pass failed")
             failed += 1
 
         if orphan_swept or oauth_swept:

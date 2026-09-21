@@ -63,9 +63,7 @@ class MailgunRateLimited(MailgunApiError):
         body_preview: str | None = None,
         retry_after_seconds: int | None = None,
     ) -> None:
-        super().__init__(
-            message, status_code=status_code, body_preview=body_preview
-        )
+        super().__init__(message, status_code=status_code, body_preview=body_preview)
         self.retry_after_seconds = retry_after_seconds
 
 

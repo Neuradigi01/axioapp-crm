@@ -81,9 +81,7 @@ def _rm_dir_quiet(path: Path) -> bool:
     except FileNotFoundError:
         return True
     except Exception as exc:  # pragma: no cover — filesystem hiccup
-        logger.warning(
-            "mailgun.orphan_cleanup: failed to remove %s: %s", path, exc
-        )
+        logger.warning("mailgun.orphan_cleanup: failed to remove %s: %s", path, exc)
         return False
 
 
@@ -111,9 +109,7 @@ def sweep_staging_orphans(self) -> int:  # noqa: ARG001
             if _rm_dir_quiet(child):
                 removed += 1
     if removed:
-        logger.info(
-            "mailgun.sweep_staging_orphans removed %d staged dir(s)", removed
-        )
+        logger.info("mailgun.sweep_staging_orphans removed %d staged dir(s)", removed)
     return removed
 
 
@@ -162,9 +158,7 @@ async def _sweep_messages_orphans_async() -> int:
                 row[0]
                 for row in (
                     await session.execute(
-                        select(Message.id).where(
-                            Message.id.in_([mid for _, mid in candidates])
-                        )
+                        select(Message.id).where(Message.id.in_([mid for _, mid in candidates]))
                     )
                 ).all()
             }
@@ -175,9 +169,7 @@ async def _sweep_messages_orphans_async() -> int:
                     removed += 1
 
     if removed:
-        logger.info(
-            "mailgun.sweep_messages_orphans removed %d orphan dir(s)", removed
-        )
+        logger.info("mailgun.sweep_messages_orphans removed %d orphan dir(s)", removed)
     return removed
 
 

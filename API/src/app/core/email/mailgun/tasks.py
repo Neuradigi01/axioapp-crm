@@ -47,6 +47,7 @@ from src.app.core.conversations.adapters.email_threading import (
 )
 from src.app.core.email.mailgun import data_access as mailgun_da
 from src.app.core.email.mailgun import service as mailgun_service
+from src.app.core.email.mailgun.ingest_forwarded import handle_forwarded_address
 from src.app.core.email_senders import data_access as senders_da
 from src.app.shared.db import async_session
 from src.celery.worker import celery
@@ -60,10 +61,8 @@ def _endpoints_refactor_enabled() -> bool:
     unchanged — a one-flip revert for the refactor without touching migrations.
     Rip the flag out once Tracks 2/4/5 all consume the endpoints DAL.
     """
-    return (
-        os.getenv("EMAIL_ENDPOINTS_REFACTOR_ENABLED", "true").strip().lower()
-        != "false"
-    )
+    return os.getenv("EMAIL_ENDPOINTS_REFACTOR_ENABLED", "true").strip().lower() != "false"
+
 
 logger = logging.getLogger(__name__)
 
@@ -163,13 +162,16 @@ async def _process_async(task, pending_dir: Path) -> None:
         _cleanup(pending_dir)
         return
 
-    recipient = our_recipients[0] if our_recipients else str(
-        payload.get("recipient", "")
-    )
-    token = mailgun_service.extract_recipient_token(recipient)
-    if not token:
+    recipient = our_recipients[0] if our_recipients else str(payload.get("recipient", ""))
+    parsed = mailgun_service.parse_recipient_kind(recipient)
+    if parsed is None:
+        # Neither ``in_<token>`` (reply-capture) nor ``f-<token>``
+        # (forwarded-address) — the Mailgun Route caught the message
+        # but its local part doesn't fit either shape our CRM knows.
+        # Audit + drop rather than let it fall through to a partial
+        # match on the reply-capture path.
         await audit.log(
-            "mailgun.inbound.unknown_recipient",
+            "mailgun.inbound.unknown_prefix",
             entity_type="webhook_attempt",
             after={
                 "recipient": recipient,
@@ -180,8 +182,24 @@ async def _process_async(task, pending_dir: Path) -> None:
         )
         _cleanup(pending_dir)
         return
+    kind, token = parsed
 
     async with async_session() as session:
+        # tasks/email-inbound-forwarding Step 3 — forwarded-address
+        # branch. Keeps the reply-capture flow below untouched so a
+        # future refactor doesn't risk regressing the shipped path.
+        if kind == mailgun_service.RECIPIENT_KIND_FORWARDED_ADDRESS:
+            await handle_forwarded_address(
+                session,
+                token=token,
+                recipient=recipient,
+                payload=payload,
+                pending_dir=pending_dir,
+                mailgun_delivery_id=mailgun_delivery_id,
+            )
+            _cleanup(pending_dir)
+            return
+
         # Track 1 Step 3 refactor: consult ``channel_endpoints`` DAL first
         # when the flag is on; legacy ``senders_da.find_by_inbound_token``
         # is preserved behind ``EMAIL_ENDPOINTS_REFACTOR_ENABLED=false``.
@@ -257,9 +275,7 @@ async def _process_async(task, pending_dir: Path) -> None:
         # ``fail`` triggers the drop so upstream mailers with
         # occasional softfails (very common) don't lose replies.
         spoof_suspected = False
-        if contact_id is not None and (
-            spf_result == "fail" or dkim_result == "fail"
-        ):
+        if contact_id is not None and (spf_result == "fail" or dkim_result == "fail"):
             spoof_suspected = True
             contact_id = None
             await audit.log(
@@ -335,8 +351,7 @@ async def _process_async(task, pending_dir: Path) -> None:
             "rfc_message_id": rfc_message_id,
             "spoof_suspected": spoof_suspected,
             "system_review_required": (
-                spoof_suspected or contact_id is None
-                or sender.verified_at is None
+                spoof_suspected or contact_id is None or sender.verified_at is None
             ),
         }
         # Track 1 Step 3: stamp the resolved endpoint id when the new

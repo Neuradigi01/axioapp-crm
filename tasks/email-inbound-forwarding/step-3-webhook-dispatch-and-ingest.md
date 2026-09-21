@@ -1,6 +1,6 @@
 # Step 3: Local-part prefix dispatch + forwarded-address ingest branch
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21, new `parse_recipient_kind` + `extract_forwarding_token` in mailgun/service.py; new `ingest_forwarded.handle_forwarded_address` module with SPF/DKIM spoof gate + default-assignee application + `last_inbound_at` stamp; tasks.py dispatches by prefix before the existing reply-capture path; `mailgun.inbound.unknown_prefix` audit for anything else; auto-create-contact deferred to Step 4 with `forwarded_awaiting_auto_create` audit signal; 13 tests in test_mailgun_forwarded_ingest.py; pin-test exception added for the new module (mirrors mailgun/tasks.py posture))
 
 ## Goal
 

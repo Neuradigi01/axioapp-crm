@@ -64,25 +64,17 @@ class EmailInboundDlq(Base):
         ForeignKey("tbl_organizations.id", ondelete="CASCADE"),
         nullable=True,
     )
-    mailgun_delivery_id: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
+    mailgun_delivery_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     pending_inbound_path: Mapped[str] = mapped_column(Text, nullable=False)
     error_reason: Mapped[str] = mapped_column(String(64), nullable=False)
-    error_details: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB, nullable=True
-    )
-    retry_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=sql_text("0")
-    )
+    error_details: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=sql_text("0"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=sql_text("now()"),
     )
-    resolved_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 __all__ = ["EmailInboundDlq"]
