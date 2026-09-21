@@ -136,6 +136,10 @@ _TRANSACTION_EXCEPTIONS: dict[str, str] = {
     "core/tenants/ownership.py": "Ownership-transfer flow (own txn)",
     # --- Conversation adapters
     "core/conversations/adapters/email.py": "Email adapter (own session for inbound)",
+    "core/conversations/adapters/email_platform_from.py": (
+        "Platform-from helper — token-collision retry loop needs "
+        "session.flush + rollback, mirrors channel_endpoints.data_access"
+    ),
     # --- Integrations DLQ
     "core/integrations/dlq.py": "Webhook DLQ writer",
     # --- WhatsApp integration sub-modules
@@ -254,6 +258,10 @@ _HELPER_CRUD_EXCEPTIONS: dict[str, str] = {
     "core/contacts/data_export.py": "Contacts CSV exporter",
     # --- Conversation adapter (inbound email)
     "core/conversations/adapters/email.py": "Email adapter (own session)",
+    "core/conversations/adapters/email_platform_from.py": (
+        "Platform-from helper — token-collision retry loop mirrors "
+        "channel_endpoints.data_access"
+    ),
     # --- Email module helpers
     "core/email/gmail/push.py": "Gmail push subscriptions",
     "core/email/gmail/sync.py": "Gmail message sync",

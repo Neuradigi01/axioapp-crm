@@ -1,6 +1,12 @@
 # Step 5: Send cascade integration — refactor `send_email()` to consult `resolve_send_envelope()`
 
-**Status:** IN PROGRESS — Step 5a landed 2026-09-21 (Mailgun API client `send_mime()` + `MailgunSendResult` parser · new `conversations/adapters/email_platform_from.py` helper with `PlatformEnvelope`/`build_platform_envelope`/`resolve_or_create_platform_reply_token`/`already_notified_first_platform_from` · 2 new test files covering send_mime multipart + platform-from helper). Step 5b pending: relax `send_email` XOR guard, wire `resolve_send_envelope`, add own_domain + platform_from dispatch, land the 10 cascade tests.
+**Status:** COMPLETED 2026-09-21.
+
+Step 5a landed the additive pieces: Mailgun API client `send_mime()` + `MailgunSendResult` parser · new `conversations/adapters/email_platform_from.py` helper with `PlatformEnvelope`/`build_platform_envelope`/`resolve_or_create_platform_reply_token`/`already_notified_first_platform_from` · 2 new test files covering send_mime multipart + platform-from helper.
+
+Step 5b landed the refactor: `send_email` XOR guard relaxed to "at most one" (both-None → cascade, both-supplied → 400) · `resolve_send_envelope` wired inline · dispatch branches added for `own_domain` (raw MIME → `MailgunApiClient.send_mime(dispatch_domain)`) and `platform_from` (mint or reuse `platform_reply_capture` endpoint · compose `org-<uuid>@platform` from + `r-<token>@inbound` reply-to · Mailgun send · fire owner-notification once per org via `_notify_first_platform_from_send`) · `SendNotConfiguredError` → 400 with "connect a mailbox or claim a domain" copy · 11 cascade tests in `test_send_email_cascade.py` covering all four envelope kinds, first-use notification idempotency (endpoint-created gate), demoted-domain skip, both-supplied guard, and the fail-through error path.
+
+Pin-test exceptions added for the new helper file (`core/conversations/adapters/email_platform_from.py` — token-collision retry uses `session.flush + rollback` like `channel_endpoints/data_access.create_smtp_reply_capture`).
 
 ## Goal
 

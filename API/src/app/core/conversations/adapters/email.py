@@ -315,21 +315,90 @@ async def send_email(
     from a contact-detail page). When None, we find-or-create one
     keyed on ``(contact_id, channel=email)``.
     """
-    if (account_id is None) == (smtp_sender_id is None):
+    if account_id is not None and smtp_sender_id is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "send_email requires exactly one of account_id (OAuth) or smtp_sender_id (SMTP)."
+                "send_email accepts at most one of account_id (OAuth) or "
+                "smtp_sender_id (SMTP); pass neither to let the org's "
+                "send cascade pick the envelope."
             ),
         )
     if (sender_user_id is None) == (ai_assistant_id is None):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "send_email requires exactly one of sender_user_id (human) "
-                "or ai_assistant_id (AI)."
+                "send_email requires exactly one of sender_user_id (human) or ai_assistant_id (AI)."
             ),
         )
+
+    # --- Envelope resolution -------------------------------------------
+    #
+    # tasks/email-sending-domains Step 5 — when neither ``account_id``
+    # nor ``smtp_sender_id`` is supplied, consult the send cascade to
+    # decide the envelope: caller → org default → verified own-domain →
+    # platform-from → error. When the cascade picks an SMTP sender or
+    # OAuth account, we forward that id into the existing per-kind
+    # loader block below (so the ``verified_at`` / ``sync_state``
+    # branches stay authoritative). ``own_domain`` / ``platform_from``
+    # dispatch via Mailgun's messages.mime endpoint further down.
+    envelope_kind: str  # "oauth_account" | "smtp_sender" | "own_domain" | "platform_from"
+    dispatch_domain: str | None = None
+    envelope_from_address: str | None = None
+    envelope_reply_to: str | None = None
+    endpoint_created_this_call = False
+
+    if account_id is None and smtp_sender_id is None:
+        # Late import — resolver lives in a peer module, and importing
+        # at module top would pull the send cascade into every adapter
+        # import path (audit log, activities, campaigns).
+        from src.app.core.email_sender_setup.service import (
+            SendNotConfiguredError,
+            resolve_send_envelope,
+        )
+
+        try:
+            envelope = await resolve_send_envelope(session, org_id=org_id)
+        except SendNotConfiguredError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "No sending path is configured for this org. Connect a "
+                    "mailbox, verify an SMTP sender, or claim a sending "
+                    "domain before sending email."
+                ),
+            ) from exc
+
+        envelope_kind = envelope.envelope_type
+        if envelope_kind == "smtp_sender":
+            smtp_sender_id = envelope.smtp_sender_id
+        elif envelope_kind == "oauth_account":
+            account_id = envelope.oauth_account_id
+        elif envelope_kind == "own_domain":
+            dispatch_domain = envelope.dispatch_domain
+            envelope_from_address = envelope.from_address
+            envelope_reply_to = envelope.reply_to
+        elif envelope_kind == "platform_from":
+            # Mint / reuse a platform reply-capture endpoint so the
+            # ``r-<token>@<inbound>`` Reply-To lands somewhere real.
+            # ``endpoint_created_this_call`` gates the first-use in-app
+            # nudge fired after the send row lands.
+            from src.app.core.conversations.adapters.email_platform_from import (
+                build_platform_envelope,
+                resolve_or_create_platform_reply_token,
+            )
+
+            reply_token, endpoint_created_this_call = await resolve_or_create_platform_reply_token(
+                session, org_id=org_id
+            )
+            platform_env = build_platform_envelope(
+                org_id=org_id,
+                reply_token=reply_token,
+                platform_domain=envelope.dispatch_domain,
+            )
+            dispatch_domain = platform_env.dispatch_domain
+            envelope_from_address = platform_env.from_address
+            envelope_reply_to = platform_env.reply_to
 
     # Resolve sender identity + normalise to a shared shape the
     # downstream MIME builder + persist step consume.
@@ -339,6 +408,7 @@ async def send_email(
     sender_display: str | None
     sender_provider_label: str
     if account_id is not None:
+        envelope_kind = "oauth_account"
         account = await email_service.get_account(session, account_id=account_id)
         if account is None:
             raise HTTPException(
@@ -360,10 +430,10 @@ async def send_email(
         sender_email = account.email_address
         sender_display = account.display_name
         sender_provider_label = account.provider.value
-    else:
+    elif smtp_sender_id is not None:
+        envelope_kind = "smtp_sender"
         from src.app.core.email_senders import data_access as smtp_da
 
-        assert smtp_sender_id is not None  # noqa: S101 — narrowed above
         smtp_sender = await smtp_da.get_by_id(session, org_id=org_id, sender_id=smtp_sender_id)
         if smtp_sender is None:
             raise HTTPException(
@@ -381,12 +451,28 @@ async def send_email(
         sender_email = smtp_sender.from_address
         sender_display = smtp_sender.display_name
         sender_provider_label = "smtp"
+    else:
+        # own_domain or platform_from — Mailgun-managed envelope. No
+        # per-row identity in the CRM; the from-address IS the identity.
+        # ``envelope_from_address`` was populated in the cascade branch
+        # above, so this is a safe unpacking.
+        assert envelope_from_address is not None  # noqa: S101
+        assert envelope_kind in ("own_domain", "platform_from")  # noqa: S101
+        sender_email = envelope_from_address
+        sender_display = None
+        sender_provider_label = f"mailgun_{envelope_kind}"
 
     # mailgun-inbound track: rewrite `Reply-To` on SMTP-only outbound.
     original_reply_to = reply_to
     inbound_rewrite = _mailgun_reply_to_for(smtp_sender)
     if inbound_rewrite is not None:
         reply_to = inbound_rewrite
+    # own_domain / platform_from Reply-To — apply the envelope's value
+    # when the caller didn't override. Never overrides an explicit
+    # caller reply_to (some flows want a specific reply target that
+    # the envelope's default shouldn't clobber).
+    if envelope_reply_to is not None and reply_to is None:
+        reply_to = envelope_reply_to
 
     contact = await contacts_da.get_contact(session, contact_id)
     if contact is None or not contact.email:
@@ -505,7 +591,8 @@ async def send_email(
     daily_sent_after = 0
     near_soft_cap = False
 
-    if account is not None:
+    if envelope_kind == "oauth_account":
+        assert account is not None  # noqa: S101 — narrowed above
         daily_sent_after = account.daily_sent_count or 0
         if account.provider == EmailAccountProvider.gmail:
             from src.app.core.email.gmail import send as gmail_send
@@ -541,7 +628,7 @@ async def send_email(
                     f"Email provider {account.provider.value} is not supported in this deploy."
                 ),
             )
-    else:
+    elif envelope_kind == "smtp_sender":
         # SMTP path (migration 0213). Dispatch the same `raw_bytes` MIME
         # we built above — the one carrying Message-ID, Date,
         # List-Unsubscribe, List-Unsubscribe-Post, Reply-To, and
@@ -562,6 +649,29 @@ async def send_email(
         # SMTP doesn't hand us a provider-side message id — the RFC
         # Message-Id we minted (own_msg_id_bare) is the threading key.
         provider_message_id = None
+    else:
+        # own_domain or platform_from — Mailgun ``messages.mime``
+        # upload. Cascade already picked ``dispatch_domain`` so the
+        # POST routes to the right per-domain Mailgun endpoint. Raw
+        # MIME is uploaded verbatim so every header we built (Message-
+        # ID, threading, List-Unsubscribe, Reply-To, tracking headers)
+        # survives Mailgun's send path.
+        assert dispatch_domain is not None  # noqa: S101 — set in cascade
+        from src.app.core.email.mailgun.api_client import MailgunApiClient
+        from src.app.core.email.mailgun.api_client_errors import MailgunApiError
+
+        try:
+            send_result = await MailgunApiClient().send_mime(
+                dispatch_domain,
+                to=contact.email,
+                raw_mime=raw_bytes,
+            )
+        except MailgunApiError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=("Upstream email provider is unavailable. Try again shortly."),
+            ) from exc
+        provider_message_id = send_result.mailgun_message_id
 
     # Persist outbound row. `channel_message_id` is OUR Message-ID
     # (the RFC 5322 token) — the threading detector matches on it
@@ -638,6 +748,17 @@ async def send_email(
             "provider_message_id": provider_message_id,
         },
     )
+
+    # First-use platform-from nudge — fires exactly once per org, when
+    # this send minted the platform_reply_capture endpoint (i.e. the
+    # first platform-from send for this org). Best-effort: any lookup
+    # or notify failure is logged + swallowed so a broken owner-lookup
+    # never rolls back the persisted message.
+    if endpoint_created_this_call and envelope_kind == "platform_from":
+        try:
+            await _notify_first_platform_from_send(session, org_id=org_id)
+        except Exception:
+            logger.exception("email.platform_from.first_use_notify_failed org=%s", org_id)
     return SendEmailResult(
         message=msg,
         conversation=conversation,
@@ -699,9 +820,7 @@ async def _persist_inbound_email(
     # belt-and-braces — the DB rejects the INSERT if we somehow
     # skipped the check, but doing it here means we don't hit the
     # constraint on every retry.
-    if channel_message_id and await _exists_by_rfc_id(
-        session, channel_message_id, org_id=org_id
-    ):
+    if channel_message_id and await _exists_by_rfc_id(session, channel_message_id, org_id=org_id):
         logger.debug(
             "_persist_inbound_email: dedupe hit provider=%s channel_message_id=%s",
             source_provider,
@@ -962,10 +1081,7 @@ def _endpoints_refactor_enabled() -> bool:
     OAuth and Mailgun ingest paths to legacy shapes. Rip out the flag
     once Tracks 2/4/5 all consume the endpoints DAL.
     """
-    return (
-        os.getenv("EMAIL_ENDPOINTS_REFACTOR_ENABLED", "true").strip().lower()
-        != "false"
-    )
+    return os.getenv("EMAIL_ENDPOINTS_REFACTOR_ENABLED", "true").strip().lower() != "false"
 
 
 async def _resolve_oauth_endpoint_id(
@@ -1093,6 +1209,77 @@ async def receive_email(account: EmailAccount, matched: dict[str, Any]) -> Messa
 
 
 # --- Helpers ------------------------------------------------------------
+
+
+async def _notify_first_platform_from_send(session: AsyncSession, *, org_id: uuid.UUID) -> None:
+    """Fire the "you're on platform sending" in-app nudge to the org
+    Owner exactly once per org.
+
+    Idempotency is defensive (no DB-side ``UNIQUE(org_id, type)`` yet):
+    we short-circuit when :func:`already_notified_first_platform_from`
+    reports a prior row. Belt for the migration-less path — Step 5b
+    could add a partial unique index if the metric shows duplicates.
+
+    Owner is resolved by joining the org's ``Owner`` role
+    (``name='Owner'``, ``is_system=True``) with its active
+    ``OrganizationMember`` and taking the linked ``User.legacy_uuid``.
+    Every org has exactly one Owner post-signup — if the lookup returns
+    zero rows we log + skip; the outbound send already succeeded.
+
+    Caller wraps in try/except and swallows every failure — a failing
+    notify never rolls back the persisted outbound message.
+    """
+    from src.app.core.conversations.adapters.email_platform_from import (
+        FIRST_USE_NOTIFICATION_KEY,
+        FIRST_USE_NOTIFICATION_TYPE,
+        already_notified_first_platform_from,
+    )
+
+    if await already_notified_first_platform_from(session, org_id=org_id):
+        return
+
+    # Late imports — notifications/permissions/users are all peer
+    # modules; importing at top would pull them into the adapter's
+    # cold-start path just for a first-use nudge fired once per org.
+    from src.app.core.notifications.service import notify
+    from src.app.core.permissions.models import Role
+    from src.app.core.users.models import OrganizationMember, User
+
+    owner_row = (
+        await session.execute(
+            select(User.legacy_uuid)
+            .join(
+                OrganizationMember,
+                OrganizationMember.user_member_id == User.id,
+            )
+            .join(Role, Role.id == OrganizationMember.role_id)
+            .where(OrganizationMember.organization_id == org_id)
+            .where(OrganizationMember.is_active.is_(True))
+            .where(Role.name == "Owner")
+            .where(Role.is_system.is_(True))
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if owner_row is None:
+        logger.warning(
+            "platform_from.first_use_notify: no active Owner for org=%s — skipped",
+            org_id,
+        )
+        return
+
+    await notify(
+        org_id=org_id,
+        user_id=owner_row,
+        type=FIRST_USE_NOTIFICATION_TYPE,
+        title="Your organisation is now sending email via the platform",
+        body=(
+            "You just sent your first email using the CRM's shared "
+            "sending domain. Replies land in Conversations. Claim your "
+            "own sending domain in Settings → Email to boost "
+            "deliverability."
+        ),
+        payload={"notification_key": FIRST_USE_NOTIFICATION_KEY},
+    )
 
 
 def _email_auth_passed(headers: dict[str, str]) -> bool:
