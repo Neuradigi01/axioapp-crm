@@ -1,6 +1,6 @@
 # Step 5: Send cascade integration — refactor `send_email()` to consult `resolve_send_envelope()`
 
-**Status:** Pending
+**Status:** IN PROGRESS — Step 5a landed 2026-09-21 (Mailgun API client `send_mime()` + `MailgunSendResult` parser · new `conversations/adapters/email_platform_from.py` helper with `PlatformEnvelope`/`build_platform_envelope`/`resolve_or_create_platform_reply_token`/`already_notified_first_platform_from` · 2 new test files covering send_mime multipart + platform-from helper). Step 5b pending: relax `send_email` XOR guard, wire `resolve_send_envelope`, add own_domain + platform_from dispatch, land the 10 cascade tests.
 
 ## Goal
 

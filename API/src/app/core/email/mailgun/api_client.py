@@ -127,6 +127,22 @@ class DomainCreateResult(DomainDetail):
     """
 
 
+class MailgunSendResult(BaseModel):
+    """Shape of ``POST /v3/{domain}/messages.mime``.
+
+    Mailgun returns ``{"id": "<abc123@sandbox.mailgun.org>", "message":
+    "Queued. Thank you."}``. We strip the angle brackets on ``id`` so
+    the value is safe to store in ``payload.provider_message_id``
+    alongside the RFC 5322 ``channel_message_id`` field (which is
+    already bare — the two match up).
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    mailgun_message_id: str
+    message: str
+
+
 # ---------------------------------------------------------------------------
 # The client
 # ---------------------------------------------------------------------------
@@ -157,9 +173,7 @@ class MailgunApiClient:
     ) -> None:
         resolved_region = region or os.getenv("MAILGUN_REGION", "us").strip().lower()
         if resolved_region not in _REGION_TO_BASE:
-            raise ValueError(
-                f"unknown MAILGUN_REGION {resolved_region!r} — expected 'us' or 'eu'"
-            )
+            raise ValueError(f"unknown MAILGUN_REGION {resolved_region!r} — expected 'us' or 'eu'")
         self._region = resolved_region
         self._base_url = _REGION_TO_BASE[resolved_region]
         self._timeout = timeout_seconds
@@ -192,9 +206,7 @@ class MailgunApiClient:
         we upgrade for defense-in-depth).
         """
         payload = {"name": domain, "dkim_key_size": str(dkim_key_size)}
-        body = await self._request(
-            "POST", "/v4/domains", data=payload
-        )
+        body = await self._request("POST", "/v4/domains", data=payload)
         return _parse_domain_body(body, expected_class=DomainCreateResult)
 
     async def get_domain(self, domain: str) -> DomainDetail:
@@ -216,6 +228,62 @@ class MailgunApiClient:
         except MailgunNotFound:
             return
 
+    async def send_mime(
+        self,
+        domain: str,
+        *,
+        to: str,
+        raw_mime: bytes,
+        tags: list[str] | None = None,
+        tracking: bool = True,
+    ) -> MailgunSendResult:
+        """Ship a pre-built MIME message via ``POST /v3/{domain}/messages.mime``.
+
+        The ``.mime`` variant is deliberate — Mailgun preserves every
+        header the caller built (Message-ID, References/In-Reply-To,
+        List-Unsubscribe, Reply-To, our custom tracking headers).
+        Sending via the plain ``/messages`` form-fields endpoint would
+        force Mailgun to synthesise MIME from scratch and drop those,
+        which breaks threading and bulk-sender compliance.
+
+        ``to`` is the SMTP-envelope recipient (RCPT TO) — Mailgun
+        requires it as a form field even when the MIME already carries
+        ``To:``. Passing them explicitly keeps envelope-vs-header
+        divergence deliberate: caller drives both.
+
+        ``tags`` map to Mailgun's ``o:tag`` form fields — searchable in
+        the Mailgun dashboard and echoed in webhook payloads.
+        ``tracking`` toggles Mailgun's own open/click tracking; the
+        default is True so Mailgun's dashboard has parity with our
+        own tracking pixels + link-rewriter output.
+
+        Retry policy inherited from :meth:`_request`: 502/503 retried
+        twice with backoff, other 5xx fail-fast. Sends are NOT
+        idempotent — 502/503 retries could yield the same message
+        delivered twice in a race. This is acceptable for now (Mailgun
+        rate-limits and dedupes internally on the same Message-ID
+        within a short window). If duplicate-delivery incidents show
+        up in the wild, add ``Idempotency-Key`` from a hash of the
+        MIME Message-ID + recipient.
+        """
+        # ``messages.mime`` expects the raw MIME as a file upload named
+        # ``message`` (see Mailgun docs § Sending). ``httpx`` picks the
+        # multipart Content-Type automatically when ``files=`` is set.
+        data: dict[str, str] = {"to": to}
+        if tags:
+            # Mailgun accepts a repeated ``o:tag`` field. httpx renders
+            # a list value as one field per element.
+            data["o:tag"] = ",".join(tags)
+        data["o:tracking"] = "yes" if tracking else "no"
+        files = {"message": ("message.mime", raw_mime, "message/rfc822")}
+        body = await self._request(
+            "POST",
+            f"/v3/{domain}/messages.mime",
+            data=data,
+            files=files,
+        )
+        return _parse_send_result(body)
+
     # ------------------------------------------------------------------
     # Internal — HTTP + retry
     # ------------------------------------------------------------------
@@ -226,12 +294,11 @@ class MailgunApiClient:
         path: str,
         *,
         data: dict[str, str] | None = None,
+        files: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         api_key = os.getenv("MAILGUN_API_KEY", "").strip()
         if not api_key:
-            raise MailgunAuthError(
-                "MAILGUN_API_KEY is not configured", status_code=None
-            )
+            raise MailgunAuthError("MAILGUN_API_KEY is not configured", status_code=None)
 
         last_error: httpx.HTTPError | None = None
         for attempt in range(_MAX_RETRIES + 1):
@@ -244,10 +311,12 @@ class MailgunApiClient:
                 if self._transport is not None:
                     client_kwargs["transport"] = self._transport
                 async with httpx.AsyncClient(**client_kwargs) as client:
+                    request_kwargs: dict[str, Any] = {}
                     if data is not None:
-                        response = await client.request(method, path, data=data)
-                    else:
-                        response = await client.request(method, path)
+                        request_kwargs["data"] = data
+                    if files is not None:
+                        request_kwargs["files"] = files
+                    response = await client.request(method, path, **request_kwargs)
             except httpx.HTTPError as exc:
                 last_error = exc
                 if attempt < _MAX_RETRIES:
@@ -394,6 +463,31 @@ def _parse_domain_body(
     )
 
 
+def _parse_send_result(body: dict[str, Any]) -> MailgunSendResult:
+    """Turn Mailgun's ``messages.mime`` response into a typed result.
+
+    Response shape:
+
+        {"id": "<abc123@sandbox-example.mailgun.org>",
+         "message": "Queued. Thank you."}
+
+    The ``id`` is angle-bracketed; strip so it matches the bare
+    channel_message_id we persist elsewhere.
+    """
+    raw_id = body.get("id")
+    message = body.get("message")
+    if not isinstance(raw_id, str) or not isinstance(message, str):
+        raise MailgunResponseInvalid(
+            "mailgun send response missing id/message string keys",
+            status_code=None,
+        )
+    mailgun_message_id = raw_id.strip().lstrip("<").rstrip(">")
+    return MailgunSendResult(
+        mailgun_message_id=mailgun_message_id,
+        message=message,
+    )
+
+
 def _parse_retry_after(response: httpx.Response) -> int | None:
     """Extract the ``Retry-After`` header if present + parseable as int."""
     header = response.headers.get("Retry-After")
@@ -412,5 +506,6 @@ __all__ = [
     "DomainCreateResult",
     "DomainDetail",
     "MailgunApiClient",
+    "MailgunSendResult",
     "Region",
 ]
