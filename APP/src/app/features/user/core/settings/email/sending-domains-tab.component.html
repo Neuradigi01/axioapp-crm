@@ -1,0 +1,187 @@
+<section class="space-y-4">
+  <header class="flex items-start justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-semibold text-default">Sending domains</h2>
+      <p class="mt-0.5 text-sm text-muted">
+        Claim your own domain to boost deliverability. Records are provided by Mailgun; publish them
+        at your DNS host and hit
+        <span class="font-medium text-default">Check now</span>
+        to verify.
+      </p>
+    </div>
+    <button
+      type="button"
+      class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+      (click)="openClaim()"
+      data-testid="claim-domain-cta"
+    >
+      <lucide-icon name="plus" size="14"></lucide-icon>
+      Claim domain
+    </button>
+  </header>
+
+  @if (loading()) {
+    <div class="flex items-center gap-2 text-sm text-muted">
+      <lucide-icon name="loader-2" size="14" class="animate-spin"></lucide-icon>
+      Loading domains…
+    </div>
+  } @else if (loadError()) {
+    <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
+      {{ loadError() }}
+    </div>
+  } @else if (sortedDomains().length === 0) {
+    <div
+      class="rounded-xl border border-dashed border-subtle bg-surface p-8 text-center"
+      data-testid="sending-domains-empty"
+    >
+      <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-2">
+        <lucide-icon name="globe" size="20" class="text-muted"></lucide-icon>
+      </div>
+      <h3 class="mt-3 text-sm font-semibold text-default">No sending domains claimed</h3>
+      <p class="mt-1 text-sm text-muted">
+        All mail sends from the CRM's shared platform address. Claim your own domain to send from
+        <span class="font-mono">you&#64;yourshop.com</span>
+        and improve deliverability.
+      </p>
+      <button
+        type="button"
+        class="mt-4 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+        (click)="openClaim()"
+        data-testid="sending-domains-empty-cta"
+      >
+        <lucide-icon name="plus" size="14"></lucide-icon>
+        Claim your domain
+      </button>
+    </div>
+  } @else {
+    <ul class="space-y-3">
+      @for (row of sortedDomains(); track row.id) {
+        <li
+          class="rounded-xl border border-subtle bg-surface p-4 shadow-sm"
+          data-testid="sending-domain-card"
+          [attr.data-domain]="row.domain"
+          [attr.data-status]="row.verification_status"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="truncate font-mono text-sm font-semibold text-default">
+                  {{ row.domain }}
+                </h3>
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
+                  [class]="statusBadgeClass(row.verification_status)"
+                >
+                  {{ statusLabel(row.verification_status) }}
+                </span>
+                <span class="text-[11px] uppercase text-muted">
+                  {{ row.region }}
+                </span>
+              </div>
+              @if (row.last_verified_at) {
+                <p class="mt-1 text-xs text-muted">
+                  Last verified {{ lastVerifiedLabel(row.last_verified_at) }}
+                </p>
+              }
+            </div>
+
+            <div class="flex items-center gap-2">
+              @if (row.verification_status !== 'released') {
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                  [disabled]="busyId() === row.id"
+                  (click)="verify(row)"
+                  data-testid="sending-domain-check-now"
+                >
+                  @if (busyId() === row.id) {
+                    <lucide-icon name="loader-2" size="12" class="animate-spin"></lucide-icon>
+                  } @else {
+                    <lucide-icon name="refresh-cw" size="12"></lucide-icon>
+                  }
+                  Check now
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                  [disabled]="busyId() === row.id"
+                  (click)="release(row)"
+                  data-testid="sending-domain-release"
+                >
+                  <lucide-icon name="trash-2" size="12"></lucide-icon>
+                  Release
+                </button>
+              }
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-surface-2"
+                (click)="toggleExpanded(row.id)"
+                data-testid="sending-domain-toggle-records"
+              >
+                @if (expandedId() === row.id) {
+                  <lucide-icon name="chevron-up" size="12"></lucide-icon>
+                  Hide records
+                } @else {
+                  <lucide-icon name="chevron-down" size="12"></lucide-icon>
+                  DNS records
+                }
+              </button>
+            </div>
+          </div>
+
+          @if (row.verification_status === 'demoted') {
+            <div
+              class="mt-3 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-amber-400"
+              data-testid="sending-domain-demoted-banner"
+            >
+              <p class="text-sm">
+                DNS records for
+                <span class="font-mono">{{ row.domain }}</span>
+                have drifted. Sends from this domain are paused until you fix the records at your
+                DNS provider — expand the DNS records section below to see which entries need
+                attention.
+              </p>
+            </div>
+          }
+
+          @if (expandedId() === row.id) {
+            <div class="mt-4 space-y-3" data-testid="sending-domain-records-panel">
+              @if (row.dns_records.sending.length > 0) {
+                <div>
+                  <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                    Sending records
+                  </p>
+                  <div class="space-y-2">
+                    @for (r of row.dns_records.sending; track r.name) {
+                      <app-dns-record-card [record]="r" (copied)="onRecordCopied()" />
+                    }
+                  </div>
+                </div>
+              }
+              @if (row.dns_records.receiving.length > 0) {
+                <div>
+                  <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                    Receiving records
+                  </p>
+                  <div class="space-y-2">
+                    @for (r of row.dns_records.receiving; track r.name) {
+                      <app-dns-record-card [record]="r" (copied)="onRecordCopied()" />
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </li>
+      }
+    </ul>
+  }
+
+  @if (showClaimModal()) {
+    <app-claim-domain-modal
+      [creating]="claiming()"
+      (submitted)="submitClaim($event)"
+      (cancelled)="cancelClaim()"
+    />
+  }
+</section>

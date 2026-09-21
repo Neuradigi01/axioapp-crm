@@ -1,6 +1,6 @@
 # Step 7: Frontend — Sending Domains tab + DNS records renderer + Claim modal
 
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Goal
 

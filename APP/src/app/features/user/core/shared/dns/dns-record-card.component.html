@@ -1,0 +1,63 @@
+<div class="rounded-lg border border-subtle bg-surface p-3 text-sm" data-testid="dns-record-card">
+  <div class="flex flex-wrap items-start gap-3">
+    <div class="flex items-center gap-2">
+      <span
+        class="inline-block h-2 w-2 rounded-full"
+        [class]="verdictClass()"
+        [attr.aria-label]="record().valid ?? 'unknown'"
+        [title]="record().valid ?? 'unknown'"
+      ></span>
+      <span class="font-mono text-xs uppercase text-muted">
+        {{ record().record_type }}
+      </span>
+    </div>
+
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-xs font-medium text-muted">Host</span>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-surface-2"
+          (click)="copyHost()"
+          data-testid="dns-record-copy-host"
+        >
+          <lucide-icon name="copy" size="12"></lucide-icon>
+          Copy
+        </button>
+      </div>
+      <p class="mt-0.5 truncate font-mono text-sm text-default" [title]="record().name ?? ''">
+        {{ record().name }}
+      </p>
+    </div>
+
+    @if (isMx()) {
+      <div class="min-w-[4rem]">
+        <span class="text-xs font-medium text-muted">Priority</span>
+        <p class="mt-0.5 font-mono text-sm text-default" data-testid="dns-record-priority">
+          {{ record().priority }}
+        </p>
+      </div>
+    }
+  </div>
+
+  <div class="mt-3">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-xs font-medium text-muted">Value</span>
+      <button
+        type="button"
+        class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-surface-2"
+        (click)="copyValue()"
+        data-testid="dns-record-copy-value"
+      >
+        <lucide-icon name="copy" size="12"></lucide-icon>
+        Copy
+      </button>
+    </div>
+    <p
+      class="mt-0.5 break-all rounded bg-surface-2 px-2 py-1 font-mono text-xs text-default"
+      data-testid="dns-record-value"
+    >
+      {{ record().value }}
+    </p>
+  </div>
+</div>

@@ -5,6 +5,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { CustomEventsPageComponent } from './custom-events/custom-events.page';
+import { SendingDomainsTabComponent } from './email/sending-domains-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { AutomationSettingsTabComponent } from './tabs/automation-settings-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
@@ -26,6 +27,7 @@ type SettingsTab =
   | 'team'
   | 'roles'
   | 'notifications'
+  | 'sending-domains'
   | 'send-rules'
   | 'custom-events'
   | 'custom-fields'
@@ -72,6 +74,16 @@ const TABS: ReadonlyArray<TabDef> = [
   { id: 'store', label: 'Store Profile', group: 'workspace', permission: 'settings.write' },
   { id: 'team', label: 'Team', group: 'workspace', permission: 'users.read' },
   { id: 'roles', label: 'Roles', group: 'workspace', permission: 'roles.read' },
+  {
+    // tasks/email-sending-domains Step 7 — Owner-only Mailgun-managed
+    // sending-domain flow. Sits alongside Roles / Team so the Owner
+    // finds it under Workspace, not buried in Integrations. Gated by
+    // ``email.sending_domains.manage`` (Owner template only).
+    id: 'sending-domains',
+    label: 'Sending Domains',
+    group: 'workspace',
+    permission: 'email.sending_domains.manage',
+  },
   // Email Accounts + Sender Setup tabs were consolidated into the
   // per-org Email Sender card on Settings → Integrations.
   // tasks/workflows Step 20 — the Email Sequences tab was absorbed
@@ -132,6 +144,7 @@ const TABS: ReadonlyArray<TabDef> = [
     TeamTabComponent,
     RolesTabComponent,
     NotificationsTabComponent,
+    SendingDomainsTabComponent,
     AutomationSettingsTabComponent,
     CustomEventsPageComponent,
     CustomFieldsPageComponent,

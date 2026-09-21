@@ -20,7 +20,8 @@ import { FurnitureAuthService, MeResponse } from '../auth/auth.service';
 import { extractApiError } from '@core/services/api-error.util';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
-import { FieldDef } from '../shared/dynamic-form/types';
+import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
+import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
@@ -58,7 +59,12 @@ interface OrgUser {
   selector: 'app-book-appointment-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, MobileSelectComponent, MobileDateTimeComponent],
+  imports: [
+    ReactiveFormsModule,
+    MobileSelectComponent,
+    MobileDateTimeComponent,
+    DynamicFormComponent,
+  ],
   templateUrl: './book-appointment-modal.component.html',
 })
 export class BookAppointmentModalComponent extends BaseFormModalComponent {
@@ -227,8 +233,17 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
       this.me() !== null &&
       !this.submitting$() &&
       this.formStatus() === 'VALID' &&
+      this.customValid() &&
       this.selectedContact() !== null,
   );
+
+  protected onCustomValueChange(v: FormValue): void {
+    this.customValue.set(v);
+  }
+
+  protected onCustomValidityChange(valid: boolean): void {
+    this.customValid.set(valid);
+  }
 
   override ngOnInit(): void {
     super.ngOnInit();
@@ -322,6 +337,10 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
       this.form.markAllAsTouched();
       return;
     }
+    if (!this.customValid()) {
+      this._submitError.set('Please fix the highlighted custom fields.');
+      return;
+    }
     const contact = this.selectedContact();
     if (!contact) {
       this._submitError.set('Please pick a contact.');
@@ -348,6 +367,7 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
       // user when the dropdown is empty (e.g. `/users` failed and the
       // user just submits the form with the form's default).
       assigned_to_id: (raw.assigned_to_id || '').trim() || user.id,
+      custom_data: this.customValue() as Record<string, unknown>,
     };
 
     this.api

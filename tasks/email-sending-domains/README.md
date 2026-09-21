@@ -2,7 +2,7 @@
 
 Give every org a **claim your own sending domain** flow with Mailgun-verified DNS records displayed verbatim, a **platform-from fallback** (`org-<id>@mail.karmcrm.com`) when they haven't verified, and a **nightly re-verify state machine** that demotes drifted domains before they become deliverability incidents.
 
-**Status:** Pending — plan drafted 2026-09-21. Depends on Track 1 (endpoint abstraction) landing first. Discovery required for Mailgun's exact `GET /v3/domains/{domain}` response shape + region split (US vs EU).
+**Status:** COMPLETED 2026-09-21 — all 7 steps shipped in one day-long session. Manager smoke + browser verification still pending.
 
 ## Why this track exists
 
@@ -214,7 +214,7 @@ Alongside the domain table, this track also adds the **platform-from envelope** 
 | 4 | Backend: router endpoints (Owner-only 4 endpoints) + schemas + JWT scoping | **COMPLETED** (2026-09-21, `sender_domains_router` mounted at `/api/v1/sender-domains`; new `email.sending_domains.manage` Owner-only permission + module descriptor; Mailgun error → HTTP status mapping; `DomainOut` trimmed to spec fields; 10 router tests seeded in `test_sending_domains_router.py`) | 3 | ~0.5 day |
 | 5 | Backend: sending cascade integration — refactor `send_email()` to call `resolve_send_envelope()` + `SendNotConfiguredError` | **COMPLETED** (2026-09-21, split into 5a additive Mailgun `send_mime` client + `email_platform_from` helper, and 5b `send_email` refactor + own_domain/platform_from dispatch + first-use owner nudge + 11 cascade tests) | 2 | ~0.75 day |
 | 6 | Backend: nightly + hourly Celery beat entries for domain verification + state-machine transitions + owner notifications | **COMPLETED** (2026-09-21, `sweep_email_domain_claims_nightly` at 04:00 UTC + `sweep_demoted_domains_hourly` at :00 · new `lock_rows_for_sweep` DAL helper with `FOR UPDATE SKIP LOCKED` · owner nudge fires on pending→verified / demoted / recovered / released_auto transitions · `EMAIL_DOMAIN_DEMOTE_AFTER_FAILED_CHECKS=3` + `EMAIL_DOMAIN_RELEASE_AFTER_FAILED_DAYS=14` config vars · 11 cron tests · pin-test exceptions added for `tasks.py`) | 3 | ~0.75 day |
-| 7 | Frontend: Sending Domains tab + DNS records renderer + Claim modal + Check-now button + warning banner | Pending | 5 | ~1 day |
+| 7 | Frontend: Sending Domains tab + DNS records renderer + Claim modal + Check-now button + warning banner | **COMPLETED** (2026-09-21, new `features/user/core/settings/email/` with `models.ts` + `sending-domains.service.ts` + `sending-domains-tab.component` + `claim-domain-modal.component` · shared `features/user/core/shared/dns/dns-record-card.component` · registered as Owner-only "Sending Domains" tab under Workspace · 8 Karma specs across 3 files · prettier-clean) | 5 | ~1 day |
 
 **Total: 7 steps, ~5 days active dev + Mailgun DNS wait time for smoke.**
 
