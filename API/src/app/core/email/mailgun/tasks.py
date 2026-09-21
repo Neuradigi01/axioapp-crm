@@ -29,6 +29,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import shutil
 import uuid
 from pathlib import Path
@@ -37,6 +38,7 @@ from typing import Any
 from sqlalchemy import text
 
 from src.app.core import audit
+from src.app.core.channel_endpoints import data_access as endpoints_da
 from src.app.core.contacts import data_access as contacts_da
 from src.app.core.conversations.adapters.email import _persist_inbound_email
 from src.app.core.conversations.adapters.email_threading import (
@@ -48,6 +50,20 @@ from src.app.core.email.mailgun import service as mailgun_service
 from src.app.core.email_senders import data_access as senders_da
 from src.app.shared.db import async_session
 from src.celery.worker import celery
+
+
+def _endpoints_refactor_enabled() -> bool:
+    """Feature flag for the ``tasks/email-endpoint-abstraction`` Track 1 refactor.
+
+    Default ``true`` in prod. Setting ``EMAIL_ENDPOINTS_REFACTOR_ENABLED=false``
+    restores the pre-Step-3 legacy path (``senders_da.find_by_inbound_token``)
+    unchanged — a one-flip revert for the refactor without touching migrations.
+    Rip the flag out once Tracks 2/4/5 all consume the endpoints DAL.
+    """
+    return (
+        os.getenv("EMAIL_ENDPOINTS_REFACTOR_ENABLED", "true").strip().lower()
+        != "false"
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +182,28 @@ async def _process_async(task, pending_dir: Path) -> None:
         return
 
     async with async_session() as session:
-        sender = await senders_da.find_by_inbound_token(session, token)
+        # Track 1 Step 3 refactor: consult ``channel_endpoints`` DAL first
+        # when the flag is on; legacy ``senders_da.find_by_inbound_token``
+        # is preserved behind ``EMAIL_ENDPOINTS_REFACTOR_ENABLED=false``.
+        # Both paths yield the same ``sender`` value + the same drop
+        # semantics on missing/inactive/deleted rows — the endpoint join
+        # in ``find_by_reply_token`` filters ``is_active=True`` and the
+        # details FK cascades on SMTP-sender deletion, so a stale endpoint
+        # row cannot resolve to a live sender.
+        endpoint = None
+        if _endpoints_refactor_enabled():
+            hit = await endpoints_da.find_by_reply_token(session, token=token)
+            if hit is not None:
+                endpoint, details = hit
+                sender = await senders_da.get_by_id(
+                    session,
+                    org_id=endpoint.org_id,
+                    sender_id=details.smtp_sender_id,
+                )
+            else:
+                sender = None
+        else:
+            sender = await senders_da.find_by_inbound_token(session, token)
         if sender is None:
             # Unknown token — sender row was deleted, or the token
             # was rotated. System-level audit only (never surface to
@@ -302,6 +339,13 @@ async def _process_async(task, pending_dir: Path) -> None:
                 or sender.verified_at is None
             ),
         }
+        # Track 1 Step 3: stamp the resolved endpoint id when the new
+        # DAL was consulted. Absent under the legacy flag path so old
+        # rows persisted before the flip stay indistinguishable from
+        # legacy-path rows — the ONE allowed shape difference between
+        # the two paths (byte-identical DB output otherwise).
+        if endpoint is not None:
+            source_reference["endpoint_id"] = str(endpoint.id)
         if stripped_reason is not None:
             source_reference["attachment_stripped_reason"] = stripped_reason
 

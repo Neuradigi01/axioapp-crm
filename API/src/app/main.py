@@ -109,6 +109,7 @@ from src.app.core.email.router import router as email_router
 from src.app.core.email.tracking.router import router as email_tracking_router
 from src.app.core.email_sender_setup.router import router as email_sender_setup_router
 from src.app.core.email_senders.router import router as email_senders_router
+from src.app.core.channel_endpoints.router import router as channel_endpoints_router
 from src.app.core.email_sequences.router import router as email_sequences_router
 from src.app.core.embed.router import (
     public_router as embed_public_router,
@@ -393,6 +394,7 @@ app.include_router(embed_public_router, prefix="/api/v1")
 app.include_router(email_router, prefix="/api/v1")
 app.include_router(email_sender_setup_router, prefix="/api/v1")
 app.include_router(email_senders_router, prefix="/api/v1")
+app.include_router(channel_endpoints_router, prefix="/api/v1")
 app.include_router(email_sequences_router, prefix="/api/v1")
 # tasks/template-library Step 3 — central multi-channel template
 # library (Email + WhatsApp + SMS + FB / IG / push). Step 10 dropped

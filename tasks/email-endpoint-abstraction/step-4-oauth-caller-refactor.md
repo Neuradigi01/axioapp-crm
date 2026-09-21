@@ -1,6 +1,6 @@
 # Step 4: Refactor — OAuth ingest records `endpoint_id` in message payload
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — `_persist_inbound_email` gains optional `endpoint_id` kwarg (default None, backwards-compatible); `receive_email` resolves the backing OAuth-mailbox endpoint via a module-level 300s TTL cache (N+1-safe — one DAL lookup per account per 5 min); Mailgun path unaffected (uses source_reference["endpoint_id"] pattern from Step 3); shared `EMAIL_ENDPOINTS_REFACTOR_ENABLED` flag mirrored so one env var flip reverts both OAuth and Mailgun paths.
 
 ## Goal
 

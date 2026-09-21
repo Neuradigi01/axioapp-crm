@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -49,6 +50,7 @@ from config import API_BASE_URL
 from src.app.core import audit
 from src.app.core.activities.models import ActivityType
 from src.app.core.activities.service import log as activities_log
+from src.app.core.channel_endpoints import data_access as endpoints_da
 from src.app.core.contacts import data_access as contacts_da
 from src.app.core.conversations.adapters import (
     ChannelMessageRef,
@@ -669,6 +671,7 @@ async def _persist_inbound_email(
     publish_workflow_events: bool,
     activity_user_id: uuid.UUID | None,
     account_email_label: str | None,
+    endpoint_id: uuid.UUID | None = None,
 ) -> Message | None:
     """Shared inbound-persistence helper for OAuth AND Mailgun paths.
 
@@ -768,6 +771,12 @@ async def _persist_inbound_email(
         payload["provider_message_id"] = provider_message_id
     if auto_generated:
         payload["auto_generated"] = True
+    # Track 1 Step 4: stamp resolved channel endpoint when the caller
+    # supplied one (OAuth sync when the account has a backing endpoint
+    # row; Mailgun path uses ``source_reference["endpoint_id"]`` at the
+    # caller instead — same shape, single source of truth).
+    if endpoint_id is not None:
+        payload["endpoint_id"] = str(endpoint_id)
 
     msg = Message(
         org_id=org_id,
@@ -930,6 +939,80 @@ async def _persist_inbound_email(
     return msg
 
 
+# Track 1 Step 4: OAuth-account → channel-endpoint resolution.
+#
+# Each ``receive_email`` call opens a fresh session (dispatcher releases
+# the caller session before invoking us — see docstring below), so
+# per-session caching won't help. Instead a module-level dict caches
+# ``account.id → endpoint.id`` with a short TTL so a sync burst pulling
+# 100 messages doesn't do 100 endpoint lookups.
+#
+# The nightly orphan-endpoint sweeper (Step 5) is authoritative on
+# endpoint lifecycle; a 5-minute stale cache is acceptable — worst case
+# a message gets stamped with a since-deactivated endpoint id for one
+# TTL window. Cleared on process restart.
+_OAUTH_ENDPOINT_CACHE: dict[uuid.UUID, tuple[uuid.UUID | None, float]] = {}
+_OAUTH_ENDPOINT_CACHE_TTL_S = 300
+
+
+def _endpoints_refactor_enabled() -> bool:
+    """Mirror of the mailgun flag — one env var controls both paths.
+
+    Setting ``EMAIL_ENDPOINTS_REFACTOR_ENABLED=false`` reverts BOTH
+    OAuth and Mailgun ingest paths to legacy shapes. Rip out the flag
+    once Tracks 2/4/5 all consume the endpoints DAL.
+    """
+    return (
+        os.getenv("EMAIL_ENDPOINTS_REFACTOR_ENABLED", "true").strip().lower()
+        != "false"
+    )
+
+
+async def _resolve_oauth_endpoint_id(
+    session: AsyncSession, account: EmailAccount
+) -> uuid.UUID | None:
+    """Look up the channel-endpoint UUID backing this OAuth account.
+
+    Returns ``None`` when no endpoint row exists (edge case: account
+    created before the Step 1 backfill AND the Step 5 sweeper hasn't
+    reconciled yet — persist proceeds without the stamp, logged at
+    warning level for operator visibility).
+    """
+    now_ts = time.time()
+    hit = _OAUTH_ENDPOINT_CACHE.get(account.id)
+    if hit is not None:
+        endpoint_id, cached_at = hit
+        if now_ts - cached_at < _OAUTH_ENDPOINT_CACHE_TTL_S:
+            return endpoint_id
+
+    rows = await endpoints_da.find_active_for_org(
+        session,
+        org_id=account.org_id,
+        endpoint_type="oauth_mailbox",
+    )
+    resolved: uuid.UUID | None = None
+    for endpoint, details in rows:
+        if details is not None and details.oauth_account_id == account.id:
+            resolved = endpoint.id
+            break
+
+    if resolved is None:
+        logger.warning(
+            "oauth_endpoint_lookup: no active endpoint for account=%s org=%s "
+            "(will retry on next sync tick; nightly sweeper reconciles)",
+            account.id,
+            account.org_id,
+        )
+
+    _OAUTH_ENDPOINT_CACHE[account.id] = (resolved, now_ts)
+    return resolved
+
+
+def _clear_oauth_endpoint_cache() -> None:
+    """Test hook. Not called in production."""
+    _OAUTH_ENDPOINT_CACHE.clear()
+
+
 async def receive_email(account: EmailAccount, matched: dict[str, Any]) -> Message | None:
     """Step 4's inbound-handler signature. Called from
     `email_tasks._dispatch_inbound` for every `MatchedMessage` the
@@ -968,6 +1051,12 @@ async def receive_email(account: EmailAccount, matched: dict[str, Any]) -> Messa
             return None
         thread_keys = extract_thread_keys(headers)
         body_text = (matched.get("body_text") or "").strip()
+        # Track 1 Step 4: resolve backing channel-endpoint under the
+        # feature flag. ``None`` when the flag is off OR the account has
+        # no endpoint row yet (Step 5 sweeper reconciles those).
+        endpoint_id: uuid.UUID | None = None
+        if _endpoints_refactor_enabled():
+            endpoint_id = await _resolve_oauth_endpoint_id(session, account)
         return await _persist_inbound_email(
             session,
             org_id=account.org_id,
@@ -999,6 +1088,7 @@ async def receive_email(account: EmailAccount, matched: dict[str, Any]) -> Messa
             publish_workflow_events=_email_auth_passed(headers),
             activity_user_id=account.user_id,
             account_email_label=account.email_address,
+            endpoint_id=endpoint_id,
         )
 
 

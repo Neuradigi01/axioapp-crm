@@ -1,6 +1,6 @@
 # Step 3: Refactor — mailgun webhook consumes `find_by_reply_token()` from new DAL
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — `EMAIL_ENDPOINTS_REFACTOR_ENABLED` feature flag added (default `true`); mailgun Celery task's token-resolve step now routes through `channel_endpoints.data_access.find_by_reply_token` under the flag with legacy `senders_da.find_by_inbound_token` preserved for one-flip revert; `endpoint_id` stamped into `payload.source_reference` on the new path (the ONE allowed shape difference); byte-identical DB assertion test asserts every other field matches; import smoke clean.
 
 ## Goal
 

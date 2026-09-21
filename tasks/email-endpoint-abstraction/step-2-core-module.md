@@ -1,6 +1,6 @@
 # Step 2: Backend — `core/channel_endpoints/` module (schemas, DAL, service, router)
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — schemas + DAL + service + router shipped; router wired under `/api/v1/channel-endpoints` with Owner+Admin `email.accounts.manage` gate; OpenAPI schema clean; import smoke passes (2 routes registered end-to-end).
 
 ## Goal
 
