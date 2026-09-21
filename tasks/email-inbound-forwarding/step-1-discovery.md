@@ -1,6 +1,6 @@
 # Step 1: Discovery — Mailgun Routes + provider forwarding guides + wizard benchmarks
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21, with 3 documented gaps flagged for user follow-up: Outlook.com URL, Custom-IMAP branch ship-decision, HubSpot/Front/Missive wizard screenshots)
 
 ## Goal
 
