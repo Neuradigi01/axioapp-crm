@@ -97,7 +97,8 @@
     }
 
     <!-- Step 3 — follow guide + wait for test -->
-    @if (step() === 3 && created() as row) {
+    @let row = created();
+    @if (step() === 3 && row) {
       <div class="mt-4 space-y-4" data-testid="wizard-step-3">
         <div class="rounded-lg border border-subtle bg-surface-2 p-3">
           <p class="text-xs font-medium text-muted">Your forwarding address</p>

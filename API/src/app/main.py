@@ -51,6 +51,12 @@ import src.app.core.custom_events.models  # noqa: F401
 import src.app.core.custom_events.module  # noqa: F401
 import src.app.core.custom_events.tasks  # noqa: F401
 
+# tasks/email-reputation-warmup Step 2 — side-effect import so the
+# new ``OrganizationEmailReputation`` model registers with
+# ``Base.metadata`` before the test-DB create_all sweep + Alembic
+# autogenerate.
+import src.app.core.email.reputation.models  # noqa: F401
+
 # tasks/email-sending-domains Step 1 — side-effect import so the new
 # ``OrganizationEmailDomain`` model (living alongside the legacy
 # ``EmailSenderDomain`` in the same models.py) registers with
@@ -114,6 +120,9 @@ from src.app.core.custom_events.router import router as custom_events_router
 from src.app.core.custom_fields.router import router as custom_fields_router
 from src.app.core.dashboard.router import router as dashboard_router
 from src.app.core.dev.router import router as dev_router
+from src.app.core.email.mailgun.events_webhook import (
+    router as mailgun_events_router,
+)
 from src.app.core.email.mailgun.router import (
     dlq_admin_router as mailgun_dlq_admin_router,
 )
@@ -518,6 +527,10 @@ app.include_router(stripe_webhooks_router, prefix="/api/v1")
 # Path shape: POST /api/v1/webhooks/mailgun/inbound, GET .../inbound/health.
 # Signed by Mailgun's HMAC (not JWT); unauthenticated at the FastAPI layer.
 app.include_router(mailgun_inbound_router, prefix="/api/v1/webhooks")
+# tasks/email-reputation-warmup Step 3 — Mailgun events webhook.
+# Path shape: POST /api/v1/webhooks/mailgun/events. Signed by the same
+# Mailgun HMAC key as inbound; unauthenticated at the FastAPI layer.
+app.include_router(mailgun_events_router, prefix="/api/v1/webhooks")
 # mailgun-inbound Step 5 — attachment download endpoint. JWT-auth'd
 # via ``conversations.read`` inside the endpoint. Mounted at /api/v1
 # so the path shape is GET /api/v1/messages/{id}/attachments/{key}.

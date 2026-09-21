@@ -1,6 +1,6 @@
 # Step 3: Mailgun events webhook + attribution via `v:` custom variables + dedup
 
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Goal
 

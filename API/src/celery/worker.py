@@ -101,6 +101,12 @@ celery.autodiscover_tasks(
         # queue — one-tick-slower delivery is fine but the worker MUST
         # know the task name.
         "src.app.core.email.mailgun.tasks",
+        # tasks/email-reputation-warmup Step 3 — Mailgun events-webhook
+        # ingest. ``process_mailgun_event`` is dispatched by the
+        # ``/webhooks/mailgun/events`` endpoint after persisting the raw
+        # JSON payload to disk. Without this entry the worker drops the
+        # task with a KeyError and 24h counters stop advancing.
+        "src.app.core.email.mailgun.events_webhook",
         # tasks/mailgun-inbound Step 3 — 5-min sweeper that re-enqueues
         # any pending-inbound directory left behind by a broker outage
         # at delivery time. Beat entry lives in celery_config.py.
