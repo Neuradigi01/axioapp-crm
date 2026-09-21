@@ -469,9 +469,7 @@ async def commit_import(
             str(row.id), str(org_id), str(user_id), create_group, group_name
         )
     else:
-        await process_contact_import_async(
-            row.id, org_id, user_id, create_group, group_name
-        )
+        await process_contact_import_async(row.id, org_id, user_id, create_group, group_name)
         await session.refresh(row)
 
     return row
@@ -566,9 +564,7 @@ async def _run_commit(
         cleaned_custom: dict[str, Any] = {}
         raw_custom = mapped.get("custom_data") or {}
         if raw_custom:
-            cleaned_custom, cf_error = _coerce_custom_data_row(
-                row_no, raw_custom, custom_defs
-            )
+            cleaned_custom, cf_error = _coerce_custom_data_row(row_no, raw_custom, custom_defs)
             if cf_error is not None:
                 errors.append(cf_error.model_dump())
                 continue
@@ -764,8 +760,7 @@ def _collect_row_warnings(row_no: int, mapped: dict[str, Any]) -> list[dict[str,
                     "column": "tag",
                     "value": original,
                     "reason": (
-                        f"tag truncated to 64 chars (was {len(original)}); "
-                        f"kept {cleaned!r}"
+                        f"tag truncated to 64 chars (was {len(original)}); kept {cleaned!r}"
                     ),
                 }
             )
@@ -818,9 +813,7 @@ def _check_row_shape(row_no: int, mapped: dict[str, Any]) -> RowError | None:
     return None
 
 
-_STANDARD_TARGETS: frozenset[str] = frozenset(
-    {"full_name", "phone", "email", "source", "tag"}
-)
+_STANDARD_TARGETS: frozenset[str] = frozenset({"full_name", "phone", "email", "source", "tag"})
 
 
 async def _load_contact_custom_field_defs(
@@ -834,9 +827,7 @@ async def _load_contact_custom_field_defs(
     import instead of once per row keeps the loop O(N) instead of
     O(N × k) round-trips.
     """
-    fields = await list_fields_query(
-        session, entity_type=_CONTACT_ENTITY, include_hidden=False
-    )
+    fields = await list_fields_query(session, entity_type=_CONTACT_ENTITY, include_hidden=False)
     return {f.field_key: f for f in fields}
 
 
@@ -1019,9 +1010,7 @@ def _split_tag_cell(cell: str) -> list[str]:
     return pieces
 
 
-async def _dedupe_key_hits(
-    session: AsyncSession, *, candidates: set[str]
-) -> set[str]:
+async def _dedupe_key_hits(session: AsyncSession, *, candidates: set[str]) -> set[str]:
     """Return the subset of normalised phone keys already present in
     the tenant's contacts table.
 
@@ -1033,9 +1022,7 @@ async def _dedupe_key_hits(
     """
     if not candidates:
         return set()
-    rows = await data_access.list_matching_phones_by_suffix(
-        session, suffixes=list(candidates)
-    )
+    rows = await data_access.list_matching_phones_by_suffix(session, suffixes=list(candidates))
     hits: set[str] = set()
     for raw in rows:
         if not raw:
@@ -1102,11 +1089,7 @@ async def _build_report_csv_response(
             import_errors.ImportRowError(
                 row_number=int(record.get("row", 0)),
                 column=record.get("column"),
-                value=(
-                    None
-                    if record.get("value") is None
-                    else str(record.get("value"))
-                ),
+                value=(None if record.get("value") is None else str(record.get("value"))),
                 reason=str(record.get("reason", "")),
             )
         )

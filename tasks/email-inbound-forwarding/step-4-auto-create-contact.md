@@ -1,6 +1,6 @@
 # Step 4: Contacts `auto_create_from_email()` + `_persist_inbound_email()` endpoint_type extension
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21, new `contacts.data_access.insert_minimal_contact` + `contacts.service.auto_create_from_email` with `InvalidFromHeader` exception, pre-check idempotency + IntegrityError fallback for concurrent races, audit `contact.auto_created_from_inbound_email`; `_persist_inbound_email` gains optional `endpoint_type` param stamped into `payload`; `ingest_forwarded.py` replaces the Step-3 `forwarded_awaiting_auto_create` audit stub with the real auto-create call — fail-soft on parse errors; 10 tests in test_contacts_auto_create.py)
 
 ## Goal
 

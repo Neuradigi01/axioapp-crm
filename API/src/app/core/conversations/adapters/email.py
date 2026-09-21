@@ -793,6 +793,7 @@ async def _persist_inbound_email(
     activity_user_id: uuid.UUID | None,
     account_email_label: str | None,
     endpoint_id: uuid.UUID | None = None,
+    endpoint_type: str | None = None,
 ) -> Message | None:
     """Shared inbound-persistence helper for OAuth AND Mailgun paths.
 
@@ -896,6 +897,12 @@ async def _persist_inbound_email(
     # caller instead — same shape, single source of truth).
     if endpoint_id is not None:
         payload["endpoint_id"] = str(endpoint_id)
+    # tasks/email-inbound-forwarding Step 4 — stamp endpoint_type so
+    # downstream analytics + inbox-triage filters can bucket by
+    # "reply-capture" vs "forwarded-address" vs "oauth-mailbox"
+    # without re-parsing the source_reference dict.
+    if endpoint_type is not None:
+        payload["endpoint_type"] = endpoint_type
 
     msg = Message(
         org_id=org_id,

@@ -111,6 +111,48 @@ def insert_contact(session: AsyncSession, contact: Contact) -> None:
     session.add(contact)
 
 
+def insert_minimal_contact(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    email: str,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    source: str | None = None,
+) -> Contact:
+    """Stage a minimal-shape Contact INSERT.
+
+    Purpose-built for auto-create paths (forwarded-address inbound in
+    ``email-inbound-forwarding`` Step 4) where we know only what the
+    sender's ``From:`` header disclosed. Custom-field validation is
+    skipped — a staff member will fill required fields in a follow-up
+    edit; the contact row must land NOW so the inbound message has
+    somewhere to attach.
+
+    ``full_name`` is composed from ``first_name`` + ``last_name`` (or
+    the local-part when neither is provided) so the mandatory
+    NOT-NULL column carries something human-readable.
+
+    Caller commits — this is a pure ``session.add`` stage.
+    """
+    parts = [(first_name or "").strip(), (last_name or "").strip()]
+    full_name = " ".join(p for p in parts if p).strip()
+    if not full_name:
+        # Fall back to the email's local-part (``ajay@x.com`` →
+        # ``ajay``) so the operator sees SOMETHING recognisable in
+        # the inbox before they open the record.
+        local_part = (email or "").split("@", 1)[0].strip()
+        full_name = local_part or "Unknown sender"
+    contact = Contact(
+        org_id=org_id,
+        full_name=full_name,
+        email=email.lower().strip(),
+        source=source,
+    )
+    session.add(contact)
+    return contact
+
+
 async def delete_contact_row(session: AsyncSession, contact: Contact) -> None:
     """Hard-delete one Contact row."""
     await session.delete(contact)
@@ -357,10 +399,12 @@ async def count_delete_blockers_for_contact(
     the specific dependency counts instead of the generic 'may have
     linked leads, appointments, or walk-ins' fallback.
     """
-    row = (
-        await session.execute(_CONTACT_BLOCKER_COUNT_SINGLE_SQL, {"cid": str(contact_id)})
-    ).one()
-    return {"leads": int(row.leads), "appointments": int(row.appointments), "walk_ins": int(row.walk_ins)}
+    row = (await session.execute(_CONTACT_BLOCKER_COUNT_SINGLE_SQL, {"cid": str(contact_id)})).one()
+    return {
+        "leads": int(row.leads),
+        "appointments": int(row.appointments),
+        "walk_ins": int(row.walk_ins),
+    }
 
 
 async def count_delete_blockers_for_contacts(
@@ -376,7 +420,11 @@ async def count_delete_blockers_for_contacts(
             {"ids": [str(i) for i in ids], "org": str(org_id)},
         )
     ).one()
-    return {"leads": int(row.leads), "appointments": int(row.appointments), "walk_ins": int(row.walk_ins)}
+    return {
+        "leads": int(row.leads),
+        "appointments": int(row.appointments),
+        "walk_ins": int(row.walk_ins),
+    }
 
 
 async def bulk_append_tag(
@@ -821,6 +869,7 @@ __all__ = [
     "get_contact",
     "get_contact_by_phone",
     "insert_contact",
+    "insert_minimal_contact",
     "is_user_active_member_of_org",
     "list_contacts_by_ids_in_org",
     "list_contacts_for_export",

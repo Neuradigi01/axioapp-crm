@@ -62,9 +62,8 @@ router = APIRouter(prefix="/contacts/imports", tags=["Contact Imports"])
 
 @router.get("", response_model=ImportListResponse)
 async def list_imports_endpoint(
-    status_filter: Literal[
-        "uploaded", "dry_run", "processing", "committed", "failed", "cancelled"
-    ] | None = Query(default=None, alias="status"),
+    status_filter: Literal["uploaded", "dry_run", "processing", "committed", "failed", "cancelled"]
+    | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),

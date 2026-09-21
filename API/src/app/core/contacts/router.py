@@ -29,7 +29,6 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
-from src.app.core.permissions.service import role_has_permission
 from src.app.core.contacts.consent_service import (
     ConsentError,
     count_consent_events,
@@ -78,6 +77,7 @@ from src.app.core.contacts.service import (
     reassign_contact,
     update_contact,
 )
+from src.app.core.permissions.service import role_has_permission
 from src.app.core.tenants import service as tenants_service
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
@@ -163,7 +163,9 @@ async def list_contacts_endpoint(
     # otherwise the sort dropdown shows "Last activity" but the rows come
     # back "Created". "Recent activity first" is also the more useful
     # default for a CRM contact list.
-    sort: Literal["full_name", "created_at", "last_activity_at"] = Query(default="last_activity_at"),
+    sort: Literal["full_name", "created_at", "last_activity_at"] = Query(
+        default="last_activity_at"
+    ),
     order: Literal["asc", "desc"] = Query(default="desc"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
@@ -329,9 +331,7 @@ async def export_csv_endpoint(
                 c.updated_at.isoformat(),
             ]
             custom_data = c.custom_data or {}
-            standard.extend(
-                _format_custom_value(custom_data.get(d.field_key)) for d in custom_defs
-            )
+            standard.extend(_format_custom_value(custom_data.get(d.field_key)) for d in custom_defs)
             writer.writerow(standard)
             yield buf.getvalue().encode("utf-8")
             buf.seek(0)
@@ -612,9 +612,7 @@ async def get_opt_in_endpoint(
     contact = await get_contact(db, contact_id)
     if contact is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="contact not found")
-    events = await list_consent_events(
-        db, contact_id=contact_id, limit=limit, offset=offset
-    )
+    events = await list_consent_events(db, contact_id=contact_id, limit=limit, offset=offset)
     total = await count_consent_events(db, contact_id=contact_id)
     return OptInHistoryOut(
         contact_id=contact.id,

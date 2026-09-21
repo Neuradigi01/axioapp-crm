@@ -298,6 +298,140 @@ def insert_contact(session: AsyncSession, contact: Contact) -> None:
     data_access.insert_contact(session, contact)
 
 
+class InvalidFromHeader(Exception):
+    """The RFC 5322 ``From:`` header didn't parse into an email
+    address the CRM can attach to a Contact. Raised by
+    :func:`auto_create_from_email` when the sender's mail client
+    ships a malformed / null / non-email ``From:`` value.
+
+    Caller (the mailgun ingest path) surfaces this by dropping the
+    auto-attribution and persisting the message with
+    ``contact_id=None``. Never bubbled up to a router / HTTP client
+    directly — this is an ingest-side signal, not a user-facing 4xx.
+    """
+
+
+# Constrained loosely — an ``@`` and a non-empty local + domain part.
+# The full RFC-5321 regex is 6.4 KB and produces the same signal in
+# practice; the strictness we lose here is the strictness we don't
+# need for auto-create (a mail that Mailgun accepted has already
+# passed a real MTA's validity check).
+_MIN_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+async def auto_create_from_email(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    from_header: str,
+    source: str = "email_forwarded_address",
+) -> Contact:
+    """Mint a minimal-shape :class:`Contact` from an RFC ``From:`` header.
+
+    Called by the forwarded-address ingest path
+    (:mod:`email.mailgun.ingest_forwarded`) when a message lands from
+    an unknown sender AND the endpoint has ``auto_create_contact=True``
+    (industry-baseline "auto-create" — HubSpot / Front match this).
+
+    Idempotent w.r.t. the sender's email: a re-fire from the same
+    ``From:`` returns the EXISTING contact instead of creating a
+    duplicate. Two mechanisms:
+
+      1. Pre-check via :func:`data_access.find_contact_by_email` —
+         handles the steady-state "customer sent us another message"
+         path in a single SELECT before we ever stage an INSERT.
+      2. Post-INSERT :class:`IntegrityError` catch — belt-and-braces
+         for the concurrent-worker race (two ``f-<token>`` deliveries
+         for the same sender arriving in the same second). Contacts
+         doesn't carry a DB-level ``UNIQUE(org_id, email)`` yet, so
+         this branch is defensive rather than load-bearing — but
+         wiring it now means adding the constraint later is a one-
+         line migration, not a behaviour rewrite.
+
+    Raises :class:`InvalidFromHeader` on a header that doesn't parse
+    into a syntactically-plausible email address. The caller drops
+    the auto-attribution and persists the message with ``contact_id=
+    None`` in that branch.
+    """
+    from email.utils import parseaddr
+
+    display_name, email_addr = parseaddr((from_header or "").strip())
+    normalised_email = (email_addr or "").strip().lower()
+    if not normalised_email or not _MIN_EMAIL_RE.match(normalised_email):
+        raise InvalidFromHeader(
+            f"could not parse a mail address out of From: header={from_header!r}"
+        )
+
+    # Idempotency pre-check.
+    existing = await data_access.find_contact_by_email(
+        session, org_id=org_id, email=normalised_email
+    )
+    if existing is not None:
+        return existing
+
+    # Split display name into first/last, preserving unicode.
+    first_name, last_name = _split_display_name(display_name)
+
+    try:
+        contact = data_access.insert_minimal_contact(
+            session,
+            org_id=org_id,
+            email=normalised_email,
+            first_name=first_name,
+            last_name=last_name,
+            source=source,
+        )
+        await session.commit()
+        await session.refresh(contact)
+    except IntegrityError:
+        # Concurrent race — some other worker created a contact with
+        # the same email between our SELECT and our INSERT. Roll back
+        # + re-SELECT so the caller gets a valid Contact back.
+        await session.rollback()
+        existing = await data_access.find_contact_by_email(
+            session, org_id=org_id, email=normalised_email
+        )
+        if existing is None:
+            # Impossible in practice (the INSERT that beat us hasn't
+            # been committed yet on the OTHER worker) — surface as a
+            # generic 500 rather than silently pretending we handled
+            # it. Caller wraps + drops the auto-attribution.
+            raise
+        return existing
+
+    await audit.log(
+        "contact.auto_created_from_inbound_email",
+        entity_type="contact",
+        entity_id=contact.id,
+        org_id=org_id,
+        after={
+            "email": normalised_email,
+            "full_name": contact.full_name,
+            "source": source,
+        },
+    )
+    return contact
+
+
+def _split_display_name(display: str | None) -> tuple[str | None, str | None]:
+    """``"Asha Rao" → ("Asha", "Rao")``.
+
+    Single-word names go entirely into ``first_name`` — losing them
+    to ``last_name`` would confuse the ``full_name`` composition
+    downstream. Preserves unicode (Devanagari, CJK, Cyrillic) since
+    we never lower/normalize.
+    """
+    if not display:
+        return None, None
+    cleaned = display.strip().strip('"').strip("'")
+    if not cleaned:
+        return None, None
+    parts = cleaned.split(None, 1)
+    if len(parts) == 1:
+        return parts[0], None
+    return parts[0], parts[1].strip() or None
+
+
 async def create_contact(
     session: AsyncSession,
     *,

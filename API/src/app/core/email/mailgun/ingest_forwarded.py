@@ -160,26 +160,52 @@ async def handle_forwarded_address(
         )
 
     # ------------------------------------------------------------------
-    # Auto-create-contact policy for unmatched senders. Step 4 wires
-    # the actual auto-create; Step 3 leaves ``contact_id=None`` and
-    # audits so the follow-up step can key off it.
+    # Auto-create-contact policy for unmatched senders.
     # ------------------------------------------------------------------
     if contact_id is None and not spoof_suspected:
         if details.auto_create_contact:
-            # Step 4 will replace this audit with the actual
-            # ``auto_create_from_email`` call. Until then the audit
-            # + null contact preserves the message row and doesn't
-            # silently associate it with the wrong contact.
-            await audit.log(
-                "mailgun.inbound.forwarded_awaiting_auto_create",
-                entity_type="webhook_attempt",
-                after={
-                    "sender_email": sender_email,
-                    "endpoint_id": str(endpoint.id),
-                    "mailgun_delivery_id": mailgun_delivery_id,
-                },
-                org_id=org_id,
+            # Auto-create from the RFC ``From:`` header. Idempotent
+            # (returns the existing contact on a re-fire). Errors
+            # fail-soft: an unparseable header drops the auto-attribution
+            # and persists the message with ``contact_id=None`` so the
+            # data isn't lost.
+            from src.app.core.contacts.service import (
+                InvalidFromHeader,
+                auto_create_from_email,
             )
+
+            from_header = headers.get("from") or headers.get("From") or ""
+            try:
+                new_contact = await auto_create_from_email(
+                    session,
+                    org_id=org_id,
+                    from_header=from_header,
+                    source="email_forwarded_address",
+                )
+                contact_id = new_contact.id
+            except InvalidFromHeader:
+                system_review_required = True
+                await audit.log(
+                    "mailgun.inbound.forwarded_invalid_from_header",
+                    entity_type="webhook_attempt",
+                    after={
+                        "from_header": from_header,
+                        "endpoint_id": str(endpoint.id),
+                        "mailgun_delivery_id": mailgun_delivery_id,
+                    },
+                    org_id=org_id,
+                )
+            except Exception:
+                # Belt-and-braces: any other error inside auto-create
+                # must never take down the ingest. Log + persist
+                # message with contact_id=None + flag for review.
+                system_review_required = True
+                logger.exception(
+                    "mailgun.forwarded_ingest.auto_create_failed org=%s from=%s delivery=%s",
+                    org_id,
+                    from_header,
+                    mailgun_delivery_id,
+                )
         else:
             system_review_required = True
             await audit.log(
@@ -261,6 +287,7 @@ async def handle_forwarded_address(
         activity_user_id=None,
         account_email_label=None,
         endpoint_id=endpoint.id,
+        endpoint_type=ENDPOINT_TYPE,
     )
 
     # ------------------------------------------------------------------

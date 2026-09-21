@@ -86,9 +86,7 @@ async def list_matching_phones_by_suffix(
     rows = (
         (
             await session.execute(
-                select(Contact.phone)
-                .where(Contact.phone.is_not(None))
-                .where(or_(*predicates))
+                select(Contact.phone).where(Contact.phone.is_not(None)).where(or_(*predicates))
             )
         )
         .scalars()

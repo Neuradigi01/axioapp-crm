@@ -117,9 +117,7 @@ async def process_contact_import_async(
         # or wasn't left in `processing` by the commit endpoint.
         async with async_session() as session:
             row = (
-                await session.execute(
-                    select(ContactImport).where(ContactImport.id == import_id)
-                )
+                await session.execute(select(ContactImport).where(ContactImport.id == import_id))
             ).scalar_one_or_none()
             if row is None:
                 logger.warning("process_contact_import: %s not found", import_id)
