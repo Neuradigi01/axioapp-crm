@@ -1,6 +1,6 @@
 # Step 3: Frontend — platform-admin audit log tab
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — backend `GET /api/v1/admin/email-inbound-deliveries` mounted on new `audit_admin_router` sibling to `dlq_admin_router`, permission-gated by `mailgun.inbound.dlq.manage` (same key as DLQ admin — documented in-code that a proper `platform.admin` role template will migrate both together); accepts `outcome` + `from`/`to` (ISO) + `page` + `page_size` (1–100 with max cap); 400 on unknown outcome enum; default window = last 24h; `received_at DESC` sort; `InboundDeliveryOut` schema deliberately excludes `outcome_detail` JSONB to avoid surfacing caller-controlled header strings. Angular `AuditLogService` + standalone `AuditLogTabComponent` (signals + OnPush + `@if`/`@for`) with outcome-chip filter, datetime-local `from`/`to` inputs, page-size dropdown (25/50/100), prev/next pagination + total count. Router registered via new `mailgun_audit_admin_router` in main.py.
 
 ## Goal
 

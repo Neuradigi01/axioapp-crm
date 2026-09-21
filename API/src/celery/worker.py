@@ -142,6 +142,12 @@ celery.autodiscover_tasks(
         # entry the beat scheduler can't find
         # ``auto_purge_quarantine`` and held rows accumulate forever.
         "src.app.core.email.quarantine.tasks",
+        # tasks/email-inbound-audit-verdicts Step 1 — daily 05:00 UTC
+        # retention sweep of tbl_email_inbound_deliveries.
+        # ``EMAIL_INBOUND_DELIVERIES_RETAIN_DAYS`` (default 90). Without
+        # this entry the beat scheduler can't find
+        # ``sweep_inbound_deliveries_daily`` and audit rows never age out.
+        "src.app.core.email.mailgun.audit_retention_task",
     ]
 )
 

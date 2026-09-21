@@ -35,6 +35,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.core import audit
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.email.mailgun import data_access, service
+from src.app.core.email.mailgun.audit_deliveries import (
+    OUTCOME_ENQUEUED,
+    OUTCOME_REPLAY_REJECTED,
+    OUTCOME_SIGNATURE_REJECTED,
+    REPLAY_FRESH,
+    REPLAY_REPLAY,
+    SIG_INVALID,
+    SIG_VALID,
+    TIMESTAMP_FRESH,
+    AuditPayload,
+    write_audit,
+)
 from src.app.core.email.mailgun.schemas import (
     DlqReprocessResponse,
     DlqRowOut,
@@ -138,6 +150,128 @@ async def reprocess_email_inbound_dlq(
     return DlqReprocessResponse(id=str(row.id), reprocessed=reprocessed)
 
 
+# ---------------------------------------------------------------------------
+# tasks/email-inbound-audit-verdicts Step 3 — admin audit-log endpoint.
+#
+# Deliberately mounted on the same ``dlq_admin_router`` so the two
+# platform-staff surfaces (DLQ + audit) share one URL prefix (``/admin/``)
+# and one permission gate (``mailgun.inbound.dlq.manage``). The plan
+# calls for ``platform.admin`` — that key isn't registered yet, so we
+# reuse the DLQ manager key (same audience: platform SRE via an
+# Owner-role membership). When a proper cross-tenant admin role
+# template lands both endpoints migrate together.
+# ---------------------------------------------------------------------------
+
+
+audit_admin_router = APIRouter(
+    prefix="/admin/email-inbound-deliveries",
+    tags=["Email Inbound Audit"],
+)
+
+
+_OUTCOME_ENUM = {
+    "enqueued",
+    "signature_rejected",
+    "replay_rejected",
+    "timestamp_rejected",
+    "size_rejected_before_download",
+}
+
+
+def _delivery_row_to_out(row) -> "InboundDeliveryOut":
+    from src.app.core.email.mailgun.schemas import InboundDeliveryOut
+
+    return InboundDeliveryOut(
+        id=str(row.id),
+        received_at=row.received_at.isoformat(),
+        signature_status=row.signature_status,
+        replay_status=row.replay_status,
+        timestamp_status=row.timestamp_status,
+        outcome=row.outcome,
+        mailgun_delivery_id=row.mailgun_delivery_id,
+        mailgun_message_id=row.mailgun_message_id,
+        recipient=row.recipient,
+        sender=row.sender,
+        payload_size_bytes=row.payload_size_bytes,
+        attachment_count=row.attachment_count,
+        client_ip=str(row.client_ip) if row.client_ip else None,
+    )
+
+
+@audit_admin_router.get("", response_model=None)
+async def list_inbound_deliveries(
+    outcome: str | None = Query(default=None),
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("mailgun.inbound.dlq.manage")),
+):
+    """Platform-admin audit log for every Mailgun webhook receipt.
+
+    Cross-tenant by design — the audit table has no ``org_id``. Row
+    detail modal is deliberately absent in v1 (metadata is all we
+    store; the DLQ + on-disk pending-inbound dirs hold the payload).
+
+    Query params:
+      * ``outcome`` — one of the 5 enum values. 400 on unknown.
+      * ``from`` / ``to`` — ISO timestamps (inclusive). Default: last 24h.
+      * ``page`` / ``page_size`` — 1-based; max page_size 100.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import func, select
+    from src.app.core.email.mailgun.audit_deliveries import (
+        EmailInboundDelivery,
+    )
+    from src.app.core.email.mailgun.schemas import InboundDeliveriesListOut
+
+    if outcome is not None and outcome not in _OUTCOME_ENUM:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unknown outcome; expected one of {sorted(_OUTCOME_ENUM)}",
+        )
+
+    now = datetime.now(UTC)
+    from_dt = _parse_iso_or_none(from_) or (now - timedelta(hours=24))
+    to_dt = _parse_iso_or_none(to) or now
+
+    stmt = select(EmailInboundDelivery).where(
+        EmailInboundDelivery.received_at >= from_dt,
+        EmailInboundDelivery.received_at <= to_dt,
+    )
+    if outcome is not None:
+        stmt = stmt.where(EmailInboundDelivery.outcome == outcome)
+
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = int((await db.execute(count_stmt)).scalar_one())
+
+    stmt = (
+        stmt.order_by(EmailInboundDelivery.received_at.desc())
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+    )
+    rows = list((await db.execute(stmt)).scalars().all())
+    return InboundDeliveriesListOut(
+        items=[_delivery_row_to_out(r) for r in rows],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+def _parse_iso_or_none(v: str | None):
+    if not v:
+        return None
+    try:
+        from datetime import datetime
+
+        return datetime.fromisoformat(v.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"invalid ISO date: {v}")
+
+
 _FAIL_RATE_KEY_PREFIX = "mgw:fail:"
 _FAIL_RATE_LIMIT = 20
 _FAIL_RATE_WINDOW_SECONDS = 60
@@ -163,12 +297,34 @@ async def mailgun_inbound(request: Request) -> JSONResponse:
     threading) lives in the Celery task so the request path is
     constant-time regardless of token validity.
     """
+    import asyncio
+
     client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent") or None
     form = await request.form()
 
     timestamp = str(form.get("timestamp", ""))
     token = str(form.get("token", ""))
     signature = str(form.get("signature", ""))
+    # Best-effort payload metadata for the audit row. These fields are
+    # always present in a well-formed Mailgun delivery; if the caller
+    # is malformed (attacker POSTing random JSON) we still log what we
+    # have so operators can trace the pattern later.
+    mailgun_delivery_id = str(form.get("Message-Id", "") or "") or None
+    mailgun_message_id = str(form.get("Message-Id", "") or "") or None
+    recipient = str(form.get("recipient", "") or "") or None
+    sender = str(form.get("sender", "") or "") or None
+    payload_size_bytes: int | None = None
+    try:
+        cl = request.headers.get("content-length")
+        if cl:
+            payload_size_bytes = int(cl)
+    except ValueError:
+        payload_size_bytes = None
+    try:
+        attachment_count: int | None = int(str(form.get("attachment-count", "") or 0)) or None
+    except ValueError:
+        attachment_count = None
 
     if not service.verify_signature(timestamp=timestamp, token=token, signature=signature):
         # Rate-limit ONLY signature failures — signed traffic is
@@ -192,6 +348,31 @@ async def mailgun_inbound(request: Request) -> JSONResponse:
             org_id=None,  # system-level — no tenant resolved yet
             ip=client_ip,
         )
+        # tasks/email-inbound-audit-verdicts Step 1 — fire-and-forget
+        # audit row. Best-effort; response time stays constant.
+        asyncio.create_task(
+            write_audit(
+                AuditPayload(
+                    outcome=OUTCOME_SIGNATURE_REJECTED,
+                    signature_status=SIG_INVALID,
+                    replay_status=REPLAY_FRESH,
+                    timestamp_status=TIMESTAMP_FRESH,
+                    mailgun_delivery_id=mailgun_delivery_id,
+                    mailgun_message_id=mailgun_message_id,
+                    recipient=recipient,
+                    sender=sender,
+                    payload_size_bytes=payload_size_bytes,
+                    attachment_count=attachment_count,
+                    outcome_detail={
+                        "timestamp_present": bool(timestamp),
+                        "token_present": bool(token),
+                        "signature_present": bool(signature),
+                    },
+                    client_ip=client_ip,
+                    user_agent=user_agent,
+                )
+            )
+        )
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"error": "bad signature"},
@@ -209,6 +390,25 @@ async def mailgun_inbound(request: Request) -> JSONResponse:
             after={"reason": "replay_or_redis_outage"},
             org_id=None,
             ip=client_ip,
+        )
+        asyncio.create_task(
+            write_audit(
+                AuditPayload(
+                    outcome=OUTCOME_REPLAY_REJECTED,
+                    signature_status=SIG_VALID,
+                    replay_status=REPLAY_REPLAY,
+                    timestamp_status=TIMESTAMP_FRESH,
+                    mailgun_delivery_id=mailgun_delivery_id,
+                    mailgun_message_id=mailgun_message_id,
+                    recipient=recipient,
+                    sender=sender,
+                    payload_size_bytes=payload_size_bytes,
+                    attachment_count=attachment_count,
+                    outcome_detail={"reason": "replay_or_redis_outage"},
+                    client_ip=client_ip,
+                    user_agent=user_agent,
+                )
+            )
         )
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -237,10 +437,34 @@ async def mailgun_inbound(request: Request) -> JSONResponse:
     # Fire-and-forget enqueue; sweeper catches broker outages.
     service.enqueue_process_task(pending_dir)
 
+    # tasks/email-inbound-audit-verdicts Step 1 — record the enqueue
+    # outcome. Downstream Celery-task success/failure is NOT tracked
+    # in this row (that's the DLQ's job); this row only tracks the
+    # webhook path.
+    asyncio.create_task(
+        write_audit(
+            AuditPayload(
+                outcome=OUTCOME_ENQUEUED,
+                signature_status=SIG_VALID,
+                replay_status=REPLAY_FRESH,
+                timestamp_status=TIMESTAMP_FRESH,
+                mailgun_delivery_id=mailgun_delivery_id,
+                mailgun_message_id=mailgun_message_id,
+                recipient=recipient,
+                sender=sender,
+                payload_size_bytes=payload_size_bytes,
+                attachment_count=attachment_count,
+                outcome_detail={"pending_dir": str(pending_dir)},
+                client_ip=client_ip,
+                user_agent=user_agent,
+            )
+        )
+    )
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"status": "accepted"},
     )
 
 
-__all__ = ["dlq_admin_router", "router"]
+__all__ = ["audit_admin_router", "dlq_admin_router", "router"]

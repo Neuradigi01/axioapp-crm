@@ -622,6 +622,83 @@ async def _apply_extended_gates(
         )
         return True
 
+    # ── Gate 3 + 4: virus + spam verdict gates ──────────────────────
+    # Track 6 Step 2. Both flagged behind a single env kill-switch so
+    # operators can flip the whole verdict tier off during a false-
+    # positive incident without a redeploy. Virus wins over spam when
+    # both fire (higher severity + policy prohibits re-release).
+    if qgates.verdict_gates_enabled():
+        virus_decision = qgates.check_virus_verdict(payload)
+        if virus_decision.action == "virus":
+            from src.app.core.email.quarantine.models import (
+                REASON_VIRUS_VERDICT,
+            )
+
+            await qservice.enqueue_quarantine(
+                session,
+                org_id=org_id,
+                endpoint_id=endpoint_id,
+                mailgun_delivery_id=mailgun_delivery_id,
+                from_address=sender_email,
+                from_display_name=headers.get("from"),
+                to_recipient=str(payload.get("recipient", "")),
+                subject=headers.get("subject"),
+                body_snippet=(str(payload.get("body-plain") or ""))[:500],
+                attachment_summary=[],
+                reason_code=REASON_VIRUS_VERDICT,
+                reason_detail={"virus_name": virus_decision.virus_name},
+                payload_path=str(pending_dir),
+            )
+            await audit.log(
+                "mailgun.inbound.virus_verdict",
+                entity_type="webhook_attempt",
+                after={
+                    "sender_email": sender_email,
+                    "virus_name": virus_decision.virus_name,
+                    "mailgun_delivery_id": mailgun_delivery_id,
+                },
+                org_id=org_id,
+            )
+            return True
+
+        spam_decision = qgates.check_spam_verdict(payload)
+        if spam_decision.action == "spam":
+            from src.app.core.email.quarantine.models import (
+                REASON_SPAM_VERDICT,
+            )
+
+            await qservice.enqueue_quarantine(
+                session,
+                org_id=org_id,
+                endpoint_id=endpoint_id,
+                mailgun_delivery_id=mailgun_delivery_id,
+                from_address=sender_email,
+                from_display_name=headers.get("from"),
+                to_recipient=str(payload.get("recipient", "")),
+                subject=headers.get("subject"),
+                body_snippet=(str(payload.get("body-plain") or ""))[:500],
+                attachment_summary=[],
+                reason_code=REASON_SPAM_VERDICT,
+                reason_detail={
+                    "flag": spam_decision.flag,
+                    "score": spam_decision.score,
+                    "threshold": qgates.spam_score_threshold(),
+                },
+                payload_path=str(pending_dir),
+            )
+            await audit.log(
+                "mailgun.inbound.spam_verdict",
+                entity_type="webhook_attempt",
+                after={
+                    "sender_email": sender_email,
+                    "score": spam_decision.score,
+                    "flag": spam_decision.flag,
+                    "mailgun_delivery_id": mailgun_delivery_id,
+                },
+                org_id=org_id,
+            )
+            return True
+
     return False
 
 

@@ -68,9 +68,54 @@ class DlqReprocessResponse(BaseModel):
     reprocessed: bool
 
 
+# ---------------------------------------------------------------------------
+# tasks/email-inbound-audit-verdicts Step 3 — admin audit-log surface.
+# ---------------------------------------------------------------------------
+
+
+class InboundDeliveryOut(BaseModel):
+    """One row of ``GET /api/v1/admin/email-inbound-deliveries``.
+
+    Deliberately keeps every field the audit table stores except the
+    ``outcome_detail`` JSONB blob — that may hold caller-controlled
+    strings (spoofed header values) and shouldn't hit an operator
+    surface without server-side sanitisation. Operators diagnose from
+    the enum outcomes; deep debugging goes through direct SQL by SRE.
+    """
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    id: str
+    received_at: str
+    signature_status: str
+    replay_status: str
+    timestamp_status: str
+    outcome: str
+    mailgun_delivery_id: str | None
+    mailgun_message_id: str | None
+    recipient: str | None
+    sender: str | None
+    payload_size_bytes: int | None
+    attachment_count: int | None
+    client_ip: str | None
+
+
+class InboundDeliveriesListOut(BaseModel):
+    """Envelope for paginated audit-log list."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[InboundDeliveryOut]
+    total: int
+    page: int
+    page_size: int
+
+
 __all__ = [
     "DlqReprocessResponse",
     "DlqRowOut",
+    "InboundDeliveriesListOut",
+    "InboundDeliveryOut",
     "WebhookAcceptedResponse",
     "WebhookHealthResponse",
 ]

@@ -68,6 +68,12 @@ import src.app.core.email_sender_setup.models  # noqa: F401
 # register with ``Base.metadata``.
 import src.app.core.email.quarantine.models  # noqa: F401
 
+# tasks/email-inbound-audit-verdicts Step 1 — side-effect import so
+# the ``tbl_email_inbound_deliveries`` audit table registers with
+# ``Base.metadata``. NOTE: this is a system-level table (no org_id) —
+# documented deviation from CLAUDE.md rule 2 in the module docstring.
+import src.app.core.email.mailgun.audit_deliveries  # noqa: F401
+
 # Side-effect import so the email_senders MODULE descriptor lands on
 # the module registry before the lifespan permission-fanout sweep.
 import src.app.core.email_senders.module  # noqa: F401
@@ -127,6 +133,9 @@ from src.app.core.dashboard.router import router as dashboard_router
 from src.app.core.dev.router import router as dev_router
 from src.app.core.email.mailgun.events_webhook import (
     router as mailgun_events_router,
+)
+from src.app.core.email.mailgun.router import (
+    audit_admin_router as mailgun_audit_admin_router,
 )
 from src.app.core.email.mailgun.router import (
     dlq_admin_router as mailgun_dlq_admin_router,
@@ -553,6 +562,7 @@ app.include_router(message_attachments_router, prefix="/api/v1")
 # GET  /api/v1/admin/email-inbound-dlq
 # POST /api/v1/admin/email-inbound-dlq/{id}/reprocess
 app.include_router(mailgun_dlq_admin_router, prefix="/api/v1")
+app.include_router(mailgun_audit_admin_router, prefix="/api/v1")
 
 # Dev-only routes (test-login dropdown backing endpoint, etc). Mounted
 # only when IS_DEVELOPMENT=true on the API container — production never

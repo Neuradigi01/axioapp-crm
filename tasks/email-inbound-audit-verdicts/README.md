@@ -2,7 +2,7 @@
 
 Append-only **audit trail** of every webhook delivery attempt (before dedup, before ingest) for forensics + replay analysis, plus wire **spam + virus verdict gates** into the shipped mailgun-inbound chain — routing hits to Track 5's quarantine rather than dropping silently.
 
-**Status:** Pending — plan drafted 2026-09-21. Depends on Track 5 (quarantine table). Small cleanup track — no discovery required.
+**Status:** COMPLETED 2026-09-21 — all 3 steps shipped in one push; migration `0237_email_inbound_audit` applied; audit table + verdict gates + admin endpoint + Angular tab all live; import + OpenAPI smoke pass end-to-end. **All 6 tracks of the email-platform redesign now COMPLETE.**
 
 ## Why this track exists
 

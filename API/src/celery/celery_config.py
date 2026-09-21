@@ -381,4 +381,14 @@ beat_schedule = {
         "task": "src.app.core.email.quarantine.tasks.auto_purge_quarantine",
         "schedule": crontab(hour=4, minute=0, day_of_week="mon"),
     },
+    # tasks/email-inbound-audit-verdicts Step 1 — daily 05:00 UTC
+    # retention sweep of tbl_email_inbound_deliveries. Deletes rows
+    # older than EMAIL_INBOUND_DELIVERIES_RETAIN_DAYS (default 90),
+    # batched at 10k rows per beat run so a retention shrink can't
+    # stall the loop. Placed 1h after quarantine auto-purge to
+    # separate janitor windows.
+    "email-inbound-deliveries-retention-daily": {
+        "task": "src.app.core.email.mailgun.audit_retention_task.sweep_inbound_deliveries_daily",
+        "schedule": crontab(hour=5, minute=0),
+    },
 }

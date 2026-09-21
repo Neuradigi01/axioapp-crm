@@ -1,6 +1,6 @@
 # Step 1: Migration — `tbl_email_inbound_deliveries` + retention beat + audit write in webhook
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — migration `0237_email_inbound_audit` on `crm_local`; `tbl_email_inbound_deliveries` has 15 columns + 3 indexes (`received_at DESC`, partial on `mailgun_delivery_id`, composite `outcome, received_at DESC`) + CHECK on outcome enum; **documented deviation from Rule 2** — no `org_id` column (precedent: `tbl_email_inbound_dlq`); `EmailInboundDelivery` ORM in `audit_deliveries.py`; `write_audit(AuditPayload)` best-effort with per-request `async_session` + `ipaddress` sanitisation; wired into `mailgun_inbound` webhook via `asyncio.create_task(write_audit(...))` on all 3 exit paths (`signature_rejected` / `replay_rejected` / `enqueued`); daily 05:00 UTC retention beat `sweep_inbound_deliveries_daily` in new `audit_retention_task.py` module, batched at 10k rows; task in autodiscover; downgrade+re-upgrade round-trip clean.
 
 ## Goal
 

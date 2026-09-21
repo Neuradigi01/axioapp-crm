@@ -1,0 +1,178 @@
+<div class="space-y-4" data-testid="audit-log-tab">
+  <header class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-default">Inbound audit log</h2>
+      <p class="mt-0.5 text-xs text-muted">
+        Every Mailgun webhook receipt — 90-day retention. Platform staff only.
+      </p>
+    </div>
+    <button
+      type="button"
+      class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs text-default hover:bg-surface-2"
+      (click)="load()"
+      data-testid="audit-log-refresh"
+    >
+      <lucide-icon name="refresh-cw" size="12"></lucide-icon>
+      Refresh
+    </button>
+  </header>
+
+  <!-- Outcome filter chips -->
+  <div class="flex flex-wrap gap-1.5" data-testid="audit-log-chips">
+    @for (chip of outcomeChips; track chip.code) {
+      <button
+        type="button"
+        class="rounded-full border px-2.5 py-0.5 text-xs transition"
+        [class.border-blue-500]="selectedOutcome() === chip.code"
+        [class.bg-blue-500]="selectedOutcome() === chip.code"
+        [class.text-white]="selectedOutcome() === chip.code"
+        [class.border-subtle]="selectedOutcome() !== chip.code"
+        [class.text-muted]="selectedOutcome() !== chip.code"
+        (click)="selectOutcome(chip.code)"
+      >
+        {{ chip.label }}
+      </button>
+    }
+  </div>
+
+  <!-- Date range + page size -->
+  <div class="flex flex-wrap items-end gap-3">
+    <div>
+      <label class="text-xs text-muted" for="audit-from">From</label>
+      <input
+        id="audit-from"
+        type="datetime-local"
+        class="mt-1 rounded-md border border-subtle bg-surface-2 px-2 py-1 text-xs text-default"
+        [ngModel]="fromDate()"
+        (ngModelChange)="fromDate.set($event)"
+        data-testid="audit-from"
+      />
+    </div>
+    <div>
+      <label class="text-xs text-muted" for="audit-to">To</label>
+      <input
+        id="audit-to"
+        type="datetime-local"
+        class="mt-1 rounded-md border border-subtle bg-surface-2 px-2 py-1 text-xs text-default"
+        [ngModel]="toDate()"
+        (ngModelChange)="toDate.set($event)"
+        data-testid="audit-to"
+      />
+    </div>
+    <button
+      type="button"
+      class="rounded-md bg-blue-500 px-3 py-1 text-xs font-medium text-white"
+      (click)="applyDateFilter()"
+      data-testid="audit-apply"
+    >
+      Apply
+    </button>
+    <div class="ml-auto">
+      <label class="text-xs text-muted" for="audit-page-size">Page size</label>
+      <select
+        id="audit-page-size"
+        class="mt-1 rounded-md border border-subtle bg-surface-2 px-2 py-1 text-xs text-default"
+        [ngModel]="pageSize()"
+        (ngModelChange)="changePageSize($event)"
+        data-testid="audit-page-size"
+      >
+        @for (opt of pageSizeOptions; track opt) {
+          <option [ngValue]="opt">{{ opt }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  @if (errorMessage()) {
+    <div
+      class="rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400"
+      data-testid="audit-log-error"
+    >
+      {{ errorMessage() }}
+    </div>
+  }
+
+  @if (loading()) {
+    <p class="text-xs text-muted" data-testid="audit-log-loading">Loading…</p>
+  } @else if (rows().length === 0) {
+    <p class="text-xs text-muted" data-testid="audit-log-empty">
+      No webhook receipts in this window.
+    </p>
+  } @else {
+    <div class="overflow-x-auto rounded-md border border-subtle">
+      <table class="w-full text-xs" data-testid="audit-log-table">
+        <thead class="bg-surface-2 text-muted">
+          <tr>
+            <th class="px-2 py-1 text-left">Received</th>
+            <th class="px-2 py-1 text-left">Outcome</th>
+            <th class="px-2 py-1 text-left">From</th>
+            <th class="px-2 py-1 text-left">To</th>
+            <th class="px-2 py-1 text-right">Size</th>
+            <th class="px-2 py-1 text-left">Signature</th>
+            <th class="px-2 py-1 text-left">Replay</th>
+            <th class="px-2 py-1 text-left">Client IP</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-subtle">
+          @for (row of rows(); track row.id) {
+            <tr [attr.data-testid]="'audit-log-row-' + row.id">
+              <td class="whitespace-nowrap px-2 py-1 text-default">
+                {{ formatReceivedAt(row.received_at) }}
+              </td>
+              <td class="px-2 py-1">
+                <span
+                  class="rounded-full px-2 py-0.5 text-[10px] font-medium uppercase"
+                  [class.bg-green-500]="row.outcome === 'enqueued'"
+                  [class.bg-red-500]="row.outcome !== 'enqueued'"
+                  [class.text-white]="true"
+                >
+                  {{ outcomeLabel(row.outcome) }}
+                </span>
+              </td>
+              <td class="truncate px-2 py-1 font-mono text-muted">
+                {{ row.sender || '—' }}
+              </td>
+              <td class="truncate px-2 py-1 font-mono text-muted">
+                {{ row.recipient || '—' }}
+              </td>
+              <td class="whitespace-nowrap px-2 py-1 text-right text-muted">
+                {{ formatSize(row.payload_size_bytes) }}
+              </td>
+              <td class="px-2 py-1 text-muted">{{ row.signature_status }}</td>
+              <td class="px-2 py-1 text-muted">{{ row.replay_status }}</td>
+              <td class="px-2 py-1 font-mono text-muted">{{ row.client_ip || '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div
+      class="flex items-center justify-between text-xs text-muted"
+      data-testid="audit-log-pagination"
+    >
+      <span>Page {{ page() }} of {{ totalPages() }} · {{ total() }} total</span>
+      <div class="flex gap-1">
+        <button
+          type="button"
+          class="rounded-md border border-subtle bg-surface px-2 py-1 disabled:opacity-40"
+          [disabled]="page() <= 1"
+          (click)="prevPage()"
+          data-testid="audit-log-prev"
+        >
+          Prev
+        </button>
+        <button
+          type="button"
+          class="rounded-md border border-subtle bg-surface px-2 py-1 disabled:opacity-40"
+          [disabled]="page() >= totalPages()"
+          (click)="nextPage()"
+          data-testid="audit-log-next"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  }
+</div>

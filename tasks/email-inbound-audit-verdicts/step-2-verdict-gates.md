@@ -1,6 +1,6 @@
 # Step 2: Spam + virus verdict gates in extended gate chain
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — `check_spam_verdict(payload)` + `check_virus_verdict(payload)` added to `core/email/quarantine/gates.py`; spam gate reads `X-Mailgun-Sflag` (case-insensitive header lookup handles the multiple parse variants Mailgun exposes) + `X-Mailgun-Sscore` and hits when `Sflag=Yes` OR score ≥ `EMAIL_SPAM_SCORE_THRESHOLD` (default 5.0); virus gate hits when `X-Mailgun-Virus` present + non-empty; both wired into `_apply_extended_gates()` in `mailgun/tasks.py` AFTER Track 5's blocklist + rate-cap, BEFORE the shipped SPF/DKIM spoof policy; **virus always beats spam** when both fire; virus verdicts land with `blocked_release=True` via Track 5's `enqueue_quarantine` (which already sets it based on reason_code); feature-flagged behind `EMAIL_VERDICT_GATES_ENABLED` (default true) — one env-var flip disables both. Smoke: `Sflag=Yes,Score=3.0`→spam; `Sflag=No,Score=7.5`→spam; empty virus header→pass; `EICAR-Test`→virus.
 
 ## Goal
 
