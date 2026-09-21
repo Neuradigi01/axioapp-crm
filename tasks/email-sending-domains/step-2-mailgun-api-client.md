@@ -1,6 +1,6 @@
 # Step 2: Mailgun API client wrapper
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — `MailgunApiClient` ships 4 methods (`create_domain`, `get_domain`, `verify_domain`, `delete_domain`) against `/v4/domains/*` (v4 verified in discovery, not v3); region routing (us/eu) + optional `MAILGUN_REGION` env resolution + `httpx.MockTransport` injection for tests; retry policy 2 retries on 502/503 only with 0.5s→1s backoff (500 not retried); 5 exception classes (`MailgunAuthError`, `MailgunNotFound`, `MailgunRateLimited` with `retry_after_seconds`, `MailgunProviderError`, `MailgunResponseInvalid`); Pydantic `DomainDetail` + `DomainCreateResult` return types with verbatim `sending_dns_records`/`receiving_dns_records` lists; DELETE is idempotent (404 = success); import smoke + MockTransport round-trip pass end-to-end.
 
 ## Goal
 
