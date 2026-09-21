@@ -208,7 +208,7 @@ Alongside the domain table, this track also adds the **platform-from envelope** 
 
 | # | Title | Status | Est files | Est effort |
 |---|---|---|---|---|
-| 1 | **Discovery + Migration**: fetch Mailgun docs (regions + response shapes), create `tbl_organization_email_domains`, no code paths yet | Pending | 3 (docs + migration + probe test) | ~0.5 day |
+| 1 | **Discovery + Migration**: fetch Mailgun docs (regions + response shapes), create `tbl_organization_email_domains`, no code paths yet | **COMPLETED** (2026-09-21, DISCOVERY-NOTES.md from official PHP SDK; migration `0233` applied; downgrade + re-upgrade clean; `/v4/` corrected from `/v3/`; EU URL flagged unverified for later confirmation) | 4 (DISCOVERY-NOTES.md + migration + models.py extension + probe tests) | ~0.5 day |
 | 2 | Backend: Mailgun API client wrapper (`api_client.py`) with region routing + retry policy | Pending | 3 | ~0.5 day |
 | 3 | Backend: DAL + service `claim_domain()`, `verify_domain()`, `release_domain()`, `resolve_send_envelope()` | Pending | 4 | ~1 day |
 | 4 | Backend: router endpoints (Owner-only 4 endpoints) + schemas + JWT scoping | Pending | 3 | ~0.5 day |

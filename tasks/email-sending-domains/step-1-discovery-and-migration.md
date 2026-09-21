@@ -1,6 +1,6 @@
 # Step 1: Discovery + Migration — `tbl_organization_email_domains`
 
-**Status:** Pending
+**Status:** COMPLETED (2026-09-21) — DISCOVERY-NOTES.md fetched from Mailgun's official PHP SDK (documentation.mailgun.com API-refs 404 on all attempted URLs; SDK was the confirmed source), locking `/v4/domains/*` paths (not `/v3/*`), 15 Domain fields, 7 DnsRecord fields (record_type, name, value, priority, valid, cached, is_active), and US base URL `https://api.mailgun.net`; EU URL flagged UNVERIFIED. Migration `0233_email_domains` applied on `crm_local`: table + 3 CHECK constraints + 2 indexes + JSONB `dns_records` column; downgrade + re-upgrade clean; ORM import + legacy `EmailSenderDomain` compatibility verified.
 
 ## Goal
 
