@@ -198,17 +198,11 @@ class OrganizationEmailDomain(Base, TenantScoped):
     consecutive_failed_checks: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=sql_text("0")
     )
-    demoted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    released_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    demoted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # us | eu — drives the Mailgun API client's base URL. EU URL
     # flagged UNVERIFIED in DISCOVERY-NOTES.md; ship US-only in v1.
-    region: Mapped[str] = mapped_column(
-        String(4), nullable=False, server_default=sql_text("'us'")
-    )
+    region: Mapped[str] = mapped_column(String(4), nullable=False, server_default=sql_text("'us'"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

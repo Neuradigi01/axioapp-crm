@@ -18,47 +18,6 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
-# Side-effect import so the email_senders MODULE descriptor lands on
-# the module registry before the lifespan permission-fanout sweep.
-import src.app.core.email_senders.module  # noqa: F401
-
-# tasks/workflows Step 1 — side-effect import so the five workflow
-# tables register with `Base.metadata` before the FastAPI app's
-# tables-create + Alembic autogenerate sweep run.
-import src.app.core.workflows.models  # noqa: F401
-
-# Side-effect import so the workflows MODULE descriptor lands on
-# the module registry before the lifespan permission-fanout sweep.
-import src.app.core.workflows.module  # noqa: F401
-
-# tasks/chatbot-builder Step 3 — chatbots MODULE descriptor.
-import src.app.core.chatbots.module  # noqa: F401
-
-# tasks/custom-events — side-effect imports so the two custom-event
-# tables register with Base.metadata + the MODULE descriptor lands
-# on the module registry before the lifespan permission-fanout sweep.
-import src.app.core.custom_events.models  # noqa: F401
-import src.app.core.custom_events.module  # noqa: F401
-import src.app.core.custom_events.tasks  # noqa: F401
-
-# tasks/email-endpoint-abstraction Step 1 — side-effect import so the
-# two channel-endpoint tables (tbl_channel_endpoints,
-# tbl_email_endpoint_details) register with `Base.metadata` before the
-# FastAPI app's tables-create + Alembic autogenerate sweep run.
-import src.app.core.channel_endpoints.models  # noqa: F401
-
-# tasks/email-sending-domains Step 1 — side-effect import so the new
-# ``OrganizationEmailDomain`` model (living alongside the legacy
-# ``EmailSenderDomain`` in the same models.py) registers with
-# ``Base.metadata`` before the test-DB create_all sweep.
-import src.app.core.email_sender_setup.models  # noqa: F401
-
-# tasks/ai-assistants Step 1 — side-effect import so the two BYOK
-# tables (tbl_ai_provider_keys, tbl_org_ai_cost_budget) register with
-# `Base.metadata` before the FastAPI app's tables-create + Alembic
-# autogenerate sweep run.
-import src.app.core.integrations.ai.models  # noqa: F401
-
 # tasks/ai-assistants Step 5 — side-effect import so the 5 assistant
 # tables (tbl_ai_assistants, tbl_ai_assistant_knowledge/_chunks/
 # _message_meta/_instruction_audit) register with `Base.metadata`.
@@ -76,11 +35,54 @@ import src.app.core.ai_assistants.module  # noqa: F401
 # the Celery import.
 import src.app.core.ai_assistants.tasks  # noqa: F401
 
+# tasks/email-endpoint-abstraction Step 1 — side-effect import so the
+# two channel-endpoint tables (tbl_channel_endpoints,
+# tbl_email_endpoint_details) register with `Base.metadata` before the
+# FastAPI app's tables-create + Alembic autogenerate sweep run.
+import src.app.core.channel_endpoints.models  # noqa: F401
+
+# tasks/chatbot-builder Step 3 — chatbots MODULE descriptor.
+import src.app.core.chatbots.module  # noqa: F401
+
+# tasks/custom-events — side-effect imports so the two custom-event
+# tables register with Base.metadata + the MODULE descriptor lands
+# on the module registry before the lifespan permission-fanout sweep.
+import src.app.core.custom_events.models  # noqa: F401
+import src.app.core.custom_events.module  # noqa: F401
+import src.app.core.custom_events.tasks  # noqa: F401
+
+# tasks/email-sending-domains Step 1 — side-effect import so the new
+# ``OrganizationEmailDomain`` model (living alongside the legacy
+# ``EmailSenderDomain`` in the same models.py) registers with
+# ``Base.metadata`` before the test-DB create_all sweep.
+import src.app.core.email_sender_setup.models  # noqa: F401
+
+# Side-effect import so the email_senders MODULE descriptor lands on
+# the module registry before the lifespan permission-fanout sweep.
+import src.app.core.email_senders.module  # noqa: F401
+
+# tasks/ai-assistants Step 1 — side-effect import so the two BYOK
+# tables (tbl_ai_provider_keys, tbl_org_ai_cost_budget) register with
+# `Base.metadata` before the FastAPI app's tables-create + Alembic
+# autogenerate sweep run.
+import src.app.core.integrations.ai.models  # noqa: F401
+
+# tasks/workflows Step 1 — side-effect import so the five workflow
+# tables register with `Base.metadata` before the FastAPI app's
+# tables-create + Alembic autogenerate sweep run.
+import src.app.core.workflows.models  # noqa: F401
+
+# Side-effect import so the workflows MODULE descriptor lands on
+# the module registry before the lifespan permission-fanout sweep.
+import src.app.core.workflows.module  # noqa: F401
+
 # Import the pack's billing __init__ so its PDF renderer registers
 # itself with `core.billing.pdf_registry` at startup.
 import src.app.packs.furniture.modules.billing  # noqa: F401
 from config import APP_NAME, STATIC_DIR, UPLOAD_DIR
 from src.app.core.activities.router import router as activities_router
+from src.app.core.ai_assistants.public_router import router as ai_assistants_public_router
+from src.app.core.ai_assistants.router import router as ai_assistants_router
 from src.app.core.appointments.router import router as appointments_router
 from src.app.core.audit.router import router as audit_router
 from src.app.core.auth.router import router as auth_router
@@ -96,11 +98,16 @@ from src.app.core.calls.router import (
 from src.app.core.campaigns.router import router as campaigns_router
 from src.app.core.catalog.public_router import router as catalog_public_router
 from src.app.core.catalog.router import router as catalog_router
+from src.app.core.channel_endpoints.router import router as channel_endpoints_router
+from src.app.core.chatbots.reply_router import router as chatbots_reply_router
+from src.app.core.chatbots.router import router as chatbots_router
 from src.app.core.contacts.groups.router import router as contact_groups_router
 from src.app.core.contacts.imports.router import router as contact_imports_router
 from src.app.core.contacts.router import router as contacts_router
 from src.app.core.conversations.router import (
     message_attachments_router,
+)
+from src.app.core.conversations.router import (
     router as conversations_router,
 )
 from src.app.core.custom_events.router import router as custom_events_router
@@ -109,13 +116,19 @@ from src.app.core.dashboard.router import router as dashboard_router
 from src.app.core.dev.router import router as dev_router
 from src.app.core.email.mailgun.router import (
     dlq_admin_router as mailgun_dlq_admin_router,
+)
+from src.app.core.email.mailgun.router import (
     router as mailgun_inbound_router,
 )
 from src.app.core.email.router import router as email_router
 from src.app.core.email.tracking.router import router as email_tracking_router
-from src.app.core.email_sender_setup.router import router as email_sender_setup_router
+from src.app.core.email_sender_setup.router import (
+    router as email_sender_setup_router,
+)
+from src.app.core.email_sender_setup.router import (
+    sender_domains_router,
+)
 from src.app.core.email_senders.router import router as email_senders_router
-from src.app.core.channel_endpoints.router import router as channel_endpoints_router
 from src.app.core.email_sequences.router import router as email_sequences_router
 from src.app.core.embed.router import (
     public_router as embed_public_router,
@@ -124,8 +137,6 @@ from src.app.core.embed.router import (
     router as embed_keys_router,
 )
 from src.app.core.health.router import router as health_router
-from src.app.core.ai_assistants.public_router import router as ai_assistants_public_router
-from src.app.core.ai_assistants.router import router as ai_assistants_router
 from src.app.core.integrations.ai.router import router as integrations_ai_router
 from src.app.core.integrations.router import router as integrations_router
 from src.app.core.integrations.whatsapp.automation_router import (
@@ -190,8 +201,6 @@ from src.app.core.users.router import router as users_router
 from src.app.core.walk_ins.router import router as walk_ins_router
 from src.app.core.workflows.router import router as workflows_router
 from src.app.core.workflows.router import schedules_router as workflow_schedules_router
-from src.app.core.chatbots.router import router as chatbots_router
-from src.app.core.chatbots.reply_router import router as chatbots_reply_router
 from src.app.packs.furniture.modules.billing.router import (
     router as fp_pos_router,
 )
@@ -399,6 +408,7 @@ app.include_router(embed_keys_router, prefix="/api/v1")
 app.include_router(embed_public_router, prefix="/api/v1")
 app.include_router(email_router, prefix="/api/v1")
 app.include_router(email_sender_setup_router, prefix="/api/v1")
+app.include_router(sender_domains_router, prefix="/api/v1")
 app.include_router(email_senders_router, prefix="/api/v1")
 app.include_router(channel_endpoints_router, prefix="/api/v1")
 app.include_router(email_sequences_router, prefix="/api/v1")

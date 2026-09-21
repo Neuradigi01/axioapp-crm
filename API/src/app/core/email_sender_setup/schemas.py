@@ -110,15 +110,19 @@ class ClaimDomainIn(BaseModel):
         return normalised
 
 
-class OrganizationEmailDomainOut(ORMModel):
-    """Response shape — deliberately omits ``mailgun_domain_id`` (an
-    internal-only identifier). ``dns_records`` is the JSONB column
+class DomainOut(ORMModel):
+    """Response shape for the sender-domains endpoints.
+
+    Locked to Step 4's spec fields — deliberately omits
+    ``mailgun_domain_id`` (internal-only), ``org_id`` (caller knows its
+    own org), ``consecutive_failed_checks``/``demoted_at``/``released_at``
+    (state-machine internals surfaced via ``verification_status``), and
+    ``updated_at`` (audit-only). ``dns_records`` is the JSONB column
     rendered verbatim: nested ``sending`` + ``receiving`` arrays with
     the seven Mailgun DnsRecord fields per item.
     """
 
     id: uuid.UUID
-    org_id: uuid.UUID
     domain: str
     verification_status: str
     dns_records: dict[str, Any]
@@ -127,12 +131,8 @@ class OrganizationEmailDomainOut(ORMModel):
     dkim_verified: bool
     dmarc_verified: bool
     last_verified_at: datetime | None
-    consecutive_failed_checks: int
-    demoted_at: datetime | None
-    released_at: datetime | None
     region: str
     created_at: datetime
-    updated_at: datetime
 
 
 EnvelopeType = Literal["smtp_sender", "oauth_account", "own_domain", "platform_from"]

@@ -240,6 +240,11 @@ _CORE_OWNER_KEYS: list[str] = _CORE_ADMIN_KEYS + [
     # this to an Admin who shouldn't see cross-tenant customer emails
     # would be a bug.
     "mailgun.inbound.dlq.manage",
+    # email-sending-domains Step 4 — claim / verify / release the org's
+    # Mailgun-managed sending domain. Owner-only: a workspace admin
+    # can wire up a mailbox (email.accounts.admin) but only the owner
+    # decides which sending domain the whole org sends from.
+    "email.sending_domains.manage",
 ]
 
 

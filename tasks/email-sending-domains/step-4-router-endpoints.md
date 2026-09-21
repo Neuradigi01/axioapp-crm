@@ -1,6 +1,6 @@
 # Step 4: Router endpoints (Owner-only 4 endpoints)
 
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Goal
 
