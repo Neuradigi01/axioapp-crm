@@ -1,0 +1,51 @@
+<div class="space-y-4" data-testid="email-hub-tab">
+  <!-- Sub-tab bar -->
+  <nav
+    class="flex flex-wrap gap-1 border-b border-subtle"
+    role="tablist"
+    aria-label="Email settings"
+    data-testid="email-hub-tabs"
+  >
+    @for (tab of visibleSubTabs(); track tab.id) {
+      <button
+        type="button"
+        role="tab"
+        class="border-b-2 px-3 py-2 text-sm transition"
+        [class.border-blue-500]="active() === tab.id"
+        [class.text-default]="active() === tab.id"
+        [class.border-transparent]="active() !== tab.id"
+        [class.text-muted]="active() !== tab.id"
+        [class.hover:text-default]="active() !== tab.id"
+        [attr.aria-selected]="active() === tab.id"
+        [attr.data-testid]="'email-hub-tab-' + tab.id"
+        (click)="select(tab.id)"
+      >
+        {{ tab.label }}
+      </button>
+    }
+  </nav>
+
+  <!-- Active sub-tab body -->
+  <div class="pt-2" role="tabpanel">
+    @switch (active()) {
+      @case ('addresses') {
+        <app-inbound-addresses-tab />
+      }
+      @case ('domains') {
+        <app-sending-domains-tab />
+      }
+      @case ('reputation') {
+        <app-reputation-dashboard-tab />
+      }
+      @case ('held') {
+        <app-quarantine-tab />
+      }
+      @case ('blocked') {
+        <app-blocklist-tab />
+      }
+      @case ('audit') {
+        <app-audit-log-tab />
+      }
+    }
+  </div>
+</div>

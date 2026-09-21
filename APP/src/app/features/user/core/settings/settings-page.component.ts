@@ -5,9 +5,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { CustomEventsPageComponent } from './custom-events/custom-events.page';
-import { InboundAddressesTabComponent } from './email/inbound-addresses-tab.component';
-import { ReputationDashboardTabComponent } from './email/reputation-dashboard-tab.component';
-import { SendingDomainsTabComponent } from './email/sending-domains-tab.component';
+import { EmailHubTabComponent } from './email/email-hub-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { AutomationSettingsTabComponent } from './tabs/automation-settings-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
@@ -29,9 +27,7 @@ type SettingsTab =
   | 'team'
   | 'roles'
   | 'notifications'
-  | 'sending-domains'
-  | 'inbound-addresses'
-  | 'reputation'
+  | 'email'
   | 'send-rules'
   | 'custom-events'
   | 'custom-fields'
@@ -79,35 +75,18 @@ const TABS: ReadonlyArray<TabDef> = [
   { id: 'team', label: 'Team', group: 'workspace', permission: 'users.read' },
   { id: 'roles', label: 'Roles', group: 'workspace', permission: 'roles.read' },
   {
-    // tasks/email-sending-domains Step 7 — Owner-only Mailgun-managed
-    // sending-domain flow. Sits alongside Roles / Team so the Owner
-    // finds it under Workspace, not buried in Integrations. Gated by
-    // ``email.sending_domains.manage`` (Owner template only).
-    id: 'sending-domains',
-    label: 'Sending Domains',
-    group: 'workspace',
-    permission: 'email.sending_domains.manage',
-  },
-  {
-    // tasks/email-inbound-forwarding Step 5 — Owner+Admin forwarded-
-    // address list. Same permission gate as the shipped email-senders /
-    // email-accounts surfaces (``email.accounts.manage``) — this is
-    // an admin inbox-config concern, not an ownership decision.
-    id: 'inbound-addresses',
-    label: 'Inbound Addresses',
+    // Consolidated email settings hub — Prativani-style. One sidebar
+    // entry that hosts Addresses / Sending domains / Reputation / Held
+    // mail (quarantine) / Blocked senders (filter rules) / Audit log as
+    // sub-tabs. Replaces the previously-shipped three separate entries
+    // for Sending Domains, Inbound Addresses, and Reputation. Gated by
+    // ``email.accounts.manage`` — the loosest of the sub-tab permissions,
+    // so any user who can reach ANY sub-tab can reach the hub; the hub
+    // itself hides sub-tabs the user lacks permission for.
+    id: 'email',
+    label: 'Email',
     group: 'workspace',
     permission: 'email.accounts.manage',
-  },
-  {
-    // tasks/email-reputation-warmup Step 7 — Owner-only reputation
-    // dashboard. Same permission gate as Sending Domains — an
-    // "am I about to get shed?" surface belongs to the owner. Sits
-    // right after Inbound Addresses so the three Mailgun-adjacent
-    // surfaces cluster together in the sidebar.
-    id: 'reputation',
-    label: 'Reputation',
-    group: 'workspace',
-    permission: 'email.sending_domains.manage',
   },
   // Email Accounts + Sender Setup tabs were consolidated into the
   // per-org Email Sender card on Settings → Integrations.
@@ -169,9 +148,7 @@ const TABS: ReadonlyArray<TabDef> = [
     TeamTabComponent,
     RolesTabComponent,
     NotificationsTabComponent,
-    SendingDomainsTabComponent,
-    InboundAddressesTabComponent,
-    ReputationDashboardTabComponent,
+    EmailHubTabComponent,
     AutomationSettingsTabComponent,
     CustomEventsPageComponent,
     CustomFieldsPageComponent,
