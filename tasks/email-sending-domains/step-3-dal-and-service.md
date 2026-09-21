@@ -1,6 +1,6 @@
 # Step 3: DAL + service (`claim_domain`, `verify_domain`, `release_domain`, `resolve_send_envelope`)
 
-**Status:** Pending
+**Status:** COMPLETED
 
 ## Goal
 

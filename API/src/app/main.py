@@ -47,6 +47,12 @@ import src.app.core.custom_events.tasks  # noqa: F401
 # FastAPI app's tables-create + Alembic autogenerate sweep run.
 import src.app.core.channel_endpoints.models  # noqa: F401
 
+# tasks/email-sending-domains Step 1 — side-effect import so the new
+# ``OrganizationEmailDomain`` model (living alongside the legacy
+# ``EmailSenderDomain`` in the same models.py) registers with
+# ``Base.metadata`` before the test-DB create_all sweep.
+import src.app.core.email_sender_setup.models  # noqa: F401
+
 # tasks/ai-assistants Step 1 — side-effect import so the two BYOK
 # tables (tbl_ai_provider_keys, tbl_org_ai_cost_budget) register with
 # `Base.metadata` before the FastAPI app's tables-create + Alembic

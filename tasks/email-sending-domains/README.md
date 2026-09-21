@@ -210,7 +210,7 @@ Alongside the domain table, this track also adds the **platform-from envelope** 
 |---|---|---|---|---|
 | 1 | **Discovery + Migration**: fetch Mailgun docs (regions + response shapes), create `tbl_organization_email_domains`, no code paths yet | **COMPLETED** (2026-09-21, DISCOVERY-NOTES.md from official PHP SDK; migration `0233` applied; downgrade + re-upgrade clean; `/v4/` corrected from `/v3/`; EU URL flagged unverified for later confirmation) | 4 (DISCOVERY-NOTES.md + migration + models.py extension + probe tests) | ~0.5 day |
 | 2 | Backend: Mailgun API client wrapper (`api_client.py`) with region routing + retry policy | **COMPLETED** (2026-09-21, 4 methods against /v4/, retry on 502/503 only, 5 exception classes, MockTransport-injectable) | 3 (api_client.py + api_client_errors.py + tests) | ~0.5 day |
-| 3 | Backend: DAL + service `claim_domain()`, `verify_domain()`, `release_domain()`, `resolve_send_envelope()` | Pending | 4 | ~1 day |
+| 3 | Backend: DAL + service `claim_domain()`, `verify_domain()`, `release_domain()`, `resolve_send_envelope()` | **COMPLETED** (2026-09-21, DAL + service extended in-module alongside legacy campaigns paths; `null_endpoint_details_domain_fk` cascade wired on release; 14 spec tests seeded in `test_sending_domains_service.py`) | 4 | ~1 day |
 | 4 | Backend: router endpoints (Owner-only 4 endpoints) + schemas + JWT scoping | Pending | 3 | ~0.5 day |
 | 5 | Backend: sending cascade integration — refactor `send_email()` to call `resolve_send_envelope()` + `SendNotConfiguredError` | Pending | 2 | ~0.75 day |
 | 6 | Backend: nightly + hourly Celery beat entries for domain verification + state-machine transitions + owner notifications | Pending | 3 | ~0.75 day |
