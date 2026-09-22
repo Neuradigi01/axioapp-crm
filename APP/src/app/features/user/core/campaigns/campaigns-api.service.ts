@@ -78,6 +78,10 @@ export interface Campaign {
    *  non-Email campaigns. Sanitised server-side on every write. */
   body_html: string | null;
   status: CampaignStatus;
+  /** Migration 0238 — soft-archive timestamp. Non-null hides the
+   *  campaign from the default list + sender-in-use pre-check but
+   *  preserves the per-message metrics rows. */
+  archived_at: string | null;
   created_by_id: string | null;
   created_at: string;
 }
@@ -247,9 +251,26 @@ export class CampaignsApiService extends BaseCrudApiService<
 > {
   protected readonly base = `${environment.apiBaseUrl}/campaigns`;
 
-  list(page = 1, size = 50): Observable<CampaignListResponse> {
-    const params = buildHttpParams({ page, size });
+  list(
+    page = 1,
+    size = 50,
+    opts: { include_archived?: boolean; archived_only?: boolean } = {},
+  ): Observable<CampaignListResponse> {
+    const params = buildHttpParams({
+      page,
+      size,
+      include_archived: opts.include_archived,
+      archived_only: opts.archived_only,
+    });
     return this.http.get<CampaignListResponse>(this.base, { params });
+  }
+
+  archive(id: string): Observable<Campaign> {
+    return this.http.post<Campaign>(`${this.base}/${id}/archive`, {});
+  }
+
+  unarchive(id: string): Observable<Campaign> {
+    return this.http.post<Campaign>(`${this.base}/${id}/unarchive`, {});
   }
 
   start(id: string): Observable<CampaignStartResponse> {

@@ -105,7 +105,7 @@
         @for (chip of statusChips; track chip.value) {
           <button
             type="button"
-            (click)="statusFilter.set(chip.value)"
+            (click)="setStatusFilter(chip.value)"
             [class]="
               'rounded-full border px-3 py-1 text-[12px] font-medium transition ' +
               (statusFilter() === chip.value
@@ -348,6 +348,41 @@
                   Delete
                 </button>
               }
+              @if (canArchive(c)) {
+                <button
+                  type="button"
+                  (click)="archive(c)"
+                  [disabled]="busyId() === c.id"
+                  class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-[11px] font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                  title="Archive"
+                >
+                  <lucide-icon name="archive" class="h-3 w-3" />
+                  Archive
+                </button>
+              } @else if (c.archived_at) {
+                <button
+                  type="button"
+                  (click)="unarchive(c)"
+                  [disabled]="busyId() === c.id"
+                  class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-[11px] font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                  title="Unarchive"
+                >
+                  <lucide-icon name="archive-restore" class="h-3 w-3" />
+                  Unarchive
+                </button>
+                @if (c.status !== 'draft' && c.status !== 'failed') {
+                  <button
+                    type="button"
+                    (click)="remove(c)"
+                    [disabled]="busyId() === c.id"
+                    class="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-surface px-2.5 py-1 text-[11px] font-medium text-red-500 hover:bg-red-500/10 disabled:opacity-50"
+                    title="Delete permanently"
+                  >
+                    <lucide-icon name="trash-2" class="h-3 w-3" />
+                    Delete
+                  </button>
+                }
+              }
               <a
                 [routerLink]="['/user/campaigns', c.id]"
                 class="ml-auto inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-[11px] font-medium text-default hover:bg-surface-2"
@@ -495,8 +530,8 @@
                   </div>
                 </td>
                 <td class="overflow-hidden px-1 py-2 align-top md:px-4 md:py-3.5">
-                  @if (c.status === 'draft' || c.status === 'failed') {
-                    <div class="flex items-center justify-end gap-1">
+                  <div class="flex items-center justify-end gap-1">
+                    @if (c.status === 'draft' || c.status === 'failed') {
                       <button
                         type="button"
                         (click)="start(c)"
@@ -515,15 +550,47 @@
                       >
                         ✕
                       </button>
-                    </div>
-                  } @else {
-                    <a
-                      [routerLink]="['/user/campaigns', c.id]"
-                      class="flex justify-end text-faint hover:text-default"
-                      title="More"
-                      >⋯</a
-                    >
-                  }
+                    }
+                    @if (canArchive(c)) {
+                      <button
+                        type="button"
+                        (click)="archive(c)"
+                        [disabled]="busyId() === c.id"
+                        class="rounded p-1 text-faint hover:bg-surface-2 hover:text-default disabled:opacity-50"
+                        title="Archive"
+                      >
+                        <lucide-icon name="archive" class="h-3.5 w-3.5" />
+                      </button>
+                    } @else if (c.archived_at) {
+                      <button
+                        type="button"
+                        (click)="unarchive(c)"
+                        [disabled]="busyId() === c.id"
+                        class="rounded p-1 text-faint hover:bg-surface-2 hover:text-default disabled:opacity-50"
+                        title="Unarchive"
+                      >
+                        <lucide-icon name="archive-restore" class="h-3.5 w-3.5" />
+                      </button>
+                      @if (c.status !== 'draft' && c.status !== 'failed') {
+                        <button
+                          type="button"
+                          (click)="remove(c)"
+                          [disabled]="busyId() === c.id"
+                          class="rounded p-1 text-red-500 hover:bg-red-500/10 disabled:opacity-50"
+                          title="Delete permanently"
+                        >
+                          ✕
+                        </button>
+                      }
+                    } @else {
+                      <a
+                        [routerLink]="['/user/campaigns', c.id]"
+                        class="rounded p-1 text-faint hover:text-default"
+                        title="Open details"
+                        >⋯</a
+                      >
+                    }
+                  </div>
                 </td>
               </tr>
             }

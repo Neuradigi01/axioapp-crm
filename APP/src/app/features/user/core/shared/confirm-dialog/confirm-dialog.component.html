@@ -25,14 +25,16 @@
       </div>
     }
     <footer class="flex items-center justify-end gap-2 border-t border-subtle px-5 py-4">
-      <button
-        type="button"
-        class="btn btn-secondary"
-        [disabled]="submitting"
-        (click)="cancel.emit()"
-      >
-        {{ cancelLabel }}
-      </button>
+      @if (!hideCancel) {
+        <button
+          type="button"
+          class="btn btn-secondary"
+          [disabled]="submitting"
+          (click)="cancel.emit()"
+        >
+          {{ cancelLabel }}
+        </button>
+      }
       <button
         type="button"
         [disabled]="submitting"

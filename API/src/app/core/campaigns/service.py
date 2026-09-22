@@ -89,11 +89,36 @@ CHUNK_SIZE = 50
 
 
 async def list_campaigns(
-    session: AsyncSession, *, page: int = 1, size: int = 50
+    session: AsyncSession,
+    *,
+    page: int = 1,
+    size: int = 50,
+    include_archived: bool = False,
+    archived_only: bool = False,
 ) -> tuple[list[Campaign], int]:
-    total = await campaigns_da.count_all_campaigns(session)
+    """List campaigns, defaulting to the non-archived subset.
+
+    ``include_archived=True`` widens to include soft-archived rows;
+    ``archived_only=True`` narrows to ONLY archived rows (Archived
+    filter chip). The total is per-scope, so pagination on the
+    Archived tab counts correctly.
+    """
+    from sqlalchemy import func, select
+
+    stmt = select(func.count()).select_from(Campaign)
+    if archived_only:
+        stmt = stmt.where(Campaign.archived_at.is_not(None))
+    elif not include_archived:
+        stmt = stmt.where(Campaign.archived_at.is_(None))
+    total = int((await session.execute(stmt)).scalar_one())
     offset = (page - 1) * size
-    rows = await campaigns_da.list_campaigns_page(session, offset=offset, limit=size)
+    rows = await campaigns_da.list_campaigns_page(
+        session,
+        offset=offset,
+        limit=size,
+        include_archived=include_archived,
+        archived_only=archived_only,
+    )
     return rows, total
 
 
@@ -747,7 +772,16 @@ async def update_campaign(
 
 async def delete_campaign(session: AsyncSession, *, campaign_id: uuid.UUID) -> None:
     campaign = await get_campaign(session, campaign_id)
-    if campaign.status not in (CampaignStatus.draft, CampaignStatus.failed):
+    # Draft / Failed remain hard-deletable at any time. Sent / Scheduled /
+    # Running normally aren't (their message receipts back the reporting
+    # UI), but once an operator has archived a campaign they've
+    # consciously said "I don't need this anymore" — permit hard-delete
+    # from the Archived slice regardless of underlying status. The FK
+    # cascades the drop into ``tbl_campaign_messages``.
+    if campaign.archived_at is None and campaign.status not in (
+        CampaignStatus.draft,
+        CampaignStatus.failed,
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"cannot delete a {campaign.status.value} campaign",
@@ -761,6 +795,72 @@ async def delete_campaign(session: AsyncSession, *, campaign_id: uuid.UUID) -> N
         entity_id=campaign_id,
         before=before,
     )
+
+
+# Statuses that can be soft-archived. Scheduled and Running are
+# deliberately excluded — those campaigns still have in-flight side
+# effects (queued rows, worker dispatches) and should be cancelled
+# rather than hidden. Extending this tuple is a policy decision.
+_ARCHIVABLE_STATUSES = (
+    CampaignStatus.draft,
+    CampaignStatus.done,
+    CampaignStatus.failed,
+)
+
+
+async def archive_campaign(
+    session: AsyncSession, *, campaign_id: uuid.UUID
+) -> Campaign:
+    """Soft-archive a campaign so it disappears from the default list
+    and the sender-in-use pre-check. Metrics rows on
+    ``tbl_campaign_messages`` are preserved. Idempotent — archiving an
+    already-archived campaign is a no-op that still returns the row.
+    """
+    campaign = await get_campaign(session, campaign_id)
+    if campaign.status not in _ARCHIVABLE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"cannot archive a {campaign.status.value} campaign — "
+                "cancel it first"
+            ),
+        )
+    if campaign.archived_at is not None:
+        return campaign
+    before = _snapshot(campaign)
+    await campaigns_da.archive_campaign_row(session, campaign, now=datetime.now(UTC))
+    await session.commit()
+    await session.refresh(campaign)
+    await log_entity_change(
+        action="campaigns.archived",
+        entity_type="campaign",
+        entity_id=campaign_id,
+        before=before,
+        after=_snapshot(campaign),
+    )
+    return campaign
+
+
+async def unarchive_campaign(
+    session: AsyncSession, *, campaign_id: uuid.UUID
+) -> Campaign:
+    """Restore a soft-archived campaign to the default list.
+    Idempotent — unarchiving an already-active row is a no-op."""
+    campaign = await get_campaign(session, campaign_id)
+    if campaign.archived_at is None:
+        return campaign
+    before = _snapshot(campaign)
+    await campaigns_da.unarchive_campaign_row(session, campaign)
+    await session.commit()
+    await session.refresh(campaign)
+    await log_entity_change(
+        action="campaigns.unarchived",
+        entity_type="campaign",
+        entity_id=campaign_id,
+        before=before,
+        after=_snapshot(campaign),
+    )
+    return campaign
 
 
 # --- audience -----------------------------------------------------------

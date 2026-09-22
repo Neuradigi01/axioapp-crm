@@ -12,6 +12,12 @@ export interface ConfirmDialogOptions {
   cancelLabel?: string;
   /** Paints the confirm button red for destructive actions. */
   danger?: boolean;
+  /** When true, the Cancel button is hidden — turns the dialog into an
+   *  info / "OK" prompt for cases where the operator has no choice to
+   *  make (e.g. "None of the selected rows are deletable"). The promise
+   *  still resolves ``true`` on Confirm and ``false`` on backdrop /
+   *  Escape dismiss, so callers can ignore the boolean. */
+  hideCancel?: boolean;
 }
 
 /** Options for the text-input prompt variant (`prompt()`). */

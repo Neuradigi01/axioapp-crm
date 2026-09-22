@@ -297,6 +297,10 @@ class CampaignOut(ORMModel):
     # + Email campaigns whose audience had no bounced contacts.
     excluded_bounced_count: int = 0
     status: CampaignStatus
+    # Migration 0238 — soft-archive timestamp. Non-null hides the
+    # campaign from the default list + sender-in-use pre-check but
+    # preserves the per-message metrics rows.
+    archived_at: datetime | None = None
     created_by_id: uuid.UUID | None
     created_at: datetime
 

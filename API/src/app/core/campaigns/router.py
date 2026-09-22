@@ -35,6 +35,7 @@ from src.app.core.campaigns.schemas import (
     CampaignUpdate,
 )
 from src.app.core.campaigns.service import (
+    archive_campaign,
     check_readiness,
     create_campaign,
     dashboard_stats,
@@ -45,6 +46,7 @@ from src.app.core.campaigns.service import (
     list_messages,
     retry_message,
     stats,
+    unarchive_campaign,
     update_campaign,
 )
 from src.app.core.users.models import User
@@ -68,10 +70,27 @@ async def dashboard_stats_endpoint(
 async def list_endpoint(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
+    include_archived: bool = Query(
+        default=False,
+        description=(
+            "Include soft-archived campaigns in the list. Default false — "
+            "the archived subset is only visible via ``archived_only``."
+        ),
+    ),
+    archived_only: bool = Query(
+        default=False,
+        description="Return ONLY archived campaigns (Archived filter chip).",
+    ),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("campaigns.read")),
 ) -> CampaignListResponse:
-    rows, total = await list_campaigns(db, page=page, size=size)
+    rows, total = await list_campaigns(
+        db,
+        page=page,
+        size=size,
+        include_archived=include_archived,
+        archived_only=archived_only,
+    )
     return CampaignListResponse(
         items=[CampaignOut.model_validate(r) for r in rows],
         total=total,
@@ -121,6 +140,31 @@ async def delete_endpoint(
 ) -> Response:
     await delete_campaign(db, campaign_id=campaign_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{campaign_id}/archive", response_model=CampaignOut)
+async def archive_endpoint(
+    campaign_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("campaigns.write")),
+) -> CampaignOut:
+    """Soft-archive a campaign — hide from the default list and the
+    sender-in-use pre-check without cascading a hard delete into the
+    per-message metrics rows. Allowed for Draft / Sent (done) / Failed
+    campaigns; Scheduled and Running must be cancelled first."""
+    campaign = await archive_campaign(db, campaign_id=campaign_id)
+    return CampaignOut.model_validate(campaign)
+
+
+@router.post("/{campaign_id}/unarchive", response_model=CampaignOut)
+async def unarchive_endpoint(
+    campaign_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("campaigns.write")),
+) -> CampaignOut:
+    """Restore a soft-archived campaign to the default list. Idempotent."""
+    campaign = await unarchive_campaign(db, campaign_id=campaign_id)
+    return CampaignOut.model_validate(campaign)
 
 
 @router.post("/{campaign_id}/start", response_model=CampaignStartResponse)

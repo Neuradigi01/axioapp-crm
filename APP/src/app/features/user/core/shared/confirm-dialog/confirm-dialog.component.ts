@@ -33,6 +33,10 @@ export class ConfirmDialogComponent {
   @Input() danger = false;
   @Input() submitting = false;
   @Input() error: string | null = null;
+  /** Hide the Cancel button — turns the dialog into an OK-only info
+   *  prompt for cases where the operator has no meaningful choice
+   *  (e.g. "None of the selected campaigns are deletable"). */
+  @Input() hideCancel = false;
 
   @Output() readonly confirm = new EventEmitter<void>();
   @Output() readonly cancel = new EventEmitter<void>();

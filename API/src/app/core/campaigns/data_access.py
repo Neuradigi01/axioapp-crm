@@ -75,36 +75,59 @@ async def count_all_campaigns(session: AsyncSession) -> int:
 
 
 async def count_campaigns_by_status_for_smtp_sender(
-    session: AsyncSession, *, org_id: uuid.UUID, smtp_sender_id: uuid.UUID
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    smtp_sender_id: uuid.UUID,
+    include_archived: bool = False,
 ) -> dict[str, int]:
     """Group campaigns that reference this SMTP sender by status.
 
     Used by the email-senders delete-sender flow to produce a helpful
     409 message instead of letting the FK RESTRICT violation surface
     as a raw asyncpg IntegrityError / 500.
+
+    Archived campaigns (``archived_at IS NOT NULL``) are excluded by
+    default — an operator who archived their historical Sent
+    campaigns before trying to remove the sender expects "no
+    references" and shouldn't be blocked by rows they've deliberately
+    put out of view.
     """
-    result = await session.execute(
-        select(Campaign.status, func.count())
-        .where(
-            Campaign.org_id == org_id,
-            Campaign.smtp_sender_id == smtp_sender_id,
-        )
-        .group_by(Campaign.status)
+    stmt = select(Campaign.status, func.count()).where(
+        Campaign.org_id == org_id,
+        Campaign.smtp_sender_id == smtp_sender_id,
     )
+    if not include_archived:
+        stmt = stmt.where(Campaign.archived_at.is_(None))
+    result = await session.execute(stmt.group_by(Campaign.status))
     return {
         str(status.value if hasattr(status, "value") else status): int(n)
         for status, n in result.all()
     }
 
 
-async def list_campaigns_page(session: AsyncSession, *, offset: int, limit: int) -> list[Campaign]:
-    """Page of campaigns sorted newest-first."""
+async def list_campaigns_page(
+    session: AsyncSession,
+    *,
+    offset: int,
+    limit: int,
+    include_archived: bool = False,
+    archived_only: bool = False,
+) -> list[Campaign]:
+    """Page of campaigns sorted newest-first.
+
+    ``include_archived`` widens the result to include soft-archived
+    rows; ``archived_only`` narrows to ONLY archived rows (for the
+    "Archived" filter chip on the frontend). Passing both is a
+    caller bug — the archived-only branch wins.
+    """
+    stmt = select(Campaign)
+    if archived_only:
+        stmt = stmt.where(Campaign.archived_at.is_not(None))
+    elif not include_archived:
+        stmt = stmt.where(Campaign.archived_at.is_(None))
     rows = (
-        (
-            await session.execute(
-                select(Campaign).order_by(Campaign.created_at.desc()).offset(offset).limit(limit)
-            )
-        )
+        (await session.execute(stmt.order_by(Campaign.created_at.desc()).offset(offset).limit(limit)))
         .scalars()
         .all()
     )
@@ -120,6 +143,20 @@ def add_campaign(session: AsyncSession, campaign: Campaign) -> Campaign:
 async def delete_campaign_row(session: AsyncSession, campaign: Campaign) -> None:
     """Hard-delete a campaign row."""
     await session.delete(campaign)
+
+
+async def archive_campaign_row(
+    session: AsyncSession, campaign: Campaign, *, now: datetime
+) -> None:
+    """Soft-archive: stamp ``archived_at`` with ``now``. Idempotent —
+    re-archiving an already-archived row is a no-op at this layer
+    (service enforces the transition validity)."""
+    campaign.archived_at = now
+
+
+async def unarchive_campaign_row(session: AsyncSession, campaign: Campaign) -> None:
+    """Restore an archived row to the default list."""
+    campaign.archived_at = None
 
 
 # --- audience -----------------------------------------------------------

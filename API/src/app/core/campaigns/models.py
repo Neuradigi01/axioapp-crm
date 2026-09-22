@@ -228,6 +228,15 @@ class Campaign(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("'draft'"),
     )
+    # Migration 0238 — soft-archive so operators can hide historical
+    # campaigns (done / failed) from their default list without
+    # cascading a hard delete into per-message metrics. NULL = active
+    # (default list shows it); non-NULL = archived (list + count
+    # queries skip it unless include_archived=True).
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         nullable=True,

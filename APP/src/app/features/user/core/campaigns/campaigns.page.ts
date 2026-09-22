@@ -12,6 +12,7 @@ import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { environment } from '../../../../../environments/environment';
+import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
 import {
   Campaign,
   CampaignDashboardStats,
@@ -101,7 +102,11 @@ const STATUS_STYLES: Record<CampaignStatus, { label: string; cls: string; dot: s
   },
 };
 
-type StatusFilter = 'all' | CampaignStatus;
+/** ``'archived'`` is a virtual filter — not a real backend status.
+ *  When active it triggers a re-fetch with ``archived_only=true`` so
+ *  the operator can review historical (soft-archived) campaigns.
+ *  Every other value maps 1:1 to a ``CampaignStatus``. */
+type StatusFilter = 'all' | 'archived' | CampaignStatus;
 type ChannelFilter = 'all' | 'whatsapp' | 'email';
 
 @Component({
@@ -115,6 +120,7 @@ export class CampaignsPageComponent {
   private readonly api = inject(CampaignsApiService);
   private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   protected readonly items = signal<Campaign[]>([]);
   protected readonly loading = signal(false);
@@ -151,7 +157,7 @@ export class CampaignsPageComponent {
   protected readonly search = signal<string>('');
   protected readonly channelMenuOpen = signal(false);
 
-  /** Preview filter chip row: All · Scheduled · Running · Sent · Draft · Failed. */
+  /** Preview filter chip row: All · Scheduled · Running · Sent · Draft · Failed · Archived. */
   protected readonly statusChips: ReadonlyArray<{
     value: StatusFilter;
     label: string;
@@ -163,6 +169,9 @@ export class CampaignsPageComponent {
     { value: 'done', label: 'Sent' },
     { value: 'draft', label: 'Draft' },
     { value: 'failed', label: 'Failed' },
+    // Soft-archived rows — hidden from every other chip; picking this
+    // triggers a re-fetch scoped to ``archived_only=true``.
+    { value: 'archived', label: 'Archived' },
   ];
 
   protected readonly channelOptions: ReadonlyArray<{
@@ -179,7 +188,10 @@ export class CampaignsPageComponent {
     const channel = this.channelFilter();
     const q = this.search().trim().toLowerCase();
     return this.items().filter((c) => {
-      if (status !== 'all' && c.status !== status) return false;
+      // The Archived chip fetches an archived-only slice via
+      // ``reload()``; the client-side predicate here just passes them
+      // all through. Every other filter still applies (channel, q).
+      if (status !== 'all' && status !== 'archived' && c.status !== status) return false;
       if (channel !== 'all' && c.channel !== channel) return false;
       if (q && !c.name.toLowerCase().includes(q)) return false;
       return true;
@@ -222,8 +234,12 @@ export class CampaignsPageComponent {
   protected reload(): void {
     this.loading.set(true);
     this.loadError.set(null);
+    // The Archived chip is a virtual filter — the backend keeps
+    // soft-archived rows out of the default response, so we swap in
+    // ``archived_only=true`` when the operator picks it.
+    const archivedOnly = this.statusFilter() === 'archived';
     this.api
-      .list(1, 100)
+      .list(1, 100, archivedOnly ? { archived_only: true } : {})
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
@@ -319,8 +335,39 @@ export class CampaignsPageComponent {
       });
   }
 
-  protected remove(c: Campaign): void {
-    const ok = window.confirm(`Delete campaign "${c.name}"?`);
+  protected async remove(c: Campaign): Promise<void> {
+    // Pre-check the backend's deletability rule client-side so
+    // non-deletable statuses (scheduled / running / done) surface a
+    // clear info dialog instead of eating a 409 from the API. Archived
+    // rows escape this gate — once the operator has hidden a campaign
+    // they can also drop it (and its cascading message receipts).
+    if (!c.archived_at && c.status !== 'draft' && c.status !== 'failed') {
+      await this.confirmDialog.ask({
+        title: `${this._statusLabel(c.status)} campaigns can't be deleted`,
+        body:
+          `"${c.name}" is ${this._statusLabel(c.status).toLowerCase()}, so it's part of your send history. ` +
+          `Only Draft and Failed campaigns can be removed outright — deleting a Sent, Scheduled, or ` +
+          `Running campaign would orphan the per-message delivery, open, and click receipts your ` +
+          `reporting relies on. Archive it first (the row is hidden from the default list and its ` +
+          `sender stops blocking teardown); you can then permanently delete it from the Archived filter.`,
+        confirmLabel: 'Got it',
+        hideCancel: true,
+      });
+      return;
+    }
+    // Archived-row delete carries a heavier warning: message receipts
+    // cascade with the row (FK ON DELETE CASCADE), so per-campaign
+    // metrics disappear from reporting for good.
+    const archivedBody =
+      `"${c.name}" and every per-message receipt tied to it — delivery, open, click, and ` +
+      `unsubscribe history — are removed permanently. This cannot be undone.`;
+    const ok = await this.confirmDialog.ask({
+      title: `Delete campaign "${c.name}"?`,
+      body: c.archived_at ? archivedBody : 'The campaign row is removed. This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep it',
+      danger: true,
+    });
     if (!ok) return;
     this.busyId.set(c.id);
     this.api
@@ -336,6 +383,118 @@ export class CampaignsPageComponent {
           this.loadError.set(extractApiError(err) ?? 'Could not delete campaign.');
         },
       });
+  }
+
+  /** Soft-archive an eligible campaign. Draft / Sent / Failed rows can
+   *  be archived — the row is hidden from the default list but every
+   *  ``tbl_campaign_messages`` receipt (delivery, open, click history)
+   *  stays intact, so per-campaign reporting still resolves. Archiving
+   *  also drops the row from the "sender in use" pre-check, which is
+   *  the only way to tear down an SMTP sender whose only outstanding
+   *  reference is a long-since-completed campaign. */
+  protected async archive(c: Campaign): Promise<void> {
+    if (c.archived_at) return;
+    const ok = await this.confirmDialog.ask({
+      title: `Archive campaign "${c.name}"?`,
+      body:
+        `The campaign is hidden from the default list. Every per-message metric row (delivery, ` +
+        `open, click history) is preserved, and any sender it referenced stops blocking deletion. ` +
+        `You can unarchive it later from the Archived filter.`,
+      confirmLabel: 'Archive',
+      cancelLabel: 'Cancel',
+    });
+    if (!ok) return;
+    this.busyId.set(c.id);
+    this.api
+      .archive(c.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.busyId.set(null);
+          // If we're on the default view, drop the row from the visible
+          // list. If we're on the Archived view, patch it in place so
+          // the ``archived_at`` timestamp reflects the update.
+          if (this.statusFilter() === 'archived') {
+            this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          } else {
+            this.items.update((rows) => rows.filter((r) => r.id !== updated.id));
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.busyId.set(null);
+          this.loadError.set(extractApiError(err) ?? 'Could not archive campaign.');
+        },
+      });
+  }
+
+  /** Restore an archived campaign back to the default list. Idempotent
+   *  server-side; a no-op archived_at reset is treated as success. */
+  protected async unarchive(c: Campaign): Promise<void> {
+    if (!c.archived_at) return;
+    const ok = await this.confirmDialog.ask({
+      title: `Unarchive "${c.name}"?`,
+      body: 'The campaign returns to the default list at its original status.',
+      confirmLabel: 'Unarchive',
+      cancelLabel: 'Cancel',
+    });
+    if (!ok) return;
+    this.busyId.set(c.id);
+    this.api
+      .unarchive(c.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.busyId.set(null);
+          if (this.statusFilter() === 'archived') {
+            // Row no longer matches the archived-only slice — drop it.
+            this.items.update((rows) => rows.filter((r) => r.id !== updated.id));
+          } else {
+            this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.busyId.set(null);
+          this.loadError.set(extractApiError(err) ?? 'Could not unarchive campaign.');
+        },
+      });
+  }
+
+  /** Pick a status chip. Crossing the archived/not-archived boundary
+   *  triggers a re-fetch since the backend keeps soft-archived rows
+   *  out of the default list — the ``archived_only=true`` slice is a
+   *  separate query. Same-side transitions stay client-side. */
+  protected setStatusFilter(value: StatusFilter): void {
+    const prev = this.statusFilter();
+    if (prev === value) return;
+    this.statusFilter.set(value);
+    const crossesArchived = prev === 'archived' || value === 'archived';
+    if (crossesArchived) this.reload();
+  }
+
+  /** True when the campaign can be archived. Scheduled / Running rows
+   *  need to finish (or be cancelled) first — archiving mid-dispatch
+   *  would leave the dispatcher chasing a hidden row. */
+  protected canArchive(c: Campaign): boolean {
+    if (c.archived_at) return false;
+    return c.status === 'draft' || c.status === 'done' || c.status === 'failed';
+  }
+
+  /** Human label for a ``CampaignStatus`` value — matches the filter
+   *  chip row (``done`` → "Sent") so error messaging reads consistent
+   *  with what the operator sees on-screen. */
+  private _statusLabel(status: CampaignStatus): string {
+    switch (status) {
+      case 'draft':
+        return 'Draft';
+      case 'scheduled':
+        return 'Scheduled';
+      case 'running':
+        return 'Running';
+      case 'done':
+        return 'Sent';
+      case 'failed':
+        return 'Failed';
+    }
   }
 
   protected onSearchInput(event: Event): void {
@@ -465,25 +624,49 @@ export class CampaignsPageComponent {
    *  (draft / failed) are actually deletable — the rest surface a
    *  "N could not be deleted" summary at the end so the operator
    *  knows why the number in the pill doesn't match the outcome. */
-  protected bulkDelete(): void {
+  protected async bulkDelete(): Promise<void> {
     const ids = Array.from(this.selectedIds());
     if (ids.length === 0) return;
 
     const rows = this.items().filter((r) => ids.includes(r.id));
-    const deletable = rows.filter((r) => r.status === 'draft' || r.status === 'failed');
+    // Archived rows can also be dropped — the operator has already
+    // hidden them and accepted "gone from the default list". Draft /
+    // Failed remain in-scope regardless.
+    const deletable = rows.filter(
+      (r) => r.archived_at || r.status === 'draft' || r.status === 'failed',
+    );
     const skipped = rows.length - deletable.length;
 
     if (deletable.length === 0) {
-      window.alert(
-        'None of the selected campaigns are deletable — only Draft and Failed campaigns can be removed.',
-      );
+      await this.confirmDialog.ask({
+        title: 'No campaigns can be deleted',
+        body:
+          `Only Draft, Failed, or already-Archived campaigns can be removed — deleting a live Sent, ` +
+          `Scheduled, or Running campaign would orphan the per-message delivery, open, and click ` +
+          `receipts your reporting relies on. Archive them first (the Archive action stays on the ` +
+          `row and unblocks any sender they were pinning), then delete from the Archived filter.`,
+        confirmLabel: 'Got it',
+        hideCancel: true,
+      });
       return;
     }
-    const msg =
+    const bulkTitle = `Delete ${deletable.length} campaign${deletable.length === 1 ? '' : 's'}?`;
+    const hasArchived = deletable.some((r) => r.archived_at);
+    const permanentSuffix = hasArchived
+      ? ' Archived rows drop their per-message metrics as well.'
+      : '';
+    const bulkBody =
       skipped > 0
-        ? `Delete ${deletable.length} campaigns? ${skipped} others will be skipped (only Draft / Failed can be deleted).`
-        : `Delete ${deletable.length} campaigns?`;
-    if (!window.confirm(msg)) return;
+        ? `${skipped} of the ${rows.length} selected can't be removed (only Draft, Failed, or Archived are deletable) and will be skipped. This cannot be undone.${permanentSuffix}`
+        : `The selected campaign rows are removed. This cannot be undone.${permanentSuffix}`;
+    const ok = await this.confirmDialog.ask({
+      title: bulkTitle,
+      body: bulkBody,
+      confirmLabel: `Delete ${deletable.length}`,
+      cancelLabel: 'Cancel',
+      danger: true,
+    });
+    if (!ok) return;
 
     this.bulkBusy.set(true);
     let remaining = deletable.length;

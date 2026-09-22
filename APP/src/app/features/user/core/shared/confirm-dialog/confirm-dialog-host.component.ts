@@ -24,6 +24,7 @@ import { PromptDialogComponent } from './prompt-dialog.component';
         [confirmLabel]="p.confirmLabel ?? 'Confirm'"
         [cancelLabel]="p.cancelLabel ?? 'Cancel'"
         [danger]="!!p.danger"
+        [hideCancel]="!!p.hideCancel"
         (confirm)="svc.confirm()"
         (cancel)="svc.cancel()"
       />
