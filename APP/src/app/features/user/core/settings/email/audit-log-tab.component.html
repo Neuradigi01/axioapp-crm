@@ -42,7 +42,7 @@
       <input
         id="audit-from"
         type="datetime-local"
-        class="mt-1 rounded-md border border-subtle bg-surface-2 px-2 py-1 text-xs text-default"
+        class="mt-1 block rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         [ngModel]="fromDate()"
         (ngModelChange)="fromDate.set($event)"
         data-testid="audit-from"
@@ -53,7 +53,7 @@
       <input
         id="audit-to"
         type="datetime-local"
-        class="mt-1 rounded-md border border-subtle bg-surface-2 px-2 py-1 text-xs text-default"
+        class="mt-1 block rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         [ngModel]="toDate()"
         (ngModelChange)="toDate.set($event)"
         data-testid="audit-to"
@@ -61,7 +61,7 @@
     </div>
     <button
       type="button"
-      class="rounded-md bg-blue-500 px-3 py-1 text-xs font-medium text-white"
+      class="inline-flex items-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
       (click)="applyDateFilter()"
       data-testid="audit-apply"
     >
@@ -71,7 +71,7 @@
       <label class="text-xs text-muted" for="audit-page-size">Page size</label>
       <select
         id="audit-page-size"
-        class="mt-1 rounded-md border border-subtle bg-surface-2 px-2 py-1 text-xs text-default"
+        class="mt-1 block rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         [ngModel]="pageSize()"
         (ngModelChange)="changePageSize($event)"
         data-testid="audit-page-size"

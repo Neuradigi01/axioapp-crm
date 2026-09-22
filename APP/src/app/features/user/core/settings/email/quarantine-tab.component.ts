@@ -16,6 +16,7 @@ import {
 } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 import {
   QuarantineListResponse,
   QuarantineRow,
@@ -41,6 +42,7 @@ const REASON_CHIPS: Array<{ code: ReasonCode | null; label: string }> = [
 })
 export class QuarantineTabComponent implements OnInit {
   private readonly svc = inject(QuarantineService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly reasonChips = REASON_CHIPS;
   readonly selectedReason = signal<ReasonCode | null>(null);
@@ -109,12 +111,17 @@ export class QuarantineTabComponent implements OnInit {
     return this.selectedIds().has(id);
   }
 
-  release(row: QuarantineRow): void {
+  async release(row: QuarantineRow): Promise<void> {
     if (row.blocked_release) return;
     if (row.reason_code === 'spam_verdict') {
-      if (!confirm('Release this spam-verdict message? Confirm it is not spam.')) {
-        return;
-      }
+      const ok = await this.confirmDialog.ask({
+        title: 'Release this spam-verdict message?',
+        body: `Mailgun classified this as spam. Releasing it delivers to the recipient's inbox and publishes the normal workflow events. Confirm it is not spam.`,
+        confirmLabel: 'Release',
+        cancelLabel: 'Keep held',
+        danger: true,
+      });
+      if (!ok) return;
     }
     this.svc.release(row.id).subscribe({
       next: () => this.load(),
@@ -122,18 +129,31 @@ export class QuarantineTabComponent implements OnInit {
     });
   }
 
-  discard(row: QuarantineRow): void {
-    if (!confirm('Discard this message? This cannot be undone.')) return;
+  async discard(row: QuarantineRow): Promise<void> {
+    const ok = await this.confirmDialog.ask({
+      title: 'Discard this message?',
+      body: `The held payload and this quarantine row will be permanently removed. This cannot be undone.`,
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep held',
+      danger: true,
+    });
+    if (!ok) return;
     this.svc.discard(row.id).subscribe({
       next: () => this.load(),
       error: (err) => this.errorMessage.set(err?.error?.detail ?? 'Failed to discard message'),
     });
   }
 
-  bulkRelease(): void {
+  async bulkRelease(): Promise<void> {
     if (!this.canBulkRelease()) return;
     const ids = Array.from(this.selectedIds());
-    if (!confirm(`Release ${ids.length} rate-capped message(s)?`)) return;
+    const ok = await this.confirmDialog.ask({
+      title: `Release ${ids.length} rate-capped message${ids.length === 1 ? '' : 's'}?`,
+      body: `Every selected message will be delivered to its recipient as if it had never been rate-capped. Workflow events will publish normally.`,
+      confirmLabel: `Release ${ids.length}`,
+      cancelLabel: 'Cancel',
+    });
+    if (!ok) return;
     this.svc.bulkRelease(ids).subscribe({
       next: () => {
         this.selectedIds.set(new Set());

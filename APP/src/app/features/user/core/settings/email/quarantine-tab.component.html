@@ -51,7 +51,7 @@
       <span class="text-xs text-default">{{ selectedIds().size }} selected</span>
       <button
         type="button"
-        class="rounded-md bg-blue-500 px-3 py-1 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+        class="inline-flex items-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
         [disabled]="!canBulkRelease()"
         (click)="bulkRelease()"
         data-testid="quarantine-bulk-release"

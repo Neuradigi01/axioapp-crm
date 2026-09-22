@@ -16,6 +16,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 import {
   CreateFilterRuleRequest,
   FilterRule,
@@ -33,6 +34,7 @@ import {
 })
 export class BlocklistTabComponent implements OnInit {
   private readonly svc = inject(QuarantineService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   readonly rules = signal<FilterRule[]>([]);
   readonly loading = signal<boolean>(false);
@@ -113,10 +115,17 @@ export class BlocklistTabComponent implements OnInit {
     });
   }
 
-  deleteRule(rule: FilterRule): void {
+  async deleteRule(rule: FilterRule): Promise<void> {
     const target =
       rule.match_kind === 'contact_flag' ? `flag "${rule.match_value}"` : rule.match_value;
-    if (!confirm(`Delete rule for ${target}?`)) return;
+    const ok = await this.confirmDialog.ask({
+      title: `Delete rule for ${target}?`,
+      body: `Future inbound mail matching this ${rule.rule_type} rule will no longer be gated by it. Any messages already quarantined stay in place.`,
+      confirmLabel: 'Delete rule',
+      cancelLabel: 'Keep it',
+      danger: true,
+    });
+    if (!ok) return;
     this.svc.deleteRule(rule.id).subscribe({
       next: () => this.load(),
       error: (err) => this.errorMessage.set(err?.error?.detail ?? 'Failed to delete rule'),
