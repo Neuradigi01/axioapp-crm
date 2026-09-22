@@ -220,8 +220,9 @@ export class SendingDomainsTabComponent {
   /** Compose a BIND-style zone-file fragment from the row's DNS records
    *  and copy it to the clipboard. */
   copyZoneFile(row: SendingDomain): void {
-    const all: DnsRecord[] = [...row.dns_records.sending, ...row.dns_records.receiving];
-    const lines = all.map((r) => this._toZoneLine(r)).filter((l): l is string => l !== null);
+    const lines = row.dns_records.sending
+      .map((r) => this._toZoneLine(r))
+      .filter((l): l is string => l !== null);
     const text = lines.join('\n') + '\n';
     void navigator.clipboard.writeText(text).then(
       () => this.toast.success('Zone file copied to clipboard.'),
@@ -232,8 +233,7 @@ export class SendingDomainsTabComponent {
   /** Compose a ``mailto:`` URL pre-filled with the zone file so the
    *  operator can email whoever manages their DNS in one click. */
   buildMailtoLink(row: SendingDomain): string {
-    const all: DnsRecord[] = [...row.dns_records.sending, ...row.dns_records.receiving];
-    const zoneBody = all
+    const zoneBody = row.dns_records.sending
       .map((r) => this._toZoneLine(r))
       .filter((l): l is string => l !== null)
       .join('\n');
