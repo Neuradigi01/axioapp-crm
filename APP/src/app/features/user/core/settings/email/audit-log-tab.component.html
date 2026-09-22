@@ -67,19 +67,20 @@
     >
       Apply
     </button>
-    <div class="ml-auto">
-      <label class="text-xs text-muted" for="audit-page-size">Page size</label>
-      <select
-        id="audit-page-size"
-        class="mt-1 block rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        [ngModel]="pageSize()"
-        (ngModelChange)="changePageSize($event)"
-        data-testid="audit-page-size"
-      >
-        @for (opt of pageSizeOptions; track opt) {
-          <option [ngValue]="opt">{{ opt }}</option>
-        }
-      </select>
+    <div class="ml-auto min-w-[6rem]">
+      <label class="text-xs text-muted">Page size</label>
+      <!-- Uses ``crm-mobile-select`` for a dark-themed dropdown popup
+           consistent with the rest of the app. String round-trip on
+           value is intentional — the component's option contract is
+           ``{value: string}`` and ``changePageSize`` re-parses. -->
+      <div class="mt-1">
+        <crm-mobile-select
+          [options]="pageSizeSelectOptions"
+          [value]="pageSizeAsString()"
+          (valueChange)="changePageSize(+$event)"
+          data-testid="audit-page-size"
+        />
+      </div>
     </div>
   </div>
 

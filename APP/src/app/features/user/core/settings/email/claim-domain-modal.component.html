@@ -51,14 +51,17 @@
 
       <label class="block text-sm">
         <span class="block text-xs font-medium text-muted">Region</span>
-        <select
-          [formControl]="form.region"
-          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          data-testid="claim-domain-region"
-        >
-          <option value="us">United States</option>
-          <option value="eu">Europe</option>
-        </select>
+        <!-- Uses the shipped ``crm-mobile-select`` so the popup renders
+             with the app's dark theme instead of the OS-native white
+             browser dropdown. Body-portaled panel keeps it visible
+             above the modal backdrop. -->
+        <div class="mt-1">
+          <crm-mobile-select
+            [options]="regionOptions"
+            [formControl]="form.region"
+            data-testid="claim-domain-region"
+          />
+        </div>
         <span class="mt-1 block text-xs text-muted">
           Region is locked once you claim. To switch, release and re-claim later.
         </span>

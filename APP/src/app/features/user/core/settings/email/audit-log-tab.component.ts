@@ -21,6 +21,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { MobileSelectComponent } from '../../shared/forms/mobile-select.component';
 import {
   AuditLogService,
   AuditOutcome,
@@ -38,11 +39,17 @@ const OUTCOME_CHIPS: Array<{ code: AuditOutcome | null; label: string }> = [
 ];
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+// Same options as ``PAGE_SIZE_OPTIONS`` but shaped for
+// ``crm-mobile-select`` (value must be string per its option contract).
+const PAGE_SIZE_SELECT_OPTIONS = PAGE_SIZE_OPTIONS.map((n) => ({
+  value: String(n),
+  label: String(n),
+}));
 
 @Component({
   selector: 'app-audit-log-tab',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, MobileSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './audit-log-tab.component.html',
 })
@@ -51,6 +58,7 @@ export class AuditLogTabComponent implements OnInit {
 
   readonly outcomeChips = OUTCOME_CHIPS;
   readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
+  readonly pageSizeSelectOptions = PAGE_SIZE_SELECT_OPTIONS;
 
   readonly selectedOutcome = signal<AuditOutcome | null>(null);
   readonly fromDate = signal<string>(this.defaultFromDate());
@@ -69,6 +77,10 @@ export class AuditLogTabComponent implements OnInit {
     if (size <= 0) return 1;
     return Math.max(1, Math.ceil(total / size));
   });
+
+  /** ``crm-mobile-select`` needs the value as a string; the component
+   *  stores the numeric ``pageSize`` for arithmetic. */
+  readonly pageSizeAsString = computed(() => String(this.pageSize()));
 
   ngOnInit(): void {
     this.load();

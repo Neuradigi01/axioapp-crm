@@ -14,6 +14,7 @@ import { ChangeDetectionStrategy, Component, inject, input, output } from '@angu
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { MobileSelectComponent } from '../../shared/forms/mobile-select.component';
 import { commonValidators } from '../../shared/validators';
 import type { ClaimDomainRequest } from './models';
 
@@ -21,13 +22,20 @@ import type { ClaimDomainRequest } from './models';
   selector: 'app-claim-domain-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, ReactiveFormsModule],
+  imports: [LucideAngularModule, ReactiveFormsModule, MobileSelectComponent],
   templateUrl: './claim-domain-modal.component.html',
 })
 export class ClaimDomainModalComponent {
   readonly creating = input<boolean>(false);
   readonly submitted = output<ClaimDomainRequest>();
   readonly cancelled = output<void>();
+
+  /** Options for the region dropdown — value must stay in sync with
+   * the backend's ``ClaimDomainIn.region`` enum ('us' | 'eu'). */
+  protected readonly regionOptions = [
+    { value: 'us', label: 'United States' },
+    { value: 'eu', label: 'Europe' },
+  ] as const;
 
   private readonly fb = inject(FormBuilder);
 

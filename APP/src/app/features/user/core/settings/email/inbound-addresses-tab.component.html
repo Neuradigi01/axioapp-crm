@@ -1,22 +1,23 @@
 <section class="space-y-4">
   <header class="flex items-start justify-between gap-3">
     <div>
-      <h2 class="text-lg font-semibold text-default">Inbound addresses</h2>
+      <h2 class="text-lg font-semibold text-default">Email</h2>
       <p class="mt-0.5 text-sm text-muted">
-        Point your own support mailbox at one of these addresses to receive customer mail as CRM
-        conversations. Set the forwarding rule at your mail provider (Gmail / Outlook / Zoho / …) —
-        replies stay in your inbox and land in the CRM at the same time.
+        Connect the addresses your customers write to. You keep your mailbox — mail is forwarded
+        here and becomes a conversation.
       </p>
     </div>
-    <button
-      type="button"
-      class="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
-      (click)="launchWizard()"
-      data-testid="inbound-add-cta"
-    >
-      <lucide-icon name="plus" size="14"></lucide-icon>
-      Add forwarding address
-    </button>
+    @if (!addFormOpen()) {
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+        (click)="toggleAddForm()"
+        data-testid="inbound-add-cta"
+      >
+        <lucide-icon name="plus" size="14"></lucide-icon>
+        Add address
+      </button>
+    }
   </header>
 
   @if (loading()) {
@@ -28,106 +29,345 @@
     <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
       {{ loadError() }}
     </div>
-  } @else if (sortedAddresses().length === 0) {
-    <div
-      class="rounded-xl border border-dashed border-subtle bg-surface p-8 text-center"
-      data-testid="inbound-empty"
-    >
-      <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-2">
-        <lucide-icon name="mail" size="20" class="text-muted"></lucide-icon>
-      </div>
-      <h3 class="mt-3 text-sm font-semibold text-default">No forwarding addresses yet</h3>
-      <p class="mt-1 text-sm text-muted">
-        Set up a forwarding address to receive mail sent to your existing support inbox.
-      </p>
-      <button
-        type="button"
-        class="mt-4 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
-        (click)="launchWizard()"
-        data-testid="inbound-empty-cta"
-      >
-        <lucide-icon name="plus" size="14"></lucide-icon>
-        Add forwarding address
-      </button>
-    </div>
   } @else {
-    <ul class="space-y-2">
-      @for (row of sortedAddresses(); track row.id) {
-        <li
-          class="rounded-xl border border-subtle bg-surface p-4 shadow-sm"
-          data-testid="inbound-row"
-          [attr.data-endpoint-id]="row.id"
-        >
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0 flex-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <h3 class="truncate text-sm font-semibold text-default">{{ row.label }}</h3>
-                @if (!row.is_active) {
-                  <span
-                    class="inline-flex items-center rounded-full border border-zinc-500/20 bg-zinc-500/15 px-2 py-0.5 text-[11px] font-medium text-zinc-500"
+    <!-- Prativani-style "Not receiving yet" banner. Fires while any
+         active address still hasn't received mail — the forwarding rule
+         at the user's provider hasn't been set (or hasn't propagated). -->
+    @if (hasPendingReceiver()) {
+      <div
+        class="flex items-start gap-3 rounded-lg border border-subtle bg-surface p-3"
+        data-testid="inbound-pending-banner"
+      >
+        <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent"></span>
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-default">Not receiving yet</p>
+          <p class="text-xs text-muted">
+            @if (pendingReceiverCount() === 1) {
+              One address is waiting on its forwarding rule.
+            } @else {
+              {{ pendingReceiverCount() }} addresses are waiting on their forwarding rules.
+            }
+          </p>
+        </div>
+      </div>
+    }
+
+    <!-- Inline "Add an email address" card. Always sits at the top of
+         the list when open — matches Prativani (no modal). -->
+    @if (addFormOpen()) {
+      <div
+        class="rounded-xl border border-subtle bg-surface p-4 shadow-sm"
+        data-testid="inbound-add-card"
+      >
+        <h3 class="text-sm font-semibold text-default">Add an email address</h3>
+        <p class="mt-1 text-sm text-muted">
+          Any address you can set a forwarding rule on — including Gmail, Outlook or Yahoo. You keep
+          your mailbox; nothing is moved.
+        </p>
+
+        <form class="mt-4 grid gap-3 md:grid-cols-2" (ngSubmit)="submitAdd()">
+          <div>
+            <label class="sr-only" for="inbound-add-email">Email address</label>
+            <input
+              id="inbound-add-email"
+              type="email"
+              autocomplete="off"
+              spellcheck="false"
+              [formControl]="addForm.email"
+              placeholder="Email address"
+              class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              [class.border-red-500/40]="addForm.email.touched && addForm.email.invalid"
+              data-testid="inbound-add-email"
+            />
+            @if (addForm.email.touched && addForm.email.invalid) {
+              <p class="mt-1 text-xs text-red-500" data-testid="inbound-add-email-error">
+                Email address is required.
+              </p>
+            }
+          </div>
+
+          <div>
+            <label class="sr-only" for="inbound-add-display">Display name</label>
+            <input
+              id="inbound-add-display"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              [formControl]="addForm.display"
+              placeholder="Display name"
+              class="block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              data-testid="inbound-add-display"
+            />
+            <p class="mt-1 text-xs text-muted">
+              Optional. Shown to your team, and as the sender name on outgoing mail.
+            </p>
+          </div>
+
+          <div class="md:col-span-2 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              class="rounded-md px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+              [disabled]="creating()"
+              (click)="cancelAdd()"
+              data-testid="inbound-add-cancel"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95 disabled:opacity-50"
+              [disabled]="creating() || addForm.email.invalid"
+              data-testid="inbound-add-submit"
+            >
+              @if (creating()) {
+                <lucide-icon name="loader-2" size="14" class="animate-spin"></lucide-icon>
+                Adding…
+              } @else {
+                Add address
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    }
+
+    <!-- Row list -->
+    @if (sortedAddresses().length === 0) {
+      <div
+        class="rounded-xl border border-dashed border-subtle bg-surface p-8 text-center"
+        data-testid="inbound-empty"
+      >
+        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-2">
+          <lucide-icon name="mail" size="20" class="text-muted"></lucide-icon>
+        </div>
+        <h3 class="mt-3 text-sm font-semibold text-default">No addresses yet</h3>
+        <p class="mt-1 text-sm text-muted">
+          Add the address your customers already write to above. Mail arrives here as a conversation
+          — you keep your mailbox exactly as it is.
+        </p>
+      </div>
+    } @else {
+      <ul class="space-y-3">
+        @for (row of sortedAddresses(); track row.id) {
+          @let parsed = parseLabel(row.label);
+          <li
+            class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm"
+            data-testid="inbound-row"
+            [attr.data-endpoint-id]="row.id"
+          >
+            <!-- Row header: name (or email) + email + overflow menu -->
+            <div
+              class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 cursor-pointer"
+              (click)="toggleExpanded(row.id)"
+            >
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-baseline gap-2">
+                  <h3 class="truncate text-sm font-semibold text-default">
+                    {{ parsed.display || parsed.email }}
+                  </h3>
+                  @if (parsed.display) {
+                    <span
+                      class="truncate font-mono text-xs text-muted"
+                      data-testid="inbound-row-email"
+                    >
+                      {{ parsed.email }}
+                    </span>
+                  }
+                  @if (!row.is_active) {
+                    <span
+                      class="inline-flex items-center rounded-full border border-zinc-500/20 bg-zinc-500/15 px-2 py-0.5 text-[11px] font-medium text-zinc-500"
+                    >
+                      Inactive
+                    </span>
+                  }
+                </div>
+              </div>
+
+              <!-- 3-dot overflow menu — Deactivate + Delete live here -->
+              <div class="relative" (click)="$event.stopPropagation()">
+                <button
+                  type="button"
+                  class="inline-flex items-center rounded-md p-1.5 text-muted hover:bg-surface-2"
+                  (click)="toggleOverflowMenu(row.id)"
+                  aria-label="More actions"
+                  [attr.aria-expanded]="openMenuId() === row.id"
+                  data-testid="inbound-overflow"
+                >
+                  <lucide-icon name="more-vertical" size="14"></lucide-icon>
+                </button>
+                @if (openMenuId() === row.id) {
+                  <div
+                    class="absolute right-0 z-30 mt-1 w-52 overflow-hidden rounded-md border border-subtle bg-surface shadow-lg"
+                    role="menu"
                   >
-                    Inactive
-                  </span>
+                    <button
+                      type="button"
+                      class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
+                      (click)="openMenuId.set(null); toggleAutoCreate(row)"
+                      data-testid="inbound-menu-auto-create"
+                    >
+                      <lucide-icon
+                        [name]="row.auto_create_contact ? 'check-square' : 'square'"
+                        size="12"
+                      ></lucide-icon>
+                      Auto-create contact
+                    </button>
+                    @if (row.is_active) {
+                      <button
+                        type="button"
+                        class="flex w-full items-center gap-2 border-t border-subtle px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
+                        (click)="deactivate(row)"
+                        data-testid="inbound-menu-deactivate"
+                      >
+                        <lucide-icon name="pause" size="12"></lucide-icon>
+                        Deactivate
+                      </button>
+                    }
+                    <button
+                      type="button"
+                      class="flex w-full items-center gap-2 border-t border-subtle px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10"
+                      (click)="remove(row)"
+                      data-testid="inbound-menu-delete"
+                    >
+                      <lucide-icon name="trash-2" size="12"></lucide-icon>
+                      Delete
+                    </button>
+                  </div>
                 }
               </div>
-              <div class="mt-1 flex items-center gap-2">
-                <p class="truncate font-mono text-xs text-muted" data-testid="inbound-address">
-                  {{ row.forwarding_address }}
-                </p>
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:bg-surface-2"
-                  (click)="copyAddress(row)"
-                  data-testid="inbound-copy"
-                >
-                  <lucide-icon name="copy" size="12"></lucide-icon>
-                  Copy
-                </button>
-              </div>
-              <p class="mt-1 text-xs text-muted">
-                Last inbound: {{ lastInboundLabel(row.last_inbound_at) }}
-              </p>
             </div>
 
-            <div class="flex items-center gap-3">
-              <label class="inline-flex items-center gap-1.5 text-xs text-muted">
-                <input
-                  type="checkbox"
-                  class="h-4 w-4 rounded border-subtle bg-surface"
-                  [checked]="row.auto_create_contact"
-                  [disabled]="busyId() === row.id"
-                  (change)="toggleAutoCreate(row)"
-                  data-testid="inbound-auto-create-toggle"
-                />
-                Auto-create contact
-              </label>
-
-              @if (row.is_active) {
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
-                  [disabled]="busyId() === row.id"
-                  (click)="deactivate(row)"
-                  data-testid="inbound-deactivate"
-                >
-                  Deactivate
-                </button>
-              }
-              <button
-                type="button"
-                class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-                [disabled]="busyId() === row.id"
-                (click)="remove(row)"
-                data-testid="inbound-delete"
+            <!-- Expandable "Receiving · Setting up" panel -->
+            @if (expandedId() === row.id) {
+              <div
+                class="border-t border-subtle bg-surface-2 px-4 py-4 space-y-4"
+                data-testid="inbound-setup-panel"
               >
-                <lucide-icon name="trash-2" size="12"></lucide-icon>
-                Delete
-              </button>
-            </div>
-          </div>
-        </li>
-      }
-    </ul>
+                <!-- Receiving section -->
+                <div class="rounded-lg border border-subtle bg-surface p-4">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-start gap-3">
+                      <span
+                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-white"
+                      >
+                        1
+                      </span>
+                      <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                          Receiving
+                        </p>
+                        <p class="text-sm font-medium text-default">Setting up</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="text-sm text-accent hover:underline"
+                      (click)="toggleExpanded(row.id)"
+                      data-testid="inbound-setup-close"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div class="mt-4">
+                    <p class="text-sm font-medium text-default">Copy your forwarding address</p>
+                    <p class="mt-1 text-sm text-muted">
+                      Keep your mailbox exactly as it is. Your provider will send a copy of incoming
+                      mail here.
+                    </p>
+
+                    <div
+                      class="mt-3 flex items-center justify-between gap-3 rounded-lg border border-dashed border-subtle bg-surface-2 p-3"
+                    >
+                      <div class="min-w-0">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                          Your forwarding address
+                        </p>
+                        <p class="truncate font-mono text-sm text-default">
+                          {{ row.forwarding_address }}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
+                        (click)="copyAddress(row)"
+                        data-testid="inbound-setup-copy"
+                      >
+                        <lucide-icon name="copy" size="12"></lucide-icon>
+                        Copy
+                      </button>
+                    </div>
+
+                    <p class="mt-2 text-xs text-muted">
+                      Unique to
+                      <span class="font-medium text-default">{{ parsed.email }}</span>
+                      — it is how we know which forwarded email was written to, so keep it to
+                      yourselves.
+                    </p>
+
+                    <div class="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+                        (click)="continueWizard(row)"
+                        data-testid="inbound-setup-continue"
+                      >
+                        Continue
+                        <lucide-icon name="arrow-right" size="14"></lucide-icon>
+                      </button>
+                    </div>
+
+                    <p class="mt-3 text-xs text-muted">
+                      Last inbound: {{ lastInboundLabel(row.last_inbound_at) }}
+                    </p>
+                  </div>
+                </div>
+
+                <!-- SEND AS YOU section -->
+                <div
+                  class="flex items-start gap-3 rounded-lg border border-subtle bg-surface p-4"
+                  data-testid="inbound-send-as-you"
+                >
+                  <span
+                    class="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-muted"
+                    aria-hidden="true"
+                  >
+                    <lucide-icon
+                      [name]="isFreeProvider(row) ? 'minus' : 'check'"
+                      size="10"
+                      class="text-muted"
+                    ></lucide-icon>
+                  </span>
+                  <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                      Send as you
+                    </p>
+                    @if (isFreeProvider(row)) {
+                      <p class="text-sm font-medium text-default">
+                        Not available for {{ freeProviderDomain(row) }}
+                      </p>
+                      <p class="mt-1 text-sm text-muted">
+                        Free providers can't authorise senders. Replies still land on the same
+                        conversation — nothing is missing. To send as your own address instead,
+                        connect one on a domain you own — that flow lives on the Sender tab.
+                      </p>
+                    } @else {
+                      <p class="text-sm font-medium text-default">
+                        Available for {{ freeProviderDomain(row) }}
+                      </p>
+                      <p class="mt-1 text-sm text-muted">
+                        You can connect a matching SMTP or OAuth sender on the Sender tab so
+                        outgoing mail carries your domain instead of the platform's.
+                      </p>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    }
   }
 
   @if (showWizard()) {
