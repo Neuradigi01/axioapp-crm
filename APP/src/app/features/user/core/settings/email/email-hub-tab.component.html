@@ -28,6 +28,9 @@
   <!-- Active sub-tab body -->
   <div class="pt-2" role="tabpanel">
     @switch (active()) {
+      @case ('sender') {
+        <app-email-sender-card />
+      }
       @case ('addresses') {
         <app-inbound-addresses-tab />
       }

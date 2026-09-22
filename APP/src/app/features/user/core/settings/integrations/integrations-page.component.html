@@ -240,7 +240,11 @@
 
       @if (canManageEmailSenders() && expandedConnector() === 'email') {
         <div id="card-email-sender">
-          <app-email-sender-card></app-email-sender-card>
+          <!-- Consolidated Email hub — replaces the previously-shipped
+               solo ``app-email-sender-card`` expansion. The card lives
+               on as the first sub-tab ("Sender") inside the hub, so
+               nothing shipped is lost. -->
+          <app-email-hub-tab />
         </div>
       }
 

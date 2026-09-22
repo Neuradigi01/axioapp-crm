@@ -19,6 +19,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { FurnitureAuthService } from '../../auth/auth.service';
+import { EmailSenderCardComponent } from '../integrations/email-sender-card.component';
 import { AuditLogTabComponent } from './audit-log-tab.component';
 import { BlocklistTabComponent } from './blocklist-tab.component';
 import { InboundAddressesTabComponent } from './inbound-addresses-tab.component';
@@ -26,7 +27,7 @@ import { QuarantineTabComponent } from './quarantine-tab.component';
 import { ReputationDashboardTabComponent } from './reputation-dashboard-tab.component';
 import { SendingDomainsTabComponent } from './sending-domains-tab.component';
 
-type EmailSubTab = 'addresses' | 'domains' | 'reputation' | 'held' | 'blocked' | 'audit';
+type EmailSubTab = 'sender' | 'addresses' | 'domains' | 'reputation' | 'held' | 'blocked' | 'audit';
 
 interface SubTabDef {
   id: EmailSubTab;
@@ -37,6 +38,10 @@ interface SubTabDef {
 }
 
 const SUB_TABS: ReadonlyArray<SubTabDef> = [
+  // "Sender" = the shipped ``app-email-sender-card`` (SMTP + OAuth
+  // outbound identity). Sits first so an operator landing on the
+  // Email hub sees "am I connected?" before every other surface.
+  { id: 'sender', label: 'Sender', permission: 'email.accounts.manage' },
   { id: 'addresses', label: 'Addresses', permission: 'email.accounts.manage' },
   {
     id: 'domains',
@@ -67,6 +72,7 @@ const SUB_TABS: ReadonlyArray<SubTabDef> = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
+    EmailSenderCardComponent,
     SendingDomainsTabComponent,
     InboundAddressesTabComponent,
     ReputationDashboardTabComponent,
@@ -104,7 +110,7 @@ export class EmailHubTabComponent {
     const qp = this.route.snapshot.queryParamMap.get('email_tab') as EmailSubTab | null;
     if (qp && this._isVisible(qp)) return qp;
     const visible = this.visibleSubTabs();
-    return visible[0]?.id ?? 'addresses';
+    return visible[0]?.id ?? 'sender';
   }
 
   private _isVisible(id: EmailSubTab): boolean {

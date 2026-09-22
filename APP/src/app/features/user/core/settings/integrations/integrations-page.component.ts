@@ -49,6 +49,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
+import { EmailHubTabComponent } from '../email/email-hub-tab.component';
 import { AiProvidersCardComponent } from './ai-providers-card.component';
 import { DlqListComponent } from './dlq-list.component';
 import { EmailSenderCardComponent } from './email-sender-card.component';
@@ -88,6 +89,7 @@ type CallbackStatus =
     MetaCardComponent,
     WhatsAppCardComponent,
     EmailSenderCardComponent,
+    EmailHubTabComponent,
     IntegrationStatusComponent,
     DlqListComponent,
     FieldMappingEditorComponent,

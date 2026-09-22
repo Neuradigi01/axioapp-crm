@@ -5,7 +5,6 @@ import { LucideAngularModule } from 'lucide-angular';
 import { CustomFieldsPageComponent } from '../custom-fields/custom-fields.page';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { CustomEventsPageComponent } from './custom-events/custom-events.page';
-import { EmailHubTabComponent } from './email/email-hub-tab.component';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { AutomationSettingsTabComponent } from './tabs/automation-settings-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
@@ -27,7 +26,6 @@ type SettingsTab =
   | 'team'
   | 'roles'
   | 'notifications'
-  | 'email'
   | 'send-rules'
   | 'custom-events'
   | 'custom-fields'
@@ -74,22 +72,9 @@ const TABS: ReadonlyArray<TabDef> = [
   { id: 'store', label: 'Store Profile', group: 'workspace', permission: 'settings.write' },
   { id: 'team', label: 'Team', group: 'workspace', permission: 'users.read' },
   { id: 'roles', label: 'Roles', group: 'workspace', permission: 'roles.read' },
-  {
-    // Consolidated email settings hub — Prativani-style. One sidebar
-    // entry that hosts Addresses / Sending domains / Reputation / Held
-    // mail (quarantine) / Blocked senders (filter rules) / Audit log as
-    // sub-tabs. Replaces the previously-shipped three separate entries
-    // for Sending Domains, Inbound Addresses, and Reputation. Gated by
-    // ``email.accounts.manage`` — the loosest of the sub-tab permissions,
-    // so any user who can reach ANY sub-tab can reach the hub; the hub
-    // itself hides sub-tabs the user lacks permission for.
-    id: 'email',
-    label: 'Email',
-    group: 'workspace',
-    permission: 'email.accounts.manage',
-  },
-  // Email Accounts + Sender Setup tabs were consolidated into the
-  // per-org Email Sender card on Settings → Integrations.
+  // Email settings hub lives on the Integrations page's Email card
+  // expansion (Prativani-style — one connector, all sub-surfaces).
+  // No Settings-tab entry: the hub is not accessible from here.
   // tasks/workflows Step 20 — the Email Sequences tab was absorbed
   // into Workflows. The standalone tab + builder routes redirect to
   // /user/workflows?category=Marketing (see user.routes.ts).
@@ -148,7 +133,6 @@ const TABS: ReadonlyArray<TabDef> = [
     TeamTabComponent,
     RolesTabComponent,
     NotificationsTabComponent,
-    EmailHubTabComponent,
     AutomationSettingsTabComponent,
     CustomEventsPageComponent,
     CustomFieldsPageComponent,
