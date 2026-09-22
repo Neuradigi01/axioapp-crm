@@ -1,0 +1,31 @@
+Domain: devreply.karmcrm.com
+
+
+1. TXT (SPF)
+Host:   devreply.karmcrm.com
+Value:  v=spf1 include:mailgun.org ~all
+
+
+2. TXT (DKIM)
+Host:   mailo._domainkey.devreply.karmcrm.com
+Value:  k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3ehvGsfuM87lpLYU41c3C+22HdxSmvgTD/vwRnVvSyU1dtMVt9T0yymFgjqOsiLfaHj2lb9HLc1EWXt7E8j6CAg+J+lMfyKx1PyfYpud0QmIjximY6HisPOV12m5bqkHmcdTdTsECImftf2X/pP+vLaNVk3XqoMNyaJ770ttojA4Pk0QoZSOpR427hDwsmOBYtZBRHVDGzTtD723QvVoxuTaxaBdOq57yoQiEZ6Nog686spJg8tPwUsWzSAf83h+23/rz681trgnmvhqH+Ln1DxZjAHwATdq7j2bv6AwNzsUDXb8eAjQmkZwpxKbV7lJnvbaDyk5lt2dMRwtheTUgQIDAQAB
+
+
+3. MX (priority 10)
+Host:   devreply.karmcrm.com
+Value:  mxa.mailgun.org
+
+
+4. MX (priority 10)
+Host:   devreply.karmcrm.com
+Value:  mxb.mailgun.org
+
+
+5. CNAME
+Host:   email.devreply.karmcrm.com
+Value:  mailgun.org
+
+
+6. TXT (DMARC)
+Host:   _dmarc.devreply.karmcrm.com
+Value:  v=DMARC1; p=none; pct=100; fo=1; ri=3600; rua=mailto:fb2d1051@dmarc.mailgun.org,mailto:xir5rfivsie@inbox.ondmarc.com; ruf=mailto:fb2d1051@dmarc.mailgun.org,mailto:xir5rfivsie@inbox.ondmarc.com;
