@@ -52,7 +52,10 @@ import { FurnitureAuthService } from '../../auth/auth.service';
 import { EmailHubTabComponent } from '../email/email-hub-tab.component';
 import { AiProvidersCardComponent } from './ai-providers-card.component';
 import { DlqListComponent } from './dlq-list.component';
-import { EmailSenderCardComponent } from './email-sender-card.component';
+// EmailSenderCardComponent is no longer rendered directly here — it
+// lives on as the first sub-tab ("Sender") inside the shipped
+// ``app-email-hub-tab`` (see ../email/email-hub-tab.component.ts).
+// The import stays out to keep NG8113 clean.
 import { RetentionCardComponent } from './retention-card.component';
 import { FieldMappingEditorComponent } from './field-mapping-editor.component';
 import { GoogleCalendarCardComponent } from './google-calendar-card.component';
@@ -88,7 +91,6 @@ type CallbackStatus =
     GoogleCalendarCardComponent,
     MetaCardComponent,
     WhatsAppCardComponent,
-    EmailSenderCardComponent,
     EmailHubTabComponent,
     IntegrationStatusComponent,
     DlqListComponent,
