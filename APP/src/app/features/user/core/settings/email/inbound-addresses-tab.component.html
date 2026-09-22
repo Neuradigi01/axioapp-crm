@@ -65,7 +65,10 @@
           your mailbox; nothing is moved.
         </p>
 
-        <form class="mt-4 grid gap-3 md:grid-cols-2" (ngSubmit)="submitAdd()">
+        <form
+          class="mt-4 grid gap-3 md:grid-cols-2"
+          (submit)="$event.preventDefault(); submitAdd()"
+        >
           <div>
             <label class="sr-only" for="inbound-add-email">Email address</label>
             <input
@@ -151,7 +154,7 @@
         @for (row of sortedAddresses(); track row.id) {
           @let parsed = parseLabel(row.label);
           <li
-            class="overflow-hidden rounded-xl border border-subtle bg-surface shadow-sm"
+            class="rounded-xl border border-subtle bg-surface shadow-sm"
             data-testid="inbound-row"
             [attr.data-endpoint-id]="row.id"
           >
@@ -240,7 +243,7 @@
             <!-- Expandable "Receiving · Setting up" panel -->
             @if (expandedId() === row.id) {
               <div
-                class="border-t border-subtle bg-surface-2 px-4 py-4 space-y-4"
+                class="border-t border-subtle bg-surface-2 px-4 py-4 space-y-4 rounded-b-xl"
                 data-testid="inbound-setup-panel"
               >
                 <!-- Receiving section -->
