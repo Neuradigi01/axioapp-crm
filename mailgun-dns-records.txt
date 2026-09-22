@@ -1,0 +1,31 @@
+Domain: reply.karmcrm.com
+
+
+1. TXT (SPF)
+Host:   reply.karmcrm.com
+Value:  v=spf1 include:mailgun.org ~all
+
+
+2. TXT (DKIM)
+Host:   k1._domainkey.reply.karmcrm.com
+Value:  k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtvyKlVpPKlIMx9npVk8yH9B2XcHva9TSlez8Qm7Z4UGe/Hp6akp1IoRA4w/cb7Je8IIJ5ag5PGm6X7LaYDKXuXw8zcpngJ1k87jFA032U9BNIdSAUWUVSqoLwXw4Wq+Z7E8pJCgI+ZIT6hRZohBupsDFmcj2HtqV9cK6OjgX8823ixeG7nMWX22o+IggBDsXI/lsF0/0Ewe6MTFLexruLU3ihpLutYDQfjDFm8qB0ZBAwEf+zqrLGdF8rlgnpRnbi/ii2eCSvPotBnS5JN1zy8rh0kBF8WQZRubhvEh7QzeUN32TdK8R2J+RXvIghOKKErZExS4GY8X1P9T+xa07RwIDAQAB
+
+
+3. MX (priority 10)
+Host:   reply.karmcrm.com
+Value:  mxa.mailgun.org
+
+
+4. MX (priority 10)
+Host:   reply.karmcrm.com
+Value:  mxb.mailgun.org
+
+
+5. CNAME
+Host:   email.reply.karmcrm.com
+Value:  mailgun.org
+
+
+6. TXT (DMARC)
+Host:   _dmarc.reply.karmcrm.com
+Value:  v=DMARC1; p=none; pct=100; fo=1; ri=3600; rua=mailto:17bf10e9@dmarc.mailgun.org,mailto:xndc46vwdvn@inbox.ondmarc.com,mailto:f4091025@dmarc.mailgun.org,mailto:xgctb2457em@inbox.ondmarc.com; ruf=mailto:17bf10e9@dmarc.mailgun.org,mailto:xndc46vwdvn@inbox.ondmarc.com,mailto:f4091025@dmarc.mailgun.org,mailto:xgctb2457em@inbox.ondmarc.com;
