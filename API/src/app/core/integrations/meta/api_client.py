@@ -170,17 +170,26 @@ def _safe_json(response: httpx.Response) -> dict | None:
 
 
 def _is_oauth_exception(detail: dict) -> bool:
-    """Meta wraps token-related errors in `{"error": {"type":
-    "OAuthException", "code": 190, ...}}`. Code 190 + sub-codes 460
-    / 463 / 467 all indicate the token is no longer usable."""
+    """Return True only when the Meta error indicates the ACCESS TOKEN
+    itself is dead (expired, revoked, invalidated) — never for missing
+    permissions, invalid params, or rate limits, all of which Meta also
+    labels ``OAuthException``.
+
+    Token-death codes:
+      * 190 — access token expired / invalid / revoked (any subcode)
+      * 102 — session key invalid (legacy token type)
+
+    We deliberately do NOT match every ``type=OAuthException`` — code
+    200 in particular means "permission not granted for this action",
+    which is a scope problem, not a token problem. Marking the token
+    ``expired`` and telling the user to reconnect would not help; they
+    need to grant the missing scope in the Meta app dashboard first.
+    """
     err = detail.get("error") if isinstance(detail, dict) else None
     if not isinstance(err, dict):
         return False
-    if err.get("type") == "OAuthException":
-        return True
-    if err.get("code") == 190:
-        return True
-    return False
+    code = err.get("code")
+    return code in (190, 102)
 
 
 __all__ = ["MetaGraphClient", "MetaTokenExpiredError"]

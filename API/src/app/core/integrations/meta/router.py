@@ -28,7 +28,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import FRONTEND_URL, META_APP_SECRET
+from config import FRONTEND_URL, META_APP_SECRET, META_ENABLE_MESSAGING_SCOPES
 from src.app.core.auth.dependencies import require_permissions
 from src.app.core.integrations.meta import data_deletion, oauth, subscriptions
 from src.app.core.integrations.meta.api_client import (
@@ -141,10 +141,17 @@ async def list_pages_endpoint(
     try:
         pages = await subscriptions.list_pages(client)
     except MetaTokenExpiredError:
-        # Surface as 401 so the UI can map to a "reconnect" CTA. The
-        # api_client already flipped status to `expired` and committed.
+        # 409 (not 401) — the CRM JWT is fine, only the downstream
+        # Meta grant is broken. Returning 401 here would trip the
+        # frontend jwtInterceptor's refresh-and-logout path and evict
+        # the user for an integration failure that has nothing to do
+        # with CRM authentication. Matches ``api_client.py``'s
+        # "integration is expired" guard for consistency. The Settings
+        # card watches ``integration.status`` (already flipped to
+        # ``expired`` by ``api_client._mark_expired``) to render the
+        # reconnect CTA.
         raise HTTPException(
-            status_code=401,
+            status_code=409,
             detail="Meta token expired — reconnect required.",
         ) from None
     return [
@@ -182,8 +189,11 @@ async def list_lead_forms_endpoint(
             client, page_id=page_id, page_token=page_token
         )
     except MetaTokenExpiredError:
+        # See list_pages_endpoint above — 409 (not 401) so the frontend
+        # jwtInterceptor doesn't misread this as a CRM auth failure and
+        # log the user out on a downstream integration hiccup.
         raise HTTPException(
-            status_code=401,
+            status_code=409,
             detail="Meta token expired — reconnect required.",
         ) from None
     return [
@@ -226,30 +236,41 @@ async def subscribe_page_endpoint(
         # lead-form submissions. Meta's endpoint is additive
         # ("subscribed_fields" REPLACES the list), so this call passes
         # both leadgen + messaging fields together.
-        try:
-            await subscriptions.subscribe_page_messaging(
-                client, page_id=page_id, page_token=page.access_token
-            )
-        except MetaTokenExpiredError:
-            raise
-        except Exception:
-            # Messaging subscription failure shouldn't block the
-            # leadgen path — the messaging scopes need App Review for
-            # non-tester users. Log and continue.
-            import logging as _logging
+        #
+        # Gated on ``META_ENABLE_MESSAGING_SCOPES`` — attempting the
+        # messaging subscribe without ``pages_messaging`` in the OAuth
+        # grant returns ``(#200) permission needed``, which Meta labels
+        # as OAuthException. Even with the narrower ``_is_oauth_exception``
+        # guard, skipping the call entirely when the scope isn't
+        # requested avoids the log-warn noise and one wasted Graph call.
+        if META_ENABLE_MESSAGING_SCOPES:
+            try:
+                await subscriptions.subscribe_page_messaging(
+                    client, page_id=page_id, page_token=page.access_token
+                )
+            except MetaTokenExpiredError:
+                raise
+            except Exception:
+                # Messaging subscription failure shouldn't block the
+                # leadgen path — the messaging scopes need App Review for
+                # non-tester users. Log and continue.
+                import logging as _logging
 
-            _logging.getLogger(__name__).warning(
-                "meta: leadgen subscribed for page=%s but messaging subscription failed "
-                "(likely App Review pending for messaging scopes)",
-                page_id,
-            )
+                _logging.getLogger(__name__).warning(
+                    "meta: leadgen subscribed for page=%s but messaging subscription failed "
+                    "(likely App Review pending for messaging scopes)",
+                    page_id,
+                )
 
         linked_ig = await subscriptions.get_linked_instagram_account(
             client, page_id=page_id, page_token=page.access_token
         )
     except MetaTokenExpiredError:
+        # See list_pages_endpoint above — 409 (not 401) so the frontend
+        # jwtInterceptor doesn't misread this as a CRM auth failure and
+        # log the user out on a downstream integration hiccup.
         raise HTTPException(
-            status_code=401,
+            status_code=409,
             detail="Meta token expired — reconnect required.",
         ) from None
     if not ok:
@@ -341,8 +362,11 @@ async def unsubscribe_page_endpoint(
             )
         ok = await subscriptions.unsubscribe_page(client, page_id=page_id, page_token=page_token)
     except MetaTokenExpiredError:
+        # See list_pages_endpoint above — 409 (not 401) so the frontend
+        # jwtInterceptor doesn't misread this as a CRM auth failure and
+        # log the user out on a downstream integration hiccup.
         raise HTTPException(
-            status_code=401,
+            status_code=409,
             detail="Meta token expired — reconnect required.",
         ) from None
     if not ok:
