@@ -179,12 +179,40 @@
                   @if (!row.is_active) {
                     <span
                       class="inline-flex items-center rounded-full border border-zinc-500/20 bg-zinc-500/15 px-2 py-0.5 text-[11px] font-medium text-zinc-500"
+                      data-testid="inbound-row-chip-inactive"
                     >
                       Inactive
+                    </span>
+                  } @else if (row.last_inbound_at) {
+                    <span
+                      class="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-500"
+                      data-testid="inbound-row-chip-verified"
+                    >
+                      <lucide-icon name="check" size="10"></lucide-icon>
+                      Verified
+                    </span>
+                    <span class="text-[11px] text-muted">
+                      · last inbound {{ lastInboundLabel(row.last_inbound_at) }}
+                    </span>
+                  } @else {
+                    <span
+                      class="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-400"
+                      data-testid="inbound-row-chip-setup"
+                    >
+                      <lucide-icon name="loader-2" size="10" class="animate-spin"></lucide-icon>
+                      Setting up
                     </span>
                   }
                 </div>
               </div>
+
+              <!-- Expand/collapse indicator — makes it clear the row is clickable. -->
+              <lucide-icon
+                [name]="expandedId() === row.id ? 'chevron-down' : 'chevron-right'"
+                size="16"
+                class="shrink-0 text-muted"
+                aria-hidden="true"
+              ></lucide-icon>
 
               <!-- 3-dot overflow menu — Deactivate + Delete live here -->
               <div class="relative" (click)="$event.stopPropagation()">
