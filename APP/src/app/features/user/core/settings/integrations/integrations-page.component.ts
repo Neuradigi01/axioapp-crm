@@ -48,6 +48,7 @@ import { forkJoin } from 'rxjs';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { FurnitureAuthService } from '../../auth/auth.service';
 import { EmailHubTabComponent } from '../email/email-hub-tab.component';
 import { AiProvidersCardComponent } from './ai-providers-card.component';
@@ -80,7 +81,14 @@ type CallbackStatus =
   // tasks/google-calendar-sync Step 2 callback statuses (Step 5 handler).
   | 'google_calendar_connected'
   | 'google_calendar_denied'
-  | 'google_calendar_error';
+  | 'google_calendar_error'
+  // Email sender OAuth (Gmail + Microsoft) callback statuses.
+  | 'gmail_connected'
+  | 'gmail_denied'
+  | 'gmail_error'
+  | 'microsoft_connected'
+  | 'microsoft_denied'
+  | 'microsoft_error';
 
 @Component({
   selector: 'app-settings-integrations-page',
@@ -107,6 +115,7 @@ export class IntegrationsPageComponent {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(FurnitureAuthService);
+  private readonly toast = inject(ToastService);
 
   // --- per-card permission gates -----------------------------------
   //
@@ -480,7 +489,15 @@ export class IntegrationsPageComponent {
     const status = params.get('status') as CallbackStatus | null;
     if (!status) return;
     const reason = params.get('reason');
-    this.callbackBanner.set(this._bannerFor(status, reason));
+    const banner = this._bannerFor(status, reason);
+    this.callbackBanner.set(banner);
+    // Mirror the callback outcome as a standardised toast so the
+    // user gets the same visual language they see everywhere else
+    // in the app (create/update/delete flows all toast).
+    const subtitle = banner.detail ?? undefined;
+    if (banner.kind === 'success') this.toast.success(banner.title, { subtitle });
+    else if (banner.kind === 'warn') this.toast.warn(banner.title, { subtitle });
+    else this.toast.error(banner.title, { subtitle });
     // Bump the calendar card's refresh signal when the callback is a
     // calendar one so the card refetches its status immediately (no
     // wait for the 5s poll).
@@ -546,6 +563,42 @@ export class IntegrationsPageComponent {
         return {
           kind: 'error',
           title: 'Calendar connect failed.',
+          detail: reason ? `Reason: ${reason}` : 'Try again, or check the backend logs.',
+        };
+      case 'gmail_connected':
+        return {
+          kind: 'success',
+          title: 'Gmail sender connected.',
+          detail: 'It now appears on the Sender tab and is ready to send.',
+        };
+      case 'gmail_denied':
+        return {
+          kind: 'warn',
+          title: 'Gmail connect cancelled.',
+          detail: reason ? `Reason: ${reason}` : 'Re-try the Connect button to authorise again.',
+        };
+      case 'gmail_error':
+        return {
+          kind: 'error',
+          title: 'Gmail connect failed.',
+          detail: reason ? `Reason: ${reason}` : 'Try again, or check the backend logs.',
+        };
+      case 'microsoft_connected':
+        return {
+          kind: 'success',
+          title: 'Microsoft sender connected.',
+          detail: 'It now appears on the Sender tab and is ready to send.',
+        };
+      case 'microsoft_denied':
+        return {
+          kind: 'warn',
+          title: 'Microsoft connect cancelled.',
+          detail: reason ? `Reason: ${reason}` : 'Re-try the Connect button to authorise again.',
+        };
+      case 'microsoft_error':
+        return {
+          kind: 'error',
+          title: 'Microsoft connect failed.',
           detail: reason ? `Reason: ${reason}` : 'Try again, or check the backend logs.',
         };
     }
