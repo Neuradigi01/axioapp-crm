@@ -47,8 +47,8 @@
           </label>
           @if (claimForm.domain.touched && claimForm.domain.invalid) {
             <p class="mt-1 text-xs text-red-500" data-testid="claim-domain-error">
-              Enter a valid domain — letters, digits, hyphens, and a TLD (e.g.
-              <span class="font-mono">yourshop.com</span>).
+              Enter a valid domain — subdomains are recommended (e.g.
+              <span class="font-mono">mail.yourshop.com</span>).
             </p>
           } @else {
             <p class="mt-1 text-xs text-muted">You'll need access to this domain's DNS settings.</p>
@@ -246,6 +246,23 @@
           </li>
         }
       </ul>
+    }
+
+    @if (releasedCount() > 0) {
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-default"
+        (click)="toggleShowReleased()"
+        data-testid="sending-domain-toggle-archived"
+      >
+        <lucide-icon
+          [name]="showReleased() ? 'chevron-up' : 'chevron-down'"
+          size="12"
+        ></lucide-icon>
+        {{ showReleased() ? 'Hide' : 'Show' }}
+        {{ releasedCount() }} released
+        {{ releasedCount() === 1 ? 'domain' : 'domains' }}
+      </button>
     }
   }
 </section>

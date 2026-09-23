@@ -75,20 +75,34 @@ export class SendingDomainsTabComponent {
         Validators.required,
         Validators.minLength(3),
         Validators.maxLength(253),
-        commonValidators.hostnameApex,
+        commonValidators.hostname,
       ],
     }) as FormControl<string>,
   };
 
-  /** Non-released rows first (newest at top), released rows at the
-   *  bottom of the list so the historical timeline stays visible
-   *  without cluttering the active view. */
+  /** Released rows are hidden by default (they're kept server-side for
+   *  audit trail, but a workspace normally only cares about live/pending
+   *  domains). The "Show archived" toggle at the bottom of the list lets
+   *  the operator reveal them when needed. */
+  readonly showReleased = signal(false);
+
+  readonly releasedCount = computed(
+    () => this.domains().filter((r) => r.verification_status === 'released').length,
+  );
+
+  /** Non-released rows first; released rows appended only when
+   *  ``showReleased`` is on. */
   readonly sortedDomains = computed<ReadonlyArray<SendingDomain>>(() => {
     const rows = this.domains();
     const active = rows.filter((r) => r.verification_status !== 'released');
+    if (!this.showReleased()) return active;
     const released = rows.filter((r) => r.verification_status === 'released');
     return [...active, ...released];
   });
+
+  toggleShowReleased(): void {
+    this.showReleased.update((v) => !v);
+  }
 
   constructor() {
     this.reload();
