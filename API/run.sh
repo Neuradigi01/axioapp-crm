@@ -1,9 +1,10 @@
 #!/bin/bash
 # Manage the API application stack (Linux / Mac).
 #
-# The `.environment` file (one word: "local" or "prod") drives everything:
-#   local -> docker-compose.local.yml + secrets.local.enc.env
-#   prod  -> docker-compose.prod.yml  + secrets.prod.enc.env
+# The `.environment` file (one word: "local" | "prod" | "prod-neuradigi") drives everything:
+#   local          -> docker-compose.local.yml          + secrets.local.enc.env
+#   prod           -> docker-compose.prod.yml           + secrets.prod.enc.env           (aixoapp.com)
+#   prod-neuradigi -> docker-compose.prod-neuradigi.yml + secrets.prod-neuradigi.enc.env (neuradigi.com)
 #
 # Secrets are decrypted in-memory by `sops exec-env` per command - never
 # written to disk. Run `./run.sh help` for the command list.
@@ -18,8 +19,8 @@ if [ ! -f ".environment" ]; then
     exit 1
 fi
 APP_ENV=$(tr -d '[:space:]' < .environment)
-if [ "$APP_ENV" != "local" ] && [ "$APP_ENV" != "prod" ]; then
-    echo "ERROR: .environment must be 'local' or 'prod', got '$APP_ENV'"
+if [ "$APP_ENV" != "local" ] && [ "$APP_ENV" != "prod" ] && [ "$APP_ENV" != "prod-neuradigi" ]; then
+    echo "ERROR: .environment must be 'local', 'prod', or 'prod-neuradigi', got '$APP_ENV'"
     exit 1
 fi
 export APP_ENV
@@ -51,7 +52,7 @@ print_help() {
     echo "${C_DIM}Usage: ./run.sh <command> [args]${C_RESET}"
     echo ""
     echo "${C_SECTION}Environment${C_RESET}"
-    echo "  ${C_CMD}env local|prod${C_RESET}     Switch this machine's active env (writes .environment)"
+    echo "  ${C_CMD}env local|prod|prod-neuradigi${C_RESET}     Switch this machine's active env (writes .environment)"
     echo ""
     echo "${C_SECTION}Stack${C_RESET}"
     echo "  ${C_CMD}up${C_RESET}                 Start the full stack (api + redis + celery + beat + flower [+ db if local])"
@@ -80,8 +81,8 @@ print_help() {
     echo "${C_SECTION}Secrets (SOPS + age)${C_RESET}"
     echo "  ${C_CMD}secrets-install${C_RESET}            Install sops + age (brew on Mac, GitHub binaries on Linux)"
     echo "  ${C_CMD}secrets-keygen${C_RESET}             Generate this machine's age key; print the public key"
-    echo "  ${C_CMD}secrets-edit [local|prod]${C_RESET}   Edit secrets.<env>.enc.env (default: active env)"
-    echo "  ${C_CMD}secrets-rekey [local|prod]${C_RESET}  Re-encrypt to current .sops.yaml recipients"
+    echo "  ${C_CMD}secrets-edit [local|prod|prod-neuradigi]${C_RESET}   Edit secrets.<env>.enc.env (default: active env)"
+    echo "  ${C_CMD}secrets-rekey [local|prod|prod-neuradigi]${C_RESET}  Re-encrypt to current .sops.yaml recipients"
     echo "  ${C_CMD}secrets-encrypt-local${C_RESET}      One-shot: encrypt a plaintext secrets.local.enc.env (post-scaffold)"
     echo ""
     echo "  ${C_CMD}help${C_RESET}               Show this help (aliases: -h, --help)"
@@ -90,9 +91,10 @@ print_help() {
 resolve_secrets_target() {
     local which="${1:-$APP_ENV}"
     case "$which" in
-        local) TARGET_FILE="secrets.local.enc.env" ;;
-        prod)  TARGET_FILE="secrets.prod.enc.env" ;;
-        *) echo "${C_ERR}Error: secrets target must be 'local' or 'prod', got '$which'${C_RESET}"; return 1 ;;
+        local)          TARGET_FILE="secrets.local.enc.env" ;;
+        prod)           TARGET_FILE="secrets.prod.enc.env" ;;
+        prod-neuradigi) TARGET_FILE="secrets.prod-neuradigi.enc.env" ;;
+        *) echo "${C_ERR}Error: secrets target must be 'local', 'prod', or 'prod-neuradigi', got '$which'${C_RESET}"; return 1 ;;
     esac
 }
 
@@ -146,12 +148,12 @@ ensure_dirs() {
 do_env() {
     local target="${1:-}"
     if [ -z "$target" ]; then
-        echo "Current env: $APP_ENV (from .environment). Pass 'local' or 'prod' to change."
+        echo "Current env: $APP_ENV (from .environment). Pass 'local', 'prod', or 'prod-neuradigi' to change."
         return 0
     fi
     case "$target" in
-        local|prod) ;;
-        *) echo "${C_ERR}Error: env must be 'local' or 'prod', got '$target'${C_RESET}"; return 1 ;;
+        local|prod|prod-neuradigi) ;;
+        *) echo "${C_ERR}Error: env must be 'local', 'prod', or 'prod-neuradigi', got '$target'${C_RESET}"; return 1 ;;
     esac
     printf '%s\n' "$target" > .environment
     echo "Switched .environment to '$target'. Run \`./run.sh up\` to bring the stack up in the new env."

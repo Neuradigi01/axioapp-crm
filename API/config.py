@@ -304,6 +304,14 @@ META_WEBHOOK_VERIFY_TOKEN = os.getenv("META_WEBHOOK_VERIFY_TOKEN", "")
 # Graph API version pin. Meta deprecates roughly every ~24 months;
 # bumping is a literal swap + a couple of response-shape adjustments.
 META_GRAPH_API_VERSION = os.getenv("META_GRAPH_API_VERSION", "v19.0")
+# Opt-in Instagram/Messenger DM scopes on the Meta OAuth authorize URL.
+# Off by default because these scopes require the Instagram Graph API +
+# Messenger products to be added on the Meta App AND the requesting FB
+# account to hold the matching role; without that setup Facebook rejects
+# the whole authorize with "Invalid Scopes: instagram_basic, ...".
+# Flip to true on deploys that have configured Instagram Business Login
+# and passed App Review for the messaging scopes.
+META_ENABLE_MESSAGING_SCOPES = os.getenv("META_ENABLE_MESSAGING_SCOPES", "false").lower() == "true"
 
 # Celery / Redis
 CELERY_ENABLED = os.getenv("CELERY_ENABLED", "false").lower() == "true"

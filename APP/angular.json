@@ -74,6 +74,28 @@
               "outputHashing": "all",
               "serviceWorker": "ngsw-config.json"
             },
+            "production-neuradigi": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all",
+              "serviceWorker": "ngsw-config.json",
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.neuradigi.ts"
+                }
+              ]
+            },
             "development": {
               "optimization": false,
               "extractLicenses": false,
@@ -96,6 +118,9 @@
           "configurations": {
             "production": {
               "buildTarget": "APP:build:production"
+            },
+            "production-neuradigi": {
+              "buildTarget": "APP:build:production-neuradigi"
             },
             "development": {
               "buildTarget": "APP:build:development"

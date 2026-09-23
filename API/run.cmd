@@ -1,8 +1,9 @@
 @echo off
 REM Manage the CRM API stack (Windows).
-REM .environment (one word: local or prod) drives everything:
-REM   local -> docker-compose.local.yml + secrets.local.enc.env
-REM   prod  -> docker-compose.prod.yml  + secrets.prod.enc.env
+REM .environment (one word: local | prod | prod-neuradigi) drives everything:
+REM   local          -> docker-compose.local.yml          + secrets.local.enc.env
+REM   prod           -> docker-compose.prod.yml           + secrets.prod.enc.env           (aixoapp.com)
+REM   prod-neuradigi -> docker-compose.prod-neuradigi.yml + secrets.prod-neuradigi.enc.env (neuradigi.com)
 REM Secrets are decrypted in-memory by 'sops exec-env'; never on disk.
 
 setlocal enabledelayedexpansion
@@ -16,8 +17,8 @@ if not exist ".environment" (
 set /p APP_ENV=<.environment
 for /f "tokens=*" %%a in ("!APP_ENV!") do set "APP_ENV=%%a"
 
-if /i not "!APP_ENV!"=="local" if /i not "!APP_ENV!"=="prod" (
-    echo ERROR: .environment must be 'local' or 'prod', got '!APP_ENV!'
+if /i not "!APP_ENV!"=="local" if /i not "!APP_ENV!"=="prod" if /i not "!APP_ENV!"=="prod-neuradigi" (
+    echo ERROR: .environment must be 'local', 'prod', or 'prod-neuradigi', got '!APP_ENV!'
     exit /b 1
 )
 
@@ -63,7 +64,7 @@ echo CRM API stack runner (env: !APP_ENV!, Windows)
 echo Usage: run.cmd ^<command^> [args]
 echo.
 echo Environment
-echo   env local^|prod       Switch this machine's active env (writes .environment)
+echo   env local^|prod^|prod-neuradigi  Switch this machine's active env (writes .environment)
 echo.
 echo Stack
 echo   up                   Start full stack (api + redis + celery + beat + flower [+ db if local])
@@ -86,8 +87,8 @@ echo   lock                 Regenerate uv.lock from pyproject.toml
 echo.
 echo Secrets (SOPS + age)
 echo   secrets-keygen               Generate this machine's age keypair; print public key
-echo   secrets-edit [local^|prod]    Edit a secrets file (default: active env)
-echo   secrets-rekey [local^|prod]   Re-encrypt to current .sops.yaml recipients
+echo   secrets-edit [local^|prod^|prod-neuradigi]    Edit a secrets file (default: active env)
+echo   secrets-rekey [local^|prod^|prod-neuradigi]   Re-encrypt to current .sops.yaml recipients
 echo   secrets-encrypt-local        Encrypt a plaintext secrets.local.enc.env in place
 echo.
 echo   help                 Show this help
@@ -98,11 +99,11 @@ exit /b 0
 set "target=%~2"
 if "%target%"=="" (
     echo Current env: !APP_ENV! ^(from .environment^)
-    echo Pass 'local' or 'prod' to change.
+    echo Pass 'local', 'prod', or 'prod-neuradigi' to change.
     exit /b 0
 )
-if /i not "%target%"=="local" if /i not "%target%"=="prod" (
-    echo ERROR: env must be 'local' or 'prod', got '%target%'
+if /i not "%target%"=="local" if /i not "%target%"=="prod" if /i not "%target%"=="prod-neuradigi" (
+    echo ERROR: env must be 'local', 'prod', or 'prod-neuradigi', got '%target%'
     exit /b 1
 )
 > .environment echo %target%
@@ -260,10 +261,11 @@ call :require_sops
 if errorlevel 1 exit /b 1
 set "which=%~2"
 if "%which%"=="" set "which=!APP_ENV!"
-if /i "%which%"=="local" set "TARGET=secrets.local.enc.env"
-if /i "%which%"=="prod"  set "TARGET=secrets.prod.enc.env"
+if /i "%which%"=="local"          set "TARGET=secrets.local.enc.env"
+if /i "%which%"=="prod"           set "TARGET=secrets.prod.enc.env"
+if /i "%which%"=="prod-neuradigi" set "TARGET=secrets.prod-neuradigi.enc.env"
 if not defined TARGET (
-    echo ERROR: secrets target must be 'local' or 'prod', got '%which%'
+    echo ERROR: secrets target must be 'local', 'prod', or 'prod-neuradigi', got '%which%'
     exit /b 1
 )
 if not exist "!TARGET!" ( echo ERROR: !TARGET! not found. & exit /b 1 )
@@ -280,10 +282,11 @@ call :require_sops
 if errorlevel 1 exit /b 1
 set "which=%~2"
 if "%which%"=="" set "which=!APP_ENV!"
-if /i "%which%"=="local" set "TARGET=secrets.local.enc.env"
-if /i "%which%"=="prod"  set "TARGET=secrets.prod.enc.env"
+if /i "%which%"=="local"          set "TARGET=secrets.local.enc.env"
+if /i "%which%"=="prod"           set "TARGET=secrets.prod.enc.env"
+if /i "%which%"=="prod-neuradigi" set "TARGET=secrets.prod-neuradigi.enc.env"
 if not defined TARGET (
-    echo ERROR: secrets target must be 'local' or 'prod', got '%which%'
+    echo ERROR: secrets target must be 'local', 'prod', or 'prod-neuradigi', got '%which%'
     exit /b 1
 )
 if not exist "!TARGET!" ( echo ERROR: !TARGET! not found. & exit /b 1 )

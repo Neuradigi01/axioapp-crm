@@ -1,0 +1,28 @@
+# Production overrides (non-secret) for the neuradigi.com deploy.
+# Sibling of docker-compose.prod.yml (aixoapp.com). Content is
+# URL-agnostic — same limits and IS_DEVELOPMENT flag — but a separate
+# file is required because run.cmd / run.sh derive the compose file
+# name from .environment (`docker-compose.${APP_ENV}.yml`).
+x-prod-env: &prod-env
+  IS_DEVELOPMENT: "false"
+
+services:
+  api:
+    environment:
+      <<: *prod-env
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  celery:
+    environment:
+      <<: *prod-env
+
+  celery-beat:
+    environment:
+      <<: *prod-env
+
+  flower:
+    environment:
+      <<: *prod-env

@@ -52,6 +52,7 @@ from config import (
     INTEGRATIONS_ENCRYPTION_KEY,
     META_APP_ID,
     META_APP_SECRET,
+    META_ENABLE_MESSAGING_SCOPES,
     META_GRAPH_API_VERSION,
     META_OAUTH_REDIRECT_URI,
 )
@@ -63,24 +64,35 @@ _AUTHORIZE_URL = "https://www.facebook.com/{ver}/dialog/oauth"
 _TOKEN_URL = "https://graph.facebook.com/{ver}/oauth/access_token"
 _USERINFO_URL = "https://graph.facebook.com/{ver}/me"
 
-# Meta scopes for lead ads (v1 set) + Messenger/Instagram DMs (v2).
-# Messenger/IG scopes require App Review before non-tester users can
-# grant them; App Testers on the app dashboard can grant them
-# immediately in dev mode. Don't add scopes opportunistically; every
-# scope added widens the App Review surface area at Meta.
-_SCOPES = [
+# Core scopes for Facebook Lead Ads. Always requested — the whole
+# integration is useless without them.
+_LEAD_ADS_SCOPES = [
     "pages_show_list",
     "pages_read_engagement",
     "pages_manage_metadata",
     "pages_manage_ads",
     "leads_retrieval",
     "business_management",
-    # Messenger + Instagram Direct DMs — required for reading + sending
-    # customer chats through Meta's Messaging Platform.
+]
+# Messenger + Instagram Direct DMs — required for reading + sending
+# customer chats through Meta's Messaging Platform. Gated behind the
+# ``META_ENABLE_MESSAGING_SCOPES`` flag because they require the
+# Instagram Graph API + Messenger products on the Meta App, plus App
+# Review for non-tester users. Without that setup Facebook rejects the
+# entire authorize URL with "Invalid Scopes: instagram_basic, ...",
+# blocking even the Lead Ads flow.
+_MESSAGING_SCOPES = [
     "pages_messaging",
     "instagram_basic",
     "instagram_manage_messages",
 ]
+
+
+def _scopes() -> list[str]:
+    if META_ENABLE_MESSAGING_SCOPES:
+        return _LEAD_ADS_SCOPES + _MESSAGING_SCOPES
+    return list(_LEAD_ADS_SCOPES)
+
 
 # State TTL — same 10-min window as Google. The OAuth dance never
 # takes more than a few seconds; 10 min covers users with slow Wi-Fi
@@ -206,7 +218,7 @@ def start_authorize(
         "client_id": META_APP_ID,
         "redirect_uri": META_OAUTH_REDIRECT_URI,
         "response_type": "code",
-        "scope": ",".join(_SCOPES),  # Meta uses comma-separated, not space
+        "scope": ",".join(_scopes()),  # Meta uses comma-separated, not space
         "state": _sign_state(state_payload),
     }
     return f"{_AUTHORIZE_URL.format(ver=META_GRAPH_API_VERSION)}?{urlencode(params)}"
@@ -332,7 +344,7 @@ async def handle_callback(
             access_token=tokens.access_token,
             refresh_token=None,  # Meta has no refresh tokens
             token_expires_at=_unix_to_aware(tokens.expires_at),
-            scopes=_SCOPES,
+            scopes=_scopes(),
         ),
     )
     return integration

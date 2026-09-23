@@ -53,3 +53,15 @@ creation_rules:
           - *prod-server2
           - *ankesh
           - *ajay
+
+  - path_regex: secrets\.prod-neuradigi\.enc\.env$
+    key_groups:
+      - age:
+          - *ryder-home
+          - *ryder-office
+          - *sagar
+          - *pratik
+          - *prod-server
+          - *prod-server2
+          - *ankesh
+          - *ajay
