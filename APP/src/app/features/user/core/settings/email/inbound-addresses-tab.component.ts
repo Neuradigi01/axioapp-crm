@@ -1,47 +1,39 @@
 /**
- * Inbound Addresses tab (Prativani-style redesign).
+ * Inbound Addresses tab — Prativani-style inline 4-step setup.
  *
- * Layout matches the reference:
- *   * Inline **"Add an email address"** card at the top — Email +
- *     Display name inputs, Cancel / Add address buttons. No modal for
- *     creation.
- *   * A **"Not receiving yet"** banner appears while any active row's
- *     forwarding rule hasn't fired yet (``last_inbound_at`` is null).
- *   * Each row card shows the display name in bold + the raw email in
- *     muted mono, with a 3-dot overflow menu on the right.
- *   * An **expandable "Receiving · Setting up"** panel per row that
- *     surfaces the copy-your-forwarding-address step inline. Continue
- *     opens the shipped :class:`ForwardingWizardComponent` modal for
- *     the multi-step provider guide.
- *   * A **"SEND AS YOU"** info block below the setup panel that
- *     detects free providers (gmail.com / outlook.com / yahoo.com /
- *     ...) and explains why send-as-you isn't available for them.
+ * Row expansion hosts a 4-step stepper (Copy → Add at provider →
+ * Confirm → Test) inline — no modal. Each row tracks its own step +
+ * chosen provider. Step 4 polls the backend for the first inbound
+ * arrival; when the poll returns ``'received'`` the row's ``last_inbound_at``
+ * is populated on reload and the stepper collapses into a "Verified"
+ * summary.
  *
- * Backend contract unchanged: ``label`` still stores the composite
- * ``"Display Name <email>"`` (or bare email when no display name),
- * matching the RFC-5322 ``mailbox`` shape the ingest side already
- * parses. All existing ``ForwardedAddress`` rows keep working — the
- * parser gracefully falls back to treating the whole label as an
- * email when it can't split.
+ * The inline "Add an email address" card at the top is unchanged —
+ * it's the single row-creation entry point. The old
+ * :class:`ForwardingWizardComponent` modal is removed; the duplicate
+ * row it used to create is no longer possible.
  */
 import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
   HostListener,
+  OnDestroy,
   computed,
   inject,
   signal,
 } from '@angular/core';
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
+import { Subscription } from 'rxjs';
 import { extractApiError } from '@core/services/api-error.util';
 
 import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { ForwardingWizardComponent } from './forwarding-wizard.component';
 import type { ForwardedAddress } from './models';
 import { InboundAddressesService } from './inbound-addresses.service';
+import { PROVIDER_GUIDES, PROVIDER_ORDER, type ProviderGuide } from './provider-guides';
+import { TestInboundStatusService, type PollTick } from './test-inbound-status.service';
 
 /** Providers whose ToS forbid sending mail on their users' behalf
  * (SPF/DKIM won't authorise us). We surface this to the operator so
@@ -71,44 +63,55 @@ interface ParsedLabel {
   email: string;
 }
 
+export type WizardStep = 1 | 2 | 3 | 4;
+
+const DEFAULT_PROVIDER_KEY = 'gmail';
+
 @Component({
   selector: 'app-inbound-addresses-tab',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ForwardingWizardComponent, LucideAngularModule, ReactiveFormsModule],
+  imports: [LucideAngularModule, ReactiveFormsModule],
   templateUrl: './inbound-addresses-tab.component.html',
 })
-export class InboundAddressesTabComponent {
+export class InboundAddressesTabComponent implements OnDestroy {
   private readonly api = inject(InboundAddressesService);
   private readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly poll = inject(TestInboundStatusService);
 
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
   readonly addresses = signal<ForwardedAddress[]>([]);
 
-  /** Row-id currently in the middle of a PATCH / DELETE — powers the
-   * per-row spinner + disables its action buttons. */
+  /** Row-id currently in the middle of a PATCH / DELETE. */
   readonly busyId = signal<string | null>(null);
-
-  /** True while the deep multi-step wizard modal is mounted. Launched
-   *  from the inline "Continue" button when the operator's ready to
-   *  set up the forwarding rule at their provider. */
-  readonly showWizard = signal(false);
 
   /** Inline "Add address" card — always visible when open. */
   readonly addFormOpen = signal(true);
   readonly creating = signal(false);
 
-  /** Which row's inline "Setting up" panel is expanded. Freshly-created
-   *  rows open by default (``expandedId`` set on create); users toggle
-   *  after the first inbound arrives. */
+  /** Which row's inline setup panel is expanded. */
   readonly expandedId = signal<string | null>(null);
 
   /** Which row's 3-dot overflow menu is open. */
   readonly openMenuId = signal<string | null>(null);
+
+  /** Per-row step in the inline 4-step setup flow. Defaults to 1. */
+  readonly rowStep = signal<Record<string, WizardStep>>({});
+
+  /** Per-row selected provider (key into PROVIDER_GUIDES). Defaults to 'gmail'. */
+  readonly rowProvider = signal<Record<string, string>>({});
+
+  /** Latest poll tick per row for step 4 status display. */
+  readonly rowPollTick = signal<Record<string, PollTick>>({});
+
+  readonly providerOrder = PROVIDER_ORDER;
+  readonly guides = PROVIDER_GUIDES;
+
+  private _pollSubs = new Map<string, Subscription>();
 
   protected readonly addForm = {
     email: this.fb.control<string>('', {
@@ -128,9 +131,6 @@ export class InboundAddressesTabComponent {
     return [...active, ...inactive];
   });
 
-  /** True when at least one active row hasn't received any mail yet —
-   *  drives the "Not receiving yet · One address is waiting on its
-   *  forwarding rule" banner Prativani shows above the list. */
   readonly hasPendingReceiver = computed(() => {
     return this.addresses().some((r) => r.is_active && !r.last_inbound_at);
   });
@@ -143,6 +143,11 @@ export class InboundAddressesTabComponent {
     this.reload();
   }
 
+  ngOnDestroy(): void {
+    for (const sub of this._pollSubs.values()) sub.unsubscribe();
+    this._pollSubs.clear();
+  }
+
   reload(): void {
     this.loading.set(true);
     this.loadError.set(null);
@@ -150,6 +155,9 @@ export class InboundAddressesTabComponent {
       next: (rows) => {
         this.addresses.set(rows);
         this.loading.set(false);
+        for (const row of rows) {
+          if (row.last_inbound_at) this._stopPolling(row.id);
+        }
       },
       error: (err) => {
         this.loadError.set(extractApiError(err) ?? 'Could not load inbound addresses.');
@@ -172,7 +180,6 @@ export class InboundAddressesTabComponent {
     if (this.creating()) return;
     this.addForm.email.reset('');
     this.addForm.display.reset('');
-    // Match Prativani: cancel just resets, doesn't collapse the card.
   }
 
   submitAdd(): void {
@@ -204,7 +211,9 @@ export class InboundAddressesTabComponent {
   // --- Row actions ---------------------------------------------------
 
   toggleExpanded(id: string): void {
+    const wasOpen = this.expandedId() === id;
     this.expandedId.update((current) => (current === id ? null : id));
+    if (wasOpen && this.stepFor(id) === 4) this._stopPolling(id);
   }
 
   toggleOverflowMenu(id: string): void {
@@ -228,18 +237,6 @@ export class InboundAddressesTabComponent {
     if (!row.forwarding_address) return;
     await navigator.clipboard.writeText(row.forwarding_address);
     this.toast.success(`Copied ${row.forwarding_address}`);
-  }
-
-  /** Mount the shipped Step-6 3-step wizard for the multi-step guide. */
-  continueWizard(row: ForwardedAddress): void {
-    void row;
-    this.openMenuId.set(null);
-    this.showWizard.set(true);
-  }
-
-  onWizardClose(): void {
-    this.showWizard.set(false);
-    this.reload();
   }
 
   toggleAutoCreate(row: ForwardedAddress): void {
@@ -298,6 +295,7 @@ export class InboundAddressesTabComponent {
       next: () => {
         this.busyId.set(null);
         this.toast.success(`${parsed.email} deleted.`);
+        this._stopPolling(row.id);
         this.reload();
       },
       error: (err) => {
@@ -307,12 +305,77 @@ export class InboundAddressesTabComponent {
     });
   }
 
+  // --- Inline stepper -------------------------------------------------
+
+  stepFor(rowId: string): WizardStep {
+    return this.rowStep()[rowId] ?? 1;
+  }
+
+  providerKeyFor(rowId: string): string {
+    return this.rowProvider()[rowId] ?? DEFAULT_PROVIDER_KEY;
+  }
+
+  guideFor(rowId: string): ProviderGuide {
+    return this.guides[this.providerKeyFor(rowId)];
+  }
+
+  pickRowProvider(rowId: string, key: string): void {
+    if (!this.guides[key]) return;
+    this.rowProvider.update((current) => ({ ...current, [rowId]: key }));
+  }
+
+  advanceStep(rowId: string): void {
+    const current = this.stepFor(rowId);
+    if (current >= 4) return;
+    const next = (current + 1) as WizardStep;
+    this.rowStep.update((c) => ({ ...c, [rowId]: next }));
+    if (next === 4) this._startPolling(rowId);
+  }
+
+  backStep(rowId: string): void {
+    const current = this.stepFor(rowId);
+    if (current <= 1) return;
+    if (current === 4) this._stopPolling(rowId);
+    const prev = (current - 1) as WizardStep;
+    this.rowStep.update((c) => ({ ...c, [rowId]: prev }));
+  }
+
+  goToStep(rowId: string, step: WizardStep): void {
+    if (step < 1 || step > 4) return;
+    const wasStep4 = this.stepFor(rowId) === 4;
+    this.rowStep.update((c) => ({ ...c, [rowId]: step }));
+    if (step === 4 && !wasStep4) this._startPolling(rowId);
+    if (step !== 4 && wasStep4) this._stopPolling(rowId);
+  }
+
+  pollTickFor(rowId: string): PollTick | null {
+    return this.rowPollTick()[rowId] ?? null;
+  }
+
+  private _startPolling(rowId: string): void {
+    this._stopPolling(rowId);
+    const sub = this.poll.poll(rowId).subscribe({
+      next: (tick) => {
+        this.rowPollTick.update((c) => ({ ...c, [rowId]: tick }));
+        if (tick.kind === 'received') {
+          this.toast.success('Test email received. Setup verified.');
+          this.reload();
+        }
+      },
+    });
+    this._pollSubs.set(rowId, sub);
+  }
+
+  private _stopPolling(rowId: string): void {
+    const sub = this._pollSubs.get(rowId);
+    if (sub) {
+      sub.unsubscribe();
+      this._pollSubs.delete(rowId);
+    }
+  }
+
   // --- Label parsing --------------------------------------------------
 
-  /** Split a stored ``label`` into ``{display, email}``. Handles both
-   *  RFC-5322 style ``"Display Name <email@x.com>"`` and the bare
-   *  ``email@x.com`` form. Falls back to treating the whole string as
-   *  the email when no ``<...>`` block is present. */
   parseLabel(label: string): ParsedLabel {
     const trimmed = (label || '').trim();
     const m = trimmed.match(/^(.*?)\s*<([^<>]+)>\s*$/);
@@ -323,7 +386,6 @@ export class InboundAddressesTabComponent {
     return { display: '', email: trimmed };
   }
 
-  /** Inverse of :func:`parseLabel`. */
   private _formatLabel(display: string, email: string): string {
     if (!display) return email;
     const needsQuote = /[",<>@]/.test(display);
@@ -331,7 +393,6 @@ export class InboundAddressesTabComponent {
     return `${safeDisplay} <${email}>`;
   }
 
-  /** True when the address's email domain is a free consumer provider. */
   isFreeProvider(row: ForwardedAddress): boolean {
     const domain = this.parseLabel(row.label).email.split('@')[1]?.toLowerCase();
     return !!domain && FREE_PROVIDER_DOMAINS.has(domain);

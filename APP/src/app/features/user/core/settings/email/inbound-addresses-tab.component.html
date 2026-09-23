@@ -246,47 +246,48 @@
                 class="border-t border-subtle bg-surface-2 px-4 py-4 space-y-4 rounded-b-xl"
                 data-testid="inbound-setup-panel"
               >
-                <!-- Receiving section -->
-                <div class="rounded-lg border border-subtle bg-surface p-4">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="flex items-start gap-3">
-                      <span
-                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-white"
-                      >
-                        1
-                      </span>
-                      <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-wide text-muted">
-                          Receiving
-                        </p>
-                        <p class="text-sm font-medium text-default">Setting up</p>
+                @if (row.last_inbound_at) {
+                  <!-- Verified summary — collapses the stepper once the
+                       first inbound has arrived. -->
+                  <div
+                    class="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4"
+                    data-testid="inbound-verified-panel"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="flex items-start gap-3">
+                        <span
+                          class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"
+                        >
+                          <lucide-icon name="check" size="12"></lucide-icon>
+                        </span>
+                        <div>
+                          <p
+                            class="text-[11px] font-semibold uppercase tracking-wide text-emerald-500"
+                          >
+                            Receiving
+                          </p>
+                          <p class="text-sm font-medium text-default">
+                            Verified — last inbound {{ lastInboundLabel(row.last_inbound_at) }}
+                          </p>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        class="text-sm text-accent hover:underline"
+                        (click)="toggleExpanded(row.id)"
+                        data-testid="inbound-verified-close"
+                      >
+                        Close
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      class="text-sm text-accent hover:underline"
-                      (click)="toggleExpanded(row.id)"
-                      data-testid="inbound-setup-close"
-                    >
-                      Close
-                    </button>
-                  </div>
-
-                  <div class="mt-4">
-                    <p class="text-sm font-medium text-default">Copy your forwarding address</p>
-                    <p class="mt-1 text-sm text-muted">
-                      Keep your mailbox exactly as it is. Your provider will send a copy of incoming
-                      mail here.
-                    </p>
-
                     <div
                       class="mt-3 flex items-center justify-between gap-3 rounded-lg border border-dashed border-subtle bg-surface-2 p-3"
                     >
                       <div class="min-w-0">
                         <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                          Your forwarding address
+                          Forwarding address
                         </p>
-                        <p class="truncate font-mono text-sm text-default">
+                        <p class="truncate font-mono text-xs text-default">
                           {{ row.forwarding_address }}
                         </p>
                       </div>
@@ -294,37 +295,391 @@
                         type="button"
                         class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
                         (click)="copyAddress(row)"
-                        data-testid="inbound-setup-copy"
+                        data-testid="inbound-verified-copy"
                       >
                         <lucide-icon name="copy" size="12"></lucide-icon>
                         Copy
                       </button>
                     </div>
-
-                    <p class="mt-2 text-xs text-muted">
-                      Unique to
-                      <span class="font-medium text-default">{{ parsed.email }}</span>
-                      — it is how we know which forwarded email was written to, so keep it to
-                      yourselves.
-                    </p>
-
-                    <div class="mt-4 flex justify-end">
+                  </div>
+                } @else {
+                  <!-- Setup mode — inline 4-step stepper (Copy → Add at
+                       provider → Confirm → Test). -->
+                  <div
+                    class="rounded-lg border border-subtle bg-surface p-4"
+                    data-testid="inbound-setup-panel"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="flex items-start gap-3">
+                        <span
+                          class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-white"
+                        >
+                          1
+                        </span>
+                        <div>
+                          <p class="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                            Receiving
+                          </p>
+                          <p class="text-sm font-medium text-default">Setting up</p>
+                        </div>
+                      </div>
                       <button
                         type="button"
-                        class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
-                        (click)="continueWizard(row)"
-                        data-testid="inbound-setup-continue"
+                        class="text-sm text-accent hover:underline"
+                        (click)="toggleExpanded(row.id)"
+                        data-testid="inbound-setup-close"
                       >
-                        Continue
-                        <lucide-icon name="arrow-right" size="14"></lucide-icon>
+                        Close
                       </button>
                     </div>
 
-                    <p class="mt-3 text-xs text-muted">
-                      Last inbound: {{ lastInboundLabel(row.last_inbound_at) }}
-                    </p>
+                    <!-- Stepper header -->
+                    <div
+                      class="mt-4 flex items-center gap-2 overflow-x-auto pb-1"
+                      data-testid="inbound-stepper"
+                      role="tablist"
+                    >
+                      <button
+                        type="button"
+                        class="flex shrink-0 items-center gap-2 text-xs"
+                        (click)="goToStep(row.id, 1)"
+                        [attr.aria-current]="stepFor(row.id) === 1 ? 'step' : null"
+                        [attr.data-testid]="'stepper-node-1'"
+                      >
+                        <span
+                          class="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold"
+                          [class]="
+                            stepFor(row.id) === 1
+                              ? 'bg-accent text-white'
+                              : stepFor(row.id) > 1
+                                ? 'bg-emerald-500 text-white'
+                                : 'border border-subtle bg-surface text-muted'
+                          "
+                        >
+                          @if (stepFor(row.id) > 1) {
+                            <lucide-icon name="check" size="12"></lucide-icon>
+                          } @else {
+                            1
+                          }
+                        </span>
+                        <span
+                          [class]="
+                            stepFor(row.id) === 1 ? 'font-semibold text-default' : 'text-muted'
+                          "
+                        >
+                          Copy address
+                        </span>
+                      </button>
+                      <div
+                        class="h-px min-w-4 flex-1"
+                        [class]="stepFor(row.id) > 1 ? 'bg-emerald-500' : 'bg-zinc-500/20'"
+                      ></div>
+
+                      <button
+                        type="button"
+                        class="flex shrink-0 items-center gap-2 text-xs"
+                        (click)="goToStep(row.id, 2)"
+                        [attr.aria-current]="stepFor(row.id) === 2 ? 'step' : null"
+                        [attr.data-testid]="'stepper-node-2'"
+                      >
+                        <span
+                          class="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold"
+                          [class]="
+                            stepFor(row.id) === 2
+                              ? 'bg-accent text-white'
+                              : stepFor(row.id) > 2
+                                ? 'bg-emerald-500 text-white'
+                                : 'border border-subtle bg-surface text-muted'
+                          "
+                        >
+                          @if (stepFor(row.id) > 2) {
+                            <lucide-icon name="check" size="12"></lucide-icon>
+                          } @else {
+                            2
+                          }
+                        </span>
+                        <span
+                          [class]="
+                            stepFor(row.id) === 2 ? 'font-semibold text-default' : 'text-muted'
+                          "
+                        >
+                          Add at provider
+                        </span>
+                      </button>
+                      <div
+                        class="h-px min-w-4 flex-1"
+                        [class]="stepFor(row.id) > 2 ? 'bg-emerald-500' : 'bg-zinc-500/20'"
+                      ></div>
+
+                      <button
+                        type="button"
+                        class="flex shrink-0 items-center gap-2 text-xs"
+                        (click)="goToStep(row.id, 3)"
+                        [attr.aria-current]="stepFor(row.id) === 3 ? 'step' : null"
+                        [attr.data-testid]="'stepper-node-3'"
+                      >
+                        <span
+                          class="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold"
+                          [class]="
+                            stepFor(row.id) === 3
+                              ? 'bg-accent text-white'
+                              : stepFor(row.id) > 3
+                                ? 'bg-emerald-500 text-white'
+                                : 'border border-subtle bg-surface text-muted'
+                          "
+                        >
+                          @if (stepFor(row.id) > 3) {
+                            <lucide-icon name="check" size="12"></lucide-icon>
+                          } @else {
+                            3
+                          }
+                        </span>
+                        <span
+                          [class]="
+                            stepFor(row.id) === 3 ? 'font-semibold text-default' : 'text-muted'
+                          "
+                        >
+                          Confirm
+                        </span>
+                      </button>
+                      <div
+                        class="h-px min-w-4 flex-1"
+                        [class]="stepFor(row.id) > 3 ? 'bg-emerald-500' : 'bg-zinc-500/20'"
+                      ></div>
+
+                      <button
+                        type="button"
+                        class="flex shrink-0 items-center gap-2 text-xs"
+                        (click)="goToStep(row.id, 4)"
+                        [attr.aria-current]="stepFor(row.id) === 4 ? 'step' : null"
+                        [attr.data-testid]="'stepper-node-4'"
+                      >
+                        <span
+                          class="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold"
+                          [class]="
+                            stepFor(row.id) === 4
+                              ? 'bg-accent text-white'
+                              : 'border border-subtle bg-surface text-muted'
+                          "
+                        >
+                          4
+                        </span>
+                        <span
+                          [class]="
+                            stepFor(row.id) === 4 ? 'font-semibold text-default' : 'text-muted'
+                          "
+                        >
+                          Test
+                        </span>
+                      </button>
+                    </div>
+
+                    <!-- Step 1: Copy address -->
+                    @if (stepFor(row.id) === 1) {
+                      <div class="mt-5" data-testid="stepper-panel-1">
+                        <p class="text-sm font-medium text-default">Copy your forwarding address</p>
+                        <p class="mt-1 text-sm text-muted">
+                          Keep your mailbox exactly as it is. Your provider will send a copy of
+                          incoming mail here.
+                        </p>
+                        <div
+                          class="mt-3 flex items-center justify-between gap-3 rounded-lg border border-dashed border-subtle bg-surface-2 p-3"
+                        >
+                          <div class="min-w-0">
+                            <p class="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                              Your forwarding address
+                            </p>
+                            <p class="truncate font-mono text-sm text-default">
+                              {{ row.forwarding_address }}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2"
+                            (click)="copyAddress(row)"
+                            data-testid="inbound-setup-copy"
+                          >
+                            <lucide-icon name="copy" size="12"></lucide-icon>
+                            Copy
+                          </button>
+                        </div>
+                        <p class="mt-2 text-xs text-muted">
+                          Unique to
+                          <span class="font-medium text-default">{{ parsed.email }}</span>
+                          — it is how we know which forwarded email was written to, so keep it to
+                          yourselves.
+                        </p>
+                      </div>
+                    }
+
+                    <!-- Step 2: Add at provider -->
+                    @if (stepFor(row.id) === 2) {
+                      <div class="mt-5" data-testid="stepper-panel-2">
+                        <p class="text-sm font-medium text-default">Add it at your provider</p>
+                        <p class="mt-1 text-sm text-muted">
+                          Tell your mail provider to forward a copy of incoming mail to the address
+                          you copied.
+                        </p>
+                        <div class="mt-3 flex flex-wrap gap-1 border-b border-subtle">
+                          @for (key of providerOrder; track key) {
+                            <button
+                              type="button"
+                              class="-mb-px border-b-2 px-3 py-2 text-sm font-medium"
+                              [class]="
+                                providerKeyFor(row.id) === key
+                                  ? 'border-accent text-default'
+                                  : 'border-transparent text-muted hover:text-default'
+                              "
+                              (click)="pickRowProvider(row.id, key)"
+                              [attr.data-testid]="'stepper-provider-' + key"
+                            >
+                              {{ guides[key].title }}
+                            </button>
+                          }
+                        </div>
+                        @let guide = guideFor(row.id);
+                        <div class="mt-4">
+                          @if (guide.placeholder) {
+                            <div
+                              class="rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-400"
+                            >
+                              Detailed steps for this provider are catching up — the notes below are
+                              a starting point. Reach out to CRM support if you get stuck.
+                            </div>
+                          }
+                          <ol
+                            class="mt-2 list-decimal space-y-1 pl-5 text-sm text-default"
+                            data-testid="stepper-provider-steps"
+                          >
+                            @for (guideStep of guide.steps; track guideStep) {
+                              <li>{{ guideStep }}</li>
+                            }
+                          </ol>
+                          @if (guide.docsUrl) {
+                            <a
+                              [href]="guide.docsUrl"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="mt-3 inline-block text-xs text-accent hover:underline"
+                            >
+                              Open the {{ guide.title }} docs
+                            </a>
+                          }
+                        </div>
+                      </div>
+                    }
+
+                    <!-- Step 3: Confirm -->
+                    @if (stepFor(row.id) === 3) {
+                      <div class="mt-5" data-testid="stepper-panel-3">
+                        <p class="text-sm font-medium text-default">
+                          Confirm the address at your provider
+                        </p>
+                        <p class="mt-1 text-sm text-muted">
+                          Your provider sent a confirmation email to your
+                          <span class="font-mono">{{ parsed.email }}</span> inbox containing a
+                          verification code (or a click-through link). Open that email in your own
+                          mailbox, grab the code (or click the link), and paste it back into your
+                          provider's confirmation dialog. Once your provider marks the address
+                          confirmed, click Continue below.
+                        </p>
+                        <div
+                          class="mt-3 rounded-md border border-blue-500/20 bg-blue-500/10 p-3 text-sm text-default"
+                        >
+                          <p class="font-medium">
+                            Skip this step if your provider doesn't need confirmation
+                          </p>
+                          <p class="mt-1 text-xs text-muted">
+                            Google Workspace admin rules, Microsoft 365 Exchange rules, and some
+                            Zoho admin flows skip the code step — they trust the admin. In that case
+                            go straight to Test.
+                          </p>
+                        </div>
+                      </div>
+                    }
+
+                    <!-- Step 4: Test -->
+                    @if (stepFor(row.id) === 4) {
+                      <div class="mt-5" data-testid="stepper-panel-4">
+                        <p class="text-sm font-medium text-default">Check it works</p>
+                        <p class="mt-1 text-sm text-muted">
+                          Send a test email to
+                          <span class="font-mono">{{ parsed.email }}</span> from any other mailbox.
+                          Your provider should forward it here within seconds.
+                        </p>
+                        <div
+                          class="mt-3 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400"
+                        >
+                          Only mail arriving <b>after</b> the forwarding rule was saved will be
+                          forwarded. If you tested earlier, send a fresh one.
+                        </div>
+                        @let tick = pollTickFor(row.id);
+                        <div class="mt-3 flex items-center gap-2" data-testid="stepper-poll-status">
+                          @if (tick && tick.kind === 'received') {
+                            <span
+                              class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-500"
+                            >
+                              <lucide-icon name="check" size="12"></lucide-icon>
+                              Received! Setup verified.
+                            </span>
+                          } @else if (tick && tick.kind === 'timeout') {
+                            <span
+                              class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-400"
+                            >
+                              <lucide-icon name="alert-triangle" size="12"></lucide-icon>
+                              Not received in 5 min. Recheck the forwarding rule at your provider.
+                            </span>
+                          } @else {
+                            <span
+                              class="inline-flex items-center gap-1.5 rounded-full border border-zinc-500/20 bg-zinc-500/15 px-2.5 py-1 text-xs font-medium text-zinc-400"
+                            >
+                              <lucide-icon
+                                name="loader-2"
+                                size="12"
+                                class="animate-spin"
+                              ></lucide-icon>
+                              Waiting for first inbound…
+                            </span>
+                          }
+                        </div>
+                      </div>
+                    }
+
+                    <!-- Nav -->
+                    <div class="mt-5 flex items-center justify-between gap-2">
+                      <div>
+                        @if (stepFor(row.id) > 1) {
+                          <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default hover:bg-surface-2"
+                            (click)="backStep(row.id)"
+                            data-testid="stepper-back"
+                          >
+                            <lucide-icon name="arrow-left" size="14"></lucide-icon>
+                            Back
+                          </button>
+                        }
+                      </div>
+                      <div>
+                        @if (stepFor(row.id) < 4) {
+                          <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
+                            (click)="advanceStep(row.id)"
+                            data-testid="stepper-continue"
+                          >
+                            @if (stepFor(row.id) === 2) {
+                              I've done this
+                            } @else {
+                              Continue
+                            }
+                            <lucide-icon name="arrow-right" size="14"></lucide-icon>
+                          </button>
+                        }
+                      </div>
+                    </div>
                   </div>
-                </div>
+                }
 
                 <!-- SEND AS YOU section -->
                 <div
@@ -371,9 +726,5 @@
         }
       </ul>
     }
-  }
-
-  @if (showWizard()) {
-    <app-forwarding-wizard (closed)="onWizardClose()" />
   }
 </section>
