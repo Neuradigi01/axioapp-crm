@@ -28,6 +28,7 @@ import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.se
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { FieldErrorComponent } from '../shared/forms/field-error.component';
+import { FormToastHelper } from '../shared/forms/form-toast.helper';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
@@ -97,6 +98,7 @@ export class TaskFormModalComponent extends BaseFormModalComponent implements On
   private readonly api = inject(TasksApiService);
   private readonly fb = inject(FormBuilder);
   private readonly contactsApi = inject(ContactsApiService);
+  private readonly formToast = inject(FormToastHelper);
 
   /** T4 — Task custom fields backed by the standard
    *  `GET /custom-fields/task/render` endpoint (added by the tasks
@@ -342,9 +344,15 @@ export class TaskFormModalComponent extends BaseFormModalComponent implements On
   }
 
   protected onSubmit(): void {
-    if (this.form.invalid || this.saving()) return;
+    if (this.saving()) return;
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.formToast.requiredFieldsMissing();
+      return;
+    }
     if (!this.customValid()) {
       this.error.set('Please fix the highlighted custom fields.');
+      this.formToast.requiredFieldsMissing();
       return;
     }
     const raw = this.form.getRawValue();

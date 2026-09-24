@@ -54,6 +54,51 @@ interface EmailAttachmentMeta {
 }
 
 /**
+ * Strip the Gmail/Outlook reply-quote block from an inbound email body.
+ * Cuts the text at whichever comes first:
+ *   - a line starting with ``>`` (Gmail wraps the included message with
+ *     ``> `` per RFC 3676)
+ *   - an "On <date/time> <name> <email> wrote:" attribution (may wrap
+ *     across two lines when Gmail hits its 76-char soft wrap)
+ *   - an Outlook / plain-text divider like ``-----Original Message-----``
+ *     or ``-----Forwarded message-----``
+ * Trailing blank lines from what remains are collapsed so the bubble
+ * doesn't render whitespace where the quote used to be.
+ */
+function stripEmailQuote(text: string): string {
+  const lines = text.split(/\r?\n/);
+  let cutAt = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (/^>/.test(trimmed)) {
+      cutAt = i;
+      break;
+    }
+    if (/^-{2,}\s*(Original|Forwarded)\s+Message\s*-{2,}$/i.test(trimmed)) {
+      cutAt = i;
+      break;
+    }
+    if (/^On\b.+\bwrote:\s*$/i.test(trimmed)) {
+      cutAt = i;
+      break;
+    }
+    // Gmail sometimes soft-wraps the attribution across two lines
+    // (attribution on line N, bare ``wrote:`` on line N+1).
+    if (/^On\b/i.test(trimmed)) {
+      const combined = (trimmed + ' ' + (lines[i + 1] ?? '').trim()).trim();
+      if (/^On\b.+\bwrote:\s*$/i.test(combined)) {
+        cutAt = i;
+        break;
+      }
+    }
+  }
+  if (cutAt < 0) return text;
+  const kept = lines.slice(0, cutAt);
+  while (kept.length && !kept[kept.length - 1].trim()) kept.pop();
+  return kept.join('\n');
+}
+
+/**
  * Chat thread — renders bubbles, auto-scrolls to bottom on new
  * messages. The conversation header shows the external_id + channel +
  * a state-aware AI pill that reflects the real ``ai_active`` /
@@ -495,6 +540,18 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
     return found ? (found as unknown as StickerAttachment) : null;
   }
 
+  /** Bubble text as displayed to the operator. Email inbound bodies
+   *  arrive with the full Gmail/Outlook reply quote chain appended
+   *  ("On <date> <sender> wrote:" + ``>``-prefixed lines). That noise
+   *  swamps the actual new reply, so on the email channel we strip the
+   *  quote block and render only the fresh text. Non-email channels
+   *  pass through unchanged. */
+  protected visibleText(m: ConversationMessage): string {
+    const raw = m.text ?? '';
+    if (!raw || this.conversation?.channel !== 'email') return raw;
+    return stripEmailQuote(raw);
+  }
+
   /** mailgun-inbound Step 5 — pluck email-shaped attachments
    *  (those carrying a ``storage_key`` field). WhatsApp / Meta
    *  attachments never have ``storage_key`` so they're naturally
@@ -634,7 +691,7 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
   }
 
   protected async copyText(m: ConversationMessage): Promise<void> {
-    const text = m.text ?? '';
+    const text = this.visibleText(m);
     if (!text || typeof navigator?.clipboard?.writeText !== 'function') {
       return;
     }

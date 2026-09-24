@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { ToastService } from '../../../../shared/components/toast/toast.service';
@@ -81,6 +82,7 @@ import { extractApiError } from '@core/services/api-error.util';
     MobileSelectComponent,
     WhatsAppTemplatePickerComponent,
     ConfirmDialogComponent,
+    RouterLink,
   ],
   templateUrl: './conversations.page.html',
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -127,6 +129,16 @@ export class ConversationsPageComponent {
    *  banner but labelled per-action so a "Could not update reaction"
    *  toast doesn't read like a list-load failure. */
   protected readonly sendError = signal<string | null>(null);
+
+  /** True when the current sendError is the backend's CAN-SPAM / DPDP
+   *  refusal ("Your organisation has no physical address configured…").
+   *  The template swaps in a friendlier banner + a direct CTA to
+   *  Settings → Store Profile so the operator can fix the missing
+   *  address in one click instead of parsing the raw 400. */
+  protected readonly sendErrorNeedsStoreProfile = computed(() => {
+    const err = this.sendError();
+    return !!err && /physical address/i.test(err);
+  });
 
   protected readonly selectedId = signal<string | null>(null);
   protected readonly detail = signal<ConversationDetail | null>(null);

@@ -19,6 +19,7 @@ import { nullableTrim } from '@core/services/form.util';
 import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { FormToastHelper } from '../shared/forms/form-toast.helper';
 import { StandardFieldsApiService } from '../standard-fields/standard-fields-api.service';
 import { StandardFieldsSignalsService } from '../standard-fields/standard-fields-signals.service';
 import type { StandardFieldRendered } from '../standard-fields/types';
@@ -62,6 +63,7 @@ export class AddItemModalComponent {
   private readonly stdSignals = inject(StandardFieldsSignalsService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly formToast = inject(FormToastHelper);
 
   protected readonly stdFields = signal<Record<string, StandardFieldRendered>>({});
 
@@ -682,15 +684,18 @@ export class AddItemModalComponent {
   protected onSubmit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      this.formToast.requiredFieldsMissing();
       return;
     }
     if (!this.customValid()) {
       this.submitError.set('Please fix the highlighted custom fields.');
+      this.formToast.requiredFieldsMissing();
       return;
     }
     const raw = this.form.getRawValue();
     if (raw.price === null) {
       this.form.controls.price.markAsTouched();
+      this.formToast.requiredFieldsMissing();
       return;
     }
     this.submitting.set(true);

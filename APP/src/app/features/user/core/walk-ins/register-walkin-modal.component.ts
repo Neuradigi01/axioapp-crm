@@ -17,6 +17,7 @@ import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.se
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
+import { FormToastHelper } from '../shared/forms/form-toast.helper';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import type { StandardFieldRendered } from '../standard-fields/types';
@@ -71,6 +72,7 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(WalkInsApiService);
   private readonly contactsApi = inject(ContactsApiService);
+  private readonly formToast = inject(FormToastHelper);
 
   @Output() readonly registered = new EventEmitter<QuickRegisterResponse>();
 
@@ -315,10 +317,12 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
     }
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      this.formToast.requiredFieldsMissing();
       return;
     }
     if (!this.customValid()) {
       this._submitError.set('Please fix the highlighted custom fields.');
+      this.formToast.requiredFieldsMissing();
       return;
     }
     this._submitError.set(null);

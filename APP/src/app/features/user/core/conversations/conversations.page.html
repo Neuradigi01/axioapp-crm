@@ -111,20 +111,60 @@
       @if (sendError(); as err) {
         <!-- Send / react / patch error. Docked at the top of the chat
              pane so it's contextually near the composer where the
-             failed action originated. -->
-        <div
-          class="flex items-start justify-between gap-2 border-b border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400"
-        >
-          <span>{{ err }}</span>
-          <button
-            type="button"
-            class="shrink-0 rounded px-1 text-amber-300 hover:text-amber-200"
-            (click)="dismissSendError()"
-            aria-label="Dismiss"
+             failed action originated. Missing-store-address gets a
+             richer banner with a direct CTA to Settings → Store Profile
+             so the operator can fix it in one click. -->
+        @if (sendErrorNeedsStoreProfile()) {
+          <div
+            class="flex items-start justify-between gap-3 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
           >
-            &times;
-          </button>
-        </div>
+            <div class="flex items-start gap-2">
+              <lucide-icon
+                name="alert-triangle"
+                size="14"
+                class="mt-0.5 shrink-0"
+                aria-hidden="true"
+              />
+              <span class="flex-1">
+                Your organisation has no physical address configured. CAN-SPAM and DPDP both require
+                it on every marketing email — replies will fail until you add one.
+              </span>
+            </div>
+            <div class="flex shrink-0 items-center gap-1">
+              <a
+                routerLink="/user/settings"
+                [queryParams]="{ tab: 'store' }"
+                (click)="dismissSendError()"
+                class="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-300 transition hover:bg-amber-500/20 hover:text-amber-200"
+              >
+                Open Store Profile
+                <lucide-icon name="arrow-right" size="12" aria-hidden="true" />
+              </a>
+              <button
+                type="button"
+                class="rounded px-1 text-amber-300 hover:text-amber-200"
+                (click)="dismissSendError()"
+                aria-label="Dismiss"
+              >
+                &times;
+              </button>
+            </div>
+          </div>
+        } @else {
+          <div
+            class="flex items-start justify-between gap-2 border-b border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400"
+          >
+            <span>{{ err }}</span>
+            <button
+              type="button"
+              class="shrink-0 rounded px-1 text-amber-300 hover:text-amber-200"
+              (click)="dismissSendError()"
+              aria-label="Dismiss"
+            >
+              &times;
+            </button>
+          </div>
+        }
       }
       @if (selectedConversation(); as conv) {
         <!-- Mobile-only strip: back button + a Details toggle so the

@@ -16,6 +16,7 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 
 import { FurnitureAuthService } from '../auth/auth.service';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
+import { FormToastHelper } from '../shared/forms/form-toast.helper';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
@@ -61,6 +62,7 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
   private readonly contactsApi = inject(ContactsApiService);
   private readonly pipelinesApi = inject(PipelinesApiService);
   private readonly auth = inject(FurnitureAuthService);
+  private readonly formToast = inject(FormToastHelper);
 
   /** Today in local `YYYY-MM-DD` shape — bound to `[min]` on the
    *  expected-close-date picker so the browser also refuses past
@@ -261,10 +263,12 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
   protected onSubmit(): void {
     if (this.standard.invalid) {
       this.standard.markAllAsTouched();
+      this.formToast.requiredFieldsMissing();
       return;
     }
     if (!this.customValid()) {
       this._submitError.set('Please fix the highlighted custom fields.');
+      this.formToast.requiredFieldsMissing();
       return;
     }
 
@@ -276,6 +280,7 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
     if (this.contactBasics.invalid) {
       this.contactBasics.markAllAsTouched();
       this._submitError.set('Please fill the contact details.');
+      this.formToast.requiredFieldsMissing();
       return;
     }
     this._submitError.set(null);

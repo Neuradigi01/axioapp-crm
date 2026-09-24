@@ -211,7 +211,7 @@
                 </p>
               }
               @if (m.text) {
-                <p class="whitespace-pre-wrap break-words">{{ m.text }}</p>
+                <p class="whitespace-pre-wrap break-words">{{ visibleText(m) }}</p>
               }
               @switch (interactiveKind(m)) {
                 @case ('reply_buttons') {

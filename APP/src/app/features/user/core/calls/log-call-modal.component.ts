@@ -23,6 +23,7 @@ import {
   ContactsApiService,
 } from '../contacts/contacts-api.service';
 import { commonValidators } from '../shared/validators';
+import { FormToastHelper } from '../shared/forms/form-toast.helper';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import { Call, CallOutcome, CallsApiService } from './calls-api.service';
@@ -65,6 +66,7 @@ export class LogCallModalComponent {
   private readonly api = inject(CallsApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly formToast = inject(FormToastHelper);
 
   @Input() set outcomes(list: CallOutcome[]) {
     this._outcomes = list;
@@ -415,6 +417,7 @@ export class LogCallModalComponent {
     }
     if (!this.form.valid) {
       this.form.markAllAsTouched();
+      this.formToast.requiredFieldsMissing();
       return;
     }
     this.submitting.set(true);

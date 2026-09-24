@@ -23,6 +23,7 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import { FormToastHelper } from '../../../core/shared/forms/form-toast.helper';
 import {
   MobileSelectComponent,
   MobileSelectOption,
@@ -102,6 +103,7 @@ export class PropertyFormPageComponent {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly formToast = inject(FormToastHelper);
 
   protected readonly TYPE_OPTIONS = PROPERTY_TYPE_OPTIONS;
   protected readonly CATEGORY_OPTIONS = PROPERTY_CATEGORY_OPTIONS;
@@ -294,6 +296,7 @@ export class PropertyFormPageComponent {
     this.form.markAllAsTouched();
     if (this.form.invalid) {
       this.submitError.set('Please fill in the highlighted fields.');
+      this.formToast.requiredFieldsMissing();
       return;
     }
     this.submitError.set(null);
