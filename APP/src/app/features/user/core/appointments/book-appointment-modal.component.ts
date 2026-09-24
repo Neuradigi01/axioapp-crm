@@ -241,10 +241,12 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
 
   protected onCustomValueChange(v: FormValue): void {
     this.customValue.set(v);
+    if (this._submitError()) this._submitError.set(null);
   }
 
   protected onCustomValidityChange(valid: boolean): void {
     this.customValid.set(valid);
+    if (valid && this._submitError()) this._submitError.set(null);
   }
 
   override ngOnInit(): void {
@@ -294,6 +296,10 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
     // Preload the first page of contacts so the dropdown is instant
     // the moment the search field gets focus.
     this.contactQuery$.next('');
+
+    // Dismiss the "Please fill …" banner the instant the operator
+    // starts editing the flagged form.
+    this.clearErrorOnChange(this._submitError, this.form);
   }
 
   protected onContactQueryInput(event: Event): void {

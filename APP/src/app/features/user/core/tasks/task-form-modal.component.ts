@@ -254,6 +254,10 @@ export class TaskFormModalComponent extends BaseFormModalComponent implements On
         },
         error: () => this.contactSearching.set(false),
       });
+
+    // Dismiss the "Please fill …" banner the instant the operator
+    // starts editing the flagged form.
+    this.clearErrorOnChange(this.error, this.form);
   }
 
   protected onContactSearchInput(event: Event): void {
@@ -276,10 +280,12 @@ export class TaskFormModalComponent extends BaseFormModalComponent implements On
 
   protected onCustomValueChange(v: FormValue): void {
     this.customValue.set(v);
+    if (this.error()) this.error.set(null);
   }
 
   protected onCustomValidityChange(valid: boolean): void {
     this.customValid.set(valid);
+    if (valid && this.error()) this.error.set(null);
   }
 
   ngOnChanges(): void {

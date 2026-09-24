@@ -5,11 +5,13 @@ import {
   Input,
   OnInit,
   Output,
+  WritableSignal,
   effect,
   inject,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { AbstractControl } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
@@ -182,5 +184,23 @@ export abstract class BaseFormModalComponent implements OnInit {
 
   protected isHidden(key: string): boolean {
     return this.stdField(key)?.is_hidden === true;
+  }
+
+  // --- Auto-clear submit error ------------------------------------------
+
+  /** Wire the given form controls so any value change clears the given
+   *  error signal. Used to dismiss a "Please fill …" banner the instant
+   *  the operator starts editing the flagged field — otherwise the
+   *  stale red banner lingers until the next submit attempt. Call once
+   *  from the subclass's ``ngOnInit`` after all forms are built. */
+  protected clearErrorOnChange(
+    errorSignal: WritableSignal<string | null>,
+    ...controls: AbstractControl[]
+  ): void {
+    for (const control of controls) {
+      control.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+        if (errorSignal()) errorSignal.set(null);
+      });
+    }
   }
 }

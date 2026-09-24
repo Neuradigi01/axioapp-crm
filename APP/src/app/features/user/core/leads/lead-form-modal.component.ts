@@ -250,14 +250,20 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
 
     const existing = this._lead();
     if (existing) this.preloadEditContact(existing.contact_id);
+
+    // Dismiss the "Please fill …" banner the instant the operator
+    // starts editing any of the flagged forms.
+    this.clearErrorOnChange(this._submitError, this.standard, this.contactBasics);
   }
 
   protected onCustomValueChange(v: FormValue): void {
     this.customValue.set(v);
+    if (this._submitError()) this._submitError.set(null);
   }
 
   protected onCustomValidityChange(v: boolean): void {
     this.customValid.set(v);
+    if (v && this._submitError()) this._submitError.set(null);
   }
 
   protected onSubmit(): void {
