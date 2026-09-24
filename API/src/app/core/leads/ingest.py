@@ -54,6 +54,21 @@ from src.app.core.leads.service import create_lead
 logger = logging.getLogger(__name__)
 
 
+# Friendly labels for the timeline "duplicate submission" note. Raw
+# enum values ("manual", "whatsapp_flow") read like internal codes to
+# an operator; these labels are what actually shows up on the lead's
+# timeline + the Activities tab.
+_SOURCE_LABEL: dict[LeadSource, str] = {
+    LeadSource.manual: "manual entry",
+    LeadSource.bulk_import: "bulk import",
+    LeadSource.widget: "website form",
+    LeadSource.google_ads: "Google Ads",
+    LeadSource.meta_ads: "Meta Ads",
+    LeadSource.whatsapp_flow: "WhatsApp",
+    LeadSource.walk_in: "walk-in",
+}
+
+
 @dataclass(frozen=True, slots=True)
 class IngestResult:
     """Return shape from `ingest()`. `action` tells the caller which
@@ -107,10 +122,11 @@ async def ingest(
             )
         ).scalar_one_or_none()
         existing_assignee_id = _existing
-        # Append a "touchpoint" activity so the open lead's timeline
-        # shows the new inbound signal. We use `ActivityType.note`
-        # (the existing enum has no dedicated `touchpoint` value) with
-        # a payload that lets the UI render it specially when needed.
+        # Append a duplicate-submission activity so the open lead's
+        # timeline shows the new inbound signal. Uses `ActivityType.note`
+        # (the existing enum has no dedicated value) with `kind` in the
+        # payload so the UI can render it specially if needed.
+        source_label = _SOURCE_LABEL.get(source, source.value)
         await activities_log(
             entity_type="lead",
             entity_id=existing_lead_id,
@@ -118,7 +134,7 @@ async def ingest(
             payload={
                 "kind": "touchpoint",
                 "source": source.value,
-                "text": f"New touchpoint via {source.value}",
+                "text": f"Duplicate submission via {source_label} — added to this lead",
             },
             user_id=actor_user_id,
             org_id=org_id,
