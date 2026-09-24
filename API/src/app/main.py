@@ -10,13 +10,72 @@ Mounts:
 import os
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import FastAPI, HTTPException
 from fastapi import Request as FastAPIRequest
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from config import (
+    SENTRY_DSN,
+    SENTRY_ENVIRONMENT,
+    SENTRY_TRACES_SAMPLE_RATE,
+)
+
+
+def _sentry_before_send(event, hint):
+    """Last-mile PII scrubber run on every event before it leaves the
+    process. ``send_default_pii=False`` (below) already blocks IPs,
+    cookies and request bodies; this strips a few additional headers
+    the SDK's stock rules don't cover (JWT bearer, our x-api-key,
+    Mailgun/Meta HMAC signatures) and defensively nukes any request
+    body attached by future integrations."""
+    try:
+        request = event.get("request") or {}
+        headers = request.get("headers") or {}
+        for name in (
+            "Authorization",
+            "Cookie",
+            "X-Api-Key",
+            "X-Hub-Signature-256",
+            "X-Mailgun-Signature-256",
+        ):
+            if name in headers:
+                headers[name] = "[Filtered]"
+        request.pop("data", None)
+    except Exception:
+        # Never let the scrubber itself kill an event — a swallowed
+        # exception here beats a lost error report.
+        pass
+    return event
+
+
+# Init BEFORE ``app = FastAPI(...)`` so the Starlette + FastAPI
+# integrations can patch the ASGI stack. Empty DSN → SDK becomes a
+# no-op (safe default for tests + local dev without a Sentry project).
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=SENTRY_ENVIRONMENT,
+        traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
+        send_default_pii=False,
+        integrations=[
+            StarletteIntegration(),
+            FastApiIntegration(),
+            SqlalchemyIntegration(),
+            RedisIntegration(),
+            CeleryIntegration(),
+        ],
+        before_send=_sentry_before_send,
+    )
 
 # tasks/ai-assistants Step 5 — side-effect import so the 5 assistant
 # tables (tbl_ai_assistants, tbl_ai_assistant_knowledge/_chunks/

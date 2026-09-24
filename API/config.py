@@ -329,6 +329,19 @@ STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
+# Sentry error monitoring + performance tracing. Empty DSN disables the
+# SDK entirely (init() becomes a no-op) — safe default for tests and
+# tooling that imports config.py without a Sentry project on hand.
+# Sample rate accepts 0.0–1.0; anything outside that range is clamped
+# by the SDK. Dev defaults to 1.0 (capture everything); production
+# environments override via config.prod.env to keep the free tier alive.
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+SENTRY_ENVIRONMENT = os.getenv("SENTRY_ENVIRONMENT", "development")
+try:
+    SENTRY_TRACES_SAMPLE_RATE = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "1.0"))
+except ValueError:
+    SENTRY_TRACES_SAMPLE_RATE = 1.0
+
 # Public-ingest — trusted-proxy allow-list for X-Forwarded-For parsing.
 # Comma-separated CIDR ranges (or plain IPs — auto-widened). Empty =
 # trust nothing (dev default; XFF is ignored + the per-IP rate limiter

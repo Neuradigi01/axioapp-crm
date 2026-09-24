@@ -1,7 +1,34 @@
+import sentry_sdk
 from celery.signals import task_prerun, worker_process_init
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from celery import Celery
-from config import CELERY_ENABLED, COMPOSE_PROJECT_NAME
+from config import (
+    CELERY_ENABLED,
+    COMPOSE_PROJECT_NAME,
+    SENTRY_DSN,
+    SENTRY_ENVIRONMENT,
+    SENTRY_TRACES_SAMPLE_RATE,
+)
+
+# Celery workers are a separate process from the FastAPI app, so the
+# SDK init in ``src/app/main.py`` doesn't reach them — every task-side
+# exception would go unreported without this second init. Empty DSN =
+# no-op, same posture as the API init.
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=SENTRY_ENVIRONMENT,
+        traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
+        send_default_pii=False,
+        integrations=[
+            CeleryIntegration(),
+            SqlalchemyIntegration(),
+            RedisIntegration(),
+        ],
+    )
 
 # Eagerly import ORM models that are referenced by ForeignKey strings in
 # other models so SQLAlchemy can resolve them at first metadata use inside

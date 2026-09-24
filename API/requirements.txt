@@ -32,6 +32,13 @@ stripe>=10.0.0
 bleach[css]>=6.1.0
 croniter>=2.0,<3.0
 
+# Sentry error monitoring + performance tracing. Extras pull in the
+# FastAPI/Starlette + SQLAlchemy + Celery + Redis integrations we init in
+# ``src/app/main.py`` and ``src/celery/worker.py``. ``sentry_sdk.init(dsn="")``
+# is a no-op, so leaving ``SENTRY_DSN`` empty in ``config.env`` disables
+# observability entirely for local dev without touching code.
+sentry-sdk[fastapi]>=2.0,<3.0
+
 # tasks/chatbot-builder Step 5 — linear-time regex for the trigger
 # matcher (no ReDoS surface). The matcher gracefully falls back to
 # Python `re` with a save-time complexity linter + 4KB text cap if
