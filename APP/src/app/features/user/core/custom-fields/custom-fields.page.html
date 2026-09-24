@@ -200,9 +200,11 @@
 
         @if (field.source === 'pack') {
           <div
-            class="rounded-md border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+            class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200"
           >
-            <p class="font-semibold text-amber-100">Installed by a vertical pack.</p>
+            <p class="font-semibold text-amber-900 dark:text-amber-100">
+              Installed by a vertical pack.
+            </p>
             <p class="mt-1">
               Pack imports, workflows, and dynamic forms that key on
               <code class="font-mono">{{ field.field_key }}</code>
@@ -212,9 +214,9 @@
           </div>
         } @else if (field.source === 'system') {
           <div
-            class="rounded-md border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+            class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200"
           >
-            <p class="font-semibold text-amber-100">System field.</p>
+            <p class="font-semibold text-amber-900 dark:text-amber-100">System field.</p>
             <p class="mt-1">
               This field ships with the core CRM. Deleting it may affect built-in behaviour that
               expects this key.
