@@ -40,6 +40,13 @@ import {
  * during creation (immutable after — renames would silently break
  * every subscribed workflow).
  */
+
+/** Entity keys the picker hides. `contact` is out until we ship a
+ *  Contact create-form + date-field triggering for it — binding an event
+ *  to an entity you can't build against is a confusing dead-end. Mirror
+ *  of `entity-registry.hiddenFromPicker` for a different picker. */
+const HIDDEN_ENTITY_KEYS: ReadonlySet<string> = new Set(['contact']);
+
 @Component({
   selector: 'app-custom-events-page',
   standalone: true,
@@ -79,7 +86,7 @@ export class CustomEventsPageComponent {
       nonNullable: true,
       validators: [Validators.maxLength(2000)],
     }),
-    entity_type: this.fb.control<EntityType>('contact', { nonNullable: true }),
+    entity_type: this.fb.control<EntityType>('lead', { nonNullable: true }),
     schedule_type: this.fb.control<ScheduleType>('manual', { nonNullable: true }),
     // Composite value: `${source}::${field_ref}` so a single dropdown
     // can group both source families under one option list.
@@ -162,13 +169,12 @@ export class CustomEventsPageComponent {
       .listEntities()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (rows) => this.entityOptions.set(rows),
+        next: (rows) => this.entityOptions.set(rows.filter((r) => !HIDDEN_ENTITY_KEYS.has(r.key))),
         error: () => {
           // Fall back to a hardcoded default so the modal still opens
           // when the endpoint is unreachable (rare — same backend, same
           // auth as list()).
           this.entityOptions.set([
-            { key: 'contact', label: 'Contact' },
             { key: 'lead', label: 'Lead' },
             { key: 'appointment', label: 'Appointment' },
           ]);
@@ -202,7 +208,7 @@ export class CustomEventsPageComponent {
       event_key: '',
       name: '',
       description: '',
-      entity_type: 'contact',
+      entity_type: 'lead',
       schedule_type: 'manual',
       schedule_field: '',
       schedule_offset_days: '0',
