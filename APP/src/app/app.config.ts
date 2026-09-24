@@ -194,6 +194,8 @@ import {
   ZoomOut,
 } from 'lucide-angular';
 
+import * as Sentry from '@sentry/angular';
+
 import { authInterceptor } from '@core/interceptors/auth.interceptor';
 import { retryInterceptor } from '@core/interceptors/retry.interceptor';
 import { RoutesHelperService } from '@core/services/routes-helper.service';
@@ -201,6 +203,7 @@ import { ThemeService } from '@core/services/theme.service';
 import { SwUpdateService } from '@core/services/sw-update.service';
 import { BrandService } from '@core/services/brand.service';
 import { AppConfigApiService } from '@app/services/app-config-api.service';
+import { environment } from '../environments/environment';
 import { jwtInterceptor } from './features/user/core/auth/jwt.interceptor';
 import { GlobalErrorHandler } from './features/user/core/error/global-error-handler';
 
@@ -405,6 +408,14 @@ export const appConfig: ApplicationConfig = {
       const swUpdate = inject(SwUpdateService);
       const appConfigApi = inject(AppConfigApiService);
       const brand = inject(BrandService);
+
+      // Constructing TraceService attaches Sentry's router listener so
+      // navigation transactions land on the perf dashboard. Skipped when
+      // Sentry.init() was skipped (empty DSN) — instantiating the service
+      // without an SDK client would just log a warning.
+      if (environment.sentryDsn) {
+        inject(Sentry.TraceService);
+      }
 
       // Before anything renders, so no component observes the default brand
       // on a branded host and no branded tab flashes the wrong favicon.

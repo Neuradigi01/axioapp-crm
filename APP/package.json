@@ -28,6 +28,7 @@
     "@fontsource-variable/inter-tight": "^5.2.7",
     "@fontsource-variable/jetbrains-mono": "^5.2.7",
     "@neuradigi/debug-console": "^0.1.0",
+    "@sentry/angular": "^11.0.0",
     "apexcharts": "^5.13.0",
     "chart.js": "^4.5.1",
     "dagre": "^0.8.5",
