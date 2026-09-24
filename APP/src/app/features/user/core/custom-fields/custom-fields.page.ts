@@ -23,7 +23,7 @@ import { FieldFormComponent } from './field-form.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { CORE_ENTITY_REGISTRY, EntityDescriptor } from '../shared/entity-registry/entity-registry';
 
-const ENTITY_TYPES = CORE_ENTITY_REGISTRY;
+const ENTITY_TYPES = CORE_ENTITY_REGISTRY.filter((d) => !d.hiddenFromPicker);
 
 @Component({
   selector: 'app-custom-fields-page',

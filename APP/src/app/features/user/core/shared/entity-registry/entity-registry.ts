@@ -15,6 +15,13 @@ export interface EntityDescriptor {
   label: string;
   icon: string;
   description: string;
+  /** When true the entity is omitted from Settings entity pickers
+   *  (custom fields, standard fields). `describeEntity()` still returns
+   *  it so contact rendering elsewhere (labels, icons) works. Set on
+   *  `contact` because there is no standalone Contact create-form yet;
+   *  exposing custom-field config for an entity you can't create leads
+   *  to a confusing empty flow. Remove when the Contact form ships. */
+  hiddenFromPicker?: boolean;
 }
 
 export const CORE_ENTITY_REGISTRY: ReadonlyArray<EntityDescriptor> = [
@@ -23,6 +30,7 @@ export const CORE_ENTITY_REGISTRY: ReadonlyArray<EntityDescriptor> = [
     label: 'Contacts',
     icon: 'users',
     description: 'People in your CRM',
+    hiddenFromPicker: true,
   },
   {
     value: 'lead',

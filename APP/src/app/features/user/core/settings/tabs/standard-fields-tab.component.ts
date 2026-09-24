@@ -117,13 +117,18 @@ export class StandardFieldsTabComponent {
   protected readonly entityCards = computed<Array<EntityDescriptor & { fieldCount: number }>>(
     () => {
       const byValue = new Map(this.entities().map((e) => [e.entity, e.field_count]));
-      const registered = CORE_ENTITY_REGISTRY.filter((d) => byValue.has(d.value)).map((d) => ({
+      const registered = CORE_ENTITY_REGISTRY.filter(
+        (d) => byValue.has(d.value) && !d.hiddenFromPicker,
+      ).map((d) => ({
         ...d,
         fieldCount: byValue.get(d.value) ?? 0,
       }));
+      const hiddenValues = new Set(
+        CORE_ENTITY_REGISTRY.filter((d) => d.hiddenFromPicker).map((d) => d.value),
+      );
       const known = new Set(registered.map((c) => c.value));
       const extras = this.entities()
-        .filter((e) => !known.has(e.entity))
+        .filter((e) => !known.has(e.entity) && !hiddenValues.has(e.entity))
         .map((e) => ({ ...describeEntity(e.entity), fieldCount: e.field_count }));
       return [...registered, ...extras];
     },
