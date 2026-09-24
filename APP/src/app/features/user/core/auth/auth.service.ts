@@ -1,5 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import * as Sentry from '@sentry/angular';
 import { Observable, finalize, shareReplay, tap } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
@@ -251,6 +252,10 @@ export class FurnitureAuthService {
         this.currentUserId.set(null);
         this.userLoaded.set(false);
         this.needsOnboarding.set(false);
+        // Drop Sentry identity so any post-logout error (e.g. captured
+        // in the /accounts/login redirect) isn't tagged with the
+        // previous session's user.
+        Sentry.setUser(null);
       }),
     );
   }
@@ -264,6 +269,18 @@ export class FurnitureAuthService {
         this.currentUserId.set(res.id);
         this.needsOnboarding.set(res.needs_onboarding);
         this.userLoaded.set(true);
+        // Sentry — every subsequent error carries user + tenant so we
+        // can filter the issues dashboard by "errors hitting org X" or
+        // "errors from user Y". No-op when Sentry.init() was skipped
+        // (empty DSN). Cleared in logout() / clearSession().
+        Sentry.setUser({
+          id: res.id,
+          email: res.email,
+          username: res.full_name,
+        });
+        Sentry.setTag('org_id', res.org_id);
+        Sentry.setTag('org_slug', res.org.slug);
+        Sentry.setTag('role', res.role_name);
       }),
     );
   }
@@ -280,5 +297,9 @@ export class FurnitureAuthService {
     this.currentUserId.set(null);
     this.userLoaded.set(false);
     this.needsOnboarding.set(false);
+    // Same reason as logout(): a 401 that lands after clearSession()
+    // (e.g. background poll firing while the tab is redirecting to
+    // /accounts/login) should not carry the just-evicted user's id.
+    Sentry.setUser(null);
   }
 }

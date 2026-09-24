@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import uuid
 
+import sentry_sdk
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -100,6 +101,24 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
                 scope=scope,
             )
         )
+
+        # Attach identity + correlation to Sentry's per-request scope.
+        # Every exception captured downstream (route handlers, services,
+        # ORM hooks) inherits these tags so an unhandled error tells you
+        # WHO hit it, in WHICH tenant, on WHICH request — not just a
+        # stack trace. Safe when Sentry is disabled (no-ops without an
+        # SDK client). No email or IP attached here: user_id is an
+        # internal UUID (not PII); the frontend attaches the email
+        # separately at ``/users/me`` time, so backend errors stay
+        # searchable by user_id and the UI joins to email client-side.
+        sentry_sdk.set_tag("request_id", request_id)
+        if org_id is not None:
+            sentry_sdk.set_tag("org_id", str(org_id))
+        if user_id is not None:
+            sentry_sdk.set_user({"id": str(user_id)})
+        if scope is not None:
+            sentry_sdk.set_tag("auth_scope", scope)
+
         try:
             response = await call_next(request)
         finally:
