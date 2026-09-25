@@ -36,6 +36,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
 
+import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
 import { GoogleCalendarStatus, IntegrationsApiService } from './integrations-api.service';
 
 const POLL_INTERVAL_MS = 5000;
@@ -44,7 +45,7 @@ const POLL_INTERVAL_MS = 5000;
   selector: 'app-google-calendar-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, DatePipe, LucideAngularModule],
+  imports: [CommonModule, ConfirmDialogComponent, DatePipe, LucideAngularModule],
   templateUrl: './google-calendar-card.component.html',
 })
 export class GoogleCalendarCardComponent {
@@ -150,20 +151,37 @@ export class GoogleCalendarCardComponent {
     this.connect();
   }
 
+  /** Themed disconnect-confirm dialog visibility. Replaces the browser's
+   *  native `confirm()` (origin-branded grey alert) with the app's
+   *  `ConfirmDialogComponent` so the messaging matches the rest of the UI. */
+  protected readonly disconnectConfirmOpen = signal(false);
+  protected readonly disconnectConfirmError = signal<string | null>(null);
+  protected readonly disconnecting = signal(false);
+
   disconnect(): void {
-    if (
-      !confirm(
-        'Disconnect Google Calendar? Appointments will stop syncing to your calendar until you reconnect.',
-      )
-    ) {
-      return;
-    }
+    if (this.disconnecting()) return;
+    this.disconnectConfirmError.set(null);
+    this.disconnectConfirmOpen.set(true);
+  }
+
+  closeDisconnectConfirm(): void {
+    if (this.disconnecting()) return;
+    this.disconnectConfirmOpen.set(false);
+    this.disconnectConfirmError.set(null);
+  }
+
+  confirmDisconnect(): void {
+    if (this.disconnecting()) return;
     this.inlineError.set(null);
+    this.disconnectConfirmError.set(null);
+    this.disconnecting.set(true);
     this.api
       .disconnectGoogleCalendar()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
+          this.disconnecting.set(false);
+          this.disconnectConfirmOpen.set(false);
           this.status.set({
             connected: false,
             google_email: null,
@@ -175,7 +193,8 @@ export class GoogleCalendarCardComponent {
           this.changed.emit();
         },
         error: (err: HttpErrorResponse) => {
-          this.inlineError.set(extractApiError(err));
+          this.disconnecting.set(false);
+          this.disconnectConfirmError.set(extractApiError(err));
         },
       });
   }

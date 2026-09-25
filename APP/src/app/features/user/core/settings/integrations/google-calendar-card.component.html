@@ -165,3 +165,21 @@
     </div>
   }
 </section>
+
+<!-- Themed disconnect confirmation. Replaces window.confirm() so the
+     dialog matches the rest of the app instead of showing the origin-
+     branded browser alert. Danger-styled (red primary) because this
+     stops appointment sync until the operator reconnects. -->
+@if (disconnectConfirmOpen()) {
+  <app-confirm-dialog
+    [title]="'Disconnect Google Calendar?'"
+    [body]="'Appointments will stop syncing to your calendar until you reconnect. Your existing Google Calendar events are not affected.'"
+    [confirmLabel]="'Disconnect'"
+    [cancelLabel]="'Keep connected'"
+    [danger]="true"
+    [submitting]="disconnecting()"
+    [error]="disconnectConfirmError()"
+    (confirm)="confirmDisconnect()"
+    (cancel)="closeDisconnectConfirm()"
+  />
+}
