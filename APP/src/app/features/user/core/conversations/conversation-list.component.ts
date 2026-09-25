@@ -168,6 +168,11 @@ export class ConversationListComponent {
   @Input() set initialAssignee(value: string) {
     this.applyHydratedAssignee(value);
   }
+  /** Hydrates the Unread chip's on/off state on mount so a refresh
+   *  keeps it toggled if the operator had it on. */
+  @Input() set initialUnreadOnly(value: boolean) {
+    this.unreadOnly.set(!!value);
+  }
 
   @Output() readonly filtersChange = new EventEmitter<ConversationListQuery>();
   @Output() readonly select = new EventEmitter<string>();
@@ -193,6 +198,10 @@ export class ConversationListComponent {
   protected readonly pillBadgeBgClass = PILL_BADGE_BG;
   protected readonly searchTerm = signal<string>('');
   protected readonly assigneeMode = signal<AssigneeMode>('all');
+  /** Unread-only toggle chip — composes with the assignee filter so
+   *  "Mine + Unread" and "Unassigned + Unread" both work. Hydrated by
+   *  the parent from sessionStorage so a refresh keeps the state. */
+  protected readonly unreadOnly = signal<boolean>(false);
   /** Set only via `applyHydratedAssignee` when a previously-saved
    *  `?assigned_to=<uuid>` value gets restored. `emitAssignee`
    *  forwards it to the parent so the filter stays applied across
@@ -402,11 +411,17 @@ export class ConversationListComponent {
     this.specificUserId.set(value);
   }
 
+  protected toggleUnread(): void {
+    this.unreadOnly.update((v) => !v);
+    this.emit();
+  }
+
   private emit(): void {
     const q: ConversationListQuery = {};
     if (this.channelFilter()) q.channel = this.channelFilter() as ConversationChannel;
     const term = this.searchTerm().trim();
     if (term) q.q = term;
+    if (this.unreadOnly()) q.unread_only = true;
     this.filtersChange.emit(q);
   }
 }

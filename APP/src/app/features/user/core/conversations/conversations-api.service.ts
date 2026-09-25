@@ -208,6 +208,9 @@ export interface ConversationListQuery {
   q?: string;
   /** Step 14 — OR-semantic filter on tag ids. */
   tag_ids?: string[];
+  /** Inbox "Unread" chip — restricts the list to threads with
+   *  `unread_count > 0`. Composes with the other filters. */
+  unread_only?: boolean;
   page?: number;
   size?: number;
 }
@@ -241,6 +244,7 @@ export class ConversationsApiService {
       assigned_to: query.assigned_to,
       q: query.q,
       tag_ids: query.tag_ids,
+      unread_only: query.unread_only ? true : undefined,
       page: query.page,
       size: query.size,
     });

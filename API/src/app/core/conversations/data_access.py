@@ -71,6 +71,7 @@ async def list_conversations_query(
     assigned_to_unassigned: bool = False,
     q: str | None = None,
     tag_ids: list[uuid.UUID] | None = None,
+    unread_only: bool = False,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Conversation], int]:
@@ -83,6 +84,11 @@ async def list_conversations_query(
 
     Tag filtering uses OR-semantics: a conversation matches when it
     carries at least one of the listed tag ids.
+
+    ``unread_only=True`` restricts the result to rows where
+    ``unread_count > 0`` — powers the inbox's "Unread" chip so the
+    operator can see every thread with pending messages across pages
+    (not just what's already loaded).
     """
     filters: list[Any] = []
     # ai_widget rows are runtime-internal — they hold the ChatRuntime's
@@ -110,6 +116,8 @@ async def list_conversations_query(
             .scalar_subquery()
         )
         filters.append(Conversation.id.in_(tagged_subquery))
+    if unread_only:
+        filters.append(Conversation.unread_count > 0)
 
     base = select(Conversation)
     if filters:

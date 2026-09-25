@@ -119,6 +119,8 @@ export class ConversationsPageComponent {
    * render. Read from `sessionStorage` once; keyed by `org_id` so two
    * orgs the same user belongs to don't leak filters between sessions. */
   protected readonly initialAssignee = this.readPersistedAssignee();
+  /** Same idea for the Unread chip so a refresh keeps it toggled. */
+  protected readonly initialUnreadOnly = this.readPersistedUnread();
 
   protected readonly items = signal<Conversation[]>([]);
   protected readonly loading = signal(false);
@@ -373,11 +375,13 @@ export class ConversationsPageComponent {
   protected readonly aiConfirmSubmitting = signal(false);
 
   constructor() {
-    // Seed the filter from the persisted assignee BEFORE the first
-    // list call so the request goes out with the right `?assigned_to=…`.
-    if (this.initialAssignee) {
-      this.filters.set({ assigned_to: this.initialAssignee });
-    }
+    // Seed the filter from the persisted assignee + unread state BEFORE
+    // the first list call so the request goes out with the right
+    // `?assigned_to=…&unread_only=…` combination.
+    const seed: ConversationListQuery = {};
+    if (this.initialAssignee) seed.assigned_to = this.initialAssignee;
+    if (this.initialUnreadOnly) seed.unread_only = true;
+    if (Object.keys(seed).length > 0) this.filters.set(seed);
     this.reloadList();
     this.loadStaff();
 
@@ -436,14 +440,15 @@ export class ConversationsPageComponent {
 
   protected onFiltersChange(next: ConversationListQuery): void {
     // Preserve assigned_to + status across channel/q updates — the list
-    // child owns channel + search, the page header owns status, so
-    // neither should clobber the other.
+    // child owns channel + search + unread_only, the page header owns
+    // status, so neither should clobber the other.
     const { assigned_to, status } = this.filters();
     this.filters.set({
       ...next,
       ...(assigned_to ? { assigned_to } : {}),
       ...(status ? { status } : {}),
     });
+    this.persistUnread(next.unread_only ?? false);
     this.reloadList();
   }
 
@@ -541,6 +546,11 @@ export class ConversationsPageComponent {
     return `conversations:assignee:${orgId}`;
   }
 
+  private unreadStorageKey(): string {
+    const orgId = this.auth.currentOrg()?.id ?? 'anon';
+    return `conversations:unread_only:${orgId}`;
+  }
+
   private readPersistedAssignee(): string {
     try {
       return sessionStorage.getItem(this.storageKey()) ?? '';
@@ -554,6 +564,23 @@ export class ConversationsPageComponent {
     try {
       if (value) sessionStorage.setItem(this.storageKey(), value);
       else sessionStorage.removeItem(this.storageKey());
+    } catch {
+      // Best-effort; failure is silent.
+    }
+  }
+
+  private readPersistedUnread(): boolean {
+    try {
+      return sessionStorage.getItem(this.unreadStorageKey()) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  private persistUnread(on: boolean): void {
+    try {
+      if (on) sessionStorage.setItem(this.unreadStorageKey(), '1');
+      else sessionStorage.removeItem(this.unreadStorageKey());
     } catch {
       // Best-effort; failure is silent.
     }

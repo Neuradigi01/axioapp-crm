@@ -78,6 +78,7 @@ async def list_conversations(
     assigned_to: str | None = None,
     q: str | None = None,
     tag_ids: list[uuid.UUID] | None = None,
+    unread_only: bool = False,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Conversation], int]:
@@ -109,6 +110,7 @@ async def list_conversations(
         assigned_to_unassigned=assigned_to_unassigned,
         q=q,
         tag_ids=tag_ids,
+        unread_only=unread_only,
         page=page,
         size=size,
     )

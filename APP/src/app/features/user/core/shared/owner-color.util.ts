@@ -28,69 +28,70 @@ export interface OwnerColor {
   textFaint: string;
 }
 
-// Palette design: translucent color background + theme-token text.
-// The colored `bg-{color}-500/15` overlay is the owner-identity signal
-// and reads as a subtle hue on top of the current surface — pale on
-// white in light mode, subtle tint on dark in dark mode. Text uses the
-// theme's `text-default / text-muted / text-faint` tokens so the
-// title / body / caption hierarchy stays legible regardless of theme;
-// coloring the text on top of a same-color translucent bg only worked
-// on light mode and washed out in dark. `ring-{color}-500/25` keeps
-// the colored border ring visible in both themes.
+// Palette design: soft pastel tint + theme-token text.
+// The colored `bg-{color}-400/25` overlay is the owner-identity signal —
+// picks the brighter -400 shade so the tint reads as a real pastel
+// avatar colour (not a dark blob) in dark mode, and stays a soft
+// coloured wash on white in light mode. Text uses the theme's
+// `text-default / text-muted / text-faint` tokens so the title / body /
+// caption hierarchy stays legible regardless of theme; coloring the
+// text on top of a same-color translucent bg only worked on light mode
+// and washed out in dark. `ring-{color}-400/40` gives the circle a
+// clear coloured edge without shouting.
 const PALETTE: ReadonlyArray<OwnerColor> = [
   {
-    bg: 'bg-blue-500/15',
+    bg: 'bg-blue-400/25',
     text: 'text-default',
-    ring: 'ring-blue-500/25',
+    ring: 'ring-blue-400/40',
     textMuted: 'text-muted',
     textFaint: 'text-faint',
   },
   {
-    bg: 'bg-emerald-500/15',
+    bg: 'bg-emerald-400/25',
     text: 'text-default',
-    ring: 'ring-emerald-500/25',
+    ring: 'ring-emerald-400/40',
     textMuted: 'text-muted',
     textFaint: 'text-faint',
   },
   {
-    bg: 'bg-amber-500/15',
+    bg: 'bg-amber-400/25',
     text: 'text-default',
-    ring: 'ring-amber-500/25',
+    ring: 'ring-amber-400/40',
     textMuted: 'text-muted',
     textFaint: 'text-faint',
   },
   {
-    bg: 'bg-red-500/15',
+    bg: 'bg-rose-400/25',
     text: 'text-default',
-    ring: 'ring-red-500/25',
+    ring: 'ring-rose-400/40',
     textMuted: 'text-muted',
     textFaint: 'text-faint',
   },
   {
-    bg: 'bg-violet-500/15',
+    bg: 'bg-violet-400/25',
     text: 'text-default',
-    ring: 'ring-violet-500/25',
+    ring: 'ring-violet-400/40',
     textMuted: 'text-muted',
     textFaint: 'text-faint',
   },
   {
-    bg: 'bg-cyan-500/15',
+    bg: 'bg-cyan-400/25',
     text: 'text-default',
-    ring: 'ring-cyan-500/25',
+    ring: 'ring-cyan-400/40',
     textMuted: 'text-muted',
     textFaint: 'text-faint',
   },
   {
-    bg: 'bg-orange-500/15',
+    bg: 'bg-orange-400/25',
     text: 'text-default',
-    ring: 'ring-orange-500/25',
+    ring: 'ring-orange-400/40',
     textMuted: 'text-muted',
     textFaint: 'text-faint',
   },
   {
-    bg: 'bg-fuchsia-500/15',
+    bg: 'bg-fuchsia-400/25',
     text: 'text-default',
-    ring: 'ring-fuchsia-500/25',
+    ring: 'ring-fuchsia-400/40',
     textMuted: 'text-muted',
     textFaint: 'text-faint',
   },

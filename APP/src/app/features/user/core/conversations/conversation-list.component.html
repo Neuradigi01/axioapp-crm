@@ -71,6 +71,24 @@
           {{ m.label }}
         </button>
       }
+      <button
+        type="button"
+        (click)="toggleUnread()"
+        title="Show only conversations with unread messages"
+        [class]="
+          'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-medium ring-1 transition ' +
+          (unreadOnly()
+            ? 'bg-red-500/15 text-red-400 ring-red-500/40'
+            : 'bg-surface-2 text-default ring-subtle hover:bg-surface')
+        "
+      >
+        <span
+          class="inline-block h-1.5 w-1.5 rounded-full"
+          [class]="unreadOnly() ? 'bg-red-400' : 'bg-red-500/60'"
+          aria-hidden="true"
+        ></span>
+        Unread
+      </button>
       <div class="ml-auto">
         <app-tag-filter [value]="tagFilterIds" (filterChange)="tagFilterChange.emit($event)" />
       </div>

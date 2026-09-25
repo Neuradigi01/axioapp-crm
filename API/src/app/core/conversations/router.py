@@ -247,6 +247,10 @@ async def list_endpoint(
     # Step 14 — OR-semantic tag filter. Repeat the query param to
     # match multiple tags: ?tag_ids=uuid1&tag_ids=uuid2.
     tag_ids: list[uuid.UUID] | None = Query(default=None),
+    # Inbox "Unread" chip — restricts to conversations with
+    # ``unread_count > 0`` so the operator can page through every
+    # thread awaiting attention, not just the ones on the current page.
+    unread_only: bool = Query(default=False),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -259,6 +263,7 @@ async def list_endpoint(
         assigned_to=assigned_to,
         q=q,
         tag_ids=tag_ids,
+        unread_only=unread_only,
         page=page,
         size=size,
     )
