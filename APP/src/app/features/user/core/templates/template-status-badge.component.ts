@@ -29,15 +29,15 @@ const INTERNAL: Record<TemplateInternalStatus, BadgeDescriptor> = {
   draft: { label: 'Draft', classes: 'bg-surface-2 text-default border-subtle' },
   in_review: {
     label: 'In review',
-    classes: 'bg-amber-50 text-amber-700 ring-amber-200',
+    classes: 'bg-amber-500/10 text-amber-700 ring-amber-500/20',
   },
   approved: {
     label: 'Ready to publish',
-    classes: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    classes: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20',
   },
   published: {
     label: 'Published',
-    classes: 'bg-blue-50 text-blue-700 ring-blue-200',
+    classes: 'bg-blue-500/10 text-blue-700 ring-blue-500/20',
   },
   archived: {
     label: 'Archived',
@@ -52,19 +52,19 @@ const EXTERNAL: Record<TemplateExternalStatus, BadgeDescriptor | null> = {
   // disambiguates, and "Provider approved" was too wide for narrow cells.
   pending: {
     label: 'Pending',
-    classes: 'bg-amber-50 text-amber-700 ring-amber-200',
+    classes: 'bg-amber-500/10 text-amber-700 ring-amber-500/20',
   },
   approved: {
     label: 'Approved',
-    classes: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    classes: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20',
   },
   rejected: {
     label: 'Rejected',
-    classes: 'bg-red-500/10 text-red-400 ring-red-500/20',
+    classes: 'bg-red-500/10 text-red-700 ring-red-500/20',
   },
   paused: {
     label: 'Paused',
-    classes: 'bg-orange-50 text-orange-700 ring-orange-200',
+    classes: 'bg-orange-500/10 text-orange-700 ring-orange-500/20',
   },
 };
 
