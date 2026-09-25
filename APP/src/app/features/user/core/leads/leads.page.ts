@@ -1789,10 +1789,15 @@ export class LeadsPageComponent {
         this.submitting.set(false);
         this.closeModal();
         this.reload();
+        this.toast.success('Lead updated.', {
+          subtitle: 'Your changes are saved.',
+        });
       },
       error: (err: HttpErrorResponse) => {
         this.submitting.set(false);
-        this.formError.set(extractApiError(err) ?? 'Could not save lead.');
+        const msg = extractApiError(err) ?? 'Could not save lead.';
+        this.formError.set(msg);
+        this.toast.error('Could not save lead.', { subtitle: msg });
       },
     });
   }
@@ -1839,12 +1844,18 @@ export class LeadsPageComponent {
    *  views (a stage change can move the card to a different column,
    *  a status filter can drop it off-page entirely). Cheap one-shot
    *  call keeps both surfaces truthful. */
-  protected onUpdateStatusSaved(_event: {
+  protected onUpdateStatusSaved(event: {
     lead: Lead;
     next_follow_up_task_id: string | null;
   }): void {
     this.closeUpdateStatus();
     this.resetCursorAndReload();
+    this.toast.success('Status updated.', {
+      subtitle:
+        event.next_follow_up_task_id !== null
+          ? 'A follow-up task has been scheduled.'
+          : 'Your changes are saved to the timeline.',
+    });
   }
 
   // Legacy single-row reassign handlers kept for the bulk-reassign

@@ -46,6 +46,7 @@ import {
 } from './won-capture-modal/won-capture-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 
 type DetailTab = 'overview' | 'activities' | 'notes' | 'tasks';
 
@@ -103,6 +104,7 @@ export class LeadDetailPageComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly usersDir = inject(UsersDirectoryService);
   private readonly auth = inject(FurnitureAuthService);
+  private readonly toast = inject(ToastService);
 
   readonly reassignOpen = signal(false);
   readonly reassignSubmitting = signal(false);
@@ -313,6 +315,12 @@ export class LeadDetailPageComponent implements OnInit {
     if (event.next_follow_up_task_id !== null) {
       this.followUpsPanel()?.reload();
     }
+    this.toast.success('Status updated.', {
+      subtitle:
+        event.next_follow_up_task_id !== null
+          ? 'A follow-up task has been scheduled.'
+          : 'Your changes are saved to the timeline.',
+    });
   }
 
   protected closeModal(): void {
@@ -446,10 +454,15 @@ export class LeadDetailPageComponent implements OnInit {
         this.lead.set(updated);
         this.submitting.set(false);
         this.closeModal();
+        this.toast.success('Lead updated.', {
+          subtitle: 'Your changes are saved.',
+        });
       },
       error: (err: HttpErrorResponse) => {
         this.submitting.set(false);
-        this.formError.set(extractApiError(err) ?? 'Could not save lead.');
+        const msg = extractApiError(err) ?? 'Could not save lead.';
+        this.formError.set(msg);
+        this.toast.error('Could not save lead.', { subtitle: msg });
       },
     });
   }
