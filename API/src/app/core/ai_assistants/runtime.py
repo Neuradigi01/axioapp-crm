@@ -98,6 +98,20 @@ def _matches_stop_keyword(message: str, stop_keywords: list[str]) -> bool:
     return False
 
 
+_RESPONSE_FORMAT_HINT = (
+    "Format your reply for the question at hand — don't force one shape on every "
+    "answer. Use short paragraphs for prose or a single-fact reply. Use a "
+    "bulleted list ('- item') when presenting multiple items, options, or "
+    "features. Use a numbered list ('1. step') for a procedure or ordered steps. "
+    "Mix formats when useful (a lead sentence + a short list). "
+    "Keep replies tight — no filler, no restating the question, no closing "
+    "flourish. Use only channel-safe markdown: single-asterisk *bold*, "
+    "single-underscore _italic_, and '-' or '1.' lists. Do NOT use "
+    "**double-asterisk**, headings (#), tables, or code fences unless the user "
+    "explicitly asked for code."
+)
+
+
 def _build_messages(
     *,
     assistant: AiAssistant,
@@ -109,6 +123,10 @@ def _build_messages(
 
     Order matters:
       * system prompt (verbatim, no wrapping — Attacker C4 defence)
+      * response-format hint (universal): tells the model to pick the
+        best structure per question (prose / bullets / numbered steps)
+        and stick to WhatsApp-safe markdown so the same reply renders
+        cleanly across WhatsApp / email / widget.
       * OPTIONAL Step-16 lead-capture ask injected as a second
         system message so the model weaves the ask into its reply
         without disturbing the operator's instructions.
@@ -121,6 +139,7 @@ def _build_messages(
     messages: list[dict] = []
     if assistant.instructions:
         messages.append({"role": "system", "content": assistant.instructions})
+    messages.append({"role": "system", "content": _RESPONSE_FORMAT_HINT})
     if lead_capture_ask:
         # Second system message rather than concatenating so an
         # audit-log reader can see the ask separately from the

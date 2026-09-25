@@ -75,10 +75,30 @@ def test_build_messages_system_prompt_verbatim() -> None:
     assert msgs[0] == {"role": "system", "content": "Do the thing."}
 
 
-def test_build_messages_omits_system_when_no_instructions() -> None:
+def test_build_messages_omits_operator_system_when_no_instructions() -> None:
+    """When the operator hasn't written any instructions, no operator-owned
+    system message is injected on their behalf. The universal response-format
+    hint is always present (see `test_build_messages_response_format_hint_present`)
+    but is a runtime-level system message, not an operator prompt."""
     a = _make_assistant(instructions=None)
     msgs = _build_messages(assistant=a, user_message="hi", retrieved_chunks=[])
-    assert all(m.get("role") != "system" for m in msgs)
+    # Exactly one system message = the format hint. No operator prompt.
+    system_msgs = [m for m in msgs if m.get("role") == "system"]
+    assert len(system_msgs) == 1
+    assert "Format your reply" in system_msgs[0]["content"]
+
+
+def test_build_messages_response_format_hint_present() -> None:
+    """Every request carries the runtime-owned response-format hint so the
+    model picks the best structure (prose / bullets / numbered steps) per
+    question, in channel-safe markdown (single-asterisk bold, '-' lists)."""
+    a = _make_assistant(instructions="Do the thing.")
+    msgs = _build_messages(assistant=a, user_message="hi", retrieved_chunks=[])
+    system_msgs = [m for m in msgs if m.get("role") == "system"]
+    # Operator prompt first, format hint second.
+    assert len(system_msgs) == 2
+    assert system_msgs[0]["content"] == "Do the thing."
+    assert "Format your reply" in system_msgs[1]["content"]
 
 
 def test_build_messages_last_is_current_user() -> None:
