@@ -51,6 +51,7 @@ import { BookAppointmentModalComponent } from './book-appointment-modal.componen
 import { RescheduleConfirm, RescheduleModalComponent } from './reschedule-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 
 interface ContactSummary {
   id: string;
@@ -109,6 +110,7 @@ export class AppointmentsPageComponent {
   private readonly usersDir = inject(UsersDirectoryService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly toast = inject(ToastService);
 
   protected readonly state = inject(AppointmentsListState);
 
@@ -443,6 +445,9 @@ export class AppointmentsPageComponent {
     this.viewMonth.set(at);
     this.selectedDay.set(at);
     this.reload();
+    this.toast.success('Appointment booked.', {
+      subtitle: `${appt.title} · ${this.formatDateTime(appt.scheduled_at)}.`,
+    });
   }
 
   protected conflictTitleFor = (id: string): string | null => {
@@ -618,14 +623,14 @@ export class AppointmentsPageComponent {
     const a = this.popoverAppointment();
     if (!a) return;
     this.closePopover();
-    this.advanceStatus(a, 'completed');
+    this.advanceStatus(a, 'completed', 'Appointment marked completed.');
   }
 
   protected onPopoverMarkNoShow(): void {
     const a = this.popoverAppointment();
     if (!a) return;
     this.closePopover();
-    this.advanceStatus(a, 'no_show');
+    this.advanceStatus(a, 'no_show', 'Appointment marked as no-show.');
   }
 
   protected onPopoverCancel(): void {
@@ -673,11 +678,14 @@ export class AppointmentsPageComponent {
           // view reflects the delete without a full refetch.
           this.state.items.update((rows) => rows.filter((r) => r.id !== a.id));
           this.closeDeleteConfirm();
+          this.toast.success('Appointment deleted.', { subtitle: a.title });
         },
         error: (err: HttpErrorResponse) => {
           this.deleteSubmitting.set(false);
-          this.state.loadError.set(extractApiError(err) ?? 'Could not delete appointment.');
+          const msg = extractApiError(err) ?? 'Could not delete appointment.';
+          this.state.loadError.set(msg);
           this.deleteAppt.set(null);
+          this.toast.error('Could not delete appointment.', { subtitle: msg });
         },
       });
   }
@@ -707,10 +715,15 @@ export class AppointmentsPageComponent {
           this.singleReassignSubmitting.set(false);
           this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.closeSingleReassign();
+          this.toast.success('Appointment reassigned.', {
+            subtitle: `Now owned by ${this.ownerLabel(updated.assigned_to_id)}.`,
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.singleReassignSubmitting.set(false);
-          this.singleReassignError.set(extractApiError(err) ?? 'Could not reassign appointment.');
+          const msg = extractApiError(err) ?? 'Could not reassign appointment.';
+          this.singleReassignError.set(msg);
+          this.toast.error('Could not reassign appointment.', { subtitle: msg });
         },
       });
   }
@@ -739,10 +752,15 @@ export class AppointmentsPageComponent {
           this.rescheduleSubmitting.set(false);
           this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.closeReschedule();
+          this.toast.success('Appointment rescheduled.', {
+            subtitle: `New slot: ${this.formatDateTime(updated.scheduled_at)}.`,
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.rescheduleSubmitting.set(false);
-          this.rescheduleError.set(extractApiError(err) ?? 'Could not reschedule appointment.');
+          const msg = extractApiError(err) ?? 'Could not reschedule appointment.';
+          this.rescheduleError.set(msg);
+          this.toast.error('Could not reschedule appointment.', { subtitle: msg });
         },
       });
   }
@@ -766,17 +784,25 @@ export class AppointmentsPageComponent {
           this.cancelSubmitting.set(false);
           this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.closeCancelConfirm();
+          this.toast.success('Appointment cancelled.', { subtitle: appt.title });
         },
         error: (err: HttpErrorResponse) => {
           this.cancelSubmitting.set(false);
           this.closeCancelConfirm();
-          this.state.loadError.set(extractApiError(err) ?? 'Could not cancel appointment.');
+          const msg = extractApiError(err) ?? 'Could not cancel appointment.';
+          this.state.loadError.set(msg);
+          this.toast.error('Could not cancel appointment.', { subtitle: msg });
         },
       });
   }
 
-  /** Inline status transition (e.g. Mark completed). Optimistic; reverts on error. */
-  private advanceStatus(appt: Appointment, target: Appointment['status']): void {
+  /** Inline status transition (e.g. Mark completed). Optimistic; reverts on error.
+   *  `successTitle` fires the branded success toast on the server-confirmed write. */
+  private advanceStatus(
+    appt: Appointment,
+    target: Appointment['status'],
+    successTitle: string,
+  ): void {
     const before = this.state.items();
     this.state.items.update((rows) =>
       rows.map((r) => (r.id === appt.id ? { ...r, status: target } : r)),
@@ -787,10 +813,13 @@ export class AppointmentsPageComponent {
       .subscribe({
         next: (updated) => {
           this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          this.toast.success(successTitle, { subtitle: appt.title });
         },
         error: (err: HttpErrorResponse) => {
           this.state.items.set(before);
-          this.state.loadError.set(extractApiError(err) ?? 'Could not update appointment status.');
+          const msg = extractApiError(err) ?? 'Could not update appointment status.';
+          this.state.loadError.set(msg);
+          this.toast.error('Could not update appointment.', { subtitle: msg });
         },
       });
   }
