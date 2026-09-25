@@ -13,6 +13,10 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 
 import { extractApiError } from '@core/services/api-error.util';
+import {
+  MobileSelectComponent,
+  type MobileSelectOption,
+} from '../shared/forms/mobile-select.component';
 
 import { PipelineStage, PipelinesApiService, StageCreate } from './pipelines-api.service';
 
@@ -36,7 +40,7 @@ import { PipelineStage, PipelinesApiService, StageCreate } from './pipelines-api
   selector: 'app-add-stage-popover',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, MobileSelectComponent],
   templateUrl: './add-stage-popover.component.html',
 })
 export class AddStagePopoverComponent {
@@ -70,6 +74,11 @@ export class AddStagePopoverComponent {
       .filter((s) => !s.is_won && !s.is_lost)
       .sort((a, b) => a.display_order - b.display_order),
   );
+
+  protected readonly anchorSelectOptions = computed<MobileSelectOption[]>(() => [
+    { value: '', label: '(at the end)' },
+    ...this.anchorOptions().map((s) => ({ value: s.key, label: `After: ${s.name}` })),
+  ]);
 
   protected readonly nameTrimmed = computed(() => this.nameValue().trim());
 

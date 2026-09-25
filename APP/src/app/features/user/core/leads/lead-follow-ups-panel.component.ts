@@ -20,6 +20,7 @@ import {
   ChangeDetectorRef,
   Component,
   DestroyRef,
+  OnInit,
   computed,
   effect,
   inject,
@@ -57,15 +58,16 @@ const TYPE_META: Record<TaskFollowupType, FollowupTypeMeta> = {
   imports: [LucideAngularModule, MobileDateTimeComponent],
   templateUrl: './lead-follow-ups-panel.component.html',
 })
-export class LeadFollowUpsPanelComponent {
+export class LeadFollowUpsPanelComponent implements OnInit {
   private readonly api = inject(TasksApiService);
   private readonly destroyRef = inject(DestroyRef);
   /** Belt-and-braces for zoneless mode: HTTP subscribe callbacks fire
    *  outside any tracked execution context; signal writes SHOULD
    *  schedule change detection on their own, but in this component
    *  the initial data was arriving in memory but not repainting until
-   *  the next user interaction. Explicit `markForCheck()` after every
-   *  async state mutation removes the race. */
+   *  the next user interaction. `detectChanges()` after every async
+   *  mutation forces a synchronous CD run on this view so the panel
+   *  repaints immediately without waiting for a scheduler tick. */
   private readonly cdr = inject(ChangeDetectorRef);
 
   readonly leadId = input.required<string>();
@@ -93,16 +95,30 @@ export class LeadFollowUpsPanelComponent {
   protected readonly hasMore = computed(() => this.tasks().length < this.total());
   protected readonly skeletonRows = [0, 1, 2] as const;
 
+  /** Skip the constructor effect's first fire — `ngOnInit()` handles
+   *  the initial load with deterministic timing (inputs are guaranteed
+   *  set, view is about to check). The effect stays wired so the panel
+   *  still auto-reloads when the parent swaps `leadId` on a mounted
+   *  instance (lead-detail route nav). */
+  private firstEffectFireSkipped = false;
+
   constructor() {
-    // Reload whenever the lead id changes (parent re-mounts on nav).
     effect(() => {
       const id = this.leadId();
+      if (!this.firstEffectFireSkipped) {
+        this.firstEffectFireSkipped = true;
+        return;
+      }
       if (!id) return;
       this.page.set(1);
       this.tasks.set([]);
       this.total.set(0);
       this.load(1);
     });
+  }
+
+  ngOnInit(): void {
+    this.load(1);
   }
 
   /** Public hook — parent calls this after the Update Status modal
@@ -112,7 +128,7 @@ export class LeadFollowUpsPanelComponent {
   prepend(task: Task): void {
     this.tasks.update((rows) => [task, ...rows].sort(this._compareDueAt));
     this.total.update((n) => n + 1);
-    this.cdr.markForCheck();
+    this.cdr.detectChanges();
   }
 
   /** Public — parent's `onUpdateStatusSaved` calls this after a modal
@@ -168,14 +184,14 @@ export class LeadFollowUpsPanelComponent {
       .subscribe({
         next: () => {
           this._setMutating(task.id, false);
-          this.cdr.markForCheck();
+          this.cdr.detectChanges();
         },
         error: (err: HttpErrorResponse) => {
           this._setMutating(task.id, false);
           this.tasks.set(snapshot);
           this.total.update((n) => n + 1);
           this._flashRowError(task.id, extractApiError(err) ?? 'Could not mark done.');
-          this.cdr.markForCheck();
+          this.cdr.detectChanges();
         },
       });
   }
@@ -226,12 +242,12 @@ export class LeadFollowUpsPanelComponent {
           this.tasks.update((rows) =>
             rows.map((r) => (r.id === updated.id ? updated : r)).sort(this._compareDueAt),
           );
-          this.cdr.markForCheck();
+          this.cdr.detectChanges();
         },
         error: (err: HttpErrorResponse) => {
           this._setMutating(task.id, false);
           this._flashRowError(task.id, extractApiError(err) ?? 'Could not reschedule.');
-          this.cdr.markForCheck();
+          this.cdr.detectChanges();
         },
       });
   }
@@ -274,12 +290,12 @@ export class LeadFollowUpsPanelComponent {
             this.tasks.set(merged.sort(this._compareDueAt));
           }
           this.page.set(page);
-          this.cdr.markForCheck();
+          this.cdr.detectChanges();
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load follow-ups.');
-          this.cdr.markForCheck();
+          this.cdr.detectChanges();
         },
       });
   }
@@ -301,7 +317,7 @@ export class LeadFollowUpsPanelComponent {
       const cur = this.rowError();
       if (cur && cur.id === id) {
         this.rowError.set(null);
-        this.cdr.markForCheck();
+        this.cdr.detectChanges();
       }
     }, 4000);
   }

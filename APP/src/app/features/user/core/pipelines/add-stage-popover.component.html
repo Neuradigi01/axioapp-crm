@@ -55,19 +55,16 @@
       }
     </div>
 
-    <label class="block">
+    <div>
       <span class="text-xs font-medium text-default">Insert</span>
-      <select
-        [value]="afterStageKey() ?? ''"
-        (change)="onAnchorChange($any($event.target).value)"
-        class="mt-1 w-full rounded border border-subtle bg-surface px-2 py-1.5 text-sm text-default focus:border-muted focus:outline-none"
-      >
-        <option value="">(at the end)</option>
-        @for (stage of anchorOptions(); track stage.id) {
-          <option [value]="stage.key">After: {{ stage.name }}</option>
-        }
-      </select>
-    </label>
+      <div class="mt-1">
+        <crm-mobile-select
+          [options]="anchorSelectOptions()"
+          [value]="afterStageKey() ?? ''"
+          (valueChange)="onAnchorChange($event)"
+        />
+      </div>
+    </div>
   </div>
 
   <footer class="flex items-center justify-end gap-2 border-t border-subtle bg-surface-2 px-3 py-2">
