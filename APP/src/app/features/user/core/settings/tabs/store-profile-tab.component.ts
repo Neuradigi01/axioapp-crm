@@ -5,6 +5,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import { FurnitureAuthService, OrgSummary } from '../../auth/auth.service';
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { OrgSettings, SettingsApiService } from '../settings-api.service';
 
 /**
@@ -45,6 +46,7 @@ export class StoreProfileTabComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(SettingsApiService);
   private readonly auth = inject(FurnitureAuthService);
+  private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly loading = signal(false);
@@ -225,6 +227,7 @@ export class StoreProfileTabComponent {
     if (Object.keys(dirty).length === 0) {
       this.saving.set(false);
       this.saveOk.set(true);
+      this.toast.info('No changes to save.');
       return;
     }
 
@@ -236,10 +239,15 @@ export class StoreProfileTabComponent {
           this._hydrate(s);
           this.saving.set(false);
           this.saveOk.set(true);
+          this.toast.success('Store profile saved.', {
+            subtitle: 'Your changes are live for the whole team.',
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.saveError.set(extractApiError(err) ?? 'Could not save settings.');
+          const msg = extractApiError(err) ?? 'Could not save settings.';
+          this.saveError.set(msg);
+          this.toast.error('Could not save store profile.', { subtitle: msg });
         },
       });
   }
