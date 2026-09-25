@@ -7,8 +7,9 @@ import {
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
+
+import { MobileDateTimeComponent } from '../../shared/forms/mobile-datetime.component';
 
 /**
  * Inline datetime picker that replaces a follow-up row's action bar
@@ -26,16 +27,16 @@ import { LucideAngularModule } from 'lucide-angular';
   selector: 'app-reschedule-inline',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, LucideAngularModule, MobileDateTimeComponent],
   template: `
     <div class="flex flex-wrap items-center gap-2 rounded-md border border-subtle bg-surface-2 p-2">
-      <input
-        type="datetime-local"
-        [ngModel]="localValue()"
-        (ngModelChange)="localValue.set($event)"
-        class="flex-1 rounded-md border border-subtle bg-surface px-2 py-1 text-sm text-default focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-        [attr.aria-label]="'New due date and time'"
-      />
+      <div class="flex-1 min-w-[12rem]">
+        <crm-mobile-datetime
+          [value]="localValue()"
+          (valueChange)="localValue.set($event)"
+          placeholder="Pick date & time"
+        />
+      </div>
       <button
         type="button"
         (click)="onSave()"
