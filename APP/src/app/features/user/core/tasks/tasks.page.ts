@@ -16,7 +16,7 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { environment } from '../../../../../environments/environment';
 import { FurnitureAuthService } from '../auth/auth.service';
-import { ToastHostService } from '../notifications/toast-host.service';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import {
@@ -91,7 +91,7 @@ export class TasksPageComponent {
   private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(FurnitureAuthService);
-  private readonly toast = inject(ToastHostService);
+  private readonly toast = inject(ToastService);
   private readonly usersDir = inject(UsersDirectoryService);
 
   protected readonly state = inject(TasksListState);
@@ -440,20 +440,17 @@ export class TasksPageComponent {
         next: () => {
           this.togglingId.set(null);
           this.fetch();
-          this.toast.push({
-            title: checked
-              ? `Task "${task.title}" marked as done`
-              : `Task "${task.title}" reopened`,
-            body: checked
-              ? 'Click the green circle again to mark it as open.'
-              : 'Click the circle again to mark it as done.',
-            tone: checked ? 'success' : 'info',
-            durationMs: 4_000,
-          });
+          if (checked) {
+            this.toast.success('Task marked done.', { subtitle: task.title });
+          } else {
+            this.toast.info('Task reopened.', { subtitle: task.title });
+          }
         },
         error: (err: HttpErrorResponse) => {
           this.togglingId.set(null);
-          this.state.loadError.set(extractApiError(err) ?? 'Could not update the task.');
+          const msg = extractApiError(err) ?? 'Could not update the task.';
+          this.state.loadError.set(msg);
+          this.toast.error('Could not update the task.', { subtitle: msg });
         },
       });
   }
@@ -474,8 +471,12 @@ export class TasksPageComponent {
   }
 
   protected onSaved(): void {
+    const wasEdit = this.editingTask() !== null;
     this.closeModal();
     this.fetch();
+    this.toast.success(wasEdit ? 'Task updated.' : 'Task created.', {
+      subtitle: wasEdit ? 'Your changes are saved.' : 'The new task is on the list.',
+    });
   }
 
   protected formatDue(iso: string | null): string {
@@ -555,10 +556,13 @@ export class TasksPageComponent {
         next: () => {
           this.togglingId.set(null);
           this.fetch();
+          this.toast.success('Task marked missed.', { subtitle: task.title });
         },
         error: (err: HttpErrorResponse) => {
           this.togglingId.set(null);
-          this.state.loadError.set(extractApiError(err) ?? 'Could not mark the task missed.');
+          const msg = extractApiError(err) ?? 'Could not mark the task missed.';
+          this.state.loadError.set(msg);
+          this.toast.error('Could not mark the task missed.', { subtitle: msg });
         },
       });
   }
@@ -586,10 +590,13 @@ export class TasksPageComponent {
           this.deleteSubmitting.set(false);
           this.closeDeleteRow();
           this.state.items.update((rows) => rows.filter((r) => r.id !== t.id));
+          this.toast.success('Task deleted.', { subtitle: t.title });
         },
         error: (err: HttpErrorResponse) => {
           this.deleteSubmitting.set(false);
-          this.state.loadError.set(extractApiError(err) ?? 'Could not delete the task.');
+          const msg = extractApiError(err) ?? 'Could not delete the task.';
+          this.state.loadError.set(msg);
+          this.toast.error('Could not delete the task.', { subtitle: msg });
         },
       });
   }
@@ -626,10 +633,13 @@ export class TasksPageComponent {
         next: () => {
           this.togglingId.set(null);
           this.fetch();
+          this.toast.success('Task snoozed by 1 week.', { subtitle: task.title });
         },
         error: (err: HttpErrorResponse) => {
           this.togglingId.set(null);
-          this.state.loadError.set(extractApiError(err) ?? 'Could not reschedule the task.');
+          const msg = extractApiError(err) ?? 'Could not reschedule the task.';
+          this.state.loadError.set(msg);
+          this.toast.error('Could not reschedule the task.', { subtitle: msg });
         },
       });
   }
@@ -662,10 +672,13 @@ export class TasksPageComponent {
         next: () => {
           this.togglingId.set(null);
           this.fetch();
+          this.toast.success('Task snoozed to tomorrow 9 AM.', { subtitle: task.title });
         },
         error: (err: HttpErrorResponse) => {
           this.togglingId.set(null);
-          this.state.loadError.set(extractApiError(err) ?? 'Could not reschedule the task.');
+          const msg = extractApiError(err) ?? 'Could not reschedule the task.';
+          this.state.loadError.set(msg);
+          this.toast.error('Could not reschedule the task.', { subtitle: msg });
         },
       });
   }
@@ -804,9 +817,9 @@ export class TasksPageComponent {
   protected priorityClass(p: TaskPriority): string {
     switch (p) {
       case 'high':
-        return 'bg-red-500/10 text-red-400 ring-red-500/20';
+        return 'bg-red-500/10 text-red-700 ring-red-500/20';
       case 'med':
-        return 'bg-amber-50 text-amber-700 ring-amber-200';
+        return 'bg-amber-500/10 text-amber-700 ring-amber-500/20';
       default:
         return 'bg-surface-2 text-default border-subtle';
     }
