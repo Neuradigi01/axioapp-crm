@@ -80,6 +80,7 @@ class LeadUpdate(BaseModel):
 
     contact_id: uuid.UUID | None = None
     assigned_to_id: uuid.UUID | None = None
+    source: LeadSource | None = None
     budget: Decimal | None = Field(default=None, ge=0)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     expected_close_date: date | None = None

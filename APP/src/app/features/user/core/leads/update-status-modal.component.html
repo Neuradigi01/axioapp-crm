@@ -137,17 +137,19 @@
             </p>
           }
 
-          <label class="block">
+          <div class="block">
             <span class="text-xs font-medium text-default">Source</span>
             <div
-              class="mt-1 rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-sm text-default"
+              class="mt-1 flex items-center justify-between gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm text-muted"
+              title="Source can only be changed from the Edit lead form."
             >
-              {{ sourceLabel() }}
+              <span class="text-default">{{ sourceLabel() }}</span>
+              <lucide-icon name="lock" size="12" class="shrink-0 text-faint" aria-hidden="true" />
             </div>
             <span class="mt-1 block text-xs text-muted">
               Source is set on the lead. Change it from <strong>Edit lead</strong>.
             </span>
-          </label>
+          </div>
 
           <label class="block">
             <span class="text-xs font-medium text-default">Owner</span>

@@ -128,6 +128,7 @@ export interface LeadIngestResult extends Lead {
 export type LeadUpdate = Partial<{
   contact_id: string;
   assigned_to_id: string | null;
+  source: LeadSource | null;
   budget: string | null;
   currency: string | null;
   expected_close_date: string | null;
