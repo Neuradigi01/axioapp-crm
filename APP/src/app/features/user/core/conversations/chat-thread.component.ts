@@ -33,7 +33,7 @@ import { ConversationExportButtonComponent } from './header/export-button.compon
 import { LocationAttachment, LocationBubbleComponent } from './thread/location-bubble.component';
 import { StickerAttachment, StickerBubbleComponent } from './thread/sticker-bubble.component';
 import { VCardAttachment, VCardBubbleComponent } from './thread/vcard-bubble.component';
-import { StaffListItem } from '../staff/staff-api.service';
+import { UserMini } from '../shared/services/users-directory.service';
 import { OwnerColor, ownerColor, staffInitials } from '../shared/owner-color.util';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { environment } from '../../../../../environments/environment';
@@ -136,7 +136,7 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
   @Input({ required: true }) conversation!: Conversation;
   @Input() detail: ConversationDetail | null = null;
   @Input() loading = false;
-  @Input() staffById: Map<string, StaffListItem> = new Map();
+  @Input() staffById: Map<string, UserMini> = new Map();
 
   /** Counterparty label to render in the header. When the parent page
    *  can resolve the linked contact's current phone (see

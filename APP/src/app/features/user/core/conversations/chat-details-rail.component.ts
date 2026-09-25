@@ -11,7 +11,7 @@ import {
 import { LucideAngularModule } from 'lucide-angular';
 
 import { Conversation, ConversationStatus, ConversationTagRef } from './conversations-api.service';
-import { StaffListItem } from '../staff/staff-api.service';
+import { UserMini } from '../shared/services/users-directory.service';
 import { OwnerColor, ownerColor, staffInitials } from '../shared/owner-color.util';
 import { TagChipComponent } from './tag-chip.component';
 import { TagManagerComponent } from './tag-manager.component';
@@ -53,7 +53,7 @@ export class ChatDetailsRailComponent {
   private readonly auth = inject(FurnitureAuthService);
 
   @Input({ required: true }) conversation!: Conversation;
-  @Input() staffById: Map<string, StaffListItem> = new Map();
+  @Input() staffById: Map<string, UserMini> = new Map();
 
   /** Counterparty label rendered at the top of the rail. Parent page
    *  resolves this from the linked contact's *current* phone so an

@@ -13,7 +13,7 @@ import {
   ConversationChannel,
   ConversationListQuery,
 } from './conversations-api.service';
-import { StaffListItem } from '../staff/staff-api.service';
+import { UserMini } from '../shared/services/users-directory.service';
 import { OwnerColor, ownerColor, staffInitials } from '../shared/owner-color.util';
 import { ChannelBrandIconComponent } from './channel-brand-icon.component';
 import { TagChipComponent } from './tag-chip.component';
@@ -150,7 +150,7 @@ export class ConversationListComponent {
   @Input() items: Conversation[] = [];
   @Input() loading = false;
   @Input() selectedId: string | null = null;
-  @Input() staffById: Map<string, StaffListItem> = new Map();
+  @Input() staffById: Map<string, UserMini> = new Map();
   /** Contact-name lookup keyed by `contact_id`. Parent hydrates it
    *  after each list load; the row falls back to `external_id` when
    *  a contact hasn't been fetched yet (or is missing). ``phone`` is

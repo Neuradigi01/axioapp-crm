@@ -16,7 +16,7 @@ import { EmailTemplateRenderResponse } from '../services/email-templates-api.ser
 import { EmailTemplatePickerComponent } from '../shared/email/template-picker.component';
 import { SendFromPickerComponent } from '../whatsapp/shared/send-from-picker.component';
 import { ConversationMessage } from './conversations-api.service';
-import { StaffListItem } from '../staff/staff-api.service';
+import { UserMini } from '../shared/services/users-directory.service';
 
 export type ComposerAttachmentType = 'image' | 'video' | 'audio' | 'document';
 
@@ -126,7 +126,7 @@ export class ComposeBarComponent {
    *  (conversations.page) loads this once at mount and passes it
    *  down. Empty when not yet loaded — the picker just renders no
    *  candidates. */
-  @Input() staff: StaffListItem[] = [];
+  @Input() staff: UserMini[] = [];
 
   /** Step 15: WhatsApp 24-hour session window has expired. When true,
    *  the textarea is disabled in Reply mode (note mode is unaffected
@@ -371,7 +371,7 @@ export class ComposeBarComponent {
     }
   }
 
-  protected pickMention(staff: StaffListItem): void {
+  protected pickMention(staff: UserMini): void {
     if (this.mentions().length >= MAX_MENTIONS) return;
     this.mentions.update((arr) => [...arr, { userId: staff.id, displayName: staff.full_name }]);
     // Replace the trailing `@query` token with `@FullName` so the

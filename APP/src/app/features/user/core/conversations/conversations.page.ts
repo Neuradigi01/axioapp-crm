@@ -44,7 +44,7 @@ import { InteractiveBuilderComponent, InteractivePayload } from './interactive-b
 import { NewConversationModalComponent } from './new-conversation-modal.component';
 import { WhatsAppTemplatePickerComponent } from './whatsapp-template-picker.component';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
-import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
+import { UserMini, UsersDirectoryService } from '../shared/services/users-directory.service';
 import {
   ReassignConfirm,
   ReassignModalComponent,
@@ -90,7 +90,7 @@ import { extractApiError } from '@core/services/api-error.util';
 export class ConversationsPageComponent {
   private readonly api = inject(ConversationsApiService);
   private readonly notifications = inject(NotificationsApiService);
-  private readonly staffApi = inject(StaffApiService);
+  private readonly usersDir = inject(UsersDirectoryService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
@@ -161,9 +161,15 @@ export class ConversationsPageComponent {
 
   /** Staff list indexed by user id — resolves `assigned_to_id` and
    * `sender_user_id` to display names. Loaded once at page construct
-   * via `GET /api/v1/staff`; the list is small (org-wide staff) and
-   * rarely changes within a session. */
-  protected readonly staffById = signal<Map<string, StaffListItem>>(new Map());
+   * via `GET /api/v1/users` (through `UsersDirectoryService` — the
+   * shared cached lookup every other list page uses). We switched OFF
+   * of `GET /api/v1/staff` because that endpoint is gated on
+   * `staff.read` which the default Employee role doesn't hold, so
+   * every assigned conversation rendered "Unknown user" at the
+   * employee login. `users` is only gated on `get_current_user`
+   * (any authenticated seat in the org) which is the correct
+   * permission bar for a name-lookup. */
+  protected readonly staffById = signal<Map<string, UserMini>>(new Map());
 
   /** Contact-name lookup for the list rows — resolves each row's
    *  `contact_id` to a display name so the list shows "Ananya Rao"
@@ -185,9 +191,7 @@ export class ConversationsPageComponent {
 
   /** Step 13 — flat staff array for the @-mention picker in the
    *  composer. Derived from `staffById` (single source of truth). */
-  protected readonly staffList = computed<StaffListItem[]>(() =>
-    Array.from(this.staffById().values()),
-  );
+  protected readonly staffList = computed<UserMini[]>(() => Array.from(this.staffById().values()));
 
   /** When `true`, the reassign modal is rendered inline and bound to
    * `selectedConversation()`. Cancel/confirm flip it back to `false`. */
@@ -421,12 +425,12 @@ export class ConversationsPageComponent {
   /** One-shot staff load at page mount. Failure is non-fatal — badges
    * fall back to "?" initials and the neutral grey palette. */
   private loadStaff(): void {
-    this.staffApi
+    this.usersDir
       .list()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => {
-          const map = new Map<string, StaffListItem>();
+          const map = new Map<string, UserMini>();
           for (const r of rows) map.set(r.id, r);
           this.staffById.set(map);
           this.cdr.markForCheck();
