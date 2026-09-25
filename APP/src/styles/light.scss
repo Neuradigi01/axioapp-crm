@@ -132,3 +132,99 @@
 
   color-scheme: light;
 }
+
+// -----------------------------------------------------------------------------
+// Light-mode contrast rescue for status/banner text.
+//
+// Most banners, pills, and status text across the app use Tailwind's 300/400
+// palette shades (e.g. `text-emerald-300`, `text-amber-400`) which are tuned
+// for dark surfaces and read as washed-out low-contrast text on our light
+// surface tokens. Under `[data-theme='light']` we promote those shades to
+// their 700 counterparts so the same markup stays legible in both themes
+// without touching hundreds of templates. Colored icons using `currentColor`
+// inherit the boost automatically.
+// -----------------------------------------------------------------------------
+[data-theme='light'] {
+  .text-emerald-300,
+  .text-emerald-400,
+  .text-emerald-500 {
+    color: rgb(4 120 87) !important; // emerald-700
+  }
+
+  .text-green-300,
+  .text-green-400,
+  .text-green-500 {
+    color: rgb(21 128 61) !important; // green-700
+  }
+
+  .text-amber-300,
+  .text-amber-400,
+  .text-amber-500 {
+    color: rgb(180 83 9) !important; // amber-700
+  }
+
+  .text-yellow-300,
+  .text-yellow-400,
+  .text-yellow-500 {
+    color: rgb(161 98 7) !important; // yellow-700
+  }
+
+  .text-orange-300,
+  .text-orange-400,
+  .text-orange-500 {
+    color: rgb(194 65 12) !important; // orange-700
+  }
+
+  .text-red-300,
+  .text-red-400 {
+    color: rgb(185 28 28) !important; // red-700
+  }
+
+  .text-sky-300,
+  .text-sky-400,
+  .text-sky-500 {
+    color: rgb(3 105 161) !important; // sky-700
+  }
+
+  .text-blue-300,
+  .text-blue-400 {
+    color: rgb(29 78 216) !important; // blue-700
+  }
+
+  .text-cyan-300,
+  .text-cyan-400,
+  .text-cyan-500 {
+    color: rgb(14 116 144) !important; // cyan-700
+  }
+
+  .text-teal-300,
+  .text-teal-400,
+  .text-teal-500 {
+    color: rgb(15 118 110) !important; // teal-700
+  }
+
+  .text-indigo-300,
+  .text-indigo-400 {
+    color: rgb(67 56 202) !important; // indigo-700
+  }
+
+  .text-violet-300,
+  .text-violet-400 {
+    color: rgb(109 40 217) !important; // violet-700
+  }
+
+  .text-purple-300,
+  .text-purple-400 {
+    color: rgb(126 34 206) !important; // purple-700
+  }
+
+  .text-pink-300,
+  .text-pink-400 {
+    color: rgb(190 24 93) !important; // pink-700
+  }
+
+  .text-rose-300,
+  .text-rose-400 {
+    color: rgb(190 18 60) !important; // rose-700
+  }
+}

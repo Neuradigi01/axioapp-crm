@@ -137,6 +137,93 @@
 }
 
 // -----------------------------------------------------------------------------
+// Dark-mode contrast rescue for status/banner text.
+//
+// A handful of banners and pills (mostly billing) use the light-mode-tuned
+// 600/700 palette shades. Those read fine on white but disappear on our dark
+// surfaces. Under the dark theme we swap them to the paler 300 shade so the
+// same markup stays legible in both themes without touching each template.
+// Icons using `currentColor` inherit the boost automatically.
+// -----------------------------------------------------------------------------
+[data-theme='dark'],
+:root:not([data-theme='light']) {
+  .text-emerald-600,
+  .text-emerald-700 {
+    color: rgb(110 231 183) !important; // emerald-300
+  }
+
+  .text-green-600,
+  .text-green-700 {
+    color: rgb(134 239 172) !important; // green-300
+  }
+
+  .text-amber-600,
+  .text-amber-700 {
+    color: rgb(252 211 77) !important; // amber-300
+  }
+
+  .text-yellow-600,
+  .text-yellow-700 {
+    color: rgb(253 224 71) !important; // yellow-300
+  }
+
+  .text-orange-600,
+  .text-orange-700 {
+    color: rgb(253 186 116) !important; // orange-300
+  }
+
+  .text-red-600,
+  .text-red-700 {
+    color: rgb(252 165 165) !important; // red-300
+  }
+
+  .text-sky-600,
+  .text-sky-700 {
+    color: rgb(125 211 252) !important; // sky-300
+  }
+
+  .text-blue-600,
+  .text-blue-700 {
+    color: rgb(147 197 253) !important; // blue-300
+  }
+
+  .text-cyan-600,
+  .text-cyan-700 {
+    color: rgb(103 232 249) !important; // cyan-300
+  }
+
+  .text-teal-600,
+  .text-teal-700 {
+    color: rgb(94 234 212) !important; // teal-300
+  }
+
+  .text-indigo-600,
+  .text-indigo-700 {
+    color: rgb(165 180 252) !important; // indigo-300
+  }
+
+  .text-violet-600,
+  .text-violet-700 {
+    color: rgb(196 181 253) !important; // violet-300
+  }
+
+  .text-purple-600,
+  .text-purple-700 {
+    color: rgb(216 180 254) !important; // purple-300
+  }
+
+  .text-pink-600,
+  .text-pink-700 {
+    color: rgb(249 168 212) !important; // pink-300
+  }
+
+  .text-rose-600,
+  .text-rose-700 {
+    color: rgb(253 164 175) !important; // rose-300
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Global autofill override — Chromium/Safari paint autofilled inputs with a
 // hard-coded white bg + black text that ignores our theme tokens; in dark
 // mode this renders as a bright white box with invisible text. The only
