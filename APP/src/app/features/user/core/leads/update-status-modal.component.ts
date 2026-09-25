@@ -178,6 +178,15 @@ export class UpdateStatusModalComponent {
   protected readonly followupTypeOptions = FOLLOWUP_TYPE_OPTIONS;
   protected readonly lostReasonOptions = LOST_REASON_OPTIONS;
 
+  /** Human label for the current `source` form value — used to render the
+   *  read-only Source pill. Source is edited from the Edit lead modal;
+   *  this modal is workflow-only, so we show the current value for
+   *  reference without letting the operator change it here. */
+  protected readonly sourceLabel = computed<string>(() => {
+    const v = this.form.controls.source.value;
+    return SOURCE_OPTIONS.find((o) => o.value === v)?.label ?? String(v);
+  });
+
   protected readonly stageOptions = computed<MobileSelectOption[]>(() =>
     [...this.pipelineStages()]
       .sort((a, b) => a.display_order - b.display_order)

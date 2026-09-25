@@ -139,11 +139,14 @@
 
           <label class="block">
             <span class="text-xs font-medium text-default">Source</span>
-            <crm-mobile-select
-              class="mt-1 block"
-              [options]="sourceOptions"
-              formControlName="source"
-            />
+            <div
+              class="mt-1 rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-sm text-default"
+            >
+              {{ sourceLabel() }}
+            </div>
+            <span class="mt-1 block text-xs text-muted">
+              Source is set on the lead. Change it from <strong>Edit lead</strong>.
+            </span>
           </label>
 
           <label class="block">

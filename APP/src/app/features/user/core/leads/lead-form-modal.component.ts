@@ -295,17 +295,15 @@ export class LeadFormModalComponent extends BaseFormModalComponent {
 
   private emitUpdate(): void {
     const raw = this.standard.getRawValue();
-    const existing = this._lead()!;
     const update: LeadUpdate = {
+      source: raw.source,
       budget: nullableTrim(raw.budget),
       expected_close_date: nullableTrim(raw.expected_close_date),
       custom_data: this.customValue() as Record<string, unknown>,
     };
-    const moveStageTo =
-      raw.pipeline_stage && raw.pipeline_stage !== existing.pipeline_stage
-        ? raw.pipeline_stage
-        : undefined;
-    this.save.emit({ update, moveStageTo });
+    // Pipeline stage is not editable from this modal — Update Status is the
+    // single stage-changer so every move is captured in the timeline.
+    this.save.emit({ update });
   }
 
   /** Find-or-create the contact from the inline basics, then emit the
