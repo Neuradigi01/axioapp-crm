@@ -202,6 +202,13 @@
                     <lucide-icon name="bot" class="h-3 w-3" aria-label="Bot" />
                   }
                 </span>
+              } @else {
+                <span
+                  class="absolute -bottom-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-2 text-muted ring-2 ring-bg"
+                  [title]="'Customer · ' + formatTime(m.sent_at || m.created_at)"
+                >
+                  <lucide-icon name="user" class="h-3 w-3" aria-label="Customer" />
+                </span>
               }
               @if (replyAttribution(m); as attr) {
                 <p
