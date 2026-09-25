@@ -30,6 +30,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { Task, TaskFollowupType, TasksApiService } from '../tasks/tasks-api.service';
 
 interface FollowupTypeMeta {
@@ -53,7 +54,7 @@ const TYPE_META: Record<TaskFollowupType, FollowupTypeMeta> = {
   selector: 'app-lead-follow-ups-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, MobileDateTimeComponent],
   templateUrl: './lead-follow-ups-panel.component.html',
 })
 export class LeadFollowUpsPanelComponent {

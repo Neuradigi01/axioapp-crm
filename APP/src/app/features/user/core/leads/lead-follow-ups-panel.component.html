@@ -59,31 +59,11 @@
               <tr class="align-top">
                 <td class="py-2 pr-3">
                   @if (rescheduling() === t.id) {
-                    <div class="flex flex-col gap-1.5">
-                      <input
-                        type="datetime-local"
-                        [value]="rescheduleDraft()"
-                        (input)="onRescheduleInput($any($event.target).value)"
-                        class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                      />
-                      <div class="flex items-center gap-1">
-                        <button
-                          type="button"
-                          class="inline-flex items-center rounded-md bg-accent px-2 py-1 text-[11px] font-medium text-white hover:brightness-95 disabled:opacity-50"
-                          [disabled]="mut"
-                          (click)="saveReschedule(t)"
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          class="inline-flex items-center rounded-md border border-subtle bg-surface px-2 py-1 text-[11px] font-medium text-default hover:bg-surface-2"
-                          (click)="cancelReschedule()"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
+                    <crm-mobile-datetime
+                      [value]="rescheduleDraft()"
+                      (valueChange)="onRescheduleInput($event)"
+                      placeholder="Pick date & time"
+                    />
                   } @else {
                     <div class="flex flex-col leading-tight">
                       <span class="text-xs font-medium text-default">{{ due.absolute }}</span>
@@ -114,7 +94,25 @@
                   }
                 </td>
                 <td class="py-2 pr-3 text-right">
-                  @if (rescheduling() !== t.id) {
+                  @if (rescheduling() === t.id) {
+                    <div class="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        class="inline-flex items-center rounded-md bg-accent px-2 py-1 text-[11px] font-medium text-white hover:brightness-95 disabled:opacity-50"
+                        [disabled]="mut"
+                        (click)="saveReschedule(t)"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex items-center rounded-md border border-subtle bg-surface px-2 py-1 text-[11px] font-medium text-default hover:bg-surface-2"
+                        (click)="cancelReschedule()"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  } @else {
                     <div class="inline-flex items-center gap-1">
                       <button
                         type="button"
