@@ -64,6 +64,7 @@ import {
   LeadCreate,
   LeadListQuery,
   LeadSortKey,
+  LeadSource,
   LeadStatus,
   LeadUpdate,
   LeadsApiService,
@@ -468,6 +469,29 @@ export class LeadsPageComponent {
     }
     if (!lead.source) return null;
     return this.prettifySource(lead.source);
+  }
+
+  /** Colour palette for the source pill in the list view — mirrors the
+   *  kanban card's `classForSource` so the same source reads with the
+   *  same colour on both surfaces. Uses alpha-based backgrounds so the
+   *  pills stay legible in both dark and light themes. */
+  protected sourceCellClass(source: LeadSource | undefined): string {
+    switch (source) {
+      case 'bulk_import':
+        return 'bg-indigo-500/10 text-indigo-400 ring-indigo-500/30';
+      case 'widget':
+        return 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30';
+      case 'google_ads':
+        return 'bg-amber-500/10 text-amber-400 ring-amber-500/30';
+      case 'meta_ads':
+        return 'bg-blue-500/10 text-blue-400 ring-blue-500/30';
+      case 'whatsapp_flow':
+        return 'bg-green-500/10 text-green-400 ring-green-500/30';
+      case 'walk_in':
+        return 'bg-teal-500/10 text-teal-400 ring-teal-500/30';
+      default:
+        return 'bg-surface-2 text-default ring-subtle';
+    }
   }
 
   /** `crm-mobile-select` shape for the source filter — same data as
@@ -1444,11 +1468,11 @@ export class LeadsPageComponent {
   protected statusClass(s: LeadStatus): string {
     switch (s) {
       case 'won':
-        return 'bg-emerald-100 text-emerald-800 ring-emerald-200';
+        return 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30';
       case 'lost':
-        return 'bg-red-500/10 text-red-400 ring-red-500/20';
+        return 'bg-red-500/10 text-red-400 ring-red-500/30';
       default:
-        return 'bg-blue-100 text-blue-800 ring-blue-200';
+        return 'bg-blue-500/10 text-blue-400 ring-blue-500/30';
     }
   }
 
@@ -1460,10 +1484,10 @@ export class LeadsPageComponent {
    * 60–89 hot orange, 90+ on-fire red. Matches the spec's intuition
    * that warmer = closer to a sale. */
   protected scoreClass(score: number): string {
-    if (score >= 90) return 'bg-red-100 text-red-800 ring-red-200';
-    if (score >= 60) return 'bg-orange-100 text-orange-800 ring-orange-200';
-    if (score >= 30) return 'bg-amber-100 text-amber-800 ring-amber-200';
-    return 'bg-surface-2 text-default border-subtle';
+    if (score >= 90) return 'bg-red-500/10 text-red-400 ring-red-500/30';
+    if (score >= 60) return 'bg-orange-500/10 text-orange-400 ring-orange-500/30';
+    if (score >= 30) return 'bg-amber-500/10 text-amber-400 ring-amber-500/30';
+    return 'bg-surface-2 text-default ring-subtle';
   }
 
   protected ownerLabel(assignedTo: string | null): string {
