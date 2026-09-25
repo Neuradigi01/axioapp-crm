@@ -224,6 +224,231 @@
 }
 
 // -----------------------------------------------------------------------------
+// Dark-mode contrast rescue for pill / badge backgrounds.
+//
+// A lot of first-generation pills across the app were written with the
+// light-mode-only Tailwind pattern `bg-{color}-50` or `bg-{color}-100` —
+// opaque near-white pastels. On a dark surface they paint as pale
+// near-white rectangles, which combined with the earlier text-color
+// promotion (700 → 300) reads as pale-on-pale washout. Under the dark
+// theme we swap those two opacity ramps to a translucent overlay so the
+// same markup renders as a subtle color tint on dark surfaces. Border
+// classes are matched for consistency (`border-*-200`/`300` → same
+// translucent ring). Icons using `currentColor` inherit correctly via
+// the existing text-color rescue above.
+// -----------------------------------------------------------------------------
+[data-theme='dark'],
+:root:not([data-theme='light']) {
+  // Emerald
+  .bg-emerald-50,
+  .bg-emerald-100 {
+    background-color: rgb(16 185 129 / 0.15) !important;
+  }
+  .border-emerald-200,
+  .border-emerald-300,
+  .ring-emerald-200,
+  .ring-emerald-300 {
+    border-color: rgb(16 185 129 / 0.3) !important;
+    --tw-ring-color: rgb(16 185 129 / 0.3) !important;
+  }
+
+  // Green
+  .bg-green-50,
+  .bg-green-100 {
+    background-color: rgb(34 197 94 / 0.15) !important;
+  }
+  .border-green-200,
+  .border-green-300,
+  .ring-green-200,
+  .ring-green-300 {
+    border-color: rgb(34 197 94 / 0.3) !important;
+    --tw-ring-color: rgb(34 197 94 / 0.3) !important;
+  }
+
+  // Amber
+  .bg-amber-50,
+  .bg-amber-100 {
+    background-color: rgb(245 158 11 / 0.15) !important;
+  }
+  .border-amber-200,
+  .border-amber-300,
+  .ring-amber-200,
+  .ring-amber-300 {
+    border-color: rgb(245 158 11 / 0.3) !important;
+    --tw-ring-color: rgb(245 158 11 / 0.3) !important;
+  }
+
+  // Yellow
+  .bg-yellow-50,
+  .bg-yellow-100 {
+    background-color: rgb(234 179 8 / 0.15) !important;
+  }
+  .border-yellow-200,
+  .border-yellow-300,
+  .ring-yellow-200,
+  .ring-yellow-300 {
+    border-color: rgb(234 179 8 / 0.3) !important;
+    --tw-ring-color: rgb(234 179 8 / 0.3) !important;
+  }
+
+  // Orange
+  .bg-orange-50,
+  .bg-orange-100 {
+    background-color: rgb(249 115 22 / 0.15) !important;
+  }
+  .border-orange-200,
+  .border-orange-300,
+  .ring-orange-200,
+  .ring-orange-300 {
+    border-color: rgb(249 115 22 / 0.3) !important;
+    --tw-ring-color: rgb(249 115 22 / 0.3) !important;
+  }
+
+  // Red
+  .bg-red-50,
+  .bg-red-100 {
+    background-color: rgb(239 68 68 / 0.15) !important;
+  }
+  .border-red-200,
+  .border-red-300,
+  .ring-red-200,
+  .ring-red-300 {
+    border-color: rgb(239 68 68 / 0.3) !important;
+    --tw-ring-color: rgb(239 68 68 / 0.3) !important;
+  }
+
+  // Sky
+  .bg-sky-50,
+  .bg-sky-100 {
+    background-color: rgb(14 165 233 / 0.15) !important;
+  }
+  .border-sky-200,
+  .border-sky-300,
+  .ring-sky-200,
+  .ring-sky-300 {
+    border-color: rgb(14 165 233 / 0.3) !important;
+    --tw-ring-color: rgb(14 165 233 / 0.3) !important;
+  }
+
+  // Blue
+  .bg-blue-50,
+  .bg-blue-100 {
+    background-color: rgb(59 130 246 / 0.15) !important;
+  }
+  .border-blue-200,
+  .border-blue-300,
+  .ring-blue-200,
+  .ring-blue-300 {
+    border-color: rgb(59 130 246 / 0.3) !important;
+    --tw-ring-color: rgb(59 130 246 / 0.3) !important;
+  }
+
+  // Cyan
+  .bg-cyan-50,
+  .bg-cyan-100 {
+    background-color: rgb(6 182 212 / 0.15) !important;
+  }
+  .border-cyan-200,
+  .border-cyan-300,
+  .ring-cyan-200,
+  .ring-cyan-300 {
+    border-color: rgb(6 182 212 / 0.3) !important;
+    --tw-ring-color: rgb(6 182 212 / 0.3) !important;
+  }
+
+  // Teal
+  .bg-teal-50,
+  .bg-teal-100 {
+    background-color: rgb(20 184 166 / 0.15) !important;
+  }
+  .border-teal-200,
+  .border-teal-300,
+  .ring-teal-200,
+  .ring-teal-300 {
+    border-color: rgb(20 184 166 / 0.3) !important;
+    --tw-ring-color: rgb(20 184 166 / 0.3) !important;
+  }
+
+  // Indigo
+  .bg-indigo-50,
+  .bg-indigo-100 {
+    background-color: rgb(99 102 241 / 0.15) !important;
+  }
+  .border-indigo-200,
+  .border-indigo-300,
+  .ring-indigo-200,
+  .ring-indigo-300 {
+    border-color: rgb(99 102 241 / 0.3) !important;
+    --tw-ring-color: rgb(99 102 241 / 0.3) !important;
+  }
+
+  // Violet
+  .bg-violet-50,
+  .bg-violet-100 {
+    background-color: rgb(139 92 246 / 0.15) !important;
+  }
+  .border-violet-200,
+  .border-violet-300,
+  .ring-violet-200,
+  .ring-violet-300 {
+    border-color: rgb(139 92 246 / 0.3) !important;
+    --tw-ring-color: rgb(139 92 246 / 0.3) !important;
+  }
+
+  // Purple
+  .bg-purple-50,
+  .bg-purple-100 {
+    background-color: rgb(168 85 247 / 0.15) !important;
+  }
+  .border-purple-200,
+  .border-purple-300,
+  .ring-purple-200,
+  .ring-purple-300 {
+    border-color: rgb(168 85 247 / 0.3) !important;
+    --tw-ring-color: rgb(168 85 247 / 0.3) !important;
+  }
+
+  // Pink
+  .bg-pink-50,
+  .bg-pink-100 {
+    background-color: rgb(236 72 153 / 0.15) !important;
+  }
+  .border-pink-200,
+  .border-pink-300,
+  .ring-pink-200,
+  .ring-pink-300 {
+    border-color: rgb(236 72 153 / 0.3) !important;
+    --tw-ring-color: rgb(236 72 153 / 0.3) !important;
+  }
+
+  // Rose
+  .bg-rose-50,
+  .bg-rose-100 {
+    background-color: rgb(244 63 94 / 0.15) !important;
+  }
+  .border-rose-200,
+  .border-rose-300,
+  .ring-rose-200,
+  .ring-rose-300 {
+    border-color: rgb(244 63 94 / 0.3) !important;
+    --tw-ring-color: rgb(244 63 94 / 0.3) !important;
+  }
+
+  // Fuchsia
+  .bg-fuchsia-50,
+  .bg-fuchsia-100 {
+    background-color: rgb(217 70 239 / 0.15) !important;
+  }
+  .border-fuchsia-200,
+  .border-fuchsia-300,
+  .ring-fuchsia-200,
+  .ring-fuchsia-300 {
+    border-color: rgb(217 70 239 / 0.3) !important;
+    --tw-ring-color: rgb(217 70 239 / 0.3) !important;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Global autofill override — Chromium/Safari paint autofilled inputs with a
 // hard-coded white bg + black text that ignores our theme tokens; in dark
 // mode this renders as a bright white box with invisible text. The only

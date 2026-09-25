@@ -19,11 +19,11 @@ const STATUS_BADGES: Record<WorkflowStatus, BadgeDescriptor> = {
   },
   active: {
     label: 'Active',
-    classes: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    classes: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20',
   },
   paused: {
     label: 'Paused',
-    classes: 'bg-amber-50 text-amber-700 ring-amber-200',
+    classes: 'bg-amber-500/10 text-amber-700 ring-amber-500/20',
   },
   archived: {
     label: 'Archived',
