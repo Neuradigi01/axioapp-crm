@@ -14,6 +14,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 import { nullableTrim } from '@core/services/form.util';
 
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 import {
   MobileSelectComponent,
@@ -60,6 +61,7 @@ export class CustomEventsPageComponent {
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly toast = inject(ToastService);
 
   protected readonly events = signal<CustomEvent[]>([]);
   protected readonly loading = signal(false);
@@ -360,10 +362,11 @@ export class CustomEventsPageComponent {
         })
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
-          next: () => {
+          next: (evt) => {
             this.saving.set(false);
             this.cancelForm();
             this.reload();
+            this.toast.success('Custom event updated', { subtitle: evt.name });
           },
           error: (err: HttpErrorResponse) => {
             this.saving.set(false);
@@ -382,10 +385,13 @@ export class CustomEventsPageComponent {
         })
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
-          next: () => {
+          next: (evt) => {
             this.saving.set(false);
             this.cancelForm();
             this.reload();
+            this.toast.success('Custom event created', {
+              subtitle: `${evt.name} · custom.${evt.event_key}`,
+            });
           },
           error: (err: HttpErrorResponse) => {
             this.saving.set(false);
@@ -425,9 +431,12 @@ export class CustomEventsPageComponent {
       .delete(evt.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
+        next: () => this.toast.success('Custom event deleted', { subtitle: evt.name }),
         error: (err: HttpErrorResponse) => {
           this.events.set(before);
-          this.loadError.set(extractApiError(err) ?? 'Could not delete custom event.');
+          this.toast.error('Could not delete custom event', {
+            subtitle: extractApiError(err) ?? evt.name,
+          });
         },
       });
   }
