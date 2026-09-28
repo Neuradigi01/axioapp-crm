@@ -88,6 +88,24 @@ def _normalize_phone(raw: str) -> str:
     return f"+{digits}"
 
 
+def _profile_name(value: dict[str, Any], wa_id: str) -> str | None:
+    """The sender's WhatsApp profile name from a Cloud API webhook
+    ``value`` block — ``contacts[].profile.name`` for the entry whose
+    ``wa_id`` matches the message's ``from`` (first entry as fallback).
+    ``None`` when Meta omits it or the user never set one."""
+    contacts = value.get("contacts")
+    if not isinstance(contacts, list):
+        return None
+    entries = [c for c in contacts if isinstance(c, dict)]
+    match = next((c for c in entries if str(c.get("wa_id", "")) == wa_id), None)
+    entry = match or (entries[0] if entries else None)
+    profile = entry.get("profile") if entry else None
+    name = profile.get("name") if isinstance(profile, dict) else None
+    if not isinstance(name, str):
+        return None
+    return name.strip()[:255] or None
+
+
 def _make_rate_limit_error(response: httpx.Response) -> WhatsAppRateLimited:
     """Translate Meta's 429 into our typed exception.
 
@@ -855,6 +873,7 @@ class WhatsAppAdapter:
             reply_to_channel_message_id=reply_to_wamid,
             reaction=reaction_block,
             referral=referral_block,
+            sender_name=_profile_name(value, str(message.get("from", ""))),
         )
 
     # --- signature / handshake --------------------------------------------
@@ -957,9 +976,7 @@ class WhatsAppWebAdapter:
 
         to = _normalize_phone(external_id).lstrip("+")
         reply_to = (
-            {"message_id": reply_to_channel_message_id}
-            if reply_to_channel_message_id
-            else None
+            {"message_id": reply_to_channel_message_id} if reply_to_channel_message_id else None
         )
 
         # Import here rather than at module scope so a sidecar-less
@@ -997,9 +1014,7 @@ class WhatsAppWebAdapter:
                 )
             else:
                 if not text:
-                    raise WhatsAppSendError(
-                        "Empty message — provide text or an attachment."
-                    )
+                    raise WhatsAppSendError("Empty message — provide text or an attachment.")
                 result = await self._sidecar.send_text(
                     sidecar_session_id=self._sidecar_session_id,
                     to=to,
@@ -1017,13 +1032,9 @@ class WhatsAppWebAdapter:
                 "reconnect it in Settings → Integrations."
             ) from exc
         except SidecarUnavailable as exc:
-            raise WhatsAppSendError(
-                f"WhatsApp Web sidecar unavailable: {exc}"
-            ) from exc
+            raise WhatsAppSendError(f"WhatsApp Web sidecar unavailable: {exc}") from exc
 
-        provider_message_id = str(
-            result.get("provider_message_id") or result.get("id") or ""
-        )
+        provider_message_id = str(result.get("provider_message_id") or result.get("id") or "")
         return ChannelMessageRef(
             channel_message_id=provider_message_id,
             sent_at=datetime.now(UTC),

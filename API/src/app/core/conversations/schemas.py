@@ -329,6 +329,27 @@ class ConversationPatch(BaseModel):
     ai_handling: bool | None = None
 
 
+class ConversationContactSet(BaseModel):
+    """Attach a contact to a conversation from the inbox details rail.
+    Exactly one of:
+
+    * ``contact_id`` — link an existing contact;
+    * ``full_name`` — save the conversation's sender as a new contact
+      (phone / email taken from the conversation's ``external_id``).
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    contact_id: uuid.UUID | None = None
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> ConversationContactSet:
+        if (self.contact_id is None) == (self.full_name is None):
+            raise ValueError("Provide exactly one of contact_id or full_name.")
+        return self
+
+
 class ConversationCreate(BaseModel):
     """Operator-initiated fresh thread. The service resolves the
     contact's phone (WhatsApp/SMS) or email (Email) as the external_id

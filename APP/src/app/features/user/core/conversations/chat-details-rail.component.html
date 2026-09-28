@@ -22,6 +22,21 @@
     </p>
   </section>
 
+  <!-- Contact — save / link the sender, or rename a placeholder.
+       Only on channels whose identity is a phone / email the backend
+       can create a contact from. -->
+  @if (hasContactIdentity()) {
+    <app-conversation-contact-card
+      [contactId]="conversation.contact_id"
+      [contactName]="contactName"
+      [handle]="displayHandle || conversation.external_id"
+      [busy]="contactBusy"
+      (saveNew)="saveContact.emit($event)"
+      (link)="linkContact.emit($event)"
+      (rename)="renameContact.emit($event)"
+    />
+  }
+
   <!-- Assignee. Reuses the same ownerColor helper as the list badge
        so the same person shows the same colour across pages. -->
   <section class="flex flex-col gap-2">

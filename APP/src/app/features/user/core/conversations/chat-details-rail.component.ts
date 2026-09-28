@@ -17,6 +17,7 @@ import { TagChipComponent } from './tag-chip.component';
 import { TagManagerComponent } from './tag-manager.component';
 import { ConversationBlockNumberActionComponent } from './header/block-number-action.component';
 import { ConversationExportButtonComponent } from './header/export-button.component';
+import { ConversationContactCardComponent } from './contact-card.component';
 import { AttributionChipComponent } from './header/attribution-chip.component';
 import { FurnitureAuthService } from '../auth/auth.service';
 
@@ -45,6 +46,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
     ConversationBlockNumberActionComponent,
     ConversationExportButtonComponent,
     AttributionChipComponent,
+    ConversationContactCardComponent,
   ],
   templateUrl: './chat-details-rail.component.html',
   host: { class: 'flex min-h-0 flex-1 flex-col overflow-y-auto' },
@@ -68,11 +70,24 @@ export class ChatDetailsRailComponent {
    *  handle is promoted back to the primary heading. */
   @Input() contactName: string | null = null;
 
+  /** True while the page's contact save / link / rename is in flight. */
+  @Input() contactBusy = false;
+
   @Output() readonly reassign = new EventEmitter<void>();
   @Output() readonly tagsChanged = new EventEmitter<ConversationTagRef[]>();
   @Output() readonly statusChange = new EventEmitter<ConversationStatus>();
   @Output() readonly takeoverAi = new EventEmitter<void>();
   @Output() readonly resumeAiOut = new EventEmitter<void>();
+  @Output() readonly saveContact = new EventEmitter<string>();
+  @Output() readonly linkContact = new EventEmitter<string>();
+  @Output() readonly renameContact = new EventEmitter<string>();
+
+  /** Channels whose ``external_id`` is a phone / email — the ones the
+   *  contact card can save a new contact from. */
+  protected hasContactIdentity(): boolean {
+    const ch = this.conversation.channel;
+    return ch === 'whatsapp' || ch === 'sms' || ch === 'email';
+  }
 
   protected readonly statusMenuOpen = signal<boolean>(false);
   protected readonly tagManagerOpen = signal<boolean>(false);

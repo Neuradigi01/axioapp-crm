@@ -431,6 +431,16 @@ export class ConversationsApiService {
     return this.http.patch<Conversation>(`${this.base}/${id}`, payload);
   }
 
+  /** Details-rail contact card — link an existing contact
+   *  (`{ contact_id }`) or save the sender as a new one
+   *  (`{ full_name }`; phone / email come from the conversation). */
+  setContact(
+    id: string,
+    payload: { contact_id: string } | { full_name: string },
+  ): Observable<Conversation> {
+    return this.http.put<Conversation>(`${this.base}/${id}/contact`, payload);
+  }
+
   // --- AI takeover (omnichannel Step 4) ------------------------------
 
   /** Human takes over — pause AI on this conversation.

@@ -73,6 +73,11 @@ class InboundMessage:
     # ``source_id``, ``source_type`` ("ad" | "post"), ``body``,
     # ``headline``, ``ctwa_clid``.
     referral: dict[str, Any] | None = None
+    # Sender's self-set display name, when the channel supplies one
+    # (WhatsApp Cloud API: ``value.contacts[].profile.name``). Used to
+    # name new / placeholder contacts instead of "Unknown WhatsApp
+    # contact". ``None`` when the channel doesn't provide it.
+    sender_name: str | None = None
 
 
 class ChannelAdapter(Protocol):

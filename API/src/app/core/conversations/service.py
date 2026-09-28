@@ -53,7 +53,7 @@ from src.app.core.conversations.models import (
     MessageDirection,
 )
 from src.app.core.conversations.registry import resolve
-from src.app.core.conversations.schemas import ConversationPatch
+from src.app.core.conversations.schemas import ConversationContactSet, ConversationPatch
 from src.app.core.email.models import EmailAccountSyncState
 from src.app.core.events import bus as events_bus
 from src.app.core.events.event_catalog import WHATSAPP_MESSAGE_RECEIVED
@@ -905,6 +905,7 @@ async def receive_webhook(
         channel=channel,
         external_id=parsed.external_id,
         received_via_phone_id=received_via_phone_id,
+        sender_name=parsed.sender_name,
     )
 
     # Serialize concurrent intake on the same conversation. Meta
@@ -1695,6 +1696,72 @@ async def start_conversation(
     return conv
 
 
+async def set_conversation_contact(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    payload: ConversationContactSet,
+    caller_user_id: uuid.UUID,
+    caller_role_id: uuid.UUID,
+) -> Conversation:
+    """Inbox details rail — link an existing contact to the conversation
+    (``payload.contact_id``) or save the sender as a new contact
+    (``payload.full_name``).
+
+    Saving reuses a contact that already owns the conversation's phone /
+    email instead of creating a duplicate; that contact is renamed only
+    while it still carries an auto-generated placeholder name."""
+    conv = await get_conversation(session, conversation_id)
+    await ensure_can_write_conversation(
+        session, conv=conv, caller_user_id=caller_user_id, caller_role_id=caller_role_id
+    )
+    before = _snapshot(conv)
+
+    if payload.contact_id is not None:
+        contact = await contacts_service.get_contact(session, payload.contact_id)
+        if contact is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="contact not found")
+    else:
+        from src.app.core.contacts import data_access as contacts_da
+
+        name = payload.full_name or ""
+        identifier = conv.external_id.strip()
+        if conv.channel in _PHONE_CHANNELS:
+            phone = identifier if identifier.startswith("+") else "+" + identifier
+            contact = await contacts_service.get_contact_by_phone(session, phone)
+            fields: dict[str, str] = {"phone": phone}
+        elif conv.channel == ConversationChannel.email:
+            contact = await contacts_da.find_contact_by_email(
+                session, org_id=conv.org_id, email=identifier
+            )
+            fields = {"email": identifier}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Saving contacts isn't supported on the {conv.channel.value} channel.",
+            )
+        if contact is None:
+            contact = Contact(
+                org_id=conv.org_id, full_name=name, source=conv.channel.value, **fields
+            )
+            contacts_service.insert_contact(session, contact)
+            await session.flush()
+        elif _is_placeholder_name(contact):
+            contact.full_name = name
+
+    conv.contact_id = contact.id
+    await session.commit()
+    await session.refresh(conv)
+    await audit.log(
+        "conversations.contact_linked",
+        entity_type="conversation",
+        entity_id=conv.id,
+        before=before,
+        after=_snapshot(conv),
+    )
+    return conv
+
+
 async def patch_conversation(
     session: AsyncSession,
     *,
@@ -1826,11 +1893,24 @@ async def _find_or_create_conversation(
     channel: ConversationChannel,
     external_id: str,
     received_via_phone_id: str | None = None,
+    sender_name: str | None = None,
 ) -> Conversation:
     existing = await _da.find_conversation_for_channel_external(
         session, channel=channel, external_id=external_id
     )
     if existing is not None:
+        if channel in _PHONE_CHANNELS:
+            if existing.contact_id is None:
+                # Conversations created before contact auto-linking (or
+                # whose contact was deleted) re-link on the next inbound
+                # — to the contact that owns this number, else a new one.
+                existing.contact_id = await _resolve_or_create_contact_by_phone(
+                    session, org_id=existing.org_id, phone=external_id, name=sender_name
+                )
+            elif sender_name:
+                await _maybe_name_placeholder_contact(
+                    session, contact_id=existing.contact_id, name=sender_name
+                )
         return existing
 
     # New conversation — `org_id` comes from `RequestContext` via the
@@ -1847,7 +1927,7 @@ async def _find_or_create_conversation(
     contact_id = None
     if channel in _PHONE_CHANNELS:
         contact_id = await _resolve_or_create_contact_by_phone(
-            session, org_id=ctx.org_id, phone=external_id
+            session, org_id=ctx.org_id, phone=external_id, name=sender_name
         )
 
     # whatsapp-platform-upgrade Step 19 — if the org has
@@ -1889,15 +1969,23 @@ async def _find_or_create_conversation(
     return conv
 
 
+# Name given to contacts auto-created from a WhatsApp number whose sender
+# supplied no profile name.
+UNKNOWN_WHATSAPP_CONTACT_NAME = "Unknown WhatsApp contact"
+
+
 async def _resolve_or_create_contact_by_phone(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
     phone: str,
+    name: str | None = None,
 ) -> uuid.UUID | None:
     """Look up a contact by phone in this org. If none exists, create
-    one with `full_name = phone` as a placeholder so the inbox has a
-    row to render. Returns the resolved/created contact id, or None if
+    one named after the sender's WhatsApp profile name (``name``), or
+    the ``"Unknown WhatsApp contact"`` placeholder when the channel
+    didn't supply one. An existing placeholder-named contact is renamed
+    to ``name``. Returns the resolved/created contact id, or None if
     the phone string is empty."""
     if not phone:
         return None
@@ -1907,22 +1995,41 @@ async def _resolve_or_create_contact_by_phone(
     normalised = phone if phone.startswith("+") else "+" + phone
     existing = await contacts_service.get_contact_by_phone(session, normalised)
     if existing is not None:
+        if name and _is_placeholder_name(existing):
+            existing.full_name = name
         return existing.id
-    # Placeholder rows used to seed `full_name = phone`, so every
-    # inbound from a new number rendered in the inbox as a raw phone
-    # number instead of a name. Now they land as `"Unknown WhatsApp
-    # contact"` and the frontend list surfaces the phone as a
-    # secondary line — reads as a contact list instead of a phone
-    # list. Operators edit the contact page to give them a real name.
+    # The frontend list surfaces the phone as a secondary line, so a
+    # nameless sender still reads as a contact rather than a raw number.
+    # Operators rename it from the conversation's contact card.
     contact = Contact(
         org_id=org_id,
-        full_name="Unknown WhatsApp contact",
+        full_name=name or UNKNOWN_WHATSAPP_CONTACT_NAME,
         phone=normalised,
         source="whatsapp",
     )
     contacts_service.insert_contact(session, contact)
     await session.flush()
     return contact.id
+
+
+def _is_placeholder_name(contact: Contact) -> bool:
+    """True when the contact still carries an auto-generated name —
+    the current placeholder, the legacy ``full_name = phone`` seed, or
+    blank — so a real WhatsApp profile name may replace it. Names an
+    operator typed are never overwritten."""
+    current = (contact.full_name or "").strip()
+    return current in ("", UNKNOWN_WHATSAPP_CONTACT_NAME, contact.phone or "")
+
+
+async def _maybe_name_placeholder_contact(
+    session: AsyncSession, *, contact_id: uuid.UUID, name: str
+) -> None:
+    """Rename a linked contact that still has a placeholder name to the
+    sender's WhatsApp profile name (dirty ORM change, flushed with the
+    inbound message's commit)."""
+    contact = await contacts_service.get_contact(session, contact_id)
+    if contact is not None and _is_placeholder_name(contact):
+        contact.full_name = name
 
 
 async def resync_external_id_for_contact_phone(

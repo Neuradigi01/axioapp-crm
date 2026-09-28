@@ -1199,6 +1199,59 @@ export class ConversationsPageComponent {
       });
   }
 
+  /** In-flight flag for the details-rail contact card. */
+  protected readonly contactBusy = signal(false);
+
+  /** Contact card → "Save as contact" (`{ full_name }`) or "Link
+   *  existing" (`{ contact_id }`). Swaps the updated conversation into
+   *  the list + detail and hydrates the linked contact's name. */
+  protected onSetContact(payload: { contact_id: string } | { full_name: string }): void {
+    const id = this.selectedId();
+    if (!id || this.contactBusy()) return;
+    this.contactBusy.set(true);
+    this.api
+      .setContact(id, payload)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.contactBusy.set(false);
+          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
+          this.hydrateContacts([updated]);
+          this.toast.success('full_name' in payload ? 'Contact saved.' : 'Contact linked.');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.contactBusy.set(false);
+          this.toast.error(extractApiError(err) ?? 'Could not save the contact.');
+        },
+      });
+  }
+
+  /** Contact card → rename the linked contact (typically replacing the
+   *  "Unknown WhatsApp contact" placeholder). */
+  protected onRenameContact(fullName: string): void {
+    const contactId = this.selectedConversation()?.contact_id;
+    if (!contactId || this.contactBusy()) return;
+    this.contactBusy.set(true);
+    this.contactsApi
+      .update(contactId, { full_name: fullName })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (contact) => {
+          this.contactBusy.set(false);
+          this.contactsById.update((current) => ({
+            ...current,
+            [contact.id]: { id: contact.id, full_name: contact.full_name, phone: contact.phone },
+          }));
+          this.toast.success('Contact name updated.');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.contactBusy.set(false);
+          this.toast.error(extractApiError(err) ?? 'Could not rename the contact.');
+        },
+      });
+  }
+
   protected dismissSendError(): void {
     this.sendError.set(null);
   }

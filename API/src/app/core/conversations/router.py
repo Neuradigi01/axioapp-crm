@@ -60,6 +60,7 @@ from src.app.core.conversations.schemas import (
     AssignTagRequest,
     AttachmentType,
     ConversationAttributionOut,
+    ConversationContactSet,
     ConversationCreate,
     ConversationDetail,
     ConversationListResponse,
@@ -92,9 +93,9 @@ from src.app.core.conversations.service import (
     send_email_reply,
     send_outbound,
     send_template_message,
+    set_conversation_contact,
     start_conversation,
 )
-from src.app.core.permissions.service import role_has_permission
 from src.app.core.conversations.tags_service import (
     assign_tag,
     bulk_tags_for_conversations,
@@ -108,6 +109,7 @@ from src.app.core.conversations.tags_service import (
 from src.app.core.conversations.whatsapp_session import (
     compute_session_state,
 )
+from src.app.core.permissions.service import role_has_permission
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
@@ -118,9 +120,7 @@ router = APIRouter(prefix="/conversations", tags=["Conversations"])
 # rather than ``/conversations/messages/{id}/...``. Composition happens
 # in main.py — this router is exported and included at prefix
 # ``/api/v1`` (like the ownership_router pattern).
-message_attachments_router = APIRouter(
-    prefix="/messages", tags=["Message Attachments"]
-)
+message_attachments_router = APIRouter(prefix="/messages", tags=["Message Attachments"])
 
 _ATTACHMENT_KEY_RE = __import__("re").compile(r"^[A-Za-z0-9._-]{1,255}$")
 
@@ -162,18 +162,12 @@ async def download_message_attachment(
     # prevents an attacker from downloading a sibling file by name
     # even after guessing the message id.
     entries = msg.attachments or []
-    matched = next(
-        (e for e in entries if e.get("storage_key") == safe_key), None
-    )
+    matched = next((e for e in entries if e.get("storage_key") == safe_key), None)
     if matched is None:
         raise HTTPException(status_code=404, detail="attachment not found")
 
-    storage_root = _Path(
-        __import__("os").getenv("STORAGE_ROOT", "./storage")
-    )
-    file_path = (
-        storage_root / str(msg.org_id) / "messages" / str(msg.id) / safe_key
-    )
+    storage_root = _Path(__import__("os").getenv("STORAGE_ROOT", "./storage"))
+    file_path = storage_root / str(msg.org_id) / "messages" / str(msg.id) / safe_key
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="attachment not found")
 
@@ -802,6 +796,25 @@ async def patch_endpoint(
     user: User = Depends(require_permissions("conversations.write")),
 ) -> ConversationOut:
     conv = await patch_conversation(
+        db,
+        conversation_id=conversation_id,
+        payload=payload,
+        caller_user_id=user.legacy_uuid,
+        caller_role_id=user.role_id,
+    )
+    return await _serialize_conversation(db, conv)
+
+
+@router.put("/{conversation_id}/contact", response_model=ConversationOut)
+async def set_contact_endpoint(
+    conversation_id: uuid.UUID,
+    payload: ConversationContactSet,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write", "contacts.write")),
+) -> ConversationOut:
+    """Details-rail "Save as contact" / "Link contact" — attach an
+    existing contact or save the sender as a new one."""
+    conv = await set_conversation_contact(
         db,
         conversation_id=conversation_id,
         payload=payload,
