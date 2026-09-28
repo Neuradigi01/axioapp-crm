@@ -13,6 +13,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { FurnitureAuthService } from '../../auth/auth.service';
 
 import { StandardFieldsApiService } from '../../standard-fields/standard-fields-api.service';
@@ -48,6 +49,7 @@ export class StandardFieldsTabComponent {
   private readonly signals = inject(StandardFieldsSignalsService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   protected readonly entities = signal<StandardFieldEntity[]>([]);
   protected readonly entity = signal<string>('');
@@ -153,27 +155,37 @@ export class StandardFieldsTabComponent {
   }
 
   protected onModalSaved(): void {
+    const field = this.editing();
     this.editing.set(null);
+    this.toast.success('Standard field updated', { subtitle: field?.label ?? null });
     // The signals service already fired notifyChange() — the `effect`
     // above will refetch automatically.
   }
 
   protected onModalReset(): void {
+    const field = this.editing();
     this.editing.set(null);
+    this.toast.success('Standard field reset to default', { subtitle: field?.label ?? null });
   }
 
   /** Inline reset (without opening the modal) for already-overridden rows. */
   protected resetRow(field: StandardFieldRendered): void {
     this.resettingKey.set(field.field_key);
-    this.api.reset(field.entity, field.field_key).subscribe({
-      next: () => {
-        this.resettingKey.set(null);
-        this.signals.notifyChange();
-      },
-      error: (err: HttpErrorResponse) => {
-        this.resettingKey.set(null);
-        this.error.set(extractApiError(err) ?? 'Reset failed.');
-      },
-    });
+    this.api
+      .reset(field.entity, field.field_key)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.resettingKey.set(null);
+          this.signals.notifyChange();
+          this.toast.success('Standard field reset to default', { subtitle: field.label });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.resettingKey.set(null);
+          this.toast.error('Could not reset field', {
+            subtitle: extractApiError(err) ?? field.label,
+          });
+        },
+      });
   }
 }

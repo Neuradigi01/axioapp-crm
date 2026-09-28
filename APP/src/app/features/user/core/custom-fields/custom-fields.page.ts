@@ -21,6 +21,7 @@ import {
 } from './custom-fields-api.service';
 import { FieldFormComponent } from './field-form.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { CORE_ENTITY_REGISTRY, EntityDescriptor } from '../shared/entity-registry/entity-registry';
 
 const ENTITY_TYPES = CORE_ENTITY_REGISTRY.filter((d) => !d.hiddenFromPicker);
@@ -35,6 +36,7 @@ const ENTITY_TYPES = CORE_ENTITY_REGISTRY.filter((d) => !d.hiddenFromPicker);
 export class CustomFieldsPageComponent {
   private readonly api = inject(CustomFieldsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   readonly entityTypes = ENTITY_TYPES;
   readonly entityType = signal<string>(ENTITY_TYPES[0].value);
@@ -135,6 +137,9 @@ export class CustomFieldsPageComponent {
           );
           this.submitting.set(false);
           this.closeForm();
+          this.toast.success('Custom field added', {
+            subtitle: `${row.field_label} · ${this.selectedEntity().label}`,
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
@@ -154,6 +159,7 @@ export class CustomFieldsPageComponent {
           this.fields.update((rows) => rows.map((f) => (f.id === row.id ? row : f)));
           this.submitting.set(false);
           this.closeForm();
+          this.toast.success('Custom field updated', { subtitle: row.field_label });
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
@@ -192,14 +198,16 @@ export class CustomFieldsPageComponent {
         next: () => {
           this.deleting.set(false);
           this.pendingDelete.set(null);
+          this.toast.success('Custom field deleted', { subtitle: field.field_label });
         },
         error: (err: HttpErrorResponse) => {
-          // Revert + surface. Keep the modal open so the operator can
-          // read the error against the field they were deleting.
+          // Revert the optimistic remove and surface the reason.
           this.fields.set(snapshot);
           this.deleting.set(false);
-          this.loadError.set(extractApiError(err) ?? 'Could not delete field.');
           this.pendingDelete.set(null);
+          this.toast.error('Could not delete custom field', {
+            subtitle: extractApiError(err) ?? field.field_label,
+          });
         },
       });
   }
@@ -222,10 +230,13 @@ export class CustomFieldsPageComponent {
     forkJoin(updates)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
+        next: () => this.toast.success('Field order saved'),
         error: (err: HttpErrorResponse) => {
           // Revert the optimistic reorder.
           this.fields.set(before);
-          this.loadError.set(extractApiError(err) ?? 'Could not reorder fields.');
+          this.toast.error('Could not reorder fields', {
+            subtitle: extractApiError(err) ?? 'The previous order was restored.',
+          });
         },
       });
   }
