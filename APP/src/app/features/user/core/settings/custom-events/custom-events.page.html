@@ -210,13 +210,22 @@
               </div>
               <div>
                 <label class="block text-xs font-medium text-default"> At (org-local time) </label>
-                <div class="mt-1">
+                <div class="mt-1 flex items-center gap-1.5">
                   <crm-mobile-select
+                    class="min-w-0 flex-1"
                     [options]="hourOptions"
                     formControlName="schedule_hour_local"
-                    placeholder="Pick an hour…"
+                    placeholder="Hour"
+                  />
+                  <span class="text-sm font-semibold text-muted">:</span>
+                  <crm-mobile-select
+                    class="min-w-0 flex-1"
+                    [options]="minuteOptions"
+                    formControlName="schedule_minute_local"
+                    placeholder="Min"
                   />
                 </div>
+                <p class="mt-1 text-xs text-muted">Hour : minute, in 5-minute steps.</p>
               </div>
               <div class="sm:col-span-2">
                 <label class="block text-xs font-medium text-default">Frequency</label>
@@ -339,8 +348,8 @@
                         ' ' +
                         evt.schedule.field_ref +
                         ' at ' +
-                        evt.schedule.hour_local +
-                        ':00 org-local'
+                        fireTimeLabel(evt.schedule) +
+                        ' org-local'
                       "
                     >
                       <lucide-icon name="clock" class="h-3 w-3" />

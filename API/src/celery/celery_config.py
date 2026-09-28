@@ -172,14 +172,16 @@ beat_schedule = {
         "task": "src.app.core.automation.tasks.daily_time_based_scan",
         "schedule": crontab(hour=3, minute=30),
     },
-    # tasks/custom-events — hourly sweep at :05 that fires date-
-    # triggered custom events for whichever orgs have their configured
-    # ``schedule_hour_local`` matching the current local hour. The
-    # partial unique index ``ux_custom_event_occ_dedup`` absorbs
-    # replays across ticks + worker restarts.
-    "custom-events-hourly-sweep": {
+    # tasks/custom-events — every-5-minute sweep that fires date-
+    # triggered custom events whose ``schedule_hour_local`` +
+    # ``schedule_minute_local`` match the org's current local 5-minute
+    # slot. Minutes are picked in 5-minute steps, so the ``*/5`` cadence
+    # lands exactly on every pickable slot. The partial unique index
+    # ``ux_custom_event_occ_dedup`` absorbs replays across ticks +
+    # worker restarts.
+    "custom-events-sweep": {
         "task": "src.app.core.custom_events.tasks.sweep_date_triggered_events",
-        "schedule": crontab(minute=5),
+        "schedule": crontab(minute="*/5"),
     },
     # tasks/workflows Step 4 — every-60s sweep that re-dispatches
     # parked wait-node runs whose next_step_at <= now(). Matches the

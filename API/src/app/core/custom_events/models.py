@@ -101,6 +101,9 @@ class CustomEvent(Base, TenantScoped):
     schedule_recurring: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # Hour of day (0..23) in the org's timezone when the sweeper fires.
     schedule_hour_local: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Minute of that hour (0..55, 5-minute steps — the sweep's grain).
+    # Migration 0239; existing date_field rows backfilled to 0.
+    schedule_minute_local: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class CustomEventOccurrence(Base, TenantScoped):
@@ -168,9 +171,7 @@ class CustomEventOccurrence(Base, TenantScoped):
     #   'none'    → ''       (single fire per contact per event ever)
     #   'yearly'  → 'YYYY'
     #   'monthly' → 'YYYY-MM'
-    period_key: Mapped[str] = mapped_column(
-        String(16), nullable=False, server_default=text("''")
-    )
+    period_key: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("''"))
 
 
 __all__ = ["CustomEvent", "CustomEventOccurrence"]

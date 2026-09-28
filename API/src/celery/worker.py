@@ -75,9 +75,9 @@ celery.autodiscover_tasks(
         # per queued automation run. The dispatcher .apply_async()'s the
         # run id; without this entry the worker can't find the task.
         "src.app.core.automation.tasks",
-        # tasks/custom-events — hourly sweep at :05 that auto-fires
-        # date_field-scheduled custom events (LEAD/appointment/contact)
-        # for orgs whose local hour matches the event's ``hour_local``.
+        # tasks/custom-events — every-5-minute sweep that auto-fires
+        # date_field-scheduled custom events (lead/appointment/contact)
+        # for orgs whose local 5-minute slot matches the event's time.
         # Without this entry beat enqueues ``sweep_date_triggered_events``
         # and the worker drops it with KeyError, so scheduled events
         # never fire and downstream workflows never run.

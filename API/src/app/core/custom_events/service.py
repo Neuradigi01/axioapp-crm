@@ -40,7 +40,6 @@ from src.app.core.custom_events import data_access as _da
 from src.app.core.custom_events.entity_registry import (
     ENTITY_REGISTRY,
     SUPPORTED_ENTITY_TYPES,
-    entity_or_400,
 )
 from src.app.core.custom_events.models import CustomEvent, CustomEventOccurrence
 from src.app.core.custom_events.schemas import (
@@ -86,7 +85,10 @@ def _to_read(row: CustomEvent) -> CustomEventRead:
             field_ref=row.schedule_field_ref or "",
             offset_days=row.schedule_offset_days or 0,
             recurring=row.schedule_recurring or "none",  # type: ignore[arg-type]
-            hour_local=row.schedule_hour_local or 9,
+            # ``is not None`` rather than ``or``: hour 0 (midnight) is a
+            # valid pick and must not read back as the 09:00 default.
+            hour_local=row.schedule_hour_local if row.schedule_hour_local is not None else 9,
+            minute_local=row.schedule_minute_local or 0,
         )
     return CustomEventRead(
         id=row.id,
@@ -181,11 +183,7 @@ def _validate_field_ref(
     when the sweeper substitutes ``schedule_field_ref`` into its WHERE
     clause on the system branch."""
     match = next(
-        (
-            e
-            for e in catalog
-            if e["source"] == source and e["field_ref"] == field_ref
-        ),
+        (e for e in catalog if e["source"] == source and e["field_ref"] == field_ref),
         None,
     )
     if match is None:
@@ -247,9 +245,7 @@ async def get_event(
 ) -> CustomEventRead:
     row = await _da.get_event(session, org_id=org_id, event_id=event_id)
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Custom event not found."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Custom event not found.")
     return _to_read(row)
 
 
@@ -272,9 +268,7 @@ async def create_event(
                 ),
             )
 
-    existing = await _da.get_event_by_key(
-        session, org_id=org_id, event_key=payload.event_key
-    )
+    existing = await _da.get_event_by_key(session, org_id=org_id, event_key=payload.event_key)
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -301,6 +295,7 @@ async def create_event(
         row.schedule_offset_days = payload.schedule.offset_days
         row.schedule_recurring = payload.schedule.recurring
         row.schedule_hour_local = payload.schedule.hour_local
+        row.schedule_minute_local = payload.schedule.minute_local
     _da.insert_event(session, row)
     await session.commit()
     await session.refresh(row)
@@ -324,9 +319,7 @@ async def update_event(
 ) -> CustomEventRead:
     row = await _da.get_event(session, org_id=org_id, event_id=event_id)
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Custom event not found."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Custom event not found.")
     before = _snapshot(row)
     changes = payload.model_dump(exclude_unset=True)
     # Apply plain-scalar edits first (name, description).
@@ -344,6 +337,7 @@ async def update_event(
             row.schedule_offset_days = None
             row.schedule_recurring = None
             row.schedule_hour_local = None
+            row.schedule_minute_local = None
         else:
             assert payload.schedule is not None
             catalog = await list_date_field_catalog(
@@ -356,6 +350,7 @@ async def update_event(
             row.schedule_offset_days = payload.schedule.offset_days
             row.schedule_recurring = payload.schedule.recurring
             row.schedule_hour_local = payload.schedule.hour_local
+            row.schedule_minute_local = payload.schedule.minute_local
     row.updated_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(row)
@@ -419,9 +414,7 @@ async def fire_event(
     """
     event = await _da.get_event(session, org_id=org_id, event_id=event_id)
     if event is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Custom event not found."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Custom event not found.")
 
     # Manual fire is allowed for events of any entity_type — staff on
     # a Contact page can force-fire a lead/appointment event without
@@ -456,7 +449,7 @@ async def fire_event(
     _da.insert_occurrence(session, occurrence)
     try:
         await session.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         # Dedup index tripped — this (event, contact, period) already
         # fired. For MANUAL fires that's a race between two staffers
         # clicking the button simultaneously, which is rare enough to
@@ -470,7 +463,7 @@ async def fire_event(
                 "This event has already fired for this contact in the current "
                 f"period ({period_key!r})."
             ),
-        )
+        ) from exc
     await session.refresh(occurrence)
 
     # Publish AFTER commit so a workflow never sees an event whose
@@ -604,12 +597,15 @@ async def sweep_and_fire_for_org(
     *,
     org_id: uuid.UUID,
     org_hour_local: int,
-    today_local: "date_type",
+    org_minute_local: int,
+    today_local: date_type,
 ) -> dict[str, int]:
     """Run the date-triggered sweep for a single org.
 
-    For every ``date_field`` event on this org whose
-    ``schedule_hour_local`` matches ``org_hour_local``:
+    For every ``date_field`` event on this org scheduled for the org's
+    current local 5-minute slot (``schedule_hour_local`` ==
+    ``org_hour_local`` and ``schedule_minute_local`` ==
+    ``org_minute_local``, already floored to a multiple of 5):
 
       1. Compute the target date = ``today_local - offset_days``.
       2. Find every contact in this org whose watched date field
@@ -627,8 +623,8 @@ async def sweep_and_fire_for_org(
 
     from sqlalchemy import Date, cast, extract, select
 
-    events = await _da.list_scheduled_events_for_hour(
-        session, org_id=org_id, hour_local=org_hour_local
+    events = await _da.list_scheduled_events_for_slot(
+        session, org_id=org_id, hour_local=org_hour_local, minute_local=org_minute_local
     )
     fire_counts: dict[str, int] = {}
     for event in events:
@@ -662,8 +658,7 @@ async def sweep_and_fire_for_org(
             known_columns = {sd.column for sd in spec.system_date_fields}
             if column_name not in known_columns:
                 logger.warning(
-                    "custom_events.sweep: skipping event %s — unknown %s "
-                    "system column %r",
+                    "custom_events.sweep: skipping event %s — unknown %s system column %r",
                     event.id,
                     entity_type,
                     column_name,
@@ -755,7 +750,7 @@ class _EventSnapshot:
 async def _fire_scheduled_occurrence(
     session: AsyncSession,
     *,
-    event: "_EventSnapshot",
+    event: _EventSnapshot,
     entity_row: Any,
     fired_at: datetime,
 ) -> None:
@@ -860,8 +855,7 @@ async def _fire_scheduled_occurrence(
         )
     except Exception:
         logger.exception(
-            "custom_events.scheduled_fire: bus.publish failed event_type=%s "
-            "occurrence_id=%s",
+            "custom_events.scheduled_fire: bus.publish failed event_type=%s occurrence_id=%s",
             event_type,
             occurrence_id,
         )
@@ -870,7 +864,6 @@ async def _fire_scheduled_occurrence(
 # --- Types (imported here to keep the sweeper signature readable) --------
 
 from datetime import date as date_type  # noqa: E402
-
 
 __all__ = [
     "create_event",

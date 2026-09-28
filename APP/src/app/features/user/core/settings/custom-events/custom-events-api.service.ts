@@ -22,6 +22,8 @@ export interface ScheduleConfig {
   offset_days: number;
   recurring: RecurringMode;
   hour_local: number;
+  /** Minute of the hour, 0..55 in 5-minute steps (sweep grain). */
+  minute_local: number;
 }
 
 /** Row from GET /custom-events/date-field-catalog. */

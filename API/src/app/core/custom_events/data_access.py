@@ -175,23 +175,25 @@ async def list_occurrences_for_contact(
     return rows
 
 
-async def list_scheduled_events_for_hour(
+async def list_scheduled_events_for_slot(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
     hour_local: int,
+    minute_local: int,
 ) -> list[CustomEvent]:
     """Return every live ``date_field``-scheduled event on this org
-    whose ``schedule_hour_local`` matches ``hour_local``.
+    scheduled for the local ``hour_local:minute_local`` slot.
 
-    Backs the Celery beat sweeper — called once per (org, hour) tick.
-    The sweeper knows the org's timezone + current local hour and
-    invokes this for exactly that hour.
+    Backs the Celery beat sweeper — called once per (org, 5-minute
+    slot) tick with the org's current local time floored to 5 minutes.
+    A NULL minute (rows written before migration 0239) counts as ``:00``.
     """
     stmt = select(CustomEvent).where(
         CustomEvent.org_id == org_id,
         CustomEvent.schedule_type == "date_field",
         CustomEvent.schedule_hour_local == hour_local,
+        func.coalesce(CustomEvent.schedule_minute_local, 0) == minute_local,
         CustomEvent.deleted_at.is_(None),
     )
     result = await session.execute(stmt)
@@ -203,8 +205,8 @@ async def list_all_scheduled_events(session: AsyncSession) -> list[CustomEvent]:
 
     Callers set no tenant context so the ORM-level tenant filter
     doesn't apply — the sweeper needs to iterate every org's
-    scheduled events in one pass, then bucket by ``(org_id,
-    schedule_hour_local)`` and sweep each bucket at its local hour."""
+    scheduled events in one pass, then sweep each org at its current
+    local 5-minute slot."""
     stmt = select(CustomEvent).where(
         CustomEvent.schedule_type == "date_field",
         CustomEvent.deleted_at.is_(None),
@@ -223,5 +225,5 @@ __all__ = [
     "list_events",
     "list_occurrences",
     "list_occurrences_for_contact",
-    "list_scheduled_events_for_hour",
+    "list_scheduled_events_for_slot",
 ]

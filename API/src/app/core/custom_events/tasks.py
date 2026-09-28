@@ -1,14 +1,15 @@
-"""Celery tasks for custom events — hourly date-triggered sweep.
+"""Celery tasks for custom events — date-triggered sweep.
 
-One task today: :func:`sweep_date_triggered_events`. Runs at ``:05``
-past every hour so it doesn't contend with :00-anchored jobs
-(lead-score recompute, subscription rollover). For each org that has
-one or more ``date_field``-scheduled custom events, the sweeper:
+One task today: :func:`sweep_date_triggered_events`. Runs every 5
+minutes (the grain of the fire-time picker: 09:00, 09:05, …). For each
+org that has one or more ``date_field``-scheduled custom events, the
+sweeper:
 
-  1. Figures out the org's current LOCAL hour from ``org.timezone``.
+  1. Figures out the org's current LOCAL time from ``org.timezone`` and
+     floors the minute to its 5-minute slot.
   2. Calls
      :func:`core.custom_events.service.sweep_and_fire_for_org`
-     with that hour + today's local date.
+     with that hour + minute slot + today's local date.
   3. The service branches on system-column vs custom-field JSONB,
      matches contacts on the appropriate date grain (full date /
      month+day / day-of-month), and fires each match.
@@ -19,10 +20,10 @@ Idempotency is upheld by the partial unique index
 
 Timezone handling: ``org.timezone`` is a full IANA name (e.g.
 ``Asia/Kolkata``). ``zoneinfo.ZoneInfo`` handles DST automatically —
-during DST transitions the hour skip / repeat may cause the sweep
-to run twice or not at all for one hour on the transition day. Both
-paths are absorbed by the dedup index (double-run) or the following
-hour's tick (skip). Documented; not a bug.
+during DST transitions the hour skip / repeat may cause a slot to be
+swept twice or not at all on the transition day. The double-run is
+absorbed by the dedup index; a skipped slot fires nothing that day.
+Documented; not a bug.
 """
 
 from __future__ import annotations
@@ -42,7 +43,6 @@ try:
 
     HAS_CELERY = True
 except ImportError:  # pragma: no cover — dev shells without Celery
-
     HAS_CELERY = False
 
     def _shared_task(*decorator_args: Any, **decorator_kwargs: Any):
@@ -77,8 +77,8 @@ async def run_hourly_sweep() -> dict[str, dict[str, int]]:
     the Celery machinery.
 
     Groups scheduled events by ``org_id``, resolves each org's local
-    hour + local date via its ``timezone``, and delegates to the
-    service sweeper. Returns per-org fire counts keyed by event_key
+    5-minute slot + local date via its ``timezone``, and delegates to
+    the service sweeper. Returns per-org fire counts keyed by event_key
     for observability.
     """
     async with async_session() as session:
@@ -106,8 +106,7 @@ async def run_hourly_sweep() -> dict[str, dict[str, int]]:
                 tz = ZoneInfo(tz_name)
             except Exception:
                 logger.warning(
-                    "custom_events.sweep: org %s has invalid timezone %r; "
-                    "falling back to UTC",
+                    "custom_events.sweep: org %s has invalid timezone %r; falling back to UTC",
                     org_id,
                     tz_name,
                 )
@@ -117,6 +116,7 @@ async def run_hourly_sweep() -> dict[str, dict[str, int]]:
                 session,
                 org_id=org_id,
                 org_hour_local=local_now.hour,
+                org_minute_local=local_now.minute - local_now.minute % 5,
                 today_local=local_now.date(),
             )
             if fires:
@@ -126,7 +126,7 @@ async def run_hourly_sweep() -> dict[str, dict[str, int]]:
 
 @_shared_task(name="src.app.core.custom_events.tasks.sweep_date_triggered_events")
 def sweep_date_triggered_events() -> dict[str, dict[str, int]]:
-    """Celery beat entry point. Runs hourly at :05.
+    """Celery beat entry point. Runs every 5 minutes.
 
     Returns per-org fire counts so operators can see recent sweep
     activity in the Celery flower / result backend without opening

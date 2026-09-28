@@ -26,6 +26,7 @@ import {
   EntityOption,
   EntityType,
   RecurringMode,
+  ScheduleConfig,
   ScheduleType,
 } from './custom-events-api.service';
 
@@ -97,6 +98,7 @@ export class CustomEventsPageComponent {
     schedule_offset_days: this.fb.control<string>('0', { nonNullable: true }),
     schedule_recurring: this.fb.control<RecurringMode>('none', { nonNullable: true }),
     schedule_hour_local: this.fb.control<string>('9', { nonNullable: true }),
+    schedule_minute_local: this.fb.control<string>('0', { nonNullable: true }),
   });
 
   /** Loaded lazily the first time the schedule_type toggles to
@@ -147,14 +149,25 @@ export class CustomEventsPageComponent {
     { value: '30', label: '30 days after' },
   ];
 
-  /** 24-hour options. */
+  /** 24-hour options (hour half of the fire time). */
   protected readonly hourOptions: ReadonlyArray<MobileSelectOption> = Array.from(
     { length: 24 },
-    (_v, i) => ({
-      value: String(i),
-      label: `${String(i).padStart(2, '0')}:00`,
-    }),
+    (_v, i) => ({ value: String(i), label: String(i).padStart(2, '0') }),
   );
+
+  /** Minute half of the fire time — 5-minute steps, matching the
+   *  backend sweep that runs every 5 minutes. */
+  protected readonly minuteOptions: ReadonlyArray<MobileSelectOption> = Array.from(
+    { length: 12 },
+    (_v, i) => ({ value: String(i * 5), label: String(i * 5).padStart(2, '0') }),
+  );
+
+  /** `HH:MM` label for a schedule's fire time. */
+  protected fireTimeLabel(schedule: ScheduleConfig): string {
+    const hh = String(schedule.hour_local).padStart(2, '0');
+    const mm = String(schedule.minute_local ?? 0).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }
 
   protected readonly totalEvents = computed(() => this.events().length);
   protected readonly totalFires = computed(() =>
@@ -214,6 +227,7 @@ export class CustomEventsPageComponent {
       schedule_offset_days: '0',
       schedule_recurring: 'none',
       schedule_hour_local: '9',
+      schedule_minute_local: '0',
     });
     this.form.controls.event_key.enable();
     this.form.controls.entity_type.enable();
@@ -233,6 +247,7 @@ export class CustomEventsPageComponent {
       schedule_offset_days: String(evt.schedule?.offset_days ?? 0),
       schedule_recurring: evt.schedule?.recurring ?? 'none',
       schedule_hour_local: String(evt.schedule?.hour_local ?? 9),
+      schedule_minute_local: String(evt.schedule?.minute_local ?? 0),
     });
     // event_key + entity_type are immutable after creation.
     this.form.controls.event_key.disable();
@@ -327,6 +342,7 @@ export class CustomEventsPageComponent {
             offset_days: Number(raw.schedule_offset_days),
             recurring: raw.schedule_recurring,
             hour_local: Number(raw.schedule_hour_local),
+            minute_local: Number(raw.schedule_minute_local),
           }
         : null;
 

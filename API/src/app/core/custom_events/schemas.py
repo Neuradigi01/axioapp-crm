@@ -9,7 +9,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
 _EVENT_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _FIELD_REF_RE = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
 
@@ -33,14 +32,21 @@ class ScheduleConfig(BaseModel):
     offset_days: int = Field(ge=-365, le=365)
     recurring: RecurringMode
     hour_local: int = Field(ge=0, le=23)
+    # 5-minute steps to match the sweep cadence (every 5 min).
+    minute_local: int = Field(default=0, ge=0, le=55)
+
+    @field_validator("minute_local")
+    @classmethod
+    def _minute_step(cls, v: int) -> int:
+        if v % 5 != 0:
+            raise ValueError("minute_local must be a multiple of 5 (00, 05, … 55).")
+        return v
 
     @field_validator("field_ref")
     @classmethod
     def _ref_shape(cls, v: str) -> str:
         if not _FIELD_REF_RE.match(v):
-            raise ValueError(
-                "field_ref must be lowercase snake_case (e.g. visa_expiry_date)."
-            )
+            raise ValueError("field_ref must be lowercase snake_case (e.g. visa_expiry_date).")
         return v
 
 
@@ -76,7 +82,7 @@ class CustomEventCreate(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def _schedule_matches_type(self) -> "CustomEventCreate":
+    def _schedule_matches_type(self) -> CustomEventCreate:
         if self.schedule_type == "date_field" and self.schedule is None:
             raise ValueError("schedule payload required when schedule_type='date_field'.")
         if self.schedule_type == "manual" and self.schedule is not None:
@@ -103,7 +109,7 @@ class CustomEventUpdate(BaseModel):
     schedule: ScheduleConfig | None = None
 
     @model_validator(mode="after")
-    def _schedule_matches_type(self) -> "CustomEventUpdate":
+    def _schedule_matches_type(self) -> CustomEventUpdate:
         # Only enforce coupling when the caller supplied schedule_type
         # — a bare name/description patch is allowed to skip both.
         if self.schedule_type == "date_field" and self.schedule is None:
