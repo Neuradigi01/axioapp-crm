@@ -23,6 +23,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../../../../shared/components/toast/toast.service';
 import { AiAssistantsApiService } from '../../../ai-assistants-api.service';
 
 @Component({
@@ -35,6 +36,7 @@ import { AiAssistantsApiService } from '../../../ai-assistants-api.service';
 export class UrlPanelComponent {
   private readonly api = inject(AiAssistantsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   @Input({ required: true }) assistantId!: string;
   @Output() readonly created = new EventEmitter<void>();
@@ -42,8 +44,6 @@ export class UrlPanelComponent {
   protected readonly url = signal('');
   protected readonly title = signal('');
   protected readonly saving = signal(false);
-  protected readonly error = signal<string | null>(null);
-  protected readonly notice = signal<string | null>(null);
 
   protected readonly canSave = computed(
     () => !this.saving() && /^https?:\/\/\S+/i.test(this.url().trim()),
@@ -60,8 +60,6 @@ export class UrlPanelComponent {
   protected save(): void {
     if (!this.canSave()) return;
     const trimmedUrl = this.url().trim();
-    this.error.set(null);
-    this.notice.set(null);
     this.saving.set(true);
     this.api
       .addKnowledgeUrl(this.assistantId, {
@@ -73,16 +71,21 @@ export class UrlPanelComponent {
         next: (resp) => {
           this.saving.set(false);
           if (resp.duplicate) {
-            this.notice.set('This URL is already in your knowledge base.');
+            this.toast.info('This URL is already in your knowledge base.');
           } else {
             this.url.set('');
             this.title.set('');
+            this.toast.success('URL added', {
+              subtitle: 'Processing now. It will be ready for the assistant shortly.',
+            });
           }
           this.created.emit();
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.error.set(extractApiError(err) ?? 'Could not add URL.');
+          this.toast.error('Could not add URL', {
+            subtitle: extractApiError(err) ?? 'Please try again.',
+          });
         },
       });
   }

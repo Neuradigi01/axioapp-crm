@@ -27,6 +27,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../../../../shared/components/toast/toast.service';
 import {
   AiAssistantsApiService,
   KnowledgeCreateResponse,
@@ -49,6 +50,7 @@ const ACCEPT_ATTR = ACCEPT_EXTENSIONS.join(',');
 export class UploadFilePanelComponent {
   private readonly api = inject(AiAssistantsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   @Input({ required: true }) assistantId!: string;
   @Output() readonly created = new EventEmitter<void>();
@@ -56,9 +58,6 @@ export class UploadFilePanelComponent {
   protected readonly dragActive = signal(false);
   protected readonly uploading = signal(false);
   protected readonly progress = signal<number>(0);
-  protected readonly error = signal<string | null>(null);
-  /** Info banner text (dedup path). Cleared on next upload attempt. */
-  protected readonly notice = signal<string | null>(null);
 
   protected readonly acceptAttr = ACCEPT_ATTR;
 
@@ -89,12 +88,9 @@ export class UploadFilePanelComponent {
   }
 
   private startUpload(file: File): void {
-    this.error.set(null);
-    this.notice.set(null);
-
     const preCheck = this.preCheck(file);
     if (preCheck) {
-      this.error.set(preCheck);
+      this.toast.error('Could not upload file', { subtitle: preCheck });
       return;
     }
 
@@ -108,7 +104,9 @@ export class UploadFilePanelComponent {
         error: (err: HttpErrorResponse) => {
           this.uploading.set(false);
           this.progress.set(0);
-          this.error.set(extractApiError(err) ?? 'Upload failed.');
+          this.toast.error('Could not upload file', {
+            subtitle: extractApiError(err) ?? 'Upload failed.',
+          });
         },
       });
   }
@@ -132,9 +130,12 @@ export class UploadFilePanelComponent {
     if (event instanceof HttpResponse) {
       this.uploading.set(false);
       this.progress.set(100);
-      const body = event.body;
-      if (body?.duplicate) {
-        this.notice.set('This file is already in your knowledge base.');
+      if (event.body?.duplicate) {
+        this.toast.info('This file is already in your knowledge base.');
+      } else {
+        this.toast.success('File uploaded', {
+          subtitle: 'Processing now. It will be ready for the assistant shortly.',
+        });
       }
       this.created.emit();
     }

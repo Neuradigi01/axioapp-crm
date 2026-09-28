@@ -24,6 +24,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../../../../shared/components/toast/toast.service';
 import { AiAssistantsApiService } from '../../../ai-assistants-api.service';
 
 const CHAR_LIMIT = 100_000;
@@ -38,6 +39,7 @@ const CHAR_LIMIT = 100_000;
 export class CustomDataPanelComponent {
   private readonly api = inject(AiAssistantsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   @Input({ required: true }) assistantId!: string;
   @Output() readonly created = new EventEmitter<void>();
@@ -45,8 +47,6 @@ export class CustomDataPanelComponent {
   protected readonly title = signal('');
   protected readonly body = signal('');
   protected readonly saving = signal(false);
-  protected readonly error = signal<string | null>(null);
-  protected readonly notice = signal<string | null>(null);
 
   protected readonly charLimit = CHAR_LIMIT;
   protected readonly charCount = computed(() => this.body().length);
@@ -64,8 +64,6 @@ export class CustomDataPanelComponent {
 
   protected save(): void {
     if (!this.canSave()) return;
-    this.error.set(null);
-    this.notice.set(null);
     this.saving.set(true);
     this.api
       .addKnowledgeText(this.assistantId, {
@@ -77,16 +75,21 @@ export class CustomDataPanelComponent {
         next: (resp) => {
           this.saving.set(false);
           if (resp.duplicate) {
-            this.notice.set('This text is already in your knowledge base.');
+            this.toast.info('This text is already in your knowledge base.');
           } else {
             this.title.set('');
             this.body.set('');
+            this.toast.success('Custom data added', {
+              subtitle: 'Processing now. It will be ready for the assistant shortly.',
+            });
           }
           this.created.emit();
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
-          this.error.set(extractApiError(err) ?? 'Could not save custom data.');
+          this.toast.error('Could not save custom data', {
+            subtitle: extractApiError(err) ?? 'Please try again.',
+          });
         },
       });
   }

@@ -11,10 +11,11 @@ export const environment = {
   // console is never patched and nothing is mounted for end users.
   enableDebugConsole: false,
   // Sentry — write-only DSN, safe to commit. Empty string disables the SDK
-  // entirely (Sentry.init() is guarded on this in main.ts). Distinct
-  // environment tag per production deployment so aixoapp errors don't
-  // get lumped with the neuradigi tenant's issues.
+  // entirely (Sentry.init() is guarded on this in main.ts). The AIXO
+  // deployment reports to AIXO's own Sentry account (project
+  // `aixoapp-frontend`), separate from the Neuradigi project used by the
+  // development + neuradigi builds.
   sentryDsn:
-    'https://68dd925b617841de4e49a400796b0e47@o4512140356354048.ingest.us.sentry.io/4512140605194240',
+    'https://b36e9dea732eed650211176e9987c49c@o4512164209164288.ingest.us.sentry.io/4512164252745728',
   sentryEnvironment: 'production-aixoapp',
 };

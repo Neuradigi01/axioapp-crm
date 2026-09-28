@@ -31,6 +31,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { Subscription, Subject, switchMap, timer } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../../../../shared/components/toast/toast.service';
 import { ConfirmDialogComponent } from '../../../../shared/confirm-dialog/confirm-dialog.component';
 import {
   AiAssistantKnowledgeRow,
@@ -48,6 +49,8 @@ const TERMINAL_STATUSES: readonly KnowledgeStatus[] = [
   'failed_ingest',
 ];
 
+const IN_FLIGHT_STATUSES: readonly KnowledgeStatus[] = ['pending', 'processing'];
+
 const SOURCE_ICON: Record<AiAssistantKnowledgeRow['source_type'], string> = {
   file: 'file-text',
   text: 'file-text',
@@ -64,6 +67,7 @@ const SOURCE_ICON: Record<AiAssistantKnowledgeRow['source_type'], string> = {
 export class SourcesListComponent implements OnChanges {
   private readonly api = inject(AiAssistantsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   @Input({ required: true }) assistantId!: string;
   /** Signal-input pattern in Input form: parent bumps a counter when
@@ -73,9 +77,10 @@ export class SourcesListComponent implements OnChanges {
   protected readonly rows = signal<AiAssistantKnowledgeRow[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
-  /** Ephemeral inline error surfaced by the action buttons — cleared
-   *  when the operator retries or the next poll succeeds. */
-  protected readonly actionError = signal<string | null>(null);
+
+  /** Last-seen status per row id. A row that moves from in-flight to a
+   *  terminal status between polls gets a ready / failed toast. */
+  private readonly lastStatus = new Map<string, KnowledgeStatus>();
 
   /** Delete-confirmation state. Non-null → dialog visible for that id. */
   protected readonly deleteTarget = signal<AiAssistantKnowledgeRow | null>(null);
@@ -95,6 +100,7 @@ export class SourcesListComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if ('assistantId' in changes) {
       this.rows.set([]);
+      this.lastStatus.clear();
       this.startPolling();
     }
     if ('refreshTick' in changes && !changes['refreshTick'].firstChange) {
@@ -120,6 +126,7 @@ export class SourcesListComponent implements OnChanges {
         next: (rows) => {
           this.loading.set(false);
           this.error.set(null);
+          this.announceFinished(rows);
           this.rows.set(rows);
           if (this.allTerminal(rows)) {
             this.pollSubscription?.unsubscribe();
@@ -141,6 +148,25 @@ export class SourcesListComponent implements OnChanges {
 
   private allTerminal(rows: readonly AiAssistantKnowledgeRow[]): boolean {
     return rows.every((r) => TERMINAL_STATUSES.includes(r.status));
+  }
+
+  /** Toast every row that finished processing since the previous poll.
+   *  Rows already terminal on first load stay quiet. */
+  private announceFinished(rows: readonly AiAssistantKnowledgeRow[]): void {
+    for (const row of rows) {
+      const prev = this.lastStatus.get(row.id);
+      this.lastStatus.set(row.id, row.status);
+      if (!prev || !IN_FLIGHT_STATUSES.includes(prev)) continue;
+      if (row.status === 'ready') {
+        this.toast.success(`"${this.displayName(row)}" is ready`, {
+          subtitle: 'The assistant can now answer from this source.',
+        });
+      } else if (TERMINAL_STATUSES.includes(row.status)) {
+        this.toast.error(`"${this.displayName(row)}" could not be processed`, {
+          subtitle: row.status_message ?? this.statusLabel(row.status),
+        });
+      }
+    }
   }
 
   // --- Row helpers -------------------------------------------------
@@ -193,14 +219,18 @@ export class SourcesListComponent implements OnChanges {
   // --- Actions -----------------------------------------------------
 
   protected onCancel(row: AiAssistantKnowledgeRow): void {
-    this.actionError.set(null);
     this.api
       .cancelKnowledge(this.assistantId, row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => this.manualRefresh.next(),
+        next: () => {
+          this.toast.info(`Cancelling "${this.displayName(row)}"`);
+          this.manualRefresh.next();
+        },
         error: (err: HttpErrorResponse) => {
-          this.actionError.set(extractApiError(err) ?? 'Cancel failed.');
+          this.toast.error('Could not cancel processing', {
+            subtitle: extractApiError(err) ?? 'Please try again.',
+          });
         },
       });
   }
@@ -220,12 +250,15 @@ export class SourcesListComponent implements OnChanges {
         next: () => {
           this.deleting.set(false);
           this.deleteTarget.set(null);
+          this.toast.success('Knowledge source deleted');
           this.manualRefresh.next();
         },
         error: (err: HttpErrorResponse) => {
           this.deleting.set(false);
-          this.actionError.set(extractApiError(err) ?? 'Delete failed.');
           this.deleteTarget.set(null);
+          this.toast.error('Could not delete knowledge source', {
+            subtitle: extractApiError(err) ?? 'Please try again.',
+          });
         },
       });
   }

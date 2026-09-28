@@ -50,13 +50,46 @@ from src.app.core.ai_assistants.models import (
 )
 from src.app.shared.db import async_session
 from src.app.shared.http.safe_fetch import UnsafeUrlError, safe_fetch
-from src.app.shared.llm import ProviderError, factory
+from src.app.shared.llm import (
+    ProviderAuthError,
+    ProviderBadRequest,
+    ProviderError,
+    ProviderQuotaExceeded,
+    ProviderTimeout,
+    factory,
+)
 from src.app.shared.storage import get_storage
 from src.app.shared.vector.base import VectorEntry
 from src.app.shared.vector.chunker import chunk_text
 from src.app.shared.vector.pgvector import PgVectorStore
 
 logger = logging.getLogger(__name__)
+
+
+def _friendly_provider_error(exc: ProviderError) -> str:
+    """Operator-facing ``status_message`` for an embedding failure.
+
+    The raw SDK payload (JSON blob, request id) goes to the log; the
+    knowledge row carries a sentence the operator can act on.
+    """
+    if isinstance(exc, ProviderQuotaExceeded):
+        if "insufficient_quota" in str(exc):
+            return (
+                "Your OpenAI account has run out of credits. Add credits in your "
+                "OpenAI billing settings, then delete and re-add this source."
+            )
+        return "OpenAI rate limit reached. Wait a minute, then delete and re-add this source."
+    if isinstance(exc, ProviderAuthError):
+        return (
+            "The OpenAI API key for this assistant is invalid or revoked. "
+            "Update the key, then delete and re-add this source."
+        )
+    if isinstance(exc, ProviderTimeout):
+        return "OpenAI took too long to respond. Delete and re-add this source to try again."
+    if isinstance(exc, ProviderBadRequest):
+        return "OpenAI rejected this content. Check the source and try again."
+    return "OpenAI is temporarily unavailable. Delete and re-add this source to try again."
+
 
 _EMBED_MODEL = "text-embedding-3-small"
 _EMBED_BATCH_SIZE = 100
@@ -405,11 +438,18 @@ async def ingest_knowledge(knowledge_id: uuid.UUID) -> IngestOutcome:
                 try:
                     vectors = await llm.embed(texts, model=_EMBED_MODEL)
                 except ProviderError as exc:
+                    logger.warning(
+                        "knowledge %s: embedding provider error (status=%s, request_id=%s): %r",
+                        knowledge_id,
+                        exc.status_code,
+                        exc.request_id,
+                        exc,
+                    )
                     await _da.set_status(
                         session,
                         knowledge_id=knowledge_id,
                         status=KnowledgeStatus.failed_ingest,
-                        message=f"embedding provider error: {exc!r}",
+                        message=_friendly_provider_error(exc),
                     )
                     await session.commit()
                     return IngestOutcome(
