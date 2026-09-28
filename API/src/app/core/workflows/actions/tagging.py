@@ -41,7 +41,7 @@ def _result_sent(output: dict[str, Any]):
     return ActionResult(output=output)
 
 
-def _result_skipped(reason: str, **extra: Any):
+def _result_skipped(reason: str, /, **extra: Any):
     from src.app.core.workflows.engine import ActionResult
 
     payload: dict[str, Any] = dict(extra) if extra else {}

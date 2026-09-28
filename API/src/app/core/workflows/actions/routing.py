@@ -77,7 +77,7 @@ def _result_assigned(
     )
 
 
-def _result_skipped(reason: str, **extra: Any):
+def _result_skipped(reason: str, /, **extra: Any):
     from src.app.core.workflows.engine import ActionResult
 
     payload: dict[str, Any] = dict(extra) if extra else {}

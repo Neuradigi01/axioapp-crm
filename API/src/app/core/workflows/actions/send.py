@@ -315,7 +315,7 @@ def _result_sent(
     )
 
 
-def _result_skipped(reason: str, **extra: Any):
+def _result_skipped(reason: str, /, **extra: Any):
     from src.app.core.workflows.engine import ActionResult
 
     output: dict[str, Any] = dict(extra) if extra else {}
@@ -437,28 +437,48 @@ async def _send_whatsapp(session, *, run, step_run, node, context):
     if skip is not None:
         return _result_skipped(skip)
 
+    from src.app.core.conversations.adapters.whatsapp import (
+        WhatsAppAdapter,
+        WhatsAppNotConnected,
+        resolve_whatsapp_adapter,
+    )
+    from src.app.core.conversations.models import ConversationChannel
+    from src.app.core.templates.models import TemplateExternalStatus
+
+    if template.channel != ConversationChannel.whatsapp:
+        return _result_skipped("template_channel_mismatch")
+    if template.external_status != TemplateExternalStatus.approved:
+        return _result_skipped("template_not_approved")
+    if not template.is_active:
+        return _result_skipped("template_inactive")
+
     rendered_body, _ = _render_template(template, context)
 
-    from src.app.core.conversations.models import ConversationChannel
-    from src.app.core.conversations.registry import (
-        ChannelNotRegistered,
-    )
-    from src.app.core.conversations.registry import (
-        resolve as resolve_adapter,
-    )
-
     try:
-        adapter = resolve_adapter(ConversationChannel.whatsapp)
-    except ChannelNotRegistered as exc:
+        adapter = await resolve_whatsapp_adapter(session)
+    except WhatsAppNotConnected as exc:
         return _result_channel_error("whatsapp_not_configured", str(exc))
 
     try:
-        ref = await adapter.send(
-            org_id=run.org_id,
-            external_id=recipient,
-            text=rendered_body,
-            attachments=[],
-        )
+        if isinstance(adapter, WhatsAppAdapter):
+            # Cloud API only delivers business-initiated messages as
+            # approved templates, so send the Meta template with the
+            # CRM named variables resolved into positional params.
+            ref, rendered_body = await _send_whatsapp_cloud_template(
+                session,
+                adapter=adapter,
+                run=run,
+                template=template,
+                context=context,
+                recipient=recipient,
+            )
+        else:
+            ref = await adapter.send(
+                org_id=run.org_id,
+                external_id=recipient,
+                text=rendered_body,
+                attachments=[],
+            )
     except Exception as exc:
         logger.warning(
             "workflows.send.whatsapp failed node=%s recipient=%s error=%s",
@@ -469,6 +489,41 @@ async def _send_whatsapp(session, *, run, step_run, node, context):
         return _result_channel_error("whatsapp_send_failed", str(exc))
 
     return _result_sent(getattr(ref, "channel_message_id", None), None, rendered_body)
+
+
+async def _send_whatsapp_cloud_template(session, *, adapter, run, template, context, recipient):
+    """Send an approved central WA template through the Cloud API.
+    Returns ``(ref, preview)`` where ``preview`` is the Meta body with
+    the positional params substituted."""
+    from src.app.core.integrations.whatsapp.meta_variables import (
+        resolve_named_body_to_positional_params,
+    )
+    from src.app.core.templates.service import ensure_wa_extension_row
+    from src.app.core.tenants import data_access as tenants_da
+
+    wa_template = await ensure_wa_extension_row(session, template=template)
+    org = await tenants_da.get_organization_by_id(session, run.org_id)
+    org_data = (
+        {"name": org.name or "", "support_email": getattr(org, "support_email", "") or ""}
+        if org is not None
+        else None
+    )
+    variables = resolve_named_body_to_positional_params(
+        template.body_text, context.get("contact"), org_data
+    )
+    ref = await adapter.send_template(
+        org_id=run.org_id,
+        external_id=recipient,
+        template_name=wa_template.name,
+        language=wa_template.language,
+        variables=variables,
+        header_type=wa_template.header_type,
+        header_text=wa_template.header_text,
+    )
+    preview = wa_template.body or f"[template: {wa_template.name}]"
+    for idx, val in variables.items():
+        preview = preview.replace("{{" + str(idx) + "}}", val)
+    return ref, preview
 
 
 # --- send.sms / send.facebook / send.instagram / send.push --------------
