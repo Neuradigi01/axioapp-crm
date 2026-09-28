@@ -7,7 +7,7 @@
  *    Keeping that side-effect contained in one injectable means the
  *    rest of the SPA never has to know `fbAsyncInit` exists.
  *  - Two parallel async signals (`FB.login` callback + a `postMessage`
- *    event from `https://www.facebook.com`) must rendezvous before
+ *    event from a `facebook.com` host) must rendezvous before
  *    the orchestration can call the backend. The choreography lives
  *    here, not in the component.
  *
@@ -15,8 +15,8 @@
  *   1. Lazy-load `https://connect.facebook.net/en_US/sdk.js` on first
  *      use. ~80KB; never loaded on page mount.
  *   2. Call `FB.init({ appId, version })` exactly once per page life.
- *   3. Attach a `window.message` listener filtered by
- *      `event.origin === 'https://www.facebook.com'` to capture the
+ *   3. Attach a `window.message` listener filtered to https
+ *      `facebook.com` origins to capture the
  *      `{event:'FINISH', data:{phone_number_id, waba_id}}` payload.
  *   4. Call `FB.login(callback, { config_id, response_type:'code',
  *      override_default_response_type:true, extras:{...} })`. The
@@ -85,7 +85,20 @@ interface FBWindow extends Window {
 
 const SDK_SCRIPT_ID = 'whatsapp-fb-jssdk';
 const SDK_URL = 'https://connect.facebook.net/en_US/sdk.js';
-const FB_ORIGIN = 'https://www.facebook.com';
+
+/** Embedded Signup v4 posts session info from `www.` or `business.`
+ *  facebook.com depending on the hosted step, so accept any https
+ *  facebook.com host (Meta's reference snippet does the same). */
+function isFacebookOrigin(origin: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(origin);
+    return (
+      protocol === 'https:' && (hostname === 'facebook.com' || hostname.endsWith('.facebook.com'))
+    );
+  } catch {
+    return false;
+  }
+}
 
 @Injectable({ providedIn: 'root' })
 export class WhatsAppFbSdkService {
@@ -223,7 +236,7 @@ export class WhatsAppFbSdkService {
       const messageHandler = (event: MessageEvent): void => {
         // Strict origin check — prevents a malicious iframe injecting
         // fake session info from another origin.
-        if (event.origin !== FB_ORIGIN) {
+        if (!isFacebookOrigin(event.origin)) {
           return;
         }
         let payload: unknown = event.data;
@@ -307,9 +320,11 @@ export class WhatsAppFbSdkService {
             config_id: configId,
             response_type: 'code',
             override_default_response_type: true,
+            // Embedded Signup v4 — matches the snippet Meta's Embedded
+            // Signup Builder generates for this login configuration.
             extras: {
-              feature: 'whatsapp_embedded_signup',
-              sessionInfoVersion: 3,
+              version: 'v4',
+              sessionInfoVersion: '3',
             },
           },
         );

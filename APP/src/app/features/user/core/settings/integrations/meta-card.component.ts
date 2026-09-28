@@ -36,6 +36,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 import {
   Integration,
   IntegrationsApiService,
@@ -73,6 +75,7 @@ export class MetaCardComponent {
 
   private readonly api = inject(IntegrationsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   protected readonly pages = signal<MetaPage[]>([]);
   protected readonly pagesLoaded = signal(false);
@@ -165,14 +168,15 @@ export class MetaCardComponent {
     this.connect();
   }
 
-  disconnect(): void {
-    if (
-      !confirm(
-        'Disconnect Meta? All active Page subscriptions stop delivering leads, and you will need to re-authorise to reconnect.',
-      )
-    ) {
-      return;
-    }
+  async disconnect(): Promise<void> {
+    const ok = await this.confirmDialog.ask({
+      title: 'Disconnect Meta?',
+      body: 'All active Page subscriptions will stop delivering leads, and you will need to re-authorise with Facebook to reconnect.',
+      confirmLabel: 'Disconnect',
+      cancelLabel: 'Keep connected',
+      danger: true,
+    });
+    if (!ok) return;
     this.inlineError.set(null);
     this.api
       .disconnect('meta_ads')
@@ -263,13 +267,16 @@ export class MetaCardComponent {
       });
   }
 
-  unsubscribePage(page: MetaPage): void {
+  async unsubscribePage(page: MetaPage): Promise<void> {
     if (this.pageActionInFlight()) return;
-    if (
-      !confirm(`Stop receiving leads from "${page.name}"? This also drops the cached Page token.`)
-    ) {
-      return;
-    }
+    const ok = await this.confirmDialog.ask({
+      title: `Stop receiving leads from "${page.name}"?`,
+      body: 'This also drops the cached Page token. You can subscribe the Page again later.',
+      confirmLabel: 'Unsubscribe',
+      cancelLabel: 'Cancel',
+      danger: true,
+    });
+    if (!ok) return;
     this.pageActionInFlight.set(page.page_id);
     this.inlineError.set(null);
     this.api
