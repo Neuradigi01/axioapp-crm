@@ -1,4 +1,4 @@
-import { DestroyRef, Directive, Injector, effect, inject, input } from '@angular/core';
+import { DestroyRef, Directive, Injector, OnInit, effect, inject, input } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -49,7 +49,7 @@ export type UrlFilterStateConfig = Record<string, UrlFilterEntry>;
   selector: '[appUrlFilterState]',
   standalone: true,
 })
-export class UrlFilterStateDirective {
+export class UrlFilterStateDirective implements OnInit {
   appUrlFilterState = input.required<UrlFilterStateConfig>();
 
   private readonly router = inject(Router);
@@ -63,10 +63,15 @@ export class UrlFilterStateDirective {
    * blank the URL just before we read it. */
   private hydrated = false;
 
-  constructor() {
-    // Wait one async tick so child template binds + parent ngOnInit
-    // run before we touch the URL. Then hydrate from params and arm
-    // the push-back effects.
+  ngOnInit(): void {
+    // Start from ngOnInit, not the constructor: the required input is
+    // only guaranteed to be bound by now. A constructor-scheduled
+    // microtask can run before the first update pass under zoneless
+    // change detection (routed pages get their first tick on the
+    // scheduler's macrotask), and reading the input then throws NG0950.
+    // Still wait one async tick so child template binds run before we
+    // touch the URL; then hydrate from params and arm the push-back
+    // effects.
     queueMicrotask(() => this.start());
   }
 
