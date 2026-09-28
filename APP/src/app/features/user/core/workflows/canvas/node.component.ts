@@ -75,9 +75,10 @@ const DEFAULT_NODE_STYLE: CanvasNodeStyle = CANVAS_NODE_STYLE.flow_control;
  * Pure presentation — every mutation routes through the canvas page /
  * `CanvasStateService` so undo / redo / dirty / auto-save stay in sync.
  *
- * Edge-creation drag starts from an output port (mousedown on a port
- * circle) — the canvas page listens for `outputPortDown`, tracks the
- * pending edge, and finalises it on `inputPortUp` over another node.
+ * Edge-creation drag starts from an output port (pointerdown on a port)
+ * — the canvas page listens for `outputPortDown`, tracks the pending
+ * edge, and on release hit-tests for a `[data-wf-node-id]` card (only
+ * nodes with an input port carry the attribute).
  *
  * Validation marker: small red dot in the corner when
  * `node.config.__valid === false`. Step 15's node editor sets this
@@ -96,8 +97,9 @@ export const NODE_HEADER = 30;
   template: `
     <svg:g
       [attr.transform]="transform()"
+      [attr.data-wf-node-id]="hasInputPort() ? node().id : null"
       class="select-none"
-      (mousedown)="onCardMouseDown($event)"
+      (pointerdown)="onCardPointerDown($event)"
       (click)="onCardClick($event)"
       (contextmenu)="onCardContextMenu($event)"
     >
@@ -164,7 +166,7 @@ export const NODE_HEADER = 30;
           type="button"
           class="w-5 h-5 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-black/5"
           (click)="onMenuClick($event)"
-          (mousedown)="$event.stopPropagation()"
+          (pointerdown)="$event.stopPropagation()"
           aria-label="Node actions"
         >
           <lucide-icon name="more-vertical" class="w-3.5 h-3.5"></lucide-icon>
@@ -177,22 +179,19 @@ export const NODE_HEADER = 30;
           cy="0"
           r="6"
           class="fill-white stroke-zinc-400 stroke-2"
-          (mouseup)="onInputUp($event)"
-          (mousedown)="$event.stopPropagation()"
+          (pointerdown)="$event.stopPropagation()"
         />
       }
 
       @for (port of outputs(); track port.label || $index; let i = $index) {
         <svg:g
           [attr.transform]="'translate(' + outputPortX(i, outputs().length) + ',' + HEIGHT + ')'"
+          class="cursor-crosshair"
+          (pointerdown)="onOutputDown($event, port.label)"
         >
-          <svg:circle
-            cx="0"
-            cy="0"
-            r="6"
-            class="fill-white stroke-zinc-400 stroke-2 cursor-crosshair"
-            (mousedown)="onOutputDown($event, port.label)"
-          />
+          <!-- Invisible finger-sized hit area around the 6px dot. -->
+          <svg:circle cx="0" cy="0" r="16" fill="transparent" />
+          <svg:circle cx="0" cy="0" r="6" class="fill-white stroke-zinc-400 stroke-2" />
           @if (port.display !== 'out') {
             <svg:text x="0" y="20" text-anchor="middle" class="fill-zinc-500 text-[10px]">
               {{ port.display }}
@@ -214,10 +213,9 @@ export class WorkflowNodeComponent {
   readonly outputPortDown = output<{
     nodeId: string;
     portLabel: string | null;
-    event: MouseEvent;
+    event: PointerEvent;
   }>();
-  readonly inputPortUp = output<{ nodeId: string; event: MouseEvent }>();
-  readonly cardMouseDown = output<{ nodeId: string; event: MouseEvent }>();
+  readonly cardPointerDown = output<{ nodeId: string; event: PointerEvent }>();
   readonly selectNode = output<string>();
   readonly nodeContextMenu = output<{ nodeId: string; x: number; y: number }>();
 
@@ -314,9 +312,9 @@ export class WorkflowNodeComponent {
     return 20 + step * index;
   }
 
-  onCardMouseDown(event: MouseEvent): void {
+  onCardPointerDown(event: PointerEvent): void {
     if (event.button !== 0) return;
-    this.cardMouseDown.emit({ nodeId: this.node().id, event });
+    this.cardPointerDown.emit({ nodeId: this.node().id, event });
   }
 
   onCardClick(event: MouseEvent): void {
@@ -349,7 +347,7 @@ export class WorkflowNodeComponent {
     });
   }
 
-  onOutputDown(event: MouseEvent, portLabel: string | null): void {
+  onOutputDown(event: PointerEvent, portLabel: string | null): void {
     event.stopPropagation();
     event.preventDefault();
     this.outputPortDown.emit({
@@ -357,10 +355,5 @@ export class WorkflowNodeComponent {
       portLabel,
       event,
     });
-  }
-
-  onInputUp(event: MouseEvent): void {
-    event.stopPropagation();
-    this.inputPortUp.emit({ nodeId: this.node().id, event });
   }
 }

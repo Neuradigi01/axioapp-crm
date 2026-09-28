@@ -51,15 +51,17 @@ import { ABStatsBannerComponent } from '../ab/ab-stats-banner.component';
  * operators drag nodes from the palette, drop on the SVG canvas,
  * connect edges, and save.
  *
- * Layout: left palette (300px) · main canvas (flex-fill) · right
- * drawer (440px, opens on node click — Step 15 fills the body).
+ * Layout (lg+): left palette · main canvas (flex-fill) · right
+ * inspector. Below lg both side panels become slide-over sheets opened
+ * from the floating "Add step" / "Edit step" bar.
  *
- * Camera: pan = drag empty space; zoom = Ctrl+wheel; both bound to a
- * single SVG `<g>` transform.
+ * Camera: pan = drag empty space; zoom = Ctrl+wheel or two-finger
+ * pinch; both bound to a single SVG `<g>` transform. All gestures use
+ * Pointer Events so mouse and touch share one path.
  *
- * Edge creation: mousedown on an output port → start tracking → drag
- * to draw a "rubber-band" path → mouseup on a target input port =
- * commit the edge; mouseup elsewhere = cancel.
+ * Edge creation: pointerdown on an output port → drag a "rubber-band"
+ * path → release over any node card = commit the edge (hit-tested);
+ * release elsewhere = cancel.
  *
  * Auto-save: 30-second timer flushes `dirty + status='draft'` to the
  * backend.
@@ -122,21 +124,87 @@ export class WorkflowCanvasPageComponent {
   readonly testFireBusy = signal(false);
   readonly testFireTrace = signal<WorkflowTestFireResponse | null>(null);
 
-  // Mobile-only overlay toggles. On desktop (md+) both panels are always
-  // visible in-flow; on mobile they slide over the canvas.
+  // Compact layout (< lg / 1024px): phones, tablets and "desktop site"
+  // mode on mobile browsers. Palette + inspector become full-height
+  // slide-over sheets and the header collapses secondary actions into
+  // an overflow menu; on lg+ both panels sit in-flow.
+  readonly isCompact = signal(false);
+
   readonly mobilePaletteOpen = signal(false);
   readonly mobileInspectorOpen = signal(false);
+  readonly mobileMenuOpen = signal(false);
 
   toggleMobilePalette(): void {
     this.mobilePaletteOpen.update((v) => !v);
     if (this.mobilePaletteOpen()) this.mobileInspectorOpen.set(false);
   }
-  toggleMobileInspector(): void {
-    this.mobileInspectorOpen.update((v) => !v);
-    if (this.mobileInspectorOpen()) this.mobilePaletteOpen.set(false);
+  openMobileInspector(): void {
+    this.mobileInspectorOpen.set(true);
+    this.mobilePaletteOpen.set(false);
   }
   closeMobileOverlays(): void {
     this.mobilePaletteOpen.set(false);
+    this.mobileInspectorOpen.set(false);
+  }
+  toggleMobileMenu(): void {
+    this.mobileMenuOpen.update((v) => !v);
+  }
+
+  /** Overflow-menu dispatcher (compact header). Closes the menu, runs
+   *  the action, and surfaces the inspector sheet for actions whose
+   *  result renders there (drawers + test-fire trace). */
+  runMenuAction(
+    action:
+      | 'test'
+      | 'discard'
+      | 'undo'
+      | 'redo'
+      | 'schedules'
+      | 'versions'
+      | 'export'
+      | 'import'
+      | 'ab',
+  ): void {
+    this.mobileMenuOpen.set(false);
+    switch (action) {
+      case 'test':
+        this.state.selectNode(null);
+        this.testFire();
+        this.openMobileInspector();
+        break;
+      case 'discard':
+        this.discard();
+        break;
+      case 'undo':
+        this.state.undo();
+        break;
+      case 'redo':
+        this.state.redo();
+        break;
+      case 'schedules':
+        this.toggleSchedulesDrawer();
+        if (this.showSchedulesDrawer()) this.openMobileInspector();
+        break;
+      case 'versions':
+        this.toggleVersionDrawer();
+        if (this.showVersionDrawer()) this.openMobileInspector();
+        break;
+      case 'export':
+        this.exportWorkflow();
+        break;
+      case 'import':
+        this.openImportModal();
+        break;
+      case 'ab':
+        this.openPairModal();
+        break;
+    }
+  }
+
+  /** Node editor's close (✕) — deselect, and on compact also dismiss
+   *  the inspector sheet so the operator lands back on the canvas. */
+  onEditorClose(): void {
+    this.state.selectNode(null);
     this.mobileInspectorOpen.set(false);
   }
 
@@ -266,22 +334,25 @@ export class WorkflowCanvasPageComponent {
     const first = this.invalidNodes()[0];
     if (!first) return;
     this.state.selectNode(first.id);
+    this.centerOnNode(first);
+    // Also open the mobile inspector so the operator sees the
+    // validation issues right away on touch devices.
+    this.openMobileInspector();
+  }
+
+  /** Re-centre the camera on a node at the current zoom (matches the
+   *  transform: `translate(pan) scale(zoom)` used by the SVG). */
+  private centerOnNode(node: CanvasNode): void {
     const svg = this.canvasRoot?.nativeElement;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
     const z = this.state.zoom();
-    const cx = (first.position?.x ?? 0) + NODE_WIDTH / 2;
-    const cy = (first.position?.y ?? 0) + NODE_HEIGHT / 2;
-    // Center the node in the viewport at the current zoom (matches
-    // the transform: `translate(pan) scale(zoom)` used by the SVG).
+    const cx = (node.position?.x ?? 0) + NODE_WIDTH / 2;
+    const cy = (node.position?.y ?? 0) + NODE_HEIGHT / 2;
     this.state.setPan({
       x: rect.width / 2 - cx * z,
       y: rect.height / 2 - cy * z,
     });
-    // Also open the mobile inspector so the operator sees the
-    // validation issues right away on touch devices.
-    this.mobileInspectorOpen.set(true);
-    this.mobilePaletteOpen.set(false);
   }
 
   readonly pendingEdgePath = computed(() => {
@@ -294,6 +365,20 @@ export class WorkflowCanvasPageComponent {
   });
 
   constructor() {
+    // Track the compact breakpoint (Tailwind `lg` = 1024px) so tap
+    // handlers can open the slide-over sheets only when they're sheets.
+    const compactQuery = window.matchMedia('(max-width: 1023.98px)');
+    this.isCompact.set(compactQuery.matches);
+    const onCompactChange = (e: MediaQueryListEvent): void => {
+      this.isCompact.set(e.matches);
+      if (!e.matches) {
+        this.closeMobileOverlays();
+        this.mobileMenuOpen.set(false);
+      }
+    };
+    compactQuery.addEventListener('change', onCompactChange);
+    this.destroyRef.onDestroy(() => compactQuery.removeEventListener('change', onCompactChange));
+
     // Boot — load existing workflow OR initialise a blank one.
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
       const id = params.get('id');
@@ -745,16 +830,25 @@ export class WorkflowCanvasPageComponent {
 
   // --- Camera (pan + zoom) --------------------------------------------
 
-  onCanvasMouseDown(event: MouseEvent): void {
+  /** Pointer Events drive every canvas gesture so mouse, touch and pen
+   *  share one code path. The SVG carries `touch-action: none` so the
+   *  browser doesn't claim touch drags for page scroll / zoom. Two
+   *  fingers on empty canvas → pinch-zoom around their midpoint. */
+  onCanvasPointerDown(event: PointerEvent): void {
     // Empty-space drag → pan. Node drag is handled by the node's own
-    // mousedown which calls `onNodeMouseDown`.
+    // pointerdown which calls `onNodePointerDown`.
     if (event.button !== 0) return;
     if (event.target !== event.currentTarget) {
-      // Click inside an SVG group → don't pan.
+      // Press inside an SVG group → don't pan.
       const tag = (event.target as Element).tagName;
       if (tag !== 'rect' || (event.target as Element).id !== 'workflow-bg') {
         return;
       }
+    }
+    this.touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (this.touchPointers.size === 2) {
+      this.startPinch();
+      return;
     }
     this.panDrag = {
       start: { x: event.clientX, y: event.clientY },
@@ -763,8 +857,47 @@ export class WorkflowCanvasPageComponent {
     this.state.selectNode(null);
   }
 
-  @HostListener('window:mousemove', ['$event'])
-  onWindowMouseMove(event: MouseEvent): void {
+  // Active pointers on empty canvas (for pinch) + the pinch baseline.
+  private readonly touchPointers = new Map<number, CursorPoint>();
+  private pinch: { dist0: number; zoom0: number; mid0: CursorPoint; pan0: CursorPoint } | null =
+    null;
+
+  private startPinch(): void {
+    const [a, b] = [...this.touchPointers.values()];
+    this.panDrag = null;
+    this.pinch = {
+      dist0: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+      zoom0: this.state.zoom(),
+      mid0: this.clientToLocal({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }),
+      pan0: { ...this.state.pan() },
+    };
+  }
+
+  private updatePinch(): void {
+    if (!this.pinch || this.touchPointers.size < 2) return;
+    const [a, b] = [...this.touchPointers.values()];
+    const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+    const z1 = Math.min(4, Math.max(0.25, this.pinch.zoom0 * (dist / this.pinch.dist0)));
+    const mid = this.clientToLocal({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    // Keep the canvas point under the starting midpoint pinned under
+    // the current midpoint (zoom + two-finger pan in one gesture).
+    const ratio = z1 / this.pinch.zoom0;
+    this.state.setZoom(z1);
+    this.state.setPan({
+      x: mid.x - (this.pinch.mid0.x - this.pinch.pan0.x) * ratio,
+      y: mid.y - (this.pinch.mid0.y - this.pinch.pan0.y) * ratio,
+    });
+  }
+
+  @HostListener('window:pointermove', ['$event'])
+  onWindowPointerMove(event: PointerEvent): void {
+    if (this.touchPointers.has(event.pointerId)) {
+      this.touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (this.pinch) {
+        this.updatePinch();
+        return;
+      }
+    }
     if (this.panDrag) {
       const dx = event.clientX - this.panDrag.start.x;
       const dy = event.clientY - this.panDrag.start.y;
@@ -793,8 +926,13 @@ export class WorkflowCanvasPageComponent {
     }
   }
 
-  @HostListener('window:mouseup', ['$event'])
-  onWindowMouseUp(_event: MouseEvent): void {
+  @HostListener('window:pointerup', ['$event'])
+  @HostListener('window:pointercancel', ['$event'])
+  onWindowPointerUp(event: PointerEvent): void {
+    this.touchPointers.delete(event.pointerId);
+    if (this.touchPointers.size < 2) {
+      this.pinch = null;
+    }
     if (this.panDrag) {
       this.panDrag = null;
     }
@@ -808,8 +946,22 @@ export class WorkflowCanvasPageComponent {
       }
       this.nodeDrag = null;
     }
-    if (this.pendingEdge()) {
-      // Mouseup outside a target → cancel.
+    const pending = this.pendingEdge();
+    if (pending) {
+      // Hit-test instead of relying on a `pointerup` on the target
+      // port: touch pointers are implicitly captured by the element
+      // the drag started on, so the target never receives the event.
+      // Releasing anywhere on a node card connects to that node.
+      const hit =
+        event.type === 'pointerup'
+          ? document
+              .elementFromPoint(event.clientX, event.clientY)
+              ?.closest('[data-wf-node-id]')
+              ?.getAttribute('data-wf-node-id')
+          : null;
+      if (hit && hit !== pending.sourceNodeId) {
+        this.state.addEdge(pending.sourceNodeId, hit, pending.sourcePortLabel);
+      }
       this.pendingEdge.set(null);
     }
   }
@@ -833,7 +985,7 @@ export class WorkflowCanvasPageComponent {
 
   // --- Node drag (move) -----------------------------------------------
 
-  onNodeMouseDown(payload: { nodeId: string; event: MouseEvent }): void {
+  onNodePointerDown(payload: { nodeId: string; event: PointerEvent }): void {
     payload.event.stopPropagation();
     const node = this.nodeById().get(payload.nodeId);
     if (!node) return;
@@ -847,6 +999,9 @@ export class WorkflowCanvasPageComponent {
 
   onNodeSelect(nodeId: string): void {
     this.state.selectNode(nodeId);
+    // Compact: the inspector is a hidden sheet — tapping a node is the
+    // operator asking to configure it, so bring the sheet up.
+    if (this.isCompact()) this.openMobileInspector();
   }
 
   // --- Right-click context menu ---------------------------------------
@@ -981,7 +1136,11 @@ export class WorkflowCanvasPageComponent {
 
   // --- Edge drag (connect) --------------------------------------------
 
-  onOutputPortDown(payload: { nodeId: string; portLabel: string | null; event: MouseEvent }): void {
+  onOutputPortDown(payload: {
+    nodeId: string;
+    portLabel: string | null;
+    event: PointerEvent;
+  }): void {
     const node = this.nodeById().get(payload.nodeId);
     if (!node) return;
     const outputs = getNodeType(node.type)?.outputs ?? [];
@@ -998,17 +1157,6 @@ export class WorkflowCanvasPageComponent {
       start: { x: sx, y: sy },
       cursor,
     });
-  }
-
-  onInputPortUp(payload: { nodeId: string; event: MouseEvent }): void {
-    const pending = this.pendingEdge();
-    if (!pending) return;
-    if (pending.sourceNodeId === payload.nodeId) {
-      this.pendingEdge.set(null);
-      return;
-    }
-    this.state.addEdge(pending.sourceNodeId, payload.nodeId, pending.sourcePortLabel);
-    this.pendingEdge.set(null);
   }
 
   private computeOutputPortX(index: number, total: number): number {
@@ -1048,28 +1196,53 @@ export class WorkflowCanvasPageComponent {
     });
   }
 
-  /** Tap-to-add fallback: touch devices can't fire HTML5 drag events,
-   *  so mobile users tap a palette item and we place the node at the
-   *  current viewport centre in canvas coords. Also closes the mobile
-   *  palette overlay so the freshly-added node is visible. */
+  /** Tap-to-add: touch devices can't fire HTML5 drag events, so a tap
+   *  on a palette item adds the node. When a node is selected and its
+   *  single output is still free, the new node lands below it and is
+   *  wired to it (a "next step" append — no port-dragging on a phone);
+   *  otherwise it drops at the viewport centre. The new node becomes
+   *  the selection so the operator can configure it straight away. */
   onPaletteTap(type: string): void {
     if (!type) return;
-    const svg = this.canvasRoot?.nativeElement;
-    const rect = svg?.getBoundingClientRect();
-    let centreClient = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    if (rect) {
-      centreClient = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    const anchor = this.appendAnchor(type);
+    let position: CursorPoint;
+    if (anchor) {
+      const at = anchor.position ?? { x: 0, y: 0 };
+      position = { x: at.x, y: at.y + NODE_HEIGHT + 80 };
+    } else {
+      const rect = this.canvasRoot?.nativeElement.getBoundingClientRect();
+      const centreClient = rect
+        ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+        : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+      // Same helper the drop handler uses (respects pan + zoom).
+      const pos = this.toCanvasCoords({
+        clientX: centreClient.x,
+        clientY: centreClient.y,
+      } as DragEvent);
+      position = { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 };
     }
-    // Translate the centre client-pt into canvas coords through the
-    // same helper the drop handler uses (respects pan + zoom).
-    const pseudoEvent = { clientX: centreClient.x, clientY: centreClient.y } as DragEvent;
-    const pos = this.toCanvasCoords(pseudoEvent);
-    this.state.addNode(type, {
-      x: pos.x - NODE_WIDTH / 2,
-      y: pos.y - NODE_HEIGHT / 2,
-    });
-    // Close the mobile palette overlay so the new node isn't covered.
+    const node = this.state.addNode(type, position);
+    if (anchor) {
+      const portLabel = getNodeType(anchor.type)?.outputs[0]?.label ?? null;
+      this.state.addEdge(anchor.id, node.id, portLabel);
+      this.centerOnNode(node);
+    }
+    this.state.selectNode(node.id);
     this.mobilePaletteOpen.set(false);
+    if (this.isCompact()) this.openMobileInspector();
+  }
+
+  /** The selected node, if a freshly tapped `type` should be appended
+   *  after it: it has exactly one output port, nothing connected to
+   *  that port yet, and the new type accepts an input. */
+  private appendAnchor(type: string): CanvasNode | null {
+    const selected = this.state.selectedNode();
+    if (!selected) return null;
+    const outputs = getNodeType(selected.type)?.outputs ?? [];
+    if (outputs.length !== 1) return null;
+    if ((getNodeType(type)?.inputPorts ?? 1) === 0) return null;
+    if (this.state.edges().some((e) => e.source === selected.id)) return null;
+    return selected;
   }
 
   // --- Camera helpers + keyboard --------------------------------------
@@ -1143,6 +1316,13 @@ export class WorkflowCanvasPageComponent {
   }
 
   // --- Coord transforms -----------------------------------------------
+
+  /** Client (viewport) point → SVG-element-local point, before the
+   *  pan/zoom transform. Pinch maths works in this space. */
+  private clientToLocal(point: CursorPoint): CursorPoint {
+    const rect = this.canvasRoot?.nativeElement.getBoundingClientRect();
+    return rect ? { x: point.x - rect.left, y: point.y - rect.top } : point;
+  }
 
   private toCanvasCoords(event: MouseEvent | DragEvent): CursorPoint {
     const svg = this.canvasRoot?.nativeElement;
