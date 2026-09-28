@@ -223,10 +223,11 @@
 
         <!-- Zoom controls (floating, bottom-right of canvas viewport)
              — slightly larger + subtle backdrop-blur so it reads as
-             a real floating pill against the grid. -->
+             a real floating pill against the grid. On mobile it sits
+             76px up so it clears the fixed 64px bottom nav. -->
         <div
           #zoomControls
-          class="fixed z-30 bottom-3 right-3 md:bottom-6 md:right-6 flex items-center gap-0.5 p-1 bg-surface/90 backdrop-blur border border-subtle rounded-full shadow-xl"
+          class="fixed z-30 bottom-[76px] right-3 md:bottom-6 md:right-6 flex items-center gap-0.5 p-1 bg-surface/90 backdrop-blur border border-subtle rounded-full shadow-xl"
           (click)="$event.stopPropagation()"
         >
           <button
@@ -268,6 +269,19 @@
             <lucide-icon name="maximize-2" size="12"></lucide-icon>
             Fit
           </button>
+          <button
+            type="button"
+            (click)="canvas.toggleMinimap()"
+            class="px-2 py-1.5 text-[11px] font-medium rounded-full hover:bg-surface-2 transition-colors flex items-center gap-1"
+            [class.text-accent]="canvas.minimapOpen()"
+            [class.text-muted]="!canvas.minimapOpen()"
+            [title]="canvas.minimapOpen() ? 'Hide minimap' : 'Show minimap'"
+            [attr.aria-label]="canvas.minimapOpen() ? 'Hide minimap' : 'Show minimap'"
+            [attr.aria-pressed]="canvas.minimapOpen()"
+          >
+            <lucide-icon name="map" size="12"></lucide-icon>
+            Map
+          </button>
         </div>
 
         <!-- Empty-canvas hint — visible only when no nodes exist yet,
@@ -289,6 +303,7 @@
         }
 
         <div
+          #canvasContent
           class="p-6 min-w-[1400px] min-h-[900px] relative"
           [style.transform]="'scale(' + zoom() + ')'"
           style="transform-origin: top left"
@@ -373,6 +388,7 @@
             type="button"
             (click)="openTriggerModal(); $event.stopPropagation()"
             (mousedown)="onNodeHeaderMouseDown('trigger', $event)"
+            data-cb-card
             [style.left.px]="triggerPosition().x"
             [style.top.px]="triggerPosition().y"
             [style.width.px]="cardWidth()"
@@ -445,6 +461,7 @@
           <!-- Nodes -->
           @for (node of nodes(); track node.id) {
             <div
+              data-cb-card
               [style.left.px]="node.position.x + nodeLeftOffset()"
               [style.top.px]="node.position.y"
               [style.width.px]="cardWidth()"

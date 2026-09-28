@@ -61,6 +61,15 @@ export class CanvasStateService {
   readonly paletteCollapsed = signal<boolean>(
     typeof window !== 'undefined' && window.innerWidth < 768,
   );
+  /** Minimap shown / hidden (session-only), toggled from the zoom
+   *  pill. Starts hidden on phones (< md ~ 768 px) where it would
+   *  cover a large share of the canvas; open on larger screens. */
+  readonly minimapOpen = signal<boolean>(typeof window !== 'undefined' && window.innerWidth >= 768);
+
+  toggleMinimap(): void {
+    this.minimapOpen.update((v) => !v);
+  }
+
   /** Palette width in px (session-only). Drag-resizable via the
    *  handle on the palette's right edge. */
   readonly paletteWidth = signal<number>(280);
@@ -101,37 +110,24 @@ export class CanvasStateService {
     this.setZoom(1);
   }
 
-  /** Fit-to-screen: shrink zoom just enough that the bounding box of
-   *  the trigger + every node fits within the given viewport size.
+  /** Fit-to-screen: shrink zoom just enough that the graph's bounding
+   *  box (unscaled canvas px, measured from the rendered cards by the
+   *  caller — the service doesn't touch the DOM) fits the viewport.
    *  Never zooms IN past 100 % — big graphs zoom out, small graphs
    *  stay at 1.0 (avoids a jarring auto-zoom on new bots). Passes
-   *  through the same clamping as ``setZoom``.
-   *
-   *  Caller supplies the viewport dimensions because the service
-   *  doesn't touch the DOM. Content size is estimated from the node
-   *  bounding box plus a per-card height fudge (nodes have variable
-   *  height depending on their schema; 320 px is a safe upper bound
-   *  that keeps the whole card visible after the scale). */
-  fitToScreen(viewportWidth: number, viewportHeight: number): void {
-    const CANVAS_PAD = 24;
-    const TRIGGER_GAP = 60;
-    const CARD_HEIGHT_ESTIMATE = 320;
-    const width = this.cardWidth();
-    const nodes = this.nodes();
-    const nodeLeftAnchor = CANVAS_PAD + width + TRIGGER_GAP;
-
-    let rightEdge = CANVAS_PAD + width; // trigger card
-    let bottomEdge = CANVAS_PAD + 118; // trigger card height
-    for (const n of nodes) {
-      rightEdge = Math.max(rightEdge, nodeLeftAnchor + n.position.x + width);
-      bottomEdge = Math.max(bottomEdge, n.position.y + CARD_HEIGHT_ESTIMATE);
-    }
-    // Add breathing room so the outermost node isn't glued to the edge.
-    const contentWidth = rightEdge + CANVAS_PAD;
-    const contentHeight = bottomEdge + CANVAS_PAD;
+   *  through the same clamping as ``setZoom``. */
+  fitToScreen(
+    viewportWidth: number,
+    viewportHeight: number,
+    contentWidth: number,
+    contentHeight: number,
+  ): void {
     if (viewportWidth <= 0 || viewportHeight <= 0) return;
+    if (contentWidth <= 0 || contentHeight <= 0) return;
     const scale = Math.min(viewportWidth / contentWidth, viewportHeight / contentHeight, 1);
-    this.setZoom(scale);
+    // Round DOWN to the 0.01 grid `setZoom` uses so rounding never
+    // pushes the fitted graph a pixel past the viewport edge.
+    this.setZoom(Math.floor(scale * 100) / 100);
   }
 
   togglePalette(): void {

@@ -5,7 +5,9 @@ import {
   DestroyRef,
   ElementRef,
   HostListener,
+  Injector,
   ViewChild,
+  afterNextRender,
   computed,
   inject,
   signal,
@@ -76,6 +78,7 @@ export class ChatbotBuilderPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
   private readonly toast = inject(ToastService);
   readonly canvas = inject(CanvasStateService);
 
@@ -361,6 +364,11 @@ export class ChatbotBuilderPageComponent {
   @ViewChild('canvasViewport', { static: false })
   private canvasViewportRef?: ElementRef<HTMLElement>;
 
+  /** The scaled content layer holding the cards — measured by
+   *  ``fitToScreen``. */
+  @ViewChild('canvasContent', { static: false })
+  private canvasContentRef?: ElementRef<HTMLElement>;
+
   /** Node ids reachable from the trigger via edge traversal. Nodes
    *  NOT in this set are visually flagged as orphans (dashed border)
    *  so operators notice branches they forgot to wire. Recomputed
@@ -420,13 +428,30 @@ export class ChatbotBuilderPageComponent {
     return false;
   }
 
-  /** Fit the current graph inside the visible canvas viewport by
-   *  shrinking zoom just enough. Called from the ``Fit`` button in
-   *  the zoom pill. */
+  /** Fit the whole graph inside the visible canvas viewport by
+   *  shrinking zoom just enough, then scroll back to the origin so the
+   *  flow is seen at once. Called from the ``Fit`` button in the zoom
+   *  pill and automatically after every load. The bounding box comes
+   *  from the rendered cards (`[data-cb-card]`) — `offsetLeft/Top/
+   *  Width/Height` are layout values, unaffected by the CSS `scale`,
+   *  so they measure real card heights instead of estimating them. */
   fitToScreen(): void {
     const el = this.canvasViewportRef?.nativeElement;
-    if (!el) return;
-    this.canvas.fitToScreen(el.clientWidth, el.clientHeight);
+    const content = this.canvasContentRef?.nativeElement;
+    if (!el || !content) return;
+    let right = 0;
+    let bottom = 0;
+    content.querySelectorAll<HTMLElement>('[data-cb-card]').forEach((card) => {
+      right = Math.max(right, card.offsetLeft + card.offsetWidth);
+      bottom = Math.max(bottom, card.offsetTop + card.offsetHeight);
+    });
+    this.canvas.fitToScreen(
+      el.clientWidth,
+      el.clientHeight,
+      right + this.CANVAS_PAD * 2,
+      bottom + this.CANVAS_PAD * 2,
+    );
+    el.scrollTo({ left: 0, top: 0 });
   }
 
   /** Case-insensitive fuzzy match on node type, label, and message
@@ -653,6 +678,9 @@ export class ChatbotBuilderPageComponent {
         next: (bot) => {
           this.canvas.loadFrom(bot);
           this.loading.set(false);
+          // Open with the whole flow in view — wait for the cards to
+          // render so their real sizes can be measured.
+          afterNextRender(() => this.fitToScreen(), { injector: this.injector });
         },
         error: (err) => {
           this.error.set(extractApiError(err) ?? 'Failed to load bot.');

@@ -8,11 +8,15 @@ import {
   inject,
 } from '@angular/core';
 
+import { LucideAngularModule } from 'lucide-angular';
+
 import { CanvasStateService } from '../canvas-state.service';
 
 /**
- * Canvas minimap — bottom-left floating thumbnail of the whole bot
- * graph. Reads the existing ``CanvasStateService`` signals (nodes /
+ * Canvas minimap — floating thumbnail of the whole bot graph. Shown
+ * while ``canvas.minimapOpen()`` is true (toggled from the zoom pill or
+ * the ✕ here). Bottom-left on md+; on phones it stacks above the zoom
+ * pill at bottom-right so it clears the fixed bottom nav. Reads the existing ``CanvasStateService`` signals (nodes /
  * edges / trigger position / card width); never writes back. Emits
  * ``(jumpTo)`` with a node id when the operator clicks a rectangle
  * so the parent can smooth-scroll the canvas.
@@ -23,55 +27,65 @@ import { CanvasStateService } from '../canvas-state.service';
 @Component({
   selector: 'app-chatbot-minimap',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LucideAngularModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div
-      class="fixed z-30 bottom-6 left-20 rounded-lg bg-surface/95 backdrop-blur border border-subtle shadow-xl overflow-hidden"
-      [style.width.px]="MAP_W"
-      [style.height.px]="MAP_H + 18"
-      (click)="$event.stopPropagation()"
-    >
+    @if (canvas.minimapOpen()) {
       <div
-        class="flex items-center justify-between px-2 py-1 border-b border-subtle text-[10px] font-semibold uppercase tracking-wider text-muted"
+        class="fixed z-30 bottom-[124px] right-3 md:bottom-6 md:left-20 md:right-auto rounded-lg bg-surface/95 backdrop-blur border border-subtle shadow-xl overflow-hidden"
+        [style.width.px]="MAP_W"
+        (click)="$event.stopPropagation()"
       >
-        <span>Minimap</span>
-        <span>{{ canvas.nodes().length }} nodes</span>
-      </div>
-      <svg
-        [attr.width]="MAP_W"
-        [attr.height]="MAP_H"
-        class="block bg-app/40"
-        (click)="onMapClick($event)"
-      >
-        <!-- Trigger rectangle -->
-        <rect
-          [attr.x]="trigger().x"
-          [attr.y]="trigger().y"
-          [attr.width]="trigger().w"
-          [attr.height]="trigger().h"
-          rx="1.5"
-          class="fill-accent"
-          opacity="0.85"
-        />
-        <!-- Nodes -->
-        @for (r of nodeRects(); track r.id) {
+        <div
+          class="flex items-center gap-2 pl-2 pr-1 py-0.5 border-b border-subtle text-[10px] font-semibold uppercase tracking-wider text-muted"
+        >
+          <span class="flex-1">Minimap</span>
+          <span>{{ canvas.nodes().length }} nodes</span>
+          <button
+            type="button"
+            (click)="canvas.toggleMinimap()"
+            class="flex h-6 w-6 items-center justify-center rounded text-muted hover:text-default hover:bg-surface-2"
+            title="Hide minimap"
+            aria-label="Hide minimap"
+          >
+            <lucide-icon name="x" size="12"></lucide-icon>
+          </button>
+        </div>
+        <svg
+          [attr.width]="MAP_W"
+          [attr.height]="MAP_H"
+          class="block bg-app/40"
+          (click)="onMapClick($event)"
+        >
+          <!-- Trigger rectangle -->
           <rect
-            [attr.x]="r.x"
-            [attr.y]="r.y"
-            [attr.width]="r.w"
-            [attr.height]="r.h"
+            [attr.x]="trigger().x"
+            [attr.y]="trigger().y"
+            [attr.width]="trigger().w"
+            [attr.height]="trigger().h"
             rx="1.5"
-            (click)="onNodeClick(r.id, $event)"
-            [class]="
-              r.id === canvas.selectedNodeId()
-                ? 'fill-accent cursor-pointer'
-                : 'fill-default/40 hover:fill-default/70 cursor-pointer'
-            "
+            class="fill-accent"
+            opacity="0.85"
           />
-        }
-      </svg>
-    </div>
+          <!-- Nodes -->
+          @for (r of nodeRects(); track r.id) {
+            <rect
+              [attr.x]="r.x"
+              [attr.y]="r.y"
+              [attr.width]="r.w"
+              [attr.height]="r.h"
+              rx="1.5"
+              (click)="onNodeClick(r.id, $event)"
+              [class]="
+                r.id === canvas.selectedNodeId()
+                  ? 'fill-accent cursor-pointer'
+                  : 'fill-default/40 hover:fill-default/70 cursor-pointer'
+              "
+            />
+          }
+        </svg>
+      </div>
+    }
   `,
 })
 export class ChatbotMinimapComponent {
