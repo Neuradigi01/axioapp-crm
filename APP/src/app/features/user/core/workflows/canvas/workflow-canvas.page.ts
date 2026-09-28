@@ -82,6 +82,10 @@ const AUTOSAVE_INTERVAL_MS = 30_000;
 
 @Component({
   selector: 'app-workflow-canvas',
+  // App-shell page: the host must fill the shell's flex scroll region
+  // (same as conversations.page) so the root div's `flex-1` resolves to
+  // a real height and the absolutely-positioned SVG canvas gets one.
+  host: { class: 'flex min-h-0 flex-1 flex-col' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [CanvasStateService],
