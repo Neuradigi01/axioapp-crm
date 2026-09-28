@@ -2,11 +2,41 @@
   <div class="fixed inset-0 z-40" (click)="dismiss.emit()" aria-hidden="true"></div>
   <div
     role="dialog"
-    class="fixed left-1/2 top-1/2 z-50 w-72 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface p-3 shadow-xl ring-1 border-subtle"
+    class="fixed left-1/2 top-1/2 z-50 w-80 max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface p-3 shadow-xl ring-1 border-subtle"
     (click)="$event.stopPropagation()"
   >
     <header class="border-b border-subtle pb-2">
       <h3 class="text-sm font-semibold text-default">{{ a.title }}</h3>
+      @if (contactName) {
+        <p class="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-default">
+          <lucide-icon name="user" class="h-3 w-3 shrink-0 text-muted" aria-hidden="true" />
+          <span class="truncate">{{ contactName }}</span>
+        </p>
+      }
+      @if (contactPhone || contactEmail) {
+        <div class="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+          @if (contactPhone) {
+            <a
+              [href]="'tel:' + contactPhone"
+              class="inline-flex items-center gap-1 text-muted hover:text-accent"
+              title="Call"
+            >
+              <lucide-icon name="phone" class="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span class="tabular-nums">{{ contactPhone }}</span>
+            </a>
+          }
+          @if (contactEmail) {
+            <a
+              [href]="'mailto:' + contactEmail"
+              class="inline-flex min-w-0 max-w-full items-center gap-1 text-muted hover:text-accent"
+              title="Email"
+            >
+              <lucide-icon name="mail" class="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span class="truncate">{{ contactEmail }}</span>
+            </a>
+          }
+        </div>
+      }
       <p
         class="mt-1 inline-flex items-center gap-1.5 font-mono text-[11px] tabular-nums text-default"
       >

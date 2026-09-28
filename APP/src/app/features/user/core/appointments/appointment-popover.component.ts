@@ -55,6 +55,13 @@ export class AppointmentPopoverComponent {
     this._appointment.set(value);
   }
 
+  /** Contact details of the appointment's contact, resolved by the
+   *  parent from its contacts map (the appointment row only carries the
+   *  id). Phone / email render as tap-to-call / tap-to-mail links. */
+  @Input() contactName: string | null = null;
+  @Input() contactPhone: string | null = null;
+  @Input() contactEmail: string | null = null;
+
   @Output() readonly reassign = new EventEmitter<void>();
   @Output() readonly reschedule = new EventEmitter<void>();
   @Output() readonly markCompleted = new EventEmitter<void>();

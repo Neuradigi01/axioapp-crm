@@ -494,6 +494,9 @@
 @if (popoverAppointment(); as appt) {
   <app-appointment-popover
     [appointment]="appt"
+    [contactName]="contactsById()[appt.contact_id]?.full_name ?? null"
+    [contactPhone]="contactPhone(appt.contact_id)"
+    [contactEmail]="contactEmail(appt.contact_id)"
     (reassign)="onPopoverReassign()"
     (reschedule)="onPopoverReschedule()"
     (markCompleted)="onPopoverMarkCompleted()"
