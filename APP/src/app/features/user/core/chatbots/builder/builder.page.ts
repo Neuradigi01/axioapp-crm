@@ -5,9 +5,7 @@ import {
   DestroyRef,
   ElementRef,
   HostListener,
-  Injector,
   ViewChild,
-  afterNextRender,
   computed,
   inject,
   signal,
@@ -78,7 +76,6 @@ export class ChatbotBuilderPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly injector = inject(Injector);
   private readonly toast = inject(ToastService);
   readonly canvas = inject(CanvasStateService);
 
@@ -644,7 +641,19 @@ export class ChatbotBuilderPageComponent {
   private autoSaveTimer: ReturnType<typeof setInterval> | null = null;
   private readonly AUTO_SAVE_INTERVAL_MS = 30_000;
 
+  /** Phone breakpoint (< Tailwind `md`). Drives the opening zoom /
+   *  palette / minimap defaults via ``applyViewportDefaults``. */
+  private readonly phoneQuery = window.matchMedia('(max-width: 767.98px)');
+
   constructor() {
+    // Re-apply the screen-class defaults when the viewport crosses the
+    // phone breakpoint so a rotate / resize never leaves a desktop 100 %
+    // zoom on a phone (or 25 % on a desktop).
+    const onPhoneChange = (e: MediaQueryListEvent): void =>
+      this.canvas.applyViewportDefaults(e.matches);
+    this.phoneQuery.addEventListener('change', onPhoneChange);
+    this.destroyRef.onDestroy(() => this.phoneQuery.removeEventListener('change', onPhoneChange));
+
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
       if (id) this.loadBot(id);
@@ -678,9 +687,8 @@ export class ChatbotBuilderPageComponent {
         next: (bot) => {
           this.canvas.loadFrom(bot);
           this.loading.set(false);
-          // Open with the whole flow in view — wait for the cards to
-          // render so their real sizes can be measured.
-          afterNextRender(() => this.fitToScreen(), { injector: this.injector });
+          // Opening zoom / palette / minimap for this screen class.
+          this.canvas.applyViewportDefaults(this.phoneQuery.matches);
         },
         error: (err) => {
           this.error.set(extractApiError(err) ?? 'Failed to load bot.');

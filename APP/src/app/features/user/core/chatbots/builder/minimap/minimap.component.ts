@@ -15,8 +15,9 @@ import { CanvasStateService } from '../canvas-state.service';
 /**
  * Canvas minimap — floating thumbnail of the whole bot graph. Shown
  * while ``canvas.minimapOpen()`` is true (toggled from the zoom pill or
- * the ✕ here). Bottom-left on md+; on phones it stacks above the zoom
- * pill at bottom-right so it clears the fixed bottom nav. Reads the existing ``CanvasStateService`` signals (nodes /
+ * the ✕ here). Stacks directly above the zoom pill at bottom-right —
+ * inside the canvas, clear of the app sidebar on desktop and of the
+ * fixed bottom nav on phones. Reads the existing ``CanvasStateService`` signals (nodes /
  * edges / trigger position / card width); never writes back. Emits
  * ``(jumpTo)`` with a node id when the operator clicks a rectangle
  * so the parent can smooth-scroll the canvas.
@@ -32,7 +33,7 @@ import { CanvasStateService } from '../canvas-state.service';
   template: `
     @if (canvas.minimapOpen()) {
       <div
-        class="fixed z-30 bottom-[124px] right-3 md:bottom-6 md:left-20 md:right-auto rounded-lg bg-surface/95 backdrop-blur border border-subtle shadow-xl overflow-hidden"
+        class="fixed z-30 bottom-[124px] right-3 md:bottom-[76px] md:right-6 rounded-lg bg-surface/95 backdrop-blur border border-subtle shadow-xl overflow-hidden"
         [style.width.px]="MAP_W"
         (click)="$event.stopPropagation()"
       >
@@ -79,7 +80,7 @@ import { CanvasStateService } from '../canvas-state.service';
               [class]="
                 r.id === canvas.selectedNodeId()
                   ? 'fill-accent cursor-pointer'
-                  : 'fill-default/40 hover:fill-default/70 cursor-pointer'
+                  : 'fill-muted opacity-50 hover:opacity-80 cursor-pointer'
               "
             />
           }

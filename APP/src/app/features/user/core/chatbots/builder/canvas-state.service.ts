@@ -110,6 +110,19 @@ export class CanvasStateService {
     this.setZoom(1);
   }
 
+  /** Screen-class defaults for the builder chrome: phones (< md) open
+   *  at 25 % zoom with the palette collapsed and the minimap hidden so
+   *  the canvas gets the whole screen; desktop opens at 100 % with
+   *  both panels shown. Applied on every bot load and whenever the
+   *  viewport crosses the md breakpoint (rotate, resize, DevTools
+   *  device toggle) — this service is app-wide, so field initialisers
+   *  alone would only ever see the first page load's width. */
+  applyViewportDefaults(isPhone: boolean): void {
+    this.setZoom(isPhone ? 0.25 : 1);
+    this.paletteCollapsed.set(isPhone);
+    this.minimapOpen.set(!isPhone);
+  }
+
   /** Fit-to-screen: shrink zoom just enough that the graph's bounding
    *  box (unscaled canvas px, measured from the rendered cards by the
    *  caller — the service doesn't touch the DOM) fits the viewport.
