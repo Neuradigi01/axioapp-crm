@@ -156,6 +156,11 @@
             placeholder="— Not set —"
             (valueChange)="onOutcomePicked($event)"
           />
+          @if (outcomes.length === 0) {
+            <span class="mt-0.5 block text-[11px] text-muted">
+              No call outcomes are set up for this workspace yet.
+            </span>
+          }
         </label>
       </div>
 

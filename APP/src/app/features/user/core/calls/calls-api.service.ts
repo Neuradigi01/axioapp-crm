@@ -74,6 +74,15 @@ export interface CallOutcome {
   created_at: string;
 }
 
+export interface CallOutcomeCreate {
+  key: string;
+  label: string;
+  color: string;
+  display_order: number;
+}
+
+export type CallOutcomeUpdate = Partial<Pick<CallOutcome, 'label' | 'color' | 'display_order'>>;
+
 export interface CallTranscript {
   id: string;
   org_id: string;
@@ -197,6 +206,18 @@ export class CallsApiService {
 
   listOutcomes(): Observable<CallOutcome[]> {
     return this.http.get<CallOutcome[]>(`${this.base}/call-outcomes`);
+  }
+
+  createOutcome(payload: CallOutcomeCreate): Observable<CallOutcome> {
+    return this.http.post<CallOutcome>(`${this.base}/call-outcomes`, payload);
+  }
+
+  updateOutcome(id: string, payload: CallOutcomeUpdate): Observable<CallOutcome> {
+    return this.http.patch<CallOutcome>(`${this.base}/call-outcomes/${id}`, payload);
+  }
+
+  deleteOutcome(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/call-outcomes/${id}`);
   }
 
   // --- Analytics ---

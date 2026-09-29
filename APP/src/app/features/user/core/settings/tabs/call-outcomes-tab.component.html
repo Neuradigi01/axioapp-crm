@@ -1,0 +1,170 @@
+<section class="rounded-xl border border-subtle bg-surface p-4">
+  <header class="mb-4">
+    <h3 class="text-sm font-semibold text-default">Call outcomes</h3>
+    <p class="mt-1 text-xs text-muted">
+      The options agents pick in "Log a call" to record how a call went. Rename, recolour and
+      reorder them to match how your team works.
+    </p>
+  </header>
+
+  @if (loading()) {
+    <div class="text-sm text-muted">Loading…</div>
+  } @else if (loadError(); as err) {
+    <div
+      class="flex items-center justify-between gap-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+    >
+      <span>{{ err }}</span>
+      <button type="button" (click)="reload()" class="text-xs font-medium underline">Retry</button>
+    </div>
+  } @else {
+    @if (outcomes().length === 0) {
+      <div
+        class="mb-4 rounded-md border border-dashed border-subtle bg-surface-2 px-3 py-3 text-xs text-muted"
+      >
+        No call outcomes yet. Add one below — agents will see it straight away.
+      </div>
+    } @else {
+      <ul class="mb-4 divide-y divide-subtle rounded-lg border border-subtle">
+        @for (outcome of outcomes(); track outcome.id; let i = $index, last = $last) {
+          <li class="px-3 py-2">
+            @if (editingId() === outcome.id) {
+              <form
+                [formGroup]="editForm"
+                (ngSubmit)="saveEdit(outcome)"
+                class="flex flex-col gap-2 sm:flex-row sm:items-start"
+              >
+                <div class="flex-1">
+                  <input
+                    formControlName="label"
+                    [maxlength]="labelMax"
+                    aria-label="Outcome name"
+                    [class.border-red-500]="!!labelError('edit')"
+                    class="block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                  />
+                  @if (labelError('edit'); as e) {
+                    <span class="mt-0.5 block text-[11px] text-red-500">{{ e }}</span>
+                  }
+                  <div class="mt-2 flex flex-wrap gap-1.5">
+                    @for (c of colors; track c) {
+                      <button
+                        type="button"
+                        (click)="editForm.controls.color.setValue(c)"
+                        [style.background-color]="c"
+                        [class.ring-2]="editForm.controls.color.value === c"
+                        [attr.aria-label]="'Colour ' + c"
+                        class="h-5 w-5 rounded-full ring-accent ring-offset-1"
+                      ></button>
+                    }
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    (click)="cancelEdit()"
+                    class="rounded-md border border-subtle bg-surface-2 px-3 py-1.5 text-xs font-medium text-default hover:brightness-110"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    [disabled]="busy()"
+                    class="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-95 disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            } @else {
+              <div class="flex items-center gap-3">
+                <span
+                  class="h-3 w-3 shrink-0 rounded-full"
+                  [style.background-color]="outcome.color"
+                ></span>
+                <span class="flex-1 truncate text-sm text-default">{{ outcome.label }}</span>
+                <div class="flex items-center gap-1">
+                  <button
+                    type="button"
+                    (click)="move(i, -1)"
+                    [disabled]="busy() || i === 0"
+                    aria-label="Move up"
+                    class="rounded px-1.5 py-0.5 text-xs text-muted hover:text-default disabled:opacity-30"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    (click)="move(i, 1)"
+                    [disabled]="busy() || last"
+                    aria-label="Move down"
+                    class="rounded px-1.5 py-0.5 text-xs text-muted hover:text-default disabled:opacity-30"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    (click)="startEdit(outcome)"
+                    [disabled]="busy()"
+                    class="rounded px-2 py-0.5 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    (click)="remove(outcome)"
+                    [disabled]="busy()"
+                    class="rounded px-2 py-0.5 text-xs font-medium text-red-500 hover:bg-red-500/10 disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    }
+
+    <form [formGroup]="addForm" (ngSubmit)="add()" class="rounded-lg bg-surface-2 p-3">
+      <span class="mb-2 block text-xs font-medium text-muted">Add an outcome</span>
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-start">
+        <div class="flex-1">
+          <input
+            formControlName="label"
+            [maxlength]="labelMax"
+            placeholder="e.g. Interested, Call back later"
+            aria-label="New outcome name"
+            [class.border-red-500]="!!labelError('add')"
+            class="block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          @if (labelError('add'); as e) {
+            <span class="mt-0.5 block text-[11px] text-red-500">{{ e }}</span>
+          }
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            @for (c of colors; track c) {
+              <button
+                type="button"
+                (click)="addForm.controls.color.setValue(c)"
+                [style.background-color]="c"
+                [class.ring-2]="addForm.controls.color.value === c"
+                [attr.aria-label]="'Colour ' + c"
+                class="h-5 w-5 rounded-full ring-accent ring-offset-1"
+              ></button>
+            }
+          </div>
+        </div>
+        <button
+          type="submit"
+          [disabled]="busy() || atLimit()"
+          class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
+        >
+          Add outcome
+        </button>
+      </div>
+      @if (atLimit()) {
+        <p class="mt-2 text-[11px] text-muted">
+          You've reached the limit of {{ maxOutcomes }} outcomes. Delete one to add another.
+        </p>
+      }
+    </form>
+  }
+</section>

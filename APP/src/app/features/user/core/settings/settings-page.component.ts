@@ -7,6 +7,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
 import { CustomEventsPageComponent } from './custom-events/custom-events.page';
 import { AppearanceTabComponent } from './tabs/appearance-tab.component';
 import { AutomationSettingsTabComponent } from './tabs/automation-settings-tab.component';
+import { CallOutcomesTabComponent } from './tabs/call-outcomes-tab.component';
 import { EmbedIntegrationsTabComponent } from './tabs/embed-integrations-tab.component';
 import { LoginHistoryTabComponent } from './tabs/login-history-tab.component';
 import { NotificationsTabComponent } from './tabs/notifications-tab.component';
@@ -25,6 +26,7 @@ type SettingsTab =
   | 'store'
   | 'team'
   | 'roles'
+  | 'call-outcomes'
   | 'notifications'
   | 'send-rules'
   | 'custom-events'
@@ -72,6 +74,12 @@ const TABS: ReadonlyArray<TabDef> = [
   { id: 'store', label: 'Store Profile', group: 'workspace', permission: 'settings.write' },
   { id: 'team', label: 'Team', group: 'workspace', permission: 'users.read' },
   { id: 'roles', label: 'Roles', group: 'workspace', permission: 'roles.read' },
+  {
+    id: 'call-outcomes',
+    label: 'Call Outcomes',
+    group: 'workspace',
+    permission: 'calls.outcomes.manage',
+  },
   // Email settings hub lives on the Integrations page's Email card
   // expansion (Prativani-style — one connector, all sub-surfaces).
   // No Settings-tab entry: the hub is not accessible from here.
@@ -132,6 +140,7 @@ const TABS: ReadonlyArray<TabDef> = [
     StoreProfileTabComponent,
     TeamTabComponent,
     RolesTabComponent,
+    CallOutcomesTabComponent,
     NotificationsTabComponent,
     AutomationSettingsTabComponent,
     CustomEventsPageComponent,

@@ -32,3 +32,15 @@ pipelines:
       - {key: proposal,   name: Proposal,   color: '#f59e0b', display_order: 3}
       - {key: won,        name: Won,        color: '#10b981', display_order: 4, is_won: true}
       - {key: lost,       name: Lost,       color: '#ef4444', display_order: 5, is_lost: true}
+
+# ---------------------------------------------------------------------------
+# Call outcomes — what an agent picks at the end of a call. Generic,
+# industry-neutral set; vertical packs add their own domain outcomes.
+# Admins can rename / recolour / add more per org.
+# ---------------------------------------------------------------------------
+call_outcomes:
+  - {key: connected,    label: Connected,    color: '#10b981', display_order: 10}
+  - {key: no_answer,    label: No Answer,    color: '#f59e0b', display_order: 20}
+  - {key: busy,         label: Busy,         color: '#f97316', display_order: 30}
+  - {key: voicemail,    label: Voicemail,    color: '#6366f1', display_order: 40}
+  - {key: wrong_number, label: Wrong Number, color: '#ef4444', display_order: 50}

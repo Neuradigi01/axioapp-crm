@@ -48,6 +48,9 @@ from src.app.shared.db.queries import ensure_found
 
 # --- Outcomes -------------------------------------------------------------
 
+#: Most outcomes one org may configure — keeps the call-logging dropdown usable.
+MAX_OUTCOMES_PER_ORG = 50
+
 
 async def list_outcomes(session: AsyncSession) -> list[CallOutcome]:
     return await _da.list_outcomes_query(session)
@@ -59,6 +62,13 @@ async def create_outcome(
     org_id: uuid.UUID,
     payload: CallOutcomeCreate,
 ) -> CallOutcome:
+    existing = await _da.list_outcomes_query(session)
+    if len(existing) >= MAX_OUTCOMES_PER_ORG:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"You can have at most {MAX_OUTCOMES_PER_ORG} call outcomes.",
+        )
+    _ensure_label_unique(existing, payload.label)
     outcome = CallOutcome(
         org_id=org_id,
         key=payload.key,
@@ -73,7 +83,7 @@ async def create_outcome(
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"call outcome '{payload.key}' already exists for this org",
+            detail=f"An outcome named '{payload.label}' already exists.",
         ) from None
     await session.refresh(outcome)
     await log_entity_change(
@@ -94,7 +104,9 @@ async def update_outcome(
     outcome = await _get_outcome(session, outcome_id)
     before = _outcome_snapshot(outcome)
     changed = False
-    if payload.label is not None:
+    if payload.label is not None and payload.label != outcome.label:
+        others = [o for o in await _da.list_outcomes_query(session) if o.id != outcome.id]
+        _ensure_label_unique(others, payload.label)
         outcome.label = payload.label
         changed = True
     if payload.color is not None:
@@ -127,6 +139,16 @@ async def delete_outcome(session: AsyncSession, *, outcome_id: uuid.UUID) -> Non
         entity_id=outcome_id,
         before=before,
     )
+
+
+def _ensure_label_unique(outcomes: list[CallOutcome], label: str) -> None:
+    """409 when another outcome already uses `label` (case-insensitive)."""
+    wanted = label.casefold()
+    if any(o.label.casefold() == wanted for o in outcomes):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"An outcome named '{label}' already exists.",
+        )
 
 
 async def _get_outcome(session: AsyncSession, outcome_id: uuid.UUID) -> CallOutcome:

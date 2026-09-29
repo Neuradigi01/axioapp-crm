@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.app.core.calls.models import CallDirection
 from src.app.shared.schemas import ORMModel, PaginatedResponse
@@ -14,17 +14,30 @@ from src.app.shared.schemas import ORMModel, PaginatedResponse
 # --- Outcomes (config) ----------------------------------------------------
 
 
+def _clean_label(value: str | None) -> str | None:
+    if value is None:
+        return None
+    trimmed = " ".join(value.split())
+    if not trimmed:
+        raise ValueError("Outcome name is required.")
+    return trimmed
+
+
 class CallOutcomeCreate(BaseModel):
-    key: str = Field(min_length=1, max_length=64)
+    key: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")
     label: str = Field(min_length=1, max_length=128)
-    color: str = Field(default="#6b7280", max_length=32)
+    color: str = Field(default="#6b7280", pattern=r"^#[0-9a-fA-F]{6}$")
     display_order: int = Field(default=0, ge=0)
+
+    _label = field_validator("label")(_clean_label)
 
 
 class CallOutcomeUpdate(BaseModel):
     label: str | None = Field(default=None, min_length=1, max_length=128)
-    color: str | None = Field(default=None, max_length=32)
+    color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
     display_order: int | None = Field(default=None, ge=0)
+
+    _label = field_validator("label")(_clean_label)
 
 
 class CallOutcomeOut(ORMModel):

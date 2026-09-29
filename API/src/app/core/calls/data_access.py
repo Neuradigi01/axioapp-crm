@@ -109,9 +109,7 @@ async def get_contact_names_bulk(
     if not ids:
         return {}
     rows = (
-        await session.execute(
-            select(Contact.id, Contact.full_name).where(Contact.id.in_(ids))
-        )
+        await session.execute(select(Contact.id, Contact.full_name).where(Contact.id.in_(ids)))
     ).all()
     return {cid: name for cid, name in rows}
 
