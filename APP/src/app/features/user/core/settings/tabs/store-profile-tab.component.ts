@@ -6,6 +6,9 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FurnitureAuthService, OrgSummary } from '../../auth/auth.service';
 import { extractApiError } from '@core/services/api-error.util';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { stripPhoneSeparators } from '../../../../../shared/validators/custom-validators';
+import { FormToastHelper } from '../../shared/forms/form-toast.helper';
+import { commonValidators } from '../../shared/validators';
 import { OrgSettings, SettingsApiService } from '../settings-api.service';
 
 /**
@@ -31,6 +34,39 @@ const REMINDER_PRESETS: readonly ReminderPreset[] = [
   { label: '1 week', minutes: 10080 },
 ];
 
+/** Store-profile form fields and the label each error message uses. */
+const FIELD_LABELS = {
+  store_name: 'Store name',
+  logo_url: 'Logo URL',
+  gst_number: 'GST number',
+  phone: 'Phone',
+  email: 'Email',
+  address_line1: 'Address line 1',
+  address_line2: 'Address line 2',
+  city: 'City',
+  state: 'State',
+  postal_code: 'Postal code',
+  country: 'Country',
+  currency: 'Currency',
+  tax_rate: 'Tax rate',
+  timezone: 'Timezone',
+  locale: 'Locale',
+} as const;
+
+type StoreField = keyof typeof FIELD_LABELS;
+
+/** Trim text, send blanks as null, and canonicalise the coded fields
+ *  (GSTIN / currency upper-case, phone without separators) so the
+ *  stored value matches what the validators accepted. */
+function normalizeField(name: StoreField, value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  if (name === 'gst_number' || name === 'currency') return trimmed.toUpperCase();
+  if (name === 'phone') return stripPhoneSeparators(trimmed);
+  return trimmed;
+}
+
 const REMINDER_MIN_MINUTES = 5;
 const REMINDER_MAX_MINUTES = 43200;
 const REMINDER_MAX_ENTRIES = 10;
@@ -47,6 +83,7 @@ export class StoreProfileTabComponent {
   private readonly api = inject(SettingsApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly toast = inject(ToastService);
+  private readonly formToast = inject(FormToastHelper);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly loading = signal(false);
@@ -151,31 +188,87 @@ export class StoreProfileTabComponent {
           this.reminderOffsets.set(s.appointment_reminder_offsets_minutes ?? []);
           this.reminderSaving.set(false);
           this.reminderSaved.set(true);
+          this.toast.success('Appointment reminders saved.');
         },
         error: (err: HttpErrorResponse) => {
           this.reminderSaving.set(false);
-          this.reminderError.set(extractApiError(err) ?? 'Could not save reminder settings.');
+          const msg = extractApiError(err) ?? 'Could not save reminder settings.';
+          this.reminderError.set(msg);
+          this.toast.error('Could not save appointment reminders.', { subtitle: msg });
         },
       });
   }
 
+  // Limits mirror `OrgSettingsPatch` in api/src/app/core/settings/schemas.py.
   protected readonly form = this.fb.group({
-    store_name: this.fb.control<string | null>(null),
-    logo_url: this.fb.control<string | null>(null),
-    gst_number: this.fb.control<string | null>(null),
-    address_line1: this.fb.control<string | null>(null),
-    address_line2: this.fb.control<string | null>(null),
-    city: this.fb.control<string | null>(null),
-    state: this.fb.control<string | null>(null),
-    postal_code: this.fb.control<string | null>(null),
-    country: this.fb.control<string | null>(null),
-    phone: this.fb.control<string | null>(null),
-    email: this.fb.control<string | null>(null),
-    currency: this.fb.control<string>('INR', { nonNullable: true }),
-    tax_rate: this.fb.control<string>('18.00', { nonNullable: true }),
-    timezone: this.fb.control<string>('Asia/Kolkata', { nonNullable: true }),
-    locale: this.fb.control<string>('en-IN', { nonNullable: true }),
+    store_name: this.fb.control<string | null>(null, [
+      commonValidators.trimmedRequired,
+      commonValidators.maxLength(255),
+    ]),
+    logo_url: this.fb.control<string | null>(null, [
+      commonValidators.url,
+      commonValidators.maxLength(512),
+    ]),
+    gst_number: this.fb.control<string | null>(null, [commonValidators.gstin]),
+    address_line1: this.fb.control<string | null>(null, [commonValidators.maxLength(255)]),
+    address_line2: this.fb.control<string | null>(null, [commonValidators.maxLength(255)]),
+    city: this.fb.control<string | null>(null, [commonValidators.maxLength(128)]),
+    state: this.fb.control<string | null>(null, [commonValidators.maxLength(128)]),
+    postal_code: this.fb.control<string | null>(null, [commonValidators.postalCode]),
+    country: this.fb.control<string | null>(null, [commonValidators.maxLength(64)]),
+    phone: this.fb.control<string | null>(null, [
+      commonValidators.phone(),
+      commonValidators.maxLength(32),
+    ]),
+    email: this.fb.control<string | null>(null, [
+      commonValidators.email,
+      commonValidators.maxLength(255),
+    ]),
+    currency: this.fb.control<string>('INR', {
+      nonNullable: true,
+      validators: [commonValidators.trimmedRequired, commonValidators.currencyCode],
+    }),
+    tax_rate: this.fb.control<string>('18.00', {
+      nonNullable: true,
+      validators: [
+        commonValidators.required,
+        commonValidators.numericInRange(0, 100),
+        commonValidators.maxDecimals(2),
+      ],
+    }),
+    timezone: this.fb.control<string>('Asia/Kolkata', {
+      nonNullable: true,
+      validators: [commonValidators.trimmedRequired, commonValidators.timezone],
+    }),
+    locale: this.fb.control<string>('en-IN', {
+      nonNullable: true,
+      validators: [commonValidators.trimmedRequired, commonValidators.locale],
+    }),
   });
+
+  /** Error text under `name`'s input once the operator has touched it,
+   *  or null while it is untouched / valid. */
+  protected fieldError(name: StoreField): string | null {
+    const ctrl = this.form.controls[name];
+    if (!ctrl.touched || !ctrl.errors) return null;
+    const errors = ctrl.errors;
+    const label = FIELD_LABELS[name];
+    if (errors['required']) return `${label} is required.`;
+    if (errors['maxlength']) {
+      return `${label} must be at most ${errors['maxlength'].requiredLength} characters.`;
+    }
+    if (errors['emailInvalid']) return 'Enter a valid email address, e.g. store@company.com.';
+    if (errors['phoneInvalid']) return 'Include the country code, e.g. +919876543210.';
+    if (errors['urlInvalid']) return 'Enter a full link starting with https://';
+    if (errors['gstinInvalid']) return 'Enter a 15-character GSTIN, e.g. 29ABCDE1234F1Z5.';
+    if (errors['postalCodeInvalid']) return 'Use 3–10 letters or digits, e.g. 560001.';
+    if (errors['currencyInvalid']) return 'Use a 3-letter currency code, e.g. INR or USD.';
+    if (errors['invalidNumber'] || errors['outOfRange']) return 'Enter a rate from 0 to 100.';
+    if (errors['tooManyDecimals']) return 'Use at most 2 decimal places.';
+    if (errors['timezoneInvalid']) return 'Use a timezone like Asia/Kolkata or UTC.';
+    if (errors['localeInvalid']) return 'Use a locale like en-IN or en-US.';
+    return `${label} is invalid.`;
+  }
 
   constructor() {
     this.reload();
@@ -207,23 +300,40 @@ export class StoreProfileTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(extractApiError(err) ?? 'Could not load settings.');
+          const msg = extractApiError(err) ?? 'Could not load settings.';
+          this.loadError.set(msg);
+          this.toast.error('Could not load store profile.', { subtitle: msg });
         },
       });
   }
 
   protected save(): void {
     if (!this.canWrite()) return;
-    this.saving.set(true);
     this.saveError.set(null);
     this.saveOk.set(false);
+
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      const invalid = (Object.keys(FIELD_LABELS) as StoreField[]).filter(
+        (name) => this.form.controls[name].invalid,
+      );
+      const missingRequired = invalid.some((name) => this.form.controls[name].errors?.['required']);
+      const labels = invalid.map((name) => FIELD_LABELS[name]);
+      if (missingRequired) {
+        this.formToast.requiredFieldsMissing(`Check: ${labels.join(', ')}.`);
+      } else {
+        this.formToast.invalidFields(labels);
+      }
+      return;
+    }
 
     // Only send dirty controls so we honor the strict-key PATCH on
     // the backend (and don't accidentally re-write defaults).
     const dirty: Record<string, unknown> = {};
     for (const [key, ctrl] of Object.entries(this.form.controls)) {
-      if (ctrl.dirty) dirty[key] = ctrl.value;
+      if (ctrl.dirty) dirty[key] = normalizeField(key as StoreField, ctrl.value);
     }
+    this.saving.set(true);
     if (Object.keys(dirty).length === 0) {
       this.saving.set(false);
       this.saveOk.set(true);

@@ -2,6 +2,7 @@ import { ValidatorFn, Validators } from '@angular/forms';
 
 import {
   choicesCsvValidator,
+  currencyCodeValidator,
   dateFutureValidator,
   dateNotFutureValidator,
   dateNotPastValidator,
@@ -10,15 +11,20 @@ import {
   dateWithinPastHours,
   emailValidator,
   fileUploadValidator,
+  gstinValidator,
   hostnameApexValidator,
   hostnameValidator,
   isoDateTimeValidator,
   isoDateValidator,
+  localeValidator,
+  maxDecimalsValidator,
   nameValidator,
   numericInRange,
   passwordStrengthValidator,
   phoneValidator,
   picklistValidator,
+  postalCodeValidator,
+  timezoneValidator,
   trimmedRequired,
   urlValidator,
   waVariablesValidator,
@@ -80,6 +86,12 @@ export const commonValidators = {
   waVariables: waVariablesValidator as ValidatorFn,
   hostname: hostnameValidator as ValidatorFn,
   hostnameApex: hostnameApexValidator as ValidatorFn,
+  gstin: gstinValidator as ValidatorFn,
+  currencyCode: currencyCodeValidator as ValidatorFn,
+  timezone: timezoneValidator as ValidatorFn,
+  locale: localeValidator as ValidatorFn,
+  postalCode: postalCodeValidator as ValidatorFn,
+  maxDecimals: (places: number): ValidatorFn => maxDecimalsValidator(places),
 } as const;
 
 /**

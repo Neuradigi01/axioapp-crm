@@ -33,6 +33,12 @@ export const REASON = {
     'variables must be numbered {{1}}, {{2}}, … sequentially without gaps (max 10)',
   invalidHostname: 'must be a valid hostname (e.g. example.com)',
   hostnameNotApex: 'enter the apex domain only (e.g. example.com, not mail.example.com)',
+  invalidGstin: 'GSTIN must be 15 characters (e.g. 29ABCDE1234F1Z5)',
+  invalidCurrency: 'currency must be a 3-letter ISO code (e.g. INR)',
+  invalidTimezone: 'timezone must be an IANA name (e.g. Asia/Kolkata)',
+  invalidLocale: 'locale must look like en or en-IN',
+  invalidPostalCode: 'postal code must be 3–10 letters, digits, spaces or dashes',
+  tooManyDecimals: 'too many decimal places',
 } as const;
 
 /**
@@ -45,6 +51,10 @@ export const NAME_RE_SRC = "^[A-Za-zÀ-ÿ' .\\-]{2,100}$";
 export const EMAIL_RE_SRC = '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$';
 export const PHONE_RE_SRC = '^\\+[1-9][0-9]{7,14}$';
 export const URL_RE_SRC = '^https?://[^\\s]+$';
+export const GSTIN_RE_SRC = '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$';
+export const CURRENCY_RE_SRC = '^[A-Z]{3}$';
+export const LOCALE_RE_SRC = '^[a-z]{2,3}(-[A-Z]{2})?$';
+export const POSTAL_CODE_RE_SRC = '^[A-Za-z0-9][A-Za-z0-9 -]{1,8}[A-Za-z0-9]$';
 
 const NAME_RE = new RegExp(NAME_RE_SRC);
 // Character-class check only (no length bounds). Lets the validator
@@ -530,4 +540,76 @@ export function urlValidator(control: AbstractControl): ValidationErrors | null 
     return { urlInvalid: REASON.invalidUrl };
   }
   return null;
+}
+
+const GSTIN_RE = new RegExp(GSTIN_RE_SRC);
+const CURRENCY_RE = new RegExp(CURRENCY_RE_SRC);
+const LOCALE_RE = new RegExp(LOCALE_RE_SRC);
+const POSTAL_CODE_RE = new RegExp(POSTAL_CODE_RE_SRC);
+
+/**
+ * Indian GSTIN: 2-digit state code, 10-char PAN, entity digit, `Z`,
+ * checksum char. Compared upper-cased so a pasted lowercase value is
+ * accepted (the form upper-cases it on save).
+ */
+export function gstinValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  return GSTIN_RE.test(String(raw).trim().toUpperCase())
+    ? null
+    : { gstinInvalid: REASON.invalidGstin };
+}
+
+/** ISO 4217-shaped currency code — three letters, compared upper-cased. */
+export function currencyCodeValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  return CURRENCY_RE.test(String(raw).trim().toUpperCase())
+    ? null
+    : { currencyInvalid: REASON.invalidCurrency };
+}
+
+/**
+ * IANA timezone the browser's Intl database knows (e.g. `Asia/Kolkata`,
+ * `UTC`). The backend checks the same value against Python's `zoneinfo`.
+ */
+export function timezoneValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  const value = String(raw).trim();
+  if (!value.includes('/') && value !== 'UTC') {
+    return { timezoneInvalid: REASON.invalidTimezone };
+  }
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+    return null;
+  } catch {
+    return { timezoneInvalid: REASON.invalidTimezone };
+  }
+}
+
+/** Language (+ optional region) locale tag: `en`, `hi`, `en-IN`. */
+export function localeValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  return LOCALE_RE.test(String(raw).trim()) ? null : { localeInvalid: REASON.invalidLocale };
+}
+
+/** Postal / PIN / ZIP code: 3–10 letters or digits, inner spaces or dashes allowed. */
+export function postalCodeValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = control.value;
+  if (isEmpty(raw)) return null;
+  return POSTAL_CODE_RE.test(String(raw).trim())
+    ? null
+    : { postalCodeInvalid: REASON.invalidPostalCode };
+}
+
+/** At most `places` digits after the decimal point. Empty → null. */
+export function maxDecimalsValidator(places: number): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const raw = control.value;
+    if (isEmpty(raw)) return null;
+    const [, fraction = ''] = String(raw).trim().split('.');
+    return fraction.length > places ? { tooManyDecimals: REASON.tooManyDecimals, places } : null;
+  };
 }

@@ -25,4 +25,13 @@ export class FormToastHelper {
       subtitle: subtitle ?? 'Some fields need attention before we can save.',
     });
   }
+
+  /** Fired when submit is blocked by fields that are filled in but
+   *  malformed (bad email, phone, URL, …). `labels` names the fields
+   *  so the operator knows where to look without scrolling. */
+  invalidFields(labels: readonly string[]): void {
+    this.toast.warn('Please fix the highlighted fields', {
+      subtitle: labels.length ? `Check: ${labels.join(', ')}.` : undefined,
+    });
+  }
 }

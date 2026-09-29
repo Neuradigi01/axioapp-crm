@@ -7,14 +7,39 @@ sneaky `org_id` / `id` / `created_at` mutations.
 
 from __future__ import annotations
 
+import re
 import uuid
+from collections.abc import Callable
 from datetime import time
 from decimal import Decimal
 from typing import Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.app.shared.schemas import TimestampedOrgScopedOut
+from src.app.shared.validators import (
+    ValidationError,
+    validate_email,
+    validate_phone,
+    validate_url,
+)
+
+# Same patterns as the frontend's *_RE_SRC constants in
+# app/src/app/shared/validators/custom-validators.ts.
+GSTIN_RE = re.compile(r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$")
+CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
+LOCALE_RE = re.compile(r"^[a-z]{2,3}(-[A-Z]{2})?$")
+POSTAL_CODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 -]{1,8}[A-Za-z0-9]$")
+
+
+def _shared_rule(rule: Callable[[str], str], value: str) -> str:
+    """Run a `shared.validators` rule, surfacing its reason as a pydantic
+    field error (capitalised for display)."""
+    try:
+        return rule(value)
+    except ValidationError as exc:
+        raise ValueError(exc.reason[:1].upper() + exc.reason[1:] + ".") from exc
 
 
 class OrgSettingsOut(TimestampedOrgScopedOut):
@@ -108,9 +133,100 @@ class OrgSettingsPatch(BaseModel):
     email: str | None = Field(default=None, max_length=255)
 
     currency: str | None = Field(default=None, min_length=3, max_length=3)
-    tax_rate: Decimal | None = Field(default=None, ge=0, le=100)
+    tax_rate: Decimal | None = Field(default=None, ge=0, le=100, decimal_places=2)
     timezone: str | None = Field(default=None, max_length=64)
     locale: str | None = Field(default=None, max_length=16)
+
+    # Store-profile format rules. Mirrored on the frontend in
+    # app/src/app/shared/validators/custom-validators.ts so the form
+    # and the API accept exactly the same values. Blank optional text
+    # is stored as NULL.
+    @field_validator(
+        "logo_url",
+        "gst_number",
+        "address_line1",
+        "address_line2",
+        "city",
+        "state",
+        "postal_code",
+        "country",
+        "phone",
+        "email",
+        mode="before",
+    )
+    @classmethod
+    def _blank_to_none(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+    @field_validator("store_name")
+    @classmethod
+    def _validate_store_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("Store name is required.")
+        return trimmed
+
+    @field_validator("logo_url")
+    @classmethod
+    def _validate_logo_url(cls, value: str | None) -> str | None:
+        return None if value is None else _shared_rule(validate_url, value)
+
+    @field_validator("email")
+    @classmethod
+    def _validate_email(cls, value: str | None) -> str | None:
+        return None if value is None else _shared_rule(validate_email, value)
+
+    @field_validator("phone")
+    @classmethod
+    def _validate_phone(cls, value: str | None) -> str | None:
+        return None if value is None else _shared_rule(validate_phone, value)
+
+    @field_validator("gst_number")
+    @classmethod
+    def _validate_gst_number(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        upper = value.upper()
+        if not GSTIN_RE.match(upper):
+            raise ValueError("GSTIN must be 15 characters (e.g. 29ABCDE1234F1Z5).")
+        return upper
+
+    @field_validator("postal_code")
+    @classmethod
+    def _validate_postal_code(cls, value: str | None) -> str | None:
+        if value is not None and not POSTAL_CODE_RE.match(value):
+            raise ValueError("Postal code must be 3–10 letters, digits, spaces or dashes.")
+        return value
+
+    @field_validator("currency")
+    @classmethod
+    def _validate_currency(cls, value: str | None) -> str:
+        upper = (value or "").strip().upper()
+        if not CURRENCY_RE.match(upper):
+            raise ValueError("Currency must be a 3-letter ISO code (e.g. INR).")
+        return upper
+
+    @field_validator("timezone")
+    @classmethod
+    def _validate_timezone(cls, value: str | None) -> str:
+        name = (value or "").strip()
+        try:
+            ZoneInfo(name)
+        except (ValueError, ZoneInfoNotFoundError) as exc:
+            raise ValueError("Timezone must be an IANA name (e.g. Asia/Kolkata).") from exc
+        return name
+
+    @field_validator("locale")
+    @classmethod
+    def _validate_locale(cls, value: str | None) -> str:
+        tag = (value or "").strip()
+        if not LOCALE_RE.match(tag):
+            raise ValueError("Locale must look like en or en-IN.")
+        return tag
 
     ai_enabled: bool | None = None
     ai_personality: str | None = None
