@@ -136,6 +136,7 @@ export class EmbedIntegrationsTabComponent {
   protected readonly renameFormState = signal<{
     form: WidgetFormListItem;
     name: string;
+
     submitting: boolean;
     error: string | null;
   } | null>(null);
