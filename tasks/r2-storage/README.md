@@ -1,6 +1,6 @@
 # Track: Cloudflare R2 file storage
 
-**Status:** Plan approved 2026-09-29 (reviewer findings consolidated below). Step 0 done for `local` + `prod-neuradigi`; `prod` (aixo) deferred.
+**Status:** Steps 0-8 COMPLETED 2026-09-29 - **local runs on R2** (`crm-local`). Step 9 (prod-neuradigi cutover) pending: runbook in `step-9-prod-neuradigi-cutover.md`. `prod` (aixo) deferred.
 **Requested:** 2026-09-29 (manager instruction via user).
 **Goal:** Every uploaded file lives in a Cloudflare R2 bucket instead of the server's `./storage` folder, so a server crash or rebuild never loses customer files. One separate Cloudflare account + bucket per environment.
 

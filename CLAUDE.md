@@ -82,7 +82,7 @@ furniture-crm/
 - **Backend:** Python **3.13**, FastAPI, **SQLAlchemy 2.x async** (`Mapped`, `async_sessionmaker`, `AsyncSession` — no v1 patterns), Alembic async, **Pydantic v2** + `pydantic-settings`, **PostgreSQL 17** (JSONB, GIN, RLS), Celery + Redis, package manager **uv**.
 - **Frontend:** **Angular 20+** standalone (signals, new control flow `@if/@for/@switch`, `inject()`, typed reactive forms — no NgModule), **TailwindCSS for all new pages**.
 - **Auth:** JWT HS256 admin (existing) + short-lived staff PIN token (Phase 3).
-- **File storage:** **Local filesystem only** under `./storage/{org_id}/{entity}/{file_id}` behind a `StorageBackend` interface. **No S3/boto3 in this build.**
+- **File storage:** every blob goes through `get_storage()` (`StorageBackend` in `shared/storage/`), keyed `{org_id}/{entity}/…`. Backend is `STORAGE_BACKEND=local|r2`: **Cloudflare R2** (private bucket per environment, boto3) or local disk under `STORAGE_ROOT`. Never open `./storage` directly (pin-test). Files reach browsers only via `/files/{key}` (public raster images a module declares in `ModuleDescriptor.public_files`) or a module's authenticated endpoint. See [`tasks/r2-storage/`](tasks/r2-storage/README.md).
 - **API:** REST, JSON, versioned at `/api/v1`.
 
 ## The 10 non-negotiable rules

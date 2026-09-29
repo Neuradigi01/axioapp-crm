@@ -17,7 +17,9 @@ from config import (
 )
 
 broker_url = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB_BROKER}"
-result_backend = f"db+postgresql://{DB_USER}:{quote_plus(DB_PASSWORD or '')}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=disable"
+# Name the driver explicitly: SQLAlchemy 2.1 made bare `postgresql://`
+# resolve to psycopg (v3), which is not installed — psycopg2-binary is.
+result_backend = f"db+postgresql+psycopg2://{DB_USER}:{quote_plus(DB_PASSWORD or '')}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=disable"
 task_default_queue = f"{COMPOSE_PROJECT_NAME}_queue"
 task_serializer = "json"
 accept_content = ["json"]
