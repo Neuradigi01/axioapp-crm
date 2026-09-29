@@ -17,7 +17,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ from src.app.core.campaigns.models import (
     Campaign,
     CampaignMessage,
     CampaignMessageStatus,
+    CampaignStatus,
 )
 from src.app.core.contacts.models import Contact
 from src.app.core.conversations.models import (
@@ -40,9 +41,12 @@ async def get_wa_extension_for_campaign_template(
 ) -> WhatsAppTemplate | None:
     """Given the central row's UUID, return its WhatsApp extension row."""
     result = await session.execute(
-        select(WhatsAppTemplate).where(WhatsAppTemplate.message_template_id == central_template_id)
+        select(WhatsAppTemplate)
+        .where(WhatsAppTemplate.message_template_id == central_template_id)
+        .order_by(WhatsAppTemplate.updated_at.desc())
+        .limit(1)
     )
-    return result.scalar_one_or_none()
+    return result.scalars().first()
 
 
 async def get_wa_extensions_for_template_ids(
@@ -127,7 +131,11 @@ async def list_campaigns_page(
     elif not include_archived:
         stmt = stmt.where(Campaign.archived_at.is_(None))
     rows = (
-        (await session.execute(stmt.order_by(Campaign.created_at.desc()).offset(offset).limit(limit)))
+        (
+            await session.execute(
+                stmt.order_by(Campaign.created_at.desc()).offset(offset).limit(limit)
+            )
+        )
         .scalars()
         .all()
     )
@@ -145,9 +153,7 @@ async def delete_campaign_row(session: AsyncSession, campaign: Campaign) -> None
     await session.delete(campaign)
 
 
-async def archive_campaign_row(
-    session: AsyncSession, campaign: Campaign, *, now: datetime
-) -> None:
+async def archive_campaign_row(session: AsyncSession, campaign: Campaign, *, now: datetime) -> None:
     """Soft-archive: stamp ``archived_at`` with ``now``. Idempotent —
     re-archiving an already-archived row is a no-op at this layer
     (service enforces the transition validity)."""
@@ -289,11 +295,13 @@ async def get_campaign_message_for_contact(
     campaign_id: uuid.UUID,
     contact_id: uuid.UUID,
 ) -> CampaignMessage | None:
-    """Resolve the per-contact `CampaignMessage` row for one campaign."""
+    """Resolve the per-contact `CampaignMessage` row for one campaign.
+    Always re-reads the row so a status another worker wrote is seen."""
     result = await session.execute(
         select(CampaignMessage)
         .where(CampaignMessage.campaign_id == campaign_id)
         .where(CampaignMessage.contact_id == contact_id)
+        .execution_options(populate_existing=True)
     )
     return result.scalar_one_or_none()
 
@@ -323,15 +331,120 @@ async def get_campaign_message_in_campaign(
     return result.scalar_one_or_none()
 
 
-async def count_queued_messages_for_campaign(session: AsyncSession, campaign_id: uuid.UUID) -> int:
-    """Number of `status='queued'` rows still pending for one campaign."""
-    result = await session.execute(
-        select(func.count())
-        .select_from(CampaignMessage)
+async def list_queued_contact_ids(
+    session: AsyncSession,
+    *,
+    campaign_id: uuid.UUID,
+    contact_ids: list[uuid.UUID] | None = None,
+) -> list[uuid.UUID]:
+    """Contact ids whose row is still `queued` for one campaign,
+    optionally narrowed to ``contact_ids``. Dispatch sends only to these
+    so a retried / duplicated chunk never re-sends a finished row."""
+    stmt = (
+        select(CampaignMessage.contact_id)
         .where(CampaignMessage.campaign_id == campaign_id)
         .where(CampaignMessage.status == CampaignMessageStatus.queued)
+        .order_by(CampaignMessage.created_at.asc())
     )
-    return int(result.scalar_one() or 0)
+    if contact_ids is not None:
+        if not contact_ids:
+            return []
+        stmt = stmt.where(CampaignMessage.contact_id.in_(contact_ids))
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def requeue_failed_messages(session: AsyncSession, *, campaign_id: uuid.UUID) -> None:
+    """Flip every `failed` row of a campaign back to `queued` (restart
+    of a failed campaign)."""
+    await session.execute(
+        update(CampaignMessage)
+        .where(CampaignMessage.campaign_id == campaign_id)
+        .where(CampaignMessage.status == CampaignMessageStatus.failed)
+        .values(status=CampaignMessageStatus.queued, error=None)
+    )
+
+
+async def get_campaign_for_update(session: AsyncSession, campaign_id: uuid.UUID) -> Campaign | None:
+    """Row-lock one campaign so concurrent starts serialise."""
+    result = await session.execute(
+        select(Campaign)
+        .where(Campaign.id == campaign_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    return result.scalar_one_or_none()
+
+
+async def fail_queued_messages(
+    session: AsyncSession,
+    *,
+    campaign_id: uuid.UUID,
+    contact_ids: list[uuid.UUID],
+    error: str,
+) -> None:
+    """Mark the given contacts' still-`queued` rows as `failed`."""
+    if not contact_ids:
+        return
+    await session.execute(
+        update(CampaignMessage)
+        .where(CampaignMessage.campaign_id == campaign_id)
+        .where(CampaignMessage.contact_id.in_(contact_ids))
+        .where(CampaignMessage.status == CampaignMessageStatus.queued)
+        .values(status=CampaignMessageStatus.failed, error=error)
+    )
+
+
+async def claim_scheduled_campaign(
+    session: AsyncSession, *, campaign_id: uuid.UUID, now: datetime
+) -> bool:
+    """Atomically flip a due `scheduled` campaign to `running`. Returns
+    False when another sweep already claimed it."""
+    result = await session.execute(
+        update(Campaign)
+        .where(Campaign.id == campaign_id)
+        .where(Campaign.status == CampaignStatus.scheduled)
+        .where(Campaign.schedule_at <= now)
+        .values(status=CampaignStatus.running)
+        .returning(Campaign.id)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def list_due_scheduled_campaigns(
+    session: AsyncSession, *, now: datetime, limit: int
+) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """Cross-org `(id, org_id)` of scheduled campaigns whose time has come."""
+    rows = await session.execute(
+        select(Campaign.id, Campaign.org_id)
+        .where(Campaign.status == CampaignStatus.scheduled)
+        .where(Campaign.schedule_at.is_not(None))
+        .where(Campaign.schedule_at <= now)
+        .order_by(Campaign.schedule_at.asc())
+        .limit(limit)
+    )
+    return [(r[0], r[1]) for r in rows.all()]
+
+
+async def list_stalled_running_campaigns(
+    session: AsyncSession, *, cutoff: datetime, limit: int
+) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """Cross-org `(id, org_id)` of `running` campaigns that still have
+    `queued` rows but no send progress since ``cutoff`` — their chunk
+    task was lost (worker restart, broker outage, hard time limit)."""
+    queued = func.count().filter(CampaignMessage.status == CampaignMessageStatus.queued)
+    last_progress = func.coalesce(
+        func.max(CampaignMessage.sent_at), func.min(CampaignMessage.created_at)
+    )
+    rows = await session.execute(
+        select(Campaign.id, Campaign.org_id)
+        .join(CampaignMessage, CampaignMessage.campaign_id == Campaign.id)
+        .where(Campaign.status == CampaignStatus.running)
+        .group_by(Campaign.id, Campaign.org_id)
+        .having(queued > 0)
+        .having(last_progress < cutoff)
+        .limit(limit)
+    )
+    return [(r[0], r[1]) for r in rows.all()]
 
 
 async def count_messages_filtered(
@@ -473,16 +586,21 @@ async def dashboard_stats_since(session: AsyncSession, *, since: datetime) -> di
 async def get_conversation_by_external_id(
     session: AsyncSession,
     *,
+    org_id: uuid.UUID,
     channel: ConversationChannel,
     external_id: str,
 ) -> Conversation | None:
-    """Resolve a conversation by `(channel, external_id)` pair."""
+    """Resolve the org's most recent conversation for a
+    `(channel, external_id)` pair."""
     result = await session.execute(
         select(Conversation)
+        .where(Conversation.org_id == org_id)
         .where(Conversation.channel == channel)
         .where(Conversation.external_id == external_id)
+        .order_by(Conversation.last_message_at.desc().nulls_last())
+        .limit(1)
     )
-    return result.scalar_one_or_none()
+    return result.scalars().first()
 
 
 def add_conversation(session: AsyncSession, conversation: Conversation) -> Conversation:
@@ -504,8 +622,10 @@ __all__ = [
     "count_all_campaigns",
     "count_campaigns_by_status_for_smtp_sender",
     "count_messages_filtered",
-    "count_queued_messages_for_campaign",
+    "claim_scheduled_campaign",
     "delete_campaign_row",
+    "fail_queued_messages",
+    "get_campaign_for_update",
     "get_campaign_message_by_channel_id",
     "get_campaign_message_for_contact",
     "get_campaign_message_in_campaign",
@@ -515,7 +635,11 @@ __all__ = [
     "add_conversation",
     "list_campaigns_page",
     "list_contact_ids_for_audience",
+    "list_due_scheduled_campaigns",
     "list_messages_page",
+    "list_queued_contact_ids",
+    "list_stalled_running_campaigns",
+    "requeue_failed_messages",
     "stats_by_status",
     "email_tracking_counts",
     "dashboard_stats_since",

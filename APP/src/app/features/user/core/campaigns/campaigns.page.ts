@@ -21,6 +21,9 @@ import {
 } from './campaigns-api.service';
 import { CreateCampaignModalComponent } from './create-campaign-modal.component';
 
+/** How often the list re-checks while a campaign is scheduled or running. */
+const LIVE_REFRESH_MS = 15_000;
+
 /** Minimal shape returned by `GET /users` — enough to resolve
  *  `created_by_id` → display name for the Created By column. */
 interface OrgUser {
@@ -229,6 +232,44 @@ export class CampaignsPageComponent {
 
   constructor() {
     this.reload();
+    const liveRefresh = setInterval(() => this.refreshLiveRows(), LIVE_REFRESH_MS);
+    this.destroyRef.onDestroy(() => clearInterval(liveRefresh));
+  }
+
+  /** Silent re-fetch while any listed campaign is scheduled or running,
+   *  so the status moves Scheduled → Running → Sent / Failed on its own
+   *  when the beat sweep fires. No spinner, no error banner. */
+  private refreshLiveRows(): void {
+    if (this.loading() || this.statusFilter() === 'archived') return;
+    const live = this.items().some((c) => c.status === 'scheduled' || c.status === 'running');
+    if (!live) return;
+    this.api
+      .list(1, 100, {})
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resp) => this.applyItems(resp.items),
+        error: () => undefined,
+      });
+    this.api
+      .dashboardStats()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (s) => this.dashboardStats.set(s),
+        error: () => undefined,
+      });
+  }
+
+  private applyItems(items: Campaign[]): void {
+    this.items.set(items);
+    // Purge any selected ids that vanished — a race between the
+    // list refresh and a background dispatch could otherwise
+    // leave the bulk-actions bar counting phantom rows.
+    const alive = new Set(items.map((r) => r.id));
+    this.selectedIds.update((set) => {
+      const next = new Set<string>();
+      for (const id of set) if (alive.has(id)) next.add(id);
+      return next;
+    });
   }
 
   protected reload(): void {
@@ -243,16 +284,7 @@ export class CampaignsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
-          this.items.set(resp.items);
-          // Purge any selected ids that vanished — a race between the
-          // list refresh and a background dispatch could otherwise
-          // leave the bulk-actions bar counting phantom rows.
-          const alive = new Set(resp.items.map((r) => r.id));
-          this.selectedIds.update((set) => {
-            const next = new Set<string>();
-            for (const id of set) if (alive.has(id)) next.add(id);
-            return next;
-          });
+          this.applyItems(resp.items);
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {

@@ -162,6 +162,9 @@ export class CreateCampaignModalComponent {
   @Output() readonly cancel = new EventEmitter<void>();
 
   protected readonly submitting = signal(false);
+  /** A future `schedule_at` makes the backend arm the campaign on
+   *  create (status Scheduled) — the submit button + copy say so. */
+  protected readonly hasFutureSchedule = signal(false);
   protected readonly submitError = signal<string | null>(null);
 
   // --- Audience builder state (Step 3.5.9) --------------------------
@@ -702,6 +705,9 @@ export class CreateCampaignModalComponent {
     this.form.controls.reply_to.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(_pushEmailBranchState);
+    this.form.controls.schedule_at.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((v) => this.hasFutureSchedule.set(!!v && new Date(v).getTime() > Date.now()));
 
     // Step 15 — load templates whenever the channel changes. Each
     // channel's published templates come from the central library;

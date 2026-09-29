@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -808,9 +808,7 @@ _ARCHIVABLE_STATUSES = (
 )
 
 
-async def archive_campaign(
-    session: AsyncSession, *, campaign_id: uuid.UUID
-) -> Campaign:
+async def archive_campaign(session: AsyncSession, *, campaign_id: uuid.UUID) -> Campaign:
     """Soft-archive a campaign so it disappears from the default list
     and the sender-in-use pre-check. Metrics rows on
     ``tbl_campaign_messages`` are preserved. Idempotent — archiving an
@@ -820,10 +818,7 @@ async def archive_campaign(
     if campaign.status not in _ARCHIVABLE_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"cannot archive a {campaign.status.value} campaign — "
-                "cancel it first"
-            ),
+            detail=(f"cannot archive a {campaign.status.value} campaign — cancel it first"),
         )
     if campaign.archived_at is not None:
         return campaign
@@ -841,9 +836,7 @@ async def archive_campaign(
     return campaign
 
 
-async def unarchive_campaign(
-    session: AsyncSession, *, campaign_id: uuid.UUID
-) -> Campaign:
+async def unarchive_campaign(session: AsyncSession, *, campaign_id: uuid.UUID) -> Campaign:
     """Restore a soft-archived campaign to the default list.
     Idempotent — unarchiving an already-active row is a no-op."""
     campaign = await get_campaign(session, campaign_id)
@@ -927,7 +920,12 @@ async def enqueue(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str,
     Returns a small summary the router echoes back to the operator
     (audience_size + chunks_enqueued + scheduled_at).
     """
-    campaign = await get_campaign(session, campaign_id)
+    await get_campaign(session, campaign_id)
+    # Row lock held until the status flip commits — a concurrent
+    # second Start waits, then sees `running` and gets the 409.
+    campaign = await campaigns_da.get_campaign_for_update(session, campaign_id)
+    assert campaign is not None  # noqa: S101 — existence checked above
+    restarting = campaign.status == CampaignStatus.failed
     if campaign.status not in (CampaignStatus.draft, CampaignStatus.failed):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -996,7 +994,6 @@ async def enqueue(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str,
         )
         if bounced_excluded:
             campaign.excluded_bounced_count = int(bounced_excluded)
-            await session.commit()
 
     # whatsapp-platform-upgrade Step 29 — minimum-audience guard.
     # A/B requires ≥ 50 recipients to keep the winner metric out
@@ -1038,6 +1035,11 @@ async def enqueue(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str,
 
     chunks = [contact_ids[i : i + CHUNK_SIZE] for i in range(0, len(contact_ids), CHUNK_SIZE)]
 
+    # Restarting a failed campaign re-sends the rows that failed.
+    if restarting:
+        await campaigns_da.requeue_failed_messages(session, campaign_id=campaign.id)
+        await session.commit()
+
     # Pre-queue placeholder rows so stats immediately reflect "queued: N".
     for chunk in chunks:
         await _queue_chunk_rows(session, campaign_id=campaign.id, contact_ids=chunk)
@@ -1054,39 +1056,12 @@ async def enqueue(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str,
     # their queued rows pre-inserted; the beat task
     # `dispatch_scheduled_campaigns` picks them up every 60s.
     if not is_scheduled:
-        from config import CELERY_ENABLED as _CELERY_ENABLED
-        from src.app.core.campaigns.tasks import (
-            HAS_CELERY,
-            send_campaign_chunk,
+        await _fan_out_chunks(
+            session,
+            campaign=campaign,
+            contact_ids=contact_ids,
+            schedule_ab_decider=campaign.is_ab_test,
         )
-
-        if HAS_CELERY and _CELERY_ENABLED:
-            for chunk in chunks:
-                send_campaign_chunk.delay(
-                    str(campaign.id),
-                    [str(c) for c in chunk],
-                )
-            # whatsapp-platform-upgrade Step 29 — schedule the A/B
-            # winner decider to fire `winner_holdback_hours` after
-            # dispatch. The task is idempotent + checks
-            # `winning_variant is NULL` before running, so a re-queue
-            # after a worker crash doesn't double-flip.
-            if campaign.is_ab_test:
-                try:
-                    from src.app.core.campaigns.tasks import run_ab_decision
-
-                    run_ab_decision.apply_async(
-                        args=[str(campaign.id)],
-                        countdown=int(campaign.winner_holdback_hours) * 3600,
-                    )
-                except Exception:  # noqa: BLE001
-                    logger.exception(
-                        "could not schedule A/B decider for campaign %s",
-                        campaign.id,
-                    )
-        else:
-            for chunk in chunks:
-                await dispatch_chunk(session, campaign_id=campaign.id, contact_ids=chunk)
 
     await audit.log(
         "campaigns.started",
@@ -1106,6 +1081,114 @@ async def enqueue(session: AsyncSession, *, campaign_id: uuid.UUID) -> dict[str,
         "chunks_enqueued": len(chunks),
         "scheduled_at": campaign.schedule_at,
     }
+
+
+async def _fan_out_chunks(
+    session: AsyncSession,
+    *,
+    campaign: Campaign,
+    contact_ids: list[uuid.UUID],
+    schedule_ab_decider: bool,
+) -> None:
+    """Hand the contacts to the sender in `CHUNK_SIZE` batches.
+
+    CELERY_ENABLED=true (prod): each chunk goes to a worker via
+    `.delay(...)` so the caller returns immediately. Otherwise the
+    chunks run inline (dev / eager smoke tests).
+
+    ``schedule_ab_decider`` arms the A/B winner decider
+    `winner_holdback_hours` after dispatch — only on the first start
+    of an A/B campaign (immediate or scheduled), never on a stall
+    re-dispatch. The task is idempotent + checks `winning_variant is
+    NULL`, so a duplicate arm can't double-flip."""
+    from config import CELERY_ENABLED as _CELERY_ENABLED
+    from src.app.core.campaigns.tasks import HAS_CELERY, send_campaign_chunk
+
+    chunks = [contact_ids[i : i + CHUNK_SIZE] for i in range(0, len(contact_ids), CHUNK_SIZE)]
+    if not (HAS_CELERY and _CELERY_ENABLED):
+        for chunk in chunks:
+            await dispatch_chunk(session, campaign_id=campaign.id, contact_ids=chunk)
+        return
+    for chunk in chunks:
+        send_campaign_chunk.delay(str(campaign.id), [str(c) for c in chunk])
+    if schedule_ab_decider:
+        try:
+            from src.app.core.campaigns.tasks import run_ab_decision
+
+            run_ab_decision.apply_async(
+                args=[str(campaign.id)],
+                countdown=int(campaign.winner_holdback_hours) * 3600,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("could not schedule A/B decider for campaign %s", campaign.id)
+
+
+# Scheduled sweep + stall recovery (driven by the
+# `dispatch_scheduled_campaigns` beat task every 60s).
+_SWEEP_BATCH_LIMIT = 100
+# A running campaign with queued rows and no send for this long lost its
+# chunk task (worker restart, broker outage, hard time limit). Well above
+# the 300s task hard limit so an in-flight chunk is never re-dispatched.
+_STALL_AFTER = timedelta(minutes=15)
+
+
+async def list_due_scheduled_campaign_refs(
+    session: AsyncSession,
+) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """Cross-org `(campaign_id, org_id)` of scheduled campaigns now due."""
+    return await campaigns_da.list_due_scheduled_campaigns(
+        session, now=datetime.now(UTC), limit=_SWEEP_BATCH_LIMIT
+    )
+
+
+async def list_stalled_campaign_refs(
+    session: AsyncSession,
+) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """Cross-org `(campaign_id, org_id)` of running campaigns whose
+    chunk tasks were lost."""
+    return await campaigns_da.list_stalled_running_campaigns(
+        session, cutoff=datetime.now(UTC) - _STALL_AFTER, limit=_SWEEP_BATCH_LIMIT
+    )
+
+
+async def start_scheduled_campaign(session: AsyncSession, *, campaign_id: uuid.UUID) -> bool:
+    """Claim a due scheduled campaign (`scheduled` → `running`) and send
+    its queued rows. Returns False when another sweep claimed it first."""
+    claimed = await campaigns_da.claim_scheduled_campaign(
+        session, campaign_id=campaign_id, now=datetime.now(UTC)
+    )
+    await session.commit()
+    if not claimed:
+        return False
+    campaign = await get_campaign(session, campaign_id)
+    await session.refresh(campaign)
+    queued = await campaigns_da.list_queued_contact_ids(session, campaign_id=campaign_id)
+    if not queued:
+        await _settle_campaign_status(session, campaign_id=campaign_id)
+        return True
+    await _fan_out_chunks(
+        session,
+        campaign=campaign,
+        contact_ids=queued,
+        schedule_ab_decider=campaign.is_ab_test,
+    )
+    return True
+
+
+async def resume_stalled_campaign(session: AsyncSession, *, campaign_id: uuid.UUID) -> int:
+    """Re-dispatch a stalled running campaign's queued rows. Returns the
+    number of contacts handed back to the sender."""
+    campaign = await get_campaign(session, campaign_id)
+    queued = await campaigns_da.list_queued_contact_ids(session, campaign_id=campaign_id)
+    if not queued:
+        await _settle_campaign_status(session, campaign_id=campaign_id)
+        return 0
+    logger.warning(
+        "re-dispatching stalled campaign",
+        extra={"campaign_id": str(campaign_id), "queued": len(queued)},
+    )
+    await _fan_out_chunks(session, campaign=campaign, contact_ids=queued, schedule_ab_decider=False)
+    return len(queued)
 
 
 async def _queue_chunk_rows(
@@ -1138,7 +1221,72 @@ async def _queue_chunk_rows(
 # --- the actual sender (called from the Celery task) ---------------------
 
 
+class _ChunkRestart(Exception):
+    """One contact's send left the session unusable; the chunk resumes
+    on the rows that are still queued."""
+
+
 async def dispatch_chunk(
+    session: AsyncSession,
+    *,
+    campaign_id: uuid.UUID,
+    contact_ids: list[uuid.UUID],
+) -> None:
+    """Send to the chunk's still-`queued` contacts, then settle the
+    campaign status once no queued rows remain.
+
+    Finished rows are skipped, so a Celery retry, a double start or a
+    stall-recovery re-dispatch never re-sends. An unexpected
+    per-contact error fails that row and restarts the chunk; an
+    unexpected chunk-level error fails the remaining rows so the
+    campaign can't sit in `running` forever."""
+    while True:
+        remaining = await campaigns_da.list_queued_contact_ids(
+            session, campaign_id=campaign_id, contact_ids=contact_ids
+        )
+        if not remaining:
+            break
+        try:
+            await _dispatch_chunk_rows(session, campaign_id=campaign_id, contact_ids=remaining)
+            break
+        except _ChunkRestart:
+            continue
+        except (ConnectionError, TimeoutError):
+            # Transient infra error — Celery retries the chunk; the rows
+            # stay queued for the retry / stall recovery.
+            raise
+        except Exception as exc:
+            logger.exception("campaign chunk aborted", extra={"campaign_id": str(campaign_id)})
+            await session.rollback()
+            await campaigns_da.fail_queued_messages(
+                session,
+                campaign_id=campaign_id,
+                contact_ids=remaining,
+                error=f"send aborted: {exc}"[:512],
+            )
+            await session.commit()
+            break
+    await _settle_campaign_status(session, campaign_id=campaign_id)
+
+
+async def _settle_campaign_status(session: AsyncSession, *, campaign_id: uuid.UUID) -> None:
+    """Close out a campaign once nothing is queued: `done` when at least
+    one message went out, `failed` when every message failed."""
+    campaign = await get_campaign(session, campaign_id)
+    await session.refresh(campaign)
+    if campaign.status not in (CampaignStatus.running, CampaignStatus.failed):
+        return
+    counts = dict(await campaigns_da.stats_by_status(session, campaign_id=campaign_id))
+    if counts.get(CampaignMessageStatus.queued, 0):
+        return
+    any_delivered = any(n for st, n in counts.items() if st != CampaignMessageStatus.failed)
+    settled = CampaignStatus.done if any_delivered or not counts else CampaignStatus.failed
+    if campaign.status != settled:
+        campaign.status = settled
+        await session.commit()
+
+
+async def _dispatch_chunk_rows(
     session: AsyncSession,
     *,
     campaign_id: uuid.UUID,
@@ -1395,369 +1543,385 @@ async def dispatch_chunk(
             email_template_subject = tpl.subject or campaign.subject
 
     for cid in contact_ids:
-        contact = await contacts_service.get_contact(session, cid)
-        if contact is None:
-            await _mark_message(
-                session,
-                campaign_id=campaign_id,
-                contact_id=cid,
-                new_status=CampaignMessageStatus.failed,
-                error="contact not found",
-            )
+        # Another dispatch (Celery retry, duplicate start, stall
+        # recovery) may have finished this row since the chunk began.
+        pending_row = await campaigns_da.get_campaign_message_for_contact(
+            session, campaign_id=campaign_id, contact_id=cid
+        )
+        if pending_row is None or pending_row.status != CampaignMessageStatus.queued:
             continue
-        # Channel-scoped external-id check. Non-Email channels write to
-        # ``contact.phone``; Email requires an email address on file.
-        if campaign.channel == ConversationChannel.email:
-            if not contact.email:
+        try:
+            contact = await contacts_service.get_contact(session, cid)
+            if contact is None:
                 await _mark_message(
                     session,
                     campaign_id=campaign_id,
                     contact_id=cid,
                     new_status=CampaignMessageStatus.failed,
-                    error="contact has no email for this channel",
+                    error="contact not found",
                 )
                 continue
-        elif not contact.phone:
-            await _mark_message(
-                session,
-                campaign_id=campaign_id,
-                contact_id=cid,
-                new_status=CampaignMessageStatus.failed,
-                error="contact has no phone for this channel",
-            )
-            continue
-
-        # whatsapp-platform-upgrade Step 29 — per-recipient variant
-        # assignment. Only applies during the A/B hold-out window
-        # (before a winner is decided). Once the winner is set, the
-        # earlier branch already pinned ``template_row`` to the
-        # winning template + the variant tag stays NULL on the row.
-        assigned_variant: str | None = None
-        if (
-            campaign.is_ab_test
-            and campaign.winning_variant is None
-            and template_a_row is not None
-            and template_b_row is not None
-        ):
-            assigned_variant = _assign_ab_variant(
-                campaign_id=campaign.id,
-                contact_id=cid,
-                split_ratio=int(campaign.split_ratio),
-            )
-            template_row = template_a_row if assigned_variant == "A" else template_b_row
-
-        # Channel-specific opt-in check. Other channels (SMS / email)
-        # have their own opt-out columns; this guard only applies to
-        # WhatsApp until those channels grow first-class opt-in cols.
-        if campaign.channel == ConversationChannel.whatsapp:
-            template_category = (
-                template_row.category.lower()
-                if template_row is not None and getattr(template_row, "category", None)
-                else None
-            )
-            decision = evaluate_contact(
-                contact,
-                template_category=template_category,
-                allow_implicit=True,
-            )
-            if decision.should_block:
-                await _mark_message(
-                    session,
-                    campaign_id=campaign_id,
-                    contact_id=cid,
-                    new_status=CampaignMessageStatus.failed,
-                    error=block_reason(decision),
-                )
-                continue
-
-            # Step 23 — block-list pre-flight. Same shape as the
-            # opt-in guard above: mark failed + continue. The
-            # Step-21 failure classifier maps the error string to
-            # the `opted_out` bucket (closest match for "we won't
-            # send"). Keep the message stable so the dashboard
-            # numbers stay reconcilable across deploys.
-            from src.app.core.integrations.whatsapp.block_list import (
-                is_blocked,
-            )
-
-            block_hit = await is_blocked(session, org_id=campaign.org_id, phone=contact.phone)
-            if block_hit is not None:
-                await _mark_message(
-                    session,
-                    campaign_id=campaign_id,
-                    contact_id=cid,
-                    new_status=CampaignMessageStatus.failed,
-                    error=(
-                        f"send blocked: number is on the block list (reason: {block_hit.reason})"
-                    ),
-                )
-                continue
-
-        # Campaigns v1 Step 05 — Email dispatch path. Bypasses the WA
-        # rate-limit + conversation-find flow entirely: send_email owns
-        # its own account resolution, MIME composition, threading, and
-        # inbox-message persistence.
-        if campaign.channel == ConversationChannel.email:
-            # Migration 0213 — exactly one of the two pre-loaded senders
-            # is non-None here (guarded above). Retain the assertion so
-            # a future refactor that adds a new sender kind trips fast.
-            assert email_account is not None or email_smtp_sender is not None  # noqa: S101
-            from fastapi import HTTPException as _HTTPExc
-
-            from src.app.core.campaigns.send_guard import (
-                block_reason as _block_reason,
-            )
-            from src.app.core.campaigns.send_guard import (
-                evaluate_email_contact,
-            )
-            from src.app.core.conversations.adapters.email import send_email
-
-            # Campaigns v1 Step 06 — Email opt-in guard, mirroring the
-            # WA-side check. ``allow_implicit=True`` matches the WA
-            # behaviour (the modal collected the operator's
-            # confirmation flag; we default the same way here until a
-            # dedicated Email consent toggle ships). Opted-out contacts
-            # are always blocked regardless.
-            email_decision = evaluate_email_contact(contact, allow_implicit=True)
-            if email_decision.should_block:
-                await _mark_message(
-                    session,
-                    campaign_id=campaign_id,
-                    contact_id=cid,
-                    new_status=CampaignMessageStatus.failed,
-                    error=_block_reason(email_decision),
-                )
-                continue
-
-            # Resolve the subject + both body halves, substituting merge
-            # tags per contact. Template-backed campaigns use the
-            # template's body; inline-compose campaigns use the
-            # campaign's body_html (Step 04 lands the field).
-            eff_subject = email_template_subject if campaign.template_id else campaign.subject
-            if campaign.template_id is not None:
-                eff_html = email_template_body_html
-                eff_text = email_template_body_text or ""
-            else:
-                eff_html = campaign.body_html
-                # No explicit inline plain-text field on the modal yet —
-                # derive from HTML so Gmail's multipart fallback lands
-                # readable content, not blank.
-                eff_text = (
-                    derive_plain_text(campaign.body_html)
-                    if campaign.body_html
-                    else (campaign.template or "")
-                )
-
-            rendered_subject = render_subject(eff_subject, contact)
-            rendered_html = render_body(eff_html, contact) if eff_html else None
-            rendered_text = render_body(eff_text, contact) if eff_text else ""
-
-            # Migration 0213 — sender-identity branch. OAuth path uses
-            # the mailbox owner's user_id as sender_user_id (matches the
-            # single-user compose path). SMTP path falls back to the
-            # campaign creator — SMTP senders are org-shared identities,
-            # not tied to a specific rep, so the campaign creator is the
-            # closest "who authored this send" attribution we have.
-            try:
-                if email_account is not None:
-                    result = await send_email(
+            # Channel-scoped external-id check. Non-Email channels write to
+            # ``contact.phone``; Email requires an email address on file.
+            if campaign.channel == ConversationChannel.email:
+                if not contact.email:
+                    await _mark_message(
                         session,
-                        org_id=campaign.org_id,
-                        sender_user_id=email_account.user_id,
-                        account_id=email_account.id,
-                        contact_id=contact.id,
-                        subject=rendered_subject,
-                        body_text=rendered_text,
-                        body_html=rendered_html,
-                        reply_to=campaign.reply_to,
+                        campaign_id=campaign_id,
+                        contact_id=cid,
+                        new_status=CampaignMessageStatus.failed,
+                        error="contact has no email for this channel",
                     )
+                    continue
+            elif not contact.phone:
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error="contact has no phone for this channel",
+                )
+                continue
+
+            # whatsapp-platform-upgrade Step 29 — per-recipient variant
+            # assignment. Only applies during the A/B hold-out window
+            # (before a winner is decided). Once the winner is set, the
+            # earlier branch already pinned ``template_row`` to the
+            # winning template + the variant tag stays NULL on the row.
+            assigned_variant: str | None = None
+            if (
+                campaign.is_ab_test
+                and campaign.winning_variant is None
+                and template_a_row is not None
+                and template_b_row is not None
+            ):
+                assigned_variant = _assign_ab_variant(
+                    campaign_id=campaign.id,
+                    contact_id=cid,
+                    split_ratio=int(campaign.split_ratio),
+                )
+                template_row = template_a_row if assigned_variant == "A" else template_b_row
+
+            # Channel-specific opt-in check. Other channels (SMS / email)
+            # have their own opt-out columns; this guard only applies to
+            # WhatsApp until those channels grow first-class opt-in cols.
+            if campaign.channel == ConversationChannel.whatsapp:
+                template_category = (
+                    template_row.category.lower()
+                    if template_row is not None and getattr(template_row, "category", None)
+                    else None
+                )
+                decision = evaluate_contact(
+                    contact,
+                    template_category=template_category,
+                    allow_implicit=True,
+                )
+                if decision.should_block:
+                    await _mark_message(
+                        session,
+                        campaign_id=campaign_id,
+                        contact_id=cid,
+                        new_status=CampaignMessageStatus.failed,
+                        error=block_reason(decision),
+                    )
+                    continue
+
+                # Step 23 — block-list pre-flight. Same shape as the
+                # opt-in guard above: mark failed + continue. The
+                # Step-21 failure classifier maps the error string to
+                # the `opted_out` bucket (closest match for "we won't
+                # send"). Keep the message stable so the dashboard
+                # numbers stay reconcilable across deploys.
+                from src.app.core.integrations.whatsapp.block_list import (
+                    is_blocked,
+                )
+
+                block_hit = await is_blocked(session, org_id=campaign.org_id, phone=contact.phone)
+                if block_hit is not None:
+                    await _mark_message(
+                        session,
+                        campaign_id=campaign_id,
+                        contact_id=cid,
+                        new_status=CampaignMessageStatus.failed,
+                        error=(
+                            f"send blocked: number is on the block list (reason: {block_hit.reason})"
+                        ),
+                    )
+                    continue
+
+            # Campaigns v1 Step 05 — Email dispatch path. Bypasses the WA
+            # rate-limit + conversation-find flow entirely: send_email owns
+            # its own account resolution, MIME composition, threading, and
+            # inbox-message persistence.
+            if campaign.channel == ConversationChannel.email:
+                # Migration 0213 — exactly one of the two pre-loaded senders
+                # is non-None here (guarded above). Retain the assertion so
+                # a future refactor that adds a new sender kind trips fast.
+                assert email_account is not None or email_smtp_sender is not None  # noqa: S101
+                from fastapi import HTTPException as _HTTPExc
+
+                from src.app.core.campaigns.send_guard import (
+                    block_reason as _block_reason,
+                )
+                from src.app.core.campaigns.send_guard import (
+                    evaluate_email_contact,
+                )
+                from src.app.core.conversations.adapters.email import send_email
+
+                # Campaigns v1 Step 06 — Email opt-in guard, mirroring the
+                # WA-side check. ``allow_implicit=True`` matches the WA
+                # behaviour (the modal collected the operator's
+                # confirmation flag; we default the same way here until a
+                # dedicated Email consent toggle ships). Opted-out contacts
+                # are always blocked regardless.
+                email_decision = evaluate_email_contact(contact, allow_implicit=True)
+                if email_decision.should_block:
+                    await _mark_message(
+                        session,
+                        campaign_id=campaign_id,
+                        contact_id=cid,
+                        new_status=CampaignMessageStatus.failed,
+                        error=_block_reason(email_decision),
+                    )
+                    continue
+
+                # Resolve the subject + both body halves, substituting merge
+                # tags per contact. Template-backed campaigns use the
+                # template's body; inline-compose campaigns use the
+                # campaign's body_html (Step 04 lands the field).
+                eff_subject = email_template_subject if campaign.template_id else campaign.subject
+                if campaign.template_id is not None:
+                    eff_html = email_template_body_html
+                    eff_text = email_template_body_text or ""
                 else:
-                    assert email_smtp_sender is not None  # noqa: S101 — narrowed above
-                    result = await send_email(
-                        session,
-                        org_id=campaign.org_id,
-                        sender_user_id=campaign.created_by_id or uuid.UUID(int=0),
-                        smtp_sender_id=email_smtp_sender.id,
-                        contact_id=contact.id,
-                        subject=rendered_subject,
-                        body_text=rendered_text,
-                        body_html=rendered_html,
-                        reply_to=campaign.reply_to,
+                    eff_html = campaign.body_html
+                    # No explicit inline plain-text field on the modal yet —
+                    # derive from HTML so Gmail's multipart fallback lands
+                    # readable content, not blank.
+                    eff_text = (
+                        derive_plain_text(campaign.body_html)
+                        if campaign.body_html
+                        else (campaign.template or "")
                     )
-            except _HTTPExc as exc:
-                # tasks/email-reputation-warmup Step 6 — reputation
-                # gate raises 429 with a structured
-                # ``{skip_code, reason}`` detail. Prefix the error
-                # with the skip code so campaign progress logs can
-                # split by ``SKIPPED_*`` vs. other failure reasons.
-                # No new enum value — a skip counts as a soft failure
-                # that keeps the campaign moving through the batch.
-                skip_code = ""
-                if isinstance(exc.detail, dict):
-                    raw_code = exc.detail.get("skip_code") if exc.detail else None
-                    if raw_code:
-                        skip_code = f"{raw_code}: "
-                logger.info(
-                    "campaign email send rejected",
-                    extra={"contact_id": str(cid), "skip_code": skip_code.rstrip(": ") or None},
-                )
+
+                rendered_subject = render_subject(eff_subject, contact)
+                rendered_html = render_body(eff_html, contact) if eff_html else None
+                rendered_text = render_body(eff_text, contact) if eff_text else ""
+
+                # Migration 0213 — sender-identity branch. OAuth path uses
+                # the mailbox owner's user_id as sender_user_id (matches the
+                # single-user compose path). SMTP path falls back to the
+                # campaign creator — SMTP senders are org-shared identities,
+                # not tied to a specific rep, so the campaign creator is the
+                # closest "who authored this send" attribution we have.
+                try:
+                    if email_account is not None:
+                        result = await send_email(
+                            session,
+                            org_id=campaign.org_id,
+                            sender_user_id=email_account.user_id,
+                            account_id=email_account.id,
+                            contact_id=contact.id,
+                            subject=rendered_subject,
+                            body_text=rendered_text,
+                            body_html=rendered_html,
+                            reply_to=campaign.reply_to,
+                        )
+                    else:
+                        assert email_smtp_sender is not None  # noqa: S101 — narrowed above
+                        result = await send_email(
+                            session,
+                            org_id=campaign.org_id,
+                            sender_user_id=campaign.created_by_id or uuid.UUID(int=0),
+                            smtp_sender_id=email_smtp_sender.id,
+                            contact_id=contact.id,
+                            subject=rendered_subject,
+                            body_text=rendered_text,
+                            body_html=rendered_html,
+                            reply_to=campaign.reply_to,
+                        )
+                except _HTTPExc as exc:
+                    # tasks/email-reputation-warmup Step 6 — reputation
+                    # gate raises 429 with a structured
+                    # ``{skip_code, reason}`` detail. Prefix the error
+                    # with the skip code so campaign progress logs can
+                    # split by ``SKIPPED_*`` vs. other failure reasons.
+                    # No new enum value — a skip counts as a soft failure
+                    # that keeps the campaign moving through the batch.
+                    skip_code = ""
+                    if isinstance(exc.detail, dict):
+                        raw_code = exc.detail.get("skip_code") if exc.detail else None
+                        if raw_code:
+                            skip_code = f"{raw_code}: "
+                    logger.info(
+                        "campaign email send rejected",
+                        extra={"contact_id": str(cid), "skip_code": skip_code.rstrip(": ") or None},
+                    )
+                    await _mark_message(
+                        session,
+                        campaign_id=campaign_id,
+                        contact_id=cid,
+                        new_status=CampaignMessageStatus.failed,
+                        error=(skip_code + str(exc.detail or "email send failed"))[:512],
+                    )
+                    continue
+                except Exception as exc:  # provider-side transient failure
+                    logger.exception("campaign email send failed", extra={"contact_id": str(cid)})
+                    await _mark_message(
+                        session,
+                        campaign_id=campaign_id,
+                        contact_id=cid,
+                        new_status=CampaignMessageStatus.failed,
+                        error=str(exc)[:512],
+                    )
+                    continue
+
+                # send_email already persisted the Message row + logged the
+                # activity + updated the conversation.last_message_at. All
+                # we own is the CampaignMessage flip so stats + funnel land.
                 await _mark_message(
                     session,
                     campaign_id=campaign_id,
                     contact_id=cid,
-                    new_status=CampaignMessageStatus.failed,
-                    error=(skip_code + str(exc.detail or "email send failed"))[:512],
-                )
-                continue
-            except Exception as exc:  # provider-side transient failure
-                logger.exception("campaign email send failed", extra={"contact_id": str(cid)})
-                await _mark_message(
-                    session,
-                    campaign_id=campaign_id,
-                    contact_id=cid,
-                    new_status=CampaignMessageStatus.failed,
-                    error=str(exc)[:512],
+                    new_status=CampaignMessageStatus.sent,
+                    channel_message_id=result.provider_message_id or str(result.message.id),
+                    sent_at=result.message.sent_at or datetime.now(UTC),
                 )
                 continue
 
-            # send_email already persisted the Message row + logged the
-            # activity + updated the conversation.last_message_at. All
-            # we own is the CampaignMessage flip so stats + funnel land.
+            # Find / create the (channel, external_id) conversation so the
+            # outbound message also appears in the inbox.
+            conversation = await _find_or_create_conversation(
+                session,
+                org_id=campaign.org_id,
+                channel=campaign.channel,
+                external_id=contact.phone,
+                contact_id=contact.id,
+            )
+
+            # Template vs text branch (Step 3.5.6). `template_row` is set
+            # iff this is a WA template campaign (loaded once before the
+            # loop). `body` is what the inbox Message row records; for
+            # template campaigns we synthesize a preview so the timeline
+            # shows something meaningful even though Meta renders the
+            # final text from approved template + parameters.
+            #
+            # Step 3.5.15 — per-org token-bucket acquire before each WA
+            # send + single in-place retry on Meta 429.
+            ref: ChannelMessageRef | None = None
+            body = ""
+            rate_retry_used = False
+            send_error: Exception | None = None
+            for _ in range(2):
+                if campaign.channel == ConversationChannel.whatsapp:
+                    from src.app.core.integrations.whatsapp.rate_limit import (
+                        acquire_wa_rate_token,
+                    )
+
+                    await acquire_wa_rate_token(campaign.org_id, rate_per_sec=wa_rate_per_sec)
+                try:
+                    if template_row is not None:
+                        # Start from the named-variable auto-resolution
+                        # (`{{contact.first_name}}` → positional {1} etc.
+                        # against the template's approved Meta body). Any
+                        # operator-supplied static/field binding on the
+                        # campaign row wins over the auto value for the
+                        # same positional slot.
+                        named_variables = _resolve_named_wa_variables(
+                            template_row, contact, org, named_body_from_central
+                        )
+                        operator_variables = _resolve_template_variables(campaign, contact)
+                        variables = {**named_variables, **operator_variables}
+                        ref = await adapter.send_template(
+                            org_id=campaign.org_id,
+                            external_id=contact.phone,
+                            template_name=template_row.name,
+                            language=template_row.language,
+                            variables=variables,
+                            header_type=template_row.header_type,
+                            header_text=template_row.header_text,
+                        )
+                        body = _preview_template_body(template_row, variables)
+                    else:
+                        body = _render_template(campaign.template or "", contact)
+                        ref = await adapter.send(
+                            org_id=campaign.org_id,
+                            external_id=contact.phone,
+                            text=body,
+                            attachments=[],
+                        )
+                    send_error = None
+                    break
+                except WhatsAppRateLimited as rl_exc:
+                    # Honour Meta's Retry-After and try the SAME contact
+                    # once more. A second 429 means the token bucket isn't
+                    # protecting hard enough — surface as a per-message
+                    # failure so the chunk doesn't stall the rest.
+                    if rate_retry_used:
+                        send_error = rl_exc
+                        break
+                    rate_retry_used = True
+                    import asyncio
+
+                    await asyncio.sleep(rl_exc.retry_after_seconds)
+                    continue
+                except Exception as exc:  # adapter-side failure
+                    send_error = exc
+                    break
+
+            if send_error is not None or ref is None:
+                logger.exception("campaign send failed", extra={"contact_id": str(cid)})
+                await _mark_message(
+                    session,
+                    campaign_id=campaign_id,
+                    contact_id=cid,
+                    new_status=CampaignMessageStatus.failed,
+                    error=str(send_error or "send failed")[:512],
+                )
+                continue
+
+            now = datetime.now(UTC)
+            campaigns_da.add_outbound_message(
+                session,
+                Message(
+                    org_id=campaign.org_id,
+                    conversation_id=conversation.id,
+                    direction=MessageDirection.out,
+                    sender_user_id=campaign.created_by_id,
+                    text=body,
+                    attachments=[],
+                    channel_message_id=ref.channel_message_id,
+                    payload={"campaign_id": str(campaign.id)},
+                    sent_at=ref.sent_at or now,
+                ),
+            )
+            conversation.last_message_at = ref.sent_at or now
             await _mark_message(
                 session,
                 campaign_id=campaign_id,
                 contact_id=cid,
                 new_status=CampaignMessageStatus.sent,
-                channel_message_id=result.provider_message_id or str(result.message.id),
-                sent_at=result.message.sent_at or datetime.now(UTC),
+                channel_message_id=ref.channel_message_id,
+                sent_at=ref.sent_at or now,
+                # Step 29 — stamp the A/B variant on the message row so
+                # per-variant analytics can compute reply / read / click
+                # rates without joining back to the campaign config.
+                variant=assigned_variant,
             )
-            continue
-
-        # Find / create the (channel, external_id) conversation so the
-        # outbound message also appears in the inbox.
-        conversation = await _find_or_create_conversation(
-            session,
-            org_id=campaign.org_id,
-            channel=campaign.channel,
-            external_id=contact.phone,
-            contact_id=contact.id,
-        )
-
-        # Template vs text branch (Step 3.5.6). `template_row` is set
-        # iff this is a WA template campaign (loaded once before the
-        # loop). `body` is what the inbox Message row records; for
-        # template campaigns we synthesize a preview so the timeline
-        # shows something meaningful even though Meta renders the
-        # final text from approved template + parameters.
-        #
-        # Step 3.5.15 — per-org token-bucket acquire before each WA
-        # send + single in-place retry on Meta 429.
-        ref: ChannelMessageRef | None = None
-        body = ""
-        rate_retry_used = False
-        send_error: Exception | None = None
-        for _ in range(2):
-            if campaign.channel == ConversationChannel.whatsapp:
-                from src.app.core.integrations.whatsapp.rate_limit import (
-                    acquire_wa_rate_token,
-                )
-
-                await acquire_wa_rate_token(campaign.org_id, rate_per_sec=wa_rate_per_sec)
-            try:
-                if template_row is not None:
-                    # Start from the named-variable auto-resolution
-                    # (`{{contact.first_name}}` → positional {1} etc.
-                    # against the template's approved Meta body). Any
-                    # operator-supplied static/field binding on the
-                    # campaign row wins over the auto value for the
-                    # same positional slot.
-                    named_variables = _resolve_named_wa_variables(
-                        template_row, contact, org, named_body_from_central
-                    )
-                    operator_variables = _resolve_template_variables(campaign, contact)
-                    variables = {**named_variables, **operator_variables}
-                    ref = await adapter.send_template(
-                        org_id=campaign.org_id,
-                        external_id=contact.phone,
-                        template_name=template_row.name,
-                        language=template_row.language,
-                        variables=variables,
-                        header_type=template_row.header_type,
-                        header_text=template_row.header_text,
-                    )
-                    body = _preview_template_body(template_row, variables)
-                else:
-                    body = _render_template(campaign.template or "", contact)
-                    ref = await adapter.send(
-                        org_id=campaign.org_id,
-                        external_id=contact.phone,
-                        text=body,
-                        attachments=[],
-                    )
-                send_error = None
-                break
-            except WhatsAppRateLimited as rl_exc:
-                # Honour Meta's Retry-After and try the SAME contact
-                # once more. A second 429 means the token bucket isn't
-                # protecting hard enough — surface as a per-message
-                # failure so the chunk doesn't stall the rest.
-                if rate_retry_used:
-                    send_error = rl_exc
-                    break
-                rate_retry_used = True
-                import asyncio
-
-                await asyncio.sleep(rl_exc.retry_after_seconds)
-                continue
-            except Exception as exc:  # adapter-side failure
-                send_error = exc
-                break
-
-        if send_error is not None or ref is None:
-            logger.exception("campaign send failed", extra={"contact_id": str(cid)})
+        except Exception as exc:
+            # Unexpected error outside the adapter call (DB, lookup,
+            # rendering). Fail this one row and restart the chunk on a
+            # clean session — rollback expires every loaded object.
+            logger.exception("campaign contact dispatch failed", extra={"contact_id": str(cid)})
+            await session.rollback()
             await _mark_message(
                 session,
                 campaign_id=campaign_id,
                 contact_id=cid,
                 new_status=CampaignMessageStatus.failed,
-                error=str(send_error or "send failed")[:512],
+                error=str(exc)[:512] or "send failed",
             )
-            continue
-
-        now = datetime.now(UTC)
-        campaigns_da.add_outbound_message(
-            session,
-            Message(
-                org_id=campaign.org_id,
-                conversation_id=conversation.id,
-                direction=MessageDirection.out,
-                sender_user_id=campaign.created_by_id,
-                text=body,
-                attachments=[],
-                channel_message_id=ref.channel_message_id,
-                payload={"campaign_id": str(campaign.id)},
-                sent_at=ref.sent_at or now,
-            ),
-        )
-        conversation.last_message_at = ref.sent_at or now
-        await _mark_message(
-            session,
-            campaign_id=campaign_id,
-            contact_id=cid,
-            new_status=CampaignMessageStatus.sent,
-            channel_message_id=ref.channel_message_id,
-            sent_at=ref.sent_at or now,
-            # Step 29 — stamp the A/B variant on the message row so
-            # per-variant analytics can compute reply / read / click
-            # rates without joining back to the campaign config.
-            variant=assigned_variant,
-        )
-
-    # If this was the last queued chunk, flip the campaign to `done`.
-    pending = await campaigns_da.count_queued_messages_for_campaign(session, campaign_id)
-    if pending == 0 and campaign.status == CampaignStatus.running:
-        campaign.status = CampaignStatus.done
-        await session.commit()
+            raise _ChunkRestart from exc
 
 
 async def _find_or_create_conversation(
@@ -1769,7 +1933,7 @@ async def _find_or_create_conversation(
     contact_id: uuid.UUID,
 ) -> Conversation:
     existing = await campaigns_da.get_conversation_by_external_id(
-        session, channel=channel, external_id=external_id
+        session, org_id=org_id, channel=channel, external_id=external_id
     )
     if existing is not None:
         return existing

@@ -3,8 +3,8 @@
     <header class="mb-4">
       <h2 class="text-lg font-semibold text-default">New campaign</h2>
       <p class="mt-1 text-xs text-muted">
-        Save as draft. Click <span class="font-medium">Start</span> from the list when you're ready
-        to send.
+        Save as a draft and click <span class="font-medium">Start</span> from the list when you're
+        ready, or pick a schedule time and it sends automatically.
       </p>
     </header>
 
@@ -868,6 +868,12 @@
           <div class="mt-1">
             <crm-mobile-datetime formControlName="schedule_at" placeholder="Pick date & time" />
           </div>
+          @if (hasFutureSchedule()) {
+            <span class="mt-1 block text-xs text-muted">
+              The campaign is checked now and sends automatically at this time — no Start click
+              needed. Its status moves Scheduled → Running → Sent.
+            </span>
+          }
         </label>
 
         @if (isWhatsAppChannel()) {
@@ -959,7 +965,9 @@
               "
               class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
             >
-              {{ submitting() ? 'Saving…' : 'Save draft' }}
+              {{
+                submitting() ? 'Saving…' : hasFutureSchedule() ? 'Schedule campaign' : 'Save draft'
+              }}
             </button>
           }
         </div>

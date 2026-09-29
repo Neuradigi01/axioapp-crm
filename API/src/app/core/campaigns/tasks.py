@@ -14,7 +14,8 @@ Two tasks:
   2. `dispatch_scheduled_campaigns_task()` — beat task that polls
      every 60s for campaigns in `status='scheduled'` whose
      `schedule_at <= now()` and flips them to `running` + enqueues
-     their pre-queued chunks. Worst-case drift is 60s, which is fine
+     their pre-queued chunks. The same sweep re-dispatches `running`
+     campaigns whose chunk tasks were lost (no progress for 15 min). Worst-case drift is 60s, which is fine
      for marketing/transactional campaigns the operator has scheduled
      "at 10:00 AM" or similar; the simplicity of cron beats per-
      campaign delayed-task coordination.
@@ -167,106 +168,54 @@ def dispatch_scheduled_campaigns() -> dict[str, Any]:
 
 
 async def _dispatch_scheduled_campaigns_async() -> dict[str, Any]:
-    from sqlalchemy import text as sql_text
-
-    from src.app.core.campaigns.models import Campaign, CampaignStatus
-    from src.app.core.campaigns.service import dispatch_chunk
+    from src.app.core.campaigns import service as campaigns_service
     from src.app.shared.context import RequestContext, reset_context, set_context
     from src.app.shared.db import async_session
 
-    fired = 0
     now = datetime.now(UTC)
+    fired = 0
+    resumed = 0
 
+    # Bypass-tenant scans — beat has no org context. Each campaign is
+    # then handled in its own session under its org's context, so one
+    # failure can't poison the session for the rest of the sweep.
     async with async_session() as session:
-        # Bypass-tenant scan — beat has no org context. We pick the
-        # campaign id + org_id, then re-enter per-campaign with the
-        # right context for `dispatch_chunk` to see RLS-scoped rows.
-        rows = (
-            (
-                await session.execute(
-                    sql_text(
-                        """
-                    SELECT id, org_id
-                    FROM tbl_campaigns
-                    WHERE status = 'scheduled'
-                      AND schedule_at IS NOT NULL
-                      AND schedule_at <= :now
-                    ORDER BY schedule_at ASC
-                    LIMIT 100
-                    """
-                    ),
-                    {"now": now},
-                )
+        due = await campaigns_service.list_due_scheduled_campaign_refs(session)
+        stalled = await campaigns_service.list_stalled_campaign_refs(session)
+
+    for campaign_id, org_id in due:
+        token = set_context(RequestContext(org_id=org_id, user_id=None))
+        try:
+            async with async_session() as session:
+                if await campaigns_service.start_scheduled_campaign(
+                    session, campaign_id=campaign_id
+                ):
+                    fired += 1
+        except Exception:
+            logger.exception(
+                "scheduled campaign dispatch failed",
+                extra={"campaign_id": str(campaign_id)},
             )
-            .mappings()
-            .all()
-        )
+        finally:
+            reset_context(token)
 
-        for row in rows:
-            campaign_id = row["id"]
-            org_id = row["org_id"]
-            token = set_context(RequestContext(org_id=org_id, user_id=None))
-            try:
-                # Re-fetch under RLS context so we don't bypass tenancy
-                # for the write.
-                campaign = (
-                    await session.execute(select(Campaign).where(Campaign.id == campaign_id))
-                ).scalar_one_or_none()
-                if campaign is None:
-                    continue
+    for campaign_id, org_id in stalled:
+        token = set_context(RequestContext(org_id=org_id, user_id=None))
+        try:
+            async with async_session() as session:
+                if await campaigns_service.resume_stalled_campaign(
+                    session, campaign_id=campaign_id
+                ):
+                    resumed += 1
+        except Exception:
+            logger.exception(
+                "stalled campaign recovery failed",
+                extra={"campaign_id": str(campaign_id)},
+            )
+        finally:
+            reset_context(token)
 
-                # Pull queued contact ids for this campaign and chunk.
-                from src.app.core.campaigns.models import CampaignMessage
-
-                queued_rows = (
-                    (
-                        await session.execute(
-                            select(CampaignMessage.contact_id).where(
-                                CampaignMessage.campaign_id == campaign_id
-                            )
-                        )
-                    )
-                    .scalars()
-                    .all()
-                )
-                if not queued_rows:
-                    campaign.status = CampaignStatus.done
-                    await session.commit()
-                    continue
-
-                campaign.status = CampaignStatus.running
-                await session.commit()
-
-                # Chunk + dispatch. In CELERY_ENABLED prod the chunks
-                # go through `.delay(...)` so the beat worker doesn't
-                # block on Meta latency; eager mode runs inline.
-                from src.app.core.campaigns.service import CHUNK_SIZE
-
-                chunks = [
-                    queued_rows[i : i + CHUNK_SIZE] for i in range(0, len(queued_rows), CHUNK_SIZE)
-                ]
-                for chunk in chunks:
-                    if HAS_CELERY:
-                        send_campaign_chunk.delay(
-                            str(campaign_id),
-                            [str(c) for c in chunk],
-                        )
-                    else:
-                        await dispatch_chunk(
-                            session,
-                            campaign_id=campaign_id,
-                            contact_ids=chunk,
-                        )
-                fired += 1
-            except Exception:
-                logger.exception(
-                    "scheduled campaign dispatch failed",
-                    extra={"campaign_id": str(campaign_id)},
-                )
-            finally:
-                reset_context(token)
-
-    return {"fired": fired, "checked_at": now.isoformat()}
+    return {"fired": fired, "resumed": resumed, "checked_at": now.isoformat()}
 
 
 # whatsapp-platform-upgrade Step 29 — A/B winner decider.

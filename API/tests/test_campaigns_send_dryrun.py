@@ -29,8 +29,11 @@ from src.app.core.permissions.service import register_permission
 class _FakeAdapter:
     def __init__(self) -> None:
         self.sent: list[dict[str, object]] = []
+        self.fail = False
 
     async def send(self, *, org_id, external_id, text, attachments):
+        if self.fail:
+            raise RuntimeError("provider rejected the message")
         self.sent.append({"to": external_id, "text": text})
         return ChannelMessageRef(channel_message_id=f"FAKE-{len(self.sent)}")
 
@@ -226,3 +229,148 @@ async def test_cannot_start_unregistered_channel(layered_client, seeded_admin):
     start = await layered_client.post(f"/api/v1/campaigns/{cid}/start", headers=headers)
     assert start.status_code == 400, start.text
     assert "sms" in start.json().get("message", start.json().get("detail", ""))
+
+
+async def _admin_headers(layered_client, seeded_admin) -> dict[str, str]:
+    await _grant(
+        seeded_admin["role"].id,
+        "campaigns.read",
+        "campaigns.write",
+        "campaigns.send",
+    )
+    token = await _login(
+        layered_client,
+        org_slug=seeded_admin["org"].slug,
+        email=seeded_admin["user"].email,
+        password=seeded_admin["password"],
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
+async def _create_batch_campaign(layered_client, headers, **extra) -> str:
+    create = await layered_client.post(
+        "/api/v1/campaigns",
+        json={
+            "name": "Batch",
+            "channel": "whatsapp",
+            "audience_filter": {"tag": "batch"},
+            "template": "Hi {{full_name}}",
+            **extra,
+        },
+        headers=headers,
+    )
+    assert create.status_code == 201, create.text
+    return create.json()["id"]
+
+
+@pytest.mark.asyncio
+async def test_all_failed_campaign_settles_failed_then_retry_resends(
+    layered_client, seeded_admin, _register_fake_whatsapp
+):
+    headers = await _admin_headers(layered_client, seeded_admin)
+    await _seed_contacts(seeded_admin["org"].id, 3)
+    cid = await _create_batch_campaign(layered_client, headers)
+
+    _register_fake_whatsapp.fail = True
+    start = await layered_client.post(f"/api/v1/campaigns/{cid}/start", headers=headers)
+    assert start.status_code == 200, start.text
+    detail = await layered_client.get(f"/api/v1/campaigns/{cid}", headers=headers)
+    assert detail.json()["status"] == "failed"
+
+    _register_fake_whatsapp.fail = False
+    retry = await layered_client.post(f"/api/v1/campaigns/{cid}/start", headers=headers)
+    assert retry.status_code == 200, retry.text
+    assert len(_register_fake_whatsapp.sent) == 3
+    stats = (await layered_client.get(f"/api/v1/campaigns/{cid}/stats", headers=headers)).json()
+    assert stats["sent"] == 3
+    assert stats["failed"] == 0
+    detail = await layered_client.get(f"/api/v1/campaigns/{cid}", headers=headers)
+    assert detail.json()["status"] == "done"
+
+
+@pytest.mark.asyncio
+async def test_redispatching_a_finished_chunk_sends_nothing(
+    layered_client, seeded_admin, _register_fake_whatsapp
+):
+    from sqlalchemy import select
+
+    from src.app.core.campaigns import service as campaigns_service
+    from src.app.core.campaigns.models import CampaignMessage
+    from src.app.shared.context import RequestContext, reset_context, set_context
+    from tests.conftest import TestSession
+
+    headers = await _admin_headers(layered_client, seeded_admin)
+    await _seed_contacts(seeded_admin["org"].id, 3)
+    cid = await _create_batch_campaign(layered_client, headers)
+    start = await layered_client.post(f"/api/v1/campaigns/{cid}/start", headers=headers)
+    assert start.status_code == 200, start.text
+    assert len(_register_fake_whatsapp.sent) == 3
+
+    token = set_context(RequestContext(org_id=seeded_admin["org"].id, user_id=None))
+    try:
+        async with TestSession() as session:
+            contact_ids = (
+                (
+                    await session.execute(
+                        select(CampaignMessage.contact_id).where(
+                            CampaignMessage.campaign_id == uuid.UUID(cid)
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            await campaigns_service.dispatch_chunk(
+                session, campaign_id=uuid.UUID(cid), contact_ids=list(contact_ids)
+            )
+    finally:
+        reset_context(token)
+    assert len(_register_fake_whatsapp.sent) == 3
+
+
+@pytest.mark.asyncio
+async def test_scheduled_campaign_fires_once_when_due(
+    layered_client, seeded_admin, _register_fake_whatsapp
+):
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import update
+
+    from src.app.core.campaigns import service as campaigns_service
+    from src.app.core.campaigns.models import Campaign
+    from src.app.shared.context import RequestContext, reset_context, set_context
+    from tests.conftest import TestSession
+
+    headers = await _admin_headers(layered_client, seeded_admin)
+    await _seed_contacts(seeded_admin["org"].id, 3)
+    future = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+    cid = await _create_batch_campaign(layered_client, headers, schedule_at=future)
+
+    # A future schedule arms the campaign on create — nothing sent yet.
+    detail = await layered_client.get(f"/api/v1/campaigns/{cid}", headers=headers)
+    assert detail.json()["status"] == "scheduled"
+    assert _register_fake_whatsapp.sent == []
+
+    token = set_context(RequestContext(org_id=seeded_admin["org"].id, user_id=None))
+    try:
+        async with TestSession() as session:
+            await session.execute(
+                update(Campaign)
+                .where(Campaign.id == uuid.UUID(cid))
+                .values(schedule_at=datetime.now(UTC) - timedelta(minutes=1))
+            )
+            await session.commit()
+            first = await campaigns_service.start_scheduled_campaign(
+                session, campaign_id=uuid.UUID(cid)
+            )
+            second = await campaigns_service.start_scheduled_campaign(
+                session, campaign_id=uuid.UUID(cid)
+            )
+    finally:
+        reset_context(token)
+
+    assert first is True
+    assert second is False
+    assert len(_register_fake_whatsapp.sent) == 3
+    detail = await layered_client.get(f"/api/v1/campaigns/{cid}", headers=headers)
+    assert detail.json()["status"] == "done"

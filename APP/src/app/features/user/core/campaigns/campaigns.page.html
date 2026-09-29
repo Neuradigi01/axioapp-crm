@@ -332,10 +332,10 @@
                   (click)="start(c)"
                   [disabled]="busyId() === c.id"
                   class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-                  title="Start"
+                  [title]="c.status === 'failed' ? 'Retry the failed messages' : 'Start'"
                 >
                   <lucide-icon name="play" class="h-3 w-3" />
-                  {{ busyId() === c.id ? '…' : 'Start' }}
+                  {{ busyId() === c.id ? '…' : c.status === 'failed' ? 'Retry' : 'Start' }}
                 </button>
                 <button
                   type="button"
@@ -537,9 +537,9 @@
                         (click)="start(c)"
                         [disabled]="busyId() === c.id"
                         class="rounded bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                        title="Start"
+                        [title]="c.status === 'failed' ? 'Retry the failed messages' : 'Start'"
                       >
-                        {{ busyId() === c.id ? '…' : 'Start' }}
+                        {{ busyId() === c.id ? '…' : c.status === 'failed' ? 'Retry' : 'Start' }}
                       </button>
                       <button
                         type="button"
