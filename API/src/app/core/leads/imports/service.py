@@ -178,7 +178,7 @@ async def upload(
 
     import_id = uuid.uuid4()
     storage_path = f"{org_id}/imports/{import_id}/source.{ext}"
-    get_storage().put(
+    await get_storage().put(
         storage_path,
         data,
         content_type=content_type or "application/octet-stream",
@@ -423,10 +423,10 @@ async def cancel_import(
 # storage_path is part of the key so a fresh upload that reuses the
 # same import_id can never hand back the previous file's rows.
 _PREVIEW_CACHE_MAX = 64
-_preview_cache: OrderedDict[tuple[str, str, int], "PreviewPayload"] = OrderedDict()
+_preview_cache: OrderedDict[tuple[str, str, int], PreviewPayload] = OrderedDict()
 
 
-def read_preview(import_row: LeadImport, limit: int) -> "PreviewPayload":
+def read_preview(import_row: LeadImport, limit: int) -> PreviewPayload:
     """Read the first `limit` data rows from the import's source file.
 
     Returns the original column header + a list-of-lists of stringified

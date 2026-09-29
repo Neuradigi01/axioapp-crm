@@ -293,7 +293,7 @@ async def set_item_cover(
     if filename and "." in filename:
         ext = filename.rsplit(".", 1)[-1].lower()[:8]
     storage_path = f"{org_id}/inventory/{item.id}/cover.{ext}"
-    ref = get_storage().put(
+    ref = await get_storage().put(
         storage_path,
         file_bytes,
         content_type=content_type or "application/octet-stream",

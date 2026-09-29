@@ -586,9 +586,7 @@ def _warning_bucket_stage_fallback(*, original: str, substituted: str) -> str:
     label so a mistyped-once "intrested" that appears 57 times shows
     as a single "57×" line instead of 57 identical entries.
     """
-    return (
-        f"unknown pipeline_stage {original!r} — defaulted to {substituted!r}"
-    )
+    return f"unknown pipeline_stage {original!r} — defaulted to {substituted!r}"
 
 
 def _make_warning_row(
@@ -757,9 +755,7 @@ def _validate_row_shape(
     try:
         shared_validators.validate_name(full_name)
     except shared_validators.ValidationError as exc:
-        return _make_error_row(
-            parsed, exc.reason, column="contact.full_name", value=full_name
-        )
+        return _make_error_row(parsed, exc.reason, column="contact.full_name", value=full_name)
 
     if email:
         stripped_email = str(email).strip()
@@ -817,7 +813,7 @@ async def _write_error_csv(
     blob = buf.getvalue().encode("utf-8")
 
     storage_path = f"{org_id}/imports/{import_id}/errors.csv"
-    get_storage().put(storage_path, blob, content_type="text/csv")
+    await get_storage().put(storage_path, blob, content_type="text/csv")
     return storage_path
 
 
@@ -855,7 +851,7 @@ async def _write_skipped_csv(
     blob = buf.getvalue().encode("utf-8")
 
     storage_path = f"{org_id}/imports/{import_id}/skipped.csv"
-    get_storage().put(storage_path, blob, content_type="text/csv")
+    await get_storage().put(storage_path, blob, content_type="text/csv")
     return storage_path
 
 
@@ -900,7 +896,7 @@ async def _write_warnings_csv(
     blob = buf.getvalue().encode("utf-8")
 
     storage_path = f"{org_id}/imports/{import_id}/warnings.csv"
-    get_storage().put(storage_path, blob, content_type="text/csv")
+    await get_storage().put(storage_path, blob, content_type="text/csv")
     return storage_path
 
 

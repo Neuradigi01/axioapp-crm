@@ -3,17 +3,18 @@
 `get_storage()` is the single entry point call sites use:
 
     from src.app.shared.storage import get_storage
-    ref = get_storage().put("catalog/<org>/<id>.jpg", data, content_type="image/jpeg")
+    ref = await get_storage().put("catalog/<org>/<id>.jpg", data, content_type="image/jpeg")
     item.image_url = ref.url
 
-The concrete backend is local disk for this build (see `LocalStorage`).
+The concrete backend is local disk (see `LocalStorage`).
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
 
-from src.app.shared.storage.base import StorageBackend, StoredFileRef
+from src.app.shared.storage.base import StorageBackend, StoredFileRef, StoredFileStat
+from src.app.shared.storage.keys import assert_org_key
 from src.app.shared.storage.local import LocalStorage
 
 
@@ -23,4 +24,11 @@ def get_storage() -> StorageBackend:
     return LocalStorage()
 
 
-__all__ = ["StorageBackend", "StoredFileRef", "LocalStorage", "get_storage"]
+__all__ = [
+    "StorageBackend",
+    "StoredFileRef",
+    "StoredFileStat",
+    "LocalStorage",
+    "assert_org_key",
+    "get_storage",
+]

@@ -31,6 +31,7 @@ normative: the `tbl_` naming map, now at [`API/docs/TABLE_NAMING_MAP.md`](../API
 
 | Track | Steps | Last touched | What it is |
 |---|---|---|---|
+| [r2-storage](r2-storage/README.md) | 10 | 2026-09-29 | Move uploaded files from `./storage` to Cloudflare R2 (private bucket per env, API-streamed `/files`) |
 | [custom-events](custom-events/README.md) | 18 | 2026-09-11 | User-defined event triggers for workflows and templates; public `POST /events/track` folded into `core/public_ingest/` |
 | [variables-unification](variables-unification/README.md) | 13 | 2026-09-11 | One variable registry behind every template / workflow / chatbot / automation-condition picker |
 | [mailgun-inbound](mailgun-inbound/README.md) | 9 | 2026-09-10 | Reply-capture for SMTP senders via Mailgun inbound routing |

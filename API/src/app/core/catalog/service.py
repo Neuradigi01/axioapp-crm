@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -125,7 +125,7 @@ async def _delete_stored_image(url: str | None) -> None:
         return
     try:
         storage = get_storage()
-        storage.delete(path)
+        await storage.delete(path)
     except Exception:  # noqa: BLE001 — storage layer is best-effort
         _log.exception("catalog: failed to delete stored image %s", path)
 
@@ -139,19 +139,13 @@ async def list_categories(
     stmt = select(CatalogCategory).where(CatalogCategory.org_id == org_id)
     if active_only:
         stmt = stmt.where(CatalogCategory.is_active.is_(True))
-    stmt = stmt.order_by(
-        CatalogCategory.display_order.asc(), CatalogCategory.name.asc()
-    )
+    stmt = stmt.order_by(CatalogCategory.display_order.asc(), CatalogCategory.name.asc())
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
 
-async def get_category(
-    session: AsyncSession, *, category_id: uuid.UUID
-) -> CatalogCategory | None:
-    result = await session.execute(
-        select(CatalogCategory).where(CatalogCategory.id == category_id)
-    )
+async def get_category(session: AsyncSession, *, category_id: uuid.UUID) -> CatalogCategory | None:
+    result = await session.execute(select(CatalogCategory).where(CatalogCategory.id == category_id))
     return result.scalar_one_or_none()
 
 
@@ -423,7 +417,7 @@ async def remove_item_image(
     before = _snapshot(item)
     old_url = item.image_url
     item.image_url = None
-    item.updated_at = datetime.now(timezone.utc)
+    item.updated_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(item)
 
@@ -467,7 +461,7 @@ async def set_item_image(
 
     storage = get_storage()
     storage_path = f"catalog/{org_id}/{item_id}.{ext}"
-    ref = storage.put(storage_path, file_bytes, content_type=mime)
+    ref = await storage.put(storage_path, file_bytes, content_type=mime)
 
     # If the previous cover lived at a different extension, its path
     # is different from the new one — clean it up so we don't leak.
@@ -483,7 +477,7 @@ async def set_item_image(
     # identical and SQLAlchemy would otherwise skip the UPDATE). The
     # frontend uses `updated_at` as an image cache-buster (`?v={ts}`);
     # without this bump the browser serves the stale cached bytes.
-    item.updated_at = datetime.now(timezone.utc)
+    item.updated_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(item)
 
@@ -537,7 +531,7 @@ async def add_gallery_image(
         }:
             break
         slot += 1
-    ref = storage.put(candidate, file_bytes, content_type=mime)
+    ref = await storage.put(candidate, file_bytes, content_type=mime)
 
     before = _snapshot(item)
     item.image_urls = list(item.image_urls or []) + [ref.url]
@@ -651,9 +645,7 @@ _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 _PRICE_MAX = 1_000_000_000  # 1B cap — covers real furniture pricing with headroom
 
 
-def _validate_bulk_import_row(
-    idx: int, row: Any
-) -> CatalogItemBulkImportRowError | None:
+def _validate_bulk_import_row(idx: int, row: Any) -> CatalogItemBulkImportRowError | None:
     """Server-side per-row validators for the bulk-import wizard.
 
     Returns the first shape failure as a `CatalogItemBulkImportRowError`,
@@ -713,9 +705,7 @@ async def bulk_import_items(
     existing_skus = {
         row[0]
         for row in (
-            await session.execute(
-                select(CatalogItem.sku).where(CatalogItem.org_id == org_id)
-            )
+            await session.execute(select(CatalogItem.sku).where(CatalogItem.org_id == org_id))
         ).all()
     }
     # Also skip duplicates within the same batch.
@@ -758,11 +748,7 @@ async def bulk_import_items(
             inserted += 1
             seen_in_batch.add(row.sku)
         except Exception as exc:  # noqa: BLE001 — collect per-row failures
-            errors.append(
-                CatalogItemBulkImportRowError(
-                    row_index=i, sku=row.sku, reason=str(exc)
-                )
-            )
+            errors.append(CatalogItemBulkImportRowError(row_index=i, sku=row.sku, reason=str(exc)))
 
     if payload.dry_run:
         # Roll back any category upserts done during dry-run so the
@@ -822,9 +808,7 @@ async def list_items(
     )
 
 
-async def count_status_histogram(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> dict[str, int]:
+async def count_status_histogram(session: AsyncSession, *, org_id: uuid.UUID) -> dict[str, int]:
     """Status histogram for the owner-dashboard tabs. Zeros the tabs
     that the DB doesn't have rows for so the frontend can render every
     tab even for an empty org."""
@@ -870,7 +854,7 @@ async def publish_item(
     before = _snapshot(item)
     item.status = CatalogStatus.published.value
     if item.published_at is None:
-        item.published_at = datetime.now(timezone.utc)
+        item.published_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(item)
     await log_entity_change(
@@ -917,7 +901,7 @@ async def archive_item(
     _reject_transition(item.status, CatalogStatus.archived.value)
     before = _snapshot(item)
     item.status = CatalogStatus.archived.value
-    item.archived_at = datetime.now(timezone.utc)
+    item.archived_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(item)
     await log_entity_change(
@@ -991,9 +975,7 @@ async def generate_public_link(
     if item.org_id != org_id:
         # Cross-tenant. Same 404 shape the ORM tenant filter would give
         # (item lookup is scoped) — but belt-and-braces here.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="catalog item not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="catalog item not found")
     if item.status != CatalogStatus.published.value:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

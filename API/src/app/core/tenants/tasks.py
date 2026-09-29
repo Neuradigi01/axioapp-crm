@@ -46,7 +46,6 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-
 try:
     from celery import shared_task as _shared_task
 
@@ -259,7 +258,7 @@ async def _delete_orphan_org(org_id: uuid.UUID) -> int:
 
             storage = get_storage()
             prefix = f"{org_id}/ai_assistants"
-            count = storage.delete_directory(prefix)
+            count = await storage.delete_directory(prefix)
             logger.info(
                 "_delete_orphan_org org=%s storage_deleted=%d",
                 org_id,

@@ -375,9 +375,7 @@ async def archive_assistant(
     a no-op. Version_id_col NOT incremented (archive isn't a user
     edit; skipping the bump avoids racing operator edits)."""
     row = await get_assistant(db, org_id=org_id, assistant_id=assistant_id)
-    previous_status = (
-        row.status.value if hasattr(row.status, "value") else str(row.status)
-    )
+    previous_status = row.status.value if hasattr(row.status, "value") else str(row.status)
     await _da.set_assistant_status(
         db,
         assistant_id=assistant_id,
@@ -409,9 +407,7 @@ async def activate_assistant(
     caller can update UI without a second GET."""
     row = await get_assistant(db, org_id=org_id, assistant_id=assistant_id)
     if row.status != AiAssistantStatus.active:
-        previous_status = (
-            row.status.value if hasattr(row.status, "value") else str(row.status)
-        )
+        previous_status = row.status.value if hasattr(row.status, "value") else str(row.status)
         await _da.set_assistant_status(
             db,
             assistant_id=assistant_id,
@@ -592,7 +588,7 @@ async def create_knowledge_from_file(
     # phantom row referring to a nonexistent blob.
     try:
         storage = get_storage()
-        storage.put(_storage_key(org_id, row.id), data, content_type=validated.sniffed_mime)
+        await storage.put(_storage_key(org_id, row.id), data, content_type=validated.sniffed_mime)
     except Exception as exc:
         await db.rollback()
         raise HTTPException(
@@ -872,7 +868,7 @@ async def delete_knowledge(
 
     if row.source_type == KnowledgeSourceType.file:
         try:
-            get_storage().delete(_storage_key(org_id, knowledge_id))
+            await get_storage().delete(_storage_key(org_id, knowledge_id))
         except Exception:
             # Non-fatal — the row is gone; a stale blob under
             # storage/ can be reaped by an operator sweep.
@@ -984,7 +980,7 @@ async def upload_profile_picture(
     key = _profile_picture_key(org_id, assistant_id, ext=validated.extension, ts_ms=ts_ms)
     try:
         storage = get_storage()
-        ref = storage.put(key, data, content_type=validated.sniffed_mime)
+        ref = await storage.put(key, data, content_type=validated.sniffed_mime)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1016,7 +1012,7 @@ async def upload_profile_picture(
         prior_key = _url_to_key(prior_url)
         if prior_key:
             try:
-                get_storage().delete(prior_key)
+                await get_storage().delete(prior_key)
             except Exception:
                 pass
 
@@ -1046,7 +1042,7 @@ async def delete_profile_picture(
         current_key = _url_to_key(current_url)
         if current_key:
             try:
-                get_storage().delete(current_key)
+                await get_storage().delete(current_key)
             except Exception:
                 pass
 

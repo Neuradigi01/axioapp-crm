@@ -203,9 +203,7 @@ async def _check_should_abort(
     operator has requested cancel / delete. Runs in its own tiny SELECT
     so the caller's outer txn stays short."""
     result = await session.execute(
-        sql_text(
-            "SELECT status::text FROM tbl_ai_assistant_knowledge WHERE id = :id"
-        ),
+        sql_text("SELECT status::text FROM tbl_ai_assistant_knowledge WHERE id = :id"),
         {"id": str(knowledge_id)},
     )
     row = result.first()
@@ -263,7 +261,7 @@ async def _extract_from_source(
         storage = get_storage()
         blob_path = _storage_key(row)
         try:
-            data = storage.get(blob_path)
+            data = await storage.get(blob_path)
         except FileNotFoundError as exc:
             raise _IngestAborted(
                 new_status=KnowledgeStatus.failed_ingest,
@@ -427,7 +425,10 @@ async def ingest_knowledge(knowledge_id: uuid.UUID) -> IngestOutcome:
             # loop here so we can heartbeat + cancellation-check per
             # batch on very large corpora.
             llm = factory(
-                "openai", db=session, org_id=org_id, key_id=await _key_id_for_assistant(session, assistant_id)
+                "openai",
+                db=session,
+                org_id=org_id,
+                key_id=await _key_id_for_assistant(session, assistant_id),
             )
 
             total = 0
@@ -630,9 +631,7 @@ async def _key_id_for_assistant(
     outside the TenantScoped auto-filter so the ingest task (with no
     request context) can still see the row."""
     result = await session.execute(
-        sql_text(
-            "SELECT key_id FROM tbl_ai_assistants WHERE id = :id"
-        ),
+        sql_text("SELECT key_id FROM tbl_ai_assistants WHERE id = :id"),
         {"id": str(assistant_id)},
     )
     row = result.first()

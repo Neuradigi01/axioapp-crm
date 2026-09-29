@@ -9,9 +9,9 @@ Tests the cleanup hooks that fire when an organization is deleted:
 
 from __future__ import annotations
 
-import pytest
 import uuid
-from pathlib import Path
+
+import pytest
 
 # Side-effect imports for FK resolution
 import src.app.core.ai_assistants.models  # noqa: F401,E402
@@ -22,7 +22,7 @@ def test_sse_registry_has_cancel_by_org():
     from src.app.core.ai_assistants.sse_registry import SseStreamRegistry
 
     registry = SseStreamRegistry()
-    assert hasattr(registry, 'cancel_by_org')
+    assert hasattr(registry, "cancel_by_org")
     assert callable(registry.cancel_by_org)
 
 
@@ -47,24 +47,25 @@ def test_storage_delete_directory_exists():
     from src.app.shared.storage.local import LocalStorage
 
     storage = LocalStorage(root="./storage")
-    assert hasattr(storage, 'delete_directory')
+    assert hasattr(storage, "delete_directory")
     assert callable(storage.delete_directory)
 
 
-def test_storage_delete_directory_returns_count(tmp_path):
+async def test_storage_delete_directory_returns_count(tmp_path):
     """LocalStorage.delete_directory returns count of deleted files."""
     from src.app.shared.storage.local import LocalStorage
 
     storage = LocalStorage(root=str(tmp_path))
+    org_id = str(uuid.uuid4())
 
     # Create nested structure.
-    org_dir = tmp_path / "test-org"
+    org_dir = tmp_path / org_id
     org_dir.mkdir()
     (org_dir / "file1.txt").write_text("content")
     (org_dir / "subdir").mkdir()
     (org_dir / "subdir" / "file2.txt").write_text("content")
 
-    count = storage.delete_directory("test-org")
+    count = await storage.delete_directory(org_id)
     assert count == 2
     assert not org_dir.exists()
 
@@ -72,8 +73,9 @@ def test_storage_delete_directory_returns_count(tmp_path):
 def test_gdpr_deletion_log_can_be_written():
     """GdprDeletionLog ORM model can be instantiated and would persist
     organization deletion metadata."""
-    from src.app.core.ai_assistants.models import GdprDeletionLog
     import uuid
+
+    from src.app.core.ai_assistants.models import GdprDeletionLog
 
     org_id = uuid.uuid4()
     log = GdprDeletionLog(

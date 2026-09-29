@@ -267,7 +267,7 @@ async def add_photo(
     visit = await get_visit(session, visit_id)
     photo_id = uuid.uuid4()
     storage_path = f"{visit.org_id}/field_visits/{visit.id}/photo-{photo_id}.{file_extension}"
-    ref = get_storage().put(storage_path, data, content_type=content_type)
+    ref = await get_storage().put(storage_path, data, content_type=content_type)
 
     photo = FieldVisitPhoto(
         id=photo_id,

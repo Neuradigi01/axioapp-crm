@@ -33,6 +33,12 @@ from src.app.packs.real_estate.modules.property import link_token as _lt
 from src.app.packs.real_estate.modules.property.constants import PropertyStatus
 from src.app.packs.real_estate.modules.property.models import Property, PropertyImage
 from src.app.packs.real_estate.modules.property.schemas import (
+    PropertyCreate,
+    PropertyImageOut,
+    PropertyListFilters,
+    PropertyListOut,
+    PropertyOut,
+    PropertyUpdate,
     PublicPropertyCardOut,
     PublicPropertyDetailOut,
     PublicPropertyImageOut,
@@ -41,15 +47,6 @@ from src.app.packs.real_estate.modules.property.schemas import (
 )
 from src.app.shared.files.image import ImageValidationError, validate_image_upload
 from src.app.shared.storage import get_storage
-from src.app.packs.real_estate.modules.property.schemas import (
-    PropertyCreate,
-    PropertyImageOut,
-    PropertyListFilters,
-    PropertyListOut,
-    PropertyOut,
-    PropertyUpdate,
-)
-
 
 # ---------------------------------------------------------------------------
 # Slug generation
@@ -128,9 +125,7 @@ async def _fetch_owned(
 ) -> Property:
     """Fetch a property that must belong to ``org_id``. 404 if missing
     or wrong tenant — never leak existence across orgs."""
-    prop = await _da.get_property_by_id(
-        session, property_id=property_id, with_images=with_images
-    )
+    prop = await _da.get_property_by_id(session, property_id=property_id, with_images=with_images)
     if prop is None or prop.org_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="property not found")
     return prop
@@ -150,9 +145,7 @@ def _to_out(prop: Property) -> PropertyOut:
     images_out: list[PropertyImageOut] = []
     featured_url: str | None = None
     if images_loaded:
-        images_out = [
-            PropertyImageOut.model_validate(i, from_attributes=True) for i in prop.images
-        ]
+        images_out = [PropertyImageOut.model_validate(i, from_attributes=True) for i in prop.images]
         featured = next((i for i in prop.images if i.is_featured), None)
         if featured is None and prop.images:
             featured = prop.images[0]
@@ -372,7 +365,7 @@ async def delete_property(
     await session.commit()
 
     try:
-        get_storage().delete_directory(f"{org_id}/property/{property_id}")
+        await get_storage().delete_directory(f"{org_id}/property/{property_id}")
     except Exception as exc:  # noqa: BLE001 — cleanup is best-effort
         # Not fatal — the DB rows are gone; leftover files are dead
         # weight the ops team can sweep later. Surface via audit.
@@ -441,9 +434,7 @@ async def unpublish_property(
     prop.status = PropertyStatus.unpublished.value
     await session.commit()
     await session.refresh(prop)
-    await audit.log(
-        "property.unpublished", entity_type="property", entity_id=prop.id
-    )
+    await audit.log("property.unpublished", entity_type="property", entity_id=prop.id)
     return _to_out(prop)
 
 
@@ -485,9 +476,7 @@ async def unarchive_property(
     prop.archived_at = None
     await session.commit()
     await session.refresh(prop)
-    await audit.log(
-        "property.unarchived", entity_type="property", entity_id=prop.id
-    )
+    await audit.log("property.unarchived", entity_type="property", entity_id=prop.id)
     return _to_out(prop)
 
 
@@ -539,9 +528,7 @@ async def upload_property_images(
     every file already written to disk in this call is removed.
     """
     if not files:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="no files uploaded"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="no files uploaded")
     if len(files) > _MAX_UPLOAD_BATCH:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -570,7 +557,7 @@ async def upload_property_images(
     try:
         for i, (image_id, data, mime, ext) in enumerate(validated):
             path = f"{org_id}/property/{prop.id}/{image_id}.{ext}"
-            ref = storage.put(path, data, content_type=mime)
+            ref = await storage.put(path, data, content_type=mime)
             written_paths.append(path)
             image = PropertyImage(
                 id=image_id,
@@ -591,7 +578,7 @@ async def upload_property_images(
         await session.rollback()
         for path in written_paths:
             try:
-                storage.delete(path)
+                await storage.delete(path)
             except Exception:  # noqa: BLE001
                 pass
         raise
@@ -620,9 +607,7 @@ async def _fetch_image_owned(
     an id exists in a different property or a different org."""
     image = await _da.get_property_image_by_id(session, image_id=image_id)
     if image is None or image.org_id != org_id or image.property_id != property_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="image not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="image not found")
     return image
 
 
@@ -655,7 +640,7 @@ async def delete_property_image(
             await session.refresh(promoted)
 
     try:
-        get_storage().delete(path)
+        await get_storage().delete(path)
     except Exception as exc:  # noqa: BLE001 — best-effort
         await audit.log(
             "property.storage_cleanup_failed",
@@ -947,9 +932,7 @@ async def get_public_property(
     if decoded is None:
         return None
     property_id, expected_org_id = decoded
-    prop = await _da.get_property_by_id(
-        session, property_id=property_id, with_images=True
-    )
+    prop = await _da.get_property_by_id(session, property_id=property_id, with_images=True)
     if prop is None or prop.org_id != expected_org_id:
         return None
     if prop.status != PropertyStatus.published.value:

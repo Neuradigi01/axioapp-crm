@@ -206,7 +206,7 @@ async def upload_file(
     import_id = uuid.uuid4()
     ext = filename.rsplit(".", 1)[-1].lower()
     storage_path = f"imports/{org_id}/{import_id}.{ext}"
-    storage.put(
+    await storage.put(
         storage_path,
         file_bytes,
         content_type=(

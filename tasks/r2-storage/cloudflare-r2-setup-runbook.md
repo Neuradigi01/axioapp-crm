@@ -2,11 +2,13 @@
 
 Do this **three times**, once per environment. Each environment gets its own Cloudflare account, bucket and API token.
 
+Only one developer machine points at `crm-local`; other developers keep `STORAGE_BACKEND=local` (shared seed UUIDs would make keys collide).
+
 | Environment | Sign up with | Bucket name | Secrets file |
 |---|---|---|---|
 | `local` | dev@karmcrm.com | `crm-local` | `secrets.local.enc.env` |
-| `prod` | aixoindia@gmail.com | `crm-prod` | `secrets.prod.enc.env` |
-| `prod-neuradigi` | admin@karmcrm.com | `crm-neuradigi` | `secrets.prod-neuradigi.enc.env` |
+| `prod` (deferred) | aixoindia@gmail.com | `crm-prod` | `secrets.prod.enc.env` |
+| `prod-neuradigi` | admin@karmcrm.com | `crm-prodneuradigi` | `secrets.prod-neuradigi.enc.env` |
 
 Cloudflare occasionally renames buttons. If a label below doesn't match exactly, look for the closest equivalent.
 
@@ -30,6 +32,10 @@ Cloudflare occasionally renames buttons. If a label below doesn't match exactly,
 4. **Default storage class:** Standard.
 5. Click **Create bucket**.
 6. **Do NOT enable public access.** Leave the "Public Development URL" (`r2.dev`) **disabled** and don't connect a custom domain. The CRM reads files privately.
+
+## 3b. Lifecycle rule
+
+Cloudflare creates a **Default Multipart Abort Rule (7 days)** on every new bucket — confirm it is present under Settings → Object Lifecycle Rules. Nothing to add.
 
 ## 4. Create the API token (keys)
 
@@ -63,13 +69,13 @@ Don't paste the keys into chat, Slack, email or any plain file.
 
 4. Repeat for the other two environments, then set `API/.environment` back to `local`.
 
-Adding the keys alone changes nothing. The CRM keeps using local disk until Step 7/8 flips `STORAGE_BACKEND=r2` for that environment.
+Adding the keys alone changes nothing. The CRM keeps using local disk until Step 8 (local) / Step 9 (prod) flips `STORAGE_BACKEND=r2` for that environment.
 
 ## Checklist to report back
 
-- [ ] local: account, `crm-local` bucket, token, 4 secrets added
+- [x] local: account, `crm-local` bucket, token `crm-api-local`, 4 secrets added (2026-09-29)
 - [ ] prod: account, `crm-prod` bucket, token, 4 secrets added
-- [ ] prod-neuradigi: account, `crm-neuradigi` bucket, token, 4 secrets added
+- [x] prod-neuradigi: account, `crm-prodneuradigi` bucket, token `crm-api-prodneuradigi`, 4 secrets added (2026-09-29)
 - [ ] Public access (`r2.dev`) left **disabled** on all three buckets
 
 ## If a key ever leaks

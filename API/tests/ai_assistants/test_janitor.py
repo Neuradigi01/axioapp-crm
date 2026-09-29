@@ -16,10 +16,7 @@ when the compose stack isn't up.
 
 from __future__ import annotations
 
-import asyncio
 import uuid
-from datetime import datetime, timedelta
-from pathlib import Path
 
 import pytest
 
@@ -32,8 +29,9 @@ import src.app.core.embed.models  # noqa: F401,E402
 def test_retention_days_field_clamped_to_400():
     """retention_days in schema is capped at 400 via Pydantic validator.
     Operator trying to set 1000 gets 422."""
-    from src.app.core.ai_assistants.schemas import AiAssistantCreate
     from pydantic import ValidationError
+
+    from src.app.core.ai_assistants.schemas import AiAssistantCreate
 
     with pytest.raises(ValidationError) as exc_info:
         AiAssistantCreate(
@@ -47,8 +45,9 @@ def test_retention_days_field_clamped_to_400():
 
 def test_retention_days_minimum_1():
     """retention_days must be >= 1."""
-    from src.app.core.ai_assistants.schemas import AiAssistantCreate
     from pydantic import ValidationError
+
+    from src.app.core.ai_assistants.schemas import AiAssistantCreate
 
     with pytest.raises(ValidationError) as exc_info:
         AiAssistantCreate(
@@ -112,22 +111,23 @@ async def test_sse_registry_cancel_by_org_cancels_all_streams(monkeypatch):
     assert handle2.cancelled
 
 
-def test_storage_delete_directory_path_handling(tmp_path):
+async def test_storage_delete_directory_path_handling(tmp_path):
     """LocalStorage.delete_directory safely deletes nested paths without
     path-traversal issues."""
     from src.app.shared.storage.local import LocalStorage
 
     storage = LocalStorage(root=str(tmp_path))
+    org_id = str(uuid.uuid4())
 
     # Create nested structure.
-    org_path = tmp_path / "test-org" / "ai_assistants"
+    org_path = tmp_path / org_id / "ai_assistants"
     org_path.mkdir(parents=True, exist_ok=True)
     (org_path / "file1.txt").write_text("content")
     (org_path / "subdir").mkdir(exist_ok=True)
     (org_path / "subdir" / "file2.txt").write_text("content")
 
     # Delete the org directory.
-    count = storage.delete_directory("test-org/ai_assistants")
+    count = await storage.delete_directory(f"{org_id}/ai_assistants")
     assert count == 2
 
     # Directory is gone.
@@ -138,22 +138,27 @@ def test_janitor_functions_are_importable():
     """All 6 janitor task async functions are importable from the janitor module."""
     from src.app.core.ai_assistants import janitor
 
-    assert hasattr(janitor, 'retention_cleanup')
-    assert hasattr(janitor, 'reap_stuck_ingest')
-    assert hasattr(janitor, 'cleanup_orphan_chunks')
-    assert hasattr(janitor, 'expire_embed_key_grace')
-    assert hasattr(janitor, 'reconcile_cost_outbox')
-    assert hasattr(janitor, 'janitor_heartbeat')
+    assert hasattr(janitor, "retention_cleanup")
+    assert hasattr(janitor, "reap_stuck_ingest")
+    assert hasattr(janitor, "cleanup_orphan_chunks")
+    assert hasattr(janitor, "expire_embed_key_grace")
+    assert hasattr(janitor, "reconcile_cost_outbox")
+    assert hasattr(janitor, "janitor_heartbeat")
 
 
 def test_janitor_functions_are_async():
     """All janitor functions are async (coroutine functions)."""
     import inspect
+
     from src.app.core.ai_assistants import janitor
 
     for name in [
-        'retention_cleanup', 'reap_stuck_ingest', 'cleanup_orphan_chunks',
-        'expire_embed_key_grace', 'reconcile_cost_outbox', 'janitor_heartbeat',
+        "retention_cleanup",
+        "reap_stuck_ingest",
+        "cleanup_orphan_chunks",
+        "expire_embed_key_grace",
+        "reconcile_cost_outbox",
+        "janitor_heartbeat",
     ]:
         fn = getattr(janitor, name)
         assert inspect.iscoroutinefunction(fn), f"{name} is not async"
@@ -174,6 +179,6 @@ def test_celery_beat_schedule_has_ai_tasks():
 
     for task_name in expected_tasks:
         assert task_name in beat_schedule, f"{task_name} not in beat_schedule"
-        assert beat_schedule[task_name]["task"].startswith(
-            "src.app.core.ai_assistants.tasks."
-        ), f"{task_name} has unexpected task path"
+        assert beat_schedule[task_name]["task"].startswith("src.app.core.ai_assistants.tasks."), (
+            f"{task_name} has unexpected task path"
+        )

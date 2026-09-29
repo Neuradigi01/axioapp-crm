@@ -257,7 +257,7 @@ async def add_photo(
     order = await get_order(session, order_id)
     photo_id = uuid.uuid4()
     storage_path = f"{order.org_id}/custom_orders/{order.id}/photo-{photo_id}.{file_extension}"
-    ref = get_storage().put(storage_path, data, content_type=content_type)
+    ref = await get_storage().put(storage_path, data, content_type=content_type)
 
     photo = CustomOrderPhoto(
         id=photo_id,

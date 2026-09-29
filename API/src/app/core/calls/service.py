@@ -312,10 +312,7 @@ async def attach_recording_file(
             # `HTTP_413_REQUEST_ENTITY_TOO_LARGE` in Starlette; use the
             # numeric code directly so we don't depend on either name.
             status_code=413,
-            detail=(
-                f"Recording too large ({len(data) // (1024 * 1024)} MB). "
-                f"Maximum: 30 MB."
-            ),
+            detail=(f"Recording too large ({len(data) // (1024 * 1024)} MB). Maximum: 30 MB."),
         )
     ext = PurePosixPath(filename or "").suffix.lower()
     if ext not in _ALLOWED_RECORDING_EXTS:
@@ -331,7 +328,7 @@ async def attach_recording_file(
     before = _call_snapshot(call)
     file_id = uuid.uuid4()
     storage_path = f"{call.org_id}/call_recordings/{file_id}{ext}"
-    get_storage().put(storage_path, data, content_type=content_type)
+    await get_storage().put(storage_path, data, content_type=content_type)
 
     call.recording_file_path = storage_path
     await session.commit()
@@ -347,9 +344,7 @@ async def attach_recording_file(
     return call
 
 
-async def read_recording_file(
-    session: AsyncSession, *, call_id: uuid.UUID
-) -> tuple[bytes, str]:
+async def read_recording_file(session: AsyncSession, *, call_id: uuid.UUID) -> tuple[bytes, str]:
     """Load an uploaded recording's bytes for streaming playback.
 
     Returns ``(data, content_type)``. Raises 404 when the call has no

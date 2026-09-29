@@ -1,21 +1,33 @@
 """Storage abstraction.
 
-`StorageBackend` is the seam every uploaded blob (catalog/inventory
-images, custom-order photos, field-visit photos, import source files)
-passes through. The build ships a single local-disk implementation
-(`LocalStorage`); the interface exists so a future S3/object-store
-backend can be dropped in without touching any call site.
+`StorageBackend` is the seam every stored blob (catalog/inventory
+images, custom-order and field-visit photos, property images, call
+recordings, import sources and reports, AI-assistant files) passes
+through. Call sites never touch the filesystem or an object store
+directly, so the concrete backend can change without touching them.
 
-Paths handed to a backend are storage-relative POSIX keys
+Keys handed to a backend are storage-relative POSIX keys
 (e.g. `catalog/{org_id}/{item_id}.jpg`) — never absolute filesystem
-paths. The backend owns the mapping from key to physical location and to
+paths — and are checked by `keys.validate_key` / `keys.validate_prefix`.
+The backend owns the mapping from key to physical location and to
 public URL.
+
+Every method except `url` is async: an object-store round trip must
+never block the event loop.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
+
+#: Default chunk size for `open_stream`.
+DEFAULT_CHUNK_SIZE = 64 * 1024
+
+#: Upper bound on how many objects one `delete_directory` call may
+#: remove. A prefix that matches more is refused rather than deleted.
+MAX_DIRECTORY_OBJECTS = 10_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,42 +43,56 @@ class StoredFileRef:
     url: str
 
 
+@dataclass(frozen=True, slots=True)
+class StoredFileStat:
+    """Metadata for a stored blob. `etag` is opaque to callers."""
+
+    size: int
+    etag: str
+    content_type: str
+
+
 class StorageBackend(ABC):
-    """Write blobs and resolve their public URLs."""
+    """Read, write and delete blobs by storage-relative key."""
 
     @abstractmethod
-    def put(self, path: str, data: bytes, content_type: str | None = None) -> StoredFileRef:
-        """Persist `data` under storage-relative `path` and return a ref.
+    async def put(self, path: str, data: bytes, content_type: str | None = None) -> StoredFileRef:
+        """Persist `data` under `path` and return a ref.
 
-        `content_type` is advisory — local disk ignores it (the static
-        mount infers MIME on serve); an object-store backend would record
-        it as response metadata.
+        `content_type` is recorded where the backend supports object
+        metadata; otherwise it is derived from the key's extension.
         """
 
     @abstractmethod
-    def get(self, path: str) -> bytes:
-        """Read + return the raw bytes at `path`.
+    async def get(self, path: str) -> bytes:
+        """Read + return the raw bytes at `path`. Raises
+        `FileNotFoundError` on miss."""
 
-        Raises `FileNotFoundError` on miss. Same path-traversal guard
-        as `put` — a `path` that resolves outside the backend root is
-        rejected before touching the filesystem. Used by the AI
-        Assistants knowledge-ingest task (Step 10) to re-read an
-        uploaded blob for parsing without keeping the request body
-        in memory across the HTTP → Celery hand-off.
-        """
+    @abstractmethod
+    def open_stream(self, path: str, chunk_size: int = DEFAULT_CHUNK_SIZE) -> AsyncIterator[bytes]:
+        """Yield the blob at `path` in chunks without loading it whole.
+        Raises `FileNotFoundError` on miss (on first iteration)."""
+
+    @abstractmethod
+    async def stat(self, path: str) -> StoredFileStat:
+        """Size, opaque ETag and content type of the blob at `path`.
+        Raises `FileNotFoundError` on miss."""
 
     @abstractmethod
     def url(self, path: str) -> str:
         """Public, server-relative URL for the object at `path`."""
 
     @abstractmethod
-    def delete(self, path: str) -> bool:
-        """Delete the blob at `path`. Returns True if a file was removed,
-        False if there was nothing there. Must reject any path that
-        resolves outside the backend root (path-traversal guard)."""
+    async def delete(self, path: str) -> bool:
+        """Delete the blob at `path`. Returns True if a blob was
+        removed, False if there was nothing there."""
 
     @abstractmethod
-    def delete_directory(self, prefix: str) -> int:
-        """Recursively delete every blob under `prefix` and return the
-        number of files removed. Same path-traversal guard as
-        `delete`."""
+    async def delete_directory(self, prefix: str) -> int:
+        """Delete every blob under the org-scoped `prefix` and return
+        the number removed. Raises `ValueError` when more than
+        `MAX_DIRECTORY_OBJECTS` match."""
+
+    @abstractmethod
+    def list_keys(self, prefix: str) -> AsyncIterator[str]:
+        """Yield every key under the org-scoped `prefix`."""
