@@ -202,7 +202,10 @@
                   </button>
                   @if (actionsMenuFor() === row.id) {
                     <div
-                      class="absolute right-6 top-10 z-50 w-48 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
+                      class="fixed z-50 w-48 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
+                      [style.top]="actionsMenuPos().top"
+                      [style.bottom]="actionsMenuPos().bottom"
+                      [style.right]="actionsMenuPos().right"
                       (click)="$event.stopPropagation()"
                     >
                       <a
@@ -330,7 +333,10 @@
                 </button>
                 @if (actionsMenuFor() === row.id) {
                   <div
-                    class="absolute right-0 top-10 z-50 w-48 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
+                    class="fixed z-50 w-48 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
+                    [style.top]="actionsMenuPos().top"
+                    [style.bottom]="actionsMenuPos().bottom"
+                    [style.right]="actionsMenuPos().right"
                     (click)="$event.stopPropagation()"
                   >
                     <a

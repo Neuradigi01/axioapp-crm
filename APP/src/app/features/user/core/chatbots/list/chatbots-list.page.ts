@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   inject,
   signal,
@@ -79,6 +80,14 @@ export class ChatbotsListPageComponent {
   readonly search = signal<string>('');
   readonly selectedStatus = signal<'' | ChatbotStatus>('');
   readonly actionsMenuFor = signal<string | null>(null);
+  /** Viewport-anchored position for the open kebab menu. The menu is
+   *  `fixed` so the scrolling `<main>` can't clip it; it flips above
+   *  the trigger when there isn't room below. */
+  readonly actionsMenuPos = signal<{ top: string | null; bottom: string | null; right: string }>({
+    top: null,
+    bottom: null,
+    right: '0px',
+  });
   /** Which row's mutation is in flight — disables the kebab affordances
    *  so operators can't double-fire publish / pause / archive. */
   readonly actionInFlight = signal<string | null>(null);
@@ -345,7 +354,25 @@ export class ChatbotsListPageComponent {
 
   toggleActionsMenu(botId: string, event: MouseEvent): void {
     event.stopPropagation();
-    this.actionsMenuFor.update((cur) => (cur === botId ? null : botId));
+    if (this.actionsMenuFor() === botId) {
+      this.actionsMenuFor.set(null);
+      return;
+    }
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const MENU_MAX_H = 180;
+    const GAP = 4;
+    const openUp = rect.bottom + GAP + MENU_MAX_H > window.innerHeight && rect.top > MENU_MAX_H;
+    this.actionsMenuPos.set({
+      top: openUp ? null : `${rect.bottom + GAP}px`,
+      bottom: openUp ? `${window.innerHeight - rect.top + GAP}px` : null,
+      right: `${window.innerWidth - rect.right}px`,
+    });
+    this.actionsMenuFor.set(botId);
+  }
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    this.actionsMenuFor.set(null);
   }
 
   closeKebab(): void {
