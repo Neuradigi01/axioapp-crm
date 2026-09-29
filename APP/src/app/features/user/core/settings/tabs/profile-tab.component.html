@@ -29,8 +29,13 @@
               type="text"
               formControlName="full_name"
               autocomplete="name"
+              maxlength="255"
+              [class.border-red-500]="!!profileFieldError('full_name')"
               class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            @if (profileFieldError('full_name'); as e) {
+              <span class="mt-0.5 block text-[11px] text-red-500">{{ e }}</span>
+            }
           </label>
           <label class="block text-sm">
             <span class="block text-xs font-medium text-muted">Email</span>
@@ -49,13 +54,16 @@
             <input
               type="tel"
               inputmode="tel"
-              pattern="\+?[0-9]{8,15}"
-              maxlength="16"
+              maxlength="32"
               placeholder="e.g. +919876543210"
               formControlName="phone"
               autocomplete="tel"
+              [class.border-red-500]="!!profileFieldError('phone')"
               class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            @if (profileFieldError('phone'); as e) {
+              <span class="mt-0.5 block text-[11px] text-red-500">{{ e }}</span>
+            }
           </label>
 
           @if (profileError(); as err) {
@@ -76,7 +84,7 @@
           <div class="flex justify-end">
             <button
               type="submit"
-              [disabled]="profileForm.invalid || profileSaving()"
+              [disabled]="profileSaving()"
               class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {{ profileSaving() ? 'Saving…' : 'Save profile' }}

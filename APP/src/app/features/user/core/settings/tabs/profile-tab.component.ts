@@ -8,6 +8,7 @@ import { ProfileApiService } from '../../profile/profile.service';
 import { commonValidators } from '../../shared/validators';
 import { matchFieldValidator } from '@shared/validators/custom-validators';
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 
 /**
  * Settings → Profile tab — self-service profile + password management.
@@ -32,6 +33,7 @@ export class ProfileTabComponent {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(ProfileApiService);
   private readonly auth = inject(FurnitureAuthService);
+  private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly me = signal<MeResponse | null>(null);
@@ -63,6 +65,17 @@ export class ProfileTabComponent {
     this.reload();
   }
 
+  /** Error text under a profile input once touched, or null. */
+  protected profileFieldError(name: 'full_name' | 'phone'): string | null {
+    const ctrl = this.profileForm.controls[name];
+    if (!ctrl.touched || !ctrl.errors) return null;
+    if (ctrl.errors['required']) return 'Full name is required.';
+    if (ctrl.errors['maxlength']) return 'Keep it under 255 characters.';
+    if (ctrl.errors['nameInvalid']) return `Full name: ${ctrl.errors['nameInvalid']}.`;
+    if (ctrl.errors['phoneInvalid']) return 'Include the country code, e.g. +919876543210.';
+    return null;
+  }
+
   protected reload(): void {
     this.loading.set(true);
     this.loadError.set(null);
@@ -80,13 +93,28 @@ export class ProfileTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
-          this.loadError.set(extractApiError(err) ?? 'Could not load profile.');
+          const msg = extractApiError(err) ?? 'Could not load profile.';
+          this.loadError.set(msg);
+          this.toast.error('Could not load profile', { subtitle: msg });
         },
       });
   }
 
   protected saveProfile(): void {
-    if (this.profileForm.invalid || this.profileSaving()) return;
+    if (this.profileSaving()) return;
+    if (this.profileForm.invalid) {
+      this.profileForm.markAllAsTouched();
+      const fields = [
+        this.profileForm.controls.full_name.invalid ? 'Full name' : null,
+        this.profileForm.controls.phone.invalid ? 'Phone' : null,
+      ].filter((f): f is string => f !== null);
+      this.toast.warn('Could not save profile', { subtitle: `Check: ${fields.join(', ')}.` });
+      return;
+    }
+    if (this.profileForm.pristine) {
+      this.toast.info('No changes to save');
+      return;
+    }
     const raw = this.profileForm.getRawValue();
     const phone = raw.phone.trim();
     this.profileSaving.set(true);
@@ -103,11 +131,14 @@ export class ProfileTabComponent {
         next: () => {
           this.profileSaving.set(false);
           this.profileOk.set(true);
+          this.toast.success('Profile updated', { subtitle: raw.full_name.trim() });
           this.reload();
         },
         error: (err: HttpErrorResponse) => {
           this.profileSaving.set(false);
-          this.profileError.set(extractApiError(err) ?? 'Could not save profile.');
+          const msg = extractApiError(err) ?? 'Could not save profile.';
+          this.profileError.set(msg);
+          this.toast.error('Could not save profile', { subtitle: msg });
         },
       });
   }
@@ -117,6 +148,9 @@ export class ProfileTabComponent {
     if (this.passwordForm.invalid) {
       this.passwordForm.markAllAsTouched();
       this.passwordError.set('Please fix the highlighted fields.');
+      this.toast.warn('Could not change password', {
+        subtitle: 'Please fix the highlighted fields.',
+      });
       return;
     }
     const raw = this.passwordForm.getRawValue();
@@ -136,6 +170,9 @@ export class ProfileTabComponent {
         next: () => {
           this.passwordSaving.set(false);
           this.passwordOk.set(true);
+          this.toast.success('Password changed', {
+            subtitle: raw.sign_out_others ? 'Your other sessions were signed out.' : null,
+          });
           this.passwordForm.reset({
             current_password: '',
             new_password: '',
@@ -145,7 +182,9 @@ export class ProfileTabComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.passwordSaving.set(false);
-          this.passwordError.set(extractApiError(err) ?? 'Could not change password.');
+          const msg = extractApiError(err) ?? 'Could not change password.';
+          this.passwordError.set(msg);
+          this.toast.error('Could not change password', { subtitle: msg });
         },
       });
   }
