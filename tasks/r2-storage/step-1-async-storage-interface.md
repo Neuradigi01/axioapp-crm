@@ -1,6 +1,6 @@
 # Step 1: Async storage interface + key guard
 
-**Status:** Pending
+**Status:** COMPLETED — 2026-09-29. Commit `9f7e4bb2`. 24 call sites awaited; key guard + `LocalStorage` round-trip tests pass.
 **Depends on:** none
 **Blocks:** Steps 2–9
 

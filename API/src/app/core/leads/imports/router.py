@@ -253,7 +253,7 @@ async def preview_lead_import_endpoint(
     row = await get_import(db, import_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
-    payload = read_preview(row, limit)
+    payload = await read_preview(row, limit)
     return PreviewResponse(columns=payload.columns, rows=payload.rows)
 
 
@@ -273,7 +273,7 @@ async def download_import_source_endpoint(
     row = await get_import(db, import_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
-    data = read_source_file(row)
+    data = await read_source_file(row)
     safe_filename = (row.original_filename or "import.csv").replace('"', "")
     return Response(
         content=data,
@@ -298,7 +298,7 @@ async def download_import_errors_endpoint(
     row = await get_import(db, import_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
-    data = read_error_csv(row)
+    data = await read_error_csv(row)
     filename = f"import-{import_id}-errors.csv"
     return Response(
         content=data,
@@ -327,7 +327,7 @@ async def download_import_skipped_endpoint(
     row = await get_import(db, import_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
-    data = read_skipped_csv(row)
+    data = await read_skipped_csv(row)
     filename = f"import-{import_id}-skipped.csv"
     return Response(
         content=data,
@@ -357,7 +357,7 @@ async def download_import_warnings_endpoint(
     row = await get_import(db, import_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="import not found")
-    data = read_warnings_csv(row)
+    data = await read_warnings_csv(row)
     filename = f"import-{import_id}-warnings.csv"
     return Response(
         content=data,

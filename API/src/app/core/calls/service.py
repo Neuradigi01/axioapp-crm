@@ -18,6 +18,7 @@ shows it.
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncIterator
 from datetime import date as Date
 from typing import Any
 
@@ -344,14 +345,17 @@ async def attach_recording_file(
     return call
 
 
-async def read_recording_file(session: AsyncSession, *, call_id: uuid.UUID) -> tuple[bytes, str]:
-    """Load an uploaded recording's bytes for streaming playback.
+async def read_recording_file(
+    session: AsyncSession, *, call_id: uuid.UUID
+) -> tuple[AsyncIterator[bytes], str, int]:
+    """Open an uploaded recording for streaming playback.
 
-    Returns ``(data, content_type)``. Raises 404 when the call has no
-    uploaded recording (the client should fall back to
-    ``recording_url``).
+    Returns ``(chunks, content_type, size)``. Raises 404 when the call
+    has no uploaded recording (the client should fall back to
+    ``recording_url``) or the stored key belongs to another org, and
+    410 when the row points at a blob that is gone.
     """
-    from pathlib import Path
+    from src.app.shared.storage import assert_org_key, get_storage
 
     call = await get_call(session, call_id)
     if not call.recording_file_path:
@@ -360,25 +364,23 @@ async def read_recording_file(session: AsyncSession, *, call_id: uuid.UUID) -> t
             detail="No recording uploaded for this call.",
         )
 
-    # Root matches ``LocalStorage.__init__`` default.
-    root = Path("./storage").resolve()
-    target = (root / call.recording_file_path).resolve()
-    if not target.is_file():
-        # Path in DB but file missing on disk — corrupted state.
+    storage = get_storage()
+    try:
+        key = assert_org_key(call.org_id, call.recording_file_path)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No recording uploaded for this call.",
+        ) from exc
+    try:
+        stat = await storage.stat(key)
+    except FileNotFoundError as exc:
+        # Key in DB but blob missing — corrupted state.
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
-            detail="Recording file is no longer on disk.",
-        )
-    # Guardrail: prevent path traversal in case a bad row landed in DB.
-    if not str(target).startswith(str(root)):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid recording path.",
-        )
-
-    data = target.read_bytes()
-    content_type = _content_type_for(call.recording_file_path)
-    return data, content_type
+            detail="Recording file is no longer available.",
+        ) from exc
+    return storage.open_stream(key), _content_type_for(key), stat.size
 
 
 def _content_type_for(path: str) -> str:

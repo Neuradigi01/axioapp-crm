@@ -32,7 +32,7 @@ from src.app.core.custom_fields.data_access import list_fields_query
 from src.app.core.custom_fields.models import CustomFieldDefinition
 from src.app.shared import import_errors, validators
 from src.app.shared.custom_fields.coercion import coerce_value
-from src.app.shared.storage import get_storage
+from src.app.shared.storage import assert_org_key, get_storage
 
 _CONTACT_ENTITY = "contact"
 _CUSTOM_TARGET_PREFIX = "custom_data."
@@ -270,8 +270,7 @@ async def dry_run_import(
     row = await _get_import(session, import_id)
     custom_defs = await _load_contact_custom_field_defs(session)
     _validate_mapping(mapping, custom_keys=set(custom_defs))
-    storage = get_storage()
-    file_bytes = _read_file_bytes(storage, row.storage_path)
+    file_bytes = await _read_file_bytes(row)
 
     # Pass 1 — gather candidate phone keys from the incoming file so the
     # existence check can target just those keys instead of streaming
@@ -512,8 +511,7 @@ async def _run_commit(
     effective_default_source = (row.default_source or "").strip() or None
     custom_defs = await _load_contact_custom_field_defs(session)
 
-    storage = get_storage()
-    file_bytes = _read_file_bytes(storage, row.storage_path)
+    file_bytes = await _read_file_bytes(row)
 
     # Pass 1 — collect candidate phone keys so the existence check
     # touches only the working set.
@@ -701,13 +699,15 @@ async def _run_commit(
 # --- internals ------------------------------------------------------------
 
 
-def _read_file_bytes(storage, storage_path: str) -> bytes:
-    """Read the uploaded file back from local storage. Wrapped so a
-    future S3 backend swaps cleanly."""
-    from pathlib import Path
-
-    full = Path("./storage").resolve() / storage_path.lstrip("/")
-    return full.read_bytes()
+async def _read_file_bytes(row: ContactImport) -> bytes:
+    """Read the import's uploaded file back from storage, scoped to the
+    import's org. 404 when the blob is gone."""
+    try:
+        return await get_storage().get(assert_org_key(row.org_id, row.storage_path))
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="import file missing"
+        ) from exc
 
 
 def _check_contact_method(row_no: int, mapped: dict[str, Any]) -> RowError | None:
@@ -1074,8 +1074,7 @@ async def _build_report_csv_response(
     # Load the original file so the CSV echoes back the offending row
     # data verbatim — operators fix the source spreadsheet against the
     # column they see in the download.
-    storage = get_storage()
-    file_bytes = _read_file_bytes(storage, row.storage_path)
+    file_bytes = await _read_file_bytes(row)
     parsed_rows = list(parse_all_rows(file_bytes, row.filename))
     headers: list[str] = list(row.headers or [])
     if not headers and parsed_rows:

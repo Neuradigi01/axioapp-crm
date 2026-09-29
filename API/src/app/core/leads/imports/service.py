@@ -31,7 +31,7 @@ from src.app.core import audit
 from src.app.core.leads.imports import data_access
 from src.app.core.leads.imports.models import LeadImport, LeadImportStatus
 from src.app.core.leads.imports.schemas import SourcePlatform
-from src.app.shared.storage import get_storage
+from src.app.shared.storage import assert_org_key, get_storage
 
 # Whitelist of CRM field keys a mapping may target. System-managed
 # columns (`id`, `org_id`, `source`, `status`, `created_at`,
@@ -255,22 +255,23 @@ async def list_imports(
     return rows, total
 
 
-def read_source_file(import_row: LeadImport) -> bytes:
+async def _read_stored(import_row: LeadImport, key: str, missing_detail: str) -> bytes:
+    """Read one of the import's stored files, scoped to the import's org.
+    404 when the blob is gone or the key does not belong to the org."""
+    try:
+        return await get_storage().get(assert_org_key(import_row.org_id, key))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=missing_detail) from exc
+
+
+async def read_source_file(import_row: LeadImport) -> bytes:
     """Read the bytes of the original uploaded source file.
 
     Used by the Step 6 history page's "Download source" action so an
     op can re-inspect what was actually uploaded weeks ago. Raises 404
     if the file is missing from disk (e.g. retention cleanup).
     """
-    from pathlib import Path
-
-    full = Path("./storage").resolve() / import_row.storage_path.lstrip("/")
-    if not full.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="source file missing on disk",
-        )
-    return full.read_bytes()
+    return await _read_stored(import_row, import_row.storage_path, "source file missing")
 
 
 async def _allowed_custom_targets(session: AsyncSession) -> set[str]:
@@ -426,7 +427,7 @@ _PREVIEW_CACHE_MAX = 64
 _preview_cache: OrderedDict[tuple[str, str, int], PreviewPayload] = OrderedDict()
 
 
-def read_preview(import_row: LeadImport, limit: int) -> PreviewPayload:
+async def read_preview(import_row: LeadImport, limit: int) -> PreviewPayload:
     """Read the first `limit` data rows from the import's source file.
 
     Returns the original column header + a list-of-lists of stringified
@@ -452,7 +453,8 @@ def read_preview(import_row: LeadImport, limit: int) -> PreviewPayload:
         _preview_cache.move_to_end(cache_key)
         return hit
 
-    header, rows_iter = parse_rows(import_row.storage_path, mapping={})
+    data = await _read_stored(import_row, import_row.storage_path, "source file missing")
+    header, rows_iter = parse_rows(import_row.storage_path, data, mapping={})
 
     rows: list[list[str | None]] = []
     try:
@@ -485,7 +487,7 @@ class PreviewPayload:
     rows: list[list[str | None]]
 
 
-def read_error_csv(import_row: LeadImport) -> bytes:
+async def read_error_csv(import_row: LeadImport) -> bytes:
     """Read the errors CSV bytes for a completed import.
 
     Raises 404 if the row has no `error_report_path` (no errors, or
@@ -498,18 +500,10 @@ def read_error_csv(import_row: LeadImport) -> bytes:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="this import has no error report",
         )
-    from pathlib import Path
-
-    full = Path("./storage").resolve() / import_row.error_report_path.lstrip("/")
-    if not full.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="error report file missing on disk",
-        )
-    return full.read_bytes()
+    return await _read_stored(import_row, import_row.error_report_path, "error report file missing")
 
 
-def read_skipped_csv(import_row: LeadImport) -> bytes:
+async def read_skipped_csv(import_row: LeadImport) -> bytes:
     """Read the duplicates-skipped CSV bytes for a completed import.
 
     Same shape as ``read_error_csv`` — 404 when the import didn't
@@ -522,18 +516,12 @@ def read_skipped_csv(import_row: LeadImport) -> bytes:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="this import has no duplicates report",
         )
-    from pathlib import Path
-
-    full = Path("./storage").resolve() / import_row.skipped_report_path.lstrip("/")
-    if not full.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="duplicates report file missing on disk",
-        )
-    return full.read_bytes()
+    return await _read_stored(
+        import_row, import_row.skipped_report_path, "duplicates report file missing"
+    )
 
 
-def read_warnings_csv(import_row: LeadImport) -> bytes:
+async def read_warnings_csv(import_row: LeadImport) -> bytes:
     """Read the warnings CSV bytes for a completed import.
 
     Same shape as the error / skipped readers — 404 when the import
@@ -545,15 +533,9 @@ def read_warnings_csv(import_row: LeadImport) -> bytes:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="this import has no warnings report",
         )
-    from pathlib import Path
-
-    full = Path("./storage").resolve() / import_row.warnings_report_path.lstrip("/")
-    if not full.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="warnings report file missing on disk",
-        )
-    return full.read_bytes()
+    return await _read_stored(
+        import_row, import_row.warnings_report_path, "warnings report file missing"
+    )
 
 
 __all__ = [

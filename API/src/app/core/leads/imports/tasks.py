@@ -85,7 +85,7 @@ from src.app.core.pipelines.service import get_pipeline_by_key
 from src.app.shared import validators as shared_validators
 from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.db import async_session
-from src.app.shared.storage import get_storage
+from src.app.shared.storage import assert_org_key, get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,8 @@ async def process_lead_import_async(import_id: uuid.UUID) -> dict[str, Any]:
     token = set_context(RequestContext(org_id=org_id, user_id=uploader))
     try:
         try:
-            header, rows_iter = parse_rows(storage_path, mapping)
+            data = await get_storage().get(assert_org_key(org_id, storage_path))
+            header, rows_iter = parse_rows(storage_path, data, mapping)
         except Exception as exc:
             logger.exception("process_lead_import: parse failed for %s", import_id)
             await _mark_failed(import_id, str(exc))

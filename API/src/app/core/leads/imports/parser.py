@@ -21,7 +21,6 @@ import csv
 import io
 from collections.abc import Iterator
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 
@@ -38,15 +37,6 @@ class HeaderInfo:
     well-shaped error CSV without re-reading the file."""
 
     columns: list[str]  # original column order, deduped
-
-
-def _open_file_bytes(path: str) -> bytes:
-    """Resolve the storage-relative path under `./storage/` and return
-    raw bytes. Mirrors the StorageBackend contract — paths are relative
-    POSIX strings, joined onto the local storage root.
-    """
-    full = Path("./storage").resolve() / path.lstrip("/")
-    return full.read_bytes()
 
 
 def _decode_csv(data: bytes) -> str:
@@ -76,10 +66,9 @@ def _apply_mapping(
 
 
 def parse_csv_rows(
-    storage_path: str, mapping: dict[str, str | None]
+    data: bytes, mapping: dict[str, str | None]
 ) -> tuple[HeaderInfo, Iterator[ParsedRow]]:
-    """Parse a CSV file at `storage_path` against `mapping`."""
-    data = _open_file_bytes(storage_path)
+    """Parse CSV `data` against `mapping`."""
     text = _decode_csv(data)
     reader = csv.reader(io.StringIO(text))
     try:
@@ -108,15 +97,14 @@ def parse_csv_rows(
 
 
 def parse_xlsx_rows(
-    storage_path: str, mapping: dict[str, str | None]
+    data: bytes, mapping: dict[str, str | None]
 ) -> tuple[HeaderInfo, Iterator[ParsedRow]]:
-    """Parse an XLSX file's first sheet at `storage_path`."""
+    """Parse the first sheet of XLSX `data`."""
     try:
         from openpyxl import load_workbook
     except ImportError as exc:  # pragma: no cover - openpyxl bundled
         raise RuntimeError("openpyxl not installed") from exc
 
-    data = _open_file_bytes(storage_path)
     wb = load_workbook(filename=io.BytesIO(data), read_only=True)
     ws = wb.active
     if ws is None:
@@ -163,14 +151,15 @@ def parse_xlsx_rows(
 
 
 def parse_rows(
-    storage_path: str, mapping: dict[str, str | None]
+    storage_path: str, data: bytes, mapping: dict[str, str | None]
 ) -> tuple[HeaderInfo, Iterator[ParsedRow]]:
-    """Dispatch to the CSV or XLSX parser based on extension."""
+    """Dispatch `data` to the CSV or XLSX parser based on the extension
+    of `storage_path`."""
     ext = storage_path.rsplit(".", 1)[-1].lower()
     if ext == "csv":
-        return parse_csv_rows(storage_path, mapping)
+        return parse_csv_rows(data, mapping)
     if ext == "xlsx":
-        return parse_xlsx_rows(storage_path, mapping)
+        return parse_xlsx_rows(data, mapping)
     raise ValueError(f"unsupported file extension: {ext!r}")
 
 

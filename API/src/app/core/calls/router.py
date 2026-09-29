@@ -36,6 +36,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
@@ -191,12 +192,12 @@ async def download_recording_endpoint(
     call_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("calls.read")),
-) -> Response:
+) -> StreamingResponse:
     """Stream the uploaded recording bytes back to the client. 404 when
     the call has no uploaded file — the frontend falls back to
     ``recording_url`` in that case."""
-    data, content_type = await read_recording_file(db, call_id=call_id)
-    return Response(content=data, media_type=content_type)
+    chunks, content_type, size = await read_recording_file(db, call_id=call_id)
+    return StreamingResponse(chunks, media_type=content_type, headers={"Content-Length": str(size)})
 
 
 # --- Transcript -----------------------------------------------------------
