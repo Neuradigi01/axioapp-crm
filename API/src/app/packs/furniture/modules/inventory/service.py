@@ -45,6 +45,7 @@ from src.app.packs.furniture.modules.inventory.schemas import (
     WarehouseUpdate,
 )
 from src.app.shared.db.queries import ensure_found
+from src.app.shared.files.image import require_image_upload
 from src.app.shared.storage import get_storage
 
 # --- warehouses ---------------------------------------------------------
@@ -276,8 +277,6 @@ async def set_item_cover(
     item_id: uuid.UUID,
     org_id: uuid.UUID,
     file_bytes: bytes,
-    content_type: str | None,
-    filename: str | None,
 ) -> str:
     """Persist a cover image for `item_id`, save to storage backend,
     write the served URL to `inventory_items.cover_url`, and return
@@ -287,17 +286,13 @@ async def set_item_cover(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="uploaded file is empty",
         )
+    # Type + extension come from the bytes (libmagic), never from the
+    # client's filename or Content-Type.
+    mime, ext = require_image_upload(file_bytes)
     item = await get_item(session, item_id)
 
-    ext = "jpg"
-    if filename and "." in filename:
-        ext = filename.rsplit(".", 1)[-1].lower()[:8]
     storage_path = f"{org_id}/inventory/{item.id}/cover.{ext}"
-    ref = await get_storage().put(
-        storage_path,
-        file_bytes,
-        content_type=content_type or "application/octet-stream",
-    )
+    ref = await get_storage().put(storage_path, file_bytes, content_type=mime)
 
     item.cover_url = ref.url
     await session.commit()

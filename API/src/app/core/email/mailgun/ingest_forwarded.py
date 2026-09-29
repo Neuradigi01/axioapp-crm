@@ -312,7 +312,7 @@ async def handle_forwarded_address(
         details.last_inbound_at = datetime.now(UTC)
         await session.commit()
         if attachments_meta:
-            mailgun_service.commit_attachments(
+            await mailgun_service.commit_attachments(
                 org_id=org_id,
                 request_id=request_id,
                 message_id=message.id,

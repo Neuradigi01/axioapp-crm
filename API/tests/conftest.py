@@ -1,3 +1,5 @@
+import os
+
 import asyncpg
 import pytest
 import pytest_asyncio
@@ -20,6 +22,12 @@ TEST_DATABASE_URL = DATABASE_URL.replace(f"/{DB_NAME}", f"/{TEST_DB_NAME}")
 
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
 TestSession = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+
+
+def pytest_configure(config):
+    """Tests never touch a real bucket: force local-disk storage even when
+    the container runs with STORAGE_BACKEND=r2."""
+    os.environ["STORAGE_BACKEND"] = "local"
 
 
 async def _ensure_test_db_exists():

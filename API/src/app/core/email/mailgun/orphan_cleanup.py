@@ -1,4 +1,4 @@
-"""Filesystem orphan sweepers for the Mailgun ingest pipeline.
+"""Orphan sweepers for the Mailgun ingest pipeline.
 
 Two sibling tasks live here:
 
@@ -8,18 +8,16 @@ Two sibling tasks live here:
     ingest task; anything older than that is either a mid-crash
     ingest that never committed or a repro-artifact.
 
-  * :func:`sweep_messages_orphans` — remove
-    ``./storage/{org_id}/messages/{message_id}/`` directories that
-    don't correspond to a ``tbl_messages`` row and are older than
-    24 hours. Catches the (rare) case where a Message row was
-    deleted or its transaction rolled back after commit_attachments
-    already moved the files in.
+  * :func:`sweep_messages_orphans` — remove committed attachments
+    (``{org_id}/messages/{message_id}/`` in the storage backend) whose
+    ``tbl_messages`` row no longer exists. ``commit_attachments`` only
+    uploads after the row commits, so a missing row always means the
+    message was deleted later — no age threshold is needed.
 
 Cadence rationale:
   * Staging sweep every 15 min (fast + cheap; staging dirs are
     small).
-  * Messages sweep daily (slow + orphaned files here are already
-    24h old; no urgency).
+  * Messages sweep daily (one storage listing per org; no urgency).
 
 Both are best-effort — a filesystem hiccup logs a warning and moves
 on. The next tick picks up whatever the previous tick missed.
@@ -29,33 +27,24 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import time
 import uuid
 from pathlib import Path
 
-from sqlalchemy import select
-
-from src.app.core.conversations.models import Message
+from src.app.core.email.mailgun import data_access as mailgun_da
 from src.app.shared.db import async_session
+from src.app.shared.storage import get_storage, storage_root
 from src.celery.worker import celery
 
 logger = logging.getLogger(__name__)
 
-_STORAGE_ROOT_ENV = "STORAGE_ROOT"
-_DEFAULT_STORAGE_ROOT = "./storage"
 _STAGING_MIN_AGE_SECONDS = 3600  # 1 hour
-_MESSAGES_ORPHAN_MIN_AGE_SECONDS = 86400  # 24 hours
-
-
-def _storage_root() -> Path:
-    return Path(os.getenv(_STORAGE_ROOT_ENV, _DEFAULT_STORAGE_ROOT))
 
 
 def _iter_org_dirs() -> list[Path]:
     """Every top-level ``./storage/<org_id>/`` — skips reserved
     names like ``pending-inbound`` that live at the same level."""
-    root = _storage_root()
+    root = storage_root()
     if not root.exists():
         return []
     out: list[Path] = []
@@ -118,58 +107,43 @@ def sweep_staging_orphans(self) -> int:  # noqa: ARG001
     bind=True,
 )
 def sweep_messages_orphans(self) -> int:  # noqa: ARG001
-    """Remove messages/{msg_id}/ dirs older than 24h with no matching
-    ``tbl_messages`` row."""
+    """Remove committed attachments whose ``tbl_messages`` row is gone."""
     return asyncio.run(_sweep_messages_orphans_async())
 
 
 async def _sweep_messages_orphans_async() -> int:
-    now = time.time()
+    storage = get_storage()
     removed = 0
     async with async_session() as session:
-        for org_dir in _iter_org_dirs():
-            messages_root = org_dir / "messages"
-            if not messages_root.exists():
-                continue
-
-            # Collect candidate dirs older than the threshold. Batch
-            # the row-existence check into one query per org to keep
-            # the sweep O(orgs) not O(orphans).
-            candidates: list[tuple[Path, uuid.UUID]] = []
-            for child in messages_root.iterdir():
-                if not child.is_dir():
-                    continue
+        org_ids = await mailgun_da.list_org_ids(session)
+        # {message_id: org_id} for every committed-attachment folder.
+        # Keys are `{org}/messages/{message_id}/{file}`.
+        stored: dict[uuid.UUID, uuid.UUID] = {}
+        for org_id in org_ids:
+            async for key in storage.list_keys(f"{org_id}/messages"):
+                parts = key.split("/")
                 try:
-                    msg_uuid = uuid.UUID(child.name)
-                except ValueError:
+                    stored[uuid.UUID(parts[2])] = org_id
+                except (IndexError, ValueError):
                     continue
-                try:
-                    age = now - child.stat().st_mtime
-                except FileNotFoundError:
-                    continue
-                if age < _MESSAGES_ORPHAN_MIN_AGE_SECONDS:
-                    continue
-                candidates.append((child, msg_uuid))
+        if not stored:
+            return 0
+        existing = await mailgun_da.existing_message_ids(session, set(stored))
 
-            if not candidates:
-                continue
-
-            existing = {
-                row[0]
-                for row in (
-                    await session.execute(
-                        select(Message.id).where(Message.id.in_([mid for _, mid in candidates]))
-                    )
-                ).all()
-            }
-            for child_path, mid in candidates:
-                if mid in existing:
-                    continue
-                if _rm_dir_quiet(child_path):
-                    removed += 1
+    for message_id, org_id in stored.items():
+        if message_id in existing:
+            continue
+        try:
+            await storage.delete_directory(f"{org_id}/messages/{message_id}")
+        except Exception as exc:  # best-effort; next tick retries
+            logger.warning(
+                "mailgun.orphan_cleanup: failed to remove message=%s: %s", message_id, exc
+            )
+            continue
+        removed += 1
 
     if removed:
-        logger.info("mailgun.sweep_messages_orphans removed %d orphan dir(s)", removed)
+        logger.info("mailgun.sweep_messages_orphans removed %d orphan message(s)", removed)
     return removed
 
 

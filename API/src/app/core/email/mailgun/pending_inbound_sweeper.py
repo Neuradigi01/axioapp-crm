@@ -23,22 +23,15 @@ Step 3 vs Step 4 boundary:
 from __future__ import annotations
 
 import logging
-import os
 import time
-from pathlib import Path
 
+from src.app.shared.storage import storage_root
 from src.celery.worker import celery
 
 logger = logging.getLogger(__name__)
 
-_STORAGE_ROOT_ENV = "STORAGE_ROOT"
-_DEFAULT_STORAGE_ROOT = "./storage"
 _PENDING_SUBDIR = "pending-inbound"
 _MIN_AGE_SECONDS = 300  # 5 minutes
-
-
-def _storage_root() -> Path:
-    return Path(os.getenv(_STORAGE_ROOT_ENV, _DEFAULT_STORAGE_ROOT))
 
 
 @celery.task(
@@ -51,7 +44,7 @@ def sweep_pending_inbound(self) -> int:  # noqa: ARG001
     Returns the count of directories re-enqueued so the beat log has
     an at-a-glance drain rate.
     """
-    pending_root = _storage_root() / _PENDING_SUBDIR
+    pending_root = storage_root() / _PENDING_SUBDIR
     if not pending_root.exists():
         return 0
 

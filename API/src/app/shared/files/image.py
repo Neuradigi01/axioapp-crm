@@ -12,10 +12,15 @@ here so size + format rules stay consistent.
 from __future__ import annotations
 
 import magic
+from fastapi import HTTPException, status
 
 # 5 MB cap — matches the contacts-import upload limit; predictable
 # memory profile for inline processing.
 MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+
+# Field / job-site photos straight from a phone camera run larger than
+# catalog covers; 10 MB matches ``MAX_FILE_SIZE_MB`` in config.env.
+PHOTO_MAX_BYTES = 10 * 1024 * 1024
 
 
 # Catalog covers in v1. GIF/BMP intentionally excluded — photo
@@ -35,7 +40,7 @@ class ImageValidationError(ValueError):
     reaches the client untouched."""
 
 
-def validate_image_upload(data: bytes) -> tuple[str, str]:
+def validate_image_upload(data: bytes, *, max_bytes: int = MAX_IMAGE_SIZE_BYTES) -> tuple[str, str]:
     """Validate raw upload bytes and return `(mime, extension)`.
 
     Stages:
@@ -48,8 +53,8 @@ def validate_image_upload(data: bytes) -> tuple[str, str]:
     if not data:
         raise ImageValidationError("Empty file.")
 
-    if len(data) > MAX_IMAGE_SIZE_BYTES:
-        max_mb = MAX_IMAGE_SIZE_BYTES // (1024 * 1024)
+    if len(data) > max_bytes:
+        max_mb = max_bytes // (1024 * 1024)
         raise ImageValidationError(f"Image exceeds the {max_mb} MB cap.")
 
     detected_mime = magic.from_buffer(data[:2048], mime=True)
@@ -61,9 +66,22 @@ def validate_image_upload(data: bytes) -> tuple[str, str]:
     return detected_mime, extension
 
 
+def require_image_upload(data: bytes, *, max_bytes: int = MAX_IMAGE_SIZE_BYTES) -> tuple[str, str]:
+    """`validate_image_upload`, translated to HTTP 422 for services that
+    have no domain-specific error mapping of their own."""
+    try:
+        return validate_image_upload(data, max_bytes=max_bytes)
+    except ImageValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+
 __all__ = [
     "ALLOWED_IMAGE_MIME",
     "MAX_IMAGE_SIZE_BYTES",
+    "PHOTO_MAX_BYTES",
     "ImageValidationError",
+    "require_image_upload",
     "validate_image_upload",
 ]

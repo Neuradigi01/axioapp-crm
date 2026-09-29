@@ -209,8 +209,6 @@ async def upload_cover_endpoint(
         item_id=item_id,
         org_id=user.org_id,
         file_bytes=data,
-        content_type=file.content_type,
-        filename=file.filename,
     )
     return CoverUploadResponse(cover_url=cover_url)
 

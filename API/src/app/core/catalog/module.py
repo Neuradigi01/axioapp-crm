@@ -23,4 +23,5 @@ MODULE = ModuleDescriptor(
         "catalog.archive",
     ],
     section="Business",
+    public_files=["catalog/{uuid}/*"],
 )

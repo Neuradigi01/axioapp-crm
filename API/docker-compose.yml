@@ -33,6 +33,12 @@ x-secret-vars: &secret-vars
   MAILGUN_API_KEY:
   MAILGUN_SIGNING_KEY:
   MAILGUN_SIGNING_KEY_PREVIOUS:
+  # r2-storage track — Cloudflare R2 bucket credentials. Only read when
+  # STORAGE_BACKEND=r2 (set per environment in config.<env>.env).
+  R2_ACCOUNT_ID:
+  R2_ACCESS_KEY_ID:
+  R2_SECRET_ACCESS_KEY:
+  R2_BUCKET:
 
 services:
   api:
@@ -86,6 +92,8 @@ services:
       - config.${APP_ENV}.env
     environment:
       <<: *secret-vars
+    volumes:
+      - ./storage:/app/storage
     depends_on:
       - celery
     profiles:

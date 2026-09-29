@@ -62,8 +62,7 @@ Each secrets file carries four new keys: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R
    - Reads are streamed in chunks (`open_stream`), not loaded whole into memory.
    - This is an unsourced trade-off. Revisit a CDN-fronted public-assets bucket only if bandwidth becomes measurable.
 4. **Public visibility comes from a registry, not hard-coded paths in core.**
-   - `shared/storage/public_registry.py` exposes `register_public_prefix(pattern)`.
-   - Each module that serves no-login images registers its own key pattern at import time, following the same pattern as the menu and permission registries (rules 1, 5 and 6):
+   - Each module that serves no-login images declares its key patterns in `ModuleDescriptor.public_files`, the same descriptor that already carries its menu entry and permissions (rules 1, 5 and 6). `registry.public_file_patterns()` collects them; `shared/storage/public_patterns.py` parses and matches them:
      - catalog: `catalog/{org}/…`
      - furniture inventory, field_visits and custom_orders: `{org}/<entity>/…`
      - real-estate property: `{org}/property/…`
@@ -132,7 +131,7 @@ Each secrets file carries four new keys: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R
 | 1 | **Async storage interface + key guard.** Make `StorageBackend` async, add `open_stream` / `stat` / `list_keys` to it, and add the `keys.py` guard. Convert `LocalStorage`, add `await` at every call site, update tests. This is mechanical and exceeds the 10-file guideline because a half-converted interface is not runnable. | shared + all callers | — |
 | 2 | **Route bypassing reads through storage.** Contact imports, lead imports service + `parser.py`, and call recordings move to `get_for_org(...)`. `Path("./storage")` is removed from `core/`. Call-recording download streams through `open_stream`. | core | 1 |
 | 3 | **`R2Storage` + backend selection.** Add `shared/storage/r2.py` and read `STORAGE_BACKEND` in `get_storage()`. Also: config validation, a shared `STORAGE_ROOT` helper, boto3 in `requirements.txt`, `R2_*` in the `docker-compose.yml` secret passthrough, and the `storage` volume on `celery-beat`. | shared | 1 |
-| 4 | **Public-prefix registry.** Add `shared/storage/public_registry.py`; each owning module (catalog, furniture ×3, real_estate property, ai_assistants) registers its pattern. | shared + modules | 1 |
+| 4 | **Public-file patterns.** `ModuleDescriptor.public_files` + `shared/storage/public_patterns.py`; each owning module (catalog, furniture ×3, real_estate property, ai_assistants) declares its pattern in `module.py`. | shared + modules | 1 |
 | 5 | **`/files/{key}` router replaces the static mount.** Fill the existing `core/files/` (router → service; no DAL, since there is no DB). Behaviour follows Decisions 4–6, with a per-IP rate limit reusing the existing limiter. Verify that every registered-prefix upload path sniffs its type. | core/files | 1, 3, 4 |
 | 6 | **Mailgun committed attachments → storage.** `commit_attachments` uploads from staging, then deletes the staging copy. The conversations endpoint streams with `Content-Disposition: attachment`. `orphan_cleanup`'s `{org}/messages` scan uses `list_keys`. | core/email, core/conversations | 1, 3 |
 | 7 | **Quarantine payloads → storage.** When quarantining, copy the payload to `{org}/quarantine/{id}/` and store that key. Release, purge and preview read and delete through storage. | core/email | 6 |

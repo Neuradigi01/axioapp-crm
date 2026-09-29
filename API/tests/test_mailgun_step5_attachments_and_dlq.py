@@ -19,14 +19,12 @@ downloadable by an authenticated caller in Org B.
 
 from __future__ import annotations
 
-import asyncio
 import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select
 
 from src.app.core.conversations.models import (
     Conversation,
@@ -36,12 +34,11 @@ from src.app.core.conversations.models import (
     MessageDirection,
 )
 from src.app.core.email.mailgun import service as mgs
-from src.app.core.email.mailgun.dlq_models import EmailInboundDlq
 from src.app.core.email.mailgun.orphan_cleanup import (
     _sweep_messages_orphans_async,
 )
 from src.app.core.tenants.models import Organization
-
+from src.app.shared.storage.local import LocalStorage
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -79,9 +76,7 @@ def test_extract_and_stage_returns_empty_when_no_attachments(tmp_path, monkeypat
     pending.mkdir(parents=True)
     org_id = uuid.uuid4()
     req_id = uuid.uuid4()
-    atts, reason = mgs.extract_and_stage_attachments(
-        pending, org_id=org_id, request_id=req_id
-    )
+    atts, reason = mgs.extract_and_stage_attachments(pending, org_id=org_id, request_id=req_id)
     assert atts == []
     assert reason is None
 
@@ -94,9 +89,7 @@ def test_extract_and_stage_accepts_allowlisted_pdf(tmp_path, monkeypatch):
     _mk_attachment(pending, 0, "invoice.pdf", b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n" + b"0" * 128)
     org_id = uuid.uuid4()
     req_id = uuid.uuid4()
-    atts, reason = mgs.extract_and_stage_attachments(
-        pending, org_id=org_id, request_id=req_id
-    )
+    atts, reason = mgs.extract_and_stage_attachments(pending, org_id=org_id, request_id=req_id)
     assert reason is None
     assert len(atts) == 1
     entry = atts[0]
@@ -173,14 +166,10 @@ def test_extract_and_stage_sanitises_path_traversal(tmp_path, monkeypatch):
     _mk_attachment(pending, 0, "safe.pdf", b"%PDF-1.4\n" + b"\x00" * 128)
     # Manually place a badly-named file too — persist_pending_inbound
     # would sanitise it, but the extractor must be robust regardless.
-    (pending / "attachment_1_..__etc__passwd.pdf").write_bytes(
-        b"%PDF-1.4\n" + b"\x00" * 128
-    )
+    (pending / "attachment_1_..__etc__passwd.pdf").write_bytes(b"%PDF-1.4\n" + b"\x00" * 128)
     org_id = uuid.uuid4()
     req_id = uuid.uuid4()
-    atts, _ = mgs.extract_and_stage_attachments(
-        pending, org_id=org_id, request_id=req_id
-    )
+    atts, _ = mgs.extract_and_stage_attachments(pending, org_id=org_id, request_id=req_id)
     # All resulting storage_keys are safe — no path separators.
     for entry in atts:
         assert "/" not in entry["storage_key"]
@@ -188,8 +177,9 @@ def test_extract_and_stage_sanitises_path_traversal(tmp_path, monkeypatch):
         assert not entry["storage_key"].startswith("..")
 
 
-def test_commit_attachments_moves_staging_to_messages(tmp_path, monkeypatch):
+async def test_commit_attachments_moves_staging_to_messages(tmp_path, monkeypatch):
     monkeypatch.setenv("STORAGE_ROOT", str(tmp_path))
+    monkeypatch.setattr(mgs, "get_storage", lambda: LocalStorage(root=str(tmp_path)))
     org_id = uuid.uuid4()
     req_id = uuid.uuid4()
     msg_id = uuid.uuid4()
@@ -197,7 +187,7 @@ def test_commit_attachments_moves_staging_to_messages(tmp_path, monkeypatch):
     staging.mkdir(parents=True)
     (staging / "file.pdf").write_bytes(b"content")
 
-    mgs.commit_attachments(org_id=org_id, request_id=req_id, message_id=msg_id)
+    await mgs.commit_attachments(org_id=org_id, request_id=req_id, message_id=msg_id)
 
     final = tmp_path / str(org_id) / "messages" / str(msg_id) / "file.pdf"
     assert final.exists()
@@ -206,10 +196,10 @@ def test_commit_attachments_moves_staging_to_messages(tmp_path, monkeypatch):
     assert not staging.exists()
 
 
-def test_commit_attachments_noop_when_staging_missing(tmp_path, monkeypatch):
+async def test_commit_attachments_noop_when_staging_missing(tmp_path, monkeypatch):
     """Ingest may commit with no attachments — must not raise."""
     monkeypatch.setenv("STORAGE_ROOT", str(tmp_path))
-    mgs.commit_attachments(
+    await mgs.commit_attachments(
         org_id=uuid.uuid4(), request_id=uuid.uuid4(), message_id=uuid.uuid4()
     )  # no raise
 
@@ -269,9 +259,7 @@ async def test_download_endpoint_rejects_bad_safe_key(
 ):
     """Attacker path-traversal probes must 400 without a DB hit."""
     monkeypatch.setenv("STORAGE_ROOT", str(tmp_path))
-    resp = await layered_client.get(
-        f"/api/v1/messages/{uuid.uuid4()}/attachments/../etc/passwd"
-    )
+    resp = await layered_client.get(f"/api/v1/messages/{uuid.uuid4()}/attachments/../etc/passwd")
     # FastAPI itself normalises the path so we expect either 404 or 400
     # depending on the URL parser; the guard exists so the endpoint
     # never touches the filesystem with an unsafe key.
@@ -288,9 +276,7 @@ async def test_download_endpoint_404s_on_missing_key_in_message(
     # No auth for this call — the endpoint is auth-gated + would 401
     # before reaching the check. That's fine; we're asserting the URL
     # is at least routable and doesn't crash.
-    resp = await layered_client.get(
-        f"/api/v1/messages/{uuid.uuid4()}/attachments/nonexistent.pdf"
-    )
+    resp = await layered_client.get(f"/api/v1/messages/{uuid.uuid4()}/attachments/nonexistent.pdf")
     assert resp.status_code in (401, 404)
 
 
@@ -356,38 +342,28 @@ def test_sweep_staging_orphans_removes_old_dirs(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_sweep_messages_orphans_removes_dirs_with_no_row(
-    test_db, tmp_path, monkeypatch
-):
-    """Attacker M5 fix — messages/{id}/ dirs orphaned by a rolled-back
-    ingest must be cleaned up, but only when >24h old AND no row."""
+async def test_sweep_messages_orphans_removes_dirs_with_no_row(test_db, tmp_path, monkeypatch):
+    """Attacker M5 fix — committed attachments whose Message row is gone
+    are removed from storage; attachments of a live message are kept."""
     monkeypatch.setenv("STORAGE_ROOT", str(tmp_path))
+    from src.app.core.email.mailgun import orphan_cleanup
+
+    monkeypatch.setattr(orphan_cleanup, "get_storage", lambda: LocalStorage(root=str(tmp_path)))
     org = await _make_org(test_db, "orphan")
     await test_db.commit()
 
-    messages_root = tmp_path / str(org.id) / "messages"
-    messages_root.mkdir(parents=True)
-
-    # Orphan (no matching row, >24h old) — remove.
-    orphan_id = uuid.uuid4()
-    orphan_dir = messages_root / str(orphan_id)
-    orphan_dir.mkdir()
+    # Orphan (no matching row) — remove.
+    orphan_dir = tmp_path / str(org.id) / "messages" / str(uuid.uuid4())
+    orphan_dir.mkdir(parents=True)
     (orphan_dir / "file").write_text("x")
-    import os
 
-    old_time = time.time() - (25 * 3600)
-    os.utime(orphan_dir, (old_time, old_time))
-
-    # Recent orphan (<24h) — keep.
-    recent_id = uuid.uuid4()
-    recent_dir = messages_root / str(recent_id)
-    recent_dir.mkdir()
-    (recent_dir / "file").write_text("y")
+    # Live message — keep.
+    _, live_file = await _make_message_with_attachment(test_db, org, tmp_path, "keep.pdf", b"y")
 
     removed = await _sweep_messages_orphans_async()
     assert removed == 1
     assert not orphan_dir.exists()
-    assert recent_dir.exists()
+    assert live_file.exists()
 
 
 # ---------------------------------------------------------------------------

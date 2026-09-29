@@ -183,17 +183,7 @@ async def upload_photo_endpoint(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="uploaded file is empty",
         )
-    ext = "jpg"
-    if file.filename and "." in file.filename:
-        ext = file.filename.rsplit(".", 1)[-1].lower()[:8]
-    photo = await add_photo(
-        db,
-        visit_id=visit_id,
-        data=data,
-        content_type=file.content_type or "application/octet-stream",
-        file_extension=ext,
-        caption=caption,
-    )
+    photo = await add_photo(db, visit_id=visit_id, data=data, caption=caption)
     return FieldVisitPhotoOut.model_validate(photo)
 
 
@@ -269,15 +259,5 @@ async def me_upload_photo_endpoint(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="uploaded file is empty",
         )
-    ext = "jpg"
-    if file.filename and "." in file.filename:
-        ext = file.filename.rsplit(".", 1)[-1].lower()[:8]
-    photo = await add_photo(
-        db,
-        visit_id=visit_id,
-        data=data,
-        content_type=file.content_type or "application/octet-stream",
-        file_extension=ext,
-        caption=caption,
-    )
+    photo = await add_photo(db, visit_id=visit_id, data=data, caption=caption)
     return FieldVisitPhotoOut.model_validate(photo)

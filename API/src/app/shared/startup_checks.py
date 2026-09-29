@@ -26,6 +26,7 @@ import logging
 
 from config import IS_DEVELOPMENT, TRUSTED_PROXIES
 from src.app.shared.http.client_ip import parse_trusted_proxies
+from src.app.shared.storage import StorageConfigError, get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +42,9 @@ def check_trusted_proxies() -> None:
     parsed = parse_trusted_proxies(TRUSTED_PROXIES)
     if IS_DEVELOPMENT:
         if not parsed:
-            logger.info(
-                "startup_checks: TRUSTED_PROXIES is empty (IS_DEVELOPMENT=true — OK)"
-            )
+            logger.info("startup_checks: TRUSTED_PROXIES is empty (IS_DEVELOPMENT=true — OK)")
         else:
-            logger.info(
-                "startup_checks: TRUSTED_PROXIES parsed into %d network(s)", len(parsed)
-            )
+            logger.info("startup_checks: TRUSTED_PROXIES parsed into %d network(s)", len(parsed))
         return
     if not parsed:
         raise StartupCheckFailed(
@@ -55,14 +52,23 @@ def check_trusted_proxies() -> None:
             "IP/CIDR (comma-separated) in config.env or the API refuses to boot "
             "— see docs/public-ingest.md."
         )
-    logger.info(
-        "startup_checks: TRUSTED_PROXIES parsed into %d network(s)", len(parsed)
-    )
+    logger.info("startup_checks: TRUSTED_PROXIES parsed into %d network(s)", len(parsed))
+
+
+def check_storage_config() -> None:
+    """``STORAGE_BACKEND`` must be valid, and ``r2`` needs every
+    ``R2_*`` variable. Reachability is probed separately and never
+    blocks boot (see ``storage.probe_storage``)."""
+    try:
+        get_storage()
+    except StorageConfigError as exc:
+        raise StartupCheckFailed(str(exc)) from exc
 
 
 def run_all() -> None:
     """Run every startup check in order. Called from ``main.lifespan``."""
     check_trusted_proxies()
+    check_storage_config()
 
 
-__all__ = ["StartupCheckFailed", "check_trusted_proxies", "run_all"]
+__all__ = ["StartupCheckFailed", "check_storage_config", "check_trusted_proxies", "run_all"]

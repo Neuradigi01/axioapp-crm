@@ -30,4 +30,5 @@ MODULE = ModuleDescriptor(
         "inventory.transfer",
     ],
     section="Sales",
+    public_files=["{uuid}/inventory/{uuid}/*"],
 )

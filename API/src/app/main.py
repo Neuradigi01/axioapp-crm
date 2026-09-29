@@ -7,6 +7,7 @@ Mounts:
     (health for now; modules added in later steps).
 """
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 
@@ -110,6 +111,17 @@ import src.app.core.custom_events.models  # noqa: F401
 import src.app.core.custom_events.module  # noqa: F401
 import src.app.core.custom_events.tasks  # noqa: F401
 
+# tasks/email-inbound-audit-verdicts Step 1 — side-effect import so
+# the ``tbl_email_inbound_deliveries`` audit table registers with
+# ``Base.metadata``. NOTE: this is a system-level table (no org_id) —
+# documented deviation from CLAUDE.md rule 2 in the module docstring.
+import src.app.core.email.mailgun.audit_deliveries  # noqa: F401
+
+# tasks/email-quarantine-filters Step 1 — side-effect import so the
+# ``tbl_email_quarantine`` + ``tbl_email_filter_rules`` tables
+# register with ``Base.metadata``.
+import src.app.core.email.quarantine.models  # noqa: F401
+
 # tasks/email-reputation-warmup Step 2 — side-effect import so the
 # new ``OrganizationEmailReputation`` model registers with
 # ``Base.metadata`` before the test-DB create_all sweep + Alembic
@@ -121,17 +133,6 @@ import src.app.core.email.reputation.models  # noqa: F401
 # ``EmailSenderDomain`` in the same models.py) registers with
 # ``Base.metadata`` before the test-DB create_all sweep.
 import src.app.core.email_sender_setup.models  # noqa: F401
-
-# tasks/email-quarantine-filters Step 1 — side-effect import so the
-# ``tbl_email_quarantine`` + ``tbl_email_filter_rules`` tables
-# register with ``Base.metadata``.
-import src.app.core.email.quarantine.models  # noqa: F401
-
-# tasks/email-inbound-audit-verdicts Step 1 — side-effect import so
-# the ``tbl_email_inbound_deliveries`` audit table registers with
-# ``Base.metadata``. NOTE: this is a system-level table (no org_id) —
-# documented deviation from CLAUDE.md rule 2 in the module docstring.
-import src.app.core.email.mailgun.audit_deliveries  # noqa: F401
 
 # Side-effect import so the email_senders MODULE descriptor lands on
 # the module registry before the lifespan permission-fanout sweep.
@@ -202,11 +203,11 @@ from src.app.core.email.mailgun.router import (
 from src.app.core.email.mailgun.router import (
     router as mailgun_inbound_router,
 )
+from src.app.core.email.quarantine.router import router as email_quarantine_router
 from src.app.core.email.reputation.router import (
     router as reputation_router,
 )
 from src.app.core.email.router import router as email_router
-from src.app.core.email.quarantine.router import router as email_quarantine_router
 from src.app.core.email.tracking.router import router as email_tracking_router
 from src.app.core.email_sender_setup.router import (
     router as email_sender_setup_router,
@@ -222,6 +223,7 @@ from src.app.core.embed.router import (
 from src.app.core.embed.router import (
     router as embed_keys_router,
 )
+from src.app.core.files.router import router as files_router
 from src.app.core.health.router import router as health_router
 from src.app.core.integrations.ai.router import router as integrations_ai_router
 from src.app.core.integrations.router import router as integrations_router
@@ -314,6 +316,7 @@ from src.app.packs.real_estate.modules.property.router import (
 from src.app.shared.db import async_session
 from src.app.shared.middleware import RawBodyCaptureMiddleware, TenantContextMiddleware
 from src.app.shared.startup_checks import run_all as run_startup_checks
+from src.app.shared.storage import probe_storage
 
 # Bind the configured Celery app at API startup so @shared_task tasks
 # (e.g. process_meta_lead, process_google_lead, campaign senders) route
@@ -333,6 +336,8 @@ async def lifespan(app: FastAPI):
     # in production so XFF parsing (and per-IP rate limiting behind it)
     # cannot silently degrade to a single-bucket-for-everyone posture.
     run_startup_checks()
+    # r2-storage — log (never fail) whether the storage backend answers.
+    app.state.storage_probe = asyncio.create_task(probe_storage())
     await generate_routes_json()
     initialize_firebase()
 
@@ -444,12 +449,6 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Local storage mount — backs `StorageBackend.url()`. Inventory covers
-# (and any future pack-uploaded blobs) live under `./storage/`.
-_STORAGE_DIR = "./storage"
-os.makedirs(_STORAGE_DIR, exist_ok=True)
-app.mount("/files", StaticFiles(directory=_STORAGE_DIR), name="files")
-
 # Public chat widget bundle — served as-is to any origin so a customer's
 # ``<script src=".../widget/v1/widget.js">`` tag works cross-origin. Built
 # by ``../widget`` (Vite) into ``../widget/dist/v1/widget.js``; docker-compose
@@ -461,6 +460,9 @@ if os.path.isdir(_WIDGET_DIR):
     app.mount("/widget", StaticFiles(directory=_WIDGET_DIR), name="widget")
 
 app.include_router(legacy_router)
+# `/files/{key}` — public images from the storage backend (backs
+# `StorageBackend.url()`); private blobs are never served here.
+app.include_router(files_router)
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")

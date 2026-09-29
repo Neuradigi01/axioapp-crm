@@ -48,6 +48,7 @@ if /i "%CMD%"=="migrate"        goto :do_migrate
 if /i "%CMD%"=="upgrade"        goto :do_upgrade
 if /i "%CMD%"=="downgrade"      goto :do_downgrade
 if /i "%CMD%"=="seed"           goto :do_seed
+if /i "%CMD%"=="storage-migrate" goto :do_storage_migrate
 if /i "%CMD%"=="lock"           goto :do_lock
 if /i "%CMD%"=="secrets-edit"   goto :do_secrets_edit
 if /i "%CMD%"=="secrets-rekey"  goto :do_secrets_rekey
@@ -81,6 +82,8 @@ echo   migrate [msg]        Generate an Alembic migration (default msg: auto_mig
 echo   upgrade [N]          Apply migrations (default: all pending)
 echo   downgrade [N]        Revert migrations (default: 1 step back)
 echo   seed [type]          Run seeds (default: all)
+echo   storage-migrate [--dry-run] [--only-missing] [--reverse]
+echo                        Copy ./storage to the env's R2 bucket (--reverse: back to disk)
 echo.
 echo Dependencies
 echo   lock                 Regenerate uv.lock from pyproject.toml
@@ -230,6 +233,13 @@ if "%seedtype%"=="" (
 ) else (
     sops exec-env "!SECRETS_FILE!" "docker compose !ENV_FILE_FLAGS! !COMPOSE_FILES! run --rm --entrypoint python api -m src.seeds.run !seedtype!"
 )
+exit /b !errorlevel!
+
+
+:do_storage_migrate
+call :require_secrets
+if errorlevel 1 exit /b 1
+sops exec-env "!SECRETS_FILE!" "docker compose !ENV_FILE_FLAGS! !COMPOSE_FILES! run --rm --entrypoint python api -m src.app.shared.storage.migrate %~2 %~3 %~4"
 exit /b !errorlevel!
 
 

@@ -52,7 +52,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import shutil
 import uuid
 from pathlib import Path
@@ -67,6 +66,7 @@ from src.app.core.email.mailgun import service as mailgun_service
 from src.app.core.email.reputation import service as reputation_service
 from src.app.shared.db import async_session
 from src.app.shared.rate_limit_shared import _redis, rate_hit  # type: ignore[attr-defined]
+from src.app.shared.storage import storage_root
 from src.celery.worker import celery
 
 logger = logging.getLogger(__name__)
@@ -86,13 +86,7 @@ _FAIL_RATE_WINDOW_SECONDS = 60
 # Storage layout mirrors the inbound webhook's ``pending-inbound/`` but
 # in a separate subdir — event payloads have a different schema and
 # get processed by a different task; the two must not collide.
-_STORAGE_ROOT_ENV = "STORAGE_ROOT"
-_DEFAULT_STORAGE_ROOT = "./storage"
 _PENDING_SUBDIR = "pending-events"
-
-
-def _storage_root() -> Path:
-    return Path(os.getenv(_STORAGE_ROOT_ENV, _DEFAULT_STORAGE_ROOT))
 
 
 async def _check_and_record_event_id(event_id: str) -> bool:
@@ -126,7 +120,7 @@ async def _persist_event_payload(body: dict[str, Any]) -> Path:
     broker enqueue. Returns the created directory (also the enqueue
     argument)."""
     request_id = uuid.uuid4()
-    pending_dir = _storage_root() / _PENDING_SUBDIR / str(request_id)
+    pending_dir = storage_root() / _PENDING_SUBDIR / str(request_id)
     pending_dir.mkdir(parents=True, exist_ok=True)
     (pending_dir / "payload.json").write_text(
         json.dumps(body, ensure_ascii=False), encoding="utf-8"

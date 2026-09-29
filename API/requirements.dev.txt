@@ -7,6 +7,9 @@ pytest-asyncio
 # stay fast and offline. Pinned loosely; API surface is stable.
 respx>=0.21,<1.0
 
+# r2-storage track — in-memory S3 stub for R2Storage tests (no network).
+moto[s3]>=5.0,<6.0
+
 # Code-quality tooling — pinned so the container and CI install identical
 # versions (this file is the pip "lockfile" for dev tools; CLAUDE.md uses pip,
 # not uv). Bump deliberately, never float.

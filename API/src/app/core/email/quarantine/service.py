@@ -6,9 +6,9 @@ DAL does the SQL. Audit events fire on every state transition.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
-import shutil
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -32,6 +32,8 @@ from src.app.core.email.quarantine.schemas import (
     FilterRuleOut,
     QuarantineOut,
 )
+from src.app.shared.storage import get_storage
+from src.app.shared.storage.keys import content_type_for, validate_prefix
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +45,12 @@ def _rule_cap_per_org() -> int:
     try:
         return max(
             1,
-            int(os.getenv(
-                "EMAIL_FILTER_RULES_MAX_PER_ORG",
-                str(_DEFAULT_FILTER_RULE_CAP_PER_ORG),
-            )),
+            int(
+                os.getenv(
+                    "EMAIL_FILTER_RULES_MAX_PER_ORG",
+                    str(_DEFAULT_FILTER_RULE_CAP_PER_ORG),
+                )
+            ),
         )
     except ValueError:
         return _DEFAULT_FILTER_RULE_CAP_PER_ORG
@@ -75,9 +79,7 @@ async def list_filter_rules(
     org_id: uuid.UUID,
     endpoint_id: uuid.UUID | None = None,
 ) -> list[FilterRuleOut]:
-    rows = await data_access.list_filter_rules(
-        db, org_id=org_id, endpoint_id=endpoint_id
-    )
+    rows = await data_access.list_filter_rules(db, org_id=org_id, endpoint_id=endpoint_id)
     return [FilterRuleOut.model_validate(r) for r in rows]
 
 
@@ -92,9 +94,7 @@ async def create_filter_rule(
     cap = _rule_cap_per_org()
     count = await data_access.count_rules_for_org(db, org_id=org_id)
     if count >= cap:
-        raise FilterRuleCapExceededError(
-            f"org has {count} rules; cap is {cap}"
-        )
+        raise FilterRuleCapExceededError(f"org has {count} rules; cap is {cap}")
     dupe = await data_access.find_rule_by_dedupe(
         db,
         org_id=org_id,
@@ -104,9 +104,7 @@ async def create_filter_rule(
         match_value=payload.match_value,
     )
     if dupe is not None:
-        raise FilterRuleDuplicateError(
-            "a rule with this type + kind + value already exists"
-        )
+        raise FilterRuleDuplicateError("a rule with this type + kind + value already exists")
 
     row = EmailFilterRule(
         org_id=org_id,
@@ -205,16 +203,26 @@ async def enqueue_quarantine(
     attachment_summary: list[dict[str, Any]],
     reason_code: str,
     reason_detail: dict[str, Any],
-    payload_path: str,
+    pending_dir: Path,
 ) -> EmailQuarantine:
     """Insert one quarantine row. Called by the gate chain in
     :mod:`src.app.core.email.mailgun.tasks` (Step 4).
+
+    The delivery's files (``payload.json`` + attachments) are copied
+    from the short-lived local ``pending_dir`` into the storage backend
+    under ``{org_id}/quarantine/{row_id}/`` so the held mail survives
+    the ingest task's cleanup and a server rebuild. ``payload_path``
+    stores that storage prefix.
 
     Virus verdicts land with ``blocked_release=True`` — the operator
     can only discard, never re-release.
     """
     blocked_release = reason_code == REASON_VIRUS_VERDICT
+    row_id = uuid.uuid4()
+    payload_prefix = f"{org_id}/quarantine/{row_id}"
+    await _store_payload(pending_dir, payload_prefix)
     row = EmailQuarantine(
+        id=row_id,
         org_id=org_id,
         endpoint_id=endpoint_id,
         mailgun_delivery_id=mailgun_delivery_id,
@@ -226,7 +234,7 @@ async def enqueue_quarantine(
         attachment_summary=attachment_summary,
         reason_code=reason_code,
         reason_detail=reason_detail,
-        payload_path=payload_path,
+        payload_path=payload_prefix,
         blocked_release=blocked_release,
     )
     data_access.add_quarantine(db, row)
@@ -261,9 +269,7 @@ async def release(
             detail=f"quarantine row is already {row.status}",
         )
     if row.blocked_release:
-        raise QuarantineReleaseBlockedError(
-            "virus_verdict rows can only be discarded"
-        )
+        raise QuarantineReleaseBlockedError("virus_verdict rows can only be discarded")
 
     now = datetime.now(UTC)
     await data_access.mark_released(
@@ -305,11 +311,9 @@ async def discard(
             detail=f"quarantine row is already {row.status}",
         )
     now = datetime.now(UTC)
-    await data_access.mark_discarded(
-        db, id=row.id, resolved_by_user_id=actor_user_id, now=now
-    )
-    _cleanup_payload_dir(row.payload_path)
+    await data_access.mark_discarded(db, id=row.id, resolved_by_user_id=actor_user_id, now=now)
     await db.commit()
+    await _delete_payload(row.payload_path)
     await audit.log(
         "email_quarantine.discarded",
         entity_type="email_quarantine",
@@ -338,9 +342,7 @@ async def bulk_release(
             rejected.append({"id": str(row_id), "reason": "not_found"})
             continue
         if row.reason_code != REASON_RATE_CAPPED:
-            rejected.append(
-                {"id": str(row_id), "reason": "bulk_only_rate_capped"}
-            )
+            rejected.append({"id": str(row_id), "reason": "bulk_only_rate_capped"})
             continue
         if row.status != STATUS_HELD:
             rejected.append({"id": str(row_id), "reason": f"already_{row.status}"})
@@ -349,9 +351,7 @@ async def bulk_release(
             rejected.append({"id": str(row_id), "reason": "blocked_release"})
             continue
         now = datetime.now(UTC)
-        await data_access.mark_released(
-            db, id=row.id, resolved_by_user_id=actor_user_id, now=now
-        )
+        await data_access.mark_released(db, id=row.id, resolved_by_user_id=actor_user_id, now=now)
         released.append(row.id)
     if released:
         await db.commit()
@@ -366,18 +366,41 @@ async def bulk_release(
     return BulkReleaseResult(released=released, rejected=rejected)
 
 
-def _cleanup_payload_dir(payload_path: str) -> None:
-    """Delete the on-disk MIME dir. Best-effort; missing = success."""
-    if not payload_path:
+async def _store_payload(pending_dir: Path, prefix: str) -> None:
+    """Copy every file of a pending delivery into storage under
+    `prefix`. Best-effort per file: a failed upload is logged and the
+    row is still written, so the operator sees the held mail."""
+    storage = get_storage()
+    files = await asyncio.to_thread(
+        lambda: (
+            sorted(p for p in pending_dir.iterdir() if p.is_file()) if pending_dir.is_dir() else []
+        )
+    )
+    for path in files:
+        try:
+            data = await asyncio.to_thread(path.read_bytes)
+            await storage.put(
+                f"{prefix}/{path.name}", data, content_type=content_type_for(path.name)
+            )
+        except Exception:
+            logger.exception("quarantine.service: failed to store %s under %s", path.name, prefix)
+
+
+async def _delete_payload(payload_path: str) -> None:
+    """Delete a held payload from storage. Best-effort; missing = success.
+
+    Rows written before payloads moved to storage hold a local
+    ``pending-inbound/`` path instead of a storage prefix; the ingest
+    task already removed that folder, so there is nothing to delete.
+    """
+    try:
+        prefix = validate_prefix(payload_path)
+    except ValueError:
         return
     try:
-        p = Path(payload_path)
-        if p.exists() and p.is_dir():
-            shutil.rmtree(p)
+        await get_storage().delete_directory(prefix)
     except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "quarantine.service: failed to remove %s: %s", payload_path, exc
-        )
+        logger.warning("quarantine.service: failed to remove %s: %s", payload_path, exc)
 
 
 # ---------------------------------------------------------------------------
@@ -403,10 +426,11 @@ async def auto_purge(db: AsyncSession) -> dict[str, Any]:
     purged = 0
     for row in rows:
         await data_access.mark_auto_purged(db, id=row.id, now=now)
-        _cleanup_payload_dir(row.payload_path)
         purged += 1
     if purged:
         await db.commit()
+        for row in rows:
+            await _delete_payload(row.payload_path)
         logger.info("quarantine.auto_purge purged=%d cutoff=%s", purged, cutoff.isoformat())
     return {"purged": purged, "cutoff": cutoff.isoformat(), "at": now.isoformat()}
 

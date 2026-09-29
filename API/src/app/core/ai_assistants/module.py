@@ -28,4 +28,5 @@ MODULE = ModuleDescriptor(
     permissions=list(ALL_KEYS),
     menu_position=715,
     section="Automation",
+    public_files=["{uuid}/ai_assistants/{uuid}/profile/*"],
 )

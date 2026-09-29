@@ -417,7 +417,7 @@ async def _process_async(task, pending_dir: Path) -> None:
         elif attachments_meta:
             # ONLY after the Message row commits do we move staged
             # attachments into ``messages/{message_id}/``.
-            mailgun_service.commit_attachments(
+            await mailgun_service.commit_attachments(
                 org_id=org_id,
                 request_id=request_id,
                 message_id=message.id,
@@ -476,9 +476,9 @@ async def _write_to_dlq(
 async def _apply_extended_gates(
     session,
     *,
-    pending_dir: "Path",
-    org_id: "uuid.UUID",
-    endpoint_id: "uuid.UUID | None",
+    pending_dir: Path,
+    org_id: uuid.UUID,
+    endpoint_id: uuid.UUID | None,
     mailgun_delivery_id: str,
     sender_email: str,
     contact,
@@ -506,7 +506,11 @@ async def _apply_extended_gates(
     """
     from src.app.core.email.quarantine import (
         data_access as qda,
+    )
+    from src.app.core.email.quarantine import (
         gates as qgates,
+    )
+    from src.app.core.email.quarantine import (
         service as qservice,
     )
     from src.app.core.email.quarantine.models import (
@@ -524,9 +528,7 @@ async def _apply_extended_gates(
         return True
 
     # ── Gate 1: filter rules ────────────────────────────────────────
-    rules = await qda.find_effective_rules(
-        session, org_id=org_id, endpoint_id=endpoint_id
-    )
+    rules = await qda.find_effective_rules(session, org_id=org_id, endpoint_id=endpoint_id)
     contact_flags: list[str] = []
     if contact is not None:
         raw_flags = getattr(contact, "flags", None) or []
@@ -553,7 +555,7 @@ async def _apply_extended_gates(
                 "rule_id": str(decision.rule_id) if decision.rule_id else None,
                 "matched_kind": decision.matched_kind,
             },
-            payload_path=str(pending_dir),
+            pending_dir=pending_dir,
         )
         await audit.log(
             "mailgun.inbound.blocked_by_filter",
@@ -574,9 +576,7 @@ async def _apply_extended_gates(
         return False
 
     # ── Gate 2: per-sender hourly rate cap ──────────────────────────
-    cap_decision = await qgates.check_sender_rate_cap(
-        org_id=org_id, from_address=sender_email
-    )
+    cap_decision = await qgates.check_sender_rate_cap(org_id=org_id, from_address=sender_email)
     if cap_decision.action == "quarantine":
         await qservice.enqueue_quarantine(
             session,
@@ -594,7 +594,7 @@ async def _apply_extended_gates(
                 "counter_value": cap_decision.counter_value,
                 "cap": qgates.sender_hourly_cap(),
             },
-            payload_path=str(pending_dir),
+            pending_dir=pending_dir,
         )
         await audit.log(
             "mailgun.inbound.rate_capped",
@@ -647,7 +647,7 @@ async def _apply_extended_gates(
                 attachment_summary=[],
                 reason_code=REASON_VIRUS_VERDICT,
                 reason_detail={"virus_name": virus_decision.virus_name},
-                payload_path=str(pending_dir),
+                pending_dir=pending_dir,
             )
             await audit.log(
                 "mailgun.inbound.virus_verdict",
@@ -684,7 +684,7 @@ async def _apply_extended_gates(
                     "score": spam_decision.score,
                     "threshold": qgates.spam_score_threshold(),
                 },
-                payload_path=str(pending_dir),
+                pending_dir=pending_dir,
             )
             await audit.log(
                 "mailgun.inbound.spam_verdict",

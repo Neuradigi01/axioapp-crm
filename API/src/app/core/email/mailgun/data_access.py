@@ -27,7 +27,9 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.conversations.models import Message
 from src.app.core.email.mailgun.dlq_models import EmailInboundDlq
+from src.app.core.tenants.models import Organization
 from src.app.shared.rate_limit_shared import _redis  # type: ignore[attr-defined]
 
 logger = logging.getLogger(__name__)
@@ -107,6 +109,21 @@ async def list_dlq_rows(
     stmt = stmt.limit(limit).offset(offset)
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def list_org_ids(session: AsyncSession) -> list[uuid.UUID]:
+    """Every organization id — the orphan sweep walks storage per org."""
+    return list((await session.execute(select(Organization.id))).scalars().all())
+
+
+async def existing_message_ids(
+    session: AsyncSession, message_ids: set[uuid.UUID]
+) -> set[uuid.UUID]:
+    """The subset of `message_ids` that still has a `tbl_messages` row."""
+    if not message_ids:
+        return set()
+    rows = await session.execute(select(Message.id).where(Message.id.in_(message_ids)))
+    return set(rows.scalars().all())
 
 
 async def get_dlq_row(session: AsyncSession, *, dlq_id: uuid.UUID) -> EmailInboundDlq | None:

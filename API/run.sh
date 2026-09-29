@@ -66,6 +66,8 @@ print_help() {
     echo "  ${C_CMD}upgrade [N]${C_RESET}        Apply migrations (default: all pending)"
     echo "  ${C_CMD}downgrade [N]${C_RESET}      Revert migrations (default: 1 step back)"
     echo "  ${C_CMD}seed [type]${C_RESET}        Run seeds (default: all)"
+    echo "  ${C_CMD}storage-migrate [--dry-run] [--only-missing] [--reverse]${C_RESET}"
+    echo "                     Copy ./storage to the env's R2 bucket (--reverse: back to disk)"
     echo ""
     echo "${C_SECTION}Dependencies${C_RESET}"
     echo "  ${C_CMD}lock${C_RESET}               Regenerate uv.lock from pyproject.toml"
@@ -219,6 +221,9 @@ case "$1" in
         require_secrets; SEED_TYPE="${2:-}"
         if [ -z "$SEED_TYPE" ]; then dc run --rm --entrypoint python api -m src.seeds.run
         else dc run --rm --entrypoint python api -m src.seeds.run "$SEED_TYPE"; fi ;;
+    storage-migrate)
+        require_secrets; shift
+        dc run --rm --entrypoint python api -m src.app.shared.storage.migrate "$@" ;;
     lock) docker run --rm -v "$(pwd)":/app -w /app "$UV_IMAGE" uv lock ;;
     lock-upgrade) docker run --rm -v "$(pwd)":/app -w /app "$UV_IMAGE" uv lock --upgrade ;;
     lint) do_lint ;;

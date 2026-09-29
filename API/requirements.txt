@@ -32,6 +32,10 @@ stripe>=10.0.0
 bleach[css]>=6.1.0
 croniter>=2.0,<3.0
 
+# r2-storage track — Cloudflare R2 (S3-compatible) blob storage. >=1.36 for
+# the `request_checksum_calculation` client option R2 needs.
+boto3>=1.36,<2.0
+
 # Sentry error monitoring + performance tracing. Extras pull in the
 # FastAPI/Starlette + SQLAlchemy + Celery + Redis integrations we init in
 # ``src/app/main.py`` and ``src/celery/worker.py``. ``sentry_sdk.init(dsn="")``

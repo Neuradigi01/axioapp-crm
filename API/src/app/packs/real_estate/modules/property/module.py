@@ -30,4 +30,5 @@ MODULE = ModuleDescriptor(
         "property.delete",
     ],
     section="Sales",
+    public_files=["{uuid}/property/{uuid}/*"],
 )

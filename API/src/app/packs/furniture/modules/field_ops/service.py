@@ -49,6 +49,7 @@ from src.app.packs.furniture.modules.field_ops.schemas import (
     FieldVisitUpdate,
 )
 from src.app.shared.audit import log_entity_change
+from src.app.shared.files.image import PHOTO_MAX_BYTES, require_image_upload
 from src.app.shared.storage import get_storage
 
 # --- reads ----------------------------------------------------------------
@@ -260,14 +261,15 @@ async def add_photo(
     *,
     visit_id: uuid.UUID,
     data: bytes,
-    content_type: str,
-    file_extension: str,
     caption: str | None = None,
 ) -> FieldVisitPhoto:
+    """Store a visit photo. The type and extension come from the bytes
+    (libmagic), never from the client's filename or Content-Type."""
+    mime, ext = require_image_upload(data, max_bytes=PHOTO_MAX_BYTES)
     visit = await get_visit(session, visit_id)
     photo_id = uuid.uuid4()
-    storage_path = f"{visit.org_id}/field_visits/{visit.id}/photo-{photo_id}.{file_extension}"
-    ref = await get_storage().put(storage_path, data, content_type=content_type)
+    storage_path = f"{visit.org_id}/field_visits/{visit.id}/photo-{photo_id}.{ext}"
+    ref = await get_storage().put(storage_path, data, content_type=mime)
 
     photo = FieldVisitPhoto(
         id=photo_id,

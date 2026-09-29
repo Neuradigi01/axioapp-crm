@@ -34,6 +34,7 @@ from src.app.packs.furniture.modules.custom_orders.schemas import (
 )
 from src.app.shared.audit import log_entity_change
 from src.app.shared.db.queries import ensure_found
+from src.app.shared.files.image import PHOTO_MAX_BYTES, require_image_upload
 from src.app.shared.storage import get_storage
 
 _PIPELINE_KEY = "custom_orders"
@@ -249,15 +250,16 @@ async def add_photo(
     *,
     order_id: uuid.UUID,
     data: bytes,
-    content_type: str,
-    file_extension: str,
     caption: str | None = None,
 ) -> CustomOrderPhoto:
-    """Persist the binary via `StorageBackend`, then write the row."""
+    """Persist the binary via `StorageBackend`, then write the row. The
+    type and extension come from the bytes (libmagic), never from the
+    client's filename or Content-Type."""
+    mime, ext = require_image_upload(data, max_bytes=PHOTO_MAX_BYTES)
     order = await get_order(session, order_id)
     photo_id = uuid.uuid4()
-    storage_path = f"{order.org_id}/custom_orders/{order.id}/photo-{photo_id}.{file_extension}"
-    ref = await get_storage().put(storage_path, data, content_type=content_type)
+    storage_path = f"{order.org_id}/custom_orders/{order.id}/photo-{photo_id}.{ext}"
+    ref = await get_storage().put(storage_path, data, content_type=mime)
 
     photo = CustomOrderPhoto(
         id=photo_id,

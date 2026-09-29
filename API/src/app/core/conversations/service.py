@@ -28,6 +28,7 @@ non-raising.
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
 
@@ -60,6 +61,7 @@ from src.app.core.events.event_catalog import WHATSAPP_MESSAGE_RECEIVED
 from src.app.core.notifications.service import notify
 from src.app.core.permissions.service import role_has_permission
 from src.app.shared.db.queries import ensure_found
+from src.app.shared.storage import get_storage
 
 # Channels whose `external_id` is a phone number; the webhook intake
 # tries to resolve / auto-create a contact for these so the inbox can
@@ -114,6 +116,23 @@ async def list_conversations(
         page=page,
         size=size,
     )
+
+
+async def open_message_attachment(
+    message: Message, safe_key: str
+) -> tuple[AsyncIterator[bytes], int]:
+    """Open a committed inbound-email attachment for streaming.
+
+    The caller has already checked the message's org and that
+    `safe_key` is listed in its attachments. 404 when the blob is gone.
+    """
+    key = f"{message.org_id}/messages/{message.id}/{safe_key}"
+    storage = get_storage()
+    try:
+        stat = await storage.stat(key)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail="attachment not found") from exc
+    return storage.open_stream(key), stat.size
 
 
 async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) -> Conversation:

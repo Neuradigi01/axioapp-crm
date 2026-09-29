@@ -31,7 +31,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.auth.dependencies import require_permissions
@@ -85,6 +85,7 @@ from src.app.core.conversations.service import (
     list_messages,
     mark_conversation_read,
     mark_conversation_unread,
+    open_message_attachment,
     patch_conversation,
     pause_ai,
     react_to_message,
@@ -127,15 +128,15 @@ _ATTACHMENT_KEY_RE = __import__("re").compile(r"^[A-Za-z0-9._-]{1,255}$")
 
 @message_attachments_router.get(
     "/{message_id}/attachments/{safe_key}",
-    response_class=FileResponse,
+    response_class=StreamingResponse,
 )
 async def download_message_attachment(
     message_id: uuid.UUID,
     safe_key: str,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions("conversations.read")),
-) -> FileResponse:
-    """Serve an inbound-email attachment from local disk.
+) -> StreamingResponse:
+    """Stream an inbound-email attachment from the storage backend.
 
     Auth: JWT (via ``conversations.read``) + explicit ``org_id`` check
     against the message row + ``safe_key`` regex guard against path
@@ -146,9 +147,8 @@ async def download_message_attachment(
     the user's local viewer (Attacker H3 fix).
 
     404 on cross-org access, missing key, or missing file on disk —
-    never 403 (no signal of existence)."""
-    from pathlib import Path as _Path
-
+    never 403 (no signal of existence). Also sends a sandboxing CSP so
+    the response can never execute even if a browser renders it."""
     from src.app.core.conversations import data_access as _da
 
     if not _ATTACHMENT_KEY_RE.match(safe_key):
@@ -166,17 +166,15 @@ async def download_message_attachment(
     if matched is None:
         raise HTTPException(status_code=404, detail="attachment not found")
 
-    storage_root = _Path(__import__("os").getenv("STORAGE_ROOT", "./storage"))
-    file_path = storage_root / str(msg.org_id) / "messages" / str(msg.id) / safe_key
-    if not file_path.exists() or not file_path.is_file():
-        raise HTTPException(status_code=404, detail="attachment not found")
-
-    return FileResponse(
-        path=str(file_path),
+    chunks, size = await open_message_attachment(msg, safe_key)
+    return StreamingResponse(
+        chunks,
         media_type="application/octet-stream",
         headers={
             "Content-Disposition": f'attachment; filename="{safe_key}"',
+            "Content-Length": str(size),
             "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
         },
     )
 

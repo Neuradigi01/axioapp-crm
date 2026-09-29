@@ -96,3 +96,8 @@ class StorageBackend(ABC):
     @abstractmethod
     def list_keys(self, prefix: str) -> AsyncIterator[str]:
         """Yield every key under the org-scoped `prefix`."""
+
+    async def check_reachable(self) -> None:
+        """Raise if the backend cannot be reached. Local disk is always
+        reachable; network backends override this."""
+        return None

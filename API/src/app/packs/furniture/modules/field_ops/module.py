@@ -15,4 +15,5 @@ MODULE = ModuleDescriptor(
         "field_visits.write",
     ],
     section="My Work",
+    public_files=["{uuid}/field_visits/{uuid}/*"],
 )

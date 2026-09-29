@@ -26,6 +26,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
+from src.app.shared.storage.public_patterns import PublicFilePattern
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,6 +82,10 @@ class ModuleDescriptor:
     # `list_for_user` so pack modules never render on orgs that haven't
     # installed the pack — even if stray permission rows exist.
     pack_id: str | None = None
+    # Storage key patterns this module serves to logged-out visitors
+    # through `/files/...` (see `shared/storage/public_patterns.py`).
+    # Every other key the module writes stays private.
+    public_files: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not _ID_RE.match(self.id):
@@ -95,6 +101,8 @@ class ModuleDescriptor:
         for key in self.permissions:
             if not _PERM_RE.match(key):
                 raise ValueError(f"permission key {key!r} must match '<module>.<action>'")
+        for pattern in self.public_files:
+            PublicFilePattern.parse(pattern)
 
 
 class ModuleRegistry:
@@ -167,6 +175,10 @@ class ModuleRegistry:
                 continue
             result.append(m)
         return result
+
+    def public_file_patterns(self) -> list[PublicFilePattern]:
+        """Every public-file pattern declared by a registered module."""
+        return [PublicFilePattern.parse(pattern) for m in self.list() for pattern in m.public_files]
 
     def clear(self) -> None:
         """Wipe the registry (used by tests and the dev refresh endpoint)."""

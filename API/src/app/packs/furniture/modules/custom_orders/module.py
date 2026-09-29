@@ -24,4 +24,5 @@ MODULE = ModuleDescriptor(
         "custom_orders.move",
     ],
     section="My Work",
+    public_files=["{uuid}/custom_orders/{uuid}/*"],
 )

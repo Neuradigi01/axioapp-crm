@@ -23,6 +23,7 @@ Step 4's :mod:`.tasks` module; Step 3 ships only the transport.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -33,6 +34,10 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any
+
+from src.app.shared.storage import get_storage, storage_root
+from src.app.shared.storage.config import storage_backend_name
+from src.app.shared.storage.keys import content_type_for
 
 try:
     import magic  # python-magic (already in requirements.txt)
@@ -49,8 +54,6 @@ _TIMESTAMP_SKEW_SECONDS = 300
 # Storage root for on-disk pending-inbound directories. Kept *outside*
 # the per-org path so the webhook can write BEFORE the token is
 # resolved (no org_id yet).
-_STORAGE_ROOT_ENV = "STORAGE_ROOT"
-_DEFAULT_STORAGE_ROOT = "./storage"
 _PENDING_SUBDIR = "pending-inbound"
 
 # Only ASCII letters, digits, dot, dash, underscore are kept in
@@ -59,10 +62,6 @@ _PENDING_SUBDIR = "pending-inbound"
 # to ``_``. Guards path traversal + filesystem-illegal chars in one
 # pass.
 _SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]")
-
-
-def _storage_root() -> Path:
-    return Path(os.getenv(_STORAGE_ROOT_ENV, _DEFAULT_STORAGE_ROOT))
 
 
 def _sanitize_attachment_filename(name: str | None) -> str:
@@ -140,7 +139,7 @@ async def persist_pending_inbound(form: Any) -> Path:
     Returns the absolute directory path (also used as the enqueue arg).
     """
     request_id = uuid.uuid4()
-    pending_dir = _storage_root() / _PENDING_SUBDIR / str(request_id)
+    pending_dir = storage_root() / _PENDING_SUBDIR / str(request_id)
     pending_dir.mkdir(parents=True, exist_ok=True)
 
     metadata: dict[str, Any] = {}
@@ -469,9 +468,10 @@ def extract_and_stage_attachments(
     """Move validated attachments from pending-inbound/ to staging/.
 
     Two-phase write (Attacker M5 sweeper-race fix): attachments land
-    at ``./storage/{org_id}/staging/{request_id}/`` FIRST, and are
-    only moved to ``./storage/{org_id}/messages/{message_id}/`` after
-    the ``Message`` row commits (via :func:`commit_attachments`).
+    on local disk at ``{STORAGE_ROOT}/{org_id}/staging/{request_id}/``
+    FIRST, and are only uploaded to the storage backend under
+    ``{org_id}/messages/{message_id}/`` after the ``Message`` row
+    commits (via :func:`commit_attachments`).
 
     Returns ``(attachments_meta, stripped_reason)``:
       * ``attachments_meta`` — list of JSONB dicts to write into
@@ -487,7 +487,7 @@ def extract_and_stage_attachments(
     if not pending_dir.exists():
         return [], None
 
-    staging_root = _storage_root() / str(org_id) / "staging" / str(request_id)
+    staging_root = storage_root() / str(org_id) / "staging" / str(request_id)
     staging_root.mkdir(parents=True, exist_ok=True)
 
     attachments: list[dict[str, Any]] = []
@@ -541,7 +541,9 @@ def extract_and_stage_attachments(
                 "size": size,
                 "content_type": sniffed,
                 "storage_key": safe,  # relative to messages/{message_id}/
-                "storage_backend": "local",
+                # Informational only — reads always use the active
+                # backend (`get_storage()`), never this field.
+                "storage_backend": storage_backend_name(),
             }
         )
 
@@ -555,34 +557,40 @@ def extract_and_stage_attachments(
     return attachments, stripped_reason
 
 
-def commit_attachments(
+async def commit_attachments(
     *,
     org_id: uuid.UUID,
     request_id: uuid.UUID,
     message_id: uuid.UUID,
 ) -> None:
-    """Move ``staging/{request_id}/`` → ``messages/{message_id}/``.
+    """Upload ``staging/{request_id}/`` into storage under
+    ``{org_id}/messages/{message_id}/`` and remove the staged copies.
 
-    Only called AFTER the ``Message`` row commits so a failed insert
-    doesn't leave orphaned files under the messages/ tree — the
-    orphan sweeper is designed to only touch messages/ dirs with no
-    matching row, and running twice-a-day is fine for that path;
-    staging/ dirs get swept aggressively (>1h age).
+    Only called AFTER the ``Message`` row commits, so every uploaded
+    blob has a row; the messages orphan sweeper only removes blobs
+    whose row was later deleted. A file whose upload fails is logged
+    and left in staging (swept after 1h) — the other attachments of
+    the same message still land.
     """
-    staging = _storage_root() / str(org_id) / "staging" / str(request_id)
+    staging = storage_root() / str(org_id) / "staging" / str(request_id)
     if not staging.exists():
         return
-    final = _storage_root() / str(org_id) / "messages" / str(message_id)
-    final.mkdir(parents=True, exist_ok=True)
-    for entry in staging.iterdir():
-        target = final / entry.name
+    storage = get_storage()
+    for entry in sorted(staging.iterdir()):
+        if not entry.is_file():
+            continue
+        key = f"{org_id}/messages/{message_id}/{entry.name}"
         try:
-            entry.rename(target)
-        except OSError:
-            import shutil as _shutil
-
-            _shutil.copy2(entry, target)
-            entry.unlink(missing_ok=True)
+            data = await asyncio.to_thread(entry.read_bytes)
+            await storage.put(key, data, content_type=content_type_for(entry.name))
+        except Exception:
+            logger.exception(
+                "mailgun.commit_attachments: upload failed message=%s file=%s",
+                message_id,
+                entry.name,
+            )
+            continue
+        entry.unlink(missing_ok=True)
     try:
         staging.rmdir()
     except OSError:
