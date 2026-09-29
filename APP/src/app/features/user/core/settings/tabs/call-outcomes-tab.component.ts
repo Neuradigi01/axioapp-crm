@@ -107,7 +107,7 @@ export class CallOutcomesTabComponent {
           const msg = extractApiError(err) ?? 'Could not load call outcomes.';
           this.loading.set(false);
           this.loadError.set(msg);
-          this.toast.error('Could not load call outcomes.', { subtitle: msg });
+          this.toast.error('Could not load call outcomes', { subtitle: msg });
         },
       });
   }
@@ -126,13 +126,15 @@ export class CallOutcomesTabComponent {
     this.addForm.markAllAsTouched();
     const label = this.addForm.controls.label.value.trim().replace(/\s+/g, ' ');
     if (this.addForm.invalid || this.duplicateOf(label, null)) {
-      this.toast.warn('Please fix the outcome name', {
-        subtitle: this.labelError('add') ?? undefined,
+      this.toast.warn('Could not add call outcome', {
+        subtitle: this.labelError('add') ?? null,
       });
       return;
     }
     if (this.atLimit()) {
-      this.toast.warn(`You can have at most ${MAX_OUTCOMES} call outcomes.`);
+      this.toast.warn('Could not add call outcome', {
+        subtitle: `You can have at most ${MAX_OUTCOMES} call outcomes.`,
+      });
       return;
     }
     const rows = this.outcomes();
@@ -151,11 +153,9 @@ export class CallOutcomesTabComponent {
           this.busy.set(false);
           this.outcomes.set([...rows, created]);
           this.addForm.reset({ label: '', color: OUTCOME_COLORS[0] });
-          this.toast.success(`"${created.label}" added.`, {
-            subtitle: 'Agents can pick it when logging a call.',
-          });
+          this.toast.success('Call outcome added', { subtitle: created.label });
         },
-        error: (err: HttpErrorResponse) => this.fail('Could not add the outcome.', err),
+        error: (err: HttpErrorResponse) => this.fail('Could not add call outcome', err),
       });
   }
 
@@ -172,15 +172,15 @@ export class CallOutcomesTabComponent {
     this.editForm.markAllAsTouched();
     const label = this.editForm.controls.label.value.trim().replace(/\s+/g, ' ');
     if (this.editForm.invalid || this.duplicateOf(label, outcome.id)) {
-      this.toast.warn('Please fix the outcome name', {
-        subtitle: this.labelError('edit') ?? undefined,
+      this.toast.warn('Could not update call outcome', {
+        subtitle: this.labelError('edit') ?? null,
       });
       return;
     }
     const color = this.editForm.controls.color.value;
     if (label === outcome.label && color === outcome.color) {
       this.editingId.set(null);
-      this.toast.info('No changes to save.');
+      this.toast.info('No changes to save', { subtitle: outcome.label });
       return;
     }
     this.busy.set(true);
@@ -192,9 +192,9 @@ export class CallOutcomesTabComponent {
           this.busy.set(false);
           this.editingId.set(null);
           this.outcomes.set(this.outcomes().map((o) => (o.id === updated.id ? updated : o)));
-          this.toast.success('Outcome updated.');
+          this.toast.success('Call outcome updated', { subtitle: updated.label });
         },
-        error: (err: HttpErrorResponse) => this.fail('Could not update the outcome.', err),
+        error: (err: HttpErrorResponse) => this.fail('Could not update call outcome', err),
       });
   }
 
@@ -220,10 +220,10 @@ export class CallOutcomesTabComponent {
           this.busy.set(false);
           const byId = new Map(updated.map((o) => [o.id, o]));
           this.outcomes.set(rows.map((o) => byId.get(o.id) ?? o));
-          this.toast.success('Order updated.');
+          this.toast.success('Call outcome order saved');
         },
         error: (err: HttpErrorResponse) => {
-          this.fail('Could not change the order.', err);
+          this.fail('Could not reorder call outcomes', err);
           this.reload();
         },
       });
@@ -247,9 +247,9 @@ export class CallOutcomesTabComponent {
         next: () => {
           this.busy.set(false);
           this.outcomes.set(this.outcomes().filter((o) => o.id !== outcome.id));
-          this.toast.success(`"${outcome.label}" deleted.`);
+          this.toast.success('Call outcome deleted', { subtitle: outcome.label });
         },
-        error: (err: HttpErrorResponse) => this.fail('Could not delete the outcome.', err),
+        error: (err: HttpErrorResponse) => this.fail('Could not delete call outcome', err),
       });
   }
 
