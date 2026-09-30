@@ -142,6 +142,7 @@ async def reply_submit(
         Message,
         MessageDirection,
     )
+    from src.app.core.conversations.utils import wake_on_inbound
 
     conv = await db.get(Conversation, run.conversation_id)
     if conv is None:
@@ -169,25 +170,20 @@ async def reply_submit(
     conv.last_message_at = inbound.sent_at
     conv.last_customer_message_at = inbound.sent_at
     conv.unread_count = (conv.unread_count or 0) + 1
+    wake_on_inbound(conv)
     await db.commit()
     await db.refresh(inbound)
 
     # Publish the matching trigger event so the trigger matcher's
     # existing active-run path picks this up + resumes the parked run
     # with resumed_by='inbound' and last_inbound_text = button label.
-    event_type = (
-        WHATSAPP_MESSAGE_RECEIVED
-        if row.channel == "whatsapp"
-        else EMAIL_MESSAGE_RECEIVED
-    )
+    event_type = WHATSAPP_MESSAGE_RECEIVED if row.channel == "whatsapp" else EMAIL_MESSAGE_RECEIVED
     try:
         await events_bus.publish(
             event_type,
             {
                 "conversation_id": str(conv.id),
-                "contact_id": (
-                    str(conv.contact_id) if conv.contact_id else None
-                ),
+                "contact_id": (str(conv.contact_id) if conv.contact_id else None),
                 "message_id": str(inbound.id),
                 "text": row.button_label,
                 "channel": conv.channel.value,
@@ -207,8 +203,6 @@ async def reply_submit(
     org = await db.get(Organization, row.org_id)
     org_name = org.name if org is not None else "the sender"
     return HTMLResponse(
-        content=_urls.render_success_page(
-            button_label=row.button_label, org_name=org_name
-        ),
+        content=_urls.render_success_page(button_label=row.button_label, org_name=org_name),
         status_code=status.HTTP_200_OK,
     )

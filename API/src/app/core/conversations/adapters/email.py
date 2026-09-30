@@ -36,6 +36,7 @@ import logging
 import os
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.message import EmailMessage
@@ -67,6 +68,7 @@ from src.app.core.conversations.models import (
     Message,
     MessageDirection,
 )
+from src.app.core.conversations.utils import OutboundAttachment, wake_on_inbound
 from src.app.core.email import service as email_service
 from src.app.core.email.models import (
     EmailAccount,
@@ -91,6 +93,8 @@ from src.app.core.events.event_catalog import EMAIL_MESSAGE_RECEIVED, EMAIL_REPL
 from src.app.core.notifications.service import notify
 from src.app.core.settings.models import OrgSettings
 from src.app.core.tenants import data_access as tenants_da
+from src.app.shared.storage import get_storage
+from src.app.shared.storage.config import storage_backend_name
 
 logger = logging.getLogger(__name__)
 
@@ -279,6 +283,7 @@ async def send_email(
     references_chain_raw: str | None = None,
     conversation_id: uuid.UUID | None = None,
     reply_to: str | None = None,
+    attachments: Sequence[OutboundAttachment] = (),
 ) -> SendEmailResult:
     """Send an email from the org's connected sender identity.
 
@@ -314,6 +319,12 @@ async def send_email(
     which conversation this belongs to (the typical compose path
     from a contact-detail page). When None, we find-or-create one
     keyed on ``(contact_id, channel=email)``.
+
+    ``attachments`` ride in the MIME for every transport. After a
+    successful dispatch each file is stored under
+    ``{org_id}/messages/{message_id}/{filename}`` and listed on the
+    Message row, so the inbox renders + downloads it exactly like an
+    inbound email attachment.
     """
     if account_id is not None and smtp_sender_id is not None:
         raise HTTPException(
@@ -606,6 +617,7 @@ async def send_email(
         reply_to=reply_to,
         list_unsubscribe_url=unsub_url,
         list_unsubscribe_mailto=_LIST_UNSUB_MAILTO,
+        attachments=attachments,
     )
     raw_bytes = mime.as_bytes()
 
@@ -715,6 +727,36 @@ async def send_email(
             ) from exc
         provider_message_id = send_result.mailgun_message_id
 
+    # The email is out — keep a copy of each attachment so the inbox can
+    # show + download it. A storage failure must not turn a delivered
+    # email into an error; the file is simply left off the row.
+    stored_attachments: list[dict[str, Any]] = []
+    if attachments:
+        storage = get_storage()
+        for att in attachments:
+            try:
+                await storage.put(
+                    f"{org_id}/messages/{pre_message_id}/{att.filename}",
+                    att.data,
+                    content_type=att.content_type,
+                )
+            except Exception:
+                logger.exception(
+                    "outbound email attachment store failed message=%s file=%s",
+                    pre_message_id,
+                    att.filename,
+                )
+                continue
+            stored_attachments.append(
+                {
+                    "filename": att.filename,
+                    "size": len(att.data),
+                    "content_type": att.content_type,
+                    "storage_key": att.filename,
+                    "storage_backend": storage_backend_name(),
+                }
+            )
+
     # Persist outbound row. `channel_message_id` is OUR Message-ID
     # (the RFC 5322 token) — the threading detector matches on it
     # when the recipient's reply lands. Provider-side ids go into
@@ -749,7 +791,7 @@ async def send_email(
         direction=MessageDirection.out,
         sender_user_id=sender_user_id,
         text=body_text,
-        attachments=[],
+        attachments=stored_attachments,
         channel_message_id=own_msg_id_bare,
         payload=outbound_payload,
         sent_at=now,
@@ -961,6 +1003,7 @@ async def _persist_inbound_email(
     session.add(msg)
     conversation.last_message_at = now
     conversation.unread_count = (conversation.unread_count or 0) + 1
+    wake_on_inbound(conversation)
     await session.commit()
     await session.refresh(msg)
     await session.refresh(conversation)
@@ -1459,6 +1502,7 @@ def _build_outbound_mime(
     reply_to: str | None = None,
     list_unsubscribe_url: str | None = None,
     list_unsubscribe_mailto: str | None = None,
+    attachments: Sequence[OutboundAttachment] = (),
 ) -> EmailMessage:
     """Assemble a multipart/alternative MIME message via stdlib
     `email.message.EmailMessage`. Sets threading headers when
@@ -1515,6 +1559,15 @@ def _build_outbound_mime(
         msg.add_alternative(body_html, subtype="html")
     else:
         msg.set_content(body_text)
+    # Attachments turn the alternative body into multipart/mixed.
+    for att in attachments:
+        maintype, _, subtype = att.content_type.partition("/")
+        msg.add_attachment(
+            att.data,
+            maintype=maintype or "application",
+            subtype=subtype or "octet-stream",
+            filename=att.filename,
+        )
     return msg
 
 

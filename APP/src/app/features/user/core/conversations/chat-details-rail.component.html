@@ -14,11 +14,8 @@
         {{ displayHandle || conversation.external_id }}
       </p>
     }
-    <p class="flex items-center gap-2 text-xs text-muted capitalize">
-      <span>{{ conversation.channel }} · {{ conversation.status }}</span>
-      @if (conversation.acquisition_source === 'ad') {
-        <app-attribution-chip [conversationId]="conversation.id" />
-      }
+    <p class="text-xs capitalize text-muted">
+      {{ conversation.channel }} · {{ conversation.status }}
     </p>
   </section>
 
@@ -34,6 +31,13 @@
       (saveNew)="saveContact.emit($event)"
       (link)="linkContact.emit($event)"
       (rename)="renameContact.emit($event)"
+    />
+  }
+  @if (conversation.contact_id) {
+    <app-contact-activity
+      [contactId]="conversation.contact_id"
+      [conversationId]="conversation.id"
+      (openConversation)="openConversation.emit($event)"
     />
   }
 
@@ -97,8 +101,8 @@
           (conversation.status === 'closed'
             ? 'bg-zinc-500/10 text-zinc-500'
             : conversation.status === 'snoozed'
-              ? 'bg-sky-500/10 text-sky-600'
-              : 'bg-emerald-500/10 text-emerald-700')
+              ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
+              : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400')
         "
         [attr.aria-expanded]="statusMenuOpen()"
         aria-haspopup="menu"
@@ -138,11 +142,40 @@
                 class="h-3 w-3"
               />
               {{ statusLabel[opt] }}
+              @if (opt === 'snoozed') {
+                <lucide-icon name="chevron-right" class="ml-auto h-3 w-3 opacity-60" />
+              }
             </button>
+          }
+          @if (snoozeSubmenuOpen()) {
+            <div class="mt-1 border-t border-subtle pt-1" role="group" aria-label="Snooze until">
+              <p class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                Snooze until
+              </p>
+              @for (s of snoozeChoices(); track s.label) {
+                <button
+                  type="button"
+                  role="menuitem"
+                  (click)="pickSnooze(s); $event.stopPropagation()"
+                  class="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs text-default transition hover:bg-surface-2"
+                >
+                  <span>{{ s.label }}</span>
+                  @if (s.hint) {
+                    <span class="text-[10.5px] text-muted">{{ s.hint }}</span>
+                  }
+                </button>
+              }
+            </div>
           }
         </div>
       }
     </div>
+    @if (snoozedUntilLabel(); as until) {
+      <p class="flex items-center gap-1 text-[11px] text-muted">
+        <lucide-icon name="clock" class="h-3 w-3" />
+        {{ until }}
+      </p>
+    }
   </section>
 
   <!-- Tags. Chip list + manager dropdown reused verbatim. -->

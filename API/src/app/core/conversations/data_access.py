@@ -34,13 +34,15 @@ from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import and_, delete, func, select, update
+from sqlalchemy import and_, delete, exists, func, or_, select, update
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.app.core.contacts.models import Contact
 from src.app.core.conversations.models import (
     Conversation,
     ConversationChannel,
+    ConversationSavedReply,
     ConversationStatus,
     ConversationTag,
     ConversationTagAssignment,
@@ -72,6 +74,7 @@ async def list_conversations_query(
     q: str | None = None,
     tag_ids: list[uuid.UUID] | None = None,
     unread_only: bool = False,
+    contact_id: uuid.UUID | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Conversation], int]:
@@ -108,7 +111,7 @@ async def list_conversations_query(
     elif assigned_to_id is not None:
         filters.append(Conversation.assigned_to_id == assigned_to_id)
     if q:
-        filters.append(Conversation.external_id.ilike(f"%{q}%"))
+        filters.append(_search_clause(q))
     if tag_ids:
         tagged_subquery = (
             select(ConversationTagAssignment.conversation_id)
@@ -118,6 +121,8 @@ async def list_conversations_query(
         filters.append(Conversation.id.in_(tagged_subquery))
     if unread_only:
         filters.append(Conversation.unread_count > 0)
+    if contact_id is not None:
+        filters.append(Conversation.contact_id == contact_id)
 
     base = select(Conversation)
     if filters:
@@ -127,6 +132,44 @@ async def list_conversations_query(
         Conversation.created_at.desc(),
     )
     return await paginate(session, base, page=page, size=size)
+
+
+# Message-body search only kicks in from this length — shorter terms
+# match almost every thread and can't use the trigram index.
+_MESSAGE_SEARCH_MIN_LEN = 3
+
+
+def _search_clause(q: str) -> Any:
+    """Inbox search: a conversation matches when the term appears in its
+    channel handle (phone / email), the linked contact's name / phone /
+    email, or — for terms of 3+ chars — any message body on the thread
+    (internal notes included, so operators can find their own notes).
+    LIKE wildcards in the term are escaped so ``50%`` searches literally.
+    Trigram GIN indexes back the name + message-body lookups."""
+    escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    term = f"%{escaped}%"
+    clauses: list[Any] = [
+        Conversation.external_id.ilike(term, escape="\\"),
+        Conversation.contact_id.in_(
+            select(Contact.id).where(
+                or_(
+                    Contact.full_name.ilike(term, escape="\\"),
+                    Contact.phone.ilike(term, escape="\\"),
+                    Contact.email.ilike(term, escape="\\"),
+                )
+            )
+        ),
+    ]
+    if len(q) >= _MESSAGE_SEARCH_MIN_LEN:
+        clauses.append(
+            exists(
+                select(Message.id).where(
+                    Message.conversation_id == Conversation.id,
+                    Message.text.ilike(term, escape="\\"),
+                )
+            )
+        )
+    return or_(*clauses)
 
 
 async def find_conversation_for_channel_external(
@@ -434,13 +477,14 @@ def insert_message(session: AsyncSession, message: Message) -> None:
     session.add(message)
 
 
-async def bulk_last_message_body_for_conversations(
+async def bulk_last_message_preview_for_conversations(
     session: AsyncSession, conversation_ids: list[uuid.UUID]
-) -> dict[uuid.UUID, str | None]:
-    """Return the latest external (non-internal-note) message body per
-    conversation as a whitespace-collapsed 140-char snippet. Used by the
-    inbox list endpoint to render a preview under each row without a
-    per-row fetch. Missing keys / attachment-only messages return None.
+) -> dict[uuid.UUID, tuple[str | None, MessageDirection]]:
+    """Return the latest external (non-internal-note) message per
+    conversation as ``(snippet, direction)`` — a whitespace-collapsed
+    140-char body (None for attachment-only messages) plus who sent it.
+    The inbox list renders the preview line from the snippet and the
+    "waiting for reply" indicator from the direction.
 
     Uses PostgreSQL ``DISTINCT ON`` so the whole batch resolves in one
     round-trip regardless of how many conversations are on the page.
@@ -448,21 +492,143 @@ async def bulk_last_message_body_for_conversations(
     if not conversation_ids:
         return {}
     stmt = (
-        select(Message.conversation_id, Message.text)
+        select(Message.conversation_id, Message.text, Message.direction)
         .where(Message.conversation_id.in_(conversation_ids))
         .where(Message.is_internal.is_(False))
         .distinct(Message.conversation_id)
         .order_by(Message.conversation_id, Message.created_at.desc())
     )
     result = await session.execute(stmt)
-    out: dict[uuid.UUID, str | None] = {}
-    for conv_id, text in result.all():
-        if text is None:
-            out[conv_id] = None
-        else:
-            snippet = " ".join(text.split())
-            out[conv_id] = snippet[:140] if len(snippet) <= 140 else snippet[:139] + "…"
+    out: dict[uuid.UUID, tuple[str | None, MessageDirection]] = {}
+    for conv_id, text, direction in result.all():
+        snippet: str | None = None
+        if text is not None:
+            collapsed = " ".join(text.split())
+            snippet = collapsed if len(collapsed) <= 140 else collapsed[:139] + "…"
+        out[conv_id] = (snippet, direction)
     return out
+
+
+async def count_unread_conversations(session: AsyncSession, *, user_uuid: uuid.UUID) -> Row:
+    """One-row aggregate of conversations with unread messages for the
+    inbox badges: ``(all, mine, unassigned, whatsapp, email)``. Closed
+    conversations and runtime-internal ``ai_widget`` rows are excluded."""
+    unread = Conversation.unread_count > 0
+    stmt = select(
+        func.count().filter(unread).label("all"),
+        func.count().filter(unread, Conversation.assigned_to_id == user_uuid).label("mine"),
+        func.count().filter(unread, Conversation.assigned_to_id.is_(None)).label("unassigned"),
+        func.count()
+        .filter(unread, Conversation.channel == ConversationChannel.whatsapp)
+        .label("whatsapp"),
+        func.count()
+        .filter(unread, Conversation.channel == ConversationChannel.email)
+        .label("email"),
+    ).where(
+        Conversation.status != ConversationStatus.closed,
+        Conversation.channel != ConversationChannel.ai_widget,
+    )
+    return (await session.execute(stmt)).one()
+
+
+async def list_conversations_by_ids(
+    session: AsyncSession, conversation_ids: list[uuid.UUID]
+) -> list[Conversation]:
+    """Fetch many conversations in one query (bulk actions). Ids from
+    another org are filtered out by the tenant scope + RLS."""
+    if not conversation_ids:
+        return []
+    result = await session.execute(
+        select(Conversation).where(Conversation.id.in_(conversation_ids))
+    )
+    return list(result.scalars().all())
+
+
+async def list_tagged_conversation_ids(
+    session: AsyncSession, *, tag_id: uuid.UUID, conversation_ids: list[uuid.UUID]
+) -> set[uuid.UUID]:
+    """Which of ``conversation_ids`` already carry ``tag_id`` (bulk tag)."""
+    if not conversation_ids:
+        return set()
+    result = await session.execute(
+        select(ConversationTagAssignment.conversation_id).where(
+            ConversationTagAssignment.tag_id == tag_id,
+            ConversationTagAssignment.conversation_id.in_(conversation_ids),
+        )
+    )
+    return set(result.scalars().all())
+
+
+async def list_due_snoozed_conversations(
+    session: AsyncSession, *, now: datetime, limit: int
+) -> list[Conversation]:
+    """Snoozed conversations whose ``snoozed_until`` has passed — the
+    beat sweeper reopens them. Runs outside any request context, so the
+    caller's session is not tenant-scoped; every org is swept."""
+    result = await session.execute(
+        select(Conversation)
+        .where(
+            Conversation.status == ConversationStatus.snoozed,
+            Conversation.snoozed_until.is_not(None),
+            Conversation.snoozed_until <= now,
+        )
+        .order_by(Conversation.snoozed_until)
+        .limit(limit)
+    )
+    return list(result.scalars().all())
+
+
+async def list_active_member_uuids(session: AsyncSession, *, org_id: uuid.UUID) -> list[uuid.UUID]:
+    """Legacy user UUIDs of every active member of ``org_id`` — the
+    audience for org-wide inbox refresh pushes."""
+    result = await session.execute(
+        select(User.legacy_uuid)
+        .join(OrganizationMember, OrganizationMember.user_member_id == User.id)
+        .where(
+            OrganizationMember.organization_id == org_id,
+            OrganizationMember.is_active.is_(True),
+        )
+    )
+    return [u for u in result.scalars().all() if u is not None]
+
+
+# --- Saved replies --------------------------------------------------------
+
+
+async def list_saved_replies(
+    session: AsyncSession, *, search: str | None = None
+) -> list[ConversationSavedReply]:
+    """Every saved reply in the active org, ordered by title. ``search``
+    matches title, body or shortcut (case-insensitive)."""
+    stmt = select(ConversationSavedReply)
+    if search:
+        term = f"%{search}%"
+        stmt = stmt.where(
+            or_(
+                ConversationSavedReply.title.ilike(term),
+                ConversationSavedReply.body.ilike(term),
+                ConversationSavedReply.shortcut.ilike(term),
+            )
+        )
+    stmt = stmt.order_by(func.lower(ConversationSavedReply.title))
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def get_saved_reply_by_id(
+    session: AsyncSession, reply_id: uuid.UUID
+) -> ConversationSavedReply | None:
+    result = await session.execute(
+        select(ConversationSavedReply).where(ConversationSavedReply.id == reply_id)
+    )
+    return result.scalar_one_or_none()
+
+
+def insert_saved_reply(session: AsyncSession, reply: ConversationSavedReply) -> None:
+    session.add(reply)
+
+
+async def delete_saved_reply_row(session: AsyncSession, reply: ConversationSavedReply) -> None:
+    await session.delete(reply)
 
 
 # --- Tags ---------------------------------------------------------------
@@ -686,7 +852,17 @@ async def list_active_members_with_names(
 
 
 __all__ = [
+    "bulk_last_message_preview_for_conversations",
     "bulk_list_tag_chips_for_conversations",
+    "count_unread_conversations",
+    "delete_saved_reply_row",
+    "get_saved_reply_by_id",
+    "insert_saved_reply",
+    "list_active_member_uuids",
+    "list_conversations_by_ids",
+    "list_due_snoozed_conversations",
+    "list_saved_replies",
+    "list_tagged_conversation_ids",
     "count_outbound_messages_for_conversation",
     "delete_tag_assignment",
     "delete_tag_row",

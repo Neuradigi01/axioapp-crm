@@ -6,19 +6,19 @@
   (dragover)="onDragOver($event)"
   (dragleave)="onDragLeave($event)"
   (drop)="onDrop($event)"
-  [class.bg-emerald-500/10]="isDragging() && canAttachMedia()"
+  [class.bg-emerald-500/10]="isDragging() && canAttach()"
 >
   @if (isNoteMode() && mentions().length > 0) {
     <div class="mb-2 flex flex-wrap gap-1">
       @for (m of mentions(); track m.userId) {
         <span
-          class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400 ring-1 border-amber-500/20"
+          class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 ring-1 ring-amber-500/20 dark:text-amber-400"
         >
           @{{ m.displayName }}
           <button
             type="button"
             (click)="removeMention(m.userId)"
-            class="rounded-full hover:bg-amber-200"
+            class="rounded-full hover:bg-amber-500/20"
             aria-label="Remove mention"
           >
             <lucide-icon name="x" size="10" />
@@ -177,7 +177,41 @@
     </div>
   }
 
+  @if (emailFiles().length > 0) {
+    <div class="mb-2 flex flex-wrap gap-1.5" data-testid="compose-email-files">
+      @for (f of emailFiles(); track $index) {
+        <span
+          class="inline-flex max-w-full items-center gap-1.5 rounded-md border border-subtle bg-surface-2 px-2 py-1 text-xs text-default"
+        >
+          <lucide-icon name="paperclip" size="12" class="shrink-0 text-muted" aria-hidden="true" />
+          <span class="max-w-[180px] truncate">{{ f.name }}</span>
+          <span class="text-faint">{{ formatBytes(f.size) }}</span>
+          <button
+            type="button"
+            (click)="removeEmailFile($index)"
+            class="rounded p-0.5 text-muted hover:bg-surface hover:text-default"
+            [attr.aria-label]="'Remove ' + f.name"
+          >
+            <lucide-icon name="x" size="12" aria-hidden="true" />
+          </button>
+        </span>
+      }
+    </div>
+  }
+
   <div class="flex items-end gap-2">
+    @if (isEmail() && !isNoteMode()) {
+      <button
+        type="button"
+        (click)="openFilePicker()"
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface text-muted hover:bg-surface-2"
+        aria-label="Attach files"
+        title="Attach files (up to 10, 18 MB total)"
+      >
+        <lucide-icon name="paperclip" size="16" aria-hidden="true"></lucide-icon>
+      </button>
+      <input #fileInput type="file" multiple class="hidden" (change)="onFilePicked($event)" />
+    }
     @if (canAttachMedia()) {
       <button
         type="button"
@@ -243,10 +277,53 @@
         [class]="
           'block max-h-[12.5rem] min-h-[2rem] w-full resize-none overflow-y-auto rounded-md border px-3 py-1.5 text-sm placeholder-zinc-400 shadow-sm focus:outline-none focus:ring-1 disabled:bg-surface-2 disabled:text-muted ' +
           (isNoteMode()
-            ? 'border-amber-300 bg-amber-500/10 focus:border-amber-500 focus:ring-amber-500'
-            : 'border-subtle bg-surface focus:border-muted focus:ring-accent')
+            ? 'border-amber-500/40 bg-amber-500/10 text-default focus:border-amber-500 focus:ring-amber-500'
+            : 'border-subtle bg-surface text-default focus:border-muted focus:ring-accent')
         "
       ></textarea>
+      @if (slashQuery() !== null && !textareaDisabled()) {
+        <ul
+          class="absolute bottom-full left-0 right-0 mb-1 max-h-56 overflow-y-auto rounded-lg border border-subtle bg-surface shadow-lg"
+          role="listbox"
+          aria-label="Saved replies"
+        >
+          @if (savedReplies.loading() && !savedReplies.loaded()) {
+            <li class="px-3 py-2 text-xs text-muted">Loading saved replies…</li>
+          } @else if (slashCandidates().length === 0) {
+            <li class="flex items-center justify-between gap-2 px-3 py-2 text-xs text-muted">
+              No saved reply matches.
+              <button type="button" class="font-medium text-accent" (click)="openManager()">
+                Manage
+              </button>
+            </li>
+          }
+          @for (r of slashCandidates(); track r.id; let i = $index) {
+            <li>
+              <button
+                type="button"
+                role="option"
+                [attr.aria-selected]="i === slashIndex()"
+                (click)="insertSavedReply(r)"
+                (mouseenter)="slashIndex.set(i)"
+                [class]="
+                  'block w-full px-3 py-1.5 text-left ' +
+                  (i === slashIndex() ? 'bg-surface-2' : 'hover:bg-surface-2')
+                "
+              >
+                <span class="flex items-center gap-2 text-sm">
+                  <span class="truncate font-medium text-default">{{ r.title }}</span>
+                  @if (r.shortcut) {
+                    <span class="shrink-0 font-mono text-[11px] text-accent"
+                      >/{{ r.shortcut }}</span
+                    >
+                  }
+                </span>
+                <span class="block truncate text-xs text-muted">{{ r.body }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
       @if (mentionOpen() && isNoteMode()) {
         <ul
           class="absolute bottom-full left-0 right-0 mb-1 max-h-48 overflow-y-auto rounded-lg border border-subtle bg-surface shadow-lg"
@@ -254,12 +331,16 @@
           @if (mentionCandidates().length === 0) {
             <li class="px-3 py-2 text-xs text-muted">No matches.</li>
           }
-          @for (s of mentionCandidates(); track s.id) {
+          @for (s of mentionCandidates(); track s.id; let i = $index) {
             <li>
               <button
                 type="button"
                 (click)="pickMention(s)"
-                class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-2"
+                (mouseenter)="mentionIndex.set(i)"
+                [class]="
+                  'flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-default ' +
+                  (i === mentionIndex() ? 'bg-surface-2' : 'hover:bg-surface-2')
+                "
               >
                 <span
                   class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-2 text-[10px] font-semibold text-muted"
@@ -279,6 +360,83 @@
        tab bar — kept out of this row so operators don't confuse a
        mode switch with an action button. -->
   <div class="mt-1 flex flex-wrap items-center justify-end gap-1.5">
+    <div class="relative mr-auto">
+      <button
+        type="button"
+        (click)="toggleRepliesMenu()"
+        [attr.aria-expanded]="repliesMenuOpen()"
+        aria-haspopup="menu"
+        title="Saved replies (or type / in the message box)"
+        class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1.5 text-xs font-medium text-default transition hover:bg-surface-2"
+      >
+        <lucide-icon name="zap" class="h-3.5 w-3.5 text-accent" />
+        Saved replies
+      </button>
+      @if (repliesMenuOpen()) {
+        <button
+          type="button"
+          class="fixed inset-0 z-30 cursor-default"
+          aria-label="Close saved replies"
+          (click)="repliesMenuOpen.set(false)"
+        ></button>
+        <div
+          class="absolute bottom-full left-0 z-40 mb-1 w-80 max-w-[85vw] rounded-lg border border-subtle bg-surface p-2 shadow-lg"
+          role="menu"
+        >
+          <input
+            type="search"
+            placeholder="Search saved replies"
+            [ngModel]="repliesMenuQuery()"
+            (ngModelChange)="repliesMenuQuery.set($event)"
+            class="mb-1.5 w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          <ul class="max-h-56 overflow-y-auto">
+            @if (savedReplies.loading() && !savedReplies.loaded()) {
+              <li class="px-2 py-2 text-xs text-muted">Loading…</li>
+            } @else if (repliesMenuItems().length === 0) {
+              <li class="px-2 py-2 text-xs text-muted">No saved replies yet.</li>
+            }
+            @for (r of repliesMenuItems(); track r.id) {
+              <li>
+                <button
+                  type="button"
+                  role="menuitem"
+                  [disabled]="textareaDisabled()"
+                  (click)="insertSavedReply(r)"
+                  class="block w-full rounded px-2 py-1.5 text-left hover:bg-surface-2 disabled:opacity-50"
+                >
+                  <span class="flex items-center gap-2 text-xs">
+                    <span class="truncate font-medium text-default">{{ r.title }}</span>
+                    @if (r.shortcut) {
+                      <span class="shrink-0 font-mono text-[10.5px] text-accent"
+                        >/{{ r.shortcut }}</span
+                      >
+                    }
+                  </span>
+                  <span class="block truncate text-[11px] text-muted">{{ r.body }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+          <div
+            class="mt-1.5 flex items-center justify-between border-t border-subtle pt-1.5 text-xs"
+          >
+            <button type="button" class="font-medium text-accent" (click)="openManager()">
+              Manage
+            </button>
+            @if (text().trim()) {
+              <button
+                type="button"
+                class="text-muted hover:text-default"
+                (click)="openManager(true)"
+              >
+                Save current text as reply
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </div>
     @if (channel === 'email') {
       <app-email-template-picker
         [contactId]="contactId"
@@ -293,7 +451,7 @@
       [class]="
         'rounded-md px-3 py-1.5 text-xs font-medium transition ' +
         (aiHandling
-          ? 'bg-violet-500/10 text-violet-700 hover:bg-violet-200'
+          ? 'bg-violet-500/10 text-violet-600 hover:bg-violet-500/20 dark:text-violet-400'
           : 'border border-subtle bg-surface text-default hover:bg-surface-2')
       "
     >
@@ -322,6 +480,10 @@
   </div>
 </div>
 
+@if (managerOpen()) {
+  <app-saved-replies-manager (dismissed)="managerOpen.set(false)" />
+}
+
 <!-- Step 28 — outbound location dialog. Lat/lng + optional label/address.
      Operator can pull the device's geolocation via the Use my location
      button (browser prompts; falls back silently). -->
@@ -341,7 +503,7 @@
           <input
             type="number"
             step="any"
-            class="w-full rounded-md border border-subtle px-2.5 py-1.5"
+            class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-default focus:outline-none focus:ring-1 focus:ring-accent"
             placeholder="19.0760"
             [ngModel]="locationDraft().latitude"
             (ngModelChange)="patchLocation({ latitude: $event })"
@@ -352,7 +514,7 @@
           <input
             type="number"
             step="any"
-            class="w-full rounded-md border border-subtle px-2.5 py-1.5"
+            class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-default focus:outline-none focus:ring-1 focus:ring-accent"
             placeholder="72.8777"
             [ngModel]="locationDraft().longitude"
             (ngModelChange)="patchLocation({ longitude: $event })"
@@ -364,7 +526,7 @@
         <input
           type="text"
           maxlength="200"
-          class="w-full rounded-md border border-subtle px-2.5 py-1.5"
+          class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-default focus:outline-none focus:ring-1 focus:ring-accent"
           placeholder="Sharma Furniture — Andheri"
           [ngModel]="locationDraft().name"
           (ngModelChange)="patchLocation({ name: $event })"
@@ -375,7 +537,7 @@
         <input
           type="text"
           maxlength="500"
-          class="w-full rounded-md border border-subtle px-2.5 py-1.5"
+          class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-default focus:outline-none focus:ring-1 focus:ring-accent"
           placeholder="123 Andheri West, Mumbai"
           [ngModel]="locationDraft().address"
           (ngModelChange)="patchLocation({ address: $event })"

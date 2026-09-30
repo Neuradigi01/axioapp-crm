@@ -18,6 +18,18 @@
     />
   }
 
+  @if (bulkAssignOpen()) {
+    <app-reassign-modal
+      [entityLabel]="'conversation'"
+      [count]="bulkSelected().size"
+      [currentOwnerId]="null"
+      [submitting]="bulkBusy()"
+      [error]="bulkAssignError()"
+      (confirm)="onBulkAssignConfirm($event)"
+      (cancel)="bulkAssignOpen.set(false)"
+    />
+  }
+
   @if (newConversationOpen()) {
     <app-new-conversation-modal
       (started)="onConversationStarted($event)"
@@ -56,7 +68,10 @@
               title="Refresh"
               aria-label="Refresh"
             >
-              <lucide-icon name="refresh-cw" class="h-3.5 w-3.5" />
+              <lucide-icon
+                name="refresh-cw"
+                [class]="'h-3.5 w-3.5 ' + (refreshing() ? 'animate-spin' : '')"
+              />
             </button>
             <button
               type="button"
@@ -85,9 +100,134 @@
           </div>
         }
       </div>
+      @if (bulkSelected().size > 0) {
+        <!-- Bulk action bar — replaces nothing, sits between the header
+             and the list while at least one row is ticked. -->
+        <div
+          class="relative flex flex-wrap items-center gap-1 border-b border-subtle bg-accent/5 px-3 py-1.5"
+          role="toolbar"
+          aria-label="Bulk actions"
+        >
+          <span class="mr-auto text-xs font-semibold text-default">
+            {{ bulkSelected().size }} selected
+          </span>
+          @if (bulkSelected().size < items().length) {
+            <button
+              type="button"
+              (click)="selectAllVisible()"
+              class="rounded px-1.5 py-1 text-[11px] font-medium text-accent hover:bg-surface-2"
+            >
+              All {{ items().length }}
+            </button>
+          }
+          @for (a of bulkIconActions; track a.action) {
+            <button
+              type="button"
+              (click)="runBulk(a.action)"
+              [disabled]="bulkBusy()"
+              [title]="a.label"
+              [attr.aria-label]="a.label"
+              class="flex h-7 w-7 items-center justify-center rounded-md text-muted transition hover:bg-surface-2 hover:text-default disabled:opacity-50"
+            >
+              <lucide-icon [name]="a.icon" class="h-3.5 w-3.5" />
+            </button>
+          }
+          <button
+            type="button"
+            (click)="openBulkSnooze()"
+            [disabled]="bulkBusy()"
+            title="Snooze"
+            aria-label="Snooze"
+            [attr.aria-expanded]="bulkSnoozeOpen()"
+            class="flex h-7 w-7 items-center justify-center rounded-md text-muted transition hover:bg-surface-2 hover:text-default disabled:opacity-50"
+          >
+            <lucide-icon name="clock" class="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            (click)="openBulkAssign()"
+            [disabled]="bulkBusy()"
+            title="Assign"
+            aria-label="Assign"
+            class="flex h-7 w-7 items-center justify-center rounded-md text-muted transition hover:bg-surface-2 hover:text-default disabled:opacity-50"
+          >
+            <lucide-icon name="user-plus" class="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            (click)="openBulkTag()"
+            [disabled]="bulkBusy()"
+            title="Add tag"
+            aria-label="Add tag"
+            [attr.aria-expanded]="bulkTagOpen()"
+            class="flex h-7 w-7 items-center justify-center rounded-md text-muted transition hover:bg-surface-2 hover:text-default disabled:opacity-50"
+          >
+            <lucide-icon name="tag" class="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            (click)="clearBulkSelection()"
+            title="Clear selection (Esc)"
+            aria-label="Clear selection"
+            class="flex h-7 w-7 items-center justify-center rounded-md text-muted transition hover:bg-surface-2 hover:text-default"
+          >
+            <lucide-icon name="x" class="h-3.5 w-3.5" />
+          </button>
+          @if (bulkSnoozeOpen()) {
+            <div
+              class="absolute right-2 top-full z-30 mt-1 w-56 rounded-lg border border-subtle bg-surface p-1 shadow-lg"
+              role="menu"
+            >
+              <p class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                Snooze until
+              </p>
+              @for (sp of bulkSnoozeChoices(); track sp.label) {
+                <button
+                  type="button"
+                  role="menuitem"
+                  (click)="
+                    runBulk('snooze', { snoozed_until: sp.until ? sp.until.toISOString() : null })
+                  "
+                  class="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs text-default hover:bg-surface-2"
+                >
+                  <span>{{ sp.label }}</span>
+                  @if (sp.hint) {
+                    <span class="text-[10.5px] text-muted">{{ sp.hint }}</span>
+                  }
+                </button>
+              }
+            </div>
+          }
+          @if (bulkTagOpen()) {
+            <div
+              class="absolute right-2 top-full z-30 mt-1 max-h-64 w-56 overflow-y-auto rounded-lg border border-subtle bg-surface p-1 shadow-lg"
+              role="menu"
+            >
+              @if (bulkTags().length === 0) {
+                <p class="px-2 py-2 text-xs text-muted">No tags yet.</p>
+              }
+              @for (t of bulkTags(); track t.id) {
+                <button
+                  type="button"
+                  role="menuitem"
+                  (click)="runBulk('add_tag', { tag_id: t.id })"
+                  class="flex w-full items-center rounded px-2 py-1.5 text-left hover:bg-surface-2"
+                >
+                  <app-tag-chip [tag]="t" />
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
       <app-conversation-list
         [items]="items()"
         [loading]="loading()"
+        [hasMore]="hasMore()"
+        [loadingMore]="loadingMore()"
+        [filtered]="hasActiveFilters()"
+        [counts]="counts()"
+        [selectedIds]="bulkSelected()"
         [selectedId]="selectedId()"
         [staffById]="staffById()"
         [contactsById]="contactsById()"
@@ -99,6 +239,9 @@
         (assigneeChange)="onAssigneeFilterChange($event)"
         (tagFilterChange)="onTagFilterChange($event)"
         (select)="onSelect($event)"
+        (loadMore)="loadMoreConversations()"
+        (clearFilters)="onClearFilters()"
+        (toggleSelect)="toggleBulkSelect($event)"
       />
     </aside>
 
@@ -225,29 +368,31 @@
           [conversation]="conv"
           [detail]="detail()"
           [loading]="threadLoading()"
+          [loadingOlder]="loadingOlder()"
+          [hasOlder]="hasOlder()"
           [staffById]="staffById()"
           [displayHandle]="selectedContactHandle()"
           [contactName]="selectedContactName()"
           (takeoverAi)="onTakeoverAi()"
           (resumeAiOut)="onResumeAi()"
-          (reassign)="openReassign()"
           (replyTo)="onReplyTo($event)"
           (react)="onReact($event)"
-          (tagsChanged)="onTagsChanged($event)"
-          (statusChange)="onStatusChange($event)"
+          (loadOlder)="onLoadOlder()"
         />
         @if (canInteractWithSelected()) {
           <app-compose-bar
             #composeBar
+            [conversationId]="conv.id"
             [aiHandling]="conv.ai_handling"
             [channel]="conv.channel"
             [contactId]="conv.contact_id"
             [replyingTo]="replyingTo()"
             [staff]="staffList()"
             [outOfSession]="isOutOfSession()"
-            [receivedViaPhoneId]="$any(conv).received_via_phone_id ?? null"
+            [receivedViaPhoneId]="conv.received_via_phone_id ?? null"
             (send)="onSendText($event)"
             (sendMedia)="onSendMedia($event)"
+            (sendEmailWithFiles)="onSendEmailWithFiles($event)"
             (sendNote)="onSendNote($event)"
             (sendLocation)="onSendLocation($event)"
             (openInteractive)="openInteractive()"
@@ -315,6 +460,8 @@
           (linkContact)="onSetContact({ contact_id: $event })"
           (renameContact)="onRenameContact($event)"
           (statusChange)="onStatusChange($event)"
+          (snooze)="onSnooze($event)"
+          (openConversation)="onSelect($event)"
           (tagsChanged)="onTagsChanged($event)"
           (takeoverAi)="onTakeoverAi()"
           (resumeAiOut)="onResumeAi()"
@@ -361,6 +508,8 @@
               (linkContact)="onSetContact({ contact_id: $event })"
               (renameContact)="onRenameContact($event)"
               (statusChange)="onStatusChange($event)"
+              (snooze)="onSnooze($event); closeMobileRail()"
+              (openConversation)="onSelect($event)"
               (tagsChanged)="onTagsChanged($event)"
               (takeoverAi)="onTakeoverAi(); closeMobileRail()"
               (resumeAiOut)="onResumeAi(); closeMobileRail()"

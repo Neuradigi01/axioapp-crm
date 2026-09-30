@@ -36,7 +36,7 @@ const MORE_EMOJIS = ['🔥', '🎉', '👏', '✅', '❌', '💯', '🤔', '😎
             (click)="pickEmoji(emoji)"
             [class]="
               'inline-flex h-8 w-8 items-center justify-center rounded-full text-lg transition hover:bg-surface-2 ' +
-              (existing === emoji ? 'bg-surface-2 ring-1 border-subtle' : '')
+              (existing === emoji ? 'bg-surface-2 ring-1 ring-subtle' : '')
             "
             [attr.aria-label]="'React with ' + emoji"
           >
@@ -60,7 +60,7 @@ const MORE_EMOJIS = ['🔥', '🎉', '👏', '✅', '❌', '💯', '🤔', '😎
               (click)="pickEmoji(emoji)"
               [class]="
                 'inline-flex h-8 w-8 items-center justify-center rounded-full text-lg transition hover:bg-surface-2 ' +
-                (existing === emoji ? 'bg-surface-2 ring-1 border-subtle' : '')
+                (existing === emoji ? 'bg-surface-2 ring-1 ring-subtle' : '')
               "
               [attr.aria-label]="'React with ' + emoji"
             >

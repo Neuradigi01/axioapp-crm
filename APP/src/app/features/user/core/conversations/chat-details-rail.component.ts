@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   computed,
@@ -18,7 +19,8 @@ import { TagManagerComponent } from './tag-manager.component';
 import { ConversationBlockNumberActionComponent } from './header/block-number-action.component';
 import { ConversationExportButtonComponent } from './header/export-button.component';
 import { ConversationContactCardComponent } from './contact-card.component';
-import { AttributionChipComponent } from './header/attribution-chip.component';
+import { ContactActivityComponent } from './contact-activity.component';
+import { SnoozePreset, formatHint, snoozePresets } from './snooze-options';
 import { FurnitureAuthService } from '../auth/auth.service';
 
 /**
@@ -45,8 +47,8 @@ import { FurnitureAuthService } from '../auth/auth.service';
     TagManagerComponent,
     ConversationBlockNumberActionComponent,
     ConversationExportButtonComponent,
-    AttributionChipComponent,
     ConversationContactCardComponent,
+    ContactActivityComponent,
   ],
   templateUrl: './chat-details-rail.component.html',
   host: { class: 'flex min-h-0 flex-1 flex-col overflow-y-auto' },
@@ -76,6 +78,11 @@ export class ChatDetailsRailComponent {
   @Output() readonly reassign = new EventEmitter<void>();
   @Output() readonly tagsChanged = new EventEmitter<ConversationTagRef[]>();
   @Output() readonly statusChange = new EventEmitter<ConversationStatus>();
+  /** Snooze picked from the status menu: ISO wake-up time, or null for
+   *  "until the customer replies". */
+  @Output() readonly snooze = new EventEmitter<string | null>();
+  /** Another conversation with the same contact was clicked. */
+  @Output() readonly openConversation = new EventEmitter<string>();
   @Output() readonly takeoverAi = new EventEmitter<void>();
   @Output() readonly resumeAiOut = new EventEmitter<void>();
   @Output() readonly saveContact = new EventEmitter<string>();
@@ -125,8 +132,45 @@ export class ChatDetailsRailComponent {
     this.statusMenuOpen.update((v) => !v);
   }
 
-  protected pickStatus(next: ConversationStatus): void {
+  /** Snooze presets, recomputed each time the menu opens so "1 hour"
+   *  is relative to now. */
+  protected readonly snoozeChoices = signal<SnoozePreset[]>([]);
+  protected readonly snoozeSubmenuOpen = signal(false);
+
+  protected openSnoozeSubmenu(): void {
+    this.snoozeChoices.set(snoozePresets());
+    this.snoozeSubmenuOpen.set(true);
+  }
+
+  protected pickSnooze(preset: SnoozePreset): void {
     this.statusMenuOpen.set(false);
+    this.snoozeSubmenuOpen.set(false);
+    this.snooze.emit(preset.until ? preset.until.toISOString() : null);
+  }
+
+  /** "Until Tue 9:00" under the status pill for a timed snooze. */
+  protected snoozedUntilLabel(): string | null {
+    const iso = this.conversation.snoozed_until;
+    if (this.conversation.status !== 'snoozed') return null;
+    return iso ? `Until ${formatHint(new Date(iso))}` : 'Until the customer replies';
+  }
+
+  /** Outside click / Esc closes the status menu (the trigger and menu
+   *  items stop propagation, so only genuine outside clicks land here). */
+  @HostListener('document:click')
+  @HostListener('document:keydown.escape')
+  protected closeStatusMenu(): void {
+    if (this.statusMenuOpen()) this.statusMenuOpen.set(false);
+    this.snoozeSubmenuOpen.set(false);
+  }
+
+  protected pickStatus(next: ConversationStatus): void {
+    if (next === 'snoozed') {
+      this.openSnoozeSubmenu();
+      return;
+    }
+    this.statusMenuOpen.set(false);
+    this.snoozeSubmenuOpen.set(false);
     if (next === this.conversation.status) return;
     this.statusChange.emit(next);
   }

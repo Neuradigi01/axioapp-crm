@@ -3,10 +3,12 @@ import {
   Component,
   ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   ViewChild,
   computed,
+  inject,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -15,10 +17,23 @@ import { LucideAngularModule } from 'lucide-angular';
 import { EmailTemplateRenderResponse } from '../services/email-templates-api.service';
 import { EmailTemplatePickerComponent } from '../shared/email/template-picker.component';
 import { SendFromPickerComponent } from '../whatsapp/shared/send-from-picker.component';
-import { ConversationMessage } from './conversations-api.service';
+import { ConversationMessage, SavedReply } from './conversations-api.service';
+import { SavedRepliesManagerComponent } from './saved-replies-manager.component';
+import { SavedRepliesStore } from './saved-replies.store';
 import { UserMini } from '../shared/services/users-directory.service';
 
 export type ComposerAttachmentType = 'image' | 'video' | 'audio' | 'document';
+
+/** Email reply with attachments (email channel only). */
+export interface ComposerEmailPayload {
+  text: string;
+  files: File[];
+}
+
+// Mirror of the backend email-attachment limits (conversations/utils.py).
+const MAX_EMAIL_FILES = 10;
+const MAX_EMAIL_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_EMAIL_TOTAL_BYTES = 18 * 1024 * 1024;
 
 export interface ComposerMediaPayload {
   file: File;
@@ -74,6 +89,29 @@ const MIME_TO_TYPE: Array<[RegExp, ComposerAttachmentType]> = [
   [/^text\/(plain|csv)$/, 'document'],
 ];
 
+/** Per-conversation unsent drafts live in sessionStorage so switching
+ *  threads (or refreshing the tab) never loses — or leaks — typed text.
+ *  Private-mode browsers throw on access; drafts are then in-memory
+ *  only for the lifetime of the component. */
+const DRAFT_KEY_PREFIX = 'conversations:draft:';
+
+function readDraft(conversationId: string): string {
+  try {
+    return sessionStorage.getItem(DRAFT_KEY_PREFIX + conversationId) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function writeDraft(conversationId: string, text: string): void {
+  try {
+    if (text.trim()) sessionStorage.setItem(DRAFT_KEY_PREFIX + conversationId, text);
+    else sessionStorage.removeItem(DRAFT_KEY_PREFIX + conversationId);
+  } catch {
+    // Best-effort; failure is silent.
+  }
+}
+
 function classifyFile(file: File): ComposerAttachmentType | null {
   for (const [pattern, type] of MIME_TO_TYPE) {
     if (pattern.test(file.type)) {
@@ -102,10 +140,63 @@ function classifyFile(file: File): ComposerAttachmentType | null {
     LucideAngularModule,
     EmailTemplatePickerComponent,
     SendFromPickerComponent,
+    SavedRepliesManagerComponent,
   ],
   templateUrl: './compose-bar.component.html',
 })
 export class ComposeBarComponent {
+  protected readonly savedReplies = inject(SavedRepliesStore);
+
+  // --- Saved replies ---------------------------------------------------
+
+  /** `/shortcut` picker — open while the whole draft is a single
+   *  `/token` (e.g. `/pri`); Enter / Tab inserts the highlighted reply. */
+  protected readonly slashQuery = signal<string | null>(null);
+  protected readonly slashIndex = signal(0);
+  protected readonly slashCandidates = computed(() => {
+    const q = this.slashQuery();
+    return q === null ? [] : this.savedReplies.search(q, 6);
+  });
+  /** Zap-button menu in the action row. */
+  protected readonly repliesMenuOpen = signal(false);
+  protected readonly repliesMenuQuery = signal('');
+  protected readonly repliesMenuItems = computed(() =>
+    this.savedReplies.search(this.repliesMenuQuery(), 8),
+  );
+  protected readonly managerOpen = signal(false);
+  @ViewChild(SavedRepliesManagerComponent) private readonly manager?: SavedRepliesManagerComponent;
+
+  protected toggleRepliesMenu(): void {
+    this.savedReplies.ensureLoaded();
+    this.repliesMenuQuery.set('');
+    this.repliesMenuOpen.update((v) => !v);
+  }
+
+  protected insertSavedReply(reply: SavedReply): void {
+    this.repliesMenuOpen.set(false);
+    this.slashQuery.set(null);
+    this.setText(reply.body);
+    this.focusInput();
+  }
+
+  protected openManager(prefillFromDraft = false): void {
+    this.repliesMenuOpen.set(false);
+    this.managerOpen.set(true);
+    const draft = this.text().trim();
+    if (prefillFromDraft && draft) queueMicrotask(() => this.manager?.prefill(draft));
+  }
+
+  private refreshSlashPicker(value: string): void {
+    const match = /^\/([\w-]*)$/.exec(value);
+    if (match) {
+      this.savedReplies.ensureLoaded();
+      this.slashQuery.set(match[1].toLowerCase());
+      this.slashIndex.set(0);
+    } else {
+      this.slashQuery.set(null);
+    }
+  }
+
   @Input() aiHandling = false;
   /** Active conversation channel — controls whether the email
    *  template picker renders, and whether the paperclip is offered. */
@@ -141,8 +232,23 @@ export class ComposeBarComponent {
    *  override when intentionally switching numbers. */
   @Input() receivedViaPhoneId: string | null = null;
 
+  /** Conversation this composer is bound to. The page keeps a single
+   *  composer instance alive across thread switches, so every piece of
+   *  per-thread state (typed text, staged file, note mode, mentions,
+   *  Send-From choice, open dialogs) is reset here — otherwise a reply
+   *  typed for one customer could be sent to the next thread opened.
+   *  Typed text is parked as a draft and restored on return. */
+  @Input() set conversationId(id: string | null) {
+    if (id === this.boundConversationId) return;
+    if (this.boundConversationId) writeDraft(this.boundConversationId, this.text());
+    this.boundConversationId = id;
+    this.resetForConversation(id);
+  }
+  private boundConversationId: string | null = null;
+
   @Output() readonly send = new EventEmitter<string>();
   @Output() readonly sendMedia = new EventEmitter<ComposerMediaPayload>();
+  @Output() readonly sendEmailWithFiles = new EventEmitter<ComposerEmailPayload>();
   @Output() readonly sendNote = new EventEmitter<ComposerNotePayload>();
   @Output() readonly sendLocation = new EventEmitter<ComposerLocationPayload>();
   @Output() readonly openInteractive = new EventEmitter<void>();
@@ -150,9 +256,9 @@ export class ComposeBarComponent {
   @Output() readonly clearReply = new EventEmitter<void>();
 
   /** Step 27b — explicit send-from selection. Null when the org
-   *  is single-number (picker hidden). Lives on this component
-   *  instance, so the choice resets when the compose-bar is
-   *  re-created (i.e. when a different conversation is opened). */
+   *  is single-number (picker hidden). Reset on every conversation
+   *  switch (see `conversationId`) so the picker falls back to the
+   *  number the new thread's customer reached us on. */
   protected readonly sendFromPhoneId = signal<string | null>(null);
 
   // --- Step 28: outbound location share -------------------------------
@@ -177,6 +283,12 @@ export class ComposeBarComponent {
 
   protected closeLocationDialog(): void {
     this.locationDialogOpen.set(false);
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this.locationDialogOpen()) this.closeLocationDialog();
+    this.repliesMenuOpen.set(false);
   }
 
   protected patchLocation(
@@ -280,6 +392,8 @@ export class ComposeBarComponent {
    *  after the `@`; the picker filters `staff` by that prefix. */
   protected readonly mentionOpen = signal<boolean>(false);
   protected readonly mentionQuery = signal<string>('');
+  /** Keyboard-highlighted row in the mention picker (↑/↓ + Enter/Tab). */
+  protected readonly mentionIndex = signal<number>(0);
   /** Resolved mentions for the in-flight note. Each entry is
    *  ``{userId, displayName}`` — we keep both so the chip row can
    *  render without re-resolving from `staff` on every keystroke. */
@@ -301,6 +415,10 @@ export class ComposeBarComponent {
   protected readonly isDragging = signal(false);
 
   protected readonly canAttachMedia = computed(() => this.channel === 'whatsapp');
+  /** Email replies accept any file type (multiple files). */
+  protected readonly isEmail = computed(() => this.channel === 'email');
+  protected readonly canAttach = computed(() => this.canAttachMedia() || this.isEmail());
+  protected readonly emailFiles = signal<File[]>([]);
   protected readonly captionsSupported = computed(() => {
     const t = this.stagedType();
     return t === 'image' || t === 'video' || t === 'document';
@@ -330,14 +448,59 @@ export class ComposeBarComponent {
   });
 
   protected onTextChange(value: string): void {
-    this.text.set(value);
+    this.setText(value);
+    this.refreshSlashPicker(value);
     if (this.isNoteMode()) {
       this.refreshMentionPicker(value);
     }
-    // Defer until Angular writes the new value to the DOM so
-    // ``scrollHeight`` reflects the just-typed content, not the
-    // previous frame.
+  }
+
+  /** Single write path for the textarea buffer: keeps the per-thread
+   *  draft in sync and re-fits the textarea height. The resize is
+   *  deferred until Angular writes the new value to the DOM so
+   *  ``scrollHeight`` reflects the new content, not the previous frame. */
+  private setText(value: string): void {
+    this.text.set(value);
+    if (this.boundConversationId) writeDraft(this.boundConversationId, value);
     queueMicrotask(() => this.autoGrowTextarea());
+  }
+
+  /** Wipe all per-thread state and load the target thread's draft. */
+  private resetForConversation(id: string | null): void {
+    this.mode.set('reply');
+    this.mentions.set([]);
+    this.mentionOpen.set(false);
+    this.mentionQuery.set('');
+    this.mentionIndex.set(0);
+    this.clearStaged();
+    this.emailFiles.set([]);
+    this.isDragging.set(false);
+    this.sendFromPhoneId.set(null);
+    this.templateError.set(null);
+    this.locationDialogOpen.set(false);
+    this.slashQuery.set(null);
+    this.repliesMenuOpen.set(false);
+    this.text.set(id ? readDraft(id) : '');
+    queueMicrotask(() => this.autoGrowTextarea());
+  }
+
+  /** Called by the page when a send fails so the operator's message is
+   *  never lost: the text goes back into the composer (unless they have
+   *  already started typing something new) and focus returns to it. */
+  public restoreText(conversationId: string, text: string): void {
+    if (conversationId !== this.boundConversationId) {
+      if (!readDraft(conversationId).trim()) writeDraft(conversationId, text);
+      return;
+    }
+    if (this.text().trim()) return;
+    this.setText(text);
+    this.focusInput();
+  }
+
+  /** Focus the textarea — used by the page's `r` / `n` shortcuts. */
+  public focusInput(mode?: 'reply' | 'note'): void {
+    if (mode) this.setMode(mode);
+    queueMicrotask(() => this.textareaEl?.nativeElement.focus());
   }
 
   /** Reads the text buffer, opens the mention picker when the cursor
@@ -350,6 +513,7 @@ export class ComposeBarComponent {
     const match = /(?:^|\s)@(\w*)$/.exec(value);
     if (match) {
       this.mentionQuery.set(match[1] || '');
+      this.mentionIndex.set(0);
       this.mentionOpen.set(true);
     } else {
       this.mentionOpen.set(false);
@@ -381,9 +545,10 @@ export class ComposeBarComponent {
       const prefix = match.startsWith(' ') ? ' ' : '';
       return `${prefix}@${staff.full_name} `;
     });
-    this.text.set(replaced);
+    this.setText(replaced);
     this.mentionOpen.set(false);
     this.mentionQuery.set('');
+    this.focusInput();
   }
 
   protected removeMention(userId: string): void {
@@ -409,11 +574,10 @@ export class ComposeBarComponent {
         text: trimmed,
         mentions: this.mentions().map((m) => m.userId),
       });
-      this.text.set('');
+      this.setText('');
       this.mentions.set([]);
       this.mentionOpen.set(false);
       this.mentionQuery.set('');
-      queueMicrotask(() => this.autoGrowTextarea());
       return;
     }
 
@@ -422,21 +586,77 @@ export class ComposeBarComponent {
     // for the operator; this is a defence in depth.
     if (this.outOfSession) return;
 
+    const emailFiles = this.emailFiles();
+    if (this.isEmail() && emailFiles.length > 0) {
+      if (!trimmed) {
+        this.mediaError.set('Add a message to go with the attachments.');
+        return;
+      }
+      this.sendEmailWithFiles.emit({ text: trimmed, files: emailFiles });
+      this.emailFiles.set([]);
+      this.mediaError.set(null);
+      this.setText('');
+      return;
+    }
+
     if (file && type) {
       const caption = this.captionsSupported() && trimmed ? trimmed : undefined;
       this.sendMedia.emit({ file, type, caption });
       this.clearStaged();
-      this.text.set('');
-      queueMicrotask(() => this.autoGrowTextarea());
+      this.setText('');
       return;
     }
     if (!trimmed) return;
     this.send.emit(trimmed);
-    this.text.set('');
-    queueMicrotask(() => this.autoGrowTextarea());
+    this.setText('');
   }
 
   protected onKey(event: KeyboardEvent): void {
+    // IME composition (Hindi / CJK keyboards) uses Enter to commit the
+    // candidate word — never treat that as "send".
+    if (event.isComposing) return;
+
+    const replies = this.slashCandidates();
+    if (this.slashQuery() !== null && replies.length > 0) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        this.slashIndex.update((i) => (i + step + replies.length) % replies.length);
+        return;
+      }
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault();
+        this.insertSavedReply(replies[Math.min(this.slashIndex(), replies.length - 1)]);
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.slashQuery.set(null);
+        return;
+      }
+    }
+
+    if (this.mentionOpen() && this.isNoteMode()) {
+      const candidates = this.mentionCandidates();
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (candidates.length === 0) return;
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        this.mentionIndex.update((i) => (i + step + candidates.length) % candidates.length);
+        return;
+      }
+      if ((event.key === 'Enter' || event.key === 'Tab') && candidates.length > 0) {
+        event.preventDefault();
+        this.pickMention(candidates[Math.min(this.mentionIndex(), candidates.length - 1)]);
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.mentionOpen.set(false);
+        return;
+      }
+    }
+
     if (event.key === 'Escape' && this.replyingTo) {
       event.preventDefault();
       this.clearReply.emit();
@@ -481,7 +701,7 @@ export class ComposeBarComponent {
 
   protected onTemplateSelected(resp: EmailTemplateRenderResponse): void {
     this.templateError.set(null);
-    this.text.set(resp.body_text || resp.body_html);
+    this.setText(resp.body_text || resp.body_html);
   }
 
   protected onTemplateError(message: string): void {
@@ -495,12 +715,17 @@ export class ComposeBarComponent {
   // --- Media attach --------------------------------------------------
 
   protected openFilePicker(): void {
-    if (!this.canAttachMedia()) return;
+    if (!this.canAttach()) return;
     this.fileInput?.nativeElement.click();
   }
 
   protected onFilePicked(event: Event): void {
     const input = event.target as HTMLInputElement;
+    if (this.isEmail()) {
+      this.stageEmailFiles(Array.from(input.files ?? []));
+      input.value = '';
+      return;
+    }
     const file = input.files?.[0] ?? null;
     if (file) {
       this.stageFile(file);
@@ -522,7 +747,7 @@ export class ComposeBarComponent {
 
   // Drag-and-drop hooks — bound to the wrapper div in the template.
   protected onDragOver(event: DragEvent): void {
-    if (!this.canAttachMedia()) return;
+    if (!this.canAttach()) return;
     event.preventDefault();
     this.isDragging.set(true);
   }
@@ -535,11 +760,46 @@ export class ComposeBarComponent {
   protected onDrop(event: DragEvent): void {
     event.preventDefault();
     this.isDragging.set(false);
-    if (!this.canAttachMedia()) return;
+    if (!this.canAttach()) return;
+    if (this.isEmail()) {
+      this.stageEmailFiles(Array.from(event.dataTransfer?.files ?? []));
+      return;
+    }
     const file = event.dataTransfer?.files?.[0] ?? null;
     if (file) {
       this.stageFile(file);
     }
+  }
+
+  /** Add files to the email attachment list, enforcing the same limits
+   *  as the backend so the operator gets instant feedback. */
+  private stageEmailFiles(files: File[]): void {
+    if (files.length === 0) return;
+    const next = [...this.emailFiles(), ...files];
+    if (next.length > MAX_EMAIL_FILES) {
+      this.mediaError.set(`Attach at most ${MAX_EMAIL_FILES} files per email.`);
+      return;
+    }
+    const tooBig = files.find((f) => f.size > MAX_EMAIL_FILE_BYTES);
+    if (tooBig) {
+      this.mediaError.set(`"${tooBig.name}" is larger than 10 MB.`);
+      return;
+    }
+    if (files.some((f) => f.size === 0)) {
+      this.mediaError.set('Empty files cannot be attached.');
+      return;
+    }
+    const total = next.reduce((sum, f) => sum + f.size, 0);
+    if (total > MAX_EMAIL_TOTAL_BYTES) {
+      this.mediaError.set('Attachments exceed 18 MB in total — email providers would reject it.');
+      return;
+    }
+    this.mediaError.set(null);
+    this.emailFiles.set(next);
+  }
+
+  protected removeEmailFile(index: number): void {
+    this.emailFiles.update((files) => files.filter((_, i) => i !== index));
   }
 
   private stageFile(file: File): void {

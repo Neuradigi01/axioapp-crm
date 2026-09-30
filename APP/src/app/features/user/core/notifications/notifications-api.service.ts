@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Observable, tap } from 'rxjs';
+import { Observable, Subject, tap } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import { TokenStorageService } from '../auth/token-storage.service';
@@ -16,6 +16,15 @@ export interface Notification {
   payload: Record<string, unknown>;
   read_at: string | null;
   created_at: string;
+}
+
+/** Non-persisted live event pushed over the same socket (server frame
+ *  `{kind: "event", type, payload}`). Never shown in the bell — pages
+ *  subscribe to `events$` to refresh live (e.g. the inbox reacting to
+ *  `conversation.updated`). */
+export interface LiveEvent {
+  type: string;
+  payload: Record<string, unknown>;
 }
 
 export interface ReadAllResponse {
@@ -55,6 +64,9 @@ export class NotificationsApiService {
   private readonly _unread = signal<number>(0);
   readonly unreadCount = computed(() => this._unread());
   readonly connected = signal<boolean>(false);
+  private readonly liveEvents = new Subject<LiveEvent>();
+  /** Live (non-notification) events — see `LiveEvent`. */
+  readonly events$ = this.liveEvents.asObservable();
 
   private ws: WebSocket | null = null;
   private started = false;
@@ -153,8 +165,12 @@ export class NotificationsApiService {
 
     socket.onmessage = (ev) => {
       try {
-        const data = JSON.parse(ev.data) as Notification;
-        this.onIncoming(data);
+        const data = JSON.parse(ev.data) as Notification | (LiveEvent & { kind: 'event' });
+        if ('kind' in data && data.kind === 'event') {
+          this.liveEvents.next({ type: data.type, payload: data.payload ?? {} });
+          return;
+        }
+        this.onIncoming(data as Notification);
       } catch {
         /* malformed frame — ignore */
       }

@@ -17,6 +17,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   computed,
@@ -411,6 +412,11 @@ export class InteractiveBuilderComponent {
   protected onCancel(): void {
     this.cancel.emit();
     this.reset();
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this.open) this.onCancel();
   }
 
   private reset(): void {

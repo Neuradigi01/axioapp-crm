@@ -10,10 +10,14 @@
         class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
       ></lucide-icon>
       <input
+        #searchInput
         type="search"
-        placeholder="Search by phone or handle"
+        placeholder="Search name, phone, email or message"
+        aria-label="Search conversations"
+        title="Search conversations (press / )"
+        [value]="searchTerm()"
         (input)="onSearchInput($event)"
-        class="block w-full rounded-lg border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        class="block w-full rounded-lg border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
       />
     </div>
     <!-- Channel filter pills (AIXO pattern). Each pill carries a small
@@ -50,6 +54,14 @@
             </span>
           }
           {{ o.label }}
+          @if (channelCount(o.value) > 0) {
+            <span
+              class="ml-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[9.5px] font-semibold text-white"
+              [attr.aria-label]="channelCount(o.value) + ' unread'"
+            >
+              {{ channelCount(o.value) }}
+            </span>
+          }
         </button>
       }
     </div>
@@ -69,6 +81,17 @@
           "
         >
           {{ m.label }}
+          @if (assigneeCount(m.value) > 0) {
+            <span
+              [class]="
+                'ml-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[9.5px] font-semibold ' +
+                (assigneeMode() === m.value ? 'bg-white/25 text-white' : 'bg-red-500 text-white')
+              "
+              [attr.aria-label]="assigneeCount(m.value) + ' unread'"
+            >
+              {{ assigneeCount(m.value) }}
+            </span>
+          }
         </button>
       }
       <button
@@ -96,26 +119,75 @@
   </div>
 
   <!-- List -->
-  <div class="min-h-0 flex-1 overflow-y-auto">
-    @if (loading) {
-      <div class="py-4 md:py-6 text-center text-sm text-muted">Loading…</div>
+  <div class="min-h-0 flex-1 overflow-y-auto" (scroll)="onListScroll($event)">
+    @if (loading && items.length === 0) {
+      <ul class="divide-y divide-subtle" aria-busy="true" aria-label="Loading conversations">
+        @for (row of [1, 2, 3, 4, 5, 6]; track row) {
+          <li class="flex items-start gap-2.5 px-3 py-2.5">
+            <span class="h-10 w-10 shrink-0 animate-pulse rounded-full bg-surface-2"></span>
+            <div class="flex-1 space-y-1.5 pt-1">
+              <div class="h-3 w-2/3 animate-pulse rounded bg-surface-2"></div>
+              <div class="h-2.5 w-full animate-pulse rounded bg-surface-2"></div>
+              <div class="h-2.5 w-1/3 animate-pulse rounded bg-surface-2"></div>
+            </div>
+          </li>
+        }
+      </ul>
     } @else if (items.length === 0) {
-      <div class="px-3 py-4 md:py-6 text-center text-sm text-muted">
-        No conversations yet. Inbound messages will land here as customers reach out.
-      </div>
+      @if (filtered) {
+        <div class="flex flex-col items-center gap-2 px-3 py-6 text-center text-sm text-muted">
+          <p>No conversations match these filters.</p>
+          <button
+            type="button"
+            (click)="onClearFilters()"
+            class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default transition hover:bg-surface-2"
+          >
+            Clear filters
+          </button>
+        </div>
+      } @else {
+        <div class="px-3 py-4 text-center text-sm text-muted md:py-6">
+          No conversations yet. Inbound messages will land here as customers reach out.
+        </div>
+      }
     } @else {
-      <ul class="divide-y divide-subtle">
+      <ul class="divide-y divide-subtle" role="listbox" aria-label="Conversations">
         @for (c of items; track c.id) {
           @let style = channelStyle(c.channel);
           @let contactAvatar = contactColor(c);
           @let ownerName = assigneeName(c.assigned_to_id);
-          <li>
+          @let unread = c.unread_count > 0;
+          @let checked = selectedIds.has(c.id);
+          <li [id]="rowDomId(c.id)" class="group relative">
             <button
               type="button"
-              (click)="pick(c.id)"
+              (click)="onToggleSelect($event, c.id)"
+              [attr.aria-label]="(checked ? 'Deselect ' : 'Select ') + rowName(c)"
+              [attr.aria-pressed]="checked"
               [class]="
-                'flex w-full items-start gap-2.5 px-3 py-2 text-left transition hover:bg-surface-2 ' +
-                (selectedId === c.id ? 'bg-surface-2' : '')
+                'absolute left-3 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full transition focus-visible:opacity-100 ' +
+                (checked
+                  ? 'bg-accent text-white opacity-100'
+                  : selectedIds.size > 0
+                    ? 'bg-surface text-muted opacity-100 ring-1 ring-subtle'
+                    : 'bg-surface text-muted opacity-0 ring-1 ring-subtle group-hover:opacity-100')
+              "
+            >
+              <lucide-icon [name]="checked ? 'check' : 'square'" class="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              role="option"
+              (click)="pick(c.id)"
+              [attr.aria-selected]="selectedId === c.id"
+              [attr.aria-current]="selectedId === c.id ? 'true' : null"
+              [class]="
+                'flex w-full items-start gap-2.5 border-l-2 px-3 py-2 text-left transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ' +
+                (selectedId === c.id
+                  ? 'border-accent bg-surface-2'
+                  : checked
+                    ? 'border-transparent bg-accent/5'
+                    : 'border-transparent')
               "
             >
               <!-- Avatar shows the CONTACT (person messaging you) with
@@ -148,11 +220,21 @@
               </span>
               <div class="min-w-0 flex-1">
                 <div class="flex items-center justify-between gap-2">
-                  <p class="min-w-0 flex-1 truncate text-[13px] font-semibold text-default">
+                  <p
+                    [class]="
+                      'min-w-0 flex-1 truncate text-[13px] text-default ' +
+                      (unread ? 'font-bold' : 'font-semibold')
+                    "
+                  >
                     {{ rowName(c) }}
                   </p>
                   <div class="flex shrink-0 items-center gap-1.5">
-                    <span class="font-mono text-[10.5px] text-faint">
+                    <span
+                      [class]="
+                        'font-mono text-[10.5px] ' +
+                        (unread ? 'font-semibold text-accent' : 'text-faint')
+                      "
+                    >
                       {{ formatTime(c.last_message_at) }}
                     </span>
                     @if (c.unread_count > 0) {
@@ -179,7 +261,12 @@
                      Falls back to the raw channel handle (phone / email)
                      when the conversation has no external messages yet so
                      the row still carries identifying info. -->
-                <p class="mt-0.5 truncate text-[11.5px] text-muted">
+                <p
+                  [class]="
+                    'mt-0.5 truncate text-[11.5px] ' +
+                    (unread ? 'font-medium text-default' : 'text-muted')
+                  "
+                >
                   @if (c.last_message_body) {
                     {{ c.last_message_body }}
                   } @else if (rowHandle(c); as handle) {
@@ -206,12 +293,29 @@
                   @if (c.status !== 'open') {
                     <span class="capitalize">· {{ c.status }}</span>
                   }
+                  @if (waitingLabel(c); as waiting) {
+                    <span
+                      [class]="
+                        'inline-flex items-center gap-0.5 font-medium ' +
+                        (waitingLong(c) ? 'text-red-500' : 'text-amber-600 dark:text-amber-400')
+                      "
+                      title="Customer is waiting for a reply"
+                    >
+                      · <lucide-icon name="clock" class="h-2.5 w-2.5" /> Waiting {{ waiting }}
+                    </span>
+                  }
                   @if (c.ai_paused) {
-                    <span class="text-amber-400" title="A team member took over from AI">
+                    <span
+                      class="text-amber-600 dark:text-amber-400"
+                      title="A team member took over from AI"
+                    >
                       · ✋ Human took over
                     </span>
                   } @else if (c.ai_active) {
-                    <span class="text-violet-400" title="AI is handling this conversation">
+                    <span
+                      class="text-violet-600 dark:text-violet-400"
+                      title="AI is handling this conversation"
+                    >
                       · 🤖 AI handled
                     </span>
                   }
@@ -233,6 +337,22 @@
           </li>
         }
       </ul>
+      @if (loadingMore) {
+        <div class="flex items-center justify-center gap-1 py-3 text-[11px] text-muted">
+          <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />
+          Loading more…
+        </div>
+      } @else if (hasMore) {
+        <div class="flex justify-center py-2">
+          <button
+            type="button"
+            (click)="loadMore.emit()"
+            class="rounded-md px-2.5 py-1 text-xs font-medium text-muted transition hover:bg-surface-2 hover:text-default"
+          >
+            Load more
+          </button>
+        </div>
+      }
     }
   </div>
 </div>

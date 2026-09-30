@@ -56,11 +56,20 @@ from src.app.core.conversations.registry import (
     ChannelNotRegistered,
     resolve,
 )
+from src.app.core.conversations.saved_replies_service import (
+    create_saved_reply,
+    delete_saved_reply,
+    list_saved_replies,
+    update_saved_reply,
+)
 from src.app.core.conversations.schemas import (
     AssignTagRequest,
     AttachmentType,
     ConversationAttributionOut,
+    ConversationBulkRequest,
+    ConversationBulkResult,
     ConversationContactSet,
+    ConversationCounts,
     ConversationCreate,
     ConversationDetail,
     ConversationListResponse,
@@ -71,14 +80,19 @@ from src.app.core.conversations.schemas import (
     MessageSendPayload,
     NoteCreate,
     ReactionRequest,
+    SavedReplyCreate,
+    SavedReplyOut,
+    SavedReplyUpdate,
     SendTemplatePayload,
     TagCreate,
     TagOut,
     TagUpdate,
 )
 from src.app.core.conversations.service import (
-    bulk_last_message_bodies,
+    bulk_last_message_previews,
+    bulk_update_conversations,
     compute_ai_active,
+    conversation_counts,
     ensure_can_write_conversation,
     get_conversation,
     list_conversations,
@@ -86,6 +100,7 @@ from src.app.core.conversations.service import (
     mark_conversation_read,
     mark_conversation_unread,
     open_message_attachment,
+    open_message_media,
     patch_conversation,
     pause_ai,
     react_to_message,
@@ -107,6 +122,7 @@ from src.app.core.conversations.tags_service import (
     unassign_tag,
     update_tag,
 )
+from src.app.core.conversations.utils import prepare_email_attachments
 from src.app.core.conversations.whatsapp_session import (
     compute_session_state,
 )
@@ -189,10 +205,12 @@ async def _serialize_conversation(
     mutation response consistently reflects whether AI is still
     going to answer this thread — the frontend banner reads
     ``ai_active`` and would flicker back to the wrong state on
-    every mutation without this."""
+    every mutation without this. Tags ride along too, so a mutation
+    response can replace the inbox row without dropping its chips."""
     ai_active_map = await compute_ai_active(db, [conv])
     out = ConversationOut.model_validate(conv)
     out.ai_active = ai_active_map.get(conv.id, False)
+    out.tags = await list_tags_for_conversation(db, conv.id)
     return out
 
 
@@ -243,6 +261,8 @@ async def list_endpoint(
     # ``unread_count > 0`` so the operator can page through every
     # thread awaiting attention, not just the ones on the current page.
     unread_only: bool = Query(default=False),
+    # Every thread with one contact (details rail "Other conversations").
+    contact_id: uuid.UUID | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -256,6 +276,7 @@ async def list_endpoint(
         q=q,
         tag_ids=tag_ids,
         unread_only=unread_only,
+        contact_id=contact_id,
         page=page,
         size=size,
     )
@@ -265,13 +286,16 @@ async def list_endpoint(
     # org-level lookup shared across every row.
     conv_ids = [r.id for r in rows]
     tags_by_conv = await bulk_tags_for_conversations(db, conv_ids)
-    preview_by_conv = await bulk_last_message_bodies(db, conv_ids)
+    preview_by_conv = await bulk_last_message_previews(db, conv_ids)
     ai_active_by_conv = await compute_ai_active(db, rows)
     items = []
     for r in rows:
         out = ConversationOut.model_validate(r)
         out.tags = tags_by_conv.get(r.id, [])
-        out.last_message_body = preview_by_conv.get(r.id)
+        preview = preview_by_conv.get(r.id)
+        if preview is not None:
+            out.last_message_body, direction = preview
+            out.last_message_direction = direction.value
         out.ai_active = ai_active_by_conv.get(r.id, False)
         items.append(out)
     return ConversationListResponse(items=items, total=total, page=page, size=size)
@@ -294,6 +318,88 @@ async def create_endpoint(
         contact_id=payload.contact_id,
     )
     return await _serialize_conversation(db, conv)
+
+
+@router.get("/counts", response_model=ConversationCounts)
+async def counts_endpoint(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.read")),
+) -> ConversationCounts:
+    """Unread badge counts for the inbox filter chips (All / Mine /
+    Unassigned / per channel). Declared before ``/{conversation_id}``."""
+    return await conversation_counts(db, caller_user_id=user.legacy_uuid)
+
+
+@router.post("/bulk", response_model=ConversationBulkResult)
+async def bulk_endpoint(
+    payload: ConversationBulkRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> ConversationBulkResult:
+    """Apply one action (close / reopen / snooze / mark read / mark
+    unread / assign / add tag) to many conversations. Rows the caller
+    may not act on are skipped and listed in ``skipped``."""
+    return await bulk_update_conversations(
+        db,
+        payload=payload,
+        caller_user_id=user.legacy_uuid,
+        caller_role_id=user.role_id,
+        org_id=user.org_id,
+    )
+
+
+# --- Saved replies ---------------------------------------------------------
+
+
+@router.get("/saved-replies", response_model=list[SavedReplyOut])
+async def list_saved_replies_endpoint(
+    search: str | None = Query(default=None, max_length=120),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.read")),
+) -> list[SavedReplyOut]:
+    rows = await list_saved_replies(db, search=search)
+    return [SavedReplyOut.model_validate(r) for r in rows]
+
+
+@router.post("/saved-replies", response_model=SavedReplyOut, status_code=status.HTTP_201_CREATED)
+async def create_saved_reply_endpoint(
+    payload: SavedReplyCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> SavedReplyOut:
+    reply = await create_saved_reply(
+        db, payload=payload, actor_id=user.legacy_uuid, org_id=user.org_id
+    )
+    return SavedReplyOut.model_validate(reply)
+
+
+@router.patch("/saved-replies/{reply_id}", response_model=SavedReplyOut)
+async def update_saved_reply_endpoint(
+    reply_id: uuid.UUID,
+    payload: SavedReplyUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> SavedReplyOut:
+    reply = await update_saved_reply(
+        db,
+        reply_id=reply_id,
+        payload=payload,
+        actor_id=user.legacy_uuid,
+        actor_role_id=user.role_id,
+    )
+    return SavedReplyOut.model_validate(reply)
+
+
+@router.delete("/saved-replies/{reply_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_saved_reply_endpoint(
+    reply_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+) -> Response:
+    await delete_saved_reply(
+        db, reply_id=reply_id, actor_id=user.legacy_uuid, actor_role_id=user.role_id
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # --- Tags (whatsapp-platform-upgrade Step 14) -----------------------------
@@ -430,6 +536,49 @@ async def list_older_messages_endpoint(
     await get_conversation(db, conversation_id)
     msgs = await list_messages(db, conversation_id, limit=capped_limit, before_id=before_id)
     return [MessageOut.model_validate(m) for m in msgs]
+
+
+# MIME families the media proxy labels with their real type so the SPA's
+# blob URL renders inline (<img> / <video> / <audio>). Everything else —
+# and SVG, which can carry script — is served as an opaque download.
+_INLINE_MEDIA_PREFIXES = ("image/", "video/", "audio/")
+_NEVER_INLINE_MEDIA = frozenset({"image/svg+xml"})
+
+
+@router.get(
+    "/{conversation_id}/messages/{message_id}/media/{index}",
+    response_class=Response,
+    summary="Download one WhatsApp media attachment for in-inbox preview.",
+)
+async def get_message_media_endpoint(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    index: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_permissions("conversations.read")),
+) -> Response:
+    """Stream the bytes of ``attachments[index]`` on a WhatsApp message.
+
+    Fetched through the SPA's authenticated HttpClient and rendered from
+    a blob URL, so the response is always ``Content-Disposition:
+    attachment`` with a sandboxing CSP + ``nosniff`` — opening the URL
+    directly can never execute content on our origin."""
+    data, mime = await open_message_media(
+        db, conversation_id=conversation_id, message_id=message_id, index=index
+    )
+    media_type = "application/octet-stream"
+    if mime and mime.startswith(_INLINE_MEDIA_PREFIXES) and mime not in _NEVER_INLINE_MEDIA:
+        media_type = mime
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": "attachment",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "Cache-Control": "private, max-age=3600",
+        },
+    )
 
 
 @router.post(
@@ -617,6 +766,36 @@ async def email_reply_endpoint(
         body_html=payload.body_html,
         subject=payload.subject,
         account_id=payload.account_id,
+    )
+    return MessageOut.model_validate(msg)
+
+
+@router.post(
+    "/{conversation_id}/email-reply/attachments",
+    response_model=MessageOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def email_reply_with_attachments_endpoint(
+    conversation_id: uuid.UUID,
+    body_text: str = Form(..., min_length=1, max_length=65536),
+    subject: str | None = Form(default=None, max_length=512),
+    files: list[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.write")),
+    _access: uuid.UUID = Depends(_require_conversation_write_access),
+) -> MessageOut:
+    """Email reply with file attachments (multipart). Same defaults as
+    ``/email-reply``; up to 10 files, 10 MB each, 18 MB total. The files
+    are stored on the sent message so the thread shows + downloads them."""
+    uploads = [(f.filename, f.content_type, await f.read()) for f in files]
+    attachments = prepare_email_attachments(uploads)
+    msg = await send_email_reply(
+        db,
+        conversation_id=conversation_id,
+        user_id=user.legacy_uuid,
+        body_text=body_text.strip(),
+        subject=subject.strip() if subject else None,
+        attachments=attachments,
     )
     return MessageOut.model_validate(msg)
 

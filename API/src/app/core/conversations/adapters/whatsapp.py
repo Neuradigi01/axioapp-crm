@@ -75,6 +75,18 @@ class WhatsAppNotConnected(Exception):
     `failed` with the message so the UI shows the configuration gap."""
 
 
+class WhatsAppMediaUnavailable(Exception):
+    """Raised by ``download_media`` when the provider can't return the
+    bytes — Meta media ids expire (~30 days), the sidecar no longer has
+    the message cached, or the provider is unreachable. The inbox
+    renders "media no longer available" instead of a broken preview."""
+
+
+# Largest blob the inbox media proxy will pull into memory. Mirrors
+# Meta's biggest per-type cap (documents, 100 MB).
+MAX_MEDIA_DOWNLOAD_BYTES = 100 * 1024 * 1024
+
+
 _PHONE_RE = re.compile(r"\D+")
 
 
@@ -399,6 +411,37 @@ class WhatsAppAdapter:
     @property
     def endpoint(self) -> str:
         return f"https://graph.facebook.com/{self._api_version}/{self._phone_id}/messages"
+
+    async def download_media(self, media_id: str) -> tuple[bytes, str | None]:
+        """Fetch a media blob by Meta ``media_id`` (inbound or one we
+        uploaded). Two hops per Meta's spec: resolve the id to a
+        short-lived signed URL, then GET that URL with the same bearer.
+        Returns ``(bytes, mime_type)``."""
+        headers = {"Authorization": f"Bearer {self._token}"}
+        meta_url = f"https://graph.facebook.com/{self._api_version}/{media_id}"
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                info = await client.get(meta_url, headers=headers)
+                if info.status_code >= 400:
+                    raise WhatsAppMediaUnavailable(
+                        f"Meta media lookup failed: HTTP {info.status_code}"
+                    )
+                body = info.json() if info.content else {}
+                url = body.get("url") if isinstance(body, dict) else None
+                if not isinstance(url, str) or not url:
+                    raise WhatsAppMediaUnavailable("Meta returned no media URL")
+                size = body.get("file_size")
+                if isinstance(size, int) and size > MAX_MEDIA_DOWNLOAD_BYTES:
+                    raise WhatsAppMediaUnavailable("Media exceeds the download size cap")
+                blob = await client.get(url, headers=headers)
+                if blob.status_code >= 400:
+                    raise WhatsAppMediaUnavailable(
+                        f"Meta media download failed: HTTP {blob.status_code}"
+                    )
+        except httpx.HTTPError as exc:
+            raise WhatsAppMediaUnavailable(f"Meta media download failed: {exc}") from exc
+        mime = body.get("mime_type") if isinstance(body.get("mime_type"), str) else None
+        return blob.content, mime
 
     # --- outbound ----------------------------------------------------------
 
@@ -947,6 +990,22 @@ class WhatsAppWebAdapter:
         self._sidecar_session_id = sidecar_session_id
         self._sidecar = sidecar_client
 
+    async def download_media(self, provider_message_id: str) -> bytes:
+        """Fetch an inbound media blob the Baileys sidecar still holds
+        for ``provider_message_id``."""
+        from src.app.core.integrations.whatsapp_web.exceptions import (
+            SessionNotConnected,
+            SidecarUnavailable,
+        )
+
+        try:
+            return await self._sidecar.download_media(
+                sidecar_session_id=self._sidecar_session_id,
+                provider_message_id=provider_message_id,
+            )
+        except (SidecarUnavailable, SessionNotConnected) as exc:
+            raise WhatsAppMediaUnavailable(f"WhatsApp Web media unavailable: {exc}") from exc
+
     async def send(
         self,
         *,
@@ -1113,6 +1172,19 @@ async def resolve_whatsapp_adapter(
     raise WhatsAppNotConnected(
         "WhatsApp is not connected for this org. Connect it in Settings → Integrations."
     )
+
+
+async def resolve_whatsapp_web_adapter(session: AsyncSession) -> WhatsAppWebAdapter:
+    """Web (Baileys) adapter for the active tenant, regardless of whether
+    a Cloud integration also exists — used to fetch media on messages
+    that arrived through the Web provider. Raises
+    :class:`WhatsAppNotConnected` when no Web session is connected."""
+    web_session_id = await _find_active_web_session_id(session)
+    if web_session_id is None:
+        raise WhatsAppNotConnected(
+            "WhatsApp Web is not connected for this org. Reconnect it in Settings → Integrations."
+        )
+    return WhatsAppWebAdapter(sidecar_session_id=web_session_id)
 
 
 async def _find_active_web_session_id(session: AsyncSession) -> str | None:

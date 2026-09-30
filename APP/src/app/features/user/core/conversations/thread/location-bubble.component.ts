@@ -60,7 +60,7 @@ export interface LocationAttachment {
           [href]="geoUrl()"
           target="_blank"
           rel="noopener noreferrer"
-          class="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-sky-700 hover:text-sky-900"
+          class="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-sky-700 hover:text-sky-900 dark:text-sky-300 dark:hover:text-sky-200"
         >
           <lucide-icon name="external-link" class="h-3 w-3" />
           Open in Maps

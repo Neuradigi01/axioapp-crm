@@ -50,6 +50,28 @@ from src.app.shared.db import async_session
 logger = logging.getLogger(__name__)
 
 
+async def push_event(
+    user_ids: list[uuid.UUID],
+    *,
+    type: str,
+    payload: dict[str, Any],
+) -> None:
+    """Push a lightweight, NON-persisted event to the users' open tabs.
+
+    Unlike :func:`notify` nothing is stored and no bell item / toast /
+    email is produced — the frame carries ``kind: "event"`` so the SPA
+    routes it to live-refresh listeners instead of the notification
+    feed. Best-effort: offline users simply miss it (their next page
+    load or poll catches up). Only reaches sockets held by this API
+    process, the same limit as :func:`notify`'s broadcast."""
+    wire = {"kind": "event", "type": type, "payload": payload}
+    for user_id in user_ids:
+        try:
+            await manager.broadcast(user_id, wire)
+        except Exception:
+            logger.exception("notifications.push_event failed user_id=%s type=%s", user_id, type)
+
+
 async def notify(
     *,
     org_id: uuid.UUID,
@@ -343,5 +365,6 @@ __all__ = [
     "mark_all_read",
     "mark_read",
     "notify",
+    "push_event",
     "update_preferences",
 ]

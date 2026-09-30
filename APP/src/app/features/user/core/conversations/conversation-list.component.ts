@@ -1,9 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
+  ElementRef,
   EventEmitter,
   Input,
   Output,
+  ViewChild,
+  inject,
   signal,
 } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
@@ -11,6 +15,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import {
   Conversation,
   ConversationChannel,
+  ConversationCounts,
   ConversationListQuery,
 } from './conversations-api.service';
 import { UserMini } from '../shared/services/users-directory.service';
@@ -108,13 +113,13 @@ const CHANNEL_PILL_OPTIONS: ChannelPillOption[] = [
  * analysis (dynamic string concat with a class name loses that). */
 const PILL_ACTIVE_OUTLINE: Record<ChannelPillOption['hue'], string> = {
   accent: 'bg-accent/10 text-accent ring-accent',
-  emerald: 'bg-emerald-500/10 text-emerald-300 ring-emerald-500',
-  fuchsia: 'bg-fuchsia-500/10 text-fuchsia-300 ring-fuchsia-500',
-  blue: 'bg-blue-500/10 text-blue-300 ring-blue-500',
-  zinc: 'bg-zinc-500/10 text-zinc-200 ring-zinc-400',
-  violet: 'bg-violet-500/10 text-violet-300 ring-violet-500',
-  sky: 'bg-sky-500/10 text-sky-300 ring-sky-500',
-  amber: 'bg-amber-500/10 text-amber-300 ring-amber-500',
+  emerald: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500 dark:text-emerald-300',
+  fuchsia: 'bg-fuchsia-500/10 text-fuchsia-700 ring-fuchsia-500 dark:text-fuchsia-300',
+  blue: 'bg-blue-500/10 text-blue-700 ring-blue-500 dark:text-blue-300',
+  zinc: 'bg-zinc-500/10 text-zinc-700 ring-zinc-400 dark:text-zinc-200',
+  violet: 'bg-violet-500/10 text-violet-700 ring-violet-500 dark:text-violet-300',
+  sky: 'bg-sky-500/10 text-sky-700 ring-sky-500 dark:text-sky-300',
+  amber: 'bg-amber-500/10 text-amber-700 ring-amber-500 dark:text-amber-300',
 };
 
 /** Solid brand-colour background for the small circular icon badge that
@@ -147,8 +152,23 @@ const ASSIGNEE_MODES: Array<{ value: AssigneeMode; label: string }> = [
   host: { class: 'flex min-h-0 flex-1 flex-col' },
 })
 export class ConversationListComponent {
+  private readonly destroyRef = inject(DestroyRef);
+
   @Input() items: Conversation[] = [];
+  /** First-load / filter-change load: the list body shows skeleton rows.
+   *  Background refreshes never set this, so the list never flickers. */
   @Input() loading = false;
+  /** True while more pages exist server-side (items.length < total). */
+  @Input() hasMore = false;
+  @Input() loadingMore = false;
+  /** Any filter (search, channel, assignee, unread, tag, status) is
+   *  active — switches the empty state to "no matches + Clear filters". */
+  @Input() filtered = false;
+  /** Unread badge counts for the filter chips (null until loaded). */
+  @Input() counts: ConversationCounts | null = null;
+  /** Bulk-selection set (owned by the page). Non-empty = selection mode:
+   *  every row shows its checkbox. */
+  @Input() selectedIds: ReadonlySet<string> = new Set();
   @Input() selectedId: string | null = null;
   @Input() staffById: Map<string, UserMini> = new Map();
   /** Contact-name lookup keyed by `contact_id`. Parent hydrates it
@@ -182,6 +202,27 @@ export class ConversationListComponent {
   /** Step 14 — emits the active tag-filter id array. Parent feeds
    *  this back into the list `tag_ids` query param (OR semantics). */
   @Output() readonly tagFilterChange = new EventEmitter<string[]>();
+  /** Infinite scroll: operator reached the end of the loaded rows. */
+  @Output() readonly loadMore = new EventEmitter<void>();
+  /** "Clear filters" in the empty state. The list has already reset
+   *  its own chips; the page resets status + tags and reloads once. */
+  @Output() readonly clearFilters = new EventEmitter<void>();
+  /** Row checkbox toggled. */
+  @Output() readonly toggleSelect = new EventEmitter<string>();
+
+  @ViewChild('searchInput') private readonly searchInput?: ElementRef<HTMLInputElement>;
+
+  /** Keystrokes inside this window collapse into one list request. */
+  private static readonly SEARCH_DEBOUNCE_MS = 300;
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Pixels from the bottom of the list that trigger the next page. */
+  private static readonly LOAD_MORE_THRESHOLD_PX = 200;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.searchTimer) clearTimeout(this.searchTimer);
+    });
+  }
 
   /** Active tag-filter ids — hydrated by the parent so a refresh
    *  doesn't reset the filter. */
@@ -352,7 +393,87 @@ export class ConversationListComponent {
   protected onSearchInput(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.searchTerm.set(value);
-    this.emit();
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => {
+      this.searchTimer = null;
+      this.emit();
+    }, ConversationListComponent.SEARCH_DEBOUNCE_MS);
+  }
+
+  /** `/` shortcut from the page. */
+  public focusSearch(): void {
+    this.searchInput?.nativeElement.focus();
+    this.searchInput?.nativeElement.select();
+  }
+
+  protected onListScroll(event: Event): void {
+    const el = event.target as HTMLElement;
+    const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (
+      remaining < ConversationListComponent.LOAD_MORE_THRESHOLD_PX &&
+      this.hasMore &&
+      !this.loadingMore
+    ) {
+      this.loadMore.emit();
+    }
+  }
+
+  /** Reset every chip this component owns without emitting per-chip
+   *  events, then hand off to the page for a single reload. */
+  protected onClearFilters(): void {
+    if (this.searchTimer) {
+      clearTimeout(this.searchTimer);
+      this.searchTimer = null;
+    }
+    this.searchTerm.set('');
+    if (this.searchInput) this.searchInput.nativeElement.value = '';
+    this.channelFilter.set('');
+    this.unreadOnly.set(false);
+    this.assigneeMode.set('all');
+    this.specificUserId.set(null);
+    this.clearFilters.emit();
+  }
+
+  /** Unread count for an assignee chip (All / Mine / Unassigned). */
+  protected assigneeCount(mode: AssigneeMode): number {
+    const c = this.counts;
+    if (!c) return 0;
+    return mode === 'mine' ? c.mine : mode === 'unassigned' ? c.unassigned : c.all;
+  }
+
+  protected channelCount(value: ConversationChannel | ''): number {
+    const c = this.counts;
+    if (!c) return 0;
+    return value ? (c.by_channel[value] ?? 0) : c.all;
+  }
+
+  /** "Waiting 3h" — the customer spoke last, no AI is answering and the
+   *  thread isn't closed. Empty string when nobody is waiting. */
+  protected waitingLabel(c: Conversation): string {
+    if (c.last_message_direction !== 'in' || c.ai_active || c.status === 'closed') return '';
+    const since = c.last_customer_message_at ?? c.last_message_at;
+    if (!since) return '';
+    const minutes = Math.max(0, Math.floor((Date.now() - new Date(since).getTime()) / 60_000));
+    if (minutes < 60) return `${Math.max(1, minutes)}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    return `${Math.floor(hours / 24)}d`;
+  }
+
+  /** Waiting for more than a day — label turns red. */
+  protected waitingLong(c: Conversation): boolean {
+    const since = c.last_customer_message_at ?? c.last_message_at;
+    return !!since && Date.now() - new Date(since).getTime() > 24 * 60 * 60 * 1000;
+  }
+
+  protected onToggleSelect(event: Event, id: string): void {
+    event.stopPropagation();
+    this.toggleSelect.emit(id);
+  }
+
+  /** Stable DOM id so the page's j/k shortcut can scroll a row into view. */
+  protected rowDomId(id: string): string {
+    return 'conv-row-' + id;
   }
 
   protected pick(id: string): void {

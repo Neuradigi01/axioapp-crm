@@ -50,7 +50,7 @@ interface AttributionResponse {
             [href]="a.deeplink"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 ring-1 ring-violet-200 hover:bg-violet-100"
+            class="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2.5 py-1 text-xs font-medium text-violet-700 ring-1 ring-violet-500/20 hover:bg-violet-500/20 dark:text-violet-300"
             [title]="hoverText(a)"
           >
             <lucide-icon name="megaphone" class="h-3 w-3" />
@@ -59,7 +59,7 @@ interface AttributionResponse {
           </a>
         } @else {
           <span
-            class="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 ring-1 ring-violet-200"
+            class="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2.5 py-1 text-xs font-medium text-violet-700 ring-1 ring-violet-500/20 dark:text-violet-300"
             [title]="hoverText(a)"
           >
             <lucide-icon name="megaphone" class="h-3 w-3" />
@@ -81,6 +81,9 @@ export class AttributionChipComponent {
   constructor() {
     effect(() => {
       const id = this.conversationId();
+      // Clear the previous thread's chip immediately so it never shows
+      // against the newly-opened conversation while this one loads.
+      this.attribution.set(null);
       if (id) this.load(id);
     });
   }
@@ -106,7 +109,10 @@ export class AttributionChipComponent {
       .get<AttributionResponse>(`${environment.apiBaseUrl}/conversations/${id}/attribution`)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (a) => this.attribution.set(a),
+        next: (a) => {
+          // Thread switched while in flight — drop the stale response.
+          if (this.conversationId() === id) this.attribution.set(a);
+        },
         error: (_err: HttpErrorResponse) => {
           // Silent failure — attribution is best-effort UX, not a
           // blocking surface. The chip simply doesn't render.

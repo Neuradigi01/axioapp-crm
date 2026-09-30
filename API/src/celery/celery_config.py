@@ -250,6 +250,12 @@ beat_schedule = {
         "task": "src.app.core.tasks.tasks.groom_stale_open_tasks",
         "schedule": crontab(hour=2, minute=0),
     },
+    # Conversations inbox — reopen snoozed conversations whose
+    # ``snoozed_until`` ("Snooze until tomorrow 9am") has passed.
+    "conversations-reopen-due-snoozed": {
+        "task": "src.app.core.conversations.tasks.reopen_due_snoozed",
+        "schedule": 60.0,
+    },
     # Module B closing-pass fix — daily 03:45 UTC sweep across
     # tbl_organizations that hard-deletes orgs still in
     # ``template_id='pending'`` more than 48 hours after signup. Users

@@ -105,6 +105,13 @@ class Conversation(Base, TenantScoped):
             "org_id",
             "last_message_at",
         ),
+        # Inbox badge counts: unread per status × assignee bucket.
+        Index(
+            "ix_conversations_org_status_assignee",
+            "org_id",
+            "status",
+            "assigned_to_id",
+        ),
         Index(
             "ix_conversations_channel_external_id",
             "channel",
@@ -139,6 +146,10 @@ class Conversation(Base, TenantScoped):
         nullable=False,
         server_default=sql_text("'open'"),
     )
+    # Timed snooze: the beat sweeper reopens the conversation at this
+    # instant. NULL = snoozed until the customer replies (or not snoozed).
+    # Cleared whenever the conversation wakes (inbound / sweeper / manual).
+    snoozed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ai_handling: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sql_text("false")
     )
@@ -408,6 +419,47 @@ class ConversationTagAssignment(Base, TenantScoped):
     )
     tagged_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     tagged_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+
+
+class ConversationSavedReply(Base, TenantScoped):
+    """Org-wide canned response ("saved reply") an operator can drop
+    into the composer instead of retyping common answers.
+
+    ``shortcut`` is an optional short keyword (``/price``) the composer
+    matches as the operator types; unique per org, case-insensitive
+    (partial unique index on ``lower(shortcut)``)."""
+
+    __tablename__ = "tbl_conversation_saved_replies"
+    __table_args__ = (
+        Index("ix_conv_saved_replies_org_title", "org_id", "title"),
+        Index(
+            "uq_conv_saved_replies_org_shortcut",
+            "org_id",
+            sql_text("lower(shortcut)"),
+            unique=True,
+            postgresql_where=sql_text("shortcut IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    title: Mapped[str] = mapped_column(String(length=120), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    shortcut: Mapped[str | None] = mapped_column(String(length=32), nullable=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=sql_text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=sql_text("now()"),

@@ -27,8 +27,9 @@ non-raising.
 
 from __future__ import annotations
 
+import logging
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -44,24 +45,40 @@ from src.app.core.conversations import data_access as _da
 from src.app.core.conversations.adapters import InboundMessage
 from src.app.core.conversations.adapters.email import send_email
 from src.app.core.conversations.adapters.whatsapp import (
+    MAX_MEDIA_DOWNLOAD_BYTES,
+    WhatsAppMediaUnavailable,
+    WhatsAppNotConnected,
+    WhatsAppWebAdapter,
     resolve_whatsapp_adapter,
+    resolve_whatsapp_web_adapter,
 )
 from src.app.core.conversations.models import (
     Conversation,
     ConversationChannel,
     ConversationStatus,
+    ConversationTagAssignment,
     Message,
     MessageDirection,
 )
 from src.app.core.conversations.registry import resolve
-from src.app.core.conversations.schemas import ConversationContactSet, ConversationPatch
+from src.app.core.conversations.schemas import (
+    ConversationBulkRequest,
+    ConversationBulkResult,
+    ConversationBulkSkipped,
+    ConversationContactSet,
+    ConversationCounts,
+    ConversationPatch,
+)
+from src.app.core.conversations.utils import OutboundAttachment, wake_on_inbound
 from src.app.core.email.models import EmailAccountSyncState
 from src.app.core.events import bus as events_bus
 from src.app.core.events.event_catalog import WHATSAPP_MESSAGE_RECEIVED
-from src.app.core.notifications.service import notify
+from src.app.core.notifications.service import notify, push_event
 from src.app.core.permissions.service import role_has_permission
 from src.app.shared.db.queries import ensure_found
 from src.app.shared.storage import get_storage
+
+logger = logging.getLogger(__name__)
 
 # Channels whose `external_id` is a phone number; the webhook intake
 # tries to resolve / auto-create a contact for these so the inbox can
@@ -81,6 +98,7 @@ async def list_conversations(
     q: str | None = None,
     tag_ids: list[uuid.UUID] | None = None,
     unread_only: bool = False,
+    contact_id: uuid.UUID | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Conversation], int]:
@@ -113,6 +131,7 @@ async def list_conversations(
         q=q,
         tag_ids=tag_ids,
         unread_only=unread_only,
+        contact_id=contact_id,
         page=page,
         size=size,
     )
@@ -135,6 +154,79 @@ async def open_message_attachment(
     return storage.open_stream(key), stat.size
 
 
+# Attachment ``type`` values the inbox media proxy will serve.
+_PROXYABLE_MEDIA_TYPES = frozenset({"image", "video", "audio", "document", "sticker"})
+
+
+async def open_message_media(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    index: int,
+) -> tuple[bytes, str | None]:
+    """Bytes for one WhatsApp media attachment so the inbox can preview
+    it (image / video / audio / sticker) or download it (document).
+
+    The provider copy is short-lived — Meta media ids expire after ~30
+    days and the Baileys sidecar only holds recent messages — so the
+    first successful fetch is cached in storage under
+    ``{org_id}/conversation_media/{message_id}/{index}`` and every later
+    view is served from there. Returns ``(data, mime_type)``.
+
+    404 when the message isn't on this conversation or the index isn't a
+    media attachment (never 403 — no existence signal); 410 when the
+    provider no longer has the media and nothing was cached."""
+    message = await _da.get_message_by_id(session, message_id)
+    if message is None or message.conversation_id != conversation_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="media not found")
+    attachments = message.attachments or []
+    if index < 0 or index >= len(attachments):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="media not found")
+    att = attachments[index]
+    if not isinstance(att, dict) or att.get("type") not in _PROXYABLE_MEDIA_TYPES:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="media not found")
+
+    mime = att.get("mime_type") if isinstance(att.get("mime_type"), str) else None
+    storage = get_storage()
+    cache_key = f"{message.org_id}/conversation_media/{message.id}/{index}"
+    try:
+        return await storage.get(cache_key), mime
+    except FileNotFoundError:
+        pass
+
+    media_id = att.get("media_id") or att.get("id")
+    provider_message_id = att.get("provider_message_id")
+    try:
+        if isinstance(media_id, str) and media_id:
+            conversation = await get_conversation(session, conversation_id)
+            adapter = await resolve_whatsapp_adapter(
+                session, phone_id=conversation.received_via_phone_id
+            )
+            if isinstance(adapter, WhatsAppWebAdapter):
+                raise WhatsAppMediaUnavailable("Cloud media id on a Web-only org")
+            data, fetched_mime = await adapter.download_media(media_id)
+            mime = mime or fetched_mime
+        elif isinstance(provider_message_id, str) and provider_message_id:
+            web_adapter = await resolve_whatsapp_web_adapter(session)
+            data = await web_adapter.download_media(provider_message_id)
+        else:
+            raise WhatsAppMediaUnavailable("Attachment carries no provider reference")
+    except (WhatsAppMediaUnavailable, WhatsAppNotConnected) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This media is no longer available from WhatsApp.",
+        ) from exc
+    if len(data) > MAX_MEDIA_DOWNLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This media is too large to preview.",
+        )
+
+    await storage.put(cache_key, data, content_type=mime)
+    return data, mime
+
+
 async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) -> Conversation:
     return ensure_found(
         await _da.get_conversation_by_id(session, conversation_id),
@@ -142,14 +234,45 @@ async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
     )
 
 
-async def bulk_last_message_bodies(
+async def bulk_last_message_previews(
     session: AsyncSession, conversation_ids: list[uuid.UUID]
-) -> dict[uuid.UUID, str | None]:
+) -> dict[uuid.UUID, tuple[str | None, MessageDirection]]:
     """Thin passthrough to the DAL — kept in service so the router
     doesn't import DAL directly (layered-architecture rule). Returns
-    a whitespace-collapsed 140-char snippet per conversation for the
-    inbox preview line."""
-    return await _da.bulk_last_message_body_for_conversations(session, conversation_ids)
+    ``(snippet, direction)`` of the latest external message per
+    conversation: the inbox preview line + "waiting for reply" flag."""
+    return await _da.bulk_last_message_preview_for_conversations(session, conversation_ids)
+
+
+async def conversation_counts(
+    session: AsyncSession, *, caller_user_id: uuid.UUID
+) -> ConversationCounts:
+    """Unread badge counts for the inbox filter chips (one query)."""
+    row = await _da.count_unread_conversations(session, user_uuid=caller_user_id)
+    return ConversationCounts(
+        all=row.all,
+        mine=row.mine,
+        unassigned=row.unassigned,
+        by_channel={"whatsapp": row.whatsapp, "email": row.email},
+    )
+
+
+async def push_inbox_refresh(
+    session: AsyncSession, *, org_id: uuid.UUID, conversation_ids: list[uuid.UUID]
+) -> None:
+    """Tell every open inbox tab in the org that these conversations
+    changed so they refresh now instead of on the next poll. Carries
+    ids only — each tab re-reads through the permission-checked API.
+    Best-effort: never raises into the caller's write path."""
+    try:
+        audience = await _da.list_active_member_uuids(session, org_id=org_id)
+        await push_event(
+            audience,
+            type="conversation.updated",
+            payload={"conversation_ids": [str(i) for i in conversation_ids]},
+        )
+    except Exception:
+        logger.exception("conversations.push_inbox_refresh failed org=%s", org_id)
 
 
 async def compute_ai_active(
@@ -327,6 +450,7 @@ async def send_email_reply(
     body_html: str | None = None,
     subject: str | None = None,
     account_id: uuid.UUID | None = None,
+    attachments: Sequence[OutboundAttachment] = (),
 ) -> Message:
     """Email-channel counterpart to `send_outbound` — routes through
     the typed `send_email(...)` path (subject + connected-mailbox
@@ -447,6 +571,7 @@ async def send_email_reply(
         body_html=body_html,
         in_reply_to_message_id=last_inbound.id if last_inbound else None,
         conversation_id=conversation_id,
+        attachments=attachments,
     )
     # Ownership handshake — email reply on an *unassigned* thread
     # implicitly claims it for the sender. Same rationale as
@@ -1059,9 +1184,12 @@ async def receive_webhook(
     # in-flight UI poll never sees a stale state.
     conv.last_customer_message_at = sent_at
     conv.unread_count = (conv.unread_count or 0) + 1
+    wake_on_inbound(conv)
     await session.commit()
     await session.refresh(msg)
     await session.refresh(conv)
+
+    await push_inbox_refresh(session, org_id=conv.org_id, conversation_ids=[conv.id])
 
     if conv.assigned_to_id is not None:
         await notify(
@@ -1811,6 +1939,12 @@ async def patch_conversation(
             caller_role_id=caller_role_id,
         )
 
+    if payload.snoozed_until is not None and payload.status != ConversationStatus.snoozed:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="snoozed_until is only valid together with status 'snoozed'.",
+        )
+
     before = _snapshot(conv)
     changed = False
     if payload.assigned_to_id is not None:
@@ -1818,6 +1952,11 @@ async def patch_conversation(
         changed = True
     if payload.status is not None:
         conv.status = payload.status
+        conv.snoozed_until = (
+            _validated_snooze_until(payload.snoozed_until)
+            if payload.status == ConversationStatus.snoozed
+            else None
+        )
         changed = True
     if payload.ai_handling is not None:
         conv.ai_handling = payload.ai_handling
@@ -1833,6 +1972,150 @@ async def patch_conversation(
             after=_snapshot(conv),
         )
     return conv
+
+
+def _validated_snooze_until(value: datetime | None) -> datetime | None:
+    """A snooze wake-up time must be timezone-aware and in the future."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="snoozed_until must include a timezone offset.",
+        )
+    if value <= datetime.now(UTC):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="snoozed_until must be in the future.",
+        )
+    return value
+
+
+async def bulk_update_conversations(
+    session: AsyncSession,
+    *,
+    payload: ConversationBulkRequest,
+    caller_user_id: uuid.UUID,
+    caller_role_id: uuid.UUID,
+    org_id: uuid.UUID,
+) -> ConversationBulkResult:
+    """Apply one inbox action to many conversations in a single
+    transaction.
+
+    Permission rules are the per-conversation ones
+    (``ensure_can_write_conversation`` / ``ensure_can_assign_conversation``)
+    evaluated in memory against one role lookup; rows the caller may not
+    touch are skipped and reported, never a whole-request 403. One
+    summary audit row records the whole operation."""
+    ids = list(dict.fromkeys(payload.conversation_ids))
+    convs = await _da.list_conversations_by_ids(session, ids)
+    by_id = {c.id: c for c in convs}
+    skipped: list[ConversationBulkSkipped] = [
+        ConversationBulkSkipped(id=i, reason="not_found") for i in ids if i not in by_id
+    ]
+    can_assign_others = await _caller_can_assign_others(session, caller_role_id)
+    snooze_until = (
+        _validated_snooze_until(payload.snoozed_until) if payload.action == "snooze" else None
+    )
+
+    if payload.action == "assign" and payload.assigned_to_id is not None:
+        members = await _da.list_active_members_with_names(
+            session, org_id=org_id, user_uuids=[payload.assigned_to_id]
+        )
+        if not members:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="The selected assignee is not an active member of this organisation.",
+            )
+
+    tag = None
+    already_tagged: set[uuid.UUID] = set()
+    if payload.action == "add_tag" and payload.tag_id is not None:
+        tag = await _da.get_tag_by_id(session, payload.tag_id)
+        if tag is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found.")
+        already_tagged = await _da.list_tagged_conversation_ids(
+            session, tag_id=tag.id, conversation_ids=list(by_id)
+        )
+
+    def _can_write(c: Conversation) -> bool:
+        return c.assigned_to_id in (None, caller_user_id) or can_assign_others
+
+    def _can_assign(c: Conversation) -> bool:
+        if can_assign_others or c.assigned_to_id == caller_user_id:
+            return True
+        return c.assigned_to_id is None and payload.assigned_to_id == caller_user_id
+
+    changed: list[uuid.UUID] = []
+    for conv in convs:
+        allowed = _can_assign(conv) if payload.action == "assign" else _can_write(conv)
+        if not allowed:
+            skipped.append(ConversationBulkSkipped(id=conv.id, reason="forbidden"))
+            continue
+        if payload.action == "close":
+            conv.status = ConversationStatus.closed
+            conv.snoozed_until = None
+        elif payload.action == "reopen":
+            conv.status = ConversationStatus.open
+            conv.snoozed_until = None
+        elif payload.action == "snooze":
+            conv.status = ConversationStatus.snoozed
+            conv.snoozed_until = snooze_until
+        elif payload.action == "mark_read":
+            conv.unread_count = 0
+        elif payload.action == "mark_unread":
+            if (conv.unread_count or 0) == 0:
+                conv.unread_count = 1
+        elif payload.action == "assign":
+            conv.assigned_to_id = payload.assigned_to_id
+        elif payload.action == "add_tag" and tag is not None:
+            if conv.id in already_tagged:
+                continue
+            _da.insert_tag_assignment(
+                session,
+                ConversationTagAssignment(
+                    org_id=conv.org_id,
+                    conversation_id=conv.id,
+                    tag_id=tag.id,
+                    tagged_by_user_id=caller_user_id,
+                ),
+            )
+        changed.append(conv.id)
+
+    if changed:
+        await session.commit()
+        await audit.log(
+            "conversations.bulk_updated",
+            entity_type="conversation",
+            after={
+                "action": payload.action,
+                "conversation_ids": [str(i) for i in changed],
+                "assigned_to_id": str(payload.assigned_to_id) if payload.assigned_to_id else None,
+                "tag_id": str(payload.tag_id) if payload.tag_id else None,
+                "snoozed_until": snooze_until.isoformat() if snooze_until else None,
+            },
+        )
+        await push_inbox_refresh(session, org_id=org_id, conversation_ids=changed)
+    return ConversationBulkResult(updated=len(changed), skipped=skipped)
+
+
+# Upper bound per beat tick; the next tick picks up any remainder.
+_SNOOZE_SWEEP_BATCH = 500
+
+
+async def reopen_due_snoozed_conversations(session: AsyncSession) -> int:
+    """Beat sweeper: reopen every snoozed conversation whose
+    ``snoozed_until`` has passed. Cross-tenant (runs without a request
+    context). Returns the number reopened."""
+    due = await _da.list_due_snoozed_conversations(
+        session, now=datetime.now(UTC), limit=_SNOOZE_SWEEP_BATCH
+    )
+    for conv in due:
+        conv.status = ConversationStatus.open
+        conv.snoozed_until = None
+    if due:
+        await session.commit()
+    return len(due)
 
 
 async def mark_conversation_read(

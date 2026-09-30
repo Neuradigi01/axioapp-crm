@@ -4,6 +4,7 @@ import {
   Component,
   ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   OnChanges,
   Output,
@@ -20,18 +21,12 @@ import {
   Conversation,
   ConversationDetail,
   ConversationMessage,
-  ConversationStatus,
-  ConversationTagRef,
   MessageReaction,
 } from './conversations-api.service';
 import { ReactionPickerComponent } from './reaction-picker.component';
-import { TagChipComponent } from './tag-chip.component';
-import { TagManagerComponent } from './tag-manager.component';
 import { AttributionChipComponent } from './header/attribution-chip.component';
-import { ConversationBlockNumberActionComponent } from './header/block-number-action.component';
-import { ConversationExportButtonComponent } from './header/export-button.component';
 import { LocationAttachment, LocationBubbleComponent } from './thread/location-bubble.component';
-import { StickerAttachment, StickerBubbleComponent } from './thread/sticker-bubble.component';
+import { MediaAttachment, MediaBubbleComponent } from './thread/media-bubble.component';
 import { VCardAttachment, VCardBubbleComponent } from './thread/vcard-bubble.component';
 import { UserMini } from '../shared/services/users-directory.service';
 import { OwnerColor, ownerColor, staffInitials } from '../shared/owner-color.util';
@@ -117,13 +112,9 @@ function stripEmailQuote(text: string): string {
   imports: [
     LucideAngularModule,
     ReactionPickerComponent,
-    TagChipComponent,
-    TagManagerComponent,
-    ConversationBlockNumberActionComponent,
-    ConversationExportButtonComponent,
     AttributionChipComponent,
     LocationBubbleComponent,
-    StickerBubbleComponent,
+    MediaBubbleComponent,
     VCardBubbleComponent,
   ],
   templateUrl: './chat-thread.component.html',
@@ -165,11 +156,6 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
    *  emit — one click, one event. */
   @Output() readonly resumeAiOut = new EventEmitter<void>();
 
-  /** Fires when the user clicks the assignee pill. The page parent owns
-   * the modal + PATCH. We emit a bare event because the parent already
-   * knows which conversation is selected via `selectedConversation()`. */
-  @Output() readonly reassign = new EventEmitter<void>();
-
   /** Step 7: user clicked Reply on a message — parent puts the composer
    *  into "replying-to" mode with the quoted snippet. */
   @Output() readonly replyTo = new EventEmitter<ConversationMessage>();
@@ -183,102 +169,6 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
   /** Which message currently has its reaction picker open. Null = none.
    *  Toggled by the React button on the hover action bar. */
   protected readonly pickerOpenFor = signal<string | null>(null);
-
-  /** Step 14 — visibility of the tag-manager dropdown on the
-   *  conversation header. */
-  protected readonly tagManagerOpen = signal<boolean>(false);
-
-  /** Step 14 — emitted when the tag list on the active conversation
-   *  changes (assign / unassign / create). The page updates the
-   *  conversation row in its `items` list + the detail. */
-  @Output() readonly tagsChanged = new EventEmitter<ConversationTagRef[]>();
-
-  /** J.16 fix — the user picked a new status from the header status
-   *  menu (open / snoozed / closed). Parent owns the PATCH; header
-   *  just surfaces the choice. Snoozed conversations get an inbound-
-   *  wake in ``receive_webhook``; closed ones stay closed until the
-   *  operator reopens them explicitly. */
-  @Output() readonly statusChange = new EventEmitter<ConversationStatus>();
-
-  /** Header status-menu open flag — flipped by the pill click. */
-  protected readonly statusMenuOpen = signal<boolean>(false);
-
-  protected toggleStatusMenu(): void {
-    this.statusMenuOpen.update((v) => !v);
-  }
-
-  protected closeStatusMenu(): void {
-    this.statusMenuOpen.set(false);
-  }
-
-  protected pickStatus(next: ConversationStatus): void {
-    this.closeStatusMenu();
-    if (next === this.conversation.status) return;
-    this.statusChange.emit(next);
-  }
-
-  /** Human label for the header pill — used for the trigger button
-   *  and read out in the menu items. */
-  protected readonly statusLabel: Record<ConversationStatus, string> = {
-    open: 'Open',
-    snoozed: 'Snoozed',
-    closed: 'Closed',
-  };
-
-  /** Menu options in fixed order so the DOM structure is stable. */
-  protected readonly statusOptions: readonly ConversationStatus[] = [
-    'open',
-    'snoozed',
-    'closed',
-  ] as const;
-
-  protected toggleTagManager(): void {
-    this.tagManagerOpen.update((v) => !v);
-  }
-
-  protected closeTagManager(): void {
-    this.tagManagerOpen.set(false);
-  }
-
-  protected onTagsChanged(tags: ConversationTagRef[]): void {
-    this.tagsChanged.emit(tags);
-  }
-
-  /** Permission gate for the reassign click target. Mirrors the
-   * backend rule in `service.ensure_can_assign_conversation`:
-   *   - Owner / Admin (`conversations.assign_others`) can always
-   *     reassign.
-   *   - The current assignee can transfer their own chat.
-   *   - Everyone else (including Employees viewing an unassigned
-   *     chat) can only be assigned *to* themselves via take-over from
-   *     AI / send-outbound implicit claim; the assignee dropdown
-   *     stays hidden. */
-  protected readonly canReassign = computed(() => {
-    if (this.auth.hasPermission('conversations.assign_others')) return true;
-    const me = this.auth.currentUserId();
-    return !!me && this.conversation?.assigned_to_id === me;
-  });
-
-  /** Write gate for reply / react / tag / mark-read on the current
-   * thread. Mirrors the backend `ensure_can_write_conversation` rule
-   * (locked 2026-09-10):
-   *   - Chat unassigned → any writer can jump in. Sending a reply
-   *     auto-claims the chat for the sender (backend does the same
-   *     via `send_outbound` / `send_email_reply`).
-   *   - Caller is the current assignee → allowed.
-   *   - Owner / Admin (`conversations.assign_others`) → always
-   *     allowed.
-   *   - Anyone else viewing an assigned chat → view-only.
-   *
-   * When false the template renders the thread in view-only mode:
-   * compose bar hidden, reply/react/tag hidden, banner explains why. */
-  protected readonly canInteract = computed(() => {
-    if (this.auth.hasPermission('conversations.assign_others')) return true;
-    const owner = this.conversation?.assigned_to_id ?? null;
-    if (owner === null) return true;
-    const me = this.auth.currentUserId();
-    return !!me && owner === me;
-  });
 
   /** Take-Over-from-AI button gate. Locked to Owner / Admin only —
    * Employees never see the button (product rule 2026-09-10: only
@@ -300,43 +190,182 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
     return !!me && holder === me;
   });
 
-  /** Name of the current assignee — used by the view-only banner. */
-  protected readonly assigneeDisplayName = computed<string | null>(() => {
-    const owner = this.conversation?.assigned_to_id;
-    if (!owner) return null;
-    return this.staffById.get(owner)?.full_name ?? 'another user';
-  });
+  /** Older-history paging (infinite scroll up). The page owns the
+   *  fetch; the thread only reports "operator reached the top". */
+  @Input() loadingOlder = false;
+  @Input() hasOlder = false;
+  @Output() readonly loadOlder = new EventEmitter<void>();
 
   @ViewChild('scrollHost') protected scrollHost?: ElementRef<HTMLDivElement>;
 
-  private lastMessageCount = 0;
-  // Tracked separately from the count so that switching between two
-  // conversations that happen to have the same message count still
-  // fires a scroll-to-bottom (count would look unchanged otherwise —
-  // the operator would land halfway up the new thread and have to
-  // scroll down manually to see the newest bubble).
+  /** Count of messages that arrived while the operator was scrolled up
+   *  reading history. Drives the "↓ N new messages" pill; cleared when
+   *  they return to the bottom. */
+  protected readonly unseenCount = signal(0);
+  /** Message id briefly highlighted after a quoted-reply jump. */
+  protected readonly flashId = signal<string | null>(null);
+
+  /** Pixels from the bottom that still count as "at the bottom". */
+  private static readonly STICK_THRESHOLD_PX = 120;
+  /** Pixels from the top that trigger loading the previous page. */
+  private static readonly LOAD_OLDER_THRESHOLD_PX = 80;
+
   private lastConversationId: string | null = null;
+  private forceScrollToBottom = true;
+  private lastFirstId: string | null = null;
+  private lastLastId: string | null = null;
+  private lastCount = 0;
+  /** scrollHeight captured before older messages are prepended, so the
+   *  viewport can be shifted by exactly the added height. */
+  private heightBeforePrepend: number | null = null;
+  private flashTimer: ReturnType<typeof setTimeout> | null = null;
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['conversation'] && this.conversation?.id !== this.lastConversationId) {
       this.lastConversationId = this.conversation?.id ?? null;
-      // Force the next ngAfterViewChecked to treat this as a "first
-      // render" — count comparison will always see a change and scroll
-      // to bottom on the freshly-loaded thread.
-      this.lastMessageCount = -1;
+      this.forceScrollToBottom = true;
+      this.unseenCount.set(0);
+      this.pickerOpenFor.set(null);
+      this.heightBeforePrepend = null;
+      this.lastLastId = null;
+    }
+    if (changes['detail'] && this.scrollHost) {
+      // Older page prepended (the previous first message is still in
+      // the list but no longer first): remember the height so
+      // ngAfterViewChecked keeps the operator's reading position steady.
+      const msgs = this.detail?.messages ?? [];
+      const firstId = msgs[0]?.id ?? null;
+      if (
+        firstId &&
+        this.lastFirstId &&
+        firstId !== this.lastFirstId &&
+        msgs.some((m) => m.id === this.lastFirstId)
+      ) {
+        this.heightBeforePrepend = this.scrollHost.nativeElement.scrollHeight;
+      }
     }
   }
 
   ngAfterViewChecked(): void {
-    const count = this.detail?.messages.length ?? 0;
-    if (count !== this.lastMessageCount && this.scrollHost) {
-      const el = this.scrollHost.nativeElement;
-      // Use rAF so the layout has applied before we measure scrollHeight.
-      requestAnimationFrame(() => {
-        el.scrollTop = el.scrollHeight;
-      });
-      this.lastMessageCount = count;
+    const el = this.scrollHost?.nativeElement;
+    if (!el) return;
+    const msgs = this.detail?.messages ?? [];
+    const last = msgs[msgs.length - 1] ?? null;
+    const lastId = last?.id ?? null;
+
+    if (this.heightBeforePrepend !== null) {
+      const delta = el.scrollHeight - this.heightBeforePrepend;
+      this.heightBeforePrepend = null;
+      if (delta > 0) el.scrollTop += delta;
+    } else if (this.forceScrollToBottom && msgs.length > 0 && !this.loading) {
+      this.forceScrollToBottom = false;
+      requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
+    } else if (last && lastId !== this.lastLastId && this.lastLastId !== null) {
+      // New tail message. Follow it when the operator is already at the
+      // bottom or sent it themselves; otherwise count it for the pill.
+      const ownSend = last.direction === 'out' && (this.isPending(last) || last.is_internal);
+      if (ownSend || this.isNearBottom(el)) {
+        requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
+      } else {
+        this.unseenCount.update((n) => n + Math.max(1, msgs.length - this.lastCount));
+      }
     }
+
+    this.lastFirstId = msgs[0]?.id ?? null;
+    this.lastLastId = lastId;
+    this.lastCount = msgs.length;
+  }
+
+  protected onScroll(): void {
+    const el = this.scrollHost?.nativeElement;
+    if (!el) return;
+    if (this.isNearBottom(el)) this.unseenCount.set(0);
+    if (
+      el.scrollTop < ChatThreadComponent.LOAD_OLDER_THRESHOLD_PX &&
+      this.hasOlder &&
+      !this.loadingOlder
+    ) {
+      this.loadOlder.emit();
+    }
+  }
+
+  protected scrollToBottom(): void {
+    const el = this.scrollHost?.nativeElement;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    this.unseenCount.set(0);
+  }
+
+  /** Quoted-reply click: scroll the original into view and flash it.
+   *  Quotes of messages outside the loaded window stay inert. */
+  protected jumpToMessage(id: string | null): void {
+    if (!id) return;
+    const target = this.scrollHost?.nativeElement.querySelector<HTMLElement>(
+      `[data-message-id="${id}"]`,
+    );
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    this.flashId.set(id);
+    if (this.flashTimer) clearTimeout(this.flashTimer);
+    this.flashTimer = setTimeout(() => this.flashId.set(null), 1600);
+  }
+
+  private isNearBottom(el: HTMLElement): boolean {
+    return (
+      el.scrollHeight - el.scrollTop - el.clientHeight < ChatThreadComponent.STICK_THRESHOLD_PX
+    );
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    this.pickerOpenFor.set(null);
+  }
+
+  /** Day-divider label ("Today" / "Yesterday" / "Mon, 14 Sep") shown
+   *  above the first message of each calendar day. Null when the
+   *  message is on the same day as its predecessor. */
+  protected dayDividerFor(index: number): string | null {
+    const msgs = this.detail?.messages ?? [];
+    const m = msgs[index];
+    if (!m) return null;
+    const cur = new Date(m.sent_at || m.created_at);
+    if (index > 0) {
+      const prevMsg = msgs[index - 1];
+      const prev = new Date(prevMsg.sent_at || prevMsg.created_at);
+      if (prev.toDateString() === cur.toDateString()) return null;
+    }
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    if (cur.toDateString() === today.toDateString()) return 'Today';
+    if (cur.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    const sameYear = cur.getFullYear() === today.getFullYear();
+    return cur.toLocaleDateString([], {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      ...(sameYear ? {} : { year: 'numeric' }),
+    });
+  }
+
+  /** Bubble widths (%) for the loading skeleton. */
+  protected readonly skeletonRows = [55, 40, 65, 35, 50];
+
+  /** "Asha, Ravi" for a note's @-mentions; falls back to a count when
+   *  a mentioned user is no longer in the staff directory. */
+  protected mentionNames(m: ConversationMessage): string {
+    const ids = m.mentioned_user_ids ?? [];
+    const names = ids
+      .map((id) => this.staffById.get(id)?.full_name)
+      .filter((n): n is string => !!n);
+    if (names.length === ids.length) return names.join(', ');
+    return `${ids.length} ${ids.length === 1 ? 'person' : 'people'}`;
+  }
+
+  /** Bubble timestamp — time only; the day lives in the divider. */
+  protected formatClock(iso: string | null): string {
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
   protected formatTime(iso: string | null): string {
@@ -372,6 +401,7 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
    * delivery tracking; for them only `sent` shows after dispatch.
    */
   protected tickState(m: ConversationMessage): 'read' | 'delivered' | 'sent' | 'pending' {
+    if (this.isPending(m)) return 'pending';
     if (m.read_at) return 'read';
     if (m.delivered_at) return 'delivered';
     if (m.sent_at) return 'sent';
@@ -503,15 +533,21 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
     return null;
   }
 
-  /** True when the attachment list has a real media reference
-   *  (image/video/audio/document) — Step-5's attachments. The Step-6
-   *  reply attribution lives in the same array but should NOT be
-   *  counted as a media attachment. */
-  protected mediaAttachmentCount(m: ConversationMessage): number {
-    return (m.attachments ?? []).filter((att) => {
-      const t = (att as { type?: string }).type;
-      return t === 'image' || t === 'video' || t === 'audio' || t === 'document';
-    }).length;
+  /** WhatsApp media attachments (image / video / audio / document /
+   *  sticker) with their position in `attachments[]` — the media proxy
+   *  addresses them by index. Step-6 reply attribution and email files
+   *  (keyed on `storage_key`) share the array but are rendered elsewhere. */
+  protected mediaAttachments(
+    m: ConversationMessage,
+  ): Array<{ att: MediaAttachment; index: number }> {
+    const out: Array<{ att: MediaAttachment; index: number }> = [];
+    (m.attachments ?? []).forEach((raw, index) => {
+      const t = (raw as { type?: string }).type;
+      if (t === 'image' || t === 'video' || t === 'audio' || t === 'document' || t === 'sticker') {
+        out.push({ att: raw as unknown as MediaAttachment, index });
+      }
+    });
+    return out;
   }
 
   /** Step 28 — pluck the first `location` attachment, or null.
@@ -530,14 +566,6 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
       (att) => (att as { type?: string }).type === 'contacts',
     );
     return found ? (found as unknown as VCardAttachment) : null;
-  }
-
-  /** Step 28 — first `sticker` attachment, or null. */
-  protected stickerAttachment(m: ConversationMessage): StickerAttachment | null {
-    const found = (m.attachments ?? []).find(
-      (att) => (att as { type?: string }).type === 'sticker',
-    );
-    return found ? (found as unknown as StickerAttachment) : null;
   }
 
   /** Bubble text as displayed to the operator. Email inbound bodies

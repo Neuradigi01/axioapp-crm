@@ -68,18 +68,18 @@ export const TAG_PALETTE: TagColor[] = [
  * color to one without the other breaks rendering.
  */
 export const TAG_COLOR_CLASSES: Record<TagColor, string> = {
-  zinc: 'bg-surface-2 text-default border-subtle',
-  rose: 'bg-red-500/10 text-red-400 ring-red-500/20',
-  amber: 'bg-amber-100 text-amber-800 ring-amber-200',
-  yellow: 'bg-yellow-100 text-yellow-800 ring-yellow-200',
-  lime: 'bg-lime-100 text-lime-800 ring-lime-200',
-  emerald: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
-  teal: 'bg-teal-100 text-teal-700 ring-teal-200',
-  sky: 'bg-sky-100 text-sky-700 ring-sky-200',
-  blue: 'bg-blue-100 text-blue-700 ring-blue-200',
-  indigo: 'bg-indigo-100 text-indigo-700 ring-indigo-200',
-  violet: 'bg-violet-100 text-violet-700 ring-violet-200',
-  fuchsia: 'bg-fuchsia-100 text-fuchsia-700 ring-fuchsia-200',
+  zinc: 'bg-surface-2 text-default ring-subtle',
+  rose: 'bg-rose-500/15 text-rose-700 ring-rose-500/25 dark:text-rose-300',
+  amber: 'bg-amber-500/15 text-amber-700 ring-amber-500/25 dark:text-amber-300',
+  yellow: 'bg-yellow-500/15 text-yellow-700 ring-yellow-500/25 dark:text-yellow-300',
+  lime: 'bg-lime-500/15 text-lime-700 ring-lime-500/25 dark:text-lime-300',
+  emerald: 'bg-emerald-500/15 text-emerald-700 ring-emerald-500/25 dark:text-emerald-300',
+  teal: 'bg-teal-500/15 text-teal-700 ring-teal-500/25 dark:text-teal-300',
+  sky: 'bg-sky-500/15 text-sky-700 ring-sky-500/25 dark:text-sky-300',
+  blue: 'bg-blue-500/15 text-blue-700 ring-blue-500/25 dark:text-blue-300',
+  indigo: 'bg-indigo-500/15 text-indigo-700 ring-indigo-500/25 dark:text-indigo-300',
+  violet: 'bg-violet-500/15 text-violet-700 ring-violet-500/25 dark:text-violet-300',
+  fuchsia: 'bg-fuchsia-500/15 text-fuchsia-700 ring-fuchsia-500/25 dark:text-fuchsia-300',
 };
 
 export interface Conversation {
@@ -113,6 +113,13 @@ export interface Conversation {
    *  the detail response and when the conversation has no messages / only
    *  attachment-only messages / only internal notes. */
   last_message_body?: string | null;
+  /** List-only: sender of the latest external message. `'in'` = the
+   *  customer is waiting on a reply. */
+  last_message_direction?: 'in' | 'out' | null;
+  /** Latest inbound customer message — the "waiting since" anchor. */
+  last_customer_message_at?: string | null;
+  /** Timed snooze wake-up (null = not snoozed / snoozed until reply). */
+  snoozed_until?: string | null;
   unread_count: number;
   created_at: string;
   /** Step 14 — assigned tag chips. Empty array when none / not loaded. */
@@ -124,6 +131,9 @@ export interface Conversation {
   acquisition_source?: 'organic' | 'ad' | 'qr' | 'wa_me' | 'form' | null;
   acquisition_campaign_id?: string | null;
   acquisition_ad_id?: string | null;
+  /** Step 27a — Meta phone id the conversation arrived on. The composer
+   *  defaults "Send from" to it. Null on legacy / non-WhatsApp rows. */
+  received_via_phone_id?: string | null;
 }
 
 export interface ConversationListResponse {
@@ -211,6 +221,8 @@ export interface ConversationListQuery {
   /** Inbox "Unread" chip — restricts the list to threads with
    *  `unread_count > 0`. Composes with the other filters. */
   unread_only?: boolean;
+  /** Every thread with one contact (details rail). */
+  contact_id?: string;
   page?: number;
   size?: number;
 }
@@ -219,6 +231,55 @@ export interface ConversationPatch {
   assigned_to_id?: string | null;
   status?: ConversationStatus;
   ai_handling?: boolean;
+  /** Only with `status: 'snoozed'` — auto-reopen at this ISO instant. */
+  snoozed_until?: string | null;
+}
+
+export type ConversationBulkAction =
+  | 'close'
+  | 'reopen'
+  | 'snooze'
+  | 'mark_read'
+  | 'mark_unread'
+  | 'assign'
+  | 'add_tag';
+
+export interface ConversationBulkRequest {
+  conversation_ids: string[];
+  action: ConversationBulkAction;
+  assigned_to_id?: string | null;
+  tag_id?: string;
+  snoozed_until?: string | null;
+}
+
+export interface ConversationBulkResult {
+  updated: number;
+  skipped: Array<{ id: string; reason: string }>;
+}
+
+/** Unread badge counts — conversations with ≥1 unread message,
+ *  excluding closed ones. */
+export interface ConversationCounts {
+  all: number;
+  mine: number;
+  unassigned: number;
+  by_channel: Record<string, number>;
+}
+
+export interface SavedReply {
+  id: string;
+  title: string;
+  body: string;
+  shortcut: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavedReplyInput {
+  title: string;
+  body: string;
+  shortcut: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -245,10 +306,41 @@ export class ConversationsApiService {
       q: query.q,
       tag_ids: query.tag_ids,
       unread_only: query.unread_only ? true : undefined,
+      contact_id: query.contact_id,
       page: query.page,
       size: query.size,
     });
     return this.http.get<ConversationListResponse>(this.base, { params });
+  }
+
+  /** Unread badge counts for the inbox filter chips. */
+  counts(): Observable<ConversationCounts> {
+    return this.http.get<ConversationCounts>(`${this.base}/counts`);
+  }
+
+  /** Apply one action to many conversations; rows the caller can't
+   *  act on come back in `skipped`. */
+  bulk(body: ConversationBulkRequest): Observable<ConversationBulkResult> {
+    return this.http.post<ConversationBulkResult>(`${this.base}/bulk`, body);
+  }
+
+  // --- Saved replies ---------------------------------------------------
+
+  listSavedReplies(search?: string): Observable<SavedReply[]> {
+    const params = buildHttpParams({ search });
+    return this.http.get<SavedReply[]>(`${this.base}/saved-replies`, { params });
+  }
+
+  createSavedReply(input: SavedReplyInput): Observable<SavedReply> {
+    return this.http.post<SavedReply>(`${this.base}/saved-replies`, input);
+  }
+
+  updateSavedReply(id: string, input: SavedReplyInput): Observable<SavedReply> {
+    return this.http.patch<SavedReply>(`${this.base}/saved-replies/${id}`, input);
+  }
+
+  deleteSavedReply(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/saved-replies/${id}`);
   }
 
   detail(id: string): Observable<ConversationDetail> {
@@ -331,6 +423,20 @@ export class ConversationsApiService {
     if (body.subject) payload['subject'] = body.subject;
     if (body.accountId) payload['account_id'] = body.accountId;
     return this.http.post<ConversationMessage>(`${this.base}/${id}/email-reply`, payload);
+  }
+
+  /** Email reply with file attachments (multipart). Server limits: 10
+   *  files, 10 MB each, 18 MB total. */
+  sendEmailReplyWithAttachments(
+    id: string,
+    body: { bodyText: string; subject?: string },
+    files: File[],
+  ): Observable<ConversationMessage> {
+    const form = new FormData();
+    form.append('body_text', body.bodyText);
+    if (body.subject) form.append('subject', body.subject);
+    for (const f of files) form.append('files', f, f.name);
+    return this.http.post<ConversationMessage>(`${this.base}/${id}/email-reply/attachments`, form);
   }
 
   /**

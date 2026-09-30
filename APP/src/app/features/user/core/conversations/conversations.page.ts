@@ -3,6 +3,7 @@ import {
   ChangeDetectorRef,
   Component,
   DestroyRef,
+  HostListener,
   ViewChild,
   computed,
   effect,
@@ -11,12 +12,12 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { Subscription, of } from 'rxjs';
+import { catchError, tap } from 'rxjs/operators';
 
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
@@ -24,16 +25,22 @@ import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 
 import {
   Conversation,
+  ConversationBulkAction,
+  ConversationCounts,
   ConversationDetail,
   ConversationListQuery,
   ConversationMessage,
   ConversationStatus,
+  ConversationTag,
   ConversationTagRef,
   ConversationsApiService,
 } from './conversations-api.service';
+import { SnoozePreset, snoozePresets } from './snooze-options';
+import { TagChipComponent } from './tag-chip.component';
 import { ChatThreadComponent } from './chat-thread.component';
 import {
   ComposeBarComponent,
+  ComposerEmailPayload,
   ComposerLocationPayload,
   ComposerMediaPayload,
   ComposerNotePayload,
@@ -83,6 +90,7 @@ import { extractApiError } from '@core/services/api-error.util';
     WhatsAppTemplatePickerComponent,
     ConfirmDialogComponent,
     RouterLink,
+    TagChipComponent,
   ],
   templateUrl: './conversations.page.html',
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -95,6 +103,8 @@ export class ConversationsPageComponent {
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   /** Zoneless CD: signal writes that fire from `setTimeout` /
    *  `setInterval` callbacks (the debounced WS reload + the 6-second
    *  open-thread poll) are outside any tracked reactive context and
@@ -111,6 +121,7 @@ export class ConversationsPageComponent {
    *  way (the compose-bar instance always exists when a
    *  conversation is open). */
   @ViewChild('composeBar') protected composeBar?: ComposeBarComponent;
+  @ViewChild(ConversationListComponent) private readonly listCmp?: ConversationListComponent;
 
   /** Logged-in user id — drives the list component's "Mine" chip. */
   protected readonly currentUserId = this.auth.currentUserId;
@@ -123,7 +134,50 @@ export class ConversationsPageComponent {
   protected readonly initialUnreadOnly = this.readPersistedUnread();
 
   protected readonly items = signal<Conversation[]>([]);
+  /** True only while a (re)load runs against an EMPTY list (first load
+   *  or a filter change). Background refreshes keep the rows painted. */
   protected readonly loading = signal(false);
+  /** Refresh-button spinner — any list request in flight. */
+  protected readonly refreshing = signal(false);
+  protected readonly loadingMore = signal(false);
+  /** Unread badge counts for the list's filter chips. */
+  protected readonly counts = signal<ConversationCounts | null>(null);
+
+  // --- Bulk selection --------------------------------------------------
+
+  /** Conversations ticked in the list (bulk actions). */
+  protected readonly bulkSelected = signal<ReadonlySet<string>>(new Set());
+  protected readonly bulkBusy = signal(false);
+  protected readonly bulkSnoozeOpen = signal(false);
+  protected readonly bulkSnoozeChoices = signal<SnoozePreset[]>([]);
+  protected readonly bulkTagOpen = signal(false);
+  protected readonly bulkTags = signal<ConversationTag[]>([]);
+  protected readonly bulkAssignOpen = signal(false);
+  protected readonly bulkAssignError = signal<string | null>(null);
+  /** One-click bulk actions rendered as icon buttons. */
+  protected readonly bulkIconActions: ReadonlyArray<{
+    action: ConversationBulkAction;
+    label: string;
+    icon: string;
+  }> = [
+    { action: 'mark_read', label: 'Mark as read', icon: 'check-check' },
+    { action: 'mark_unread', label: 'Mark as unread', icon: 'mail' },
+    { action: 'close', label: 'Close', icon: 'check-circle-2' },
+    { action: 'reopen', label: 'Reopen', icon: 'circle-dot' },
+  ];
+
+  /** Server-side total for the active filters (drives "Load more"). */
+  protected readonly total = signal(0);
+  protected readonly hasMore = computed(() => this.items().length < this.total());
+  /** Pages pulled so far — a background refresh re-fetches this many
+   *  rows (capped by the API's 200 page size) so new inbound previews
+   *  and unread badges stay current across everything on screen. */
+  private loadedPages = 1;
+  private static readonly LIST_PAGE_SIZE = 50;
+  private static readonly LIST_MAX_PAGE_SIZE = 200;
+  /** In-flight list request — cancelled when a newer one starts so a
+   *  slow response can never overwrite fresher results. */
+  private listSub: Subscription | null = null;
   /** Errors from the list / thread load paths. Rendered by the header
    *  banner. Cleared on next reload. */
   protected readonly loadError = signal<string | null>(null);
@@ -145,6 +199,12 @@ export class ConversationsPageComponent {
   protected readonly selectedId = signal<string | null>(null);
   protected readonly detail = signal<ConversationDetail | null>(null);
   protected readonly threadLoading = signal(false);
+  /** Older-history paging for the open thread. */
+  protected readonly loadingOlder = signal(false);
+  protected readonly hasOlder = signal(false);
+  /** Mirrors the detail endpoint's first-page size (router.py). A first
+   *  page shorter than this means the whole thread is already loaded. */
+  private static readonly THREAD_PAGE_SIZE = 50;
 
   protected readonly filters = signal<ConversationListQuery>({});
 
@@ -253,9 +313,32 @@ export class ConversationsPageComponent {
    *  on the snippet. */
   protected readonly replyingTo = signal<ConversationMessage | null>(null);
 
+  /** The open conversation. Prefers the list row (carries the preview
+   *  + tags from the list payload) but falls back to the loaded detail
+   *  so a thread that drops out of the current filter — e.g. marked
+   *  read while the Unread chip is on, or deep-linked from a
+   *  notification — stays open instead of blanking the chat pane. */
   protected readonly selectedConversation = computed<Conversation | null>(() => {
     const id = this.selectedId();
-    return this.items().find((c) => c.id === id) ?? null;
+    if (!id) return null;
+    const row = this.items().find((c) => c.id === id);
+    if (row) return row;
+    const d = this.detail();
+    return d && d.conversation.id === id ? d.conversation : null;
+  });
+
+  /** Any list filter active — switches the list's empty state to
+   *  "No matches · Clear filters". */
+  protected readonly hasActiveFilters = computed(() => {
+    const f = this.filters();
+    return !!(
+      f.channel ||
+      f.status ||
+      f.assigned_to ||
+      f.q ||
+      f.unread_only ||
+      (f.tag_ids && f.tag_ids.length > 0)
+    );
   });
 
   /** Header/rail counterparty label. Prefers the linked contact's
@@ -350,20 +433,28 @@ export class ConversationsPageComponent {
    *  is hidden to avoid burning requests. */
   private static readonly OPEN_THREAD_POLL_MS = 6_000;
   private static readonly LIST_POLL_EVERY_N_TICKS = 3; // ≈ every 18s
+  /** With no thread open, the list still refreshes on this cadence so
+   *  new unassigned inbound conversations appear without a manual
+   *  refresh (the WS push only reaches the assignee). */
+  private static readonly IDLE_LIST_POLL_MS = 20_000;
   private openThreadPollTimer: ReturnType<typeof setInterval> | null = null;
   private openThreadPollTicks = 0;
+  private idleListPollTimer: ReturnType<typeof setInterval> | null = null;
   private readonly onVisibilityChange = (): void => {
     if (document.visibilityState === 'visible') {
-      this.startOpenThreadPolling();
       // Regained focus — refresh immediately so the operator doesn't
       // wait a full tick before seeing what landed while they were away.
       const id = this.selectedId();
       if (id) {
+        this.startOpenThreadPolling();
         this._reloadDetail(id);
-        this.reloadList();
+      } else {
+        this.startIdleListPolling();
       }
+      this.reloadList();
     } else {
       this.stopOpenThreadPolling();
+      this.stopIdleListPolling();
     }
   };
 
@@ -386,8 +477,17 @@ export class ConversationsPageComponent {
     if (this.initialAssignee) seed.assigned_to = this.initialAssignee;
     if (this.initialUnreadOnly) seed.unread_only = true;
     if (Object.keys(seed).length > 0) this.filters.set(seed);
-    this.reloadList();
+    this.reloadList({ reset: true });
     this.loadStaff();
+
+    // Deep link: `/user/conversations?c=<id>` opens that thread (from a
+    // notification, a shared link, or a refresh with a thread open).
+    const deepLinkId = this.route.snapshot.queryParamMap.get('c');
+    if (deepLinkId) {
+      this.onSelect(deepLinkId);
+    } else {
+      this.startIdleListPolling();
+    }
 
     // WS hook: react to the notifications signal. The notifications
     // service prepends new rows; we only care about `conversation.message`.
@@ -398,6 +498,23 @@ export class ConversationsPageComponent {
       this.lastSeenNotificationId = head.id;
       if (head.type !== 'conversation.message') return;
       this.onIncomingNotification(head.payload);
+    });
+
+    // Live refresh: the backend pushes a non-persisted
+    // `conversation.updated` event to every org member when a thread
+    // changes (inbound message, bulk action). Coalesce bursts into one
+    // list reload + one open-thread refresh.
+    this.notifications.events$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((evt) => {
+      if (evt.type !== 'conversation.updated') return;
+      const ids = Array.isArray(evt.payload['conversation_ids'])
+        ? (evt.payload['conversation_ids'] as unknown[]).filter(
+            (v): v is string => typeof v === 'string',
+          )
+        : [];
+      const open = this.selectedId();
+      this.onIncomingNotification(
+        open && ids.includes(open) ? { conversation_id: open } : { conversation_id: null },
+      );
     });
 
     // Refresh whenever the browser tab regains focus. Even with the
@@ -418,6 +535,8 @@ export class ConversationsPageComponent {
         this.pendingDetailReload = null;
       }
       this.stopOpenThreadPolling();
+      this.stopIdleListPolling();
+      this.listSub?.unsubscribe();
       document.removeEventListener('visibilitychange', this.onVisibilityChange);
     });
   }
@@ -453,7 +572,7 @@ export class ConversationsPageComponent {
       ...(status ? { status } : {}),
     });
     this.persistUnread(next.unread_only ?? false);
-    this.reloadList();
+    this.reloadList({ reset: true });
   }
 
   /** Page-header status filter — patches the list query and reloads.
@@ -466,7 +585,7 @@ export class ConversationsPageComponent {
       const { status: _omit, ...rest } = prev;
       return cast ? { ...rest, status: cast } : rest;
     });
-    this.reloadList();
+    this.reloadList({ reset: true });
   }
 
   protected onAssigneeFilterChange(value: string | undefined): void {
@@ -475,7 +594,18 @@ export class ConversationsPageComponent {
       return value ? { ...rest, assigned_to: value } : rest;
     });
     this.persistAssignee(value);
-    this.reloadList();
+    this.reloadList({ reset: true });
+  }
+
+  /** Empty-state "Clear filters": the list child already reset its
+   *  chips; drop status + tags here and reload once. */
+  protected onClearFilters(): void {
+    this.statusFilter.set('');
+    this.tagFilterIds.set([]);
+    this.filters.set({});
+    this.persistAssignee(undefined);
+    this.persistUnread(false);
+    this.reloadList({ reset: true });
   }
 
   // --- Session window (Step 15) --------------------------------------
@@ -523,7 +653,7 @@ export class ConversationsPageComponent {
       const { tag_ids: _omit, ...rest } = prev;
       return ids.length > 0 ? { ...rest, tag_ids: ids } : rest;
     });
-    this.reloadList();
+    this.reloadList({ reset: true });
   }
 
   /** Step 14 — tag-manager dispatched a change. Patch the row in
@@ -591,13 +721,20 @@ export class ConversationsPageComponent {
   }
 
   protected onSelect(id: string): void {
+    if (id !== this.selectedId()) {
+      // Reply targets belong to the thread they were picked in.
+      this.replyingTo.set(null);
+      this.sendError.set(null);
+    }
     this.selectedId.set(id);
     this.loadDetail(id);
+    this.stopIdleListPolling();
     this.startOpenThreadPolling();
     // Close the mobile rail if the operator flips to a different
     // conversation while it's open — the drawer is scoped to the
     // currently-selected conv and would look stale otherwise.
     this.mobileRailOpen.set(false);
+    this.syncUrl(id);
   }
 
   /** Mobile back button — clears the selection so the list pane
@@ -605,13 +742,103 @@ export class ConversationsPageComponent {
    *  visible so the button is hidden there. */
   protected deselect(): void {
     this.selectedId.set(null);
+    this.detail.set(null);
     this.replyingTo.set(null);
     this.mobileRailOpen.set(false);
     this.stopOpenThreadPolling();
+    this.startIdleListPolling();
+    this.syncUrl(null);
+  }
+
+  /** Keep `?c=<id>` in the URL in step with the open thread (replace,
+   *  not push — thread switches shouldn't flood browser history). */
+  private syncUrl(id: string | null): void {
+    if (this.route.snapshot.queryParamMap.get('c') === id) return;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { c: id },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  private startIdleListPolling(): void {
+    if (this.idleListPollTimer !== null) return;
+    if (document.visibilityState !== 'visible') return;
+    this.idleListPollTimer = setInterval(
+      () => this.reloadList(),
+      ConversationsPageComponent.IDLE_LIST_POLL_MS,
+    );
+  }
+
+  private stopIdleListPolling(): void {
+    if (this.idleListPollTimer !== null) {
+      clearInterval(this.idleListPollTimer);
+      this.idleListPollTimer = null;
+    }
+  }
+
+  // --- Keyboard shortcuts ---------------------------------------------
+
+  /** Inbox shortcuts (ignored while typing in a field or when a dialog
+   *  is open):  j / k  next / previous conversation · /  search ·
+   *  r  reply · n  internal note · Esc  close the mobile details drawer. */
+  @HostListener('document:keydown', ['$event'])
+  protected onGlobalKeydown(event: KeyboardEvent): void {
+    if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
+    const target = event.target as HTMLElement | null;
+    const tag = target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
+      return;
+    }
+    if (event.key === 'Escape') {
+      if (this.mobileRailOpen()) this.closeMobileRail();
+      else if (this.bulkSelected().size > 0 && !this.bulkAssignOpen()) this.clearBulkSelection();
+      return;
+    }
+    if (
+      this.bulkAssignOpen() ||
+      this.reassignOpen() ||
+      this.newConversationOpen() ||
+      this.interactiveOpen() ||
+      this.pendingAiConfirm()
+    ) {
+      return;
+    }
+    switch (event.key) {
+      case 'j':
+      case 'k':
+        event.preventDefault();
+        this.selectAdjacent(event.key === 'j' ? 1 : -1);
+        break;
+      case '/':
+        event.preventDefault();
+        this.listCmp?.focusSearch();
+        break;
+      case 'r':
+      case 'n':
+        if (this.composeBar) {
+          event.preventDefault();
+          this.composeBar.focusInput(event.key === 'r' ? 'reply' : 'note');
+        }
+        break;
+    }
+  }
+
+  private selectAdjacent(step: 1 | -1): void {
+    const rows = this.items();
+    if (rows.length === 0) return;
+    const idx = rows.findIndex((c) => c.id === this.selectedId());
+    const next = idx === -1 ? (step === 1 ? 0 : rows.length - 1) : idx + step;
+    if (next < 0 || next >= rows.length) return;
+    const id = rows[next].id;
+    this.onSelect(id);
+    document.getElementById('conv-row-' + id)?.scrollIntoView({ block: 'nearest' });
   }
 
   private startOpenThreadPolling(): void {
     if (this.openThreadPollTimer !== null) return;
+    if (!this.selectedId()) return;
     if (document.visibilityState !== 'visible') return;
     this.openThreadPollTicks = 0;
     this.openThreadPollTimer = setInterval(() => {
@@ -706,8 +933,59 @@ export class ConversationsPageComponent {
             ? 'Could not send this email. Check your connected mailbox and try again.'
             : 'Could not send this message. Try again in a moment.';
         this.sendError.set(extractApiError(err) ?? fallback);
+        // Never lose what the operator typed — put it back in the composer.
+        this.composeBar?.restoreText(id, text);
+        if (replyTarget && this.selectedId() === id && !this.replyingTo()) {
+          this.replyingTo.set(replyTarget);
+        }
       },
     });
+  }
+
+  /** Email reply with attachments. Optimistic bubble shows the text; the
+   *  stored attachments appear when the server row swaps in. */
+  protected onSendEmailWithFiles(payload: ComposerEmailPayload): void {
+    const id = this.selectedId();
+    if (!id) return;
+    const optimistic: ConversationMessage = {
+      id: 'tmp-' + Math.random().toString(36).slice(2),
+      org_id: '',
+      conversation_id: id,
+      direction: 'out',
+      sender_user_id: this.auth.currentUserId(),
+      text: payload.text,
+      attachments: [],
+      interactive_payload: null,
+      reply_to_message_id: null,
+      reactions: [],
+      is_internal: false,
+      mentioned_user_ids: [],
+      is_ai: false,
+      channel_message_id: null,
+      sent_at: null,
+      delivered_at: null,
+      read_at: null,
+      created_at: new Date().toISOString(),
+    };
+    this.detail.update((d) => (d ? { ...d, messages: [...d.messages, optimistic] } : d));
+    this.api
+      .sendEmailReplyWithAttachments(id, { bodyText: payload.text }, payload.files)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (real) => {
+          this.swapOptimisticMessage(id, optimistic.id, real);
+          this.bumpListLastMessage(id, real.sent_at ?? real.created_at);
+          this.claimAssigneeOnSend(id);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.removeOptimisticMessage(id, optimistic.id);
+          this.sendError.set(
+            extractApiError(err) ??
+              'Could not send this email. Check your connected mailbox and try again.',
+          );
+          this.composeBar?.restoreText(id, payload.text);
+        },
+      });
   }
 
   // --- Internal note (Step 13) ---------------------------------------
@@ -749,6 +1027,7 @@ export class ConversationsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.removeOptimisticMessage(id, optimistic.id);
           this.sendError.set(extractApiError(err) ?? 'Could not post the note.');
+          this.composeBar?.restoreText(id, payload.text);
         },
       });
   }
@@ -964,6 +1243,7 @@ export class ConversationsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.removeOptimisticMessage(id, optimistic.id);
           this.sendError.set(extractApiError(err) ?? 'Could not send media.');
+          if (payload.caption) this.composeBar?.restoreText(id, payload.caption);
         },
       });
   }
@@ -995,8 +1275,10 @@ export class ConversationsPageComponent {
         next: (updated) => {
           // Authoritative write-back — overrides any stale WS-driven
           // refresh that arrived during the PATCH round-trip.
-          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
-          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
+          this.syncListRow(updated);
+          this.detail.update((d) =>
+            d && d.conversation.id === updated.id ? { ...d, conversation: updated } : d,
+          );
           this.closeReassign();
         },
         error: (err: HttpErrorResponse) => {
@@ -1014,8 +1296,10 @@ export class ConversationsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
-          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
+          this.syncListRow(updated);
+          this.detail.update((d) =>
+            d && d.conversation.id === updated.id ? { ...d, conversation: updated } : d,
+          );
         },
         error: (err: HttpErrorResponse) => {
           this.sendError.set(extractApiError(err) ?? 'Could not update AI handling.');
@@ -1082,11 +1366,11 @@ export class ConversationsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
-          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
-          this.toast.success('You took over from AI.', {
-            subtitle: 'Reload the thread to see the system message.',
-          });
+          this.syncListRow(updated);
+          this.detail.update((d) =>
+            d && d.conversation.id === updated.id ? { ...d, conversation: updated } : d,
+          );
+          this.toast.success('You took over from AI.');
           // Reload the thread so the freshly-inserted system marker
           // ("— {you} took over from AI —") lands in the UI without
           // needing a full page refresh.
@@ -1117,8 +1401,10 @@ export class ConversationsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
-          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
+          this.syncListRow(updated);
+          this.detail.update((d) =>
+            d && d.conversation.id === updated.id ? { ...d, conversation: updated } : d,
+          );
           this.toast.success('Returned to AI.');
           this._reloadDetail(id);
           this.aiConfirmSubmitting.set(false);
@@ -1153,20 +1439,33 @@ export class ConversationsPageComponent {
           // and the sent message drops out of the UI until the next
           // fetch. Merging keeps optimistic bubbles until the server
           // supersedes them with a real row.
+          //
+          // The refresh only returns the newest page, so any older
+          // history the operator scrolled up to load is kept too.
           this.detail.update((current) => {
             if (!current || current.conversation.id !== id) return fresh;
             const freshIds = new Set(fresh.messages.map((m) => m.id));
+            const oldestFresh = fresh.messages[0];
+            const oldestFreshAt = oldestFresh ? oldestFresh.created_at : null;
+            const olderHistory = current.messages.filter(
+              (m) =>
+                !m.id.startsWith('tmp-') &&
+                !freshIds.has(m.id) &&
+                oldestFreshAt !== null &&
+                m.created_at < oldestFreshAt,
+            );
             const optimistic = current.messages.filter(
               (m) => m.id.startsWith('tmp-') && !freshIds.has(m.id),
             );
-            if (optimistic.length === 0) return fresh;
-            const merged = [...fresh.messages, ...optimistic].sort((a, b) => {
+            if (olderHistory.length === 0 && optimistic.length === 0) return fresh;
+            const tail = [...fresh.messages, ...optimistic].sort((a, b) => {
               const at = a.sent_at ?? a.created_at ?? '';
               const bt = b.sent_at ?? b.created_at ?? '';
               return at.localeCompare(bt);
             });
-            return { ...fresh, messages: merged };
+            return { ...fresh, messages: [...olderHistory, ...tail] };
           });
+          this.syncListRow(fresh.conversation);
           this.cdr.markForCheck();
         },
         error: () => {
@@ -1187,14 +1486,39 @@ export class ConversationsPageComponent {
     if (!id) return;
     this.api
       .patch(id, { status: next })
+      .pipe(tap(() => this.loadCounts()))
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
-          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
+          this.syncListRow(updated);
+          this.detail.update((d) =>
+            d && d.conversation.id === updated.id ? { ...d, conversation: updated } : d,
+          );
         },
         error: (err: HttpErrorResponse) => {
           this.sendError.set(extractApiError(err) ?? 'Could not update conversation status.');
+        },
+      });
+  }
+
+  /** Rail "Snooze until…" pick: ISO wake-up time or null (until reply). */
+  protected onSnooze(until: string | null): void {
+    const id = this.selectedId();
+    if (!id) return;
+    this.api
+      .patch(id, { status: 'snoozed', snoozed_until: until })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.syncListRow(updated);
+          this.detail.update((d) =>
+            d && d.conversation.id === updated.id ? { ...d, conversation: updated } : d,
+          );
+          this.toast.success('Conversation snoozed.');
+          this.loadCounts();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.sendError.set(extractApiError(err) ?? 'Could not snooze the conversation.');
         },
       });
   }
@@ -1215,8 +1539,10 @@ export class ConversationsPageComponent {
       .subscribe({
         next: (updated) => {
           this.contactBusy.set(false);
-          this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
-          this.detail.update((d) => (d ? { ...d, conversation: updated } : d));
+          this.syncListRow(updated);
+          this.detail.update((d) =>
+            d && d.conversation.id === updated.id ? { ...d, conversation: updated } : d,
+          );
           this.hydrateContacts([updated]);
           this.toast.success('full_name' in payload ? 'Contact saved.' : 'Contact linked.');
         },
@@ -1256,27 +1582,215 @@ export class ConversationsPageComponent {
     this.sendError.set(null);
   }
 
-  protected reloadList(): void {
-    this.loading.set(true);
+  /** Refresh the list. `reset` (filter change / first load) clears the
+   *  rows and shows the skeleton; a plain refresh (polls, WS pushes,
+   *  the Refresh button) re-fetches every loaded page silently so the
+   *  list never flickers or loses its scroll position. */
+  protected reloadList(opts: { reset?: boolean } = {}): void {
+    const reset = !!opts.reset;
+    if (reset) {
+      this.loadedPages = 1;
+      this.items.set([]);
+      this.total.set(0);
+      this.clearBulkSelection();
+    }
+    const { LIST_PAGE_SIZE, LIST_MAX_PAGE_SIZE } = ConversationsPageComponent;
+    const size = Math.min(this.loadedPages * LIST_PAGE_SIZE, LIST_MAX_PAGE_SIZE);
+    this.loading.set(this.items().length === 0);
+    this.refreshing.set(true);
+    this.loadingMore.set(false);
     this.loadError.set(null);
-    this.sendError.set(null);
-    this.api
-      .list({ ...this.filters(), size: 100 })
+    this.listSub?.unsubscribe();
+    this.listSub = this.api
+      .list({ ...this.filters(), page: 1, size })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
-          this.items.set(resp.items);
+          // Rows loaded beyond the refresh window (> 200) are kept as-is.
+          const freshIds = new Set(resp.items.map((r) => r.id));
+          const beyond = this.items()
+            .slice(size)
+            .filter((r) => !freshIds.has(r.id));
+          this.items.set([...resp.items, ...beyond]);
+          this.total.set(resp.total);
           this.loading.set(false);
+          this.refreshing.set(false);
           this.hydrateContacts(resp.items);
+          this.pruneBulkSelection();
+          this.loadCounts();
           this.cdr.markForCheck();
         },
         error: (err: HttpErrorResponse) => {
-          this.items.set([]);
           this.loading.set(false);
+          this.refreshing.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load conversations.');
           this.cdr.markForCheck();
         },
       });
+  }
+
+  private loadCounts(): void {
+    this.api
+      .counts()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (c) => {
+          this.counts.set(c);
+          this.cdr.markForCheck();
+        },
+        // Badges are decoration — keep the previous numbers on failure.
+        error: () => undefined,
+      });
+  }
+
+  // --- Bulk actions ------------------------------------------------------
+
+  protected toggleBulkSelect(id: string): void {
+    this.bulkSelected.update((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  protected selectAllVisible(): void {
+    this.bulkSelected.set(new Set(this.items().map((c) => c.id)));
+  }
+
+  protected clearBulkSelection(): void {
+    this.bulkSelected.set(new Set());
+    this.bulkSnoozeOpen.set(false);
+    this.bulkTagOpen.set(false);
+  }
+
+  /** Drop ticked ids that are no longer in the list (filter change). */
+  private pruneBulkSelection(): void {
+    const sel = this.bulkSelected();
+    if (sel.size === 0) return;
+    const visible = new Set(this.items().map((c) => c.id));
+    const kept = [...sel].filter((id) => visible.has(id));
+    if (kept.length !== sel.size) this.bulkSelected.set(new Set(kept));
+  }
+
+  protected openBulkSnooze(): void {
+    this.bulkTagOpen.set(false);
+    this.bulkSnoozeChoices.set(snoozePresets());
+    this.bulkSnoozeOpen.update((v) => !v);
+  }
+
+  protected openBulkTag(): void {
+    this.bulkSnoozeOpen.set(false);
+    const opening = !this.bulkTagOpen();
+    this.bulkTagOpen.set(opening);
+    if (opening) {
+      this.api
+        .listTags()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (tags) => {
+            this.bulkTags.set(tags);
+            this.cdr.markForCheck();
+          },
+          error: (err: HttpErrorResponse) => {
+            this.bulkTagOpen.set(false);
+            this.toast.error(extractApiError(err) ?? 'Could not load tags.');
+          },
+        });
+    }
+  }
+
+  protected openBulkAssign(): void {
+    this.bulkSnoozeOpen.set(false);
+    this.bulkTagOpen.set(false);
+    this.bulkAssignError.set(null);
+    this.bulkAssignOpen.set(true);
+  }
+
+  protected runBulk(
+    action: ConversationBulkAction,
+    extra: { assigned_to_id?: string | null; tag_id?: string; snoozed_until?: string | null } = {},
+  ): void {
+    const ids = [...this.bulkSelected()];
+    if (ids.length === 0 || this.bulkBusy()) return;
+    this.bulkBusy.set(true);
+    this.bulkSnoozeOpen.set(false);
+    this.bulkTagOpen.set(false);
+    this.api
+      .bulk({ conversation_ids: ids, action, ...extra })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          this.bulkBusy.set(false);
+          this.bulkAssignOpen.set(false);
+          this.clearBulkSelection();
+          const skipped = res.skipped.length;
+          const done = `Updated ${res.updated} conversation${res.updated === 1 ? '' : 's'}.`;
+          if (skipped > 0) {
+            this.toast.warn(done, {
+              subtitle: `${skipped} skipped — assigned to someone else or no longer available.`,
+            });
+          } else {
+            this.toast.success(done);
+          }
+          this.reloadList();
+          const open = this.selectedId();
+          if (open && ids.includes(open)) this._reloadDetail(open);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bulkBusy.set(false);
+          const message = extractApiError(err) ?? 'Could not update the selected conversations.';
+          if (this.bulkAssignOpen()) this.bulkAssignError.set(message);
+          else this.toast.error(message);
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  protected onBulkAssignConfirm(payload: ReassignConfirm): void {
+    this.runBulk('assign', { assigned_to_id: payload.userId });
+  }
+
+  /** Infinite scroll — append the next page. */
+  protected loadMoreConversations(): void {
+    if (this.loadingMore() || this.refreshing() || !this.hasMore()) return;
+    const { LIST_PAGE_SIZE } = ConversationsPageComponent;
+    const nextPage = Math.floor(this.items().length / LIST_PAGE_SIZE) + 1;
+    this.loadingMore.set(true);
+    this.listSub?.unsubscribe();
+    this.listSub = this.api
+      .list({ ...this.filters(), page: nextPage, size: LIST_PAGE_SIZE })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resp) => {
+          const have = new Set(this.items().map((r) => r.id));
+          const added = resp.items.filter((r) => !have.has(r.id));
+          this.items.update((rows) => [...rows, ...added]);
+          this.total.set(resp.total);
+          this.loadedPages = nextPage;
+          this.loadingMore.set(false);
+          this.hydrateContacts(added);
+          this.cdr.markForCheck();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loadingMore.set(false);
+          this.loadError.set(extractApiError(err) ?? 'Could not load more conversations.');
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  /** Patch a list row in place from a fresher server copy (thread
+   *  refresh, mark-read) without refetching the whole list. Keeps the
+   *  list-only fields (preview) the detail payload doesn't carry. */
+  private syncListRow(conv: Conversation): void {
+    this.items.update((rows) =>
+      rows.map((r) =>
+        r.id === conv.id
+          ? { ...r, ...conv, last_message_body: conv.last_message_body ?? r.last_message_body }
+          : r,
+      ),
+    );
   }
 
   /** Fetch contact rows for the currently-visible ``contact_id``s so
@@ -1292,8 +1806,7 @@ export class ConversationsPageComponent {
    *  ones) so a contact edit made from the Contacts page — most
    *  commonly adding a "+91" prefix to a phone — propagates into the
    *  header/rail/list handle labels the next time this page pulls the
-   *  inbox. The list is capped at ~50 rows so the one extra bulk POST
-   *  per reload is negligible. */
+   *  inbox. One bulk POST per reload regardless of row count. */
   private hydrateContacts(rows: Conversation[]): void {
     const ids = new Set<string>();
     for (const r of rows) {
@@ -1321,35 +1834,82 @@ export class ConversationsPageComponent {
 
   private loadDetail(id: string): void {
     this.threadLoading.set(true);
+    this.loadingOlder.set(false);
+    this.hasOlder.set(false);
+    // Drop the previous thread immediately so its messages can never
+    // flash under the newly-selected header.
+    if (this.detail()?.conversation.id !== id) this.detail.set(null);
     this.api
       .detail(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (d) => {
+          // Thread switched while this was in flight — drop it.
+          if (this.selectedId() !== id) return;
           this.detail.set(d);
+          this.hasOlder.set(d.messages.length >= ConversationsPageComponent.THREAD_PAGE_SIZE);
           this.threadLoading.set(false);
+          this.syncListRow(d.conversation);
           this.cdr.markForCheck();
-          // If the row we just opened has an unread badge, clear it
-          // server-side. The endpoint is idempotent so we don't need
-          // to gate on the count locally — the backend no-ops when
-          // it's already 0. Best-effort: notification-refresh will
-          // pick up the fresh count for the list badge.
+          // Opened a thread with an unread badge → clear it server-side
+          // and zero the row locally (no full list reload — that used to
+          // flicker the list and, with the Unread chip on, blank the
+          // open thread). Best-effort: a failure leaves the badge lit.
           if ((d.conversation.unread_count ?? 0) > 0) {
             this.api
               .markRead(id)
               .pipe(takeUntilDestroyed(this.destroyRef))
               .subscribe({
-                next: () => this.reloadList(),
-                // Silent failure — the badge stays lit until next open
-                // or reload. Not worth surfacing to the operator.
+                next: (updated) => {
+                  this.syncListRow(updated);
+                  this.detail.update((cur) =>
+                    cur && cur.conversation.id === id
+                      ? { ...cur, conversation: { ...cur.conversation, unread_count: 0 } }
+                      : cur,
+                  );
+                  this.cdr.markForCheck();
+                },
                 error: () => undefined,
               });
           }
         },
         error: (err: HttpErrorResponse) => {
+          if (this.selectedId() !== id) return;
           this.detail.set(null);
           this.threadLoading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load thread.');
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  /** Scroll-up paging: prepend the page older than the oldest loaded
+   *  (non-optimistic) message. */
+  protected onLoadOlder(): void {
+    const id = this.selectedId();
+    const d = this.detail();
+    if (!id || !d || d.conversation.id !== id || this.loadingOlder() || !this.hasOlder()) return;
+    const oldest = d.messages.find((m) => !m.id.startsWith('tmp-'));
+    if (!oldest) return;
+    const { THREAD_PAGE_SIZE } = ConversationsPageComponent;
+    this.loadingOlder.set(true);
+    this.api
+      .loadOlderMessages(id, oldest.id, THREAD_PAGE_SIZE)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (older) => {
+          this.loadingOlder.set(false);
+          if (this.selectedId() !== id) return;
+          this.hasOlder.set(older.length >= THREAD_PAGE_SIZE);
+          this.mutateDetailForConversation(id, (cur) => {
+            const have = new Set(cur.messages.map((m) => m.id));
+            const add = older.filter((m) => !have.has(m.id));
+            return add.length ? { ...cur, messages: [...add, ...cur.messages] } : cur;
+          });
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loadingOlder.set(false);
+          this.sendError.set(extractApiError(err) ?? 'Could not load earlier messages.');
           this.cdr.markForCheck();
         },
       });

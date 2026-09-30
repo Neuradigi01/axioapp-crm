@@ -108,6 +108,9 @@ celery.autodiscover_tasks(
         # ``open`` tasks whose ``due_at`` is > 7 days ago to ``missed``
         # so the dashboard's Overdue bucket doesn't grow unbounded.
         "src.app.core.tasks.tasks",
+        # Conversations inbox — every-minute sweep reopening snoozed
+        # conversations whose ``snoozed_until`` has passed.
+        "src.app.core.conversations.tasks",
         # Module B closing-pass fix — nightly janitor that hard-deletes
         # organizations still stuck in ``template_id='pending'`` more
         # than 48 hours after signup (abandoned onboarding). Without

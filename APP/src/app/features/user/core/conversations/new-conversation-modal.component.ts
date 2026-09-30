@@ -5,6 +5,7 @@ import {
   Component,
   DestroyRef,
   EventEmitter,
+  HostListener,
   Output,
   computed,
   effect,
@@ -176,7 +177,9 @@ export class NewConversationModalComponent {
       });
   }
 
+  @HostListener('document:keydown.escape')
   protected close(): void {
+    if (this.submittingId() !== null) return;
     this.cancel.emit();
   }
 

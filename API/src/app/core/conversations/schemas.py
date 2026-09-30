@@ -327,6 +327,103 @@ class ConversationPatch(BaseModel):
     assigned_to_id: uuid.UUID | None = None
     status: ConversationStatus | None = None
     ai_handling: bool | None = None
+    # Only meaningful with ``status="snoozed"``: reopen automatically at
+    # this instant. Omitted / null = snoozed until the customer replies.
+    snoozed_until: datetime | None = None
+
+
+# Hard cap on one bulk request — the inbox list pages at 50 and never
+# loads more than a few pages at a time.
+BULK_MAX_CONVERSATIONS = 200
+
+BulkAction = Literal[
+    "close",
+    "reopen",
+    "snooze",
+    "mark_read",
+    "mark_unread",
+    "assign",
+    "add_tag",
+]
+
+
+class ConversationBulkRequest(BaseModel):
+    """Body of ``POST /api/v1/conversations/bulk``. One action applied to
+    every listed conversation the caller may act on; rows the caller
+    can't touch are skipped (reported back), never a whole-request 403."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_ids: list[uuid.UUID] = Field(min_length=1, max_length=BULK_MAX_CONVERSATIONS)
+    action: BulkAction
+    # ``assign`` — target user (null = unassign).
+    assigned_to_id: uuid.UUID | None = None
+    # ``add_tag`` — tag to attach.
+    tag_id: uuid.UUID | None = None
+    # ``snooze`` — optional wake-up time.
+    snoozed_until: datetime | None = None
+
+    @model_validator(mode="after")
+    def _check_action_args(self) -> ConversationBulkRequest:
+        if self.action == "add_tag" and self.tag_id is None:
+            raise ValueError("tag_id is required for add_tag.")
+        return self
+
+
+class ConversationBulkSkipped(BaseModel):
+    id: uuid.UUID
+    reason: str
+
+
+class ConversationBulkResult(BaseModel):
+    updated: int
+    skipped: list[ConversationBulkSkipped] = Field(default_factory=list)
+
+
+class ConversationCounts(BaseModel):
+    """Unread badge counts for the inbox filter chips. Each value is the
+    number of conversations with at least one unread message (not the
+    message total), excluding closed conversations."""
+
+    all: int
+    mine: int
+    unassigned: int
+    by_channel: dict[str, int] = Field(default_factory=dict)
+
+
+_SHORTCUT_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,31}$"
+
+
+class SavedReplyCreate(BaseModel):
+    """Body of ``POST /api/v1/conversations/saved-replies``."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    title: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=4096)
+    # Lower-case keyword typed after ``/`` in the composer, e.g. ``price``.
+    shortcut: str | None = Field(default=None, pattern=_SHORTCUT_PATTERN)
+
+
+class SavedReplyUpdate(BaseModel):
+    """Body of ``PATCH /api/v1/conversations/saved-replies/{id}``. Only
+    supplied keys change; send ``shortcut: null`` to clear it."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+    body: str | None = Field(default=None, min_length=1, max_length=4096)
+    shortcut: str | None = Field(default=None, pattern=_SHORTCUT_PATTERN)
+
+
+class SavedReplyOut(ORMModel):
+    id: uuid.UUID
+    title: str
+    body: str
+    shortcut: str | None
+    created_by_user_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
 
 
 class ConversationContactSet(BaseModel):
@@ -396,6 +493,14 @@ class ConversationOut(ORMModel):
     # Internal notes are excluded from the preview so the customer-facing
     # snippet reflects what was actually exchanged externally.
     last_message_body: str | None = None
+    # List-only: who sent the latest external message. ``"in"`` means the
+    # customer is waiting on a reply (drives the "Waiting 2h" indicator).
+    last_message_direction: Literal["in", "out"] | None = None
+    # Last inbound customer message — the "waiting since" anchor and the
+    # WhatsApp 24h-window pivot.
+    last_customer_message_at: datetime | None = None
+    # Timed snooze wake-up; null when not snoozed or snoozed until reply.
+    snoozed_until: datetime | None = None
     unread_count: int
     created_at: datetime
     # Step 14 — assigned tags as embedded `{id, name, color}` triples.
