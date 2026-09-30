@@ -364,6 +364,30 @@
             />
           </div>
         }
+        @if (aiSummary(); as summary) {
+          @if (summary.conversationId === conv.id) {
+            <div
+              class="flex items-start gap-2 border-b border-violet-500/20 bg-violet-500/10 px-3 py-2 text-xs text-default"
+            >
+              <lucide-icon
+                name="sparkles"
+                class="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-600 dark:text-violet-400"
+              />
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 font-semibold text-violet-700 dark:text-violet-300">AI summary</p>
+                <p class="whitespace-pre-wrap">{{ summary.text }}</p>
+              </div>
+              <button
+                type="button"
+                (click)="aiSummary.set(null)"
+                class="shrink-0 rounded p-0.5 text-muted hover:text-default"
+                aria-label="Dismiss summary"
+              >
+                <lucide-icon name="x" class="h-3.5 w-3.5" />
+              </button>
+            </div>
+          }
+        }
         <app-chat-thread
           [conversation]="conv"
           [detail]="detail()"
@@ -383,6 +407,8 @@
           <app-compose-bar
             #composeBar
             [conversationId]="conv.id"
+            [aiBusy]="aiSuggestBusy()"
+            (aiSuggest)="onAiSuggest()"
             [aiHandling]="conv.ai_handling"
             [channel]="conv.channel"
             [contactId]="conv.contact_id"
@@ -462,6 +488,8 @@
           (statusChange)="onStatusChange($event)"
           (snooze)="onSnooze($event)"
           (openConversation)="onSelect($event)"
+          [summarizing]="summarizing()"
+          (summarize)="onSummarize()"
           (tagsChanged)="onTagsChanged($event)"
           (takeoverAi)="onTakeoverAi()"
           (resumeAiOut)="onResumeAi()"
@@ -510,6 +538,8 @@
               (statusChange)="onStatusChange($event)"
               (snooze)="onSnooze($event); closeMobileRail()"
               (openConversation)="onSelect($event)"
+              [summarizing]="summarizing()"
+              (summarize)="onSummarize(); closeMobileRail()"
               (tagsChanged)="onTagsChanged($event)"
               (takeoverAi)="onTakeoverAi(); closeMobileRail()"
               (resumeAiOut)="onResumeAi(); closeMobileRail()"

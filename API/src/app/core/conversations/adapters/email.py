@@ -93,6 +93,7 @@ from src.app.core.events.event_catalog import EMAIL_MESSAGE_RECEIVED, EMAIL_REPL
 from src.app.core.notifications.service import notify
 from src.app.core.settings.models import OrgSettings
 from src.app.core.tenants import data_access as tenants_da
+from src.app.shared.context import RequestContext, reset_context, set_context
 from src.app.shared.storage import get_storage
 from src.app.shared.storage.config import storage_backend_name
 
@@ -1027,6 +1028,8 @@ async def _persist_inbound_email(
             org_id=org_id,
             user_id=activity_user_id,
         )
+    if conversation.assigned_to_id is None:
+        await _auto_assign(session, conversation=conversation, org_id=org_id)
     if conversation.assigned_to_id is not None:
         await notify(
             org_id=org_id,
@@ -1174,6 +1177,27 @@ def _endpoints_refactor_enabled() -> bool:
     once Tracks 2/4/5 all consume the endpoints DAL.
     """
     return os.getenv("EMAIL_ENDPOINTS_REFACTOR_ENABLED", "true").strip().lower() != "false"
+
+
+async def _auto_assign(
+    session: AsyncSession, *, conversation: Conversation, org_id: uuid.UUID
+) -> None:
+    """Route an unassigned email conversation through the org's
+    assignment rules — the same rules WhatsApp uses (one rule set per
+    org). Inbound email arrives from Celery / webhooks with or without a
+    request context, so the org's tenant context is pinned here: the
+    engine reads its rules through the tenant-scoped ORM filter. The
+    engine commits on success and swallows its own failures; any other
+    error is logged and never loses the stored inbound message."""
+    from src.app.core.integrations.whatsapp.assignment_engine import dispatch_assignment
+
+    token = set_context(RequestContext(org_id=org_id, user_id=None))
+    try:
+        await dispatch_assignment(session, conversation=conversation)
+    except Exception:
+        logger.exception("email auto-assignment failed conversation=%s", conversation.id)
+    finally:
+        reset_context(token)
 
 
 async def _resolve_oauth_endpoint_id(

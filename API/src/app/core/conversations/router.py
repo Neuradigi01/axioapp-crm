@@ -39,6 +39,7 @@ from src.app.core.conversations.adapters.whatsapp import (
     WhatsAppNotConnected,
     resolve_whatsapp_adapter,
 )
+from src.app.core.conversations.ai_assist_service import run_ai_assist
 from src.app.core.conversations.media_upload import (
     MAX_CAPTION_LENGTH,
     MediaUploadError,
@@ -63,6 +64,8 @@ from src.app.core.conversations.saved_replies_service import (
     update_saved_reply,
 )
 from src.app.core.conversations.schemas import (
+    AiAssistOut,
+    AiAssistRequest,
     AssignTagRequest,
     AttachmentType,
     ConversationAttributionOut,
@@ -768,6 +771,23 @@ async def email_reply_endpoint(
         account_id=payload.account_id,
     )
     return MessageOut.model_validate(msg)
+
+
+@router.post("/{conversation_id}/ai-assist", response_model=AiAssistOut)
+async def ai_assist_endpoint(
+    conversation_id: uuid.UUID,
+    payload: AiAssistRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("conversations.read")),
+) -> AiAssistOut:
+    """Operator-side AI help: ``suggest_reply`` drafts the next message
+    (it is placed in the composer, never sent automatically);
+    ``summarize`` returns a bullet summary of the thread. Uses the org's
+    AI Assistant key + model and counts against the org AI budget."""
+    text = await run_ai_assist(
+        db, conversation_id=conversation_id, org_id=user.org_id, mode=payload.mode
+    )
+    return AiAssistOut(text=text)
 
 
 @router.post(

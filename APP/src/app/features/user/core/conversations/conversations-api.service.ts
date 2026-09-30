@@ -313,6 +313,12 @@ export class ConversationsApiService {
     return this.http.get<ConversationListResponse>(this.base, { params });
   }
 
+  /** Operator AI help — a draft reply or a thread summary. Uses the
+   *  org's AI Assistant key and counts against the org AI budget. */
+  aiAssist(id: string, mode: 'suggest_reply' | 'summarize'): Observable<{ text: string }> {
+    return this.http.post<{ text: string }>(`${this.base}/${id}/ai-assist`, { mode });
+  }
+
   /** Unread badge counts for the inbox filter chips. */
   counts(): Observable<ConversationCounts> {
     return this.http.get<ConversationCounts>(`${this.base}/counts`);

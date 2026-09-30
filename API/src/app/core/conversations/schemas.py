@@ -391,6 +391,18 @@ class ConversationCounts(BaseModel):
     by_channel: dict[str, int] = Field(default_factory=dict)
 
 
+class AiAssistRequest(BaseModel):
+    """Body of ``POST /api/v1/conversations/{id}/ai-assist``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["suggest_reply", "summarize"]
+
+
+class AiAssistOut(BaseModel):
+    text: str
+
+
 _SHORTCUT_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,31}$"
 
 

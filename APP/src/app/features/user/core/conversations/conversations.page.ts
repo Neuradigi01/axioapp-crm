@@ -1523,6 +1523,55 @@ export class ConversationsPageComponent {
       });
   }
 
+  // --- AI help (suggest reply / summarize) ------------------------------
+
+  protected readonly aiSuggestBusy = signal(false);
+  protected readonly summarizing = signal(false);
+  /** Latest AI summary, pinned above the thread it belongs to. */
+  protected readonly aiSummary = signal<{ conversationId: string; text: string } | null>(null);
+
+  protected onAiSuggest(): void {
+    const id = this.selectedId();
+    if (!id || this.aiSuggestBusy()) return;
+    this.aiSuggestBusy.set(true);
+    this.api
+      .aiAssist(id, 'suggest_reply')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: ({ text }) => {
+          this.aiSuggestBusy.set(false);
+          this.composeBar?.applyAiDraft(id, text);
+          this.cdr.markForCheck();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.aiSuggestBusy.set(false);
+          this.toast.error(extractApiError(err) ?? 'Could not draft a reply.');
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  protected onSummarize(): void {
+    const id = this.selectedId();
+    if (!id || this.summarizing()) return;
+    this.summarizing.set(true);
+    this.api
+      .aiAssist(id, 'summarize')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: ({ text }) => {
+          this.summarizing.set(false);
+          this.aiSummary.set({ conversationId: id, text });
+          this.cdr.markForCheck();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.summarizing.set(false);
+          this.toast.error(extractApiError(err) ?? 'Could not summarize this conversation.');
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
   /** In-flight flag for the details-rail contact card. */
   protected readonly contactBusy = signal(false);
 

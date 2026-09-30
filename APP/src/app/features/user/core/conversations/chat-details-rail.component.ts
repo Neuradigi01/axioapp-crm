@@ -81,6 +81,9 @@ export class ChatDetailsRailComponent {
   /** Snooze picked from the status menu: ISO wake-up time, or null for
    *  "until the customer replies". */
   @Output() readonly snooze = new EventEmitter<string | null>();
+  /** "Summarize with AI" clicked. */
+  @Output() readonly summarize = new EventEmitter<void>();
+  @Input() summarizing = false;
   /** Another conversation with the same contact was clicked. */
   @Output() readonly openConversation = new EventEmitter<string>();
   @Output() readonly takeoverAi = new EventEmitter<void>();

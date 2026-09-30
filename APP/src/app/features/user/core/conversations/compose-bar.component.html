@@ -437,6 +437,23 @@
         </div>
       }
     </div>
+    @if (!isNoteMode() && !outOfSession) {
+      <button
+        type="button"
+        (click)="aiSuggest.emit()"
+        [disabled]="aiBusy"
+        title="Draft a reply with AI — you review it before sending"
+        class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1.5 text-xs font-medium text-default transition hover:bg-surface-2 disabled:opacity-60"
+      >
+        <lucide-icon
+          [name]="aiBusy ? 'loader-2' : 'sparkles'"
+          [class]="
+            'h-3.5 w-3.5 text-violet-600 dark:text-violet-400 ' + (aiBusy ? 'animate-spin' : '')
+          "
+        />
+        {{ aiBusy ? 'Drafting…' : 'AI reply' }}
+      </button>
+    }
     @if (channel === 'email') {
       <app-email-template-picker
         [contactId]="contactId"

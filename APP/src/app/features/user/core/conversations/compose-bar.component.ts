@@ -232,6 +232,11 @@ export class ComposeBarComponent {
    *  override when intentionally switching numbers. */
   @Input() receivedViaPhoneId: string | null = null;
 
+  /** True while an AI draft is being generated (button spinner). */
+  @Input() aiBusy = false;
+  /** Operator asked AI to draft the next reply. */
+  @Output() readonly aiSuggest = new EventEmitter<void>();
+
   /** Conversation this composer is bound to. The page keeps a single
    *  composer instance alive across thread switches, so every piece of
    *  per-thread state (typed text, staged file, note mode, mentions,
@@ -493,6 +498,15 @@ export class ComposeBarComponent {
       return;
     }
     if (this.text().trim()) return;
+    this.setText(text);
+    this.focusInput();
+  }
+
+  /** Put an AI-drafted reply in the composer for the operator to review
+   *  and edit — never sent automatically. Switches to reply mode. */
+  public applyAiDraft(conversationId: string, text: string): void {
+    if (conversationId !== this.boundConversationId) return;
+    this.setMode('reply');
     this.setText(text);
     this.focusInput();
   }

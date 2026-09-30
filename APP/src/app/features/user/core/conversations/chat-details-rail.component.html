@@ -256,6 +256,21 @@
   <section class="flex flex-col gap-2">
     <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">Actions</p>
     <div class="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        (click)="summarize.emit()"
+        [disabled]="summarizing"
+        class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default transition hover:bg-surface-2 disabled:opacity-60"
+      >
+        <lucide-icon
+          [name]="summarizing ? 'loader-2' : 'sparkles'"
+          [class]="
+            'h-3.5 w-3.5 text-violet-600 dark:text-violet-400 ' +
+            (summarizing ? 'animate-spin' : '')
+          "
+        />
+        {{ summarizing ? 'Summarizing…' : 'Summarize' }}
+      </button>
       <app-conversation-export-button [conversationId]="conversation.id" />
       @if (conversation.channel === 'whatsapp') {
         <app-conversation-block-number-action [phoneNumber]="conversation.external_id" />
