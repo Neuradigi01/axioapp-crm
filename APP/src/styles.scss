@@ -607,3 +607,61 @@ body {
 .toast-error {
   --toast-accent: #ef4444; // red-500
 }
+
+// ---------------------------------------------------------------------------
+// ApexCharts — dark theme
+// ---------------------------------------------------------------------------
+// Chart widgets configure ApexCharts with light-mode colours (dark labels,
+// white tooltip, pale gridlines, gradient fills that shade toward white).
+// On dark surfaces those read as dim text + muddy fills, so repoint the
+// chart chrome at the AIXO tokens here. CSS (not per-chart options) so
+// every chart flips live with the theme toggle without re-rendering.
+[data-theme='dark'] {
+  .apexcharts-legend-text {
+    color: var(--text-muted) !important;
+  }
+
+  .apexcharts-xaxis-label,
+  .apexcharts-yaxis-label,
+  .apexcharts-xaxis-title-text,
+  .apexcharts-yaxis-title-text {
+    fill: var(--text-muted);
+  }
+
+  .apexcharts-gridline,
+  .apexcharts-xaxis line,
+  .apexcharts-xaxis-tick,
+  .apexcharts-yaxis line {
+    stroke: var(--border);
+  }
+
+  // Thinner area fills: stacked bands stay distinct instead of blending
+  // into a murky layer over the dark card (multiplies the gradient stops).
+  .apexcharts-area-series .apexcharts-area {
+    fill-opacity: 0.45;
+  }
+
+  .apexcharts-tooltip.apexcharts-theme-light {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+
+    .apexcharts-tooltip-title {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+  }
+
+  .apexcharts-xaxistooltip,
+  .apexcharts-yaxistooltip {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .apexcharts-xaxistooltip-bottom::before,
+  .apexcharts-xaxistooltip-bottom::after {
+    border-bottom-color: var(--border);
+  }
+}

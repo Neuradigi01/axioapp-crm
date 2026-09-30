@@ -72,7 +72,9 @@ import {
           </div>
           <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
             <p class="text-[10px] uppercase text-muted">Sent (AI)</p>
-            <p class="text-lg font-semibold text-violet-700">{{ r.total_ai_sent }}</p>
+            <p class="text-lg font-semibold text-violet-700 dark:text-violet-400">
+              {{ r.total_ai_sent }}
+            </p>
           </div>
           <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
             <p class="text-[10px] uppercase text-muted">Failed</p>

@@ -54,7 +54,9 @@ import { AIMetricsReport, ReportRange, WhatsAppReportsService } from './whatsapp
         <div class="mb-4 grid grid-cols-3 gap-2">
           <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
             <p class="text-[10px] uppercase text-muted">AI response rate</p>
-            <p class="text-lg font-semibold text-violet-700">{{ percent(r.ai_response_rate) }}%</p>
+            <p class="text-lg font-semibold text-violet-700 dark:text-violet-400">
+              {{ percent(r.ai_response_rate) }}%
+            </p>
             <p class="text-[10px] text-muted">
               {{ r.ai_replies }} AI / {{ r.human_replies }} human
             </p>

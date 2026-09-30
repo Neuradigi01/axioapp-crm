@@ -73,7 +73,7 @@ import {
             </div>
             <div class="rounded border border-subtle bg-surface-2 px-3 py-2">
               <p class="text-[10px] uppercase text-muted">Revenue</p>
-              <p class="text-lg font-semibold text-violet-700">
+              <p class="text-lg font-semibold text-violet-700 dark:text-violet-400">
                 {{ formatCurrency(r.total_revenue) }}
               </p>
             </div>
