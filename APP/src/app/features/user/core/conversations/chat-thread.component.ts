@@ -14,7 +14,6 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 
 import {
@@ -122,7 +121,6 @@ function stripEmailQuote(text: string): string {
 })
 export class ChatThreadComponent implements AfterViewChecked, OnChanges {
   private readonly auth = inject(FurnitureAuthService);
-  private readonly http = inject(HttpClient);
 
   @Input({ required: true }) conversation!: Conversation;
   @Input() detail: ConversationDetail | null = null;
@@ -615,34 +613,17 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
     return `${environment.apiBaseUrl}/messages/${m.id}/attachments/${att.storage_key}`;
   }
 
-  /** Fetch the attachment via HttpClient so the auth interceptor
-   *  attaches the JWT header (native ``<a href>`` clicks don't carry
-   *  the Authorization header and get 401'd by the server). Streams
-   *  the response into a Blob, hands it to a hidden ``<a download>``,
-   *  then revokes the object URL. */
-  protected downloadEmailAttachment(m: ConversationMessage, att: EmailAttachmentMeta): void {
-    const url = this.emailAttachmentUrl(m, att);
-    this.http.get(url, { responseType: 'blob' }).subscribe({
-      next: (blob) => {
-        const objectUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = objectUrl;
-        link.download = att.filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(objectUrl);
-      },
-    });
-  }
-
-  /** Compact size label — "42 KB" / "3 MB" — for the download link
-   *  hover title. Missing / zero size falls back to no suffix. */
-  protected formatAttachmentSize(bytes: number | undefined): string {
-    if (!bytes || bytes <= 0) return '';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  /** Email files render in the shared media viewer: images inline,
+   *  PDFs in the in-page viewer, anything else as a download chip. */
+  protected emailMedia(att: EmailAttachmentMeta): MediaAttachment {
+    const ct = (att.content_type ?? '').toLowerCase();
+    const isImage = ct.startsWith('image/') && ct !== 'image/svg+xml';
+    return {
+      type: isImage ? 'image' : 'document',
+      mime_type: ct || null,
+      filename: att.filename,
+      size_bytes: att.size ?? null,
+    };
   }
 
   // --- Reply / quote / reactions (Step 7) ----------------------------
