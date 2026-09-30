@@ -73,6 +73,7 @@ async def submit_external(
     user_id: uuid.UUID | None,
     app_id: str,
     app_secret: str,
+    header_sample: tuple[bytes, str] | None = None,
 ) -> MessageTemplate:
     """Submit the template to its channel's external review pipeline.
 
@@ -82,7 +83,9 @@ async def submit_external(
 
     The ``app_id`` + ``app_secret`` args are Meta-App credentials
     needed by the WA submission path; the router pulls them from the
-    SOPS-managed config and passes them in.
+    SOPS-managed config and passes them in. ``header_sample`` —
+    ``(bytes, mime_type)`` — is the sample file a media-header
+    WhatsApp template must include for Meta's review.
     """
     from src.app.core.templates.service import ensure_wa_extension_row
 
@@ -116,6 +119,7 @@ async def submit_external(
         template_id=wa_row.id,
         app_id=app_id,
         app_secret=app_secret,
+        header_sample=header_sample,
     )
 
     template.external_status = TemplateExternalStatus.pending

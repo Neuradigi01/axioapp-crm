@@ -10,6 +10,8 @@ import {
   ChangeDetectorRef,
   Component,
   DestroyRef,
+  ElementRef,
+  ViewChild,
   computed,
   effect,
   inject,
@@ -25,8 +27,8 @@ import {
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { timer } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { EMPTY, timer } from 'rxjs';
+import { catchError, distinctUntilChanged, map, switchMap } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
@@ -87,6 +89,58 @@ const EXTERNAL_STATUS_POLL_MS = 15_000;
  *  Meta with a title-cased name would otherwise waste a Meta round-trip
  *  and get a cryptic error banner instead of a fix hint. */
 const WA_NAME_RE = /^[a-z0-9_]+$/;
+
+/** Auto-save fires this long after the last edit on a saved draft. */
+const AUTO_SAVE_DELAY_MS = 30_000;
+
+/** Operator-facing names for form controls, used to list what still
+ *  needs fixing when a save is blocked by validation. */
+const FIELD_LABELS: Record<string, string> = {
+  name: 'Name',
+  channel: 'Channel',
+  body_text: 'Body',
+  body_html: 'Email design',
+  subject: 'Subject',
+  preview_text: 'Preview text',
+  header_text: 'Header text',
+  footer_text: 'Footer',
+  language: 'Language',
+  category: 'Category',
+  text: 'Button label',
+  url: 'Button URL',
+  phone_number: 'Button phone number',
+  title: 'Title',
+  action_url: 'Action URL',
+  dlt_entity_id: 'DLT entity ID',
+  dlt_template_id: 'DLT template ID',
+  dlt_header: 'DLT sender header',
+  dlt_principal_entity_id: 'DLT principal entity ID',
+};
+
+/** Human labels of every invalid control under `control` (deduped, in
+ *  form order). A group-level error with no invalid child (e.g. the
+ *  email "text or HTML body required" rule) reports as `groupLabel`. */
+function invalidFieldLabels(control: AbstractControl, groupLabel: string): string[] {
+  const out: string[] = [];
+  const walk = (c: AbstractControl, key: string | null): void => {
+    const children = (c as FormGroup).controls as
+      | Record<string, AbstractControl>
+      | AbstractControl[]
+      | undefined;
+    if (children) {
+      const entries = Array.isArray(children)
+        ? children.map((child) => [null, child] as const)
+        : Object.entries(children);
+      const before = out.length;
+      for (const [k, child] of entries) walk(child, k);
+      if (c.errors && out.length === before) out.push(groupLabel);
+      return;
+    }
+    if (c.invalid) out.push((key && FIELD_LABELS[key]) || 'A field');
+  };
+  walk(control, null);
+  return [...new Set(out)];
+}
 
 function waNameValidator(control: AbstractControl): { waName: true } | null {
   const v = (control.value as string | null) ?? '';
@@ -189,7 +243,7 @@ export class TemplateEditorPageComponent {
    *  successful save (or the last template load). Drives the Save
    *  Draft button's disabled state so accidental double-saves + saves
    *  with nothing changed can't happen. Reset in `finishSave` and at
-   *  the tail of `loadTemplate`. */
+   *  the tail of `hydrateFromRow`. */
   protected readonly dirty = signal<boolean>(false);
 
   /** Reactive mirror of the channel form control. Form controls aren't
@@ -600,11 +654,31 @@ export class TemplateEditorPageComponent {
     });
 
     // Load existing template when the route carries an `:id` (or stays
-    // empty for the `/new` path).
-    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-      const id = params.get('id');
-      if (id) this.loadTemplate(id);
-    });
+    // empty for the `/new` path). switchMap cancels an in-flight load
+    // when the id changes, so a slow response for the previous template
+    // can never paint over the one now being opened.
+    this.route.paramMap
+      .pipe(
+        map((params) => params.get('id')),
+        distinctUntilChanged(),
+        switchMap((id) => {
+          this.clearAutoSave();
+          this.loadError.set(null);
+          this.rejectionReason.set(null);
+          if (!id) return EMPTY;
+          return this.api.get(id).pipe(
+            catchError((err: HttpErrorResponse) => {
+              this.loadError.set(extractApiError(err) ?? 'Could not load template.');
+              return EMPTY;
+            }),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((row) => this.hydrateFromRow(row));
+
+    // The auto-save timer must never outlive the page.
+    this.destroyRef.onDestroy(() => this.clearAutoSave());
 
     // Auto-poll for external-status updates while a WhatsApp template
     // sits in ``pending`` or ``paused`` (Meta hasn't ruled yet). The
@@ -647,153 +721,156 @@ export class TemplateEditorPageComponent {
 
   // --- load / hydrate -------------------------------------------------
 
-  private loadTemplate(id: string): void {
-    this.loadError.set(null);
-    this.api
-      .get(id)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (row) => {
-          this.template.set(row);
-          this.headerForm.controls.name.setValue(row.name);
-          this.headerForm.controls.channel.setValue(row.channel as ChannelOption);
-          // Channel-locked once saved.
-          this.headerForm.controls.channel.disable({ emitEvent: false });
-          // Always build FRESH sub-forms on load. Reusing the existing
-          // FormGroup + patching in place keeps the same object reference,
-          // which under zoneless change detection means the child sub-form
-          // component's `form()` input signal doesn't fire — the child
-          // template's direct reads (e.g. `form().controls.category.value
-          // === cat.value` in the WA category picker) don't re-evaluate,
-          // and the page appears empty until the operator clicks/types
-          // and forces a CD tick. A brand-new FormGroup reference makes
-          // the signal write actually notify subscribers.
-          if (row.channel === 'whatsapp') {
-            const f = WaFormComponent.build();
-            f.patchValue({
-              body_text: row.body_text,
-              language: row.language,
-              category: (row.whatsapp?.category ?? 'marketing') as
-                | 'marketing'
-                | 'utility'
-                | 'authentication',
-              header_type: (row.whatsapp?.header_type ?? '') as
-                | ''
-                | 'text'
-                | 'image'
-                | 'video'
-                | 'document',
-              header_text: row.whatsapp?.header_text ?? '',
-              footer_text: row.whatsapp?.footer_text ?? '',
-            });
-            // Rebuild the buttons FormArray from the loaded row —
-            // patchValue can't add FormGroups to a FormArray.
-            f.controls.buttons.clear({ emitEvent: false });
-            for (const b of row.whatsapp?.buttons ?? []) {
-              const group = WaFormComponent.buildButton({
-                type: b.type,
-                text: b.text,
-                url: b.url ?? '',
-                phone_number: b.phone_number ?? '',
-              });
-              // Wire the sibling-clear subscription for buttons loaded
-              // from the server — new-add via `addButton` in the child
-              // component wires it too. Without this, a hydrated URL
-              // button whose type is switched to Phone keeps the URL
-              // field populated and the payload ends up mixed.
-              WaFormComponent.wireSiblingClear(group);
-              f.controls.buttons.push(group);
-            }
-            this.waForm.set(f);
-          } else if (row.channel === 'email') {
-            const f = EmailFormComponent.build();
-            f.patchValue({
-              subject: row.subject ?? '',
-              preview_text: row.preview_text ?? '',
-              body_text: row.body_text,
-              // Campaigns v1 Step 04 — hydrate HTML body + fallback flag.
-              body_html: row.body_html ?? '',
-              body_text_fallback_auto: row.body_text_fallback_auto,
-            });
-            this.emailForm.set(f);
-          } else if (row.channel === 'sms') {
-            const f = SmsFormComponent.build();
-            f.patchValue({ body_text: row.body_text });
-            this.smsForm.set(f);
-            this.loadSmsDltMetadata(row.id);
-          } else if (row.channel === 'facebook' || row.channel === 'instagram') {
-            // Step 13 — quick replies aren't persisted at the central
-            // model level yet; they'll round-trip once the FB/IG
-            // adapter ships. body_text is the source of truth in v1.
-            const f = FbFormComponent.build();
-            f.patchValue({ body_text: row.body_text });
-            this.fbForm.set(f);
-          } else if (row.channel === 'push') {
-            // Push title repurposes the central `subject` column per
-            // the models docstring. action_url isn't persisted yet —
-            // it'll round-trip when the push provider adapter lands.
-            const f = PushFormComponent.build();
-            f.patchValue({
-              title: row.subject ?? '',
-              body_text: row.body_text,
-            });
-            this.pushForm.set(f);
-          }
-          if (this.locked()) {
-            this.headerForm.disable({ emitEvent: false });
-            this.waForm()?.disable({ emitEvent: false });
-            this.emailForm()?.disable({ emitEvent: false });
-            this.smsForm()?.disable({ emitEvent: false });
-            this.fbForm()?.disable({ emitEvent: false });
-            this.pushForm()?.disable({ emitEvent: false });
-          }
-          // Step 14 — Meta's rejection_reason lives on the WA extension
-          // row, surfaced through GET /external-status. Fetch it when
-          // we land on a rejected WA template so the banner can render.
-          if (row.channel === 'whatsapp' && row.external_status === 'rejected') {
-            this.loadExternalStatus(row.id);
-          }
-          // Hydration is done — the patchValue / setValue calls above
-          // fired valueChanges which flipped dirty to true. Reset it
-          // so the Save Draft button starts disabled after load; user
-          // input will re-enable it.
-          this.dirty.set(false);
-
-          // Zoneless CD kick — both the parent header (which binds the
-          // channel dropdown to `headerForm.controls.channel.value`, a
-          // plain getter with no signal dependency) AND the child sub-
-          // form (whose template reads raw FormGroup state, e.g. the WA
-          // category cards) can render stale on the very first paint.
-          // Angular's default reactivity scheduler will eventually run
-          // CD via signal writes above, but the first paint fires before
-          // that microtask settles — which is why the operator sees the
-          // page load blank until any keystroke or click forces a CD
-          // tick.
-          //
-          // Two-step guarantee:
-          //   1. Fire each sub-form's valueChanges so the child's
-          //      FormGroup directive re-writes the DOM with loaded
-          //      values + the parent's preview effect refreshes.
-          //   2. Force `detectChanges()` so ALL template bindings
-          //      (including the parent's `[value]="…channel.value"` on
-          //      the channel picker) re-evaluate against the loaded
-          //      state instead of waiting for the async scheduler.
-          queueMicrotask(() => {
-            this.waForm()?.updateValueAndValidity({ emitEvent: true });
-            this.emailForm()?.updateValueAndValidity({ emitEvent: true });
-            this.smsForm()?.updateValueAndValidity({ emitEvent: true });
-            this.fbForm()?.updateValueAndValidity({ emitEvent: true });
-            this.pushForm()?.updateValueAndValidity({ emitEvent: true });
-            // valueChanges emitted above would re-flip dirty via the
-            // sub-form's scheduleAutoSave path, so re-clear it once more.
-            this.dirty.set(false);
-            this.cdr.detectChanges();
-          });
-        },
-        error: (err: HttpErrorResponse) => {
-          this.loadError.set(extractApiError(err) ?? 'Could not load template.');
-        },
+  /** Rebuild every form from a server row — used on load and after a
+   *  version restore, so the editor always shows exactly what's saved. */
+  private hydrateFromRow(row: TemplateRead): void {
+    this.template.set(row);
+    this.rejectionReason.set(null);
+    this.headerForm.controls.name.setValue(row.name);
+    this.headerForm.controls.channel.setValue(row.channel as ChannelOption);
+    // Always build FRESH sub-forms on load. Reusing the existing
+    // FormGroup + patching in place keeps the same object reference,
+    // which under zoneless change detection means the child sub-form
+    // component's `form()` input signal doesn't fire — the child
+    // template's direct reads (e.g. `form().controls.category.value
+    // === cat.value` in the WA category picker) don't re-evaluate,
+    // and the page appears empty until the operator clicks/types
+    // and forces a CD tick. A brand-new FormGroup reference makes
+    // the signal write actually notify subscribers.
+    if (row.channel === 'whatsapp') {
+      const f = WaFormComponent.build();
+      f.patchValue({
+        body_text: row.body_text,
+        language: row.language,
+        category: (row.whatsapp?.category ?? 'marketing') as
+          | 'marketing'
+          | 'utility'
+          | 'authentication',
+        header_type: (row.whatsapp?.header_type ?? '') as
+          | ''
+          | 'text'
+          | 'image'
+          | 'video'
+          | 'document',
+        header_text: row.whatsapp?.header_text ?? '',
+        footer_text: row.whatsapp?.footer_text ?? '',
       });
+      // Rebuild the buttons FormArray from the loaded row —
+      // patchValue can't add FormGroups to a FormArray.
+      f.controls.buttons.clear({ emitEvent: false });
+      for (const b of row.whatsapp?.buttons ?? []) {
+        const group = WaFormComponent.buildButton({
+          type: b.type,
+          text: b.text,
+          url: b.url ?? '',
+          phone_number: b.phone_number ?? '',
+        });
+        // Wire the sibling-clear subscription for buttons loaded
+        // from the server — new-add via `addButton` in the child
+        // component wires it too. Without this, a hydrated URL
+        // button whose type is switched to Phone keeps the URL
+        // field populated and the payload ends up mixed.
+        WaFormComponent.wireSiblingClear(group);
+        f.controls.buttons.push(group);
+      }
+      this.waForm.set(f);
+    } else if (row.channel === 'email') {
+      const f = EmailFormComponent.build();
+      f.patchValue({
+        subject: row.subject ?? '',
+        preview_text: row.preview_text ?? '',
+        body_text: row.body_text,
+        // Campaigns v1 Step 04 — hydrate HTML body + fallback flag.
+        body_html: row.body_html ?? '',
+        body_text_fallback_auto: row.body_text_fallback_auto,
+      });
+      this.emailForm.set(f);
+    } else if (row.channel === 'sms') {
+      const f = SmsFormComponent.build();
+      f.patchValue({ body_text: row.body_text });
+      this.smsForm.set(f);
+      this.loadSmsDltMetadata(row.id);
+    } else if (row.channel === 'facebook' || row.channel === 'instagram') {
+      // Step 13 — quick replies aren't persisted at the central
+      // model level yet; they'll round-trip once the FB/IG
+      // adapter ships. body_text is the source of truth in v1.
+      const f = FbFormComponent.build();
+      f.patchValue({ body_text: row.body_text });
+      this.fbForm.set(f);
+    } else if (row.channel === 'push') {
+      // Push title repurposes the central `subject` column per
+      // the models docstring. action_url isn't persisted yet —
+      // it'll round-trip when the push provider adapter lands.
+      const f = PushFormComponent.build();
+      f.patchValue({
+        title: row.subject ?? '',
+        body_text: row.body_text,
+      });
+      this.pushForm.set(f);
+    }
+    this.applyLockState();
+    // Step 14 — Meta's rejection_reason lives on the WA extension
+    // row, surfaced through GET /external-status. Fetch it when
+    // we land on a rejected WA template so the banner can render.
+    if (row.channel === 'whatsapp' && row.external_status === 'rejected') {
+      this.loadExternalStatus(row.id);
+    }
+    // Hydration is done — the patchValue / setValue calls above
+    // fired valueChanges which flipped dirty to true. Reset it
+    // so the Save Draft button starts disabled after load; user
+    // input will re-enable it.
+    this.dirty.set(false);
+
+    // Zoneless CD kick — both the parent header (which binds the
+    // channel dropdown to `headerForm.controls.channel.value`, a
+    // plain getter with no signal dependency) AND the child sub-
+    // form (whose template reads raw FormGroup state, e.g. the WA
+    // category cards) can render stale on the very first paint.
+    // Angular's default reactivity scheduler will eventually run
+    // CD via signal writes above, but the first paint fires before
+    // that microtask settles — which is why the operator sees the
+    // page load blank until any keystroke or click forces a CD
+    // tick.
+    //
+    // Two-step guarantee:
+    //   1. Fire each sub-form's valueChanges so the child's
+    //      FormGroup directive re-writes the DOM with loaded
+    //      values + the parent's preview effect refreshes.
+    //   2. Force `detectChanges()` so ALL template bindings
+    //      (including the parent's `[value]="…channel.value"` on
+    //      the channel picker) re-evaluate against the loaded
+    //      state instead of waiting for the async scheduler.
+    queueMicrotask(() => {
+      this.waForm()?.updateValueAndValidity({ emitEvent: true });
+      this.emailForm()?.updateValueAndValidity({ emitEvent: true });
+      this.smsForm()?.updateValueAndValidity({ emitEvent: true });
+      this.fbForm()?.updateValueAndValidity({ emitEvent: true });
+      this.pushForm()?.updateValueAndValidity({ emitEvent: true });
+      // valueChanges emitted above would re-flip dirty via the
+      // sub-form's scheduleAutoSave path, so re-clear it once more.
+      this.dirty.set(false);
+      this.cdr.detectChanges();
+    });
+  }
+
+  /** Enable / disable every form from the single source of truth,
+   *  `locked()` (Meta state + internal review + the caller's publish
+   *  right). The channel stays disabled once the template exists. */
+  private applyLockState(): void {
+    const forms = [
+      this.headerForm,
+      this.waForm(),
+      this.emailForm(),
+      this.smsForm(),
+      this.fbForm(),
+      this.pushForm(),
+    ];
+    if (this.locked()) {
+      for (const f of forms) f?.disable({ emitEvent: false });
+      return;
+    }
+    for (const f of forms) f?.enable({ emitEvent: false });
+    if (this.template()) this.headerForm.controls.channel.disable({ emitEvent: false });
   }
 
   private loadSmsDltMetadata(templateId: string): void {
@@ -954,12 +1031,19 @@ export class TemplateEditorPageComponent {
     };
   }
 
-  protected save(): void {
+  /** Save the template. `auto` = fired by the auto-save timer: it
+   *  stays silent (no validation popup) and only runs when there is
+   *  something unsaved and nothing else is saving. */
+  protected save(opts: { auto?: boolean } = {}): void {
+    const auto = !!opts.auto;
+    this.clearAutoSave();
     if (this.locked()) return;
     if (!this.canWrite()) return;
+    if (this.saving()) return;
+    if (auto && !this.dirty()) return;
     const channel = this.channel();
     if (!channel) {
-      this.saveError.set('Pick a channel before saving.');
+      if (!auto) this.saveError.set('Pick a channel before saving.');
       return;
     }
     const subForm =
@@ -973,9 +1057,30 @@ export class TemplateEditorPageComponent {
               ? this.pushForm()
               : this.emailForm();
     if (this.headerForm.invalid || subForm?.invalid) {
+      // Auto-save never nags — the operator is mid-edit.
+      if (auto) return;
       this.headerForm.markAllAsTouched();
       subForm?.markAllAsTouched();
-      this.saveError.set('Fix the highlighted fields and try again.');
+      const labels = [
+        ...invalidFieldLabels(this.headerForm, 'Name'),
+        ...(subForm
+          ? invalidFieldLabels(subForm, channel === 'email' ? 'Email body' : 'Body')
+          : []),
+      ];
+      const unique = [...new Set(labels)];
+      this.saveError.set(
+        unique.length > 0
+          ? `Fix ${unique.length === 1 ? 'this field' : 'these fields'}: ${unique.join(', ')}.`
+          : 'Fix the highlighted fields and try again.',
+      );
+      // Bring the first highlighted field into view.
+      queueMicrotask(() => {
+        const first = document.querySelector<HTMLElement>(
+          '.tpl-validate :is(input, textarea, select).ng-invalid',
+        );
+        first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        first?.focus({ preventScroll: true });
+      });
       return;
     }
     this.saveError.set(null);
@@ -1054,10 +1159,18 @@ export class TemplateEditorPageComponent {
     // constructor.
     this.dirty.set(true);
     if (!this.template() || this.locked() || !this.canWrite()) return;
-    if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+    this.clearAutoSave();
     this.autoSaveTimer = setTimeout(() => {
-      this.save();
-    }, 30_000);
+      this.autoSaveTimer = null;
+      this.save({ auto: true });
+    }, AUTO_SAVE_DELAY_MS);
+  }
+
+  private clearAutoSave(): void {
+    if (this.autoSaveTimer) {
+      clearTimeout(this.autoSaveTimer);
+      this.autoSaveTimer = null;
+    }
   }
 
   protected dismissToast(): void {
@@ -1110,12 +1223,59 @@ export class TemplateEditorPageComponent {
       });
   }
 
+  @ViewChild('headerSampleInput') private headerSampleInput?: ElementRef<HTMLInputElement>;
+
+  /** Media header on the saved WhatsApp template (needs a sample file). */
+  protected readonly mediaHeaderType = computed<'image' | 'video' | 'document' | null>(() => {
+    const t = this.template();
+    const h = t?.channel === 'whatsapp' ? t.whatsapp?.header_type : null;
+    return h === 'image' || h === 'video' || h === 'document' ? h : null;
+  });
+
+  protected readonly submitToMetaHint = computed(() => {
+    const kind = this.mediaHeaderType();
+    return kind ? `You'll be asked for a sample ${kind} for Meta's review.` : '';
+  });
+
+  /** File types Meta accepts as a sample, per header format. */
+  protected readonly headerSampleAccept = computed(() => {
+    switch (this.mediaHeaderType()) {
+      case 'image':
+        return 'image/jpeg,image/png';
+      case 'video':
+        return 'video/mp4';
+      case 'document':
+        return 'application/pdf';
+      default:
+        return '';
+    }
+  });
+
   protected submitToMeta(): void {
     const t = this.template();
     if (!t || this.transitioning()) return;
+    // Media headers need a sample — ask for the file first; the upload
+    // continues in `onHeaderSamplePicked`.
+    if (this.mediaHeaderType()) {
+      this.headerSampleInput?.nativeElement.click();
+      return;
+    }
+    this.sendToMeta(t.id);
+  }
+
+  protected onHeaderSamplePicked(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    const t = this.template();
+    if (!file || !t || this.transitioning()) return;
+    this.sendToMeta(t.id, file);
+  }
+
+  private sendToMeta(id: string, headerSample?: File): void {
     this.transitioning.set('submit_external');
     this.api
-      .submitExternal(t.id)
+      .submitExternal(id, headerSample)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (row) => this.applyTransition(row, 'Submitted to Meta'),
@@ -1176,25 +1336,10 @@ export class TemplateEditorPageComponent {
   private applyTransition(row: TemplateRead, message: string): void {
     this.transitioning.set(null);
     this.template.set(row);
-    if (LOCKED_STATUSES.has(row.internal_status)) {
-      this.headerForm.disable({ emitEvent: false });
-      this.waForm()?.disable({ emitEvent: false });
-      this.emailForm()?.disable({ emitEvent: false });
-      this.smsForm()?.disable({ emitEvent: false });
-      this.fbForm()?.disable({ emitEvent: false });
-      this.pushForm()?.disable({ emitEvent: false });
-    } else {
-      // Workflow may have moved a previously-locked template back to
-      // draft (reject / request-changes) — re-enable the form so
-      // editing resumes. Channel stays locked once a template exists.
-      this.headerForm.enable({ emitEvent: false });
-      this.headerForm.controls.channel.disable({ emitEvent: false });
-      this.waForm()?.enable({ emitEvent: false });
-      this.emailForm()?.enable({ emitEvent: false });
-      this.smsForm()?.enable({ emitEvent: false });
-      this.fbForm()?.enable({ emitEvent: false });
-      this.pushForm()?.enable({ emitEvent: false });
-    }
+    // Same rule as on load (`locked()`), so an Owner who publishes keeps
+    // editing rights, and a reject / request-changes reopens the form.
+    this.applyLockState();
+    if (this.locked()) this.clearAutoSave();
     this.toast.set(message);
   }
 
@@ -1239,33 +1384,12 @@ export class TemplateEditorPageComponent {
   protected closeVersionsDrawer(): void {
     this.versionsDrawerOpen.set(false);
   }
+  /** Restore saved a new version server-side — rebuild every form from
+   *  the returned row so nothing half-restored or stale stays on screen. */
   protected onRestoredFromVersion(row: TemplateRead): void {
-    this.applyTransition(row, `Restored — now at v${row.current_version}`);
-    if (row.channel === 'whatsapp') {
-      this.waForm()?.patchValue(
-        { body_text: row.body_text, language: row.language },
-        { emitEvent: false },
-      );
-    } else if (row.channel === 'email') {
-      this.emailForm()?.patchValue(
-        {
-          subject: row.subject ?? '',
-          preview_text: row.preview_text ?? '',
-          body_text: row.body_text,
-        },
-        { emitEvent: false },
-      );
-    } else if (row.channel === 'sms') {
-      this.smsForm()?.patchValue({ body_text: row.body_text }, { emitEvent: false });
-    } else if (row.channel === 'facebook' || row.channel === 'instagram') {
-      this.fbForm()?.patchValue({ body_text: row.body_text }, { emitEvent: false });
-    } else if (row.channel === 'push') {
-      this.pushForm()?.patchValue(
-        { title: row.subject ?? '', body_text: row.body_text },
-        { emitEvent: false },
-      );
-    }
-    this.currentBody.set(row.body_text);
-    this.currentSubject.set(row.subject ?? null);
+    this.clearAutoSave();
+    this.transitioning.set(null);
+    this.hydrateFromRow(row);
+    this.toast.set(`Restored — now at v${row.current_version}`);
   }
 }

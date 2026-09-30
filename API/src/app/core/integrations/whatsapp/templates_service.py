@@ -127,9 +127,8 @@ def _payload_to_components(
             }
         )
     elif payload.header_type in ("IMAGE", "VIDEO", "DOCUMENT"):
-        # Sample asset attaches at submit-time via `example.header_handle`
-        # — out of scope for the management surface, the operator will
-        # see Meta's rejection if they forget to wire it.
+        # The sample asset is uploaded + attached at submit time as
+        # `example.header_handle` (see `submit_for_approval`).
         components.append({"type": "HEADER", "format": payload.header_type})
 
     components.append({"type": "BODY", "text": payload.body})
@@ -758,6 +757,41 @@ async def _allocate_copy_name(
     )
 
 
+# Meta's accepted sample formats + size caps per media-header format.
+_HEADER_SAMPLE_RULES: dict[str, tuple[frozenset[str], int]] = {
+    "IMAGE": (frozenset({"image/jpeg", "image/png"}), 5 * 1024 * 1024),
+    "VIDEO": (frozenset({"video/mp4"}), 16 * 1024 * 1024),
+    "DOCUMENT": (frozenset({"application/pdf"}), 100 * 1024 * 1024),
+}
+
+
+def _validate_header_sample(fmt: str, sample: tuple[bytes, str] | None) -> tuple[bytes, str]:
+    """A media-header template must ship a sample of the right type —
+    Meta rejects it otherwise. Fail here with an actionable message."""
+    kind = fmt.lower()
+    if sample is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"This template has a {kind} header — attach a sample {kind} to submit it.",
+        )
+    data, mime = sample
+    allowed, cap = _HEADER_SAMPLE_RULES[fmt]
+    if mime not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"The {kind} header sample must be one of: {', '.join(sorted(allowed))} "
+                f"(got {mime or 'unknown'})."
+            ),
+        )
+    if not data or len(data) > cap:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"The {kind} header sample must be under {cap // (1024 * 1024)} MB.",
+        )
+    return data, mime
+
+
 async def submit_for_approval(
     session: AsyncSession,
     *,
@@ -766,6 +800,7 @@ async def submit_for_approval(
     app_id: str,
     app_secret: str,
     http_client_factory: HttpClientFactory | None = None,
+    header_sample: tuple[bytes, str] | None = None,
 ) -> WhatsAppTemplate:
     """POST the draft to Meta's ``/{waba_id}/message_templates``.
 
@@ -773,7 +808,11 @@ async def submit_for_approval(
     flips to ``pending_review`` and ``meta_template_id`` lands. On
     Meta 4xx the row stays draft and the error message bubbles to
     the operator verbatim — Meta's reasons are operator-actionable
-    (e.g. "Header text too long")."""
+    (e.g. "Header text too long").
+
+    ``header_sample`` — ``(bytes, mime_type)`` — is required when the
+    template has an IMAGE / VIDEO / DOCUMENT header: it is uploaded to
+    Meta and attached as ``example.header_handle``."""
     row = await get_template_or_404(session, template_id)
     if row.submission_status not in _EDITABLE_STATUSES:
         raise HTTPException(
@@ -812,7 +851,19 @@ async def submit_for_approval(
         category=row.category,
         components=components,
     )
+    media_header = next(
+        (
+            c
+            for c in components
+            if c.get("type") == "HEADER" and c.get("format") in _HEADER_SAMPLE_RULES
+        ),
+        None,
+    )
     try:
+        if media_header is not None:
+            data, mime = _validate_header_sample(media_header["format"], header_sample)
+            handle = await client.upload_template_sample(token=token, data=data, mime_type=mime)
+            media_header["example"] = {"header_handle": [handle]}
         meta_body = await client.submit_template(
             waba_id=config.waba_id,
             token=token,

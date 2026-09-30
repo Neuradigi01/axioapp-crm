@@ -13,6 +13,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
+import { Subscription } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../auth/auth.service';
@@ -141,6 +142,12 @@ export class TemplatesPageComponent {
 
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  /** In-flight list request. A newer request cancels it so a slow
+   *  response for old filters can never overwrite fresher rows. */
+  private listSub: Subscription | null = null;
+  /** True while a user-triggered (non-silent) load is running — the
+   *  background poll skips its tick instead of cancelling that load. */
+  private foregroundLoading = false;
 
   /** True when at least one visible row is awaiting Meta review — drives
    *  the silent auto-poll. Terminal-only lists (all approved / rejected /
@@ -260,10 +267,13 @@ export class TemplatesPageComponent {
   }
 
   private fetchPage({ silent }: { silent: boolean }): void {
+    if (silent && this.foregroundLoading) return;
+    this.foregroundLoading = !silent;
+    this.listSub?.unsubscribe();
     const offset = this.pageIndex() * PAGE_SIZE;
     const channels = this.channelFilter();
     const statuses = this.statusFilter();
-    this.api
+    this.listSub = this.api
       .list({
         channel: channels.length > 0 ? (channels as TemplateChannel[]) : undefined,
         internal_status: statuses.length > 0 ? (statuses as TemplateInternalStatus[]) : undefined,
@@ -274,12 +284,14 @@ export class TemplatesPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (res) => {
+          this.foregroundLoading = false;
           this.items.set(res.items);
           this.total.set(res.total);
           if (!silent) this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
           if (silent) return;
+          this.foregroundLoading = false;
           this.items.set([]);
           this.total.set(0);
           this.loading.set(false);

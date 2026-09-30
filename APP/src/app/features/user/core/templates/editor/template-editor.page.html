@@ -144,6 +144,7 @@
           <button
             type="button"
             (click)="submitToMeta()"
+            [title]="submitToMetaHint()"
             [disabled]="transitioning() !== null"
             class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-violet-300 bg-violet-500/10 px-3 py-1.5 text-sm font-medium text-violet-800 hover:bg-violet-500/10 disabled:opacity-50"
             title="Ships the template to WhatsApp (Meta) for approval before it can be sent to customers."
@@ -386,7 +387,7 @@
     }
   </header>
 
-  <section class="flex-1 px-4 py-4 md:px-6 md:py-6">
+  <section class="tpl-validate flex-1 px-4 py-4 md:px-6 md:py-6">
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px_360px]">
       <!-- left: header form + sub-form -->
       <div class="flex flex-col gap-4">
@@ -435,12 +436,20 @@
           <label class="block">
             <span class="text-xs font-medium text-default">Channel</span>
             <div class="mt-1">
-              <crm-mobile-select
-                [options]="channelOptions"
-                [value]="headerForm.controls.channel.value"
-                placeholder="— Pick a channel —"
-                (valueChange)="onChannelPicked($event)"
-              />
+              @if (template(); as t) {
+                <!-- Saved templates can't change channel — show it
+                     read-only instead of a picker that looks editable. -->
+                <div class="flex h-9 items-center">
+                  <app-channel-chip [channel]="t.channel" />
+                </div>
+              } @else {
+                <crm-mobile-select
+                  [options]="channelOptions"
+                  [value]="headerForm.controls.channel.value"
+                  placeholder="— Pick a channel —"
+                  (valueChange)="onChannelPicked($event)"
+                />
+              }
             </div>
             @if (template()) {
               <p class="mt-1 text-[10px] text-faint">
@@ -524,7 +533,18 @@
 @if (versionsDrawerOpen() && template(); as t) {
   <app-versions-drawer
     [template]="t"
+    [locked]="locked()"
+    [dirty]="dirty()"
     (closed)="closeVersionsDrawer()"
     (updated)="onRestoredFromVersion($event)"
   />
 }
+
+<!-- Sample file for media-header WhatsApp templates (Submit to Meta). -->
+<input
+  #headerSampleInput
+  type="file"
+  class="hidden"
+  [accept]="headerSampleAccept()"
+  (change)="onHeaderSamplePicked($event)"
+/>

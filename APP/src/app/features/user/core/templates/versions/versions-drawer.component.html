@@ -1,6 +1,9 @@
-<div class="fixed inset-0 z-50 flex justify-end bg-black/40">
+<div class="fixed inset-0 z-50 flex justify-end bg-black/40" (click)="close()">
   <div
-    class="flex h-full w-full max-w-xl flex-col bg-surface shadow-xl ring-1 border-subtle"
+    class="flex h-full w-full max-w-xl flex-col bg-surface shadow-xl ring-1 ring-subtle"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Version history"
     (click)="$event.stopPropagation()"
   >
     <header class="flex items-center justify-between border-b border-subtle px-5 py-3">
@@ -66,10 +69,10 @@
                     <lucide-icon name="eye" size="11" />
                     View
                   </button>
-                  @if (canRestore && v.version !== template().current_version) {
+                  @if (canRestore && !locked() && v.version !== template().current_version) {
                     <button
                       type="button"
-                      (click)="restore(v)"
+                      (click)="askRestore(v)"
                       [disabled]="restoring() !== null"
                       class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                     >
@@ -86,6 +89,44 @@
             </li>
           }
         </ul>
+      }
+
+      @if (confirmingRestore(); as cv) {
+        <div
+          class="mx-5 my-3 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-default"
+          role="alertdialog"
+          aria-label="Confirm restore"
+        >
+          <p class="font-semibold">Restore v{{ cv.version }}?</p>
+          <p class="mt-1 text-muted">
+            The body{{
+              template().channel === 'email' ? ', subject and email design' : ' and subject'
+            }}
+            are replaced with v{{ cv.version }} and saved as a new version.
+            @if (template().channel === 'whatsapp') {
+              Header, footer and buttons are not versioned and stay as they are.
+            }
+            @if (dirty()) {
+              <strong class="text-red-500">Your unsaved edits will be lost.</strong>
+            }
+          </p>
+          <div class="mt-2 flex gap-2">
+            <button
+              type="button"
+              (click)="restore(cv)"
+              class="rounded-md bg-accent px-2.5 py-1 font-semibold text-white hover:brightness-95"
+            >
+              Yes, restore
+            </button>
+            <button
+              type="button"
+              (click)="cancelRestore()"
+              class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-default hover:bg-surface-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       }
 
       @if (restoreError(); as err) {

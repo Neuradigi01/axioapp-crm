@@ -27,7 +27,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -638,13 +638,20 @@ def _meta_app_credentials() -> tuple[str, str]:
 @router.post("/{template_id}/submit-external", response_model=TemplateRead)
 async def submit_external_endpoint(
     template_id: uuid.UUID,
+    header_sample: UploadFile | None = File(default=None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions(PERM_SUBMIT_EXTERNAL)),
 ) -> TemplateRead:
     """Submit the template to its channel's external review pipeline
     (today: WhatsApp / Meta). Returns the central row with
-    ``external_status='pending'`` on success."""
+    ``external_status='pending'`` on success.
+
+    Optional multipart ``header_sample`` — required by Meta for IMAGE /
+    VIDEO / DOCUMENT headers (uploaded and attached as the example)."""
     app_id, app_secret = _meta_app_credentials()
+    sample: tuple[bytes, str] | None = None
+    if header_sample is not None:
+        sample = (await header_sample.read(), (header_sample.content_type or "").lower())
     try:
         template = await templates_external.submit_external(
             db,
@@ -653,6 +660,7 @@ async def submit_external_endpoint(
             user_id=user.legacy_uuid,
             app_id=app_id,
             app_secret=app_secret,
+            header_sample=sample,
         )
     except TemplateNotFound as exc:
         raise HTTPException(

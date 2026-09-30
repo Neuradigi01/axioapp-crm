@@ -665,3 +665,14 @@ body {
     border-bottom-color: var(--border);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Template editor — invalid-field highlight
+// ---------------------------------------------------------------------------
+// Reactive forms tag controls with `.ng-invalid.ng-touched` once a save
+// attempt marks everything touched. Scoped to the editor so other forms
+// keep their own error treatment.
+.tpl-validate :is(input, textarea, select).ng-invalid.ng-touched:not(:disabled) {
+  border-color: rgb(239 68 68);
+  box-shadow: 0 0 0 1px rgb(239 68 68 / 0.6);
+}

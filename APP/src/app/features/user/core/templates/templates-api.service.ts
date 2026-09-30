@@ -110,6 +110,8 @@ export interface TemplateVersionRead {
   template_id: string;
   version: number;
   body_text: string;
+  /** Email HTML design snapshot (null for non-email / text-only). */
+  body_html: string | null;
   subject: string | null;
   variables: string[];
   changed_by_user_id: string | null;
@@ -348,8 +350,15 @@ export class TemplatesApiService {
 
   // --- external submission (Step 9) -----------------------------------
 
-  submitExternal(id: string): Observable<TemplateRead> {
-    return this.http.post<TemplateRead>(`${this.base}/${id}/submit-external`, {});
+  /** Submit to Meta. Media-header WhatsApp templates must include a
+   *  sample file (image / video / PDF) for Meta's review. */
+  submitExternal(id: string, headerSample?: File): Observable<TemplateRead> {
+    if (!headerSample) {
+      return this.http.post<TemplateRead>(`${this.base}/${id}/submit-external`, {});
+    }
+    const form = new FormData();
+    form.append('header_sample', headerSample, headerSample.name);
+    return this.http.post<TemplateRead>(`${this.base}/${id}/submit-external`, form);
   }
 
   externalStatus(id: string): Observable<{

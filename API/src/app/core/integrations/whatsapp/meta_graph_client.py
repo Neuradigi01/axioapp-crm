@@ -475,6 +475,47 @@ class MetaGraphClient:
         )
         return body
 
+    async def upload_template_sample(self, *, token: str, data: bytes, mime_type: str) -> str:
+        """Upload a sample image / video / document through Meta's
+        Resumable Upload API and return the file handle (``h``) that a
+        media-header template must carry in ``example.header_handle``.
+
+        Two hops per Meta's spec: open an upload session on the app
+        (``/{app_id}/uploads``), then POST the raw bytes to it with
+        ``file_offset: 0``. Handles are only valid for template review."""
+        session = await self._request(
+            method="POST",
+            url=self._url(f"/{self._app_id}/uploads"),
+            stage="template_sample_upload",
+            params={
+                "file_length": str(len(data)),
+                "file_type": mime_type,
+                "access_token": token,
+            },
+        )
+        upload_id = session.get("id")
+        if not isinstance(upload_id, str) or not upload_id:
+            raise MetaGraphError(
+                http_status=502,
+                user_message="Meta did not open an upload session for the header sample.",
+            )
+        async with self._factory() as client:
+            response = await client.post(
+                self._url(f"/{upload_id}"),
+                content=data,
+                headers={"Authorization": f"OAuth {token}", "file_offset": "0"},
+            )
+        if response.status_code >= 400:
+            raise _classify(response=response, stage="template_sample_upload")
+        body = response.json() if response.content else {}
+        handle = body.get("h") if isinstance(body, dict) else None
+        if not isinstance(handle, str) or not handle:
+            raise MetaGraphError(
+                http_status=502,
+                user_message="Meta did not return a handle for the header sample.",
+            )
+        return handle
+
     # ----- 8a. fetch a template's current status from Meta ---------------
     # (tasks/template-library Step 14)
 

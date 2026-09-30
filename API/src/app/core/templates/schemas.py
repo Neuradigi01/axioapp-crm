@@ -47,9 +47,7 @@ class WhatsAppTemplateButton(BaseModel):
     def _type_companion_required(self) -> WhatsAppTemplateButton:
         if self.type == "url" and not (self.url and self.url.strip()):
             raise ValueError("url is required for a URL button")
-        if self.type == "phone_number" and not (
-            self.phone_number and self.phone_number.strip()
-        ):
+        if self.type == "phone_number" and not (self.phone_number and self.phone_number.strip()):
             raise ValueError("phone_number is required for a Phone button")
         return self
 
@@ -76,12 +74,8 @@ class WhatsAppExtensionPayload(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    category: str | None = Field(
-        default=None, pattern=r"^(marketing|utility|authentication)$"
-    )
-    header_type: str | None = Field(
-        default=None, pattern=r"^(text|image|video|document)$"
-    )
+    category: str | None = Field(default=None, pattern=r"^(marketing|utility|authentication)$")
+    header_type: str | None = Field(default=None, pattern=r"^(text|image|video|document)$")
     header_text: str | None = Field(default=None, max_length=60)
     footer_text: str | None = Field(default=None, max_length=60)
     buttons: list[WhatsAppTemplateButton] | None = Field(default=None, max_length=3)
@@ -134,9 +128,7 @@ class TemplateCreate(BaseModel):
         has_html = bool(self.body_html and self.body_html.strip())
         if self.channel == ConversationChannel.email:
             if not has_text and not has_html:
-                raise ValueError(
-                    "email templates require body_text or body_html (or both)"
-                )
+                raise ValueError("email templates require body_text or body_html (or both)")
             if not self.subject or not self.subject.strip():
                 raise ValueError("subject is required for email templates")
         else:
@@ -144,8 +136,7 @@ class TemplateCreate(BaseModel):
                 raise ValueError("body_text is required for non-email templates")
             if self.body_html is not None:
                 raise ValueError(
-                    "body_html is only valid for email templates; "
-                    f"got channel={self.channel.value}"
+                    f"body_html is only valid for email templates; got channel={self.channel.value}"
                 )
             if self.subject is not None:
                 raise ValueError(
@@ -156,9 +147,7 @@ class TemplateCreate(BaseModel):
                     f"preview_text is only valid for email templates; got channel={self.channel.value}"
                 )
         if self.whatsapp is not None and self.channel != ConversationChannel.whatsapp:
-            raise ValueError(
-                "whatsapp extension fields are only valid for whatsapp templates"
-            )
+            raise ValueError("whatsapp extension fields are only valid for whatsapp templates")
         return self
 
 
@@ -264,6 +253,9 @@ class TemplateVersionRead(ORMModel):
     template_id: uuid.UUID
     version: int
     body_text: str
+    # Email HTML design captured with this version (null otherwise) —
+    # restoring a version brings it back.
+    body_html: str | None = None
     subject: str | None
     variables: list[Any]
     changed_by_user_id: uuid.UUID | None

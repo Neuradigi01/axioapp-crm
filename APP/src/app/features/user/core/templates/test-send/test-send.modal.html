@@ -1,5 +1,11 @@
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-  <div class="w-full max-w-md rounded-lg bg-surface shadow-xl ring-1 border-subtle">
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="close()">
+  <div
+    class="w-full max-w-md rounded-lg bg-surface shadow-xl ring-1 ring-subtle"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Send test"
+    (click)="$event.stopPropagation()"
+  >
     <header class="border-b border-subtle px-5 py-3">
       <h2 class="text-sm font-semibold text-default">Send test</h2>
       <p class="mt-0.5 text-xs text-muted">{{ template().name }} · {{ template().channel }}</p>

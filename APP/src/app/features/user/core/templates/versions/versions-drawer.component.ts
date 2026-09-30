@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   effect,
   inject,
   input,
@@ -42,6 +43,11 @@ export class VersionsDrawerComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly template = input.required<TemplateRead>();
+  /** Template is locked (Meta-approved / pending / internal review) —
+   *  restoring would edit a locked body, so the action is hidden. */
+  readonly locked = input<boolean>(false);
+  /** The editor has unsaved edits — the restore confirm warns about it. */
+  readonly dirty = input<boolean>(false);
 
   readonly closed = output<void>();
   /** Emits the refreshed template after Restore so the parent updates. */
@@ -53,6 +59,8 @@ export class VersionsDrawerComponent {
   protected readonly viewing = signal<TemplateVersionRead | null>(null);
   protected readonly restoring = signal<number | null>(null);
   protected readonly restoreError = signal<string | null>(null);
+  /** Version awaiting the operator's "Yes, restore" confirmation. */
+  protected readonly confirmingRestore = signal<TemplateVersionRead | null>(null);
 
   protected readonly canRestore = this.auth.hasPermission('templates.write');
 
@@ -92,15 +100,35 @@ export class VersionsDrawerComponent {
     this.viewing.set(null);
   }
 
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this.confirmingRestore() !== null) this.confirmingRestore.set(null);
+    else this.close();
+  }
+
+  protected askRestore(v: TemplateVersionRead): void {
+    this.restoreError.set(null);
+    this.confirmingRestore.set(v);
+  }
+
+  protected cancelRestore(): void {
+    this.confirmingRestore.set(null);
+  }
+
+  /** Restore brings back everything a version snapshot holds: body,
+   *  subject and (email) the HTML design. WhatsApp header / footer /
+   *  buttons are not versioned, so they stay as they are now. */
   protected restore(v: TemplateVersionRead): void {
-    if (!this.canRestore) return;
+    if (!this.canRestore || this.locked()) return;
     if (this.restoring() !== null) return;
+    this.confirmingRestore.set(null);
     this.restoring.set(v.version);
     this.restoreError.set(null);
     this.api
       .update(this.template().id, {
         body_text: v.body_text,
         subject: v.subject,
+        ...(this.template().channel === 'email' ? { body_html: v.body_html } : {}),
         change_note: `Restored from v${v.version}`,
       })
       .pipe(takeUntilDestroyed(this.destroyRef))

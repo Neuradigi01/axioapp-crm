@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   inject,
   input,
@@ -154,6 +155,7 @@ export class TestSendModalComponent {
       });
   }
 
+  @HostListener('document:keydown.escape')
   protected close(): void {
     if (this.submitting()) return;
     this.closed.emit();
