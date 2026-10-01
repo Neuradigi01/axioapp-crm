@@ -30,7 +30,7 @@ class ReviewUpdate(BaseModel):
 
 
 class ReviewReplyPayload(BaseModel):
-    text: str = Field(min_length=1)
+    text: str = Field(min_length=1, max_length=4000)
 
 
 class ReviewEscalatePayload(BaseModel):

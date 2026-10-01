@@ -61,6 +61,8 @@ async def stats_endpoint(
 async def list_endpoint(
     source: str | None = Query(default=None, max_length=32),
     rating: int | None = Query(default=None, ge=1, le=5),
+    # "Needs attention" panel: reviews at or below this star count.
+    max_rating: int | None = Query(default=None, ge=1, le=5),
     status_: ReviewStatus | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
@@ -71,6 +73,7 @@ async def list_endpoint(
         db,
         source=source,
         rating=rating,
+        max_rating=max_rating,
         status_filter=status_,
         page=page,
         size=size,

@@ -49,6 +49,7 @@ async def list_reviews(
     *,
     source: str | None = None,
     rating: int | None = None,
+    max_rating: int | None = None,
     status_filter: ReviewStatus | None = None,
     page: int = 1,
     size: int = 50,
@@ -57,6 +58,7 @@ async def list_reviews(
         session,
         source=source,
         rating=rating,
+        max_rating=max_rating,
         status_filter=status_filter,
         page=page,
         size=size,
@@ -280,7 +282,7 @@ async def _publish_review_lifecycle_event(
                 "id": str(review.id),
                 "rating": review.rating,
                 "status": review.status.value,
-                "source": review.source.value if review.source else None,
+                "source": review.source,
             },
         }
         if extras:

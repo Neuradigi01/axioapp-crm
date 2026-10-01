@@ -40,16 +40,20 @@ async def list_reviews_query(
     *,
     source: str | None = None,
     rating: int | None = None,
+    max_rating: int | None = None,
     status_filter: ReviewStatus | None = None,
     page: int = 1,
     size: int = 50,
 ) -> tuple[list[Review], int]:
-    """Filtered paginated list, newest first."""
+    """Filtered paginated list, newest first. ``max_rating`` keeps
+    reviews at or below that star count (the "needs attention" panel)."""
     filters: list[Any] = []
     if source is not None:
         filters.append(Review.source == source)
     if rating is not None:
         filters.append(Review.rating == rating)
+    if max_rating is not None:
+        filters.append(Review.rating <= max_rating)
     if status_filter is not None:
         filters.append(Review.status == status_filter)
     where = and_(*filters) if filters else None
@@ -103,13 +107,12 @@ async def review_rating_distribution(
 
 
 async def count_responded_reviews(session: AsyncSession) -> int:
-    """Reviews not currently in the ``pending_reply`` status."""
+    """Reviews that actually received a reply. Escalated-but-unanswered
+    reviews are not "responded" — counting them inflated the rate."""
     return int(
         (
             await session.execute(
-                select(func.count())
-                .select_from(Review)
-                .where(Review.status != ReviewStatus.pending_reply)
+                select(func.count()).select_from(Review).where(Review.reply_text.is_not(None))
             )
         ).scalar_one()
         or 0

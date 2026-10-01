@@ -23,11 +23,24 @@
         <span class="block text-xs font-medium text-muted">Your reply</span>
         <textarea
           rows="4"
+          maxlength="4000"
           [formControl]="textControl"
           placeholder="Thanks for the feedback…"
           class="mt-1 block w-full resize-none rounded-lg border border-subtle bg-surface px-3 py-2 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
         ></textarea>
       </label>
+      <div class="mt-1 flex items-start justify-between gap-2 text-[11px]">
+        <span class="text-red-500">
+          @if (textControl.touched && textControl.invalid) {
+            @if (textControl.hasError('maxlength')) {
+              The reply can be at most 4000 characters.
+            } @else {
+              Write at least 2 characters.
+            }
+          }
+        </span>
+        <span class="shrink-0 text-faint">{{ textControl.value.length }} / 4000</span>
+      </div>
 
       @if (submitError(); as err) {
         <div

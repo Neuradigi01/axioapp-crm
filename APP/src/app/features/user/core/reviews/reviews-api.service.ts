@@ -33,6 +33,8 @@ export interface ReviewListResponse {
 export interface ReviewListQuery {
   source?: string;
   rating?: number;
+  /** Reviews at or below this star count ("needs attention"). */
+  max_rating?: number;
   status?: ReviewStatus;
   page?: number;
   size?: number;
@@ -61,6 +63,7 @@ export class ReviewsApiService {
     const params = buildHttpParams({
       source: query.source,
       rating: query.rating ? query.rating : undefined,
+      max_rating: query.max_rating,
       status: query.status,
       page: query.page,
       size: query.size,
