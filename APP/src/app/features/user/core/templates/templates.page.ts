@@ -22,6 +22,7 @@ import { StaffApiService, StaffListItem } from '../staff/staff-api.service';
 
 import { ColumnFilterComponent } from '../shared/table-filters/column-filter.component';
 import { ColumnFilterOption } from '../shared/table-filters/column-filter.types';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 
 import { ChannelChipComponent } from './channel-chip.component';
 import { TemplateStatusBadgeComponent } from './template-status-badge.component';
@@ -97,6 +98,12 @@ const EXTERNAL_FILTER_OPTIONS: ReadonlyArray<{
   { value: 'paused', label: 'Paused by Meta' },
 ];
 
+const ACTIVE_FILTER_OPTIONS: ReadonlyArray<{ value: '' | 'active' | 'inactive'; label: string }> = [
+  { value: '', label: 'Active & inactive' },
+  { value: 'active', label: 'Active only' },
+  { value: 'inactive', label: 'Inactive only' },
+];
+
 const SORT_OPTIONS: ReadonlyArray<{ value: TemplateSort; label: string }> = [
   { value: 'updated', label: 'Last updated' },
   { value: 'created', label: 'Newest first' },
@@ -120,6 +127,7 @@ const NON_ARCHIVED: TemplateInternalStatus[] = ['draft', 'in_review', 'approved'
     ChannelChipComponent,
     ColumnFilterComponent,
     TemplateStatusBadgeComponent,
+    MobileSelectComponent,
   ],
   templateUrl: './templates.page.html',
 })
@@ -132,6 +140,7 @@ export class TemplatesPageComponent {
 
   protected readonly CHANNEL_TABS = CHANNEL_TABS;
   protected readonly EXTERNAL_FILTER_OPTIONS = EXTERNAL_FILTER_OPTIONS;
+  protected readonly ACTIVE_FILTER_OPTIONS = ACTIVE_FILTER_OPTIONS;
   protected readonly SORT_OPTIONS = SORT_OPTIONS;
   protected readonly CHANNEL_OPTIONS = CHANNEL_OPTIONS;
   protected readonly STATUS_OPTIONS = STATUS_OPTIONS;
