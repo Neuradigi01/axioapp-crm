@@ -163,17 +163,17 @@ export class ReviewsPageComponent {
       case 'replied':
         return {
           label: 'Replied',
-          cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+          cls: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-300',
         };
       case 'escalated':
         return {
           label: 'Escalated',
-          cls: 'bg-red-500/10 text-red-400 ring-red-500/20',
+          cls: 'bg-red-500/10 text-red-700 ring-red-500/20 dark:text-red-300',
         };
       default:
         return {
           label: 'Pending reply',
-          cls: 'bg-amber-50 text-amber-700 ring-amber-200',
+          cls: 'bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-300',
         };
     }
   }
@@ -185,13 +185,13 @@ export class ReviewsPageComponent {
    */
   protected sourcePill(source: string): string {
     const palette = [
-      'bg-blue-50 text-blue-700 ring-blue-200',
-      'bg-violet-50 text-violet-700 ring-violet-200',
-      'bg-sky-50 text-sky-700 ring-sky-200',
-      'bg-emerald-50 text-emerald-700 ring-emerald-200',
-      'bg-red-500/10 text-red-400 ring-red-500/20',
-      'bg-amber-50 text-amber-700 ring-amber-200',
-      'bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-200',
+      'bg-blue-500/10 text-blue-700 ring-blue-500/20 dark:text-blue-300',
+      'bg-violet-500/10 text-violet-700 ring-violet-500/20 dark:text-violet-300',
+      'bg-sky-500/10 text-sky-700 ring-sky-500/20 dark:text-sky-300',
+      'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-300',
+      'bg-red-500/10 text-red-700 ring-red-500/20 dark:text-red-300',
+      'bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-300',
+      'bg-fuchsia-500/10 text-fuchsia-700 ring-fuchsia-500/20 dark:text-fuchsia-300',
     ];
     let h = 0;
     for (const c of source) h = (h * 31 + c.charCodeAt(0)) >>> 0;
@@ -204,6 +204,32 @@ export class ReviewsPageComponent {
       month: 'short',
       year: 'numeric',
     });
+  }
+
+  /** "3h ago" / "2d ago" for recent dates, the full date after a week. */
+  protected relativeDate(iso: string): string {
+    const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return this.formatDate(iso);
+  }
+
+  /** Display name for a review platform ("google_business" → "Google Business"). */
+  protected sourceLabel(source: string): string {
+    return source
+      .split(/[_\s-]+/)
+      .filter(Boolean)
+      .map((w) => w[0].toUpperCase() + w.slice(1))
+      .join(' ');
+  }
+
+  /** Screen-reader text for a star rating. */
+  protected starsLabel(n: number): string {
+    return `${n} out of 5 stars`;
   }
 
   constructor() {

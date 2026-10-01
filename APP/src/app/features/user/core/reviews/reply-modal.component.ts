@@ -1,11 +1,15 @@
 import {
+  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   OnInit,
   Output,
+  ViewChild,
   computed,
   inject,
   signal,
@@ -33,7 +37,7 @@ import { extractApiError } from '@core/services/api-error.util';
   imports: [ReactiveFormsModule],
   templateUrl: './reply-modal.component.html',
 })
-export class ReviewReplyModalComponent implements OnInit {
+export class ReviewReplyModalComponent implements OnInit, AfterViewInit {
   private readonly api = inject(ReviewsApiService);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly savedReplies = inject(SavedRepliesStore);
@@ -65,8 +69,20 @@ export class ReviewReplyModalComponent implements OnInit {
     return !!this.review.reply_text;
   }
 
+  @ViewChild('replyBox') private readonly replyBox?: ElementRef<HTMLTextAreaElement>;
+
   ngOnInit(): void {
     if (this.review.reply_text) this.textControl.setValue(this.review.reply_text);
+  }
+
+  ngAfterViewInit(): void {
+    this.replyBox?.nativeElement.focus();
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this.repliesOpen()) this.repliesOpen.set(false);
+    else this.close();
   }
 
   protected toggleReplies(): void {
@@ -125,6 +141,7 @@ export class ReviewReplyModalComponent implements OnInit {
   }
 
   protected close(): void {
+    if (this.submitting()) return;
     this.cancel.emit();
   }
 

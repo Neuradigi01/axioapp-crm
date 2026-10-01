@@ -1,7 +1,13 @@
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-  <div class="w-full max-w-lg rounded-lg bg-surface p-5 shadow-xl">
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" (click)="close()">
+  <div
+    class="w-full max-w-lg rounded-xl border border-subtle bg-surface p-5 shadow-xl"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="review-reply-title"
+    (click)="$event.stopPropagation()"
+  >
     <header class="mb-3">
-      <h2 class="text-lg font-semibold text-default">
+      <h2 id="review-reply-title" class="text-lg font-semibold text-default">
         {{ isEdit ? 'Edit reply' : 'Reply to review' }}
       </h2>
       <p class="mt-1 text-xs text-muted capitalize">Source: {{ review.source }}</p>
@@ -10,7 +16,12 @@
     <!-- Original review (read-only) -->
     <div class="mb-4 rounded-md border border-subtle bg-surface-2 p-3">
       <div class="mb-1 flex items-baseline gap-2">
-        <span class="text-base text-amber-500">{{ stars(review.rating) }}</span>
+        <span
+          class="text-base text-amber-500"
+          role="img"
+          [attr.aria-label]="review.rating + ' out of 5 stars'"
+          >{{ stars(review.rating) }}</span
+        >
         <span class="text-xs text-muted">{{ review.rating }}/5</span>
       </div>
       @if (review.text) {
@@ -79,6 +90,7 @@
       <label class="block text-sm">
         <span class="block text-xs font-medium text-muted">Your reply</span>
         <textarea
+          #replyBox
           rows="4"
           maxlength="4000"
           [formControl]="textControl"

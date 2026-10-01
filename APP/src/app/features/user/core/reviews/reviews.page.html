@@ -1,6 +1,6 @@
 <div class="px-4 py-4 md:px-6 md:py-6">
   <!-- Header -->
-  <header class="mb-6 flex items-start justify-between">
+  <header class="mb-6 flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1 class="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-default">
         Reviews &amp; Reputation
@@ -9,7 +9,7 @@
         Monitor ratings, reply fast, escalate the angry ones
       </p>
     </div>
-    <div class="flex items-center gap-3">
+    <div class="flex flex-wrap items-center gap-3">
       @if (autoRequest() !== null) {
         <label
           class="flex items-center gap-2 text-sm text-default"
@@ -71,8 +71,17 @@
       <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
         <div class="text-xs font-medium uppercase tracking-wide text-muted">Average rating</div>
         <div class="mt-2 flex items-baseline gap-2">
-          <span class="text-2xl font-semibold text-default">{{ s.average_rating }}</span>
-          <span class="text-amber-500">{{ stars(roundedAvg(s.average_rating)) }}</span>
+          @if (s.total > 0) {
+            <span class="text-2xl font-semibold text-default">{{ s.average_rating }}</span>
+            <span
+              class="text-amber-500"
+              role="img"
+              [attr.aria-label]="starsLabel(roundedAvg(s.average_rating))"
+              >{{ stars(roundedAvg(s.average_rating)) }}</span
+            >
+          } @else {
+            <span class="text-2xl font-semibold text-muted">—</span>
+          }
         </div>
       </div>
       <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
@@ -85,7 +94,7 @@
       </div>
       <div
         [class]="
-          'rounded-lg border p-4 shadow-sm ' +
+          'rounded-xl border p-4 shadow-sm ' +
           (s.alerts_last_7_days > 0
             ? 'border-red-500/20 bg-red-500/10'
             : 'border-subtle bg-surface')
@@ -162,8 +171,15 @@
             @for (a of attentionRows(); track a.id) {
               <li class="rounded-md border border-subtle p-2">
                 <div class="flex items-center justify-between">
-                  <span class="text-amber-500">{{ stars(a.rating) }}</span>
-                  <span class="text-[10px] text-muted">{{ formatDate(a.created_at) }}</span>
+                  <span
+                    class="text-amber-500"
+                    role="img"
+                    [attr.aria-label]="starsLabel(a.rating)"
+                    >{{ stars(a.rating) }}</span
+                  >
+                  <span class="text-[10px] text-muted" [title]="formatDate(a.created_at)">{{
+                    relativeDate(a.created_at)
+                  }}</span>
                 </div>
                 @if (a.text) {
                   <p class="mt-1 line-clamp-2 text-xs text-default">{{ a.text }}</p>
@@ -215,6 +231,7 @@
     <button
       type="button"
       (click)="setRating(null)"
+      [attr.aria-pressed]="ratingFilter() === null"
       [class]="
         'rounded-full border px-3 py-1 text-xs font-medium ' +
         (ratingFilter() === null
@@ -228,6 +245,8 @@
       <button
         type="button"
         (click)="setRating(r)"
+        [attr.aria-pressed]="ratingFilter() === r"
+        [attr.aria-label]="r + ' star reviews'"
         [class]="
           'rounded-full border px-3 py-1 text-xs font-medium ' +
           (ratingFilter() === r
@@ -254,15 +273,22 @@
   </div>
 
   <!-- List -->
-  @if (loading()) {
-    <div
-      class="rounded-xl border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
-    >
-      Loading…
-    </div>
+  @if (loading() && items().length === 0) {
+    <ul class="space-y-3" aria-busy="true" aria-label="Loading reviews">
+      @for (row of [1, 2, 3]; track row) {
+        <li class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
+          <div class="flex items-center gap-2">
+            <div class="h-4 w-24 animate-pulse rounded bg-surface-2"></div>
+            <div class="h-4 w-16 animate-pulse rounded-full bg-surface-2"></div>
+          </div>
+          <div class="mt-3 h-3 w-full animate-pulse rounded bg-surface-2"></div>
+          <div class="mt-2 h-3 w-2/3 animate-pulse rounded bg-surface-2"></div>
+        </li>
+      }
+    </ul>
   } @else if (items().length === 0) {
     <div
-      class="rounded-lg border border-dashed border-subtle bg-surface p-6 md:p-12 text-center text-sm text-muted"
+      class="rounded-xl border border-dashed border-subtle bg-surface p-6 text-center text-sm text-muted md:p-12"
     >
       @if (hasFilters()) {
         <p>No reviews match these filters.</p>
@@ -281,22 +307,32 @@
       }
     </div>
   } @else {
-    <ul class="space-y-3">
+    <!-- Rows stay visible (dimmed) while a filter change reloads. -->
+    <ul
+      class="space-y-3 transition-opacity"
+      [class.opacity-50]="loading()"
+      [attr.aria-busy]="loading()"
+    >
       @for (r of items(); track r.id) {
         @let badge = statusBadge(r.status);
         <li class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
-          <div class="flex items-start justify-between gap-4">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
-                <span class="text-base text-amber-500">{{ stars(r.rating) }}</span>
+                <span
+                  class="text-base text-amber-500"
+                  role="img"
+                  [attr.aria-label]="starsLabel(r.rating)"
+                  >{{ stars(r.rating) }}</span
+                >
                 <span class="text-xs text-muted">{{ r.rating }}/5</span>
                 <span
                   [class]="
-                    'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 capitalize ' +
+                    'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ' +
                     sourcePill(r.source)
                   "
                 >
-                  {{ r.source }}
+                  {{ sourceLabel(r.source) }}
                 </span>
                 <span
                   [class]="
@@ -322,7 +358,7 @@
                   </a>
                 }
                 <span class="ml-auto text-[10px] text-muted">
-                  {{ formatDate(r.created_at) }}
+                  <span [title]="formatDate(r.created_at)">{{ relativeDate(r.created_at) }}</span>
                 </span>
               </div>
               @if (r.text) {
@@ -333,9 +369,17 @@
                   class="mt-3 rounded-md border-l-2 border-emerald-400 bg-emerald-500/10 px-3 py-2 text-sm text-default"
                 >
                   <p
-                    class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-400"
+                    class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400"
                   >
                     Our reply
+                    @if (r.replied_at) {
+                      <span
+                        class="font-normal normal-case tracking-normal text-muted"
+                        [title]="formatDate(r.replied_at)"
+                      >
+                        · {{ relativeDate(r.replied_at) }}
+                      </span>
+                    }
                   </p>
                   <p class="whitespace-pre-wrap">{{ r.reply_text }}</p>
                   <button
@@ -349,7 +393,7 @@
               }
             </div>
             @if (canReply(r)) {
-              <div class="flex shrink-0 flex-col gap-2">
+              <div class="flex shrink-0 flex-row gap-2 sm:flex-col">
                 <button
                   type="button"
                   (click)="openReply(r)"
