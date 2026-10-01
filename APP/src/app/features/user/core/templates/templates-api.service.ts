@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, catchError, switchMap, throwError } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 import { buildHttpParams } from '../shared/services/query-builder';
@@ -97,6 +97,9 @@ export interface TemplateRead {
   last_reviewed_by_user_id: string | null;
   last_reviewed_action: string | null;
   last_reviewed_at: string | null;
+  /** Reviewer's note on that latest review — the reject / request-
+   *  changes reason the author needs to see. */
+  last_review_note?: string | null;
   created_at: string;
   updated_at: string;
   /** Populated by the backend for WhatsApp templates that have a
@@ -198,7 +201,48 @@ export interface TemplateListQuery {
   q?: string;
   limit?: number;
   offset?: number;
+  /** `updated` (default) · `created` · `name`. */
+  sort?: TemplateSort;
 }
+
+export type TemplateSort = 'updated' | 'created' | 'name';
+
+/** Copy name for "Duplicate": WhatsApp names must stay snake_case. */
+function copyName(row: TemplateRead, attempt: number): string {
+  const n = attempt > 1 ? String(attempt) : '';
+  const suffix =
+    row.channel === 'whatsapp' ? `_copy${n ? '_' + n : ''}` : ` (copy${n ? ' ' + n : ''})`;
+  return row.name.slice(0, 120 - suffix.length) + suffix;
+}
+
+/** Everything a template holds, as a create payload for its copy. */
+function copyPayload(row: TemplateRead, attempt: number): TemplateCreatePayload {
+  const wa = row.whatsapp;
+  return {
+    name: copyName(row, attempt),
+    channel: row.channel,
+    category: row.category,
+    language: row.language,
+    body_text: row.body_text,
+    body_html: row.channel === 'email' ? row.body_html : undefined,
+    body_text_fallback_auto: row.channel === 'email' ? row.body_text_fallback_auto : undefined,
+    subject: row.subject,
+    preview_text: row.preview_text,
+    whatsapp:
+      row.channel === 'whatsapp' && wa
+        ? {
+            category: wa.category,
+            header_type: wa.header_type,
+            header_text: wa.header_text,
+            footer_text: wa.footer_text,
+            buttons: wa.buttons,
+          }
+        : undefined,
+  };
+}
+
+/** How many "_copy_N" names to try before giving up on a name clash. */
+const MAX_COPY_ATTEMPTS = 5;
 
 export interface VariableDef {
   key: string;
@@ -269,8 +313,30 @@ export class TemplatesApiService {
       q: query.q,
       limit: query.limit,
       offset: query.offset,
+      sort: query.sort,
     });
     return this.http.get<TemplateListResponse>(this.base, { params });
+  }
+
+  /** `{channel: count}` for the library's channel tabs. */
+  counts(includeArchived = false): Observable<Record<string, number>> {
+    const params = buildHttpParams({ include_archived: includeArchived || undefined });
+    return this.http.get<Record<string, number>>(`${this.base}/counts`, { params });
+  }
+
+  /** Create an editable draft copy of a template (body, subject, email
+   *  design, WhatsApp header / footer / buttons). Name clashes retry as
+   *  `_copy_2`, `_copy_3`, … */
+  duplicate(id: string): Observable<TemplateRead> {
+    const attempt = (row: TemplateRead, n: number): Observable<TemplateRead> =>
+      this.create(copyPayload(row, n)).pipe(
+        catchError((err: { status?: number }) =>
+          err?.status === 409 && n < MAX_COPY_ATTEMPTS
+            ? attempt(row, n + 1)
+            : throwError(() => err),
+        ),
+      );
+    return this.get(id).pipe(switchMap((row) => attempt(row, 1)));
   }
 
   get(id: string): Observable<TemplateRead> {

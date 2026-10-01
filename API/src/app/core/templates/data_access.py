@@ -128,8 +128,11 @@ async def list_templates(
     q: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    sort: str = "updated",
 ) -> tuple[list[tuple[MessageTemplate, str | None]], int]:
-    """Filterable + paginated list. ``q`` matches against ``name`` or
+    """Filterable + paginated list. ``sort`` is ``updated`` (newest
+    edit first, default), ``created`` (newest first) or ``name`` (A→Z).
+    ``q`` matches against ``name`` or
     ``body_text`` (case-insensitive). ``is_active`` filters on the
     activation toggle — pickers pass ``True`` so operators never see
     an inactive template; the library page passes ``None`` so admins
@@ -209,20 +212,20 @@ async def list_templates(
             )
         )
 
-    result = await session.execute(
-        listing.order_by(MessageTemplate.updated_at.desc()).offset(offset).limit(limit)
-    )
-    rows: list[tuple[MessageTemplate, str | None]] = [
-        (row[0], row[1]) for row in result.all()
-    ]
+    order = {
+        "name": (func.lower(MessageTemplate.name).asc(), MessageTemplate.id.asc()),
+        "created": (MessageTemplate.created_at.desc(), MessageTemplate.id.desc()),
+    }.get(sort, (MessageTemplate.updated_at.desc(), MessageTemplate.id.desc()))
+    result = await session.execute(listing.order_by(*order).offset(offset).limit(limit))
+    rows: list[tuple[MessageTemplate, str | None]] = [(row[0], row[1]) for row in result.all()]
     return rows, int(total)
 
 
 async def latest_reviews_for_templates(
     session: AsyncSession,
     template_ids: list[uuid.UUID],
-) -> dict[uuid.UUID, tuple[uuid.UUID | None, str, datetime]]:
-    """Return ``{template_id: (reviewer_user_id, action, created_at)}``
+) -> dict[uuid.UUID, tuple[uuid.UUID | None, str, datetime, str | None]]:
+    """Return ``{template_id: (reviewer_user_id, action, created_at, note)}``
     for every template in ``template_ids`` that has at least one review
     row. Latest = most recent ``created_at``.
 
@@ -242,6 +245,7 @@ async def latest_reviews_for_templates(
             MessageTemplateReview.reviewer_user_id,
             MessageTemplateReview.action,
             MessageTemplateReview.created_at,
+            MessageTemplateReview.note,
             func.row_number()
             .over(
                 partition_by=MessageTemplateReview.template_id,
@@ -258,14 +262,34 @@ async def latest_reviews_for_templates(
             ranked.c.reviewer_user_id,
             ranked.c.action,
             ranked.c.created_at,
+            ranked.c.note,
         ).where(ranked.c.rn == 1)
     )
-    out: dict[uuid.UUID, tuple[uuid.UUID | None, str, datetime]] = {}
-    for tpl_id, reviewer_id, action, created_at in result.all():
+    out: dict[uuid.UUID, tuple[uuid.UUID | None, str, datetime, str | None]] = {}
+    for tpl_id, reviewer_id, action, created_at, note in result.all():
         # ``action`` comes back as the enum instance — .value for the
         # string wire representation the schema expects.
-        out[tpl_id] = (reviewer_id, action.value, created_at)
+        out[tpl_id] = (reviewer_id, action.value, created_at, note)
     return out
+
+
+async def count_templates_by_channel(
+    session: AsyncSession, *, org_id: uuid.UUID, include_archived: bool
+) -> dict[str, int]:
+    """``{channel: count}`` for the library's channel tabs (one
+    GROUP BY). Internal ``ai_prompt`` presets are never counted."""
+    stmt = (
+        select(MessageTemplate.channel, func.count())
+        .where(
+            MessageTemplate.org_id == org_id,
+            MessageTemplate.channel != ConversationChannel.ai_prompt,
+        )
+        .group_by(MessageTemplate.channel)
+    )
+    if not include_archived:
+        stmt = stmt.where(MessageTemplate.internal_status != TemplateInternalStatus.archived)
+    result = await session.execute(stmt)
+    return {channel.value: int(n) for channel, n in result.all()}
 
 
 # --- tbl_message_template_versions --------------------------------------

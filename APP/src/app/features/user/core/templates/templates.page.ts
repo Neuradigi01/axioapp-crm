@@ -4,13 +4,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   effect,
   inject,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 import { Subscription } from 'rxjs';
@@ -26,8 +27,10 @@ import { ChannelChipComponent } from './channel-chip.component';
 import { TemplateStatusBadgeComponent } from './template-status-badge.component';
 import {
   TemplateChannel,
+  TemplateExternalStatus,
   TemplateInternalStatus,
   TemplateRead,
+  TemplateSort,
   TemplatesApiService,
 } from './templates-api.service';
 
@@ -74,6 +77,36 @@ const STATUS_OPTIONS: readonly ColumnFilterOption[] = [
   { value: 'archived', label: 'Archived' },
 ];
 
+/** Channel tabs above the table (counts come from `/templates/counts`). */
+const CHANNEL_TABS: ReadonlyArray<{ value: TemplateChannel; label: string }> = [
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'email', label: 'Email' },
+  { value: 'sms', label: 'SMS' },
+  { value: 'push', label: 'Push' },
+];
+
+const EXTERNAL_FILTER_OPTIONS: ReadonlyArray<{
+  value: TemplateExternalStatus | '';
+  label: string;
+}> = [
+  { value: '', label: 'Any Meta status' },
+  { value: 'n_a', label: 'Not submitted' },
+  { value: 'pending', label: 'Pending review' },
+  { value: 'approved', label: 'Approved by Meta' },
+  { value: 'rejected', label: 'Rejected by Meta' },
+  { value: 'paused', label: 'Paused by Meta' },
+];
+
+const SORT_OPTIONS: ReadonlyArray<{ value: TemplateSort; label: string }> = [
+  { value: 'updated', label: 'Last updated' },
+  { value: 'created', label: 'Newest first' },
+  { value: 'name', label: 'Name A–Z' },
+];
+
+/** Internal statuses shown when "Show archived" is off and no status
+ *  column filter is set — archived templates stay out of the way. */
+const NON_ARCHIVED: TemplateInternalStatus[] = ['draft', 'in_review', 'approved', 'published'];
+
 @Component({
   selector: 'app-templates-page',
   standalone: true,
@@ -95,7 +128,11 @@ export class TemplatesPageComponent {
   private readonly auth = inject(FurnitureAuthService);
   private readonly staffApi = inject(StaffApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
 
+  protected readonly CHANNEL_TABS = CHANNEL_TABS;
+  protected readonly EXTERNAL_FILTER_OPTIONS = EXTERNAL_FILTER_OPTIONS;
+  protected readonly SORT_OPTIONS = SORT_OPTIONS;
   protected readonly CHANNEL_OPTIONS = CHANNEL_OPTIONS;
   protected readonly STATUS_OPTIONS = STATUS_OPTIONS;
   protected readonly PAGE_SIZE = PAGE_SIZE;
@@ -128,6 +165,21 @@ export class TemplatesPageComponent {
   protected readonly searchQuery = signal<string>('');
   // Debounced version of `searchQuery` — what actually drives the API.
   protected readonly debouncedSearch = signal<string>('');
+  protected readonly externalFilter = signal<TemplateExternalStatus | ''>('');
+  protected readonly activeFilter = signal<'' | 'active' | 'inactive'>('');
+  protected readonly showArchived = signal(false);
+  protected readonly sort = signal<TemplateSort>('updated');
+  /** Per-channel counts for the tabs (null until loaded). */
+  protected readonly channelCounts = signal<Record<string, number> | null>(null);
+  protected readonly channelCountTotal = computed(() =>
+    Object.values(this.channelCounts() ?? {}).reduce((a, b) => a + b, 0),
+  );
+
+  // --- row actions ------------------------------------------------------
+  protected readonly menuOpenFor = signal<string | null>(null);
+  protected readonly confirmArchiveFor = signal<TemplateRead | null>(null);
+  protected readonly rowBusy = signal<string | null>(null);
+  protected readonly actionError = signal<string | null>(null);
 
   protected readonly canWrite = computed(() => this.auth.hasPermission('templates.write'));
   /** Attribution track — reviewers see a "Needs approval" chip on rows
@@ -165,11 +217,19 @@ export class TemplatesPageComponent {
       const status = this.statusFilter();
       const q = this.debouncedSearch();
       const page = this.pageIndex();
+      const external = this.externalFilter();
+      const active = this.activeFilter();
+      const archived = this.showArchived();
+      const sort = this.sort();
       void channel;
       void status;
       void q;
       void page;
+      void external;
+      void active;
+      void sort;
       this.reload();
+      this.loadCounts(archived);
     });
     // Attribution track — one-shot staff load at page mount for the
     // "Created by" / "Approved by" cells. Failure is non-fatal; those
@@ -222,8 +282,42 @@ export class TemplatesPageComponent {
     }, 300);
   }
 
+  /** Channel tab click — a single channel, or all ('' ). */
+  protected selectChannelTab(channel: TemplateChannel | ''): void {
+    this.channelFilter.set(channel ? [channel] : []);
+    this.pageIndex.set(0);
+  }
+
+  protected activeChannelTab(): string {
+    const c = this.channelFilter();
+    return c.length === 1 ? c[0] : c.length === 0 ? '' : 'multi';
+  }
+
+  protected setExternalFilter(value: string): void {
+    this.externalFilter.set(value as TemplateExternalStatus | '');
+    this.pageIndex.set(0);
+  }
+
+  protected setActiveFilter(value: string): void {
+    this.activeFilter.set(value as '' | 'active' | 'inactive');
+    this.pageIndex.set(0);
+  }
+
+  protected toggleShowArchived(): void {
+    this.showArchived.update((v) => !v);
+    this.pageIndex.set(0);
+  }
+
+  protected setSort(value: string): void {
+    this.sort.set(value as TemplateSort);
+    this.pageIndex.set(0);
+  }
+
   protected clearFilters(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.externalFilter.set('');
+    this.activeFilter.set('');
+    this.showArchived.set(false);
     this.channelFilter.set([]);
     this.statusFilter.set([]);
     this.searchQuery.set('');
@@ -237,8 +331,95 @@ export class TemplatesPageComponent {
     () =>
       this.channelFilter().length > 0 ||
       this.statusFilter().length > 0 ||
+      this.externalFilter() !== '' ||
+      this.activeFilter() !== '' ||
+      this.showArchived() ||
       this.debouncedSearch().length > 0,
   );
+
+  // --- row navigation + actions -----------------------------------------
+
+  /** Whole-row click opens the editor (links / buttons inside the row
+   *  handle their own clicks). */
+  protected openRow(row: TemplateRead, event: MouseEvent): void {
+    if ((event.target as HTMLElement).closest('a, button')) return;
+    void this.router.navigate(['/user/templates', row.id]);
+  }
+
+  protected toggleMenu(id: string, event: Event): void {
+    event.stopPropagation();
+    this.menuOpenFor.update((cur) => (cur === id ? null : id));
+  }
+
+  @HostListener('document:click')
+  protected closeMenu(): void {
+    this.menuOpenFor.set(null);
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    this.menuOpenFor.set(null);
+    this.confirmArchiveFor.set(null);
+  }
+
+  protected duplicate(row: TemplateRead): void {
+    this.menuOpenFor.set(null);
+    if (this.rowBusy()) return;
+    this.rowBusy.set(row.id);
+    this.actionError.set(null);
+    this.api
+      .duplicate(row.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (copy) => {
+          this.rowBusy.set(null);
+          void this.router.navigate(['/user/templates', copy.id]);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.rowBusy.set(null);
+          this.actionError.set(extractApiError(err) ?? 'Could not duplicate the template.');
+        },
+      });
+  }
+
+  protected askArchive(row: TemplateRead): void {
+    this.menuOpenFor.set(null);
+    this.confirmArchiveFor.set(row);
+  }
+
+  protected confirmArchive(): void {
+    const row = this.confirmArchiveFor();
+    if (!row || this.rowBusy()) return;
+    this.rowBusy.set(row.id);
+    this.actionError.set(null);
+    this.api
+      .archiveViaWorkflow(row.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.rowBusy.set(null);
+          this.confirmArchiveFor.set(null);
+          this.reload();
+          this.loadCounts(this.showArchived());
+        },
+        error: (err: HttpErrorResponse) => {
+          this.rowBusy.set(null);
+          this.confirmArchiveFor.set(null);
+          this.actionError.set(extractApiError(err) ?? 'Could not archive the template.');
+        },
+      });
+  }
+
+  private loadCounts(includeArchived: boolean): void {
+    this.api
+      .counts(includeArchived)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (c) => this.channelCounts.set(c),
+        // Tab counts are decoration — keep the previous numbers.
+        error: () => undefined,
+      });
+  }
 
   // --- pagination -----------------------------------------------------
 
@@ -272,12 +453,21 @@ export class TemplatesPageComponent {
     this.listSub?.unsubscribe();
     const offset = this.pageIndex() * PAGE_SIZE;
     const channels = this.channelFilter();
-    const statuses = this.statusFilter();
+    const statuses: string[] =
+      this.statusFilter().length > 0
+        ? this.statusFilter()
+        : this.showArchived()
+          ? []
+          : NON_ARCHIVED;
+    const active = this.activeFilter();
     this.listSub = this.api
       .list({
         channel: channels.length > 0 ? (channels as TemplateChannel[]) : undefined,
         internal_status: statuses.length > 0 ? (statuses as TemplateInternalStatus[]) : undefined,
+        external_status: this.externalFilter() || undefined,
+        is_active: active === '' ? undefined : active === 'active',
         q: this.debouncedSearch() || undefined,
+        sort: this.sort(),
         limit: PAGE_SIZE,
         offset,
       })

@@ -4,6 +4,7 @@ import { environment } from '../../../environments/environment';
 import { furnitureAuthGuard } from './core/auth/auth.guard';
 import { permissionGuard } from './core/auth/permission.guard';
 import { noOrgGuard } from './core/shared/guards/no-org.guard';
+import { unsavedChangesGuard } from './core/shared/guards/unsaved-changes.guard';
 
 // Dev-only routes are spread into the shell's children when not building
 // for production. The guard on the shell still applies, so the route is
@@ -510,6 +511,7 @@ export const userRoutes: Routes = [
         // Employee sees a read-only editor.
         path: 'templates/new',
         canActivate: [permissionGuard('templates.read')],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./core/templates/editor/template-editor.page').then(
             (m) => m.TemplateEditorPageComponent,
@@ -518,6 +520,7 @@ export const userRoutes: Routes = [
       {
         path: 'templates/:id',
         canActivate: [permissionGuard('templates.read')],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./core/templates/editor/template-editor.page').then(
             (m) => m.TemplateEditorPageComponent,

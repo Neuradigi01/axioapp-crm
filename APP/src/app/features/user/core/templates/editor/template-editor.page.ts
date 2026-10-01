@@ -11,6 +11,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  HostListener,
   ViewChild,
   computed,
   effect,
@@ -27,12 +28,13 @@ import {
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { EMPTY, timer } from 'rxjs';
+import { EMPTY, Observable, of, timer } from 'rxjs';
 import { catchError, distinctUntilChanged, map, switchMap } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../../auth/auth.service';
 import { StaffApiService, StaffListItem } from '../../staff/staff-api.service';
+import { HasUnsavedChanges } from '../../shared/guards/unsaved-changes.guard';
 
 import { ChannelChipComponent } from '../channel-chip.component';
 import { TemplateReviewModalComponent } from '../review/template-review.modal';
@@ -174,7 +176,7 @@ function waNameValidator(control: AbstractControl): { waName: true } | null {
   ],
   templateUrl: './template-editor.page.html',
 })
-export class TemplateEditorPageComponent {
+export class TemplateEditorPageComponent implements HasUnsavedChanges {
   private readonly api = inject(TemplatesApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly staffApi = inject(StaffApiService);
@@ -433,7 +435,30 @@ export class TemplateEditorPageComponent {
     if (!this.canWrite()) return false;
     return t.external_status === 'rejected';
   });
+  /** Owners / Admins who can publish AND submit to Meta fix a rejected
+   *  template in one click: save → back to draft → publish → submit. */
+  protected readonly showOneStepResubmit = computed(
+    () => this.showResubmitButton() && this.canPublish() && this.canSubmitExternal(),
+  );
   protected readonly rejectionReason = signal<string | null>(null);
+
+  /** Reviewer's reject / request-changes note, shown to the author while
+   *  the template is back in draft. */
+  protected readonly reviewNote = computed(() => {
+    const t = this.template();
+    if (!t || t.internal_status !== 'draft') return null;
+    if (t.last_reviewed_action !== 'reject' && t.last_reviewed_action !== 'request_changes') {
+      return null;
+    }
+    return {
+      action: t.last_reviewed_action,
+      note: t.last_review_note ?? null,
+      by: this.staffName(t.last_reviewed_by_user_id),
+    };
+  });
+
+  protected readonly confirmArchiveOpen = signal(false);
+  protected readonly duplicating = signal(false);
 
   // --- modal / drawer state ------------------------------------------
 
@@ -1046,63 +1071,81 @@ export class TemplateEditorPageComponent {
       if (!auto) this.saveError.set('Pick a channel before saving.');
       return;
     }
-    const subForm =
-      channel === 'whatsapp'
-        ? this.waForm()
-        : channel === 'sms'
-          ? this.smsForm()
-          : channel === 'facebook' || channel === 'instagram'
-            ? this.fbForm()
-            : channel === 'push'
-              ? this.pushForm()
-              : this.emailForm();
+    const subForm = this.activeSubForm();
     if (this.headerForm.invalid || subForm?.invalid) {
       // Auto-save never nags — the operator is mid-edit.
       if (auto) return;
-      this.headerForm.markAllAsTouched();
-      subForm?.markAllAsTouched();
-      const labels = [
-        ...invalidFieldLabels(this.headerForm, 'Name'),
-        ...(subForm
-          ? invalidFieldLabels(subForm, channel === 'email' ? 'Email body' : 'Body')
-          : []),
-      ];
-      const unique = [...new Set(labels)];
-      this.saveError.set(
-        unique.length > 0
-          ? `Fix ${unique.length === 1 ? 'this field' : 'these fields'}: ${unique.join(', ')}.`
-          : 'Fix the highlighted fields and try again.',
-      );
-      // Bring the first highlighted field into view.
-      queueMicrotask(() => {
-        const first = document.querySelector<HTMLElement>(
-          '.tpl-validate :is(input, textarea, select).ng-invalid',
-        );
-        first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        first?.focus({ preventScroll: true });
-      });
+      this.reportInvalidFields();
       return;
     }
     this.saveError.set(null);
     this.saving.set(true);
     const existing = this.template();
     const payload = this.buildPayload();
-
-    // `channel` is immutable after first save — TemplateUpdate schema
-    // rejects it with "Extra inputs are not permitted" via
-    // ``extra=forbid``. buildPayload() always emits channel because
-    // it's required on create; strip it before firing the PATCH.
-    let updatePayload: TemplateUpdatePayload | null = null;
-    if (existing) {
-      const cloned = { ...(payload as TemplateCreatePayload) } as Record<string, unknown>;
-      delete cloned['channel'];
-      updatePayload = cloned as TemplateUpdatePayload;
-    }
-
     const obs = existing
-      ? this.api.update(existing.id, updatePayload as TemplateUpdatePayload)
+      ? this.api.update(existing.id, this.toUpdatePayload(payload))
       : this.api.create(payload as TemplateCreatePayload);
+    this.subscribeSave(obs, !existing);
+  }
 
+  /** The active channel's sub-form (null before a channel is picked). */
+  private activeSubForm(): FormGroup | null {
+    switch (this.channel()) {
+      case 'whatsapp':
+        return this.waForm();
+      case 'sms':
+        return this.smsForm();
+      case 'facebook':
+      case 'instagram':
+        return this.fbForm();
+      case 'push':
+        return this.pushForm();
+      case 'email':
+        return this.emailForm();
+      default:
+        return null;
+    }
+  }
+
+  /** Mark every field touched, name the invalid ones in the error
+   *  banner and bring the first into view. */
+  private reportInvalidFields(): void {
+    const channel = this.channel();
+    const subForm = this.activeSubForm();
+    this.headerForm.markAllAsTouched();
+    subForm?.markAllAsTouched();
+    const labels = [
+      ...invalidFieldLabels(this.headerForm, 'Name'),
+      ...(subForm ? invalidFieldLabels(subForm, channel === 'email' ? 'Email body' : 'Body') : []),
+    ];
+    const unique = [...new Set(labels)];
+    this.saveError.set(
+      unique.length > 0
+        ? `Fix ${unique.length === 1 ? 'this field' : 'these fields'}: ${unique.join(', ')}.`
+        : 'Fix the highlighted fields and try again.',
+    );
+    // Bring the first highlighted field into view.
+    queueMicrotask(() => {
+      const first = document.querySelector<HTMLElement>(
+        '.tpl-validate :is(input, textarea, select).ng-invalid',
+      );
+      first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      first?.focus({ preventScroll: true });
+    });
+  }
+
+  /** `channel` is immutable after first save — TemplateUpdate rejects it
+   *  ("Extra inputs are not permitted", ``extra=forbid``). buildPayload()
+   *  always emits it because create needs it; strip it for PATCH. */
+  private toUpdatePayload(
+    payload: TemplateCreatePayload | TemplateUpdatePayload,
+  ): TemplateUpdatePayload {
+    const cloned = { ...(payload as TemplateCreatePayload) } as Record<string, unknown>;
+    delete cloned['channel'];
+    return cloned as TemplateUpdatePayload;
+  }
+
+  private subscribeSave(obs: Observable<TemplateRead>, isNew: boolean): void {
     obs.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (row) => {
         if (row.channel === 'sms') {
@@ -1112,7 +1155,7 @@ export class TemplateEditorPageComponent {
               .patchSmsMetadata(row.id, dltPatch)
               .pipe(takeUntilDestroyed(this.destroyRef))
               .subscribe({
-                next: () => this.finishSave(row, !existing),
+                next: () => this.finishSave(row, isNew),
                 error: (err: HttpErrorResponse) => {
                   // Central row saved; only the DLT patch failed. The
                   // toast nudges the operator to retry so they don't
@@ -1127,7 +1170,7 @@ export class TemplateEditorPageComponent {
             return;
           }
         }
-        this.finishSave(row, !existing);
+        this.finishSave(row, isNew);
       },
       error: (err: HttpErrorResponse) => {
         this.saving.set(false);
@@ -1149,6 +1192,40 @@ export class TemplateEditorPageComponent {
         replaceUrl: true,
       });
     }
+  }
+
+  /** Route guard hook — true when leaving would drop typed changes. */
+  public hasUnsavedChanges(): boolean {
+    return this.dirty() && !this.locked() && this.canWrite() && !this.saving();
+  }
+
+  /** Browser-level guard for tab close / reload. */
+  @HostListener('window:beforeunload', ['$event'])
+  protected onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.hasUnsavedChanges()) event.preventDefault();
+  }
+
+  /** Make an editable draft copy of the saved template and open it. */
+  protected duplicateTemplate(): void {
+    const t = this.template();
+    if (!t || this.duplicating()) return;
+    this.duplicating.set(true);
+    this.saveError.set(null);
+    this.api
+      .duplicate(t.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (copy) => {
+          this.duplicating.set(false);
+          // The copy is a different template — leaving this one is fine
+          // even with unsaved edits, the guard still asks first.
+          void this.router.navigate(['/user/templates', copy.id]);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.duplicating.set(false);
+          this.saveError.set(extractApiError(err) ?? 'Could not duplicate the template.');
+        },
+      });
   }
 
   private scheduleAutoSave(): void {
@@ -1211,8 +1288,14 @@ export class TemplateEditorPageComponent {
   }
 
   protected archiveTemplate(): void {
+    if (!this.template() || this.transitioning()) return;
+    this.confirmArchiveOpen.set(true);
+  }
+
+  protected confirmArchive(): void {
     const t = this.template();
     if (!t || this.transitioning()) return;
+    this.confirmArchiveOpen.set(false);
     this.transitioning.set('archive');
     this.api
       .archiveViaWorkflow(t.id)
@@ -1257,11 +1340,15 @@ export class TemplateEditorPageComponent {
     // Media headers need a sample — ask for the file first; the upload
     // continues in `onHeaderSamplePicked`.
     if (this.mediaHeaderType()) {
+      this.pendingSampleAction = 'submit';
       this.headerSampleInput?.nativeElement.click();
       return;
     }
     this.sendToMeta(t.id);
   }
+
+  /** Which action is waiting for the header sample file picker. */
+  private pendingSampleAction: 'submit' | 'resubmit' = 'submit';
 
   protected onHeaderSamplePicked(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -1269,7 +1356,62 @@ export class TemplateEditorPageComponent {
     input.value = '';
     const t = this.template();
     if (!file || !t || this.transitioning()) return;
-    this.sendToMeta(t.id, file);
+    if (this.pendingSampleAction === 'resubmit') this.runSaveAndResubmit(file);
+    else this.sendToMeta(t.id, file);
+  }
+
+  /** One click for a Meta-rejected template: save the fixes, move back
+   *  to draft, publish and submit to WhatsApp again. */
+  protected saveAndResubmit(): void {
+    if (!this.template() || this.transitioning()) return;
+    const subForm = this.activeSubForm();
+    if (this.headerForm.invalid || subForm?.invalid) {
+      this.reportInvalidFields();
+      return;
+    }
+    if (this.mediaHeaderType()) {
+      this.pendingSampleAction = 'resubmit';
+      this.headerSampleInput?.nativeElement.click();
+      return;
+    }
+    this.runSaveAndResubmit();
+  }
+
+  private runSaveAndResubmit(headerSample?: File): void {
+    const t = this.template();
+    if (!t) return;
+    this.clearAutoSave();
+    this.saveError.set(null);
+    this.transitioning.set('resubmit');
+    const saved$: Observable<TemplateRead> = this.dirty()
+      ? this.api.update(t.id, this.toUpdatePayload(this.buildPayload()))
+      : of(t);
+    saved$
+      .pipe(
+        switchMap(() => this.api.resubmit(t.id)),
+        switchMap(() => this.api.publish(t.id)),
+        switchMap(() => this.api.submitExternal(t.id, headerSample)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (row) => {
+          this.dirty.set(false);
+          this.rejectionReason.set(null);
+          this.applyTransition(
+            row,
+            'Resubmitted to WhatsApp — Meta usually replies within minutes.',
+          );
+        },
+        error: (err: HttpErrorResponse) => {
+          this.applyTransitionError(err);
+          // A step in the chain may already have succeeded — show the
+          // real saved state rather than a half-updated screen.
+          this.api
+            .get(t.id)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({ next: (row) => this.hydrateFromRow(row), error: () => undefined });
+        },
+      });
   }
 
   private sendToMeta(id: string, headerSample?: File): void {

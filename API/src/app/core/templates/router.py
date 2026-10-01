@@ -165,6 +165,7 @@ async def list_endpoint(
     q: str | None = Query(default=None, max_length=255),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    sort: Literal["updated", "created", "name"] = Query(default="updated"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_permissions(PERM_READ)),
 ) -> TemplateListResponse:
@@ -178,6 +179,7 @@ async def list_endpoint(
         q=q,
         limit=limit,
         offset=offset,
+        sort=sort,
     )
     # Campaigns v1 Step 02 — each row is (MessageTemplate, rejection_reason);
     # attach the reason to the response schema so the frontend picker +
@@ -193,10 +195,11 @@ async def list_endpoint(
         payload.external_rejection_reason = rejection_reason
         review = latest_reviews.get(template.id)
         if review is not None:
-            reviewer_id, action, reviewed_at = review
+            reviewer_id, action, reviewed_at, note = review
             payload.last_reviewed_by_user_id = reviewer_id
             payload.last_reviewed_action = action
             payload.last_reviewed_at = reviewed_at
+            payload.last_review_note = note
         items.append(payload)
     return TemplateListResponse(
         items=items,
@@ -229,6 +232,19 @@ async def create_endpoint(
             detail=str(exc),
         ) from exc
     return TemplateRead.model_validate(template)
+
+
+@router.get("/counts", response_model=dict[str, int])
+async def counts_endpoint(
+    include_archived: bool = Query(default=False),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions(PERM_READ)),
+) -> dict[str, int]:
+    """Template counts per channel for the library's channel tabs.
+    Declared before ``/{template_id}`` so the path isn't swallowed."""
+    return await templates_service.count_templates_by_channel(
+        db, org_id=user.org_id, include_archived=include_archived
+    )
 
 
 @router.get("/variables/{channel}", response_model=list[VariableDefOut])
@@ -265,10 +281,11 @@ async def get_endpoint(
     latest = await templates_da.latest_reviews_for_templates(db, [template.id])
     review = latest.get(template.id)
     if review is not None:
-        reviewer_id, action, reviewed_at = review
+        reviewer_id, action, reviewed_at, note = review
         payload_out.last_reviewed_by_user_id = reviewer_id
         payload_out.last_reviewed_action = action
         payload_out.last_reviewed_at = reviewed_at
+        payload_out.last_review_note = note
     return payload_out
 
 

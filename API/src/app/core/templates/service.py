@@ -122,6 +122,7 @@ async def list_templates(
     q: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    sort: str = "updated",
 ) -> tuple[list[tuple[MessageTemplate, str | None]], int]:
     """Filterable + paginated list. Returns ``(rows, total)`` where each
     row is ``(MessageTemplate, external_rejection_reason)`` — the reason
@@ -138,6 +139,16 @@ async def list_templates(
         q=q,
         limit=limit,
         offset=offset,
+        sort=sort,
+    )
+
+
+async def count_templates_by_channel(
+    session: AsyncSession, *, org_id: uuid.UUID, include_archived: bool = False
+) -> dict[str, int]:
+    """Per-channel template counts for the library's channel tabs."""
+    return await data_access.count_templates_by_channel(
+        session, org_id=org_id, include_archived=include_archived
     )
 
 
@@ -325,7 +336,7 @@ async def _load_wa_extension(session: AsyncSession, *, template: MessageTemplate
     )
 
     if template.channel != ConversationChannel.whatsapp:
-        setattr(template, "whatsapp", None)
+        template.whatsapp = None
         return
 
     row = (
@@ -335,7 +346,7 @@ async def _load_wa_extension(session: AsyncSession, *, template: MessageTemplate
     ).scalar_one_or_none()
 
     if row is None:
-        setattr(template, "whatsapp", None)
+        template.whatsapp = None
         return
 
     # Reverse the components payload into structured buttons so the
@@ -359,17 +370,7 @@ async def _load_wa_extension(session: AsyncSession, *, template: MessageTemplate
                     )
                 break
 
-    setattr(
-        template,
-        "whatsapp",
-        WhatsAppExtensionRead(
-            category=row.category,
-            header_type=row.header_type,
-            header_text=row.header_text,
-            footer_text=row.footer_text,
-            buttons=buttons,
-        ),
-    )
+    template.whatsapp = WhatsAppExtensionRead(category=row.category, header_type=row.header_type, header_text=row.header_text, footer_text=row.footer_text, buttons=buttons)
 
 
 async def create_template(

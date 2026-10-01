@@ -244,6 +244,9 @@ class TemplateRead(ORMModel):
     last_reviewed_by_user_id: uuid.UUID | None = None
     last_reviewed_action: str | None = None
     last_reviewed_at: datetime | None = None
+    # Reviewer's note on that latest review (reject / request-changes
+    # reason) — shown to the author in the editor and list.
+    last_review_note: str | None = None
     created_at: datetime
     updated_at: datetime
 
