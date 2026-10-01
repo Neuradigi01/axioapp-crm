@@ -46,6 +46,7 @@ import {
 } from '../shared/reassign-modal/reassign-modal.component';
 import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
+import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
 import { ColumnFilterComponent } from '../shared/table-filters/column-filter.component';
 import type { ColumnFilterOption } from '../shared/table-filters/column-filter.types';
 import { extractApiError } from '@core/services/api-error.util';
@@ -76,6 +77,7 @@ class ContactsListState extends ListPageState<ContactListItem> {}
     OptInChipComponent,
     ColumnFilterComponent,
     EmptyStateComponent,
+    MobileSelectComponent,
   ],
   providers: [ContactsListState],
   templateUrl: './contacts-list.page.html',
@@ -449,6 +451,25 @@ export class ContactsListPageComponent {
       this.state.page.set(1);
       this.reload();
     }
+  }
+
+  /** Sort choices for the mobile toolbar (the desktop table sorts from
+   *  its headers). Value is `<key>:<order>`. */
+  protected readonly sortOptions = [
+    { value: 'last_activity_at:desc', label: 'Recent activity' },
+    { value: 'created_at:desc', label: 'Newest first' },
+    { value: 'created_at:asc', label: 'Oldest first' },
+    { value: 'full_name:asc', label: 'Name A–Z' },
+    { value: 'full_name:desc', label: 'Name Z–A' },
+  ];
+
+  protected onSortSelect(value: string): void {
+    const [key, order] = value.split(':') as [ContactSortKey, SortOrder];
+    if (key === this.sortKey() && order === this.sortOrder()) return;
+    this.sortKey.set(key);
+    this.sortOrder.set(order);
+    this.state.page.set(1);
+    this.reload();
   }
 
   /** `aria-sort` value for a sortable column header. */

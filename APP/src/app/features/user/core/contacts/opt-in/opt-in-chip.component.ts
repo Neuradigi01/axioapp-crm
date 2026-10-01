@@ -53,13 +53,13 @@ export class OptInChipComponent {
   protected readonly classes = computed(() => {
     switch (this.status()) {
       case 'opted_in':
-        return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+        return 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-300';
       case 'opted_out':
-        return 'bg-red-500/10 text-red-400 ring-red-500/20';
+        return 'bg-red-500/10 text-red-700 ring-red-500/20 dark:text-red-300';
       case 'implicit':
-        return 'bg-amber-50 text-amber-700 ring-amber-200';
+        return 'bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-300';
       default:
-        return 'bg-surface-2 text-muted border-subtle';
+        return 'bg-surface-2 text-muted ring-subtle';
     }
   });
 

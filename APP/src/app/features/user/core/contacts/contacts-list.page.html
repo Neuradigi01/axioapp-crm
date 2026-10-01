@@ -101,6 +101,49 @@
     }
   </div>
 
+  <!-- Mobile toolbar — on desktop these live in the table header. -->
+  <div class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 md:hidden">
+    @if (state.items().length > 0) {
+      <label class="inline-flex items-center gap-2 text-xs text-muted">
+        <input
+          type="checkbox"
+          class="checkbox"
+          [checked]="state.allOnPageSelected()"
+          (change)="toggleAllOnPage()"
+        />
+        All
+      </label>
+    }
+    <div
+      class="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold tracking-[.06em] text-faint uppercase"
+    >
+      <app-column-filter
+        label="Source"
+        [options]="sourceOptions()"
+        [value]="sourceFilter()"
+        (valueChange)="onColumnFilterChange('source', $event)"
+      />
+      <app-column-filter
+        label="Owner"
+        [options]="assigneeOptions()"
+        [value]="assigneeFilter()"
+        (valueChange)="onColumnFilterChange('assignee', $event)"
+      />
+      <app-column-filter
+        label="Tags"
+        [options]="tagOptions()"
+        [value]="tagFilter()"
+        (valueChange)="onColumnFilterChange('tag', $event)"
+      />
+    </div>
+    <crm-mobile-select
+      class="w-40"
+      [options]="sortOptions"
+      [value]="sortKey() + ':' + sortOrder()"
+      (valueChange)="onSortSelect($event)"
+    />
+  </div>
+
   <!-- Body -->
   <div class="overflow-hidden rounded-xl border border-subtle bg-surface md:overflow-x-auto">
     @if (state.loadError(); as err) {
@@ -148,15 +191,131 @@
         </app-empty-state>
       }
     } @else {
+      <!-- Phone / small tablet: one card per contact. The table below
+           needs ~1100px, so it only renders from md up. -->
+      <ul
+        class="divide-y divide-subtle transition-opacity md:hidden"
+        [class.opacity-50]="state.loading()"
+        [attr.aria-busy]="state.loading()"
+        aria-label="Contacts"
+      >
+        @for (item of state.items(); track item.id) {
+          <li
+            class="flex items-start gap-3 px-4 py-3 transition"
+            [class.bg-surface-2]="state.selectedIds().has(item.id)"
+          >
+            <input
+              type="checkbox"
+              class="checkbox mt-2.5 shrink-0"
+              [checked]="state.selectedIds().has(item.id)"
+              (click)="toggleRow(item.id, $event)"
+              [attr.aria-label]="'Select ' + item.full_name"
+            />
+            <div
+              class="min-w-0 flex-1 cursor-pointer rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              tabindex="0"
+              role="link"
+              [attr.aria-label]="'Open ' + item.full_name"
+              (click)="onRowClick(item)"
+              (keydown.enter)="onRowClick(item)"
+            >
+              <div class="flex items-start gap-2.5">
+                <span
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft font-display text-xs font-semibold text-accent"
+                  aria-hidden="true"
+                >
+                  {{ initials(item.full_name) }}
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-baseline justify-between gap-2">
+                    <span class="truncate text-sm font-medium text-default">{{
+                      item.full_name
+                    }}</span>
+                    <span class="shrink-0 font-mono text-[11px] text-faint tabular-nums">
+                      {{ item.last_activity_at | relativeTime }}
+                    </span>
+                  </div>
+                  @if (item.email || item.phone) {
+                    <p class="mt-0.5 truncate text-xs text-muted">
+                      {{ item.phone ?? '' }}{{ item.phone && item.email ? ' · ' : ''
+                      }}{{ item.email ?? '' }}
+                    </p>
+                  }
+                  <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
+                    @if (item.source) {
+                      <span>{{ sourceLabel(item.source) }}</span>
+                    }
+                    @if (item.assigned_to_id) {
+                      <span class="inline-flex items-center gap-1">
+                        <lucide-icon name="user" class="h-3 w-3 text-faint" aria-hidden="true" />
+                        {{ ownerLabel(item.assigned_to_id) }}
+                      </span>
+                    }
+                    @for (tag of item.tags; track tag) {
+                      <span
+                        class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 font-medium text-muted ring-1 ring-subtle"
+                      >
+                        {{ tag }}
+                      </span>
+                    }
+                    @if (item.anonymised_at) {
+                      <span
+                        class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted ring-1 ring-subtle"
+                        title="This contact has been anonymised (DPDP right-to-be-forgotten). PII is wiped and both consent channels are opted-out."
+                      >
+                        Anonymised
+                      </span>
+                    }
+                    @if (item.whatsapp_opt_in_status === 'opted_out') {
+                      <app-opt-in-chip [status]="item.whatsapp_opt_in_status" channel="whatsapp" />
+                    }
+                    @if (item.email_opt_in_status === 'opted_out') {
+                      <app-opt-in-chip [status]="item.email_opt_in_status" channel="email" />
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Quick reach-out — the main reason to open Contacts on a phone. -->
+            <div class="flex shrink-0 flex-col gap-1">
+              @if (item.phone) {
+                <a
+                  [appPhoneLink]="item.phone"
+                  class="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-default"
+                  [attr.aria-label]="'Call ' + item.full_name"
+                >
+                  <lucide-icon name="phone" class="h-4 w-4" />
+                </a>
+                <a
+                  [appWhatsappLink]="item.phone"
+                  class="flex h-8 w-8 items-center justify-center rounded-full text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400"
+                  [attr.aria-label]="'WhatsApp ' + item.full_name"
+                >
+                  <lucide-icon name="message-circle" class="h-4 w-4" />
+                </a>
+              } @else if (item.email) {
+                <a
+                  [appMailLink]="item.email"
+                  class="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-default"
+                  [attr.aria-label]="'Email ' + item.full_name"
+                >
+                  <lucide-icon name="mail" class="h-4 w-4" />
+                </a>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+
       <!-- Rows stay visible (dimmed) while a filter / sort / page change reloads. -->
       <table
-        class="w-full table-fixed transition-opacity md:table-auto md:min-w-[1100px]"
+        class="hidden w-full min-w-[1100px] transition-opacity md:table"
         [class.opacity-50]="state.loading()"
         [attr.aria-busy]="state.loading()"
       >
         <thead>
           <tr class="border-b border-subtle bg-surface-2">
-            <th scope="col" class="hidden w-10 px-3 py-2.5 text-left md:table-cell">
+            <th scope="col" class="w-10 px-3 py-2.5 text-left">
               <input
                 type="checkbox"
                 class="checkbox"
@@ -167,12 +326,12 @@
             </th>
             <th
               scope="col"
-              class="w-[32%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
+              class="px-6 py-2.5 text-left text-[11px] font-semibold tracking-[.06em] text-faint uppercase"
               [attr.aria-sort]="ariaSort('full_name')"
             >
               <button
                 type="button"
-                class="inline-flex items-center gap-1 transition hover:text-default focus:outline-none"
+                class="inline-flex items-center gap-1 transition hover:text-default focus:outline-none focus-visible:text-default"
                 (click)="toggleSort('full_name')"
               >
                 Name
@@ -186,19 +345,19 @@
             </th>
             <th
               scope="col"
-              class="w-[26%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
+              class="px-6 py-2.5 text-left text-[11px] font-semibold tracking-[.06em] text-faint uppercase"
             >
               Email
             </th>
             <th
               scope="col"
-              class="w-[20%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
+              class="px-6 py-2.5 text-left text-[11px] font-semibold tracking-[.06em] text-faint uppercase"
             >
               Phone
             </th>
             <th
               scope="col"
-              class="w-[12%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
+              class="px-6 py-2.5 text-left text-[11px] font-semibold tracking-[.06em] text-faint uppercase"
             >
               <app-column-filter
                 label="Source"
@@ -209,7 +368,7 @@
             </th>
             <th
               scope="col"
-              class="w-[10%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
+              class="px-6 py-2.5 text-left text-[11px] font-semibold tracking-[.06em] text-faint uppercase"
             >
               <app-column-filter
                 label="Owner"
@@ -220,7 +379,7 @@
             </th>
             <th
               scope="col"
-              class="hidden px-4 py-2.5 text-left text-[11px] font-semibold tracking-[.06em] text-faint uppercase md:table-cell md:px-6"
+              class="px-6 py-2.5 text-left text-[11px] font-semibold tracking-[.06em] text-faint uppercase"
             >
               <app-column-filter
                 label="Tags"
@@ -231,12 +390,12 @@
             </th>
             <th
               scope="col"
-              class="hidden px-4 py-2.5 text-right text-[11px] font-semibold tracking-[.06em] text-faint uppercase md:table-cell md:px-6"
+              class="px-6 py-2.5 text-right text-[11px] font-semibold tracking-[.06em] text-faint uppercase"
               [attr.aria-sort]="ariaSort('created_at')"
             >
               <button
                 type="button"
-                class="inline-flex items-center gap-1 transition hover:text-default focus:outline-none"
+                class="inline-flex items-center gap-1 transition hover:text-default focus:outline-none focus-visible:text-default"
                 (click)="toggleSort('created_at')"
               >
                 Created
@@ -250,12 +409,12 @@
             </th>
             <th
               scope="col"
-              class="hidden px-4 py-2.5 text-right text-[11px] font-semibold tracking-[.06em] text-faint uppercase md:table-cell md:px-6"
+              class="px-6 py-2.5 text-right text-[11px] font-semibold tracking-[.06em] text-faint uppercase"
               [attr.aria-sort]="ariaSort('last_activity_at')"
             >
               <button
                 type="button"
-                class="inline-flex items-center gap-1 transition hover:text-default focus:outline-none"
+                class="inline-flex items-center gap-1 transition hover:text-default focus:outline-none focus-visible:text-default"
                 (click)="toggleSort('last_activity_at')"
               >
                 Last activity
@@ -275,10 +434,10 @@
               tabindex="0"
               (click)="onRowClick(item)"
               (keydown.enter)="onRowClick(item)"
-              class="cursor-pointer border-b border-subtle transition last:border-b-0 hover:bg-surface-2 focus:bg-surface-2 focus:outline-none"
+              class="cursor-pointer border-b border-subtle transition last:border-b-0 hover:bg-surface-2 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
               [class.bg-surface-2]="state.selectedIds().has(item.id)"
             >
-              <td class="hidden w-10 px-3 py-3 md:table-cell" (click)="$event.stopPropagation()">
+              <td class="w-10 px-3 py-3" (click)="$event.stopPropagation()">
                 <input
                   type="checkbox"
                   class="checkbox"
@@ -287,22 +446,19 @@
                   [attr.aria-label]="'Select ' + item.full_name"
                 />
               </td>
-              <td
-                class="overflow-hidden px-1.5 py-2 align-top text-[11px] font-medium text-default sm:px-2 sm:text-[12px] md:px-6 md:py-3 md:text-sm md:whitespace-nowrap"
-              >
-                <div class="flex items-start gap-1.5 md:items-center md:gap-3">
+              <td class="px-6 py-3 text-sm font-medium whitespace-nowrap text-default">
+                <div class="flex items-center gap-3">
                   <span
-                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-soft font-display text-[9px] font-semibold text-accent sm:h-7 sm:w-7 sm:text-[10px] md:h-8 md:w-8 md:text-xs"
+                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft font-display text-xs font-semibold text-accent"
+                    aria-hidden="true"
                   >
                     {{ initials(item.full_name) }}
                   </span>
-                  <span class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 md:gap-2">
-                    <span class="min-w-0 leading-tight [overflow-wrap:anywhere]">
-                      {{ item.full_name }}
-                    </span>
+                  <span class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                    <span class="min-w-0 leading-tight">{{ item.full_name }}</span>
                     @if (item.anonymised_at) {
                       <span
-                        class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-faint"
+                        class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted ring-1 ring-subtle"
                         title="This contact has been anonymised (DPDP right-to-be-forgotten). PII is wiped and both consent channels are opted-out."
                       >
                         Anonymised
@@ -318,7 +474,7 @@
                 </div>
               </td>
               <td
-                class="overflow-hidden px-1.5 py-2 align-top text-[11px] leading-snug text-muted [overflow-wrap:anywhere] sm:px-2 sm:text-[12px] md:px-6 md:py-3 md:text-sm md:leading-normal md:break-normal md:whitespace-nowrap"
+                class="px-6 py-3 text-sm whitespace-nowrap text-muted"
                 (click)="$event.stopPropagation()"
               >
                 @if (item.email) {
@@ -330,17 +486,19 @@
                 }
               </td>
               <td
-                class="overflow-hidden px-1.5 py-2 align-top text-[11px] leading-snug text-muted [overflow-wrap:anywhere] sm:px-2 sm:text-[12px] md:px-6 md:py-3 md:text-sm md:leading-normal md:break-normal md:whitespace-nowrap"
+                class="px-6 py-3 text-sm whitespace-nowrap text-muted"
                 (click)="$event.stopPropagation()"
               >
                 @if (item.phone) {
-                  <span class="inline-flex flex-wrap items-center gap-1.5 md:gap-2">
+                  <span class="inline-flex items-center gap-2">
                     <a [appPhoneLink]="item.phone" class="text-default hover:text-accent">
                       {{ item.phone }}
                     </a>
                     <a
                       [appWhatsappLink]="item.phone"
-                      class="hidden text-emerald-500 hover:text-emerald-400 md:inline"
+                      class="text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300"
+                      [attr.aria-label]="'WhatsApp ' + item.full_name"
+                      title="Open in WhatsApp"
                     >
                       <lucide-icon name="message-circle" class="h-3.5 w-3.5" />
                     </a>
@@ -349,40 +507,29 @@
                   <span class="text-faint">—</span>
                 }
               </td>
-              <td
-                class="overflow-hidden px-1.5 py-2 align-top text-[11px] leading-snug text-muted sm:px-2 sm:text-[12px] md:px-6 md:py-3 md:text-sm md:leading-normal md:whitespace-nowrap"
-              >
-                <span
-                  class="block truncate sm:whitespace-normal sm:[overflow-wrap:anywhere]"
-                  [attr.title]="sourceLabel(item.source)"
-                >
-                  {{ sourceLabel(item.source) }}
-                </span>
+              <td class="px-6 py-3 text-sm whitespace-nowrap text-muted">
+                {{ sourceLabel(item.source) }}
               </td>
-              <td
-                class="overflow-hidden px-1.5 py-2 align-top text-[11px] text-muted sm:px-2 sm:text-[12px] md:px-6 md:py-3 md:text-sm md:whitespace-nowrap"
-              >
+              <td class="px-6 py-3 text-sm whitespace-nowrap text-muted">
                 @if (item.assigned_to_id) {
-                  <div class="flex items-center gap-1.5 md:gap-2">
+                  <div class="flex items-center gap-2">
                     <span
                       class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-soft font-display text-[10px] font-semibold text-accent"
-                      [attr.title]="ownerLabel(item.assigned_to_id)"
+                      aria-hidden="true"
                     >
                       {{ initials(ownerLabel(item.assigned_to_id)) }}
                     </span>
-                    <span class="hidden truncate md:inline md:whitespace-normal">
-                      {{ ownerLabel(item.assigned_to_id) }}
-                    </span>
+                    <span class="truncate">{{ ownerLabel(item.assigned_to_id) }}</span>
                   </div>
                 } @else {
                   <span class="text-faint">—</span>
                 }
               </td>
-              <td class="hidden px-4 py-3 text-sm text-muted md:table-cell md:px-6">
+              <td class="px-6 py-3 text-sm text-muted">
                 <div class="flex flex-wrap gap-1">
                   @for (tag of item.tags; track tag) {
                     <span
-                      class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted"
+                      class="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted ring-1 ring-subtle"
                     >
                       {{ tag }}
                     </span>
@@ -392,12 +539,12 @@
                 </div>
               </td>
               <td
-                class="hidden px-4 py-3 text-right font-mono text-sm whitespace-nowrap text-muted tabular-nums md:table-cell md:px-6"
+                class="px-6 py-3 text-right font-mono text-sm whitespace-nowrap text-muted tabular-nums"
               >
                 {{ item.created_at | relativeTime }}
               </td>
               <td
-                class="hidden px-4 py-3 text-right font-mono text-sm whitespace-nowrap text-muted tabular-nums md:table-cell md:px-6"
+                class="px-6 py-3 text-right font-mono text-sm whitespace-nowrap text-muted tabular-nums"
               >
                 {{ item.last_activity_at | relativeTime }}
               </td>
