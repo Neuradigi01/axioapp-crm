@@ -18,6 +18,7 @@ import {
   Component,
   DestroyRef,
   EventEmitter,
+  HostListener,
   Input,
   OnInit,
   Output,
@@ -29,6 +30,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '@shared/components/toast/toast.service';
+import { ConfirmDialogService } from '../../../shared/confirm-dialog/confirm-dialog.service';
 import { environment } from '../../../../../../../environments/environment';
 import {
   AiAssistantsApiService,
@@ -66,6 +69,10 @@ function _apiHost(): string {
 export class EmbedSnippetModalComponent implements OnInit {
   private readonly api = inject(AiAssistantsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  /** True while a rotate/revoke confirm is up, so Esc doesn't close this modal behind it. */
+  private confirming = false;
 
   @Input({ required: true }) assistantId!: string;
   @Output() readonly dismissed = new EventEmitter<void>();
@@ -145,6 +152,7 @@ export class EmbedSnippetModalComponent implements OnInit {
           this.busy.set(false);
           this.freshSecret.set(resp.secret);
           this.refresh();
+          this.toast.success('Embed key issued', { subtitle: 'Copy the snippet below.' });
         },
         error: (err: HttpErrorResponse) => {
           this.busy.set(false);
@@ -153,16 +161,17 @@ export class EmbedSnippetModalComponent implements OnInit {
       });
   }
 
-  protected rotate(key: EmbedKeyRow, graceDays = 0): void {
-    if (
-      !confirm(
+  protected async rotate(key: EmbedKeyRow, graceDays = 0): Promise<void> {
+    const ok = await this.ask({
+      title: 'Rotate this key?',
+      body:
         graceDays > 0
-          ? `Rotate key? The old key stays live for ${graceDays} days so you can swap the snippet.`
-          : 'Rotate key? The old key is revoked immediately.',
-      )
-    ) {
-      return;
-    }
+          ? `The old key stays live for ${graceDays} days so you can swap the snippet.`
+          : 'The old key stops working immediately — update the snippet on your site.',
+      confirmLabel: 'Rotate',
+      danger: graceDays === 0,
+    });
+    if (!ok) return;
     this.busy.set(true);
     this.error.set(null);
     this.api
@@ -173,6 +182,7 @@ export class EmbedSnippetModalComponent implements OnInit {
           this.busy.set(false);
           this.freshSecret.set(resp.secret);
           this.refresh();
+          this.toast.success('Key rotated', { subtitle: 'Copy the new snippet below.' });
         },
         error: (err: HttpErrorResponse) => {
           this.busy.set(false);
@@ -181,14 +191,14 @@ export class EmbedSnippetModalComponent implements OnInit {
       });
   }
 
-  protected revokeNow(key: EmbedKeyRow): void {
-    if (
-      !confirm(
-        'Revoke immediately? Any in-flight chat sessions using this key will be dropped. This cannot be undone.',
-      )
-    ) {
-      return;
-    }
+  protected async revokeNow(key: EmbedKeyRow): Promise<void> {
+    const ok = await this.ask({
+      title: 'Revoke this key now?',
+      body: 'Chat sessions using this key are dropped immediately. This cannot be undone.',
+      confirmLabel: 'Revoke',
+      danger: true,
+    });
+    if (!ok) return;
     this.busy.set(true);
     this.error.set(null);
     this.api
@@ -198,6 +208,7 @@ export class EmbedSnippetModalComponent implements OnInit {
         next: () => {
           this.busy.set(false);
           this.refresh();
+          this.toast.success('Key revoked');
         },
         error: (err: HttpErrorResponse) => {
           this.busy.set(false);
@@ -214,8 +225,24 @@ export class EmbedSnippetModalComponent implements OnInit {
       // Reset after a moment so a subsequent copy also flashes.
       setTimeout(() => this.copyState.set('idle'), 1500);
     } catch {
-      this.error.set('Clipboard access blocked. Select the snippet manually.');
+      this.toast.error('Clipboard access blocked', {
+        subtitle: 'Select the snippet and copy it manually.',
+      });
     }
+  }
+
+  private async ask(opts: Parameters<ConfirmDialogService['ask']>[0]): Promise<boolean> {
+    this.confirming = true;
+    try {
+      return await this.confirmDialog.ask(opts);
+    } finally {
+      this.confirming = false;
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (!this.confirming) this.close();
   }
 
   protected close(): void {

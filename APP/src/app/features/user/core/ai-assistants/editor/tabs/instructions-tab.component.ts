@@ -34,6 +34,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '@shared/components/toast/toast.service';
+import { ConfirmDialogService } from '../../../shared/confirm-dialog/confirm-dialog.service';
 import {
   MobileSelectComponent,
   MobileSelectOption,
@@ -57,6 +59,8 @@ const OPENAI_MODELS: readonly string[] = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'
 export class InstructionsTabComponent {
   private readonly api = inject(AiAssistantsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
   protected readonly formState = inject(AssistantFormStateService);
 
   protected readonly loading = signal(true);
@@ -106,7 +110,12 @@ export class InstructionsTabComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => this.keys.set(rows),
-        error: () => this.keys.set([]),
+        error: (err: HttpErrorResponse) => {
+          this.keys.set([]);
+          this.toast.error('Could not load your OpenAI keys', {
+            subtitle: extractApiError(err) ?? 'Reload the page to try again.',
+          });
+        },
       });
   }
 
@@ -120,11 +129,26 @@ export class InstructionsTabComponent {
     this.presets().map((p) => ({ value: p.id, label: p.label })),
   );
 
-  protected onPresetChange(id: string): void {
+  protected async onPresetChange(id: string): Promise<void> {
+    const previous = this.selectedPresetId();
     this.selectedPresetId.set(id);
     if (id === CUSTOM_PROMPT_ID) return;
     const preset = this.presets().find((p) => p.id === id);
     if (!preset) return;
+    // Never silently throw away instructions the operator wrote.
+    const current = (this.formState.formState().instructions ?? '').trim();
+    if (current && current !== preset.body.trim()) {
+      const ok = await this.confirmDialog.ask({
+        title: `Replace your instructions with "${preset.label}"?`,
+        body: 'Your current instructions will be overwritten. You can undo by not saving.',
+        confirmLabel: 'Replace',
+        danger: true,
+      });
+      if (!ok) {
+        this.selectedPresetId.set(previous);
+        return;
+      }
+    }
     // Copy — NOT bind. Operator can freely edit after paste, and
     // future edits to the preset library don't retroactively
     // change the assistant's prompt.

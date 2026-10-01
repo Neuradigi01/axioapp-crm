@@ -28,6 +28,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '@shared/components/toast/toast.service';
+import { ConfirmDialogService } from '../../../shared/confirm-dialog/confirm-dialog.service';
 import {
   MobileSelectComponent,
   MobileSelectOption,
@@ -90,6 +92,8 @@ const COLOR_FIELDS: readonly ColorField[] = [
 export class StylingTabComponent {
   private readonly api = inject(AiAssistantsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
   protected readonly formState = inject(AssistantFormStateService);
 
   protected readonly colorFields = COLOR_FIELDS;
@@ -146,7 +150,6 @@ export class StylingTabComponent {
 
   protected readonly uploading = signal(false);
   protected readonly deleting = signal(false);
-  protected readonly picError = signal<string | null>(null);
 
   protected onPickPicture(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -154,14 +157,15 @@ export class StylingTabComponent {
     // Reset so re-selecting the same file after an error refires the change.
     input.value = '';
     if (!file) return;
-    this.picError.set(null);
     if (file.size > MAX_IMAGE_BYTES) {
-      this.picError.set('Image exceeds the 2 MB limit.');
+      this.toast.warn('Image is too large', { subtitle: 'Profile pictures can be up to 2 MB.' });
       return;
     }
     const assistantId = this.formState.assistantId();
     if (!assistantId) {
-      this.picError.set('Save the assistant before uploading a profile picture.');
+      this.toast.warn('Save the assistant first', {
+        subtitle: 'A profile picture can be added once the assistant is saved.',
+      });
       return;
     }
     this.uploading.set(true);
@@ -176,18 +180,25 @@ export class StylingTabComponent {
           this.formState.setStylingConfigSilently({
             header_profile_picture_url: resp.url,
           });
+          this.toast.success('Profile picture updated');
         },
         error: (err: HttpErrorResponse) => {
           this.uploading.set(false);
-          this.picError.set(extractApiError(err) ?? 'Upload failed.');
+          this.toast.error(extractApiError(err) ?? 'Upload failed.');
         },
       });
   }
 
-  protected removePicture(): void {
+  protected async removePicture(): Promise<void> {
     const assistantId = this.formState.assistantId();
     if (!assistantId) return;
-    this.picError.set(null);
+    const ok = await this.confirmDialog.ask({
+      title: 'Remove the profile picture?',
+      body: 'The chat header falls back to the default avatar.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
     this.deleting.set(true);
     this.api
       .deleteProfilePicture(assistantId)
@@ -199,10 +210,11 @@ export class StylingTabComponent {
           this.formState.setStylingConfigSilently({
             header_profile_picture_url: null,
           });
+          this.toast.success('Profile picture removed');
         },
         error: (err: HttpErrorResponse) => {
           this.deleting.set(false);
-          this.picError.set(extractApiError(err) ?? 'Delete failed.');
+          this.toast.error(extractApiError(err) ?? 'Could not remove the picture.');
         },
       });
   }

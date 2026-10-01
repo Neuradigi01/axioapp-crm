@@ -18,6 +18,7 @@
 import { Routes } from '@angular/router';
 
 import { permissionGuard } from '../auth/permission.guard';
+import { unsavedChangesGuard } from '../shared/guards/unsaved-changes.guard';
 
 export const AI_ASSISTANTS_ROUTES: Routes = [
   {
@@ -37,6 +38,7 @@ export const AI_ASSISTANTS_ROUTES: Routes = [
   {
     path: ':id',
     canActivate: [permissionGuard('ai_assistants.view')],
+    canDeactivate: [unsavedChangesGuard],
     loadComponent: () =>
       import('./editor/ai-assistant-editor.page').then((m) => m.AiAssistantEditorPage),
   },

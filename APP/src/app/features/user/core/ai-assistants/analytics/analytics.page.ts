@@ -23,7 +23,7 @@ import {
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
-import { switchMap } from 'rxjs';
+import { EMPTY, catchError, switchMap } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { AiAssistantAnalyticsResponse, AiAssistantsApiService } from '../ai-assistants-api.service';
@@ -73,22 +73,22 @@ export class AiAssistantAnalyticsPage {
           if (!id) {
             this.error.set('Missing assistant id.');
             this.loading.set(false);
-            return [];
+            return EMPTY;
           }
           this.assistantId.set(id);
-          return this.api.getAnalytics(id, this.windowDays());
+          return this.api.getAnalytics(id, this.windowDays()).pipe(
+            catchError((err: HttpErrorResponse) => {
+              this.loading.set(false);
+              this.error.set(extractApiError(err) ?? 'Could not load analytics.');
+              return EMPTY;
+            }),
+          );
         }),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe({
-        next: (resp) => {
-          this.data.set(resp);
-          this.loading.set(false);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.loading.set(false);
-          this.error.set(extractApiError(err) ?? 'Could not load analytics.');
-        },
+      .subscribe((resp) => {
+        this.data.set(resp);
+        this.loading.set(false);
       });
   }
 }

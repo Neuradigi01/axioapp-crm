@@ -16,6 +16,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  HostListener,
   computed,
   inject,
   output,
@@ -28,6 +29,7 @@ import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { FormToastHelper } from '../shared/forms/form-toast.helper';
 import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import { AiProviderKey } from '../settings/integrations/ai-providers-api.service';
 import { AiAssistant, AiAssistantsApiService } from './ai-assistants-api.service';
@@ -109,6 +111,7 @@ export class CreateAssistantModalComponent {
   protected readonly loadError = signal<string | null>(null);
   protected readonly keys = signal<AiProviderKey[]>([]);
   protected readonly saving = signal(false);
+  private readonly formToast = inject(FormToastHelper);
   protected readonly saveError = signal<string | null>(null);
 
   protected readonly form = this.fb.nonNullable.group({
@@ -142,14 +145,15 @@ export class CreateAssistantModalComponent {
   );
 
   constructor() {
-    // Load provider keys — filter to non-revoked so the user can't
-    // pick a key that will fail at chat time.
+    // Load provider keys — only live keys that passed their test, the
+    // same rule the editor's key picker uses, so the new assistant
+    // never lands with a key the editor can't show.
     this.api
       .listProviderKeys()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => {
-          const live = rows.filter((r) => !r.revoked_at);
+          const live = rows.filter((r) => !r.revoked_at && r.test_status === 'success');
           this.keys.set(live);
           if (live.length > 0) {
             this.form.patchValue({ key_id: live[0].id });
@@ -161,6 +165,11 @@ export class CreateAssistantModalComponent {
           this.loadError.set(extractApiError(err) ?? 'Could not load provider keys.');
         },
       });
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    this.close();
   }
 
   protected close(): void {
@@ -183,12 +192,13 @@ export class CreateAssistantModalComponent {
     }
 
     if (!this.hasKeys()) {
-      this.saveError.set('Add an OpenAI key in Settings → Integrations first.');
+      this.saveError.set('Add and test an OpenAI key in Settings → Integrations first.');
       return;
     }
-    if (!this.form.valid) {
+    if (!this.form.valid || !this.form.getRawValue().name.trim()) {
       this.form.markAllAsTouched();
       this.saveError.set('Enter a name and pick an OpenAI key.');
+      this.formToast.requiredFieldsMissing();
       return;
     }
 

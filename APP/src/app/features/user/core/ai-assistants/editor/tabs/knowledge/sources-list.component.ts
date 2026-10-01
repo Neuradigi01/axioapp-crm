@@ -28,7 +28,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
-import { Subscription, Subject, switchMap, timer } from 'rxjs';
+import { EMPTY, Subscription, Subject, catchError, switchMap, timer } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { ToastService } from '../../../../../../../shared/components/toast/toast.service';
@@ -108,42 +108,48 @@ export class SourcesListComponent implements OnChanges {
     }
   }
 
+  constructor() {
+    // One subscription for the component's lifetime: a nudge restarts
+    // the poll loop so the next fetch happens now, not after 3s.
+    // (Subscribing inside startPolling() added a new listener on every
+    // restart, so each nudge fanned out into exponentially many.)
+    this.manualRefresh.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      if (this.assistantId) this.startPolling();
+    });
+  }
+
   private startPolling(): void {
     this.pollSubscription?.unsubscribe();
-    this.loading.set(true);
-    // Use ``switchMap`` — a new refresh cancels the in-flight one so
-    // a slow response doesn't clobber a fresh state.
+    this.loading.set(this.rows().length === 0);
+    const assistantId = this.assistantId;
+    // ``switchMap`` — a new tick cancels the in-flight fetch so a slow
+    // response can't clobber fresher state. Fetch errors are handled
+    // per tick so one failure doesn't end the loop for good.
     this.pollSubscription = timer(0, POLL_MS)
       .pipe(
-        // Merge the manual pings by resetting the timer whenever a
-        // nudge arrives. We can't easily merge two sources without
-        // duplicated GETs, so we live with the 3s cadence + the
-        // manual reset (subscribed side-effect below).
-        switchMap(() => this.api.listKnowledge(this.assistantId)),
+        switchMap(() =>
+          this.api.listKnowledge(assistantId).pipe(
+            catchError((err: HttpErrorResponse) => {
+              this.loading.set(false);
+              this.error.set(extractApiError(err) ?? 'Could not load knowledge sources.');
+              return EMPTY;
+            }),
+          ),
+        ),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe({
-        next: (rows) => {
-          this.loading.set(false);
-          this.error.set(null);
-          this.announceFinished(rows);
-          this.rows.set(rows);
-          if (this.allTerminal(rows)) {
-            this.pollSubscription?.unsubscribe();
-            this.pollSubscription = null;
-          }
-        },
-        error: (err: HttpErrorResponse) => {
-          this.loading.set(false);
-          this.error.set(extractApiError(err) ?? 'Could not load knowledge sources.');
-        },
+      .subscribe((rows) => {
+        // Assistant switched while in flight — drop the stale rows.
+        if (assistantId !== this.assistantId) return;
+        this.loading.set(false);
+        this.error.set(null);
+        this.announceFinished(rows);
+        this.rows.set(rows);
+        if (this.allTerminal(rows)) {
+          this.pollSubscription?.unsubscribe();
+          this.pollSubscription = null;
+        }
       });
-
-    this.manualRefresh.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
-      // Fresh nudge — restart the polling loop so we don't wait for
-      // the current 3s tick to elapse.
-      this.startPolling();
-    });
   }
 
   private allTerminal(rows: readonly AiAssistantKnowledgeRow[]): boolean {

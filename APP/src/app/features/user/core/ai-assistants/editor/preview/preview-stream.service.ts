@@ -32,6 +32,29 @@ export interface PreviewStreamEvent {
   cost_usd?: string;
 }
 
+/** Operator-readable reason for a failed preview request (instead of
+ *  the raw "HTTP 4xx" + JSON body). */
+async function friendlyStreamError(response: Response): Promise<string> {
+  if (response.status === 401) return 'Your session expired — refresh the page and try again.';
+  if (response.status === 403) return "You don't have permission to chat with this assistant.";
+  let detail: unknown = null;
+  try {
+    const body = await response.text();
+    try {
+      detail = (JSON.parse(body) as { detail?: unknown }).detail;
+    } catch {
+      detail = body;
+    }
+  } catch {
+    /* body already consumed */
+  }
+  if (typeof detail === 'string' && detail.trim()) return detail.trim();
+  if (detail && typeof detail === 'object' && 'message' in detail) {
+    return String((detail as { message: unknown }).message);
+  }
+  return `The assistant could not answer (error ${response.status}). Try again in a moment.`;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PreviewStreamService {
   private readonly tokens = inject(TokenStorageService);
@@ -63,14 +86,7 @@ export class PreviewStreamService {
     if (!response.ok || !response.body) {
       // Yield a synthetic error so the caller renders the failure
       // via the same UI path as a mid-stream error.
-      let detail = `HTTP ${response.status}`;
-      try {
-        const body = await response.text();
-        detail = body || detail;
-      } catch {
-        /* body already consumed */
-      }
-      yield { type: 'error', reason: detail };
+      yield { type: 'error', reason: await friendlyStreamError(response) };
       yield { type: 'done' };
       return;
     }

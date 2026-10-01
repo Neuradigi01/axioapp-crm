@@ -3,8 +3,12 @@
   role="dialog"
   aria-modal="true"
   aria-labelledby="embed-snippet-modal-title"
+  (click)="close()"
 >
-  <div class="w-full max-w-xl rounded-2xl border border-subtle bg-surface p-6 shadow-xl">
+  <div
+    class="w-full max-w-xl rounded-2xl border border-subtle bg-surface p-6 shadow-xl"
+    (click)="$event.stopPropagation()"
+  >
     <div class="flex items-start justify-between">
       <div>
         <h3 id="embed-snippet-modal-title" class="text-lg font-semibold text-default">
@@ -119,7 +123,7 @@
               Issue new
             </button>
           </div>
-          <div class="overflow-hidden rounded-lg border border-subtle">
+          <div class="overflow-x-auto rounded-lg border border-subtle">
             <table class="min-w-full text-left text-xs">
               <thead class="bg-surface-2/60 text-[10px] uppercase tracking-wide text-muted">
                 <tr>

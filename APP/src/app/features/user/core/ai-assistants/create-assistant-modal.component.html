@@ -3,8 +3,12 @@
   role="dialog"
   aria-modal="true"
   aria-labelledby="create-assistant-modal-title"
+  (click)="close()"
 >
-  <div class="w-full max-w-md rounded-2xl border border-subtle bg-surface p-6 shadow-xl">
+  <div
+    class="w-full max-w-md rounded-2xl border border-subtle bg-surface p-6 shadow-xl"
+    (click)="$event.stopPropagation()"
+  >
     <div class="flex items-start justify-between">
       <div>
         <h3 id="create-assistant-modal-title" class="text-lg font-semibold text-default">
@@ -84,7 +88,7 @@
             <div
               class="mt-1 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400"
             >
-              No OpenAI keys stored yet. Add one in
+              No tested OpenAI key yet. Add one (or run its test) in
               <a
                 routerLink="/user/settings/integrations"
                 class="font-semibold underline"

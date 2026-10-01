@@ -17,6 +17,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   inject,
   signal,
@@ -28,6 +29,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged, skip, switchMap, tap } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '@shared/components/toast/toast.service';
 import { FurnitureAuthService } from '../auth/auth.service';
 import {
   AiAssistant,
@@ -69,6 +71,7 @@ export class AiAssistantsPage {
   private readonly auth = inject(FurnitureAuthService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
@@ -90,6 +93,9 @@ export class AiAssistantsPage {
   protected readonly pendingArchive = signal<AiAssistantListItem | null>(null);
   protected readonly pendingActivate = signal<AiAssistantListItem | null>(null);
   protected readonly actionInFlight = signal<string | null>(null);
+  /** Failure of the confirm-dialog action — shown inside the dialog so
+   *  the operator can retry or cancel with the context still visible. */
+  protected readonly actionError = signal<string | null>(null);
 
   protected readonly statusPills = STATUS_PILLS;
 
@@ -199,6 +205,7 @@ export class AiAssistantsPage {
     this.kebabOpenId.update((cur) => (cur === id ? null : id));
   }
 
+  @HostListener('document:keydown.escape')
   protected closeKebab(): void {
     this.kebabOpenId.set(null);
   }
@@ -215,6 +222,7 @@ export class AiAssistantsPage {
 
   protected cancelArchive(): void {
     if (this.actionInFlight()) return;
+    this.actionError.set(null);
     this.pendingArchive.set(null);
   }
 
@@ -222,7 +230,7 @@ export class AiAssistantsPage {
     const row = this.pendingArchive();
     if (!row) return;
     this.actionInFlight.set(row.id);
-    this.loadError.set(null);
+    this.actionError.set(null);
     this.api
       .archive(row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -237,11 +245,11 @@ export class AiAssistantsPage {
               r.id === row.id ? { ...r, status: 'archived' as AiAssistantStatus } : r,
             ),
           );
+          this.toast.success(`“${row.name}” archived`);
         },
         error: (err: HttpErrorResponse) => {
           this.actionInFlight.set(null);
-          this.pendingArchive.set(null);
-          this.loadError.set(extractApiError(err) ?? 'Archive failed.');
+          this.actionError.set(extractApiError(err) ?? 'Archive failed.');
         },
       });
   }
@@ -254,6 +262,7 @@ export class AiAssistantsPage {
 
   protected cancelActivate(): void {
     if (this.actionInFlight()) return;
+    this.actionError.set(null);
     this.pendingActivate.set(null);
   }
 
@@ -261,7 +270,7 @@ export class AiAssistantsPage {
     const row = this.pendingActivate();
     if (!row) return;
     this.actionInFlight.set(row.id);
-    this.loadError.set(null);
+    this.actionError.set(null);
     this.api
       .activate(row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -272,11 +281,11 @@ export class AiAssistantsPage {
           this.items.update((rows) =>
             rows.map((r) => (r.id === row.id ? { ...r, status: updated.status } : r)),
           );
+          this.toast.success(`“${row.name}” is live`);
         },
         error: (err: HttpErrorResponse) => {
           this.actionInFlight.set(null);
-          this.pendingActivate.set(null);
-          this.loadError.set(extractApiError(err) ?? 'Activate failed.');
+          this.actionError.set(extractApiError(err) ?? 'Activate failed.');
         },
       });
   }
@@ -293,6 +302,7 @@ export class AiAssistantsPage {
 
   protected cancelDelete(): void {
     if (this.actionInFlight()) return;
+    this.actionError.set(null);
     this.pendingDelete.set(null);
   }
 
@@ -300,7 +310,7 @@ export class AiAssistantsPage {
     const row = this.pendingDelete();
     if (!row) return;
     this.actionInFlight.set(row.id);
-    this.loadError.set(null);
+    this.actionError.set(null);
     this.api
       .delete(row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -310,11 +320,11 @@ export class AiAssistantsPage {
           this.pendingDelete.set(null);
           this.items.update((rows) => rows.filter((r) => r.id !== row.id));
           this.total.update((n) => Math.max(0, n - 1));
+          this.toast.success(`“${row.name}” deleted`);
         },
         error: (err: HttpErrorResponse) => {
           this.actionInFlight.set(null);
-          this.loadError.set(extractApiError(err) ?? 'Delete failed.');
-          this.pendingDelete.set(null);
+          this.actionError.set(extractApiError(err) ?? 'Delete failed.');
         },
       });
   }
@@ -351,7 +361,7 @@ export class AiAssistantsPage {
       case 'ai_widget':
         return 'globe';
       default:
-        return 'circle';
+        return 'circle-dot';
     }
   }
 }

@@ -12,7 +12,16 @@
  * flow into this component (the mock stays until then so the
  * preview never needs a valid key + budget to render).
  */
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { AssistantFormStateService } from '../../form-state.service';
@@ -192,6 +201,26 @@ export class AssistantPreviewComponent {
   /** Ties every message in one preview session together so the
    *  backend can group them into a single conversation row. */
   private readonly sessionToken = signal<string>(this._newSessionToken());
+  /** Cancels the in-flight stream (leaving the page, clearing the chat,
+   *  switching assistant) so a paid generation never keeps running
+   *  unseen in the background. */
+  private abort: AbortController | null = null;
+  private lastAssistantId: string | null = null;
+
+  constructor() {
+    // A different assistant gets a fresh preview chat.
+    effect(() => {
+      const id = this.formState.assistantId();
+      untracked(() => {
+        if (id !== this.lastAssistantId) {
+          this.lastAssistantId = id;
+          this.clearChat();
+          this.input.set('');
+        }
+      });
+    });
+    inject(DestroyRef).onDestroy(() => this.abort?.abort());
+  }
 
   protected readonly canSend = computed(
     () =>
@@ -210,6 +239,8 @@ export class AssistantPreviewComponent {
   }
 
   protected clearChat(): void {
+    this.abort?.abort();
+    this.abort = null;
     this.messages.set([]);
     this.sessionToken.set(this._newSessionToken());
   }
@@ -225,9 +256,16 @@ export class AssistantPreviewComponent {
     this.messages.update((cur) => [...cur, { role: 'user', text: message }, nextAssistant]);
     this.input.set('');
     this.streaming.set(true);
+    const controller = new AbortController();
+    this.abort = controller;
 
     try {
-      for await (const evt of this.stream.stream(assistantId, message, this.sessionToken())) {
+      for await (const evt of this.stream.stream(
+        assistantId,
+        message,
+        this.sessionToken(),
+        controller.signal,
+      )) {
         if (evt.type === 'token' && evt.delta) {
           this.messages.update((cur) => {
             const copy = [...cur];
@@ -249,6 +287,8 @@ export class AssistantPreviewComponent {
         }
       }
     } catch (err) {
+      // Cancelled on purpose (cleared / switched / left) — not an error.
+      if (controller.signal.aborted) return;
       this.messages.update((cur) => {
         const copy = [...cur];
         const last = copy[copy.length - 1];
@@ -261,6 +301,7 @@ export class AssistantPreviewComponent {
         return copy;
       });
     } finally {
+      if (this.abort === controller) this.abort = null;
       // Flip streaming off on the last bubble.
       this.messages.update((cur) => {
         const copy = [...cur];

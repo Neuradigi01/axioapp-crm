@@ -144,7 +144,7 @@
                   </span>
                 </div>
                 <p class="mt-0.5 truncate text-xs text-muted">Model: {{ a.model }}</p>
-                @if (a.bound_channels?.length) {
+                @if (a.bound_channels.length) {
                   <div class="mt-2 flex flex-wrap items-center gap-1">
                     @for (ch of a.bound_channels; track ch) {
                       <span
@@ -164,15 +164,26 @@
                     type="button"
                     class="rounded p-1 text-muted hover:bg-surface-2"
                     (click)="toggleKebab(a.id, $event)"
-                    aria-label="More actions"
+                    [attr.aria-label]="'More actions for ' + a.name"
+                    aria-haspopup="menu"
+                    [attr.aria-expanded]="kebabOpenId() === a.id"
                   >
                     <lucide-icon name="more-vertical" size="14" aria-hidden="true"></lucide-icon>
                   </button>
                   @if (kebabOpenId() === a.id) {
                     <div
+                      role="menu"
                       class="absolute right-0 z-50 mt-1 w-40 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
                       (click)="$event.stopPropagation()"
                     >
+                      <a
+                        role="menuitem"
+                        [routerLink]="['/user/ai-assistants', a.id, 'analytics']"
+                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
+                      >
+                        <lucide-icon name="bar-chart-3" size="12"></lucide-icon>
+                        Analytics
+                      </a>
                       @if (a.status !== 'archived') {
                         <button
                           type="button"
@@ -247,6 +258,7 @@
     [cancelLabel]="'Cancel'"
     [danger]="true"
     [submitting]="actionInFlight() === row.id"
+    [error]="actionError()"
     (confirm)="confirmDelete()"
     (cancel)="cancelDelete()"
   />
@@ -259,6 +271,7 @@
     [confirmLabel]="'Archive'"
     [cancelLabel]="'Cancel'"
     [submitting]="actionInFlight() === row.id"
+    [error]="actionError()"
     (confirm)="confirmArchive()"
     (cancel)="cancelArchive()"
   />
@@ -271,6 +284,7 @@
     [confirmLabel]="'Activate'"
     [cancelLabel]="'Cancel'"
     [submitting]="actionInFlight() === row.id"
+    [error]="actionError()"
     (confirm)="confirmActivate()"
     (cancel)="cancelActivate()"
   />

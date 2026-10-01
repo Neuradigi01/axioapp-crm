@@ -14,6 +14,7 @@ import {
   Component,
   DestroyRef,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   inject,
@@ -23,6 +24,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '@shared/components/toast/toast.service';
 import {
   AiAssistantKnowledgeRow,
   AiAssistantsApiService,
@@ -41,6 +43,7 @@ const MAX_BYTES = 90 * 1024 * 1024;
 export class ReplaceModalComponent {
   private readonly api = inject(AiAssistantsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   @Input({ required: true }) assistantId!: string;
   @Input({ required: true }) knowledge!: AiAssistantKnowledgeRow;
@@ -56,6 +59,11 @@ export class ReplaceModalComponent {
     const file = input.files?.[0];
     input.value = '';
     if (file) this.startUpload(file);
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    this.close();
   }
 
   protected close(): void {
@@ -98,6 +106,9 @@ export class ReplaceModalComponent {
     if (event instanceof HttpResponse) {
       this.uploading.set(false);
       this.progress.set(100);
+      this.toast.success('File replaced', {
+        subtitle: 'It is being re-indexed for the assistant.',
+      });
       this.replaced.emit();
     }
   }

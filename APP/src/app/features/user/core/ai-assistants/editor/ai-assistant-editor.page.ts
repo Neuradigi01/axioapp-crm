@@ -22,18 +22,20 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   inject,
   signal,
 } from '@angular/core';
-import { toObservable } from '@angular/core/rxjs-interop';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { LucideAngularModule } from 'lucide-angular';
-import { switchMap } from 'rxjs';
+import { EMPTY, catchError, switchMap } from 'rxjs';
 
+import { FurnitureAuthService } from '../../auth/auth.service';
+import { HasUnsavedChanges } from '../../shared/guards/unsaved-changes.guard';
 import { extractApiError } from '@core/services/api-error.util';
 import { AiAssistantsApiService } from '../ai-assistants-api.service';
 import { AssistantFormStateService } from '../form-state.service';
@@ -84,6 +86,7 @@ const TABS: TabDescriptor[] = [
   imports: [
     FormsModule,
     LucideAngularModule,
+    RouterLink,
     AssistantPreviewComponent,
     EmbedSnippetModalComponent,
     InstructionsTabComponent,
@@ -93,7 +96,7 @@ const TABS: TabDescriptor[] = [
   ],
   templateUrl: './ai-assistant-editor.page.html',
 })
-export class AiAssistantEditorPage {
+export class AiAssistantEditorPage implements HasUnsavedChanges {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly api = inject(AiAssistantsApiService);
@@ -106,8 +109,6 @@ export class AiAssistantEditorPage {
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
   protected readonly saving = signal(false);
-  protected readonly saveError = signal<string | null>(null);
-  protected readonly savedAt = signal<number | null>(null);
   protected readonly publishing = signal(false);
   protected readonly nameEditing = signal(false);
   protected readonly nameDraft = signal('');
@@ -125,6 +126,11 @@ export class AiAssistantEditorPage {
   protected closeEmbedModal(): void {
     this.embedModalOpen.set(false);
   }
+
+  private readonly auth = inject(FurnitureAuthService);
+  /** Holders of `ai_assistants.manage` can edit; everyone else gets a
+   *  read-only editor instead of controls that would only 403. */
+  protected readonly canManage = this.auth.hasPermission('ai_assistants.manage');
 
   protected readonly canSave = computed(
     () => this.formState.loaded() && this.formState.dirty() && !this.saving(),
@@ -157,7 +163,6 @@ export class AiAssistantEditorPage {
   constructor() {
     // Load whenever the :id in the route changes (covers back/forward
     // navigation between assistants without a full page refresh).
-    toObservable(this.activeTab); // touch to register in DI graph
     this.route.paramMap
       .pipe(
         switchMap((params) => {
@@ -165,26 +170,43 @@ export class AiAssistantEditorPage {
           this.loading.set(true);
           this.loadError.set(null);
           this.formState.reset();
+          // Per-assistant UI state starts fresh on every switch.
+          this.activeTab.set('instructions');
+          this.nameEditing.set(false);
+          this.embedModalOpen.set(false);
           if (!id) {
             this.loadError.set('Missing assistant id.');
             this.loading.set(false);
-            return [];
+            return EMPTY;
           }
-          return this.api.get(id);
+          // Errors are caught per load so one failure doesn't end the
+          // subscription — the next :id change still loads.
+          return this.api.get(id).pipe(
+            catchError((err: HttpErrorResponse) => {
+              this.loading.set(false);
+              this.loadError.set(extractApiError(err) ?? 'Could not load assistant.');
+              return EMPTY;
+            }),
+          );
         }),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe({
-        next: (row) => {
-          this.formState.load(row);
-          this.nameDraft.set(row.name);
-          this.loading.set(false);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.loading.set(false);
-          this.loadError.set(extractApiError(err) ?? 'Could not load assistant.');
-        },
+      .subscribe((row) => {
+        this.formState.load(row);
+        this.nameDraft.set(row.name);
+        this.loading.set(false);
       });
+  }
+
+  /** Route guard hook — leaving would drop edits not yet saved. */
+  public hasUnsavedChanges(): boolean {
+    return this.formState.dirty() && !this.saving();
+  }
+
+  /** Browser-level guard for tab close / reload. */
+  @HostListener('window:beforeunload', ['$event'])
+  protected onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.hasUnsavedChanges()) event.preventDefault();
   }
 
   protected setActiveTab(id: TabId): void {
@@ -231,7 +253,6 @@ export class AiAssistantEditorPage {
     const id = this.formState.assistantId();
     if (!id) return;
     this.saving.set(true);
-    this.saveError.set(null);
     const payload = this.formState.buildUpdatePayload();
     this.api
       .update(id, payload)
@@ -240,13 +261,11 @@ export class AiAssistantEditorPage {
         next: (row) => {
           this.saving.set(false);
           this.formState.applySaveResponse(row);
-          this.savedAt.set(Date.now());
           this.toast.success('Assistant saved.');
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
           const message = this._friendlyErrorMessage(err);
-          this.saveError.set(message);
           this.toast.error(message);
         },
       });

@@ -45,18 +45,37 @@
           [class.text-emerald-400]="st === 'active'"
           [class.ring-emerald-500\/20]="st === 'active'"
           [class.text-faint]="st === 'archived'"
+          [class.bg-surface-2]="st === 'archived'"
+          [class.ring-subtle]="st === 'archived'"
         >
           {{ st }}
         </span>
       }
       @if (formState.dirty()) {
-        <span class="text-xs text-amber-400">Unsaved changes</span>
-      } @else if (savedAt()) {
-        <span class="text-xs text-emerald-400">Saved</span>
+        <span class="text-xs text-amber-600 dark:text-amber-400">Unsaved changes</span>
       }
     </div>
     <div class="flex items-center gap-2">
-      @if (formState.status() !== 'active') {
+      @if (formState.assistantId(); as aid) {
+        <a
+          [routerLink]="['/user/ai-assistants', aid, 'analytics']"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2 py-1.5 text-sm font-medium text-default hover:bg-surface-2 md:px-3"
+          aria-label="Analytics"
+          title="Conversations, cost and top questions"
+        >
+          <lucide-icon name="bar-chart-3" size="14" aria-hidden="true"></lucide-icon>
+          <span class="hidden sm:inline">Analytics</span>
+        </a>
+      }
+      @if (!canManage) {
+        <span
+          class="rounded-md border border-subtle bg-surface-2 px-2 py-1 text-xs text-muted"
+          title="Your role can view assistants but not change them"
+        >
+          View only
+        </span>
+      }
+      @if (canManage && formState.status() !== 'active') {
         <button
           type="button"
           class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40"
@@ -78,46 +97,42 @@
           }
         </button>
       }
-      <button
-        type="button"
-        class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2 md:px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-40"
-        [disabled]="!formState.assistantId() || formState.status() !== 'active'"
-        [attr.title]="embedBlockedReason()"
-        (click)="openEmbedModal()"
-        aria-label="Embed"
-      >
-        <lucide-icon name="code" size="14" aria-hidden="true"></lucide-icon>
-        <span class="hidden sm:inline">Embed</span>
-      </button>
-      <button
-        type="button"
-        class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 md:px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 disabled:opacity-40"
-        (click)="save()"
-        [disabled]="!canSave()"
-      >
-        @if (saving()) {
-          <lucide-icon
-            name="loader-2"
-            size="14"
-            class="animate-spin"
-            aria-hidden="true"
-          ></lucide-icon>
-          <span class="hidden sm:inline">Saving…</span>
-          <span class="sm:hidden">…</span>
-        } @else {
-          <lucide-icon name="save" size="14" aria-hidden="true"></lucide-icon>
-          <span class="hidden md:inline">Save AI Assistant</span>
-          <span class="md:hidden">Save</span>
-        }
-      </button>
+      @if (canManage) {
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2 md:px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-40"
+          [disabled]="!formState.assistantId() || formState.status() !== 'active'"
+          [attr.title]="embedBlockedReason()"
+          (click)="openEmbedModal()"
+          aria-label="Embed"
+        >
+          <lucide-icon name="code" size="14" aria-hidden="true"></lucide-icon>
+          <span class="hidden sm:inline">Embed</span>
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 md:px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 disabled:opacity-40"
+          (click)="save()"
+          [disabled]="!canSave()"
+        >
+          @if (saving()) {
+            <lucide-icon
+              name="loader-2"
+              size="14"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+            <span class="hidden sm:inline">Saving…</span>
+            <span class="sm:hidden">…</span>
+          } @else {
+            <lucide-icon name="save" size="14" aria-hidden="true"></lucide-icon>
+            <span class="hidden md:inline">Save AI Assistant</span>
+            <span class="md:hidden">Save</span>
+          }
+        </button>
+      }
     </div>
   </header>
-
-  @if (saveError(); as err) {
-    <div class="border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-xs text-red-300">
-      {{ err }}
-    </div>
-  }
 
   @if (loading()) {
     <div class="flex flex-1 items-center justify-center">
@@ -173,7 +188,12 @@
         </div>
 
         <!-- Tab body -->
-        <div class="flex-1 overflow-y-auto bg-surface-2/40 p-4 md:p-6">
+        <!-- A disabled fieldset turns every input / upload / delete
+             button in the tabs off at once for view-only roles. -->
+        <fieldset
+          class="min-w-0 flex-1 overflow-y-auto bg-surface-2/40 p-4 md:p-6"
+          [disabled]="!canManage"
+        >
           @switch (activeTab()) {
             @case ('instructions') {
               <app-ai-assistant-instructions-tab></app-ai-assistant-instructions-tab>
@@ -188,7 +208,7 @@
               <app-ai-assistant-styling-tab></app-ai-assistant-styling-tab>
             }
           }
-        </div>
+        </fieldset>
       </div>
 
       <!-- Right pane: live preview. On mobile it drops below the tab
