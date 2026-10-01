@@ -43,7 +43,7 @@
 
   <!-- Header — type dropdown + text (text-only inline for now) -->
   <div class="rounded-md border border-subtle bg-surface-2 p-3">
-    <div class="grid grid-cols-[160px_1fr] gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr]">
       <label class="block">
         <span class="text-xs font-medium text-default">Header</span>
         <select
@@ -133,7 +133,7 @@
     <div class="flex items-center justify-between">
       <div>
         <span class="text-xs font-medium text-default">Call-to-action buttons</span>
-        <p class="text-[10px] text-faint">Up to 3. Meta caps at three per template.</p>
+        <p class="text-[10px] text-faint">Up to 3 buttons per template.</p>
       </div>
       <button
         type="button"
@@ -149,7 +149,7 @@
       @for (btn of form().controls.buttons.controls; track $index) {
         <div
           [formGroupName]="$index"
-          class="grid grid-cols-[110px_140px_1fr_28px] items-start gap-2 rounded-lg border border-subtle bg-surface p-2"
+          class="grid grid-cols-2 items-start gap-2 rounded-lg border border-subtle bg-surface p-2 sm:grid-cols-[110px_140px_1fr_28px]"
         >
           <label class="block">
             <span class="text-[10px] font-medium text-muted">Type</span>
@@ -172,10 +172,13 @@
               placeholder="Shop now"
               class="mt-0.5 block w-full rounded-lg border border-subtle bg-surface px-2 py-1 text-xs focus:border-muted focus:outline-none"
             />
+            <span class="mt-0.5 block text-right text-[10px] text-faint">
+              {{ btn.controls.text.value.length }} / 25
+            </span>
           </label>
 
           @if (btn.controls.type.value === 'url') {
-            <label class="block">
+            <label class="col-span-2 block sm:col-span-1">
               <span class="text-[10px] font-medium text-muted">URL</span>
               <input
                 type="url"
@@ -185,7 +188,7 @@
               />
             </label>
           } @else if (btn.controls.type.value === 'phone_number') {
-            <label class="block">
+            <label class="col-span-2 block sm:col-span-1">
               <span class="text-[10px] font-medium text-muted">Phone (with country code)</span>
               <input
                 type="tel"
@@ -195,7 +198,7 @@
               />
             </label>
           } @else {
-            <p class="self-end pb-1 text-[10px] text-muted">
+            <p class="col-span-2 self-end pb-1 text-[10px] text-muted sm:col-span-1">
               Quick-reply buttons post the label back to the CRM as an inbound message.
             </p>
           }
@@ -204,11 +207,11 @@
             type="button"
             (click)="removeButton($index)"
             [disabled]="disabled()"
-            class="mt-4 flex h-6 w-6 items-center justify-center rounded text-red-500 hover:bg-red-500/10 disabled:opacity-50"
+            class="col-span-2 flex h-6 w-6 items-center justify-center justify-self-end rounded text-red-500 hover:bg-red-500/10 disabled:opacity-50 sm:col-span-1 sm:mt-4"
             aria-label="Remove button"
             title="Remove"
           >
-            ×
+            <lucide-icon name="x" size="14" />
           </button>
         </div>
       }

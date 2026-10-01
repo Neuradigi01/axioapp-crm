@@ -11,8 +11,11 @@
         Loading…
       </div>
     } @else if (loadError(); as err) {
-      <div class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400">
-        {{ err }}
+      <div
+        class="flex items-center justify-between gap-2 rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-500"
+      >
+        <span>{{ err }}</span>
+        <button type="button" (click)="retry()" class="font-medium underline">Retry</button>
       </div>
     } @else if (grouped().length === 0) {
       <p class="px-2 text-xs text-muted">No variables for this channel.</p>

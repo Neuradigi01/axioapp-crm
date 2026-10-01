@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
+import { LucideAngularModule } from 'lucide-angular';
 import { commonValidators } from '../../shared/validators';
 
 /**
@@ -83,7 +84,7 @@ const CATEGORY_OPTIONS: Array<{ value: WaCategory; label: string; blurb: string 
   selector: 'app-wa-form',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, LucideAngularModule],
   templateUrl: './wa-form.component.html',
 })
 export class WaFormComponent {

@@ -166,9 +166,19 @@
 
   <section class="flex-1 px-4 md:px-6 py-4 md:py-6">
     @if (loading()) {
-      <div class="flex items-center gap-2 text-sm text-muted">
-        <lucide-icon name="loader-2" size="14" class="animate-spin" />
-        Loading templates…
+      <div
+        class="overflow-hidden rounded-xl border border-subtle bg-surface"
+        aria-busy="true"
+        aria-label="Loading templates"
+      >
+        @for (row of [1, 2, 3, 4, 5, 6]; track row) {
+          <div class="flex items-center gap-4 border-b border-subtle px-4 py-3 last:border-b-0">
+            <div class="h-3.5 w-1/3 animate-pulse rounded bg-surface-2"></div>
+            <div class="h-3.5 w-16 animate-pulse rounded-full bg-surface-2"></div>
+            <div class="h-3.5 w-20 animate-pulse rounded-full bg-surface-2"></div>
+            <div class="ml-auto hidden h-3 w-24 animate-pulse rounded bg-surface-2 md:block"></div>
+          </div>
+        }
       </div>
     } @else if (items().length === 0) {
       <div
@@ -200,7 +210,7 @@
     } @else {
       <div class="overflow-hidden rounded-xl border border-subtle bg-surface md:overflow-x-auto">
         <table class="w-full table-fixed text-sm md:table-auto">
-          <thead class="bg-surface-2 text-[10px] text-muted md:text-xs">
+          <thead class="bg-surface-2 text-[11px] text-muted md:text-xs">
             <tr>
               <th
                 class="w-[26%] overflow-hidden px-1.5 py-2 text-left font-medium sm:w-[32%] md:w-auto md:px-4"
@@ -245,13 +255,13 @@
                 <td class="overflow-hidden px-1.5 py-2 align-top md:px-4 md:py-3">
                   <a
                     [routerLink]="['/user/templates', row.id]"
-                    class="block text-[11px] leading-tight font-medium text-default [overflow-wrap:anywhere] hover:text-default md:truncate md:text-sm md:leading-normal"
+                    class="block text-xs font-medium leading-tight text-default [overflow-wrap:anywhere] hover:text-default md:truncate md:text-sm md:leading-normal"
                   >
                     {{ row.name }}
                   </a>
                   @if (row.subject) {
                     <div
-                      class="mt-0.5 truncate text-[10px] text-muted md:text-xs"
+                      class="mt-0.5 truncate text-[11px] text-muted md:text-xs"
                       [title]="row.subject"
                     >
                       {{ row.subject }}

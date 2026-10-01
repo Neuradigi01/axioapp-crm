@@ -26,22 +26,22 @@ interface BadgeDescriptor {
 // other meaning "Meta/DLT OK'd it, safe to send") consistently misled
 // operators into thinking a WA-pending template was ready.
 const INTERNAL: Record<TemplateInternalStatus, BadgeDescriptor> = {
-  draft: { label: 'Draft', classes: 'bg-surface-2 text-default border-subtle' },
+  draft: { label: 'Draft', classes: 'bg-surface-2 text-default ring-subtle' },
   in_review: {
     label: 'In review',
-    classes: 'bg-amber-500/10 text-amber-700 ring-amber-500/20',
+    classes: 'bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-300',
   },
   approved: {
     label: 'Ready to publish',
-    classes: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20',
+    classes: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-300',
   },
   published: {
     label: 'Published',
-    classes: 'bg-blue-500/10 text-blue-700 ring-blue-500/20',
+    classes: 'bg-blue-500/10 text-blue-700 ring-blue-500/20 dark:text-blue-300',
   },
   archived: {
     label: 'Archived',
-    classes: 'bg-surface-2 text-muted border-subtle',
+    classes: 'bg-surface-2 text-muted ring-subtle',
   },
 };
 
@@ -52,19 +52,19 @@ const EXTERNAL: Record<TemplateExternalStatus, BadgeDescriptor | null> = {
   // disambiguates, and "Provider approved" was too wide for narrow cells.
   pending: {
     label: 'Pending',
-    classes: 'bg-amber-500/10 text-amber-700 ring-amber-500/20',
+    classes: 'bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-300',
   },
   approved: {
     label: 'Approved',
-    classes: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20',
+    classes: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-300',
   },
   rejected: {
     label: 'Rejected',
-    classes: 'bg-red-500/10 text-red-700 ring-red-500/20',
+    classes: 'bg-red-500/10 text-red-700 ring-red-500/20 dark:text-red-300',
   },
   paused: {
     label: 'Paused',
-    classes: 'bg-orange-500/10 text-orange-700 ring-orange-500/20',
+    classes: 'bg-orange-500/10 text-orange-700 ring-orange-500/20 dark:text-orange-300',
   },
 };
 

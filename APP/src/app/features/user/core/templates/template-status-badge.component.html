@@ -12,7 +12,7 @@
       [title]="'Meta rejection reason: ' + rejectionReason()"
     >
       <span
-        class="inline-flex max-w-full cursor-help items-center rounded-md px-1 py-0.5 text-[10px] leading-tight font-medium whitespace-nowrap ring-1 ring-inset md:px-1.5 md:text-xs"
+        class="inline-flex max-w-full cursor-help items-center rounded-md px-1 py-0.5 text-[11px] leading-tight font-medium whitespace-nowrap ring-1 ring-inset md:px-1.5 md:text-xs"
         [class]="d.classes"
       >
         {{ d.label }}
@@ -30,14 +30,14 @@
           Update the template and resubmit.
         </span>
         <span
-          class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-zinc-900"
+          class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[var(--accent)]"
           aria-hidden="true"
         ></span>
       </span>
     </span>
   } @else {
     <span
-      class="inline-flex max-w-full items-center rounded-md px-1 py-0.5 text-[10px] leading-tight font-medium whitespace-nowrap ring-1 ring-inset md:px-1.5 md:text-xs"
+      class="inline-flex max-w-full items-center rounded-md px-1 py-0.5 text-[11px] leading-tight font-medium whitespace-nowrap ring-1 ring-inset md:px-1.5 md:text-xs"
       [class]="d.classes"
     >
       {{ d.label }}

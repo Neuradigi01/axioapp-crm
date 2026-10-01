@@ -92,6 +92,9 @@ const EXTERNAL_STATUS_POLL_MS = 15_000;
  *  and get a cryptic error banner instead of a fix hint. */
 const WA_NAME_RE = /^[a-z0-9_]+$/;
 
+/** Header toast auto-dismiss delay. */
+const TOAST_DISMISS_MS = 5_000;
+
 /** Auto-save fires this long after the last edit on a saved draft. */
 const AUTO_SAVE_DELAY_MS = 30_000;
 
@@ -239,6 +242,11 @@ export class TemplateEditorPageComponent implements HasUnsavedChanges {
   protected readonly loadError = signal<string | null>(null);
   protected readonly saveError = signal<string | null>(null);
   protected readonly toast = signal<string | null>(null);
+  /** Warning-tone toasts (Meta rejected / paused, a usage hint) get an
+   *  amber style + alert icon instead of the success check. */
+  protected readonly toastIsWarning = computed(() =>
+    /rejected|paused|click into/i.test(this.toast() ?? ''),
+  );
   protected readonly saving = signal<boolean>(false);
 
   /** True when the operator has typed something since the last
@@ -469,6 +477,8 @@ export class TemplateEditorPageComponent implements HasUnsavedChanges {
 
   protected readonly currentBody = signal<string>('');
   protected readonly currentSubject = signal<string | null>(null);
+  /** Email HTML design for the live preview (null on other channels). */
+  protected readonly currentBodyHtml = signal<string | null>(null);
 
   // WhatsApp preview extras — updated from the wa-form valueChanges
   // subscription below so the preview bubble renders the operator's
@@ -604,11 +614,20 @@ export class TemplateEditorPageComponent implements HasUnsavedChanges {
             this.currentSubject.set(v ?? '');
             this.scheduleAutoSave();
           });
+        const subHtml = f.controls.body_html.valueChanges
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe((v) => {
+            this.currentBodyHtml.set(v || null);
+            this.scheduleAutoSave();
+          });
         this.currentBody.set(f.controls.body_text.value);
         this.currentSubject.set(f.controls.subject.value);
+        this.currentBodyHtml.set(f.controls.body_html.value || null);
         onCleanup(() => {
           subBody.unsubscribe();
           subSubject.unsubscribe();
+          subHtml.unsubscribe();
+          this.currentBodyHtml.set(null);
         });
       } else if (channel === 'sms') {
         const f = this.smsForm();
@@ -704,6 +723,13 @@ export class TemplateEditorPageComponent implements HasUnsavedChanges {
 
     // The auto-save timer must never outlive the page.
     this.destroyRef.onDestroy(() => this.clearAutoSave());
+
+    // Toasts fade on their own after a few seconds.
+    effect((onCleanup) => {
+      if (!this.toast()) return;
+      const timer = setTimeout(() => this.toast.set(null), TOAST_DISMISS_MS);
+      onCleanup(() => clearTimeout(timer));
+    });
 
     // Auto-poll for external-status updates while a WhatsApp template
     // sits in ``pending`` or ``paused`` (Meta hasn't ruled yet). The
@@ -929,6 +955,7 @@ export class TemplateEditorPageComponent implements HasUnsavedChanges {
   // --- variable insertion --------------------------------------------
 
   protected onInsertVariable(token: string): void {
+    if (this.locked() || !this.canWrite()) return;
     const el = this.focusedField;
     if (!el) {
       this.toast.set('Click into the field you want before picking a variable.');

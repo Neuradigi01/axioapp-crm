@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
+import { Subscription } from 'rxjs';
 
 import { TemplateChannel, TemplatesApiService, VariableDef } from '../templates-api.service';
 
@@ -57,28 +58,37 @@ export class VariablePickerComponent {
       .sort((a, b) => a.namespace.localeCompare(b.namespace));
   });
 
+  private loadSub: Subscription | null = null;
+
   constructor() {
     // Re-fetch whenever the channel changes.
-    effect(() => {
-      const channel = this.channel();
-      this.loading.set(true);
-      this.loadError.set(null);
-      this.api
-        .variables(channel)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: (rows) => {
-            this.variables.set(rows);
-            this.loading.set(false);
-          },
-          error: (err: HttpErrorResponse) => {
-            this.variables.set([]);
-            this.loading.set(false);
-            this.loadError.set('Could not load variables.');
-            void err;
-          },
-        });
-    });
+    effect(() => this.load(this.channel()));
+  }
+
+  protected retry(): void {
+    this.load(this.channel());
+  }
+
+  /** Newest channel wins — a slow response for the previous channel is
+   *  cancelled so it can't overwrite the current list. */
+  private load(channel: TemplateChannel): void {
+    this.loading.set(true);
+    this.loadError.set(null);
+    this.loadSub?.unsubscribe();
+    this.loadSub = this.api
+      .variables(channel)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          this.variables.set(rows);
+          this.loading.set(false);
+        },
+        error: (_err: HttpErrorResponse) => {
+          this.variables.set([]);
+          this.loading.set(false);
+          this.loadError.set('Could not load variables.');
+        },
+      });
   }
 
   protected onInsert(def: VariableDef): void {

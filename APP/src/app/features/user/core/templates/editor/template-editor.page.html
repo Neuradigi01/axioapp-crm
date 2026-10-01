@@ -36,10 +36,20 @@
       <div class="flex flex-wrap items-center gap-2">
         @if (toast(); as msg) {
           <div
-            class="whitespace-nowrap rounded-md border border-subtle bg-surface-2 px-3 py-1.5 text-xs text-default"
+            role="status"
+            [class]="
+              'flex max-w-full items-start gap-1.5 rounded-md border px-3 py-1.5 text-xs md:whitespace-nowrap ' +
+              (toastIsWarning()
+                ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                : 'border-subtle bg-surface-2 text-default')
+            "
           >
-            <lucide-icon name="check" size="12" class="mr-1 inline" />
-            {{ msg }}
+            <lucide-icon
+              [name]="toastIsWarning() ? 'alert-triangle' : 'check'"
+              size="12"
+              class="mt-0.5 shrink-0"
+            />
+            <span class="min-w-0">{{ msg }}</span>
             <button
               type="button"
               (click)="dismissToast()"
@@ -82,7 +92,7 @@
             type="button"
             (click)="submitForReview()"
             [disabled]="transitioning() !== null"
-            class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-amber-300 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-500/20 dark:text-amber-400 disabled:opacity-50"
             title="Goes to your Admin / Owner for internal approval. This is not the same as WhatsApp approval."
           >
             @if (transitioning() === 'submit') {
@@ -113,7 +123,7 @@
           <button
             type="button"
             (click)="openReviewModal()"
-            class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-300 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/10"
+            class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400"
             title="Approve or reject the draft submitted for review."
           >
             <lucide-icon name="check" size="12" />
@@ -146,7 +156,7 @@
             (click)="submitToMeta()"
             [title]="submitToMetaHint()"
             [disabled]="transitioning() !== null"
-            class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-violet-300 bg-violet-500/10 px-3 py-1.5 text-sm font-medium text-violet-800 hover:bg-violet-500/10 disabled:opacity-50"
+            class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-sm font-medium text-violet-700 hover:bg-violet-500/20 dark:text-violet-300 disabled:opacity-50"
           >
             @if (transitioning() === 'submit_external') {
               <lucide-icon name="loader-2" size="12" class="animate-spin" />
@@ -552,6 +562,7 @@
             [channel]="c"
             [subject]="currentSubject()"
             [body]="currentBody()"
+            [bodyHtml]="currentBodyHtml()"
             [waHeaderType]="currentWaHeaderType()"
             [waHeaderText]="currentWaHeaderText()"
             [waFooter]="currentWaFooter()"
