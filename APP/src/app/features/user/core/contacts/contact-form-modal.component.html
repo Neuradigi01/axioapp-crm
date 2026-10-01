@@ -1,13 +1,18 @@
 <div
   class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
   style="animation: fadeIn 0.12s ease"
+  (click)="requestClose()"
 >
   <div
     class="w-full max-w-2xl overflow-hidden rounded-2xl border border-subtle bg-surface-2 shadow-elevated"
     style="animation: popIn 0.12s ease"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="contact_form_title"
+    (click)="$event.stopPropagation()"
   >
     <header class="border-b border-subtle px-4 md:px-6 py-4">
-      <h2 class="font-display text-base font-semibold text-default">
+      <h2 id="contact_form_title" class="font-display text-base font-semibold text-default">
         {{ isEdit() ? 'Edit contact' : 'New contact' }}
       </h2>
       <p class="mt-1 text-xs text-muted">
@@ -267,7 +272,7 @@
     </form>
 
     <footer class="flex items-center justify-end gap-2 border-t border-subtle px-4 md:px-6 py-4">
-      <button type="button" class="btn btn-secondary" (click)="cancel.emit()">Cancel</button>
+      <button type="button" class="btn btn-secondary" (click)="requestClose()">Cancel</button>
       <button type="button" [disabled]="submitting$()" (click)="onSubmit()" class="btn btn-primary">
         {{ isEdit() ? 'Save' : 'Create' }}
       </button>

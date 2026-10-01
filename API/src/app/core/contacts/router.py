@@ -55,6 +55,7 @@ from src.app.core.contacts.schemas import (
     ContactMergeResponse,
     ContactOut,
     ContactReassign,
+    ContactTagsResponse,
     ContactUpdate,
     OptInHistoryOut,
     OptInRecordRequest,
@@ -72,6 +73,7 @@ from src.app.core.contacts.service import (
     get_contact,
     hydrate_contacts_by_ids,
     list_contact_custom_field_defs,
+    list_contact_tags,
     list_contacts,
     merge_contacts,
     reassign_contact,
@@ -229,6 +231,14 @@ async def create_contact_endpoint(
 # Static GETs MUST precede `/{contact_id}` — FastAPI matches in
 # registration order, so e.g. `/export.csv` would otherwise be parsed
 # as a UUID and fail validation.
+
+
+@router.get("/tags", response_model=ContactTagsResponse)
+async def list_contact_tags_endpoint(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("contacts.read")),
+) -> ContactTagsResponse:
+    return ContactTagsResponse(tags=await list_contact_tags(db, org_id=user.org_id))
 
 
 @router.get("/check-duplicate", response_model=ContactDuplicateCheckResponse)

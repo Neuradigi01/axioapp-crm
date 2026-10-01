@@ -8,9 +8,13 @@
       >
         Contacts
       </h1>
-      <p class="mt-0.5 text-[13px] text-muted md:mt-1 md:text-[14px]">
-        {{ state.total() | number }} people
-      </p>
+      @if (loadedOnce()) {
+        <p class="mt-0.5 text-[13px] text-muted md:mt-1 md:text-[14px]">
+          {{ state.total() | number }} {{ state.total() === 1 ? 'person' : 'people' }}
+        </p>
+      } @else {
+        <div class="mt-1.5 h-3.5 w-20 animate-pulse rounded bg-surface-2 md:mt-2"></div>
+      }
     </div>
     <!-- Buttons row — AIXO mobile packs Export/Import/Groups/+ New in one row
          via wrap-inside-button. `whitespace-normal leading-[1.1] h-auto min-h-[34px]`
@@ -69,13 +73,45 @@
         class="input pl-9"
       />
     </div>
+    @if (filterChips().length > 0) {
+      <div class="mt-2.5 flex flex-wrap items-center gap-1.5" aria-label="Active filters">
+        @for (chip of filterChips(); track chip.target + chip.value) {
+          <span
+            class="inline-flex max-w-full items-center gap-1 rounded-full bg-accent-soft py-0.5 pr-1 pl-2.5 text-xs font-medium text-accent"
+          >
+            <span class="truncate">{{ chip.label }}</span>
+            <button
+              type="button"
+              class="rounded-full p-0.5 hover:bg-accent/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              [attr.aria-label]="'Remove filter ' + chip.label"
+              (click)="removeFilterChip(chip.target, chip.value)"
+            >
+              <lucide-icon name="x" class="h-3 w-3" />
+            </button>
+          </span>
+        }
+        <button
+          type="button"
+          class="ml-1 text-xs font-medium text-muted underline-offset-2 hover:text-default hover:underline"
+          (click)="clearFilters()"
+        >
+          Clear all
+        </button>
+      </div>
+    }
   </div>
 
   <!-- Body -->
   <div class="overflow-hidden rounded-xl border border-subtle bg-surface md:overflow-x-auto">
     @if (state.loadError(); as err) {
-      <div class="px-4 py-4 text-sm text-red-500 md:px-6">{{ err }}</div>
-    } @else if (state.loading()) {
+      <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-4 md:px-6">
+        <p class="text-sm text-red-600 dark:text-red-400">{{ err }}</p>
+        <button type="button" class="btn btn-secondary btn-sm" (click)="reload()">
+          <lucide-icon name="refresh-cw" class="h-3.5 w-3.5" />
+          Retry
+        </button>
+      </div>
+    } @else if (state.loading() && state.items().length === 0) {
       <div class="divide-y divide-subtle">
         @for (i of [0, 1, 2, 3, 4]; track i) {
           <div class="flex items-center gap-4 px-4 py-4 md:px-6">
@@ -89,12 +125,35 @@
         }
       </div>
     } @else if (state.items().length === 0) {
-      <div class="px-4 py-12 text-center md:px-6">
-        <p class="text-sm font-medium text-default">No contacts found.</p>
-        <p class="mt-1 text-xs text-faint">Try a different search or clear filters.</p>
-      </div>
+      @if (hasActiveFilters()) {
+        <app-empty-state
+          icon="filter-x"
+          title="No contacts match your filters"
+          subtitle="Try a different search, or clear the filters to see everyone."
+        >
+          <button type="button" class="btn btn-secondary btn-sm" (click)="clearFilters()">
+            Clear filters
+          </button>
+        </app-empty-state>
+      } @else {
+        <app-empty-state
+          icon="users"
+          title="No contacts yet"
+          subtitle="Contacts are created automatically from new leads, forms and walk-ins — or import a spreadsheet to bring in your existing list."
+        >
+          <a routerLink="/user/contacts/import" class="btn btn-primary btn-sm">
+            <lucide-icon name="upload" class="h-4 w-4" />
+            Import contacts
+          </a>
+        </app-empty-state>
+      }
     } @else {
-      <table class="w-full table-fixed md:table-auto md:min-w-[1100px]">
+      <!-- Rows stay visible (dimmed) while a filter / sort / page change reloads. -->
+      <table
+        class="w-full table-fixed transition-opacity md:table-auto md:min-w-[1100px]"
+        [class.opacity-50]="state.loading()"
+        [attr.aria-busy]="state.loading()"
+      >
         <thead>
           <tr class="border-b border-subtle bg-surface-2">
             <th scope="col" class="hidden w-10 px-3 py-2.5 text-left md:table-cell">
@@ -109,6 +168,7 @@
             <th
               scope="col"
               class="w-[32%] overflow-hidden px-1.5 py-2 text-left text-[9px] font-semibold tracking-normal text-faint uppercase sm:w-auto sm:px-2 sm:text-[10px] sm:tracking-[.04em] md:px-6 md:py-2.5 md:text-[11px]"
+              [attr.aria-sort]="ariaSort('full_name')"
             >
               <button
                 type="button"
@@ -172,6 +232,26 @@
             <th
               scope="col"
               class="hidden px-4 py-2.5 text-right text-[11px] font-semibold tracking-[.06em] text-faint uppercase md:table-cell md:px-6"
+              [attr.aria-sort]="ariaSort('created_at')"
+            >
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 transition hover:text-default focus:outline-none"
+                (click)="toggleSort('created_at')"
+              >
+                Created
+                @if (sortKey() === 'created_at') {
+                  <lucide-icon
+                    [name]="sortOrder() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                    class="h-3 w-3"
+                  />
+                }
+              </button>
+            </th>
+            <th
+              scope="col"
+              class="hidden px-4 py-2.5 text-right text-[11px] font-semibold tracking-[.06em] text-faint uppercase md:table-cell md:px-6"
+              [attr.aria-sort]="ariaSort('last_activity_at')"
             >
               <button
                 type="button"
@@ -274,9 +354,9 @@
               >
                 <span
                   class="block truncate sm:whitespace-normal sm:[overflow-wrap:anywhere]"
-                  [attr.title]="item.source ?? ''"
+                  [attr.title]="sourceLabel(item.source)"
                 >
-                  {{ item.source ?? '—' }}
+                  {{ sourceLabel(item.source) }}
                 </span>
               </td>
               <td
@@ -314,6 +394,11 @@
               <td
                 class="hidden px-4 py-3 text-right font-mono text-sm whitespace-nowrap text-muted tabular-nums md:table-cell md:px-6"
               >
+                {{ item.created_at | relativeTime }}
+              </td>
+              <td
+                class="hidden px-4 py-3 text-right font-mono text-sm whitespace-nowrap text-muted tabular-nums md:table-cell md:px-6"
+              >
                 {{ item.last_activity_at | relativeTime }}
               </td>
             </tr>
@@ -324,10 +409,11 @@
   </div>
 
   <!-- Pagination -->
-  @if (!state.loading() && state.total() > 0) {
+  @if (state.total() > 0 && !state.loadError()) {
     <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
-      <span class="font-mono">
-        Page {{ state.page() }} of {{ state.totalPages() }} · {{ state.total() }} contact(s)
+      <span class="font-mono tabular-nums">
+        {{ rangeLabel() }} of {{ state.total() | number }}
+        {{ state.total() === 1 ? 'contact' : 'contacts' }}
       </span>
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-1.5">
@@ -344,24 +430,44 @@
           </select>
         </div>
         @if (state.total() > state.pageSize()) {
-          <div class="flex items-center gap-1">
+          <nav class="flex items-center gap-1" aria-label="Pagination">
             <button
               type="button"
-              class="btn btn-secondary btn-sm"
-              [disabled]="state.page() <= 1"
+              class="btn btn-secondary btn-sm !px-2"
+              [disabled]="state.loading() || state.page() <= 1"
               (click)="goToPage(state.page() - 1)"
+              aria-label="Previous page"
             >
-              Previous
+              <lucide-icon name="chevron-left" class="h-4 w-4" />
             </button>
+            @for (p of pageNumbers(); track $index) {
+              @if (p === '…') {
+                <span class="px-1 text-faint" aria-hidden="true">…</span>
+              } @else {
+                <button
+                  type="button"
+                  class="btn btn-sm min-w-[30px] !px-2 tabular-nums"
+                  [class.btn-primary]="p === state.page()"
+                  [class.btn-secondary]="p !== state.page()"
+                  [disabled]="state.loading()"
+                  [attr.aria-current]="p === state.page() ? 'page' : null"
+                  [attr.aria-label]="'Page ' + p"
+                  (click)="goToPage(p)"
+                >
+                  {{ p }}
+                </button>
+              }
+            }
             <button
               type="button"
-              class="btn btn-secondary btn-sm"
-              [disabled]="state.page() >= state.totalPages()"
+              class="btn btn-secondary btn-sm !px-2"
+              [disabled]="state.loading() || state.page() >= state.totalPages()"
               (click)="goToPage(state.page() + 1)"
+              aria-label="Next page"
             >
-              Next
+              <lucide-icon name="chevron-right" class="h-4 w-4" />
             </button>
-          </div>
+          </nav>
         }
       </div>
     </div>
@@ -419,13 +525,18 @@
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
     style="animation: fadeIn 0.12s ease"
+    (click)="state.bulkSubmitting() || closeBulkModal()"
   >
     <div
       class="w-full max-w-md overflow-hidden rounded-2xl border border-subtle bg-surface-2 shadow-elevated"
       style="animation: popIn 0.12s ease"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="bulk_tag_title"
+      (click)="$event.stopPropagation()"
     >
       <header class="border-b border-subtle px-5 py-4">
-        <h2 class="font-display text-base font-semibold text-default">
+        <h2 id="bulk_tag_title" class="font-display text-base font-semibold text-default">
           Add tag to {{ state.selectedCount() }} contact{{ state.selectedCount() === 1 ? '' : 's' }}
         </h2>
       </header>
@@ -438,7 +549,15 @@
           class="input mt-1"
           placeholder="e.g. vip"
           maxlength="64"
+          list="bulk_tag_suggestions"
+          autocomplete="off"
+          (keydown.enter)="onBulkAddTag()"
         />
+        <datalist id="bulk_tag_suggestions">
+          @for (t of allTags(); track t) {
+            <option [value]="t"></option>
+          }
+        </datalist>
         @if (state.bulkError(); as err) {
           <p class="field-error mt-2">{{ err }}</p>
         }

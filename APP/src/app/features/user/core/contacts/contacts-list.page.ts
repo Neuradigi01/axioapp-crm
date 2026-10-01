@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   Injectable,
   computed,
   effect,
@@ -30,6 +31,7 @@ import { OptInChipComponent } from './opt-in/opt-in-chip.component';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
+import { EmptyStateComponent } from '../shared/empty-state/empty-state.component';
 import { MailLinkDirective } from '../shared/directives/mail-link.directive';
 import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
 import {
@@ -48,6 +50,7 @@ import { ColumnFilterComponent } from '../shared/table-filters/column-filter.com
 import type { ColumnFilterOption } from '../shared/table-filters/column-filter.types';
 import { extractApiError } from '@core/services/api-error.util';
 import { initials } from '@core/services/text.util';
+import { ToastService } from '@shared/components/toast/toast.service';
 
 @Injectable()
 class ContactsListState extends ListPageState<ContactListItem> {}
@@ -72,6 +75,7 @@ class ContactsListState extends ListPageState<ContactListItem> {}
     UrlFilterStateDirective,
     OptInChipComponent,
     ColumnFilterComponent,
+    EmptyStateComponent,
   ],
   providers: [ContactsListState],
   templateUrl: './contacts-list.page.html',
@@ -84,6 +88,7 @@ export class ContactsListPageComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(FurnitureAuthService);
   private readonly usersDir = inject(UsersDirectoryService);
+  private readonly toast = inject(ToastService);
 
   protected readonly state = inject(ContactsListState);
 
@@ -125,14 +130,6 @@ export class ContactsListPageComponent {
     { initialValue: '' },
   );
 
-  /** Distinct source options for the column-header filter popover.
-   *  Contacts store `source` as free-form text — some rows use raw
-   *  enum keys ("google_ads"), others use pretty labels ("Google Ads"),
-   *  and casing varies ("facebook" vs "Facebook Ads"). Collapse to
-   *  one canonical entry per lowercase key so the popover doesn't
-   *  show the same source twice. `value` is the original raw string
-   *  of the first occurrence (what the backend filter matches on);
-   *  `label` is the display-only prettified version. */
   /** Source column-filter options. Fixed list mirroring the Add Lead
    *  modal + Contact create form, so every canonical source shows up
    *  in the popover regardless of what data currently exists.
@@ -154,21 +151,27 @@ export class ContactsListPageComponent {
     { value: 'bulk_import', label: 'Bulk import' },
   ]);
 
-  /** Prettify a raw source token ("google_ads" → "Google Ads"). Same
-   *  logic as leads.page.ts; kept local so contacts doesn't take a
-   *  dependency on the leads module. */
-  private prettifySource(raw: string): string {
-    const trimmed = raw.trim();
-    if (!trimmed) return trimmed;
+  /** Display label for a stored source. Canonical keys use the same
+   *  label as the Source filter ("widget" → "Forms"); other raw tokens
+   *  are prettified ("google_ads" → "Google Ads"); already-pretty free
+   *  text ("Facebook Ads") is shown as stored. */
+  protected sourceLabel(raw: string | null): string {
+    const trimmed = (raw ?? '').trim();
+    if (!trimmed) return '—';
+    const known = this.sourceOptions().find((o) => o.value === trimmed);
+    if (known) return known.label;
     if (/\s/.test(trimmed) && trimmed !== trimmed.toLowerCase()) return trimmed;
     return trimmed.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
+  /** Org-wide tag vocabulary (`GET /contacts/tags`), so the Tags filter
+   *  offers every tag — not just the ones on the rows currently shown. */
+  protected readonly allTags = signal<string[]>([]);
+
+  /** Tag filter options. Active selections are always kept so a filter
+   *  can be switched off even if its tag no longer exists. */
   readonly tagOptions = computed<ColumnFilterOption[]>(() => {
-    const set = new Set<string>();
-    for (const item of this.state.items()) {
-      for (const t of item.tags) set.add(t);
-    }
+    const set = new Set<string>([...this.allTags(), ...this.tagFilter()]);
     return [...set].sort().map((t) => ({ value: t, label: t }));
   });
 
@@ -188,6 +191,61 @@ export class ContactsListPageComponent {
       out.push({ value: u.id, label: u.full_name });
     }
     return out;
+  });
+
+  /** True when any search or column filter narrows the list — picks
+   *  between the "no matches" and "no contacts yet" empty states. */
+  readonly hasActiveFilters = computed(
+    () =>
+      !!this.q() ||
+      this.sourceFilter().length > 0 ||
+      this.tagFilter().length > 0 ||
+      this.assigneeFilter().length > 0,
+  );
+
+  /** One removable chip per active column-filter value. The filters
+   *  live inside the column headers, so this row is what tells the
+   *  operator the list is narrowed. */
+  readonly filterChips = computed<
+    { target: 'source' | 'tag' | 'assignee'; value: string; label: string }[]
+  >(() => {
+    const me = this.auth.currentUserId();
+    return [
+      ...this.sourceFilter().map((v) => ({
+        target: 'source' as const,
+        value: v,
+        label: `Source: ${this.sourceLabel(v)}`,
+      })),
+      ...this.tagFilter().map((v) => ({ target: 'tag' as const, value: v, label: `Tag: ${v}` })),
+      ...this.assigneeFilter().map((v) => ({
+        target: 'assignee' as const,
+        value: v,
+        label: `Owner: ${v === me ? 'Me' : this.ownerLabel(v)}`,
+      })),
+    ];
+  });
+
+  /** Page buttons for the pager: first, last, and a window around the
+   *  current page, with '…' gaps. */
+  readonly pageNumbers = computed<(number | '…')[]>(() => {
+    const total = this.state.totalPages();
+    const current = this.state.page();
+    const pages = new Set<number>([1, total, current - 1, current, current + 1]);
+    const sorted = [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+    const out: (number | '…')[] = [];
+    for (const p of sorted) {
+      const prev = out[out.length - 1];
+      if (typeof prev === 'number' && p - prev > 1) out.push('…');
+      out.push(p);
+    }
+    return out;
+  });
+
+  /** "26–50" — the row range shown on the current page. */
+  readonly rangeLabel = computed(() => {
+    const start = (this.state.page() - 1) * this.state.pageSize() + 1;
+    const end = Math.min(this.state.page() * this.state.pageSize(), this.state.total());
+    return `${start}–${end}`;
   });
 
   // --- Multi-select + bulk actions -------------------------------------------
@@ -274,6 +332,10 @@ export class ContactsListPageComponent {
   readonly submitting = signal(false);
   readonly formError = signal<string | null>(null);
 
+  /** False until the first list response lands — the header count shows
+   *  a placeholder instead of "0 people" during the initial load. */
+  readonly loadedOnce = signal(false);
+
   constructor() {
     this.state.bulkActions.set([
       {
@@ -293,6 +355,7 @@ export class ContactsListPageComponent {
     ]);
     // Initial load — runs after the effect below subscribes to the filter signals.
     this.reload();
+    this.loadTags();
 
     // Reactive: search box change resets to page 1 and re-fetches.
     // Column-header filters call `onColumnFilterChange` directly so
@@ -311,6 +374,7 @@ export class ContactsListPageComponent {
         return;
       }
       this.state.page.set(1);
+      this.clearSelection();
       this.reload();
     });
     // Honour `/user/contacts?new=1` (used by the dashboard quick-action)
@@ -337,6 +401,9 @@ export class ContactsListPageComponent {
     else if (target === 'tag') this.tagFilter.set(values);
     else this.assigneeFilter.set(values);
     this.state.page.set(1);
+    // A new filter means a new result set — drop the old selection so a
+    // bulk action can't hit contacts that are no longer on screen.
+    this.clearSelection();
     this.reload();
   }
 
@@ -354,6 +421,40 @@ export class ContactsListPageComponent {
       out.push(trimmed);
     }
     return out;
+  }
+
+  protected removeFilterChip(target: 'source' | 'tag' | 'assignee', value: string): void {
+    const current =
+      target === 'source'
+        ? this.sourceFilter()
+        : target === 'tag'
+          ? this.tagFilter()
+          : this.assigneeFilter();
+    this.onColumnFilterChange(
+      target,
+      current.filter((v) => v !== value),
+    );
+  }
+
+  /** Reset search + every column filter. A non-empty search box hands
+   *  the reload to the debounced `q()` effect; otherwise reload here. */
+  protected clearFilters(): void {
+    this.sourceFilter.set([]);
+    this.tagFilter.set([]);
+    this.assigneeFilter.set([]);
+    this.clearSelection();
+    if (this.searchControl.value) {
+      this.searchControl.setValue('');
+    } else {
+      this.state.page.set(1);
+      this.reload();
+    }
+  }
+
+  /** `aria-sort` value for a sortable column header. */
+  protected ariaSort(key: ContactSortKey): 'ascending' | 'descending' | 'none' {
+    if (this.sortKey() !== key) return 'none';
+    return this.sortOrder() === 'asc' ? 'ascending' : 'descending';
   }
 
   /** Click a sortable header. Same key → flip order; new key → reset to a
@@ -409,9 +510,18 @@ export class ContactsListPageComponent {
       .subscribe({
         next: (resp) => {
           if (seq !== this.reloadSeq) return;
-          this.state.items.set(resp.items);
           this.state.total.set(resp.total);
+          // The page ran past the end (e.g. its last rows were just
+          // deleted) — step back to the real last page instead of
+          // showing "No contacts found".
+          if (resp.items.length === 0 && this.state.page() > this.state.totalPages()) {
+            this.state.page.set(this.state.totalPages());
+            this.reload();
+            return;
+          }
+          this.state.items.set(resp.items);
           this.state.loading.set(false);
+          this.loadedOnce.set(true);
         },
         error: (err: HttpErrorResponse) => {
           if (seq !== this.reloadSeq) return;
@@ -419,8 +529,18 @@ export class ContactsListPageComponent {
           this.state.total.set(0);
           this.state.loadError.set(extractApiError(err) ?? 'Could not load contacts.');
           this.state.loading.set(false);
+          this.loadedOnce.set(true);
         },
       });
+  }
+
+  /** Refresh the Tags filter vocabulary. A failure keeps the previous
+   *  options — the list itself still works. */
+  private loadTags(): void {
+    this.api
+      .listTags()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({ next: (resp) => this.allTags.set(resp.tags), error: () => undefined });
   }
 
   protected onRowClick(item: ContactListItem): void {
@@ -483,12 +603,18 @@ export class ContactsListPageComponent {
         next: (blob) => {
           this.triggerDownload(blob);
           this.exporting.set(false);
+          this.toast.success('Contacts exported', {
+            subtitle: this.hasActiveFilters()
+              ? 'The CSV contains the contacts matching your filters.'
+              : undefined,
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.exporting.set(false);
-          this.state.loadError.set(
-            extractApiError(err) ?? 'Could not export. Narrow the filter and try again.',
-          );
+          // Toast, not `loadError` — the list is fine and must stay visible.
+          this.toast.error('Export failed', {
+            subtitle: extractApiError(err) ?? 'Narrow the filter and try again.',
+          });
         },
       });
   }
@@ -531,10 +657,12 @@ export class ContactsListPageComponent {
       .create(payload)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
+        next: (created) => {
           this.submitting.set(false);
           this.closeModal();
           this.reload();
+          this.loadTags();
+          this.toast.success('Contact created', { subtitle: created.full_name });
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
@@ -554,6 +682,8 @@ export class ContactsListPageComponent {
           this.submitting.set(false);
           this.closeModal();
           this.reload();
+          this.loadTags();
+          this.toast.success('Contact saved');
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
@@ -608,6 +738,13 @@ export class ContactsListPageComponent {
     } else if (key === 'delete') this.state.bulkModal.set('delete');
   }
 
+  /** Esc closes the page's own bulk "Add tag" modal. (The reassign /
+   *  delete dialogs and the contact form handle their own keys.) */
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this.state.bulkModal() === 'tag' && !this.state.bulkSubmitting()) this.closeBulkModal();
+  }
+
   protected closeBulkModal(): void {
     this.state.bulkModal.set(null);
     this.state.bulkError.set(null);
@@ -623,7 +760,8 @@ export class ContactsListPageComponent {
       .bulkReassign(ids, { userId: payload.userId, note: payload.note })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
+        next: (resp) => {
+          this.toast.success(`Reassigned ${this.contactCount(resp.reassigned)}`);
           this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
@@ -645,7 +783,8 @@ export class ContactsListPageComponent {
       .bulkDelete(ids)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
+        next: (resp) => {
+          this.toast.success(`Deleted ${this.contactCount(resp.deleted)}`);
           this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
@@ -672,16 +811,27 @@ export class ContactsListPageComponent {
       .bulkAddTag(ids, tag)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
+        next: (resp) => {
+          this.toast.success(`Tagged ${this.contactCount(resp.updated)} with “${tag}”`, {
+            subtitle:
+              resp.updated < ids.length
+                ? 'Contacts that already had this tag were skipped.'
+                : undefined,
+          });
           this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
+          this.loadTags();
         },
         error: (err: HttpErrorResponse) => {
           this.state.bulkSubmitting.set(false);
           this.state.bulkError.set(extractApiError(err) ?? 'Could not add tag.');
         },
       });
+  }
+
+  private contactCount(n: number): string {
+    return `${n} contact${n === 1 ? '' : 's'}`;
   }
 }

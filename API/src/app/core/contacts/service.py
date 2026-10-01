@@ -1449,6 +1449,17 @@ def _normalise_phone_suffix(raw: str) -> str | None:
     return digits[-10:] if len(digits) >= 10 else digits
 
 
+CONTACT_TAG_OPTIONS_LIMIT = 500
+
+
+async def list_contact_tags(session: AsyncSession, *, org_id: uuid.UUID) -> list[str]:
+    """Tag vocabulary for the list page's Tags column filter. Org-wide,
+    so the options don't depend on which page of contacts is showing."""
+    return await data_access.list_distinct_contact_tags(
+        session, org_id=org_id, limit=CONTACT_TAG_OPTIONS_LIMIT
+    )
+
+
 async def check_duplicate(
     session: AsyncSession,
     *,

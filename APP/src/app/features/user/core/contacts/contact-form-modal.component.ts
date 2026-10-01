@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   computed,
@@ -17,6 +18,8 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { FurnitureAuthService } from '../auth/auth.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
+import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
+import { FormToastHelper } from '../shared/forms/form-toast.helper';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
@@ -62,6 +65,16 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
   private readonly api = inject(ContactsApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly usersDir = inject(UsersDirectoryService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly formToast = inject(FormToastHelper);
+
+  /** Custom-field dirty tracking. The dynamic form emits its value on
+   *  render, so the first emission is the baseline; any later different
+   *  value means the user changed a custom field. */
+  private customBaseline: string | null = null;
+  private customDirty = false;
+  /** True while the discard-changes confirm is up, so Esc doesn't stack. */
+  private confirming = false;
 
   protected renderCustomFields$(): Observable<FieldDef[]> {
     return this.api.renderFields();
@@ -226,6 +239,34 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
 
   protected onCustomValueChange(v: FormValue): void {
     this.customValue.set(v);
+    const json = JSON.stringify(v);
+    if (this.customBaseline === null) this.customBaseline = json;
+    else if (json !== this.customBaseline) this.customDirty = true;
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (!this.confirming) void this.requestClose();
+  }
+
+  /** Cancel / Esc / backdrop. Asks before throwing away typed changes. */
+  protected async requestClose(): Promise<void> {
+    if (this.submitting$()) return;
+    if (this.standard.dirty || this.customDirty) {
+      this.confirming = true;
+      try {
+        const ok = await this.confirmDialog.ask({
+          title: 'Discard changes?',
+          body: 'What you entered for this contact will be lost.',
+          confirmLabel: 'Discard',
+          danger: true,
+        });
+        if (!ok) return;
+      } finally {
+        this.confirming = false;
+      }
+    }
+    this.cancel.emit();
   }
 
   protected onCustomValidityChange(valid: boolean): void {
@@ -235,6 +276,18 @@ export class ContactFormModalComponent extends BaseFormModalComponent {
   protected onSubmit(): void {
     if (this.standard.invalid) {
       this.standard.markAllAsTouched();
+      const labels: Record<string, string> = {
+        full_name: 'Name',
+        phone: 'Phone',
+        email: 'Email',
+        source: 'Source',
+        tags_csv: 'Tags',
+      };
+      this.formToast.invalidFields(
+        Object.entries(this.standard.controls)
+          .filter(([, c]) => c.invalid)
+          .map(([k]) => labels[k] ?? k),
+      );
       return;
     }
     if (!this.customValid()) {

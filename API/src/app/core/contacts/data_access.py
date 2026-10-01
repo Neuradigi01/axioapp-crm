@@ -335,6 +335,18 @@ async def is_user_active_member_of_org(
     return result.scalar_one_or_none() is not None
 
 
+async def list_distinct_contact_tags(
+    session: AsyncSession, *, org_id: uuid.UUID, limit: int
+) -> list[str]:
+    """Every distinct tag used on the org's contacts, alphabetical."""
+    tag = func.unnest(Contact.tags).label("tag")
+    inner = select(tag).where(Contact.org_id == org_id).subquery()
+    result = await session.execute(
+        select(inner.c.tag).distinct().order_by(inner.c.tag).limit(limit)
+    )
+    return list(result.scalars().all())
+
+
 async def list_contacts_by_ids_in_org(
     session: AsyncSession,
     *,

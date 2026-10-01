@@ -296,5 +296,9 @@ class ContactDuplicateMatch(ORMModel):
     assigned_to_id: uuid.UUID | None = None
 
 
+class ContactTagsResponse(BaseModel):
+    tags: list[str]
+
+
 class ContactDuplicateCheckResponse(BaseModel):
     matches: list[ContactDuplicateMatch]

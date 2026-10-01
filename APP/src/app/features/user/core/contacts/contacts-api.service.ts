@@ -385,6 +385,12 @@ export class ContactsApiService extends BaseCrudApiService<Contact, ContactCreat
   /** Live duplicate check called from the create / edit modal as the
    * user types. Backend matches phone on last-10-digit suffix and
    * email case-insensitively. */
+  /** Every distinct tag on the org's contacts — options for the list
+   *  page's Tags column filter. */
+  listTags(): Observable<{ tags: string[] }> {
+    return this.http.get<{ tags: string[] }>(`${this.base}/tags`);
+  }
+
   checkDuplicate(query: {
     phone?: string | null;
     email?: string | null;
