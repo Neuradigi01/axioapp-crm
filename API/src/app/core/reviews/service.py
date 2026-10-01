@@ -320,6 +320,43 @@ async def _publish_review_lifecycle_event(
         )
 
 
+# Suggested replies: business-owner voice, platform-safe length.
+_SUGGEST_REPLY_SYSTEM = (
+    "You write public replies from a business to its customer reviews. "
+    "Thank the reviewer, address what they actually said, stay warm and "
+    "professional, and keep it under 600 characters. For a negative review "
+    "apologise without admitting fault on specifics, and invite them to get in "
+    "touch so the team can make it right. Never invent offers, refunds or "
+    "facts. Reply in the reviewer's language. Return only the reply text."
+)
+
+
+async def suggest_review_reply(
+    session: AsyncSession, *, review_id: uuid.UUID, org_id: uuid.UUID
+) -> str:
+    """Draft a public reply with the org's AI Assistant (shared key +
+    budget path from the conversations module). Nothing is posted."""
+    from src.app.core.conversations.ai_assist_service import complete_with_org_assistant
+
+    review = await get_review(session, review_id)
+    review_text = (review.text or "").strip() or "(rating only, no written review)"
+    user_prompt = (
+        f"Platform: {review.source}\n"
+        f"Rating: {review.rating} out of 5\n"
+        f"Review: {review_text[:2000]}\n\n"
+        "Write the business's reply."
+    )
+    return await complete_with_org_assistant(
+        session,
+        org_id=org_id,
+        channel=None,
+        system=_SUGGEST_REPLY_SYSTEM,
+        user_prompt=user_prompt,
+        max_tokens=300,
+        include_business_context=True,
+    )
+
+
 # --- stats ----------------------------------------------------------------
 
 
@@ -334,6 +371,8 @@ async def stats(session: AsyncSession) -> dict[str, Any]:
             "distribution": [],
             "pending_count": 0,
             "alerts_last_7_days": 0,
+            "status_counts": {},
+            "source_counts": {},
         }
 
     avg = await _da.avg_review_rating(session)
@@ -357,6 +396,8 @@ async def stats(session: AsyncSession) -> dict[str, Any]:
         "distribution": distribution,
         "pending_count": int(pending),
         "alerts_last_7_days": int(alerts),
+        "status_counts": await _da.review_status_counts(session),
+        "source_counts": await _da.review_source_counts(session),
     }
 
 

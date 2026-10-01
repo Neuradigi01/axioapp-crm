@@ -61,6 +61,12 @@ class RatingDistributionRow(BaseModel):
     count: int
 
 
+class ReviewSuggestedReplyOut(BaseModel):
+    """AI-drafted reply text — placed in the composer, never posted."""
+
+    text: str
+
+
 class ReviewStatsOut(BaseModel):
     """Snapshot of the review queue health."""
 
@@ -70,3 +76,6 @@ class ReviewStatsOut(BaseModel):
     distribution: list[RatingDistributionRow]
     pending_count: int
     alerts_last_7_days: int
+    # List tabs + platform filter: ``{status: n}`` / ``{source: n}``.
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    source_counts: dict[str, int] = Field(default_factory=dict)

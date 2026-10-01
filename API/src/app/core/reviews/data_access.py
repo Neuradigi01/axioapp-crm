@@ -106,6 +106,18 @@ async def review_rating_distribution(
     )
 
 
+async def review_status_counts(session: AsyncSession) -> dict[str, int]:
+    """``{status: count}`` in one GROUP BY (list status tabs)."""
+    rows = await session.execute(select(Review.status, func.count()).group_by(Review.status))
+    return {status.value: int(n) for status, n in rows.all()}
+
+
+async def review_source_counts(session: AsyncSession) -> dict[str, int]:
+    """``{source: count}`` in one GROUP BY (platform filter)."""
+    rows = await session.execute(select(Review.source, func.count()).group_by(Review.source))
+    return {source: int(n) for source, n in rows.all()}
+
+
 async def count_responded_reviews(session: AsyncSession) -> int:
     """Reviews that actually received a reply. Escalated-but-unanswered
     reviews are not "responded" — counting them inflated the rate."""

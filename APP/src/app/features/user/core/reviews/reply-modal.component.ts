@@ -4,7 +4,9 @@ import {
   DestroyRef,
   EventEmitter,
   Input,
+  OnInit,
   Output,
+  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -13,12 +15,15 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { commonValidators } from '../shared/validators';
+import { SavedRepliesStore } from '../conversations/saved-replies.store';
+import { SavedReply } from '../conversations/conversations-api.service';
 import { Review, ReviewsApiService } from './reviews-api.service';
 import { extractApiError } from '@core/services/api-error.util';
 
 /**
- * Modal for replying to a review. Shows the original review for
- * context (read-only), then a textarea + Send. On success the parent
+ * Modal for replying to a review (or editing an existing reply). Shows
+ * the original review for context, then the reply box with the team's
+ * saved replies and an AI-drafted suggestion. On success the parent
  * receives the updated `Review` (status flipped to `replied`).
  */
 @Component({
@@ -28,9 +33,10 @@ import { extractApiError } from '@core/services/api-error.util';
   imports: [ReactiveFormsModule],
   templateUrl: './reply-modal.component.html',
 })
-export class ReviewReplyModalComponent {
+export class ReviewReplyModalComponent implements OnInit {
   private readonly api = inject(ReviewsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  protected readonly savedReplies = inject(SavedRepliesStore);
 
   @Input({ required: true }) review!: Review;
 
@@ -48,6 +54,53 @@ export class ReviewReplyModalComponent {
 
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
+  protected readonly suggesting = signal(false);
+  protected readonly repliesOpen = signal(false);
+  protected readonly repliesQuery = signal('');
+  protected readonly repliesMatches = computed(() =>
+    this.savedReplies.search(this.repliesQuery(), 8),
+  );
+
+  protected get isEdit(): boolean {
+    return !!this.review.reply_text;
+  }
+
+  ngOnInit(): void {
+    if (this.review.reply_text) this.textControl.setValue(this.review.reply_text);
+  }
+
+  protected toggleReplies(): void {
+    this.savedReplies.ensureLoaded();
+    this.repliesQuery.set('');
+    this.repliesOpen.update((v) => !v);
+  }
+
+  protected useSavedReply(reply: SavedReply): void {
+    this.textControl.setValue(reply.body);
+    this.textControl.markAsTouched();
+    this.repliesOpen.set(false);
+  }
+
+  /** AI draft into the reply box — the operator reviews before sending. */
+  protected suggest(): void {
+    if (this.suggesting()) return;
+    this.suggesting.set(true);
+    this.submitError.set(null);
+    this.api
+      .suggestReply(this.review.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: ({ text }) => {
+          this.suggesting.set(false);
+          this.textControl.setValue(text.slice(0, 4000));
+          this.textControl.markAsTouched();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.suggesting.set(false);
+          this.submitError.set(extractApiError(err) ?? 'Could not draft a reply.');
+        },
+      });
+  }
 
   protected submit(): void {
     if (!this.textControl.valid) {

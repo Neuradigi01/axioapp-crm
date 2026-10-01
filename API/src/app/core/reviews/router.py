@@ -29,6 +29,7 @@ from src.app.core.reviews.schemas import (
     ReviewOut,
     ReviewReplyPayload,
     ReviewStatsOut,
+    ReviewSuggestedReplyOut,
     ReviewUpdate,
 )
 from src.app.core.reviews.service import (
@@ -39,6 +40,7 @@ from src.app.core.reviews.service import (
     list_reviews,
     reply_to_review,
     stats,
+    suggest_review_reply,
     update_review,
 )
 from src.app.core.users.models import User
@@ -138,6 +140,17 @@ async def reply_endpoint(
         db, review_id=review_id, user_id=user.legacy_uuid, payload=payload
     )
     return ReviewOut.model_validate(review)
+
+
+@router.post("/{review_id}/suggest-reply", response_model=ReviewSuggestedReplyOut)
+async def suggest_reply_endpoint(
+    review_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("reviews.write")),
+) -> ReviewSuggestedReplyOut:
+    """AI-drafted reply for the composer (org AI Assistant + budget)."""
+    text = await suggest_review_reply(db, review_id=review_id, org_id=user.org_id)
+    return ReviewSuggestedReplyOut(text=text)
 
 
 @router.post("/{review_id}/escalate", response_model=ReviewOut)

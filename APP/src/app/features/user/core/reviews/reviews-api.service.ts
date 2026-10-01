@@ -52,6 +52,10 @@ export interface ReviewStats {
   distribution: RatingDistributionRow[];
   pending_count: number;
   alerts_last_7_days: number;
+  /** `{status: count}` for the list tabs. */
+  status_counts: Partial<Record<ReviewStatus, number>>;
+  /** `{source: count}` for the platform filter. */
+  source_counts: Record<string, number>;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -77,6 +81,11 @@ export class ReviewsApiService {
 
   reply(id: string, text: string): Observable<Review> {
     return this.http.post<Review>(`${this.base}/${id}/reply`, { text });
+  }
+
+  /** AI-drafted reply (org AI Assistant + budget). Never posted. */
+  suggestReply(id: string): Observable<{ text: string }> {
+    return this.http.post<{ text: string }>(`${this.base}/${id}/suggest-reply`, {});
   }
 
   escalate(id: string, reason?: string): Observable<Review> {

@@ -1,10 +1,14 @@
-"""Agent-side AI help in the inbox: suggest a reply, summarise a thread.
+"""Agent-side AI help: suggest a reply, summarise a thread.
 
 Uses the org's own AI Assistant setup — the assistant bound to the
-conversation's channel (else any active assistant) supplies the
-provider key + model, and every call goes through the org AI budget
-(pre-flight cap check, then the real cost is charged). Nothing is sent
-to the customer: the suggestion lands in the operator's composer.
+channel (else any active assistant) supplies the provider key + model,
+and every call goes through the org AI budget (pre-flight cap check,
+then the real cost is charged). Nothing is sent to the customer: the
+suggestion lands in the operator's composer.
+
+:func:`complete_with_org_assistant` is the shared entry point other
+modules (e.g. Reviews' suggested reply) call so they reuse the same
+key, budget and error handling.
 """
 
 from __future__ import annotations
@@ -49,8 +53,12 @@ _SUMMARY_SYSTEM = (
 AssistMode = Literal["suggest_reply", "summarize"]
 
 
-async def _resolve_assistant(session: AsyncSession, channel: str) -> AiAssistant:
-    assistant = await _ai_da.find_active_assistant_bound_to_channel(session, channel=channel)
+async def _resolve_assistant(session: AsyncSession, channel: str | None) -> AiAssistant:
+    assistant = (
+        await _ai_da.find_active_assistant_bound_to_channel(session, channel=channel)
+        if channel
+        else None
+    )
     if assistant is None:
         active = await _ai_da.list_assistants(
             session, filter_status=AiAssistantStatus.active, limit=1
@@ -82,16 +90,22 @@ def _transcript(messages: list[Message], *, include_notes: bool) -> str:
     return "\n".join(lines)
 
 
-async def run_ai_assist(
+async def complete_with_org_assistant(
     session: AsyncSession,
     *,
-    conversation_id: uuid.UUID,
     org_id: uuid.UUID,
-    mode: AssistMode,
+    channel: str | None,
+    system: str,
+    user_prompt: str,
+    max_tokens: int,
+    include_business_context: bool = False,
 ) -> str:
-    """Return a suggested reply or a thread summary for the operator."""
-    conversation = await get_conversation(session, conversation_id)
-    assistant = await _resolve_assistant(session, conversation.channel.value)
+    """One budget-checked completion with the org's AI Assistant (bound
+    to ``channel`` when given, else any active one). Raises 409 when no
+    assistant is set up, 429 when the AI budget is spent, 502 when the
+    provider fails or answers empty. ``include_business_context``
+    appends the assistant's own instructions to ``system``."""
+    assistant = await _resolve_assistant(session, channel)
 
     allowed, reason = await _budget_service.charge_budget(
         session, org_id=org_id, cost_usd=Decimal("0"), dry_run=True
@@ -105,24 +119,8 @@ async def run_ai_assist(
             ),
         )
 
-    messages = await list_messages(session, conversation_id, limit=_CONTEXT_MESSAGES)
-    transcript = _transcript(messages, include_notes=mode == "summarize")
-    if not transcript:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="There are no messages to work with yet.",
-        )
-
-    if mode == "suggest_reply":
-        system = _SUGGEST_SYSTEM
-        if assistant.instructions:
-            system += "\n\nBusiness context from the org's assistant:\n" + assistant.instructions
-        user_prompt = f"Conversation so far:\n{transcript}\n\nWrite the agent's next reply."
-        max_tokens = 400
-    else:
-        system = _SUMMARY_SYSTEM
-        user_prompt = f"Conversation:\n{transcript}"
-        max_tokens = 500
+    if include_business_context and assistant.instructions:
+        system += "\n\nBusiness context from the org's assistant:\n" + assistant.instructions
 
     llm = factory("openai", db=session, org_id=org_id, key_id=assistant.key_id)
     try:
@@ -136,7 +134,7 @@ async def run_ai_assist(
             max_tokens=max_tokens,
         )
     except ProviderError as exc:
-        logger.warning("conversations.ai_assist provider error conv=%s: %s", conversation_id, exc)
+        logger.warning("ai_assist provider error org=%s: %s", org_id, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The AI provider could not answer right now. Try again in a moment.",
@@ -145,7 +143,7 @@ async def run_ai_assist(
     try:
         cost = cost_for(response.usage, assistant.model)
     except KeyError:
-        logger.warning("conversations.ai_assist no price for model=%s", assistant.model)
+        logger.warning("ai_assist no price for model=%s", assistant.model)
         cost = Decimal("0")
     await _budget_service.charge_budget(session, org_id=org_id, cost_usd=cost, dry_run=False)
 
@@ -156,3 +154,40 @@ async def run_ai_assist(
             detail="The AI returned an empty answer. Try again.",
         )
     return text
+
+
+async def run_ai_assist(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    org_id: uuid.UUID,
+    mode: AssistMode,
+) -> str:
+    """Return a suggested reply or a thread summary for the operator."""
+    conversation = await get_conversation(session, conversation_id)
+    messages = await list_messages(session, conversation_id, limit=_CONTEXT_MESSAGES)
+    transcript = _transcript(messages, include_notes=mode == "summarize")
+    if not transcript:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="There are no messages to work with yet.",
+        )
+
+    if mode == "suggest_reply":
+        return await complete_with_org_assistant(
+            session,
+            org_id=org_id,
+            channel=conversation.channel.value,
+            system=_SUGGEST_SYSTEM,
+            user_prompt=f"Conversation so far:\n{transcript}\n\nWrite the agent's next reply.",
+            max_tokens=400,
+            include_business_context=True,
+        )
+    return await complete_with_org_assistant(
+        session,
+        org_id=org_id,
+        channel=conversation.channel.value,
+        system=_SUMMARY_SYSTEM,
+        user_prompt=f"Conversation:\n{transcript}",
+        max_tokens=500,
+    )

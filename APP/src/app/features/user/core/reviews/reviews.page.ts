@@ -1,9 +1,19 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Subscription } from 'rxjs';
+import { RouterLink } from '@angular/router';
+import { Subscription, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
-import { Review, ReviewStats, ReviewsApiService } from './reviews-api.service';
+import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
+import { Review, ReviewStats, ReviewStatus, ReviewsApiService } from './reviews-api.service';
 import { ReviewReplyModalComponent } from './reply-modal.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { FurnitureAuthService } from '../auth/auth.service';
@@ -38,12 +48,13 @@ const ATTENTION_MAX_RATING = 3;
   selector: 'app-reviews-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReviewReplyModalComponent, ConfirmDialogComponent],
+  imports: [ReviewReplyModalComponent, ConfirmDialogComponent, RouterLink],
   templateUrl: './reviews.page.html',
 })
 export class ReviewsPageComponent {
   private readonly api = inject(ReviewsApiService);
   private readonly settingsApi = inject(SettingsApiService);
+  private readonly contactsApi = inject(ContactsApiService);
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -60,6 +71,30 @@ export class ReviewsPageComponent {
 
   /** null = All · 1..5 = star filter */
   protected readonly ratingFilter = signal<number | null>(null);
+  protected readonly statusFilter = signal<ReviewStatus | null>(null);
+  protected readonly sourceFilter = signal<string | null>(null);
+
+  protected readonly statusTabs: ReadonlyArray<{ value: ReviewStatus | null; label: string }> = [
+    { value: null, label: 'All' },
+    { value: 'pending_reply', label: 'Needs reply' },
+    { value: 'escalated', label: 'Escalated' },
+    { value: 'replied', label: 'Replied' },
+  ];
+
+  /** Platforms seen in this org's reviews, most reviews first. */
+  protected readonly sources = computed(() =>
+    Object.entries(this.stats()?.source_counts ?? {})
+      .sort((a, b) => b[1] - a[1])
+      .map(([source, count]) => ({ source, count })),
+  );
+
+  protected readonly hasFilters = computed(
+    () =>
+      this.ratingFilter() !== null || this.statusFilter() !== null || this.sourceFilter() !== null,
+  );
+
+  /** Linked contact names, keyed by contact id. */
+  protected readonly contactNames = signal<Record<string, string>>({});
   protected readonly replyTarget = signal<Review | null>(null);
 
   protected readonly attentionRows = signal<Review[]>([]);
@@ -84,6 +119,18 @@ export class ReviewsPageComponent {
   /** Lookup the count for a given rating in the distribution. */
   protected countFor(rating: number): number {
     return this.stats()?.distribution.find((d) => d.rating === rating)?.count ?? 0;
+  }
+
+  protected statusCount(status: ReviewStatus | null): number {
+    const s = this.stats();
+    if (!s) return 0;
+    return status === null ? s.total : (s.status_counts[status] ?? 0);
+  }
+
+  /** Share of all reviews with this rating (shown next to the bar). */
+  protected sharePct(rating: number): number {
+    const total = this.stats()?.total ?? 0;
+    return total ? Math.round((this.countFor(rating) / total) * 100) : 0;
   }
 
   /** Bar width % for the distribution bars — relative to the rating with most counts. */
@@ -166,6 +213,28 @@ export class ReviewsPageComponent {
 
   protected setRating(r: number | null): void {
     this.ratingFilter.set(r);
+    this.reloadList();
+  }
+
+  /** Distribution bar click — toggles that star filter. */
+  protected toggleRating(r: number): void {
+    this.setRating(this.ratingFilter() === r ? null : r);
+  }
+
+  protected setStatus(s: ReviewStatus | null): void {
+    this.statusFilter.set(s);
+    this.reloadList();
+  }
+
+  protected setSource(value: string): void {
+    this.sourceFilter.set(value || null);
+    this.reloadList();
+  }
+
+  protected clearFilters(): void {
+    this.ratingFilter.set(null);
+    this.statusFilter.set(null);
+    this.sourceFilter.set(null);
     this.reloadList();
   }
 
@@ -268,12 +337,19 @@ export class ReviewsPageComponent {
     if (page > 1) this.loadingMore.set(true);
     this.listSub?.unsubscribe();
     this.listSub = this.api
-      .list({ rating: rating ?? undefined, page, size: PAGE_SIZE })
+      .list({
+        rating: rating ?? undefined,
+        status: this.statusFilter() ?? undefined,
+        source: this.sourceFilter() ?? undefined,
+        page,
+        size: PAGE_SIZE,
+      })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
           this.page = page;
           this.items.update((rows) => (page === 1 ? resp.items : [...rows, ...resp.items]));
+          this.hydrateContacts(resp.items);
           this.total.set(resp.total);
           this.loading.set(false);
           this.loadingMore.set(false);
@@ -288,6 +364,28 @@ export class ReviewsPageComponent {
           this.loadError.set(extractApiError(err) ?? 'Could not load reviews.');
         },
       });
+  }
+
+  /** Resolve linked contact names for the rows in one batch request. */
+  private hydrateContacts(rows: Review[]): void {
+    const known = this.contactNames();
+    const ids = [
+      ...new Set(rows.map((r) => r.contact_id).filter((id): id is string => !!id)),
+    ].filter((id) => !(id in known));
+    if (ids.length === 0) return;
+    this.contactsApi
+      .hydrateByIds(ids)
+      .pipe(
+        catchError(() => of([] as ContactListItem[])),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((contacts) =>
+        this.contactNames.update((cur) => {
+          const next = { ...cur };
+          for (const c of contacts) next[c.id] = c.full_name;
+          return next;
+        }),
+      );
   }
 
   private reloadStats(): void {

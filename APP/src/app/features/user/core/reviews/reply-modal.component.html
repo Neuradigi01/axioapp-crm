@@ -1,7 +1,9 @@
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
   <div class="w-full max-w-lg rounded-lg bg-surface p-5 shadow-xl">
     <header class="mb-3">
-      <h2 class="text-lg font-semibold text-default">Reply to review</h2>
+      <h2 class="text-lg font-semibold text-default">
+        {{ isEdit ? 'Edit reply' : 'Reply to review' }}
+      </h2>
       <p class="mt-1 text-xs text-muted capitalize">Source: {{ review.source }}</p>
     </header>
 
@@ -19,6 +21,61 @@
     </div>
 
     <form (ngSubmit)="submit()">
+      <div class="relative mb-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          (click)="toggleReplies()"
+          [attr.aria-expanded]="repliesOpen()"
+          class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2"
+        >
+          ⚡ Saved replies
+        </button>
+        <button
+          type="button"
+          (click)="suggest()"
+          [disabled]="suggesting()"
+          title="Draft a reply with AI — you review it before sending"
+          class="rounded-md border border-subtle bg-surface px-2 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-60"
+        >
+          {{ suggesting() ? 'Drafting…' : '✨ AI reply' }}
+        </button>
+        @if (repliesOpen()) {
+          <div
+            class="absolute left-0 top-full z-10 mt-1 w-80 max-w-full rounded-lg border border-subtle bg-surface p-2 shadow-lg"
+          >
+            <input
+              type="search"
+              placeholder="Search saved replies"
+              [value]="repliesQuery()"
+              (input)="repliesQuery.set($any($event.target).value)"
+              class="mb-1.5 w-full rounded-md border border-subtle bg-surface px-2 py-1 text-xs text-default focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            <ul class="max-h-52 overflow-y-auto">
+              @if (savedReplies.loading() && !savedReplies.loaded()) {
+                <li class="px-2 py-2 text-xs text-muted">Loading…</li>
+              } @else if (repliesMatches().length === 0) {
+                <li class="px-2 py-2 text-xs text-muted">
+                  No saved replies yet — add them from the Conversations composer.
+                </li>
+              }
+              @for (sr of repliesMatches(); track sr.id) {
+                <li>
+                  <button
+                    type="button"
+                    (click)="useSavedReply(sr)"
+                    class="block w-full rounded px-2 py-1.5 text-left hover:bg-surface-2"
+                  >
+                    <span class="block truncate text-xs font-medium text-default">{{
+                      sr.title
+                    }}</span>
+                    <span class="block truncate text-[11px] text-muted">{{ sr.body }}</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </div>
       <label class="block text-sm">
         <span class="block text-xs font-medium text-muted">Your reply</span>
         <textarea
@@ -63,7 +120,7 @@
           [disabled]="submitting() || !textControl.value.trim()"
           class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
         >
-          {{ submitting() ? 'Sending…' : 'Send reply' }}
+          {{ submitting() ? 'Sending…' : isEdit ? 'Update reply' : 'Send reply' }}
         </button>
       </div>
     </form>
