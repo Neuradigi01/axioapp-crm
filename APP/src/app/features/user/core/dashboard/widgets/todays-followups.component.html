@@ -208,6 +208,7 @@
                     · {{ le.type }}:
                     <a
                       [routerLink]="openLink(row)"
+                      [queryParams]="openQuery(row)"
                       class="font-medium text-accent hover:opacity-80"
                     >
                       {{ le.label }}
@@ -262,6 +263,7 @@
                   }
                   <a
                     [routerLink]="openLink(row)"
+                    [queryParams]="openQuery(row)"
                     class="btn btn-secondary btn-sm !h-7 !px-2 !text-[11px]"
                   >
                     <lucide-icon name="external-link" size="12" aria-hidden="true"></lucide-icon>

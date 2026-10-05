@@ -20,34 +20,58 @@
         </span>
       </p>
     </div>
-    <button
-      type="button"
-      (click)="openCreate()"
-      class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
-    >
-      + Create task
+    <button type="button" (click)="openCreate()" class="btn btn-primary">
+      <lucide-icon name="plus" class="h-4 w-4" />
+      Create task
     </button>
   </header>
 
   <!-- Chips + assignee dropdown + search -->
   <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
     <div class="flex flex-wrap items-center gap-2">
-      @for (c of chips(); track c.key) {
+      <!-- Whose tasks: Mine | All (All needs users.read). -->
+      @if (canViewAll()) {
+        <div
+          class="inline-flex overflow-hidden rounded-full border border-subtle bg-surface text-xs font-medium"
+          role="group"
+          aria-label="Whose tasks"
+        >
+          @for (sc of ['mine', 'all']; track sc) {
+            <button
+              type="button"
+              (click)="setScope($any(sc))"
+              [attr.aria-pressed]="scope() === sc"
+              [class]="
+                scope() === sc
+                  ? 'bg-accent px-3 py-1 text-white'
+                  : 'px-3 py-1 text-default hover:bg-surface-2'
+              "
+            >
+              {{ sc === 'mine' ? 'Mine' : 'All' }}
+            </button>
+          }
+        </div>
+      }
+      @for (c of chips; track c.key) {
         <!-- Active state uses a single mutually-exclusive class string
              so a Tailwind compile-order collision can't leave the
-             base `bg-surface` beating `bg-accent` (produced an
-             invisible "All" chip in light mode: text-white on a
-             white pill). -->
+             base `bg-surface` beating `bg-accent`. -->
         <button
           type="button"
           (click)="selectChip(c.key)"
+          [attr.aria-pressed]="activeChip() === c.key"
           [class]="
             activeChip() === c.key
-              ? 'rounded-full border border-accent bg-accent px-3 py-1 text-xs font-medium text-white'
-              : 'rounded-full border border-subtle bg-surface px-3 py-1 text-xs font-medium text-default hover:bg-surface-2'
+              ? 'inline-flex items-center gap-1.5 rounded-full border border-accent bg-accent px-3 py-1 text-xs font-medium text-white'
+              : 'inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface px-3 py-1 text-xs font-medium text-default hover:bg-surface-2'
           "
         >
           {{ c.label }}
+          @if (counts(); as n) {
+            <span class="font-mono text-[10.5px] tabular-nums" [class]="chipCountClass(c, n)">
+              {{ n[c.count] }}
+            </span>
+          }
         </button>
       }
 
@@ -125,13 +149,40 @@
           </div>
         }
       </div>
-      <input
-        [formControl]="searchCtrl"
-        type="text"
-        placeholder="Search tasks…"
-        class="w-full max-w-xs rounded-md border border-subtle px-3 py-1.5 text-sm focus:border-muted focus:outline-none sm:w-64"
-      />
+      <div class="relative w-full max-w-xs sm:w-64">
+        <label for="tasks_q" class="sr-only">Search tasks</label>
+        <lucide-icon
+          name="search"
+          class="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-faint"
+        />
+        <input
+          id="tasks_q"
+          [formControl]="searchCtrl"
+          type="search"
+          placeholder="Search tasks…"
+          class="w-full rounded-md border border-subtle bg-surface py-1.5 pr-8 pl-8 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+        />
+        @if (searchCtrl.value) {
+          <button
+            type="button"
+            class="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-1 text-faint hover:text-default"
+            aria-label="Clear search"
+            (click)="searchCtrl.setValue('')"
+          >
+            <lucide-icon name="x" class="h-3.5 w-3.5" />
+          </button>
+        }
+      </div>
     </div>
+  </div>
+
+  <!-- Phone layout has no table headers to sort from. -->
+  <div class="mb-3 md:hidden">
+    <crm-mobile-select
+      [options]="sortSelectOptions"
+      [value]="sortBy() + ':' + sortDir()"
+      (valueChange)="onSortSelect($event)"
+    />
   </div>
 
   @if (state.loadError(); as err) {
@@ -154,15 +205,29 @@
       }
     </div>
   } @else if (state.items().length === 0) {
-    <div class="rounded-xl border border-dashed border-subtle bg-surface p-6 md:p-12 text-center">
-      <p class="text-sm text-muted">No tasks match this filter.</p>
-      <button
-        type="button"
-        (click)="openCreate()"
-        class="mt-3 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
-      >
-        Create your first task
-      </button>
+    <div class="rounded-xl border border-dashed border-subtle bg-surface">
+      @if (hasActiveFilters()) {
+        <app-empty-state
+          icon="filter-x"
+          title="No tasks match these filters"
+          subtitle="Try another tab, owner or search — or clear the filters."
+        >
+          <button type="button" class="btn btn-secondary btn-sm" (click)="clearFilters()">
+            Clear filters
+          </button>
+        </app-empty-state>
+      } @else {
+        <app-empty-state
+          icon="check-circle-2"
+          title="No open tasks — you're all caught up"
+          subtitle="New follow-ups from leads and workflows land here."
+        >
+          <button type="button" class="btn btn-primary btn-sm" (click)="openCreate()">
+            <lucide-icon name="plus" class="h-4 w-4" />
+            Create task
+          </button>
+        </app-empty-state>
+      }
     </div>
   } @else {
     <!-- Mobile: card per task so every field + action stays visible on
@@ -237,14 +302,7 @@
                 Missed
               </span>
             }
-            <span
-              class="text-[11px]"
-              [class.text-red-500]="isOverdue(t)"
-              [class.font-medium]="isOverdue(t)"
-              [class.text-muted]="!isOverdue(t)"
-            >
-              Due: {{ formatDue(t.due_at) }}
-            </span>
+            <span class="text-[11px]" [class]="dueClass(t)"> Due: {{ formatDue(t.due_at) }} </span>
           </div>
 
           <!-- Description if present -->
@@ -326,47 +384,86 @@
       <table class="w-full text-sm">
         <thead class="bg-surface-2 text-xs uppercase tracking-wide text-muted">
           <tr>
-            <th class="w-10 px-3 py-2"></th>
-            <th class="w-10 px-3 py-2"></th>
-            <th
-              class="cursor-pointer px-3 py-2 text-left font-medium hover:text-default"
-              (click)="setSort('title')"
-            >
-              Title
-              @if (sortBy() === 'title') {
-                <span class="ml-1 text-faint">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
-              }
+            <th class="w-10 px-3 py-2"><span class="sr-only">Select</span></th>
+            <th class="w-10 px-3 py-2"><span class="sr-only">Complete</span></th>
+            <th class="px-3 py-2 text-left font-medium" [attr.aria-sort]="ariaSort('title')">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 uppercase tracking-wide hover:text-default focus:outline-none focus-visible:text-default"
+                (click)="setSort('title')"
+              >
+                Title
+                @if (sortBy() === 'title') {
+                  <span class="text-faint" aria-hidden="true">{{
+                    sortDir() === 'asc' ? '↑' : '↓'
+                  }}</span>
+                }
+              </button>
+            </th>
+            <th class="px-3 py-2 text-left font-medium" [attr.aria-sort]="ariaSort('priority')">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 uppercase tracking-wide hover:text-default focus:outline-none focus-visible:text-default"
+                (click)="setSort('priority')"
+              >
+                Priority
+                @if (sortBy() === 'priority') {
+                  <span class="text-faint" aria-hidden="true">{{
+                    sortDir() === 'asc' ? '↑' : '↓'
+                  }}</span>
+                }
+              </button>
+            </th>
+            <th class="px-3 py-2 text-left font-medium" [attr.aria-sort]="ariaSort('due_at')">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 uppercase tracking-wide hover:text-default focus:outline-none focus-visible:text-default"
+                (click)="setSort('due_at')"
+              >
+                Due
+                @if (sortBy() === 'due_at') {
+                  <span class="text-faint" aria-hidden="true">{{
+                    sortDir() === 'asc' ? '↑' : '↓'
+                  }}</span>
+                }
+              </button>
             </th>
             <th
-              class="cursor-pointer px-3 py-2 text-left font-medium hover:text-default"
-              (click)="setSort('priority')"
+              class="px-3 py-2 text-right font-medium hidden lg:table-cell"
+              [attr.aria-sort]="ariaSort('created_at')"
             >
-              Priority
-              @if (sortBy() === 'priority') {
-                <span class="ml-1 text-faint">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
-              }
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 uppercase tracking-wide hover:text-default focus:outline-none focus-visible:text-default justify-end"
+                (click)="setSort('created_at')"
+              >
+                Created
+                @if (sortBy() === 'created_at') {
+                  <span class="text-faint" aria-hidden="true">{{
+                    sortDir() === 'asc' ? '↑' : '↓'
+                  }}</span>
+                }
+              </button>
             </th>
             <th
-              class="cursor-pointer px-3 py-2 text-left font-medium hover:text-default"
-              (click)="setSort('due_at')"
+              class="px-3 py-2 text-right font-medium"
+              [attr.aria-sort]="ariaSort('last_activity_at')"
             >
-              Due
-              @if (sortBy() === 'due_at') {
-                <span class="ml-1 text-faint">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
-              }
-            </th>
-            <th
-              class="cursor-pointer px-3 py-2 text-right font-medium hover:text-default"
-              (click)="setSort('last_activity_at')"
-            >
-              Last activity
-              @if (sortBy() === 'last_activity_at') {
-                <span class="ml-1 text-faint">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
-              }
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 uppercase tracking-wide hover:text-default focus:outline-none focus-visible:text-default justify-end"
+                (click)="setSort('last_activity_at')"
+              >
+                Last activity
+                @if (sortBy() === 'last_activity_at') {
+                  <span class="text-faint" aria-hidden="true">{{
+                    sortDir() === 'asc' ? '↑' : '↓'
+                  }}</span>
+                }
+              </button>
             </th>
             <th class="px-3 py-2 text-left font-medium">Assignee</th>
             <th class="px-3 py-2 text-left font-medium">Related</th>
-            <!-- T1/T2/T9 — row actions column. -->
             <th class="w-10 px-3 py-2 text-right font-medium">
               <span class="sr-only">Actions</span>
             </th>
@@ -453,9 +550,14 @@
                 </span>
               </td>
               <td class="px-3 py-2 text-xs">
-                <span [class.text-red-500]="isOverdue(t)" [class.font-medium]="isOverdue(t)">
+                <span class="whitespace-nowrap" [class]="dueClass(t)">
                   {{ formatDue(t.due_at) }}
                 </span>
+              </td>
+              <td
+                class="hidden whitespace-nowrap px-3 py-2 text-right text-xs text-muted tabular-nums lg:table-cell"
+              >
+                {{ t.created_at | relativeTime }}
               </td>
               <td class="whitespace-nowrap px-3 py-2 text-right text-xs text-muted tabular-nums">
                 {{ t.last_activity_at | relativeTime }}

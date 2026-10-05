@@ -188,6 +188,10 @@ export class TasksApiService {
     return this.http.post<Task>(this.base, payload);
   }
 
+  get(id: string): Observable<Task> {
+    return this.http.get<Task>(`${this.base}/${id}`);
+  }
+
   update(id: string, payload: TaskUpdate): Observable<Task> {
     return this.http.patch<Task>(`${this.base}/${id}`, payload);
   }

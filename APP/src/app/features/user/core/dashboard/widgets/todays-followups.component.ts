@@ -245,7 +245,12 @@ export class TodaysFollowupsComponent {
     if (row.linked_entity?.type === 'lead') {
       return ['/user/leads', row.linked_entity.id];
     }
-    return ['/user/tasks', row.id];
+    return ['/user/tasks'];
+  }
+
+  /** Unlinked follow-ups open the task itself on the Tasks page. */
+  protected openQuery(row: FollowupItem): Record<string, string> | null {
+    return row.linked_entity ? null : { task: row.id };
   }
 
   protected dueTimeShort(iso: string | null): string {

@@ -11,7 +11,7 @@ import {
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
@@ -21,6 +21,7 @@ import { ToastService } from '../../../../shared/components/toast/toast.service'
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
+import { EmptyStateComponent } from '../shared/empty-state/empty-state.component';
 import {
   UrlFilterStateConfig,
   UrlFilterStateDirective,
@@ -54,18 +55,30 @@ import { TaskAssignee, TaskFormModalComponent } from './task-form-modal.componen
 class TasksListState extends ListPageState<Task> {}
 
 type Scope = 'all' | 'mine';
-type Chip = 'all' | 'mine' | 'overdue' | 'today' | 'done' | 'missed';
+type StatusChip = 'open' | 'overdue' | 'today' | 'done' | 'missed';
+/** Accepted from URLs / saved views. `all` / `mine` are the pre-split
+ *  chips that combined scope + "open"; they map onto the scope toggle. */
+type Chip = StatusChip | 'all' | 'mine';
 
-const CHIP_KEYS: readonly Chip[] = ['all', 'mine', 'overdue', 'today', 'done', 'missed'];
+const CHIP_KEYS: readonly Chip[] = ['open', 'overdue', 'today', 'done', 'missed', 'all', 'mine'];
 
 /** Rows per request; "Load more" fetches the next page. */
 const PAGE_SIZE = 100;
 
 interface ChipDef {
-  key: Chip;
+  key: StatusChip;
   label: string;
-  scopeForce?: Scope;
+  /** Which `TaskCounts` number badges this chip. */
+  count: keyof TaskCounts;
 }
+
+const STATUS_CHIPS: readonly ChipDef[] = [
+  { key: 'open', label: 'Open', count: 'open' },
+  { key: 'overdue', label: 'Overdue', count: 'overdue' },
+  { key: 'today', label: 'Due today', count: 'due_today' },
+  { key: 'done', label: 'Done', count: 'done' },
+  { key: 'missed', label: 'Missed', count: 'missed' },
+];
 
 /**
  * `/user/tasks` — standalone Tasks list page.
@@ -93,6 +106,7 @@ interface ChipDef {
     RelativeTimePipe,
     MobileSelectComponent,
     RouterLink,
+    EmptyStateComponent,
   ],
   providers: [TasksListState],
   templateUrl: './tasks.page.html',
@@ -105,6 +119,7 @@ export class TasksPageComponent {
   private readonly toast = inject(ToastService);
   private readonly usersDir = inject(UsersDirectoryService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly confirmDialog = inject(ConfirmDialogService);
 
   protected readonly state = inject(TasksListState);
@@ -138,17 +153,16 @@ export class TasksPageComponent {
     return m;
   });
 
-  protected readonly activeChip = signal<Chip>('mine');
+  protected readonly activeChip = signal<StatusChip>('open');
   protected readonly scope = signal<Scope>('mine');
   protected readonly status = signal<TaskListFilters['status']>('open');
   protected readonly dueFilter = signal<TaskDueFilter | undefined>(undefined);
   protected readonly priorityFilter = signal<TaskPriority | undefined>(undefined);
   protected readonly q = signal<string>('');
-  protected readonly sortBy = signal<TaskSortBy>('created_at');
-  protected readonly sortDir = signal<TaskSortDir>('desc');
+  protected readonly sortBy = signal<TaskSortBy>('due_at');
+  protected readonly sortDir = signal<TaskSortDir>('asc');
 
   protected readonly searchCtrl = new FormControl('', { nonNullable: true });
-  protected readonly chipBusy = signal<Chip | null>(null);
   protected readonly togglingId = signal<string | null>(null);
 
   protected readonly modalOpen = signal(false);
@@ -229,6 +243,15 @@ export class TasksPageComponent {
         if ((CHIP_KEYS as readonly string[]).includes(v)) this.selectChip(v as Chip);
       },
       queryKey: 'chip',
+      defaultValue: 'open',
+    },
+    scope: {
+      read: () => this.scope(),
+      // Applied for real once /me says whether "All" is allowed.
+      write: (v) => {
+        if (v === 'all' || v === 'mine') this.scope.set(v);
+      },
+      queryKey: 'scope',
     },
     assignee: {
       read: () => this.assigneeControl.value,
@@ -261,18 +284,34 @@ export class TasksPageComponent {
     },
   };
 
-  protected readonly chips = computed<ChipDef[]>(() => {
-    const base: ChipDef[] = [];
-    if (this.canViewAll()) {
-      base.push({ key: 'all', label: 'All', scopeForce: 'all' });
-    }
-    base.push({ key: 'mine', label: 'Mine', scopeForce: 'mine' });
-    base.push({ key: 'overdue', label: 'Overdue' });
-    base.push({ key: 'today', label: 'Due today' });
-    base.push({ key: 'done', label: 'Done' });
-    base.push({ key: 'missed', label: 'Missed' });
-    return base;
+  protected readonly chips = STATUS_CHIPS;
+
+  /** Sort choices for the phone layout (the desktop table sorts from
+   *  its headers). Value is `<sort_by>:<sort_dir>`. */
+  protected readonly sortSelectOptions: ReadonlyArray<{ value: string; label: string }> = [
+    { value: 'due_at:asc', label: 'Due soonest' },
+    { value: 'due_at:desc', label: 'Due latest' },
+    { value: 'priority:asc', label: 'Highest priority' },
+    { value: 'created_at:desc', label: 'Newest' },
+    { value: 'created_at:asc', label: 'Oldest' },
+    { value: 'last_activity_at:desc', label: 'Recent activity' },
+    { value: 'title:asc', label: 'Title A–Z' },
+  ];
+
+  /** Signal mirror of the owner dropdown for computeds. */
+  private readonly assigneeValue = toSignal(this.assigneeControl.valueChanges, {
+    initialValue: this.assigneeControl.value,
   });
+
+  /** True when anything beyond the default "Open" view narrows the list —
+   *  picks between the "no matches" and "all caught up" empty states. */
+  protected readonly hasActiveFilters = computed(
+    () =>
+      this.activeChip() !== 'open' ||
+      !!this.q() ||
+      !!this.assigneeValue() ||
+      this.priorityFilter() !== undefined,
+  );
 
   constructor() {
     this.state.bulkActions.set([
@@ -306,14 +345,20 @@ export class TasksPageComponent {
           this.canAssignOthers.set(me.permission_keys.includes('tasks.assign_others'));
           this.canDelete.set(me.permission_keys.includes('tasks.delete'));
           this.callerUuid.set(me.id);
-          // Default scope for the role, then honour a deep-linked chip
-          // (`?chip=overdue`) instead of overwriting it with the default.
-          this.scope.set(canView ? 'all' : 'mine');
-          this.chipBusy.set(null);
-          const urlChip = this.route.snapshot.queryParamMap.get('chip') as Chip | null;
-          const chipAllowed =
-            urlChip !== null && CHIP_KEYS.includes(urlChip) && (urlChip !== 'all' || canView);
-          this.selectChip(chipAllowed ? urlChip : canView ? 'all' : 'mine');
+          // Scope: a deep-linked `?scope=` wins when the role allows it,
+          // otherwise the role default. Then the deep-linked chip.
+          const params = this.route.snapshot.queryParamMap;
+          const urlScope = params.get('scope');
+          this.scope.set(
+            urlScope === 'mine' || (urlScope === 'all' && canView)
+              ? urlScope
+              : canView
+                ? 'all'
+                : 'mine',
+          );
+          const urlChip = params.get('chip') as Chip | null;
+          this.selectChip(urlChip !== null && CHIP_KEYS.includes(urlChip) ? urlChip : 'open');
+          this.openFromLink(params.get('new') !== null, params.get('task'));
           if (canView) this.loadAssignees();
           this.fetch();
           this.reloadSavedViews();
@@ -351,23 +396,21 @@ export class TasksPageComponent {
   }
 
   protected selectChip(chip: Chip): void {
-    if (this.chipBusy()) return;
-    this.chipBusy.set(chip);
-    this.activeChip.set(chip);
+    let key: StatusChip;
+    if (chip === 'all' || chip === 'mine') {
+      this.setScope(chip);
+      key = 'open';
+    } else {
+      key = chip;
+    }
+    this.activeChip.set(key);
 
-    switch (chip) {
-      case 'all':
-        this.scope.set('all');
-        this.status.set('open');
-        this.dueFilter.set(undefined);
-        break;
-      case 'mine':
-        this.scope.set('mine');
+    switch (key) {
+      case 'open':
         this.status.set('open');
         this.dueFilter.set(undefined);
         break;
       case 'overdue':
-        // scope preserved
         this.status.set('open');
         this.dueFilter.set('overdue');
         break;
@@ -388,6 +431,34 @@ export class TasksPageComponent {
         this.dueFilter.set(undefined);
         break;
     }
+  }
+
+  /** Mine | All toggle. "All" needs `users.read`; switching to Mine
+   *  clears an owner pick (the owner filter only applies to All). */
+  protected setScope(value: Scope): void {
+    if (value === 'all' && !this.canViewAll()) value = 'mine';
+    this.scope.set(value);
+    if (value === 'mine' && this.assigneeControl.value) this.assigneeControl.setValue('');
+  }
+
+  /** Back to the default view: Open, no search, no owner, no priority. */
+  protected clearFilters(): void {
+    this.priorityFilter.set(undefined);
+    this.selectChip('open');
+    if (this.assigneeControl.value) this.assigneeControl.setValue('');
+    if (this.searchCtrl.value) this.searchCtrl.setValue('');
+  }
+
+  protected onSortSelect(value: string): void {
+    const [by, dir] = value.split(':') as [TaskSortBy, TaskSortDir];
+    this.sortBy.set(by);
+    this.sortDir.set(dir);
+  }
+
+  /** `aria-sort` for a sortable header. */
+  protected ariaSort(column: TaskSortBy): 'ascending' | 'descending' | 'none' {
+    if (this.sortBy() !== column) return 'none';
+    return this.sortDir() === 'asc' ? 'ascending' : 'descending';
   }
 
   protected setSort(column: TaskSortBy): void {
@@ -448,6 +519,32 @@ export class TasksPageComponent {
       });
   }
 
+  /** Dashboard deep links: `?new=1` opens Create, `?task=<id>` opens
+   *  that task. Both params are stripped so a refresh doesn't reopen. */
+  private openFromLink(isNew: boolean, taskId: string | null): void {
+    if (!isNew && !taskId) return;
+    if (isNew) {
+      this.openCreate();
+    } else if (taskId) {
+      this.api
+        .get(taskId)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (task) => this.openEdit(task),
+          error: () =>
+            this.toast.warn('Task not found', {
+              subtitle: 'It may have been deleted or reassigned.',
+            }),
+        });
+    }
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { new: null, task: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
   protected openCreate(): void {
     this.editingTask.set(null);
     this.modalOpen.set(true);
@@ -499,16 +596,31 @@ export class TasksPageComponent {
       d.getMonth() === yesterday.getMonth() &&
       d.getDate() === yesterday.getDate();
     if (isYesterday) return `Yesterday, ${time}`;
-    return d.toLocaleDateString(undefined, {
+    const date = d.toLocaleDateString(undefined, {
+      weekday: 'short',
       month: 'short',
       day: 'numeric',
       year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric',
     });
+    return `${date}, ${time}`;
   }
 
   protected isOverdue(task: Task): boolean {
     if (!task.due_at || task.status !== 'open') return false;
     return new Date(task.due_at).getTime() < Date.now();
+  }
+
+  /** Open, not yet overdue, due later today. */
+  protected isDueToday(task: Task): boolean {
+    if (!task.due_at || task.status !== 'open' || this.isOverdue(task)) return false;
+    return new Date(task.due_at).toDateString() === new Date().toDateString();
+  }
+
+  /** Colour for the due date: red overdue, amber due today, muted otherwise. */
+  protected dueClass(task: Task): string {
+    if (this.isOverdue(task)) return 'font-medium text-red-600 dark:text-red-400';
+    if (this.isDueToday(task)) return 'font-medium text-amber-700 dark:text-amber-300';
+    return 'text-muted';
   }
 
   protected assigneeName(task: Task): string {
@@ -701,15 +813,10 @@ export class TasksPageComponent {
       due_filter?: unknown;
       priority?: unknown;
     };
-    if (
-      cfg.chip === 'all' ||
-      cfg.chip === 'mine' ||
-      cfg.chip === 'overdue' ||
-      cfg.chip === 'today' ||
-      cfg.chip === 'done' ||
-      cfg.chip === 'missed'
-    ) {
-      this.selectChip(cfg.chip);
+    const savedScope = (cfg as { scope?: unknown }).scope;
+    if (savedScope === 'all' || savedScope === 'mine') this.setScope(savedScope);
+    if (typeof cfg.chip === 'string' && (CHIP_KEYS as readonly string[]).includes(cfg.chip)) {
+      this.selectChip(cfg.chip as Chip);
     }
     if (
       cfg.status === 'open' ||
@@ -764,6 +871,7 @@ export class TasksPageComponent {
       order: this.sortDir(),
     };
     cfg['chip'] = this.activeChip();
+    cfg['scope'] = this.scope();
     cfg['status'] = this.status();
     cfg['due_filter'] = this.dueFilter() ?? null;
     cfg['priority'] = this.priorityFilter() ?? null;
@@ -781,6 +889,7 @@ export class TasksPageComponent {
           this.currentViewId.set(v.id);
           this.currentViewName.set(v.name);
           this.saveViewOpen.set(false);
+          this.toast.success('View saved', { subtitle: v.name });
         },
         error: (err: HttpErrorResponse) => {
           this.toast.error('Could not save the view', {
@@ -808,6 +917,7 @@ export class TasksPageComponent {
           this.savedViews.update((rows) => rows.filter((r) => r.id !== id));
           this.currentViewId.set(null);
           this.currentViewName.set(null);
+          this.toast.success('View deleted');
         },
         error: (err: HttpErrorResponse) =>
           this.toast.error('Could not delete the view', {
@@ -848,7 +958,6 @@ export class TasksPageComponent {
         this.state.items.set(res.items);
         this.state.total.set(res.total);
         this.state.loading.set(false);
-        this.chipBusy.set(null);
         // If the edit modal is open on a task that just got refreshed
         // (e.g. inline snooze/mark-missed while the modal is up, or a
         // row action fired between "click +1w" and "click title"),
@@ -868,10 +977,20 @@ export class TasksPageComponent {
         this.state.items.set([]);
         this.state.total.set(0);
         this.state.loading.set(false);
-        this.chipBusy.set(null);
         this.state.loadError.set(extractApiError(err) ?? 'Could not load tasks.');
       },
     });
+  }
+
+  private taskCount(n: number): string {
+    return `${n} task${n === 1 ? '' : 's'}`;
+  }
+
+  /** Count badge colour on a status chip — red for a non-zero Overdue. */
+  protected chipCountClass(c: ChipDef, n: TaskCounts): string {
+    if (this.activeChip() === c.key) return 'opacity-80';
+    if (c.key === 'overdue' && n.overdue > 0) return 'text-red-600 dark:text-red-400';
+    return 'text-faint';
   }
 
   protected retry(): void {
@@ -1005,6 +1124,9 @@ export class TasksPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
+          this.toast.success(`Reassigned ${this.taskCount(ids.length)}`, {
+            subtitle: `Now assigned to ${this.assigneeMap().get(payload.userId ?? '') ?? 'the new owner'}.`,
+          });
           this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
@@ -1030,7 +1152,9 @@ export class TasksPageComponent {
           this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
-          if (result.skipped > 0) {
+          if (result.skipped === 0) {
+            this.toast.success(`Marked ${this.taskCount(result.done)} done`);
+          } else {
             this.toast.warn(`${result.done} marked done`, {
               subtitle: `${result.skipped} skipped — already done.`,
             });
@@ -1054,6 +1178,7 @@ export class TasksPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
+          this.toast.success(`Deleted ${this.taskCount(ids.length)}`);
           this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
