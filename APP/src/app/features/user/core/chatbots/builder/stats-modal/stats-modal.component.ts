@@ -4,6 +4,7 @@ import {
   Component,
   DestroyRef,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   inject,
@@ -35,6 +36,9 @@ import { nodeTypeLabel } from '../node-type-registry';
     >
       <div
         class="bg-surface border border-subtle rounded-xl w-[540px] max-w-[92vw] max-h-[85vh] flex flex-col shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cb_stats_title"
         (click)="$event.stopPropagation()"
       >
         <header class="flex items-center gap-3 px-5 py-4 border-b border-subtle">
@@ -44,7 +48,7 @@ import { nodeTypeLabel } from '../node-type-registry';
             <lucide-icon name="bar-chart-3" size="16"></lucide-icon>
           </span>
           <div class="flex-1">
-            <h2 class="text-sm font-semibold text-default">Bot analytics</h2>
+            <h2 id="cb_stats_title" class="text-sm font-semibold text-default">Bot analytics</h2>
             <p class="text-[11px] text-muted mt-0.5">
               Real customer runs only (test runs are excluded).
             </p>
@@ -66,7 +70,7 @@ import { nodeTypeLabel } from '../node-type-registry';
               Loading stats…
             </div>
           } @else if (error()) {
-            <div class="text-sm text-red-500">{{ error() }}</div>
+            <div class="text-sm text-red-600 dark:text-red-400">{{ error() }}</div>
           } @else if (stats(); as s) {
             @if (s.total_runs === 0) {
               <div class="py-10 text-center text-sm text-muted">
@@ -84,7 +88,7 @@ import { nodeTypeLabel } from '../node-type-registry';
                   <div class="text-[10px] font-semibold text-muted uppercase tracking-wider">
                     Completion rate
                   </div>
-                  <div class="text-2xl font-bold text-emerald-500 mt-1">
+                  <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
                     {{ s.completion_rate | percent: '1.0-1' }}
                   </div>
                 </div>
@@ -104,7 +108,9 @@ import { nodeTypeLabel } from '../node-type-registry';
               <div class="space-y-1.5 mb-5">
                 <div class="flex items-center justify-between text-[12px]">
                   <span class="text-default">Completed</span>
-                  <span class="font-mono text-emerald-500">{{ s.completed }}</span>
+                  <span class="font-mono text-emerald-600 dark:text-emerald-400">{{
+                    s.completed
+                  }}</span>
                 </div>
                 <div class="flex items-center justify-between text-[12px]">
                   <span class="text-default">Parked (waiting for reply)</span>
@@ -120,7 +126,7 @@ import { nodeTypeLabel } from '../node-type-registry';
                 </div>
                 <div class="flex items-center justify-between text-[12px]">
                   <span class="text-default">Errored</span>
-                  <span class="font-mono text-red-500">{{ s.errored }}</span>
+                  <span class="font-mono text-red-600 dark:text-red-400">{{ s.errored }}</span>
                 </div>
               </div>
 
@@ -159,6 +165,11 @@ export class ChatbotStatsModalComponent {
   @Input({ required: true }) botId!: string;
 
   @Output() readonly close = new EventEmitter<void>();
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    this.close.emit();
+  }
 
   readonly loading = signal<boolean>(true);
   readonly error = signal<string | null>(null);

@@ -34,6 +34,7 @@ import { CanvasStateService } from '../canvas-state.service';
     @if (canvas.minimapOpen()) {
       <div
         class="fixed z-30 bottom-[124px] right-3 md:bottom-[76px] md:right-6 rounded-lg bg-surface/95 backdrop-blur border border-subtle shadow-xl overflow-hidden"
+        [style.right.px]="canvas.rightOverlayOffset()"
         [style.width.px]="MAP_W"
         (click)="$event.stopPropagation()"
       >

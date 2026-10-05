@@ -10,6 +10,7 @@ import {
   afterEveryRender,
   afterNextRender,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -110,6 +111,13 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
   readonly historyModalOpen = signal<boolean>(false);
   readonly statsModalOpen = signal<boolean>(false);
   readonly variablesPanelOpen = signal<boolean>(false);
+  /** Below Tailwind `md` — drives phone-only behaviour (drawer panels,
+   *  closing the palette after adding a step). */
+  readonly isPhone = signal<boolean>(window.matchMedia('(max-width: 767.98px)').matches);
+  /** Display text for raw keys like the bot status. */
+  protected readonly humanize = humanizeKey;
+
+  @ViewChild('renameInput') private renameInputRef?: ElementRef<HTMLInputElement>;
 
   /** Session variables — every `save_to` in the current graph that
    *  writes to `answers.<key>` becomes a session variable operators
@@ -688,6 +696,15 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
   startRename(): void {
     if (!this.bot()) return;
     this.renaming.set(true);
+    // `autofocus` doesn't apply to inputs inserted after page load.
+    afterNextRender(
+      () => {
+        const el = this.renameInputRef?.nativeElement;
+        el?.focus();
+        el?.select();
+      },
+      { injector: this.injector },
+    );
   }
 
   cancelRename(): void {
@@ -762,8 +779,10 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     // Re-apply the screen-class defaults when the viewport crosses the
     // phone breakpoint so a rotate / resize never leaves a desktop 100 %
     // zoom on a phone (or 25 % on a desktop).
-    const onPhoneChange = (e: MediaQueryListEvent): void =>
+    const onPhoneChange = (e: MediaQueryListEvent): void => {
+      this.isPhone.set(e.matches);
       this.canvas.applyViewportDefaults(e.matches);
+    };
     this.phoneQuery.addEventListener('change', onPhoneChange);
     this.destroyRef.onDestroy(() => this.phoneQuery.removeEventListener('change', onPhoneChange));
 
@@ -781,6 +800,12 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     this.cardObserver = new ResizeObserver(() => this.measurePorts());
     this.destroyRef.onDestroy(() => this.cardObserver?.disconnect());
     afterEveryRender(() => this.measurePorts());
+
+    // Keep the floating zoom pill + minimap clear of the docked
+    // Variables panel on desktop (on phones the panel is a drawer).
+    effect(() => {
+      this.canvas.rightOverlayOffset.set(this.variablesPanelOpen() && !this.isPhone() ? 344 : null);
+    });
 
     // Kick off the auto-save loop. Interval fires forever; the guard
     // inside skips when there's nothing to save.
@@ -1025,10 +1050,14 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     this.triggerModalOpen.set(false);
   }
 
+  /** The palette has just added (and selected) a node: on phones close
+   *  the drawer so the canvas is visible, then scroll the new node into
+   *  view on every screen size. */
   onPaletteAdd(_meta: NodeTypeMeta): void {
-    // Palette already added the node via canvas service; nothing
-    // extra to do here for v1. Hook exists so the builder page can
-    // trigger analytics / haptics in future.
+    if (this.isPhone()) this.canvas.paletteCollapsed.set(true);
+    const id = this.selectedNodeId();
+    if (!id) return;
+    afterNextRender(() => this.jumpToNode(id), { injector: this.injector });
   }
 
   selectNode(nodeId: string): void {
@@ -1050,7 +1079,7 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     this.canvas.selectedNodeId.set(nodeId);
   }
 
-  onOutputPortClick(sourceId: string, label: string | null, evt: MouseEvent): void {
+  onOutputPortClick(sourceId: string, label: string | null, evt: Event): void {
     evt.stopPropagation();
     if (this.pendingSourceId() === sourceId && this.canvas.pendingSourceLabel() === label) {
       this.canvas.cancelConnect();
@@ -1059,7 +1088,7 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     this.canvas.beginConnect(sourceId, label);
   }
 
-  onInputPortClick(targetId: string, evt: MouseEvent): void {
+  onInputPortClick(targetId: string, evt: Event): void {
     evt.stopPropagation();
     if (!this.pendingSourceId()) return;
     this.canvas.completeConnect(targetId);
@@ -1144,8 +1173,10 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     };
   }
 
-  @HostListener('document:mousemove', ['$event'])
-  onDocumentMouseMove(evt: MouseEvent): void {
+  // Pointer events (not mouse events) so dragging cards, the trigger
+  // and resize grips also works with touch and pens.
+  @HostListener('document:pointermove', ['$event'])
+  onDocumentMouseMove(evt: PointerEvent): void {
     // Card resize takes priority over move — the corner grip
     // handler set `cardResizeStart` above.
     if (this.cardResizeStart) {
@@ -1178,8 +1209,9 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     }
   }
 
-  @HostListener('document:mouseup', ['$event'])
-  onDocumentMouseUp(_evt: MouseEvent): void {
+  @HostListener('document:pointerup')
+  @HostListener('document:pointercancel')
+  onDocumentMouseUp(): void {
     if (this.cardResizeStart) {
       this.cardResizeStart = null;
       this.suppressNextClick = true;

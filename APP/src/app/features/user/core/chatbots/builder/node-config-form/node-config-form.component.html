@@ -15,6 +15,7 @@
             [value]="getText(field.key)"
             (input)="onText(field.key, $any($event.target).value)"
             [placeholder]="field.placeholder ?? ''"
+            [attr.aria-label]="field.label"
             [attr.maxlength]="field.maxLength ?? null"
             class="w-full px-2 py-1.5 text-xs bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent"
           />
@@ -43,6 +44,7 @@
               [value]="getText(field.key)"
               (input)="onText(field.key, $any($event.target).value)"
               [placeholder]="field.placeholder ?? ''"
+              [attr.aria-label]="field.label"
               [attr.maxlength]="field.maxLength ?? null"
               [rows]="field.rows ?? 3"
               class="w-full px-2 py-1.5 text-xs bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent resize-y"
@@ -55,6 +57,7 @@
             type="number"
             [value]="getNumber(field.key)"
             (input)="onNumber(field.key, $any($event.target).value)"
+            [attr.aria-label]="field.label"
             [min]="field.min ?? null"
             [max]="field.max ?? null"
             [step]="field.step ?? 1"
@@ -106,6 +109,7 @@
               #strItemInput
               type="text"
               [placeholder]="field.placeholder ?? 'Type, press Enter'"
+              [attr.aria-label]="field.label"
               (keydown.enter)="
                 addStringItem(field.key, strItemInput.value); strItemInput.value = ''
               "
@@ -131,6 +135,7 @@
                   type="text"
                   [value]="btn.title"
                   (input)="updateButtonTitle(field.key, i, $any($event.target).value)"
+                  [attr.aria-label]="'Button ' + (i + 1) + ' label'"
                   placeholder="Button label"
                   maxlength="20"
                   class="flex-1 min-w-0 px-1.5 py-1 text-xs bg-surface text-default border border-subtle rounded focus:outline-none focus:border-accent"
@@ -139,6 +144,7 @@
                   type="text"
                   [value]="btn.id"
                   (change)="commitButtonId(field.key, i, $any($event.target))"
+                  [attr.aria-label]="'Button ' + (i + 1) + ' id'"
                   title="Button id — the reply value the bot matches on"
                   placeholder="id"
                   maxlength="32"
@@ -159,6 +165,10 @@
                   <span
                     [attr.data-port]="'out:' + nodeId + '::' + btn.id"
                     (click)="onPortClick(btn.id, $event)"
+                    (keydown.enter)="onPortClick(btn.id, $event); $event.preventDefault()"
+                    (keydown.space)="onPortClick(btn.id, $event); $event.preventDefault()"
+                    tabindex="0"
+                    role="button"
                     (mousedown)="$event.stopPropagation()"
                     [class]="
                       'absolute right-[-16px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-accent cursor-pointer transition-all shadow-sm ' +
@@ -167,7 +177,7 @@
                         : 'bg-surface hover:bg-accent hover:scale-110')
                     "
                     title="Click to start a connection from this button"
-                    aria-label="Button output port"
+                    [attr.aria-label]="'Connect from button “' + (btn.title || btn.id) + '”'"
                   ></span>
                 }
               </div>
@@ -190,6 +200,7 @@
         @case ('json') {
           <textarea
             [value]="jsonText(field.key)"
+            [attr.aria-label]="field.label + ' (JSON)'"
             (blur)="onJsonBlur(field.key)"
             (input)="onJson(field.key, $any($event.target).value)"
             rows="4"

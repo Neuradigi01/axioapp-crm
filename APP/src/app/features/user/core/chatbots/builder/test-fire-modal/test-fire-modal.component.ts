@@ -4,6 +4,7 @@ import {
   Component,
   DestroyRef,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   inject,
@@ -107,17 +108,22 @@ export class ChatbotTestFireModalComponent {
     if (evt.target === evt.currentTarget && !this.running()) this.close.emit();
   }
 
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (!this.running()) this.close.emit();
+  }
+
   protected readonly humanize = humanizeKey;
   protected readonly nodeLabel = nodeTypeLabel;
 
   statusTone(status: string): string {
     switch (status) {
       case 'completed':
-        return 'bg-emerald-500/15 text-emerald-500';
+        return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300';
       case 'errored':
-        return 'bg-red-500/15 text-red-500';
+        return 'bg-red-500/15 text-red-700 dark:text-red-300';
       case 'parked':
-        return 'bg-amber-500/15 text-amber-500';
+        return 'bg-amber-500/15 text-amber-700 dark:text-amber-300';
       case 'canceled':
         return 'bg-zinc-500/15 text-muted';
       default:
@@ -128,11 +134,11 @@ export class ChatbotTestFireModalComponent {
   stepTone(status: string): string {
     switch (status) {
       case 'completed':
-        return 'text-emerald-500';
+        return 'text-emerald-600 dark:text-emerald-400';
       case 'errored':
-        return 'text-red-500';
+        return 'text-red-600 dark:text-red-400';
       case 'skipped':
-        return 'text-amber-500';
+        return 'text-amber-700 dark:text-amber-300';
       default:
         return 'text-muted';
     }

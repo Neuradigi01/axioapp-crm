@@ -49,11 +49,11 @@ export class ChatbotPaletteComponent {
   @Output() add = new EventEmitter<NodeTypeMeta>();
 
   onTile(meta: NodeTypeMeta): void {
-    this.add.emit(meta);
-    // Also drop the node directly at a safe canvas coord so the
-    // click-to-add UX works without a drag. Parent listens for
-    // `add` for its own bookkeeping.
+    // Drop the node at a safe canvas coord so click-to-add works
+    // without a drag, THEN tell the parent — it scrolls to the new
+    // node (now the selected one) and closes the drawer on phones.
     this.canvas.addNode(meta, this.nextDropPosition());
+    this.add.emit(meta);
   }
 
   /** Active resize gesture, if any — the width-drag handle records
@@ -70,14 +70,15 @@ export class ChatbotPaletteComponent {
     };
   }
 
-  @HostListener('document:mousemove', ['$event'])
-  onDocumentMouseMove(evt: MouseEvent): void {
+  @HostListener('document:pointermove', ['$event'])
+  onDocumentMouseMove(evt: PointerEvent): void {
     if (!this.resizeStart) return;
     const dx = evt.clientX - this.resizeStart.startX;
     this.canvas.setPaletteWidth(this.resizeStart.startWidth + dx);
   }
 
-  @HostListener('document:mouseup')
+  @HostListener('document:pointerup')
+  @HostListener('document:pointercancel')
   onDocumentMouseUp(): void {
     this.resizeStart = null;
   }

@@ -43,8 +43,11 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, LucideAngularModule],
   template: `
+    <!-- Phones: an overlay drawer (in-flow it squeezed the canvas to
+         ~40px). md+: docked panel beside the canvas. -->
     <aside
-      class="w-72 lg:w-80 flex-shrink-0 border-l border-subtle bg-surface flex flex-col h-full"
+      class="fixed inset-y-0 right-0 z-40 w-[85vw] max-w-xs shadow-2xl md:static md:z-auto md:w-72 md:max-w-none md:shadow-none lg:w-80 flex-shrink-0 border-l border-subtle bg-surface flex flex-col h-full"
+      aria-label="Variables"
       (click)="$event.stopPropagation()"
     >
       <header class="flex items-center gap-2 px-3 py-2.5 border-b border-subtle flex-shrink-0">
@@ -90,12 +93,14 @@ import {
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-xs text-default truncate">{{ v.label }}</span>
                   @if (copiedPath() === v.path) {
-                    <span class="text-[10px] text-emerald-500 flex-shrink-0">Copied!</span>
+                    <span class="text-[10px] text-emerald-700 dark:text-emerald-300 flex-shrink-0"
+                      >Copied!</span
+                    >
                   } @else {
                     <lucide-icon
                       name="copy"
                       size="11"
-                      class="text-muted opacity-0 group-hover:opacity-100 flex-shrink-0"
+                      class="text-muted opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 flex-shrink-0"
                     ></lucide-icon>
                   }
                 </div>

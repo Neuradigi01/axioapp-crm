@@ -65,7 +65,7 @@ export class NodeConfigFormComponent {
   @Input() sessionVariables: BotVariable[] = [];
 
   @Output() readonly patch = new EventEmitter<Record<string, unknown>>();
-  @Output() readonly portClick = new EventEmitter<{ label: string; event: MouseEvent }>();
+  @Output() readonly portClick = new EventEmitter<{ label: string; event: Event }>();
   /** A button id (= its port label) changed — the canvas re-points the edge. */
   @Output() readonly portRenamed = new EventEmitter<{ from: string; to: string }>();
   /** A button was removed — the canvas drops its edge. */
@@ -306,7 +306,7 @@ export class NodeConfigFormComponent {
 
   /** Bubble a button-row port click up to the builder page which
    *  owns the connect state machine. */
-  onPortClick(label: string, evt: MouseEvent): void {
+  onPortClick(label: string, evt: Event): void {
     evt.stopPropagation();
     this.portClick.emit({ label, event: evt });
   }

@@ -105,7 +105,7 @@
           >
             @if (tile.beta) {
               <span
-                class="absolute top-1 right-1 px-1 py-px text-[8px] font-bold uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-500 rounded"
+                class="absolute top-1 right-1 px-1 py-px text-[8px] font-bold uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300 rounded"
               >
                 Beta
               </span>
@@ -126,8 +126,8 @@
          operators can find it. Full-height hit target with a small
          centered dotted grip for affordance. -->
     <div
-      (mousedown)="onResizeMouseDown($event)"
-      class="group absolute top-0 right-[-4px] bottom-0 w-2 cursor-col-resize hover:bg-accent/20 z-10 flex items-center justify-center"
+      (pointerdown)="onResizeMouseDown($event)"
+      class="group absolute top-0 right-[-4px] bottom-0 w-2 cursor-col-resize touch-none hover:bg-accent/20 z-10 flex items-center justify-center"
       title="Drag to resize palette"
       aria-label="Resize palette"
     >

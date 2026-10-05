@@ -1,4 +1,4 @@
-<div class="flex flex-col h-screen bg-app">
+<div class="flex flex-1 min-h-0 flex-col bg-app">
   <!-- Top bar — wraps on mobile so all actions stay reachable. Button
        LABELS hide below md (icons stay); the phone header packs three
        icon buttons + the Save pill in the space desktop uses for the
@@ -23,25 +23,32 @@
           (keydown.escape)="cancelRename()"
           (blur)="commitRename(renameInput.value)"
           class="text-sm font-semibold text-default bg-app border border-accent rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-accent/30 min-w-[200px]"
-          autofocus
+          aria-label="Bot name"
         />
       } @else {
-        <h1
-          class="text-sm font-semibold text-default truncate cursor-text hover:bg-surface-2 rounded px-1 -mx-1"
-          title="Click to rename"
-          (click)="startRename()"
-        >
-          {{ bot()?.name ?? 'Loading…' }}
+        <h1 class="min-w-0 text-sm font-semibold text-default">
+          <button
+            type="button"
+            class="block max-w-full truncate cursor-text rounded px-1 -mx-1 text-left hover:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            title="Click to rename"
+            [attr.aria-label]="'Rename bot ' + (bot()?.name ?? '')"
+            [disabled]="!bot()"
+            (click)="startRename()"
+          >
+            {{ bot()?.name ?? 'Loading…' }}
+          </button>
         </h1>
       }
       @if (bot()) {
         <span
           [class]="
             'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ' +
-            (isLive() ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500')
+            (isLive()
+              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+              : 'bg-amber-500/15 text-amber-700 dark:text-amber-300')
           "
         >
-          {{ bot()?.status }}
+          {{ humanize(bot()?.status) }}
         </span>
       }
       @if (dirty()) {
@@ -122,8 +129,8 @@
       [class]="
         'px-2 md:px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ' +
         (isLive()
-          ? 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25'
-          : 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25') +
+          ? 'bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-300'
+          : 'bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 dark:text-emerald-300') +
         ' disabled:opacity-40 disabled:cursor-not-allowed'
       "
     >
@@ -269,6 +276,7 @@
         <div
           #zoomControls
           class="fixed z-30 bottom-[76px] right-3 md:bottom-6 md:right-6 flex items-center gap-0.5 p-1 bg-surface/90 backdrop-blur border border-subtle rounded-full shadow-xl"
+          [style.right.px]="canvas.rightOverlayOffset()"
           (click)="$event.stopPropagation()"
         >
           <button
@@ -325,30 +333,30 @@
           </button>
         </div>
 
-        <!-- Empty-canvas hint — visible only when no nodes exist yet,
-             so first-timers know where to click to get started. -->
-        @if (!nodes().length) {
-          <div
-            class="pointer-events-none absolute left-[380px] top-[24px] flex items-start gap-3 text-[13px] text-muted"
-            style="max-width: 380px"
-          >
-            <div class="mt-4 h-px w-16 bg-accent/40"></div>
-            <div class="mt-1">
-              <p class="font-medium text-default">Start here →</p>
-              <p class="text-xs mt-1 leading-relaxed">
-                Pick a node from the left palette to drop it onto the canvas. Your first node
-                auto-wires to the Trigger; use the dots on each node to draw further edges.
-              </p>
-            </div>
-          </div>
-        }
-
         <div
           #canvasContent
           class="p-6 min-w-[1400px] min-h-[900px] relative"
           [style.transform]="'scale(' + zoom() + ')'"
           style="transform-origin: top left"
         >
+          <!-- Empty-canvas hint — inside the scaled layer so it sits
+               beside the trigger at any zoom / card width. -->
+          @if (!nodes().length) {
+            <div
+              class="pointer-events-none absolute top-[24px] flex items-start gap-3 text-[13px] text-muted"
+              [style.left.px]="nodeLeftOffset()"
+              style="max-width: 380px"
+            >
+              <div class="mt-4 h-px w-16 bg-accent/40"></div>
+              <div class="mt-1">
+                <p class="font-medium text-default">Start here →</p>
+                <p class="text-xs mt-1 leading-relaxed">
+                  Pick a node from the left palette to drop it onto the canvas. Your first node
+                  auto-wires to the Trigger; use the dots on each node to draw further edges.
+                </p>
+              </div>
+            </div>
+          }
           <!-- Edges — SVG overlay, behind the node cards -->
           <svg
             class="absolute inset-0 pointer-events-none"
@@ -425,15 +433,19 @@
           <!-- Trigger card — entry point of the flow. Distinctive
                halo + darker inner surface so operators visually
                anchor "this is where it all starts". Draggable. -->
-          <button
-            type="button"
+          <div
+            role="button"
+            tabindex="0"
+            aria-label="Trigger settings"
             (click)="onTriggerCardClick($event)"
-            (mousedown)="onNodeHeaderMouseDown('trigger', $event)"
+            (keydown.enter)="openTriggerModal(); $event.preventDefault()"
+            (keydown.space)="openTriggerModal(); $event.preventDefault()"
+            (pointerdown)="onNodeHeaderMouseDown('trigger', $event)"
             data-cb-card
             [style.left.px]="triggerPosition().x"
             [style.top.px]="triggerPosition().y"
             [style.width.px]="cardWidth()"
-            class="absolute block p-4 rounded-2xl border-2 border-accent bg-accent-soft text-left hover:brightness-110 transition-all cursor-move select-none shadow-[0_0_0_4px_rgba(0,0,0,0.02),0_8px_24px_-6px_rgba(0,0,0,0.25)] hover:shadow-[0_0_0_6px_rgba(0,0,0,0.02),0_10px_28px_-6px_rgba(0,0,0,0.35)]"
+            class="absolute block p-4 rounded-2xl border-2 border-accent bg-accent-soft text-left hover:brightness-110 transition-all cursor-move select-none touch-none focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/30 shadow-[0_0_0_4px_rgba(0,0,0,0.02),0_8px_24px_-6px_rgba(0,0,0,0.25)] hover:shadow-[0_0_0_6px_rgba(0,0,0,0.02),0_10px_28px_-6px_rgba(0,0,0,0.35)]"
           >
             <div class="flex items-center gap-2">
               <span
@@ -469,7 +481,12 @@
                  it's the primary handoff to the rest of the graph. -->
             <span
               data-port="out:trigger::"
+              tabindex="0"
+              role="button"
               (click)="onOutputPortClick('trigger', null, $event)"
+              (keydown.enter)="onOutputPortClick('trigger', null, $event); $event.preventDefault()"
+              (keydown.space)="onOutputPortClick('trigger', null, $event); $event.preventDefault()"
+              (pointerdown)="$event.stopPropagation()"
               [class]="
                 'absolute right-[-10px] top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 border-accent cursor-pointer transition-all shadow-md ' +
                 (pendingSourceId() === 'trigger'
@@ -477,15 +494,15 @@
                   : 'bg-surface hover:bg-accent hover:scale-110')
               "
               title="Click to start an edge from the trigger"
-              aria-label="Trigger output port"
+              aria-label="Connect from the trigger"
             ></span>
 
             <!-- Resize grip (bottom-right corner) — drag to change
                  the shared card width. Diagonal chevron reads as an
                  image-style resize affordance. -->
             <span
-              (mousedown)="onCardResizeMouseDown($event)"
-              class="absolute right-1 bottom-1 w-3.5 h-3.5 cursor-se-resize text-accent/70 hover:text-accent"
+              (pointerdown)="onCardResizeMouseDown($event)"
+              class="absolute right-1 bottom-1 w-3.5 h-3.5 cursor-se-resize touch-none text-accent/70 hover:text-accent"
               title="Drag to resize all cards"
               aria-label="Resize"
             >
@@ -498,12 +515,15 @@
                 />
               </svg>
             </span>
-          </button>
+          </div>
 
           <!-- Nodes -->
           @for (node of nodes(); track node.id) {
             <div
               data-cb-card
+              tabindex="0"
+              [attr.aria-label]="(nodeMeta(node.type)?.label ?? node.type) + ' step'"
+              (keydown.enter)="$event.target === $event.currentTarget && selectNode(node.id)"
               [attr.data-node-id]="node.id"
               [style.left.px]="node.position.x + nodeLeftOffset()"
               [style.top.px]="node.position.y"
@@ -537,18 +557,18 @@
 
               <!-- Node header — also the drag handle -->
               <div
-                (mousedown)="onNodeHeaderMouseDown(node.id, $event)"
-                class="flex items-center gap-2 px-3.5 py-3 border-b border-subtle relative cursor-move select-none"
+                (pointerdown)="onNodeHeaderMouseDown(node.id, $event)"
+                class="flex items-center gap-2 px-3.5 py-3 border-b border-subtle relative cursor-move select-none touch-none"
               >
                 <span
                   [class]="
                     'w-7 h-7 rounded-lg inline-flex items-center justify-center flex-shrink-0 ' +
                     (nodeMeta(node.type)?.category === 'message'
-                      ? 'bg-sky-500/10 text-sky-500'
+                      ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
                       : nodeMeta(node.type)?.category === 'crm'
-                        ? 'bg-emerald-500/10 text-emerald-500'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                         : nodeMeta(node.type)?.category === 'ai'
-                          ? 'bg-fuchsia-500/10 text-fuchsia-500'
+                          ? 'bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400'
                           : 'bg-accent-soft text-accent')
                   "
                 >
@@ -559,14 +579,14 @@
                 </span>
                 @if (nodeMeta(node.type)?.beta) {
                   <span
-                    class="px-1.5 py-px text-[8px] font-bold uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-500 rounded"
+                    class="px-1.5 py-px text-[8px] font-bold uppercase tracking-wider bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300 rounded"
                   >
                     Beta
                   </span>
                 }
                 @if (nodeHasError(node)) {
                   <span
-                    class="inline-flex items-center gap-1 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider bg-red-500/15 text-red-500 rounded"
+                    class="inline-flex items-center gap-1 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider bg-red-500/15 text-red-700 dark:text-red-300 rounded"
                     title="This node has empty required fields. Save will fail until you fill them in."
                   >
                     <lucide-icon name="alert-triangle" size="10"></lucide-icon>
@@ -575,7 +595,7 @@
                 }
                 @if (isOrphan(node.id)) {
                   <span
-                    class="inline-flex items-center gap-1 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-500 rounded"
+                    class="inline-flex items-center gap-1 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300 rounded"
                     title="This node isn't reachable from the trigger — it will never fire. Wire an incoming edge to make it part of the flow."
                   >
                     Orphan
@@ -583,9 +603,19 @@
                 }
                 <button
                   type="button"
+                  (click)="duplicateNode(node.id); $event.stopPropagation()"
+                  class="p-1 rounded hover:bg-surface-2 text-muted hover:text-default transition-colors"
+                  aria-label="Duplicate step"
+                  title="Duplicate step"
+                >
+                  <lucide-icon name="copy" size="13"></lucide-icon>
+                </button>
+                <button
+                  type="button"
                   (click)="deleteNode(node.id, $event)"
-                  class="p-1 rounded hover:bg-red-500/10 text-muted hover:text-red-500 transition-colors"
-                  aria-label="Delete node"
+                  class="p-1 rounded hover:bg-red-500/10 text-muted hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                  aria-label="Delete step"
+                  title="Delete step"
                 >
                   <lucide-icon name="trash-2" size="13"></lucide-icon>
                 </button>
@@ -595,7 +625,12 @@
                      "drop it here". -->
                 <span
                   [attr.data-port]="'in:' + node.id"
+                  tabindex="0"
+                  role="button"
                   (click)="onInputPortClick(node.id, $event)"
+                  (keydown.enter)="onInputPortClick(node.id, $event); $event.preventDefault()"
+                  (keydown.space)="onInputPortClick(node.id, $event); $event.preventDefault()"
+                  (pointerdown)="$event.stopPropagation()"
                   [class]="
                     'absolute left-[-10px] top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 border-subtle cursor-pointer transition-all shadow-md bg-surface ' +
                     (isConnecting()
@@ -603,7 +638,7 @@
                       : 'hover:bg-accent hover:border-accent hover:scale-110')
                   "
                   title="Click to connect the pending edge to this node"
-                  aria-label="Input port"
+                  aria-label="Connect to this step"
                 ></span>
               </div>
 
@@ -673,7 +708,15 @@
                       </span>
                       <span
                         [attr.data-port]="'out:' + node.id + '::' + (port.label ?? '')"
+                        tabindex="0"
+                        role="button"
                         (click)="onOutputPortClick(node.id, port.label, $event)"
+                        (keydown.enter)="
+                          onOutputPortClick(node.id, port.label, $event); $event.preventDefault()
+                        "
+                        (keydown.space)="
+                          onOutputPortClick(node.id, port.label, $event); $event.preventDefault()
+                        "
                         [class]="
                           'w-4 h-4 rounded-full border-2 border-accent cursor-pointer transition-all flex-shrink-0 shadow-sm mr-[-8px] ' +
                           (pendingSourceId() === node.id &&
@@ -682,7 +725,7 @@
                             : 'bg-surface hover:bg-accent hover:scale-110')
                         "
                         title="Click to start a connection from this port"
-                        aria-label="Output port"
+                        [attr.aria-label]="'Connect from “' + port.title + '”'"
                       ></span>
                     </div>
                   }
@@ -692,8 +735,8 @@
               <!-- Resize grip on the bottom-right corner of every
                    node card — drag to change the shared card width. -->
               <span
-                (mousedown)="onCardResizeMouseDown($event)"
-                class="absolute right-1 bottom-1 w-3.5 h-3.5 cursor-se-resize text-muted hover:text-accent"
+                (pointerdown)="onCardResizeMouseDown($event)"
+                class="absolute right-1 bottom-1 w-3.5 h-3.5 cursor-se-resize touch-none text-muted hover:text-accent"
                 title="Drag to resize all cards"
                 aria-label="Resize"
               >
@@ -712,6 +755,13 @@
       </main>
 
       @if (variablesPanelOpen()) {
+        @if (isPhone()) {
+          <div
+            class="fixed inset-0 z-30 bg-black/40 md:hidden"
+            (click)="variablesPanelOpen.set(false)"
+            aria-hidden="true"
+          ></div>
+        }
         <app-variables-panel
           [sessionVariables]="sessionVariables()"
           (close)="variablesPanelOpen.set(false)"
@@ -805,7 +855,7 @@
       <button
         type="button"
         (click)="requestDeleteFromMenu(ctxNodeId)"
-        class="w-full text-left px-3 py-2 text-[12px] text-red-500 hover:bg-red-500/10 flex items-center gap-2"
+        class="w-full text-left px-3 py-2 text-[12px] text-red-600 dark:text-red-400 hover:bg-red-500/10 flex items-center gap-2"
       >
         <lucide-icon name="trash-2" size="12"></lucide-icon>
         Delete
@@ -826,7 +876,7 @@
 <button
   type="button"
   (click)="openHelp()"
-  class="fixed z-30 bottom-3 left-3 md:bottom-6 md:left-6 w-9 h-9 md:w-11 md:h-11 rounded-full bg-accent-soft text-accent border border-accent/40 shadow-xl hover:brightness-110 transition-all flex items-center justify-center"
+  class="fixed z-30 bottom-[76px] left-3 md:bottom-6 md:left-6 w-9 h-9 md:w-11 md:h-11 rounded-full bg-accent-soft text-accent border border-accent/40 shadow-xl hover:brightness-110 transition-all flex items-center justify-center"
   title="How to use the builder"
   aria-label="Help"
 >
@@ -840,6 +890,9 @@
   >
     <div
       class="bg-surface border border-subtle rounded-xl w-[560px] max-w-[92vw] max-h-[85vh] overflow-y-auto shadow-2xl"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cb_help_title"
       (click)="$event.stopPropagation()"
     >
       <header class="flex items-center gap-3 px-5 py-4 border-b border-subtle">
@@ -849,7 +902,9 @@
           <lucide-icon name="help-circle" size="16"></lucide-icon>
         </span>
         <div class="flex-1">
-          <h2 class="text-sm font-semibold text-default">How the bot builder works</h2>
+          <h2 id="cb_help_title" class="text-sm font-semibold text-default">
+            How the bot builder works
+          </h2>
           <p class="text-[11px] text-muted mt-0.5">A quick guide to designing a flow.</p>
         </div>
         <button
@@ -891,14 +946,14 @@
           <ul class="text-muted list-disc list-inside space-y-1">
             <li>
               <span
-                class="inline-block px-1.5 py-px text-[9px] font-bold uppercase bg-red-500/15 text-red-500 rounded"
+                class="inline-block px-1.5 py-px text-[9px] font-bold uppercase bg-red-500/15 text-red-700 dark:text-red-300 rounded"
                 >Fix</span
               >
               — a required field is empty. Save will fail until you fill it in.
             </li>
             <li>
               <span
-                class="inline-block px-1.5 py-px text-[9px] font-bold uppercase bg-amber-500/15 text-amber-500 rounded"
+                class="inline-block px-1.5 py-px text-[9px] font-bold uppercase bg-amber-500/15 text-amber-700 dark:text-amber-300 rounded"
                 >Orphan</span
               >
               — the node isn't reachable from the Trigger. It will never fire.
@@ -908,9 +963,10 @@
         <section>
           <h3 class="text-[13px] font-semibold text-default mb-1">5. Right-click a node</h3>
           <p class="text-muted">
-            Opens a menu with <b>Duplicate</b> (copy the node + config in one click) and
-            <b>Delete</b> (with confirmation). With a step selected you can also press
-            <b>Delete</b> on the keyboard, and <b>Ctrl/⌘+S</b> saves.
+            Opens a menu with <b>Duplicate</b> (copy the node + config in one click — also the copy
+            icon in each step's header, for touch screens) and <b>Delete</b> (with confirmation).
+            With a step selected you can also press <b>Delete</b> on the keyboard, and
+            <b>Ctrl/⌘+S</b> saves.
           </p>
         </section>
         <section>

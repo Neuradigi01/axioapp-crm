@@ -78,7 +78,7 @@ import { ChatbotVersionRead, ChatbotsApiService } from '../../chatbots-api.servi
               Loading history…
             </div>
           } @else if (error()) {
-            <div class="p-5 text-sm text-red-500">{{ error() }}</div>
+            <div class="p-5 text-sm text-red-600 dark:text-red-400">{{ error() }}</div>
           } @else if (versions().length === 0) {
             <div class="p-10 text-center text-sm text-muted">
               No versions yet. Save the bot to create the first version.
@@ -94,7 +94,7 @@ import { ChatbotVersionRead, ChatbotsApiService } from '../../chatbots-api.servi
                       >
                       @if (v.version_number === currentVersion) {
                         <span
-                          class="px-1.5 py-px text-[9px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-500 rounded"
+                          class="px-1.5 py-px text-[9px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 rounded"
                         >
                           Current
                         </span>

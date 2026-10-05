@@ -97,6 +97,11 @@ export class CanvasStateService {
    *  instead of a fixed guess that overlapped tall cards. */
   readonly cardHeights = signal<Record<string, number>>({});
 
+  /** Right offset (px) for the floating zoom pill + minimap while the
+   *  desktop Variables panel is open, so they don't sit on top of it.
+   *  `null` = default position. Set by the builder page. */
+  readonly rightOverlayOffset = signal<number | null>(null);
+
   private readonly ZOOM_MIN = 0.25;
   private readonly ZOOM_MAX = 2;
   private readonly ZOOM_STEPS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -268,6 +273,7 @@ export class CanvasStateService {
     this.paletteWidth.set(280);
     this.cardWidth.set(320);
     this.cardHeights.set({});
+    this.rightOverlayOffset.set(null);
   }
 
   addNode(meta: NodeTypeMeta, position: { x: number; y: number }): CanvasNode {
