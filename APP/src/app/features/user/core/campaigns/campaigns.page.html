@@ -407,6 +407,7 @@
                   [disabled]="busyId() === c.id"
                   class="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-surface px-2.5 py-1 text-[11px] font-medium text-red-500 hover:bg-red-500/10 disabled:opacity-50"
                   title="Delete"
+                  [attr.aria-label]="'Delete ' + c.name"
                 >
                   <lucide-icon name="trash-2" class="h-3 w-3" />
                   Delete
@@ -419,6 +420,7 @@
                   [disabled]="busyId() === c.id"
                   class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-[11px] font-medium text-default hover:bg-surface-2 disabled:opacity-50"
                   title="Archive"
+                  [attr.aria-label]="'Archive ' + c.name"
                 >
                   <lucide-icon name="archive" class="h-3 w-3" />
                   Archive
@@ -430,6 +432,7 @@
                   [disabled]="busyId() === c.id"
                   class="inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-[11px] font-medium text-default hover:bg-surface-2 disabled:opacity-50"
                   title="Unarchive"
+                  [attr.aria-label]="'Unarchive ' + c.name"
                 >
                   <lucide-icon name="archive-restore" class="h-3 w-3" />
                   Unarchive
@@ -441,6 +444,7 @@
                     [disabled]="busyId() === c.id"
                     class="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-surface px-2.5 py-1 text-[11px] font-medium text-red-500 hover:bg-red-500/10 disabled:opacity-50"
                     title="Delete permanently"
+                    [attr.aria-label]="'Delete ' + c.name + ' permanently'"
                   >
                     <lucide-icon name="trash-2" class="h-3 w-3" />
                     Delete
@@ -451,6 +455,7 @@
                 [routerLink]="['/user/campaigns', c.id]"
                 class="ml-auto inline-flex items-center gap-1 rounded-md border border-subtle bg-surface px-2.5 py-1 text-[11px] font-medium text-default hover:bg-surface-2"
                 title="Open details"
+                [attr.aria-label]="'Open ' + c.name"
               >
                 Details
                 <lucide-icon name="chevron-right" class="h-3 w-3" />
@@ -611,8 +616,9 @@
                         [disabled]="busyId() === c.id"
                         class="rounded p-1 text-red-500 hover:bg-red-500/10 disabled:opacity-50"
                         title="Delete"
+                        [attr.aria-label]="'Delete ' + c.name"
                       >
-                        ✕
+                        <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
                       </button>
                     }
                     @if (canArchive(c)) {
@@ -622,6 +628,7 @@
                         [disabled]="busyId() === c.id"
                         class="rounded p-1 text-faint hover:bg-surface-2 hover:text-default disabled:opacity-50"
                         title="Archive"
+                        [attr.aria-label]="'Archive ' + c.name"
                       >
                         <lucide-icon name="archive" class="h-3.5 w-3.5" />
                       </button>
@@ -632,6 +639,7 @@
                         [disabled]="busyId() === c.id"
                         class="rounded p-1 text-faint hover:bg-surface-2 hover:text-default disabled:opacity-50"
                         title="Unarchive"
+                        [attr.aria-label]="'Unarchive ' + c.name"
                       >
                         <lucide-icon name="archive-restore" class="h-3.5 w-3.5" />
                       </button>
@@ -642,8 +650,9 @@
                           [disabled]="busyId() === c.id"
                           class="rounded p-1 text-red-500 hover:bg-red-500/10 disabled:opacity-50"
                           title="Delete permanently"
+                          [attr.aria-label]="'Delete ' + c.name + ' permanently'"
                         >
-                          ✕
+                          <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
                         </button>
                       }
                     } @else {
@@ -651,6 +660,7 @@
                         [routerLink]="['/user/campaigns', c.id]"
                         class="rounded p-1 text-faint hover:text-default"
                         title="Open details"
+                        [attr.aria-label]="'Open ' + c.name"
                         >⋯</a
                       >
                     }

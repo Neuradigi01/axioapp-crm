@@ -49,6 +49,7 @@
       <button
         type="button"
         role="tab"
+        [attr.aria-selected]="activeTab() === 'overview'"
         [class]="
           'rounded px-3 py-1 ' +
           (activeTab() === 'overview' ? 'bg-accent text-white' : 'text-default hover:bg-surface-2')
@@ -61,6 +62,7 @@
         <button
           type="button"
           role="tab"
+          [attr.aria-selected]="activeTab() === 'analytics'"
           [class]="
             'rounded px-3 py-1 ' +
             (activeTab() === 'analytics'
@@ -78,7 +80,7 @@
       <app-campaign-analytics-tab [campaignId]="id" />
     } @else {
       @if (stats(); as s) {
-        <div class="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+        <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
           <div class="rounded-xl border border-subtle bg-surface p-3 text-center">
             <div class="text-[10px] uppercase tracking-wide text-muted">Audience</div>
             <div class="mt-1 text-xl font-semibold text-default">{{ s.audience_size }}</div>
@@ -89,7 +91,7 @@
           </div>
           <div class="rounded-lg border border-sky-200 bg-sky-500/10 p-3 text-center">
             <div class="text-[10px] uppercase tracking-wide text-sky-700">Sent</div>
-            <div class="mt-1 text-xl font-semibold text-sky-900">{{ s.sent }}</div>
+            <div class="mt-1 text-xl font-semibold text-sky-700">{{ s.sent }}</div>
           </div>
           <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-center">
             <div class="text-[10px] uppercase tracking-wide text-emerald-400">Delivered</div>
@@ -103,7 +105,7 @@
           @if (isEmailCampaign()) {
             <div class="rounded-lg border border-violet-200 bg-violet-500/10 p-3 text-center">
               <div class="text-[10px] uppercase tracking-wide text-violet-700">Opened</div>
-              <div class="mt-1 text-xl font-semibold text-violet-900">{{ s.opened }}</div>
+              <div class="mt-1 text-xl font-semibold text-violet-700">{{ s.opened }}</div>
               <div class="text-[10px] text-violet-700">pixel</div>
             </div>
             <div class="rounded-lg border border-indigo-200 bg-indigo-500/10 p-3 text-center">
@@ -119,7 +121,7 @@
           } @else {
             <div class="rounded-lg border border-violet-200 bg-violet-500/10 p-3 text-center">
               <div class="text-[10px] uppercase tracking-wide text-violet-700">Read</div>
-              <div class="mt-1 text-xl font-semibold text-violet-900">{{ s.read }}</div>
+              <div class="mt-1 text-xl font-semibold text-violet-700">{{ s.read }}</div>
               @if (readRate() !== null) {
                 <div class="text-[10px] text-violet-700">{{ readRate() }}% of delivered</div>
               }

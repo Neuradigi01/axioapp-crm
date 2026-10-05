@@ -30,7 +30,7 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
         statistically meaningful.
       </p>
 
-      <div class="mb-2 grid grid-cols-2 gap-2">
+      <div class="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <label>
           <span class="mb-1 block font-medium text-default"> Variant A template </span>
           <select
@@ -77,7 +77,7 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
         </span>
       </label>
 
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <label>
           <span class="mb-1 block font-medium text-default"> Winner metric </span>
           <select

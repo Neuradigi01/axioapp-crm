@@ -94,7 +94,7 @@ export class FunnelChartComponent {
   protected barColor(key: string): string {
     switch (key) {
       case 'targeted':
-        return 'bg-muted';
+        return 'bg-slate-500';
       case 'sent':
         return 'bg-sky-500';
       case 'delivered':
@@ -108,7 +108,7 @@ export class FunnelChartComponent {
       case 'failed':
         return 'bg-red-500';
       default:
-        return 'bg-surface-2';
+        return 'bg-slate-500';
     }
   }
 }
