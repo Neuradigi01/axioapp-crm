@@ -12,7 +12,7 @@ import { format } from 'date-fns';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService } from '../auth/auth.service';
-import { Appointment } from './appointments-api.service';
+import { Appointment, APPOINTMENT_STATUS_LABELS } from './appointments-api.service';
 
 /**
  * Compact popover surfacing the four hot actions for an appointment:
@@ -48,6 +48,7 @@ const ALLOWED_FROM_STATUS: Record<Appointment['status'], ReadonlyArray<string>> 
 })
 export class AppointmentPopoverComponent {
   private readonly auth = inject(FurnitureAuthService);
+  protected readonly statusLabels = APPOINTMENT_STATUS_LABELS;
 
   protected readonly _appointment = signal<Appointment | null>(null);
 

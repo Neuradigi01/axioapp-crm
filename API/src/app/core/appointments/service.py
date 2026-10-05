@@ -633,6 +633,8 @@ async def list_appointments(
     status_filter: AppointmentStatus | None = None,
     sort: Literal["scheduled_at", "created_at", "last_activity_at"] = "scheduled_at",
     order: Literal["asc", "desc"] = "asc",
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[Appointment]:
     """Calendar / list reading.
 
@@ -645,9 +647,8 @@ async def list_appointments(
     - Default `scheduled_at asc` matches the prior calendar default
       (upcoming first).
 
-    Not paginated — the FE either passes a bounded `[from, to)` slice
-    or filters down via assignee/status; per-day / per-week views
-    never produce result sets large enough to warrant cursor paging.
+    - `limit` / `offset` page the open-ended list view ("Load more").
+      Calendar views pass a bounded `[from, to)` window and no limit.
     """
     return await _da.list_appointments_query(
         session,
@@ -657,6 +658,8 @@ async def list_appointments(
         status_filter=status_filter,
         sort=sort,
         order=order,
+        limit=limit,
+        offset=offset,
     )
 
 

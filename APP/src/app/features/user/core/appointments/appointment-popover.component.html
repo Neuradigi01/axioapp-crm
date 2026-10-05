@@ -2,7 +2,7 @@
   <div class="fixed inset-0 z-40" (click)="dismiss.emit()" aria-hidden="true"></div>
   <div
     role="dialog"
-    class="fixed left-1/2 top-1/2 z-50 w-80 max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface p-3 shadow-xl ring-1 border-subtle"
+    class="fixed left-1/2 top-1/2 z-50 w-80 max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-subtle bg-surface p-3 shadow-xl"
     (click)="$event.stopPropagation()"
   >
     <header class="border-b border-subtle pb-2">
@@ -47,7 +47,7 @@
       </p>
       <div class="mt-1 flex items-center gap-2">
         <p class="text-[10px] uppercase tracking-wide text-muted">
-          {{ a.status }}
+          {{ statusLabels[a.status] }}
         </p>
         <!-- tasks/google-calendar-sync Step 5 — per-appointment sync
              chip. Display-only for v1; no click action. Two states:

@@ -1,5 +1,5 @@
 <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-  <div class="w-full max-w-2xl rounded-lg bg-surface shadow-xl ring-1 border-subtle">
+  <div class="w-full max-w-2xl rounded-lg bg-surface border border-subtle shadow-xl">
     <header class="border-b border-subtle px-4 md:px-6 py-4">
       <h2 class="text-base font-semibold text-default">Book appointment</h2>
       <p class="mt-1 text-xs text-muted">
@@ -47,7 +47,7 @@
             />
             @if (contactSearchOpen() && contactResults().length > 0) {
               <ul
-                class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-surface py-1 shadow-lg ring-1 border-subtle"
+                class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-surface py-1 border border-subtle shadow-lg"
               >
                 @for (c of contactResults(); track c.id) {
                   <li>
@@ -265,7 +265,7 @@
       <!-- Errors / conflicts -->
       @if (conflicts().length > 0) {
         <div
-          class="mt-4 rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"
+          class="mt-4 rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-600 border border-red-500/20 dark:text-red-400"
         >
           <p class="font-semibold">Time conflict</p>
           <p class="mt-1">{{ submitError$() ?? 'Conflicts with the following appointments:' }}</p>
@@ -280,7 +280,7 @@
         </div>
       } @else if (submitError$(); as err) {
         <div
-          class="mt-4 rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"
+          class="mt-4 rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-600 border border-red-500/20 dark:text-red-400"
         >
           {{ err }}
         </div>

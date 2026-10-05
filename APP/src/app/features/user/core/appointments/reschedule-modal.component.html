@@ -1,5 +1,5 @@
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-  <div class="w-full max-w-md rounded-lg bg-surface shadow-xl ring-1 border-subtle">
+  <div class="w-full max-w-md rounded-lg bg-surface border border-subtle shadow-xl">
     <header class="border-b border-subtle px-5 py-3">
       <h2 class="text-sm font-semibold text-default">Reschedule appointment</h2>
       @if (_appointment(); as a) {
@@ -47,7 +47,7 @@
       }
       @if (_error(); as err) {
         <div
-          class="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"
+          class="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-600 border border-red-500/20 dark:text-red-400"
         >
           {{ err }}
         </div>

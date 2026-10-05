@@ -63,6 +63,16 @@ async def list_appointments_endpoint(
     status_filter: AppointmentStatus | None = Query(default=None, alias="status"),
     sort: Literal["scheduled_at", "created_at", "last_activity_at"] = Query(default="scheduled_at"),
     order: Literal["asc", "desc"] = Query(default="asc"),
+    limit: int | None = Query(
+        default=None,
+        ge=1,
+        le=500,
+        description=(
+            "Page size for the open-ended list view. Omit for a bounded "
+            "`from`/`to` calendar window, which returns every row in range."
+        ),
+    ),
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permissions("appointments.read")),
 ) -> list[AppointmentOut]:
@@ -74,6 +84,8 @@ async def list_appointments_endpoint(
         status_filter=status_filter,
         sort=sort,
         order=order,
+        limit=limit,
+        offset=offset,
     )
     return [AppointmentOut.model_validate(r) for r in rows]
 

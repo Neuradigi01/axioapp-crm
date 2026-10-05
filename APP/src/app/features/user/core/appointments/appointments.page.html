@@ -5,8 +5,8 @@
         Appointments
       </h1>
       <p class="mt-1 text-[14px] text-muted">
-        {{ state.items().length | number }}
-        {{ state.items().length === 1 ? 'appointment' : 'appointments' }}
+        {{ state.items().length | number }}{{ hasMore() ? '+' : '' }}
+        {{ state.items().length === 1 && !hasMore() ? 'appointment' : 'appointments' }}
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -47,9 +47,15 @@
   </header>
 
   @if (state.loadError(); as err) {
-    <p class="rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 border-red-500/20">
-      {{ err }}
-    </p>
+    <div
+      class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3"
+    >
+      <p class="text-sm text-red-600 dark:text-red-400">{{ err }}</p>
+      <button type="button" class="btn btn-secondary btn-sm" (click)="reload()">
+        <lucide-icon name="refresh-cw" class="h-3.5 w-3.5" />
+        Retry
+      </button>
+    </div>
   }
 
   <!-- Shared filter row -->
@@ -72,7 +78,7 @@
     }
 
     @if (canChangeScope()) {
-      <div class="inline-flex overflow-hidden rounded-full border-subtle bg-surface ring-1">
+      <div class="inline-flex overflow-hidden rounded-full border border-subtle bg-surface">
         @for (
           sc of [
             { v: 'mine', label: 'Mine' },
@@ -134,7 +140,7 @@
         />
       </section>
 
-      <aside class="rounded-lg bg-surface p-5 shadow-sm ring-1 border-subtle">
+      <aside class="rounded-lg border border-subtle bg-surface p-5 shadow-sm">
         <header class="mb-3 border-b border-subtle pb-3">
           <h2 class="text-sm font-semibold text-default">
             {{ selectedDayLabel() }}
@@ -181,7 +187,7 @@
                     class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1"
                     [class]="statusClass(a.status)"
                   >
-                    {{ a.status }}
+                    {{ statusLabels[a.status] }}
                   </span>
                 </div>
                 <p class="mt-1.5 text-xs" [class]="palette.textMuted">
@@ -210,7 +216,11 @@
     <!-- List view — AIXO row layout: time + colored bar + title/customer + status pill.
          Owner + last activity + actions collapse to the right side as compact chips
          so no data or interaction from the old table is lost. -->
-    <section class="rounded-xl border border-subtle bg-surface">
+    <section
+      class="rounded-xl border border-subtle bg-surface transition-opacity"
+      [class.opacity-60]="state.loading() && state.items().length > 0"
+      [attr.aria-busy]="state.loading()"
+    >
       @if (state.loading() && state.items().length === 0) {
         <div class="divide-y divide-subtle">
           @for (i of [0, 1, 2, 3, 4]; track i) {
@@ -229,139 +239,179 @@
           <span class="block text-xs text-faint">Try "All" status + "All" scope.</span>
         </div>
       } @else {
-        <ul class="divide-y divide-subtle">
-          @for (a of state.items(); track a.id) {
-            @let palette = ownerPalette(a.assigned_to_id);
-            <li
-              class="group flex items-center gap-3 px-3 py-3 transition hover:bg-surface-2 md:gap-4 md:px-5 md:py-3.5"
-              [class.bg-surface-2]="isSelected(a.id)"
-              (click)="openPopover(a)"
-              (keydown.enter)="openPopover(a)"
-              tabindex="0"
-              role="button"
-              [attr.aria-label]="'Open actions for ' + a.title"
+        @for (group of listGroups(); track group.key) {
+          @if (group.label) {
+            <h3
+              class="sticky top-0 z-[1] flex items-center gap-2 border-b first:rounded-t-xl border-subtle bg-surface-2/95 px-3 py-1.5 text-[11px] font-semibold tracking-[.06em] uppercase backdrop-blur md:px-5"
+              [class.text-faint]="group.past"
+              [class.text-muted]="!group.past"
             >
-              <!-- Checkbox — hidden on mobile (bulk actions live on md+ only) -->
-              <input
-                type="checkbox"
-                class="hidden h-4 w-4 shrink-0 cursor-pointer rounded border-subtle text-default focus:ring-accent md:block"
-                [class.md:invisible]="!isSelected(a.id) && state.selectedCount() === 0"
-                [class.md:group-hover:visible]="!isSelected(a.id)"
-                [checked]="isSelected(a.id)"
-                (click)="toggleRow(a.id, $event)"
-                [attr.aria-label]="'Select appointment ' + a.title"
-              />
-
-              <!-- Time (mono). Duration text hidden on mobile — AIXO look. -->
-              <div
-                class="w-[46px] shrink-0 text-right font-mono text-[13px] leading-tight tabular-nums text-muted md:w-[60px]"
+              {{ group.label }}
+              <span class="font-mono font-normal tracking-normal normal-case text-faint">
+                · {{ group.items.length }}
+              </span>
+            </h3>
+          }
+          <ul class="divide-y divide-subtle">
+            @for (a of group.items; track a.id) {
+              @let palette = ownerPalette(a.assigned_to_id);
+              <li
+                class="group flex items-center gap-3 px-3 py-3 transition hover:bg-surface-2 md:gap-4 md:px-5 md:py-3.5"
+                [class.bg-surface-2]="isSelected(a.id)"
+                (click)="openPopover(a)"
+                (keydown.enter)="openPopover(a)"
+                tabindex="0"
+                role="button"
+                [attr.aria-label]="'Open actions for ' + a.title"
               >
-                {{ formatTime(a.scheduled_at) }}
-                <div class="hidden text-[10px] text-faint md:block">{{ a.duration_min }}m</div>
-              </div>
+                <!-- Checkbox — hidden on mobile (bulk actions live on md+ only) -->
+                <input
+                  type="checkbox"
+                  class="hidden h-4 w-4 shrink-0 cursor-pointer rounded border-subtle text-default focus:ring-accent md:block"
+                  [class.md:invisible]="!isSelected(a.id) && state.selectedCount() === 0"
+                  [class.md:group-hover:visible]="!isSelected(a.id)"
+                  [checked]="isSelected(a.id)"
+                  (click)="toggleRow(a.id, $event)"
+                  [attr.aria-label]="'Select appointment ' + a.title"
+                />
 
-              <!-- Colored status bar (AIXO signature) — one solid hue per
+                <!-- Time (mono). Duration text hidden on mobile — AIXO look. -->
+                <div
+                  class="w-[46px] shrink-0 text-right font-mono text-[13px] leading-tight tabular-nums text-muted md:w-[60px]"
+                >
+                  @if (!group.label) {
+                    <div class="text-[10px] text-faint">{{ formatShortDate(a.scheduled_at) }}</div>
+                  }
+                  {{ formatTime(a.scheduled_at) }}
+                  <div class="hidden text-[10px] text-faint md:block">{{ a.duration_min }}m</div>
+                </div>
+
+                <!-- Colored status bar (AIXO signature) — one solid hue per
                    appointment status so the row's outcome reads at a glance.
                    Past-scheduled slots go red to flag "overdue" alongside
                    the pill on the right. -->
-              <span
-                class="h-[42px] w-[3px] shrink-0 rounded-[2px] md:h-[38px]"
-                [class]="isOverdue(a) ? 'bg-red-500' : statusBarClass(a.status)"
-                [title]="isOverdue(a) ? 'Overdue — needs an outcome' : 'Status: ' + a.status"
-                aria-hidden="true"
-              ></span>
-
-              <!-- Title + customer + optional purpose chip -->
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
-                  <p
-                    class="line-clamp-2 min-w-0 text-[13px] leading-snug font-semibold text-default md:truncate md:text-[14px] md:leading-normal"
-                  >
-                    {{ a.title }}
-                  </p>
-                  @if (a.purpose) {
-                    <span
-                      class="hidden shrink-0 items-center rounded-full border border-subtle bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-muted md:inline-flex"
-                    >
-                      {{ a.purpose }}
-                    </span>
-                  }
-                </div>
-                <div class="mt-0.5 flex items-center gap-2 text-[12px] text-muted md:text-[12.5px]">
-                  <span class="truncate">{{ contactName(a.contact_id) }}</span>
-                  @if (contactPhone(a.contact_id); as phone) {
-                    <a
-                      [appPhoneLink]="phone"
-                      class="hidden text-faint hover:text-default md:inline"
-                      (click)="$event.stopPropagation()"
-                      title="Call"
-                    >
-                      <lucide-icon name="phone" class="h-3 w-3" />
-                    </a>
-                    <a
-                      [appWhatsappLink]="phone"
-                      class="hidden text-emerald-500 hover:text-emerald-400 md:inline"
-                      (click)="$event.stopPropagation()"
-                      title="WhatsApp"
-                    >
-                      <lucide-icon name="message-circle" class="h-3 w-3" />
-                    </a>
-                  }
-                  @if (contactEmail(a.contact_id); as email) {
-                    <a
-                      [appMailLink]="email"
-                      class="hidden text-faint hover:text-default md:inline"
-                      (click)="$event.stopPropagation()"
-                      title="Email"
-                    >
-                      <lucide-icon name="mail" class="h-3 w-3" />
-                    </a>
-                  }
-                </div>
-              </div>
-
-              <!-- Right cluster: status pill + owner chip + last-activity + actions -->
-              <div
-                class="flex shrink-0 items-center gap-2 md:gap-3"
-                (click)="$event.stopPropagation()"
-              >
                 <span
-                  class="hidden font-mono text-[11px] whitespace-nowrap text-faint tabular-nums lg:inline"
-                  [title]="a.last_activity_at ? 'Last activity' : 'Created'"
-                >
-                  {{ a.last_activity_at ?? a.created_at | relativeTime }}
-                </span>
-                <span
-                  class="hidden items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ring-1 md:inline-flex"
-                  [class]="palette.bg + ' ' + palette.text + ' ' + palette.ring"
-                  [title]="'Owner: ' + ownerLabel(a.assigned_to_id)"
-                >
-                  <lucide-icon name="circle-dot" class="h-3 w-3" />
-                  {{ ownerLabel(a.assigned_to_id) }}
-                </span>
-                <span
-                  class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap ring-1 md:px-2 md:text-[11px]"
-                  [class]="
+                  class="h-[42px] w-[3px] shrink-0 rounded-[2px] md:h-[38px]"
+                  [class]="isOverdue(a) ? 'bg-red-500' : statusBarClass(a.status)"
+                  [title]="
                     isOverdue(a)
-                      ? 'bg-red-500/10 text-red-400 ring-red-500/30'
-                      : statusClass(a.status)
+                      ? 'Overdue — needs an outcome'
+                      : 'Status: ' + statusLabels[a.status]
                   "
+                  aria-hidden="true"
+                ></span>
+
+                <!-- Title + customer + optional purpose chip -->
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <p
+                      class="line-clamp-2 min-w-0 text-[13px] leading-snug font-semibold text-default md:truncate md:text-[14px] md:leading-normal"
+                    >
+                      {{ a.title }}
+                    </p>
+                    @if (a.purpose) {
+                      <span
+                        class="hidden shrink-0 items-center rounded-full border border-subtle bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-muted md:inline-flex"
+                      >
+                        {{ a.purpose }}
+                      </span>
+                    }
+                  </div>
+                  <div
+                    class="mt-0.5 flex items-center gap-2 text-[12px] text-muted md:text-[12.5px]"
+                  >
+                    <span class="truncate">{{ contactName(a.contact_id) }}</span>
+                    @if (contactPhone(a.contact_id); as phone) {
+                      <a
+                        [appPhoneLink]="phone"
+                        class="hidden text-faint hover:text-default md:inline"
+                        (click)="$event.stopPropagation()"
+                        title="Call"
+                      >
+                        <lucide-icon name="phone" class="h-3 w-3" />
+                      </a>
+                      <a
+                        [appWhatsappLink]="phone"
+                        class="hidden text-emerald-500 hover:text-emerald-400 md:inline"
+                        (click)="$event.stopPropagation()"
+                        title="WhatsApp"
+                      >
+                        <lucide-icon name="message-circle" class="h-3 w-3" />
+                      </a>
+                    }
+                    @if (contactEmail(a.contact_id); as email) {
+                      <a
+                        [appMailLink]="email"
+                        class="hidden text-faint hover:text-default md:inline"
+                        (click)="$event.stopPropagation()"
+                        title="Email"
+                      >
+                        <lucide-icon name="mail" class="h-3 w-3" />
+                      </a>
+                    }
+                  </div>
+                </div>
+
+                <!-- Right cluster: status pill + owner chip + last-activity + actions -->
+                <div
+                  class="flex shrink-0 items-center gap-2 md:gap-3"
+                  (click)="$event.stopPropagation()"
                 >
-                  {{ isOverdue(a) ? 'Overdue' : a.status }}
-                </span>
-                <button
-                  type="button"
-                  (click)="openPopover(a); $event.stopPropagation()"
-                  class="hidden h-8 w-8 items-center justify-center rounded-lg border border-subtle bg-surface text-muted transition hover:bg-surface-2 hover:text-default md:inline-flex"
-                  title="Actions"
-                  [attr.aria-label]="'Actions for ' + a.title"
-                >
-                  <lucide-icon name="more-vertical" class="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </li>
-          }
-        </ul>
+                  <span
+                    class="hidden font-mono text-[11px] whitespace-nowrap text-faint tabular-nums lg:inline"
+                    [title]="a.last_activity_at ? 'Last activity' : 'Created'"
+                  >
+                    {{ a.last_activity_at ?? a.created_at | relativeTime }}
+                  </span>
+                  <span
+                    class="hidden items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ring-1 md:inline-flex"
+                    [class]="palette.bg + ' ' + palette.text + ' ' + palette.ring"
+                    [title]="'Owner: ' + ownerLabel(a.assigned_to_id)"
+                  >
+                    <lucide-icon name="circle-dot" class="h-3 w-3" />
+                    {{ ownerLabel(a.assigned_to_id) }}
+                  </span>
+                  <span
+                    class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap ring-1 md:px-2 md:text-[11px]"
+                    [class]="
+                      isOverdue(a)
+                        ? 'bg-red-500/10 text-red-700 ring-red-500/25 dark:text-red-300'
+                        : statusClass(a.status)
+                    "
+                  >
+                    {{ isOverdue(a) ? 'Overdue' : statusLabels[a.status] }}
+                  </span>
+                  <button
+                    type="button"
+                    (click)="openPopover(a); $event.stopPropagation()"
+                    class="hidden h-8 w-8 items-center justify-center rounded-lg border border-subtle bg-surface text-muted transition hover:bg-surface-2 hover:text-default md:inline-flex"
+                    title="Actions"
+                    [attr.aria-label]="'Actions for ' + a.title"
+                  >
+                    <lucide-icon name="more-vertical" class="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+        @if (hasMore()) {
+          <div class="border-t border-subtle px-4 py-3 text-center">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              [disabled]="loadingMore()"
+              (click)="loadMore()"
+            >
+              @if (loadingMore()) {
+                <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />
+                Loading…
+              } @else {
+                Load more
+              }
+            </button>
+          </div>
+        }
       }
     </section>
   }
@@ -411,6 +461,7 @@
     [confirmLabel]="'Cancel selected'"
     [danger]="true"
     [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
     (confirm)="onBulkCancel()"
     (cancel)="closeBulkModal()"
   />
@@ -432,6 +483,7 @@
     [confirmLabel]="'Delete selected'"
     [danger]="true"
     [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
     (confirm)="onBulkDelete()"
     (cancel)="closeBulkModal()"
   />

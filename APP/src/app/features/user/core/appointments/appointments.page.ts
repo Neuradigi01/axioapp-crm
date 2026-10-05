@@ -13,7 +13,18 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
-import { endOfMonth, endOfWeek, format, isSameDay, startOfMonth, startOfWeek } from 'date-fns';
+import {
+  endOfMonth,
+  endOfWeek,
+  format,
+  isSameDay,
+  isToday,
+  isTomorrow,
+  isYesterday,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+} from 'date-fns';
 import { of } from 'rxjs';
 import { catchError, distinctUntilChanged } from 'rxjs/operators';
 
@@ -41,6 +52,7 @@ import {
 import { ListPageState } from '../shared/services/list-page.service';
 import { UsersDirectoryService } from '../shared/services/users-directory.service';
 import {
+  APPOINTMENT_STATUS_LABELS,
   Appointment,
   AppointmentSortKey,
   AppointmentsApiService,
@@ -62,6 +74,17 @@ interface ContactSummary {
 
 type AppointmentStatusValue = 'scheduled' | 'completed' | 'no_show' | 'cancelled';
 type StatusFilter = 'all' | 'upcoming' | AppointmentStatusValue;
+
+/** List-view page size. The calendar reads a bounded month window instead. */
+const LIST_PAGE_SIZE = 100;
+
+/** A run of list rows under one day heading (`label` null = ungrouped). */
+interface ListGroup {
+  key: string;
+  label: string | null;
+  past: boolean;
+  items: Appointment[];
+}
 
 const FILTER_CHIPS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
   { id: 'all', label: 'All' },
@@ -102,6 +125,7 @@ class AppointmentsListState extends ListPageState<Appointment> {}
 export class AppointmentsPageComponent {
   protected readonly ownerColor = ownerColor;
   protected readonly initials = initials;
+  protected readonly statusLabels = APPOINTMENT_STATUS_LABELS;
 
   private readonly api = inject(AppointmentsApiService);
   private readonly contactsApi = inject(ContactsApiService);
@@ -203,6 +227,38 @@ export class AppointmentsPageComponent {
   });
 
   readonly selectedDayLabel = computed(() => format(this.selectedDay(), 'EEEE, d MMMM yyyy'));
+
+  /** List rows grouped under day headings when sorted by appointment
+   *  time. Other sorts (created / activity) interleave days, so they
+   *  stay ungrouped and each row shows its own date instead. */
+  readonly listGroups = computed<ListGroup[]>(() => {
+    const items = this.state.items();
+    if (this.sortKey() !== 'scheduled_at') {
+      return [{ key: 'all', label: null, past: false, items }];
+    }
+    const today = startOfDay(new Date(this.nowTick())).getTime();
+    const groups: ListGroup[] = [];
+    for (const a of items) {
+      const d = new Date(a.scheduled_at);
+      const key = this.dayKey(d);
+      const last = groups[groups.length - 1];
+      if (last && last.key === key) {
+        last.items.push(a);
+      } else {
+        groups.push({
+          key,
+          label: this.dayHeading(d),
+          past: startOfDay(d).getTime() < today,
+          items: [a],
+        });
+      }
+    }
+    return groups;
+  });
+
+  /** More list rows exist on the server ("Load more"). */
+  readonly hasMore = signal(false);
+  readonly loadingMore = signal(false);
 
   // --- Selection + bulk --------------------------------------------------
 
@@ -532,9 +588,12 @@ export class AppointmentsPageComponent {
           this.clearSelection();
           this.closeBulkModal();
           if (result.skipped > 0) {
-            this.state.loadError.set(
-              this.formatBulkCancelSkipMessage(result.cancelled, result.skipped_by_status),
-            );
+            this.toast.warn('Some appointments were not cancelled', {
+              subtitle: this.formatBulkCancelSkipMessage(
+                result.cancelled,
+                result.skipped_by_status,
+              ),
+            });
           }
           this.reload();
         },
@@ -683,7 +742,6 @@ export class AppointmentsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.deleteSubmitting.set(false);
           const msg = extractApiError(err) ?? 'Could not delete appointment.';
-          this.state.loadError.set(msg);
           this.deleteAppt.set(null);
           this.toast.error('Could not delete appointment.', { subtitle: msg });
         },
@@ -790,7 +848,6 @@ export class AppointmentsPageComponent {
           this.cancelSubmitting.set(false);
           this.closeCancelConfirm();
           const msg = extractApiError(err) ?? 'Could not cancel appointment.';
-          this.state.loadError.set(msg);
           this.toast.error('Could not cancel appointment.', { subtitle: msg });
         },
       });
@@ -818,7 +875,6 @@ export class AppointmentsPageComponent {
         error: (err: HttpErrorResponse) => {
           this.state.items.set(before);
           const msg = extractApiError(err) ?? 'Could not update appointment status.';
-          this.state.loadError.set(msg);
           this.toast.error('Could not update appointment.', { subtitle: msg });
         },
       });
@@ -832,6 +888,20 @@ export class AppointmentsPageComponent {
 
   protected formatDateTime(iso: string): string {
     return format(new Date(iso), 'd MMM yyyy, HH:mm');
+  }
+
+  /** Short date for ungrouped list rows ("9 Oct", "9 Oct 2025" for other years). */
+  protected formatShortDate(iso: string): string {
+    const d = new Date(iso);
+    return format(d, d.getFullYear() === new Date().getFullYear() ? 'd MMM' : 'd MMM yyyy');
+  }
+
+  /** Day heading for the grouped list ("Today", "Tomorrow", "Thu 9 Oct"). */
+  private dayHeading(d: Date): string {
+    if (isToday(d)) return 'Today';
+    if (isTomorrow(d)) return 'Tomorrow';
+    if (isYesterday(d)) return 'Yesterday';
+    return format(d, d.getFullYear() === new Date().getFullYear() ? 'EEE d MMM' : 'EEE d MMM yyyy');
   }
 
   protected contactName(id: string): string {
@@ -854,11 +924,11 @@ export class AppointmentsPageComponent {
   protected statusClass(status: Appointment['status']): string {
     switch (status) {
       case 'completed':
-        return 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/30';
+        return 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-300';
       case 'cancelled':
-        return 'bg-red-500/10 text-red-400 ring-red-500/25';
+        return 'bg-red-500/10 text-red-700 ring-red-500/25 dark:text-red-300';
       case 'no_show':
-        return 'bg-amber-500/10 text-amber-400 ring-amber-500/30';
+        return 'bg-amber-500/10 text-amber-700 ring-amber-500/25 dark:text-amber-300';
       default:
         return 'bg-zinc-500/10 text-muted ring-zinc-500/25';
     }
@@ -947,32 +1017,79 @@ export class AppointmentsPageComponent {
     return extraFrom ? { scheduledFrom: extraFrom } : {};
   }
 
-  private reload(): void {
+  /** Bumped on every reload so a slow earlier response can't overwrite
+   *  a newer one when filters change quickly. */
+  private reloadSeq = 0;
+
+  /** Shared query for reload + load-more. The list view pages
+   *  (`LIST_PAGE_SIZE`); the calendar reads its whole month window. */
+  private listQuery(offset: number) {
     const { status, extraFrom } = this.resolveStatusAndFrom();
     const { scheduledFrom, scheduledTo } = this.resolveDateWindow(extraFrom);
+    const paged = this.view() === 'list';
+    return {
+      scheduledFrom,
+      scheduledTo,
+      assignedTo: this.resolveAssignee(),
+      status,
+      sort: this.sortKey(),
+      order: this.sortOrder(),
+      limit: paged ? LIST_PAGE_SIZE : undefined,
+      offset: paged ? offset : undefined,
+    };
+  }
 
+  protected reload(): void {
+    const seq = ++this.reloadSeq;
+    const query = this.listQuery(0);
     this.state.loading.set(true);
     this.state.loadError.set(null);
+    this.loadingMore.set(false);
     this.api
-      .list({
-        scheduledFrom,
-        scheduledTo,
-        assignedTo: this.resolveAssignee(),
-        status,
-        sort: this.sortKey(),
-        order: this.sortOrder(),
-      })
+      .list(query)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => {
+          if (seq !== this.reloadSeq) return;
           this.state.items.set(rows);
+          this.hasMore.set(query.limit !== undefined && rows.length === query.limit);
           this.state.loading.set(false);
           this.hydrateContacts(rows);
         },
         error: (err: HttpErrorResponse) => {
+          if (seq !== this.reloadSeq) return;
           this.state.items.set([]);
+          this.hasMore.set(false);
           this.state.loading.set(false);
           this.state.loadError.set(extractApiError(err) ?? 'Could not load appointments.');
+        },
+      });
+  }
+
+  protected loadMore(): void {
+    if (this.loadingMore() || !this.hasMore()) return;
+    const seq = this.reloadSeq;
+    const query = this.listQuery(this.state.items().length);
+    this.loadingMore.set(true);
+    this.api
+      .list(query)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          if (seq !== this.reloadSeq) return;
+          // De-dupe by id — a row edited locally can shift server offsets.
+          const seen = new Set(this.state.items().map((r) => r.id));
+          this.state.items.update((cur) => [...cur, ...rows.filter((r) => !seen.has(r.id))]);
+          this.hasMore.set(rows.length === query.limit);
+          this.loadingMore.set(false);
+          this.hydrateContacts(rows);
+        },
+        error: (err: HttpErrorResponse) => {
+          if (seq !== this.reloadSeq) return;
+          this.loadingMore.set(false);
+          this.toast.error('Could not load more appointments', {
+            subtitle: extractApiError(err) ?? undefined,
+          });
         },
       });
   }

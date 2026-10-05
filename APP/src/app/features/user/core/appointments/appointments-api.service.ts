@@ -8,6 +8,14 @@ import { buildHttpParams } from '../shared/services/query-builder';
 
 export type AppointmentStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show';
 
+/** Display labels for appointment statuses (raw values are snake_case). */
+export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
+  scheduled: 'Scheduled',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  no_show: 'No-show',
+};
+
 export type AppointmentSortKey = 'scheduled_at' | 'created_at' | 'last_activity_at';
 
 export type SortOrder = 'asc' | 'desc';
@@ -72,6 +80,9 @@ export interface AppointmentListQuery {
   status?: AppointmentStatus;
   sort?: AppointmentSortKey;
   order?: SortOrder;
+  /** Page size for the open-ended list view; omit for calendar windows. */
+  limit?: number;
+  offset?: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -98,6 +109,8 @@ export class AppointmentsApiService extends BaseCrudApiService<
       status: query.status,
       sort: query.sort,
       order: query.order,
+      limit: query.limit,
+      offset: query.offset,
     });
     return this.http.get<Appointment[]>(this.base, { params });
   }

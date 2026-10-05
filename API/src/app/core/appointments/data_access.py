@@ -119,10 +119,12 @@ async def list_appointments_query(
     status_filter: AppointmentStatus | None = None,
     sort: Literal["scheduled_at", "created_at", "last_activity_at"] = "scheduled_at",
     order: Literal["asc", "desc"] = "asc",
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[Appointment]:
-    """Calendar / list read. Not paginated by design — the FE either
-    passes a bounded ``[from, to)`` window or filters down via
-    assignee/status.
+    """Calendar / list read. ``limit`` / ``offset`` page the open-ended
+    list view; calendar reads pass a bounded ``[from, to)`` window and
+    no limit. The ``id`` tiebreaker keeps offset pages stable.
 
     ``last_activity_at`` ordering appends ``NULLS LAST`` so
     never-touched rows sink to the bottom in either direction.
@@ -149,6 +151,8 @@ async def list_appointments_query(
     else:
         primary = sort_col.asc() if order == "asc" else sort_col.desc()
     stmt = stmt.order_by(primary, Appointment.id.asc())
+    if limit is not None:
+        stmt = stmt.limit(limit).offset(offset)
 
     return list((await session.execute(stmt)).scalars().all())
 
