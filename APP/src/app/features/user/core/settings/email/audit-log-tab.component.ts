@@ -19,6 +19,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { format } from 'date-fns';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { MobileSelectComponent } from '../../shared/forms/mobile-select.component';
@@ -156,9 +157,10 @@ export class AuditLogTabComponent implements OnInit {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
+  /** Default window start: 24h ago, as local `YYYY-MM-DDTHH:mm` for the
+   *  datetime-local input (which `isoOrUndefined` reads back as local). */
   private defaultFromDate(): string {
-    const dt = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    return dt.toISOString().slice(0, 16);
+    return format(new Date(Date.now() - 24 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm");
   }
 
   private isoOrUndefined(value: string): string | undefined {
