@@ -7,10 +7,14 @@
   GET    /api/v1/staff/{user_id}/activity?limit=
   POST   /api/v1/staff/{user_id}/clock-in
   POST   /api/v1/staff/{user_id}/clock-out
+  GET    /api/v1/staff/me/attendance/open
+  POST   /api/v1/staff/me/clock-in
+  POST   /api/v1/staff/me/clock-out
 
-Reads need `staff.read`; profile writes need `staff.write`; clock
-in/out needs `attendance.write`. Tenant scoping is automatic via the
-ORM filter on `TenantScoped`.
+Reads need `staff.read`; profile writes need `staff.write`; clocking
+another user in/out needs `attendance.write`. The `/me/*` routes let
+any signed-in user clock only themselves (header Clock In/Out button).
+Tenant scoping is automatic via the ORM filter on `TenantScoped`.
 """
 
 from __future__ import annotations
@@ -22,7 +26,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app.core.activities.schemas import ActivityOut
-from src.app.core.auth.dependencies import require_permissions
+from src.app.core.auth.dependencies import get_current_user, require_permissions
 from src.app.core.staff.schemas import (
     AttendanceOut,
     ClockInPayload,
@@ -42,6 +46,7 @@ from src.app.core.staff.service import (
 from src.app.core.staff.service import (
     compute_performance,
     compute_performance_bulk,
+    get_open_attendance,
     list_activities_for,
     list_attendance,
     list_staff,
@@ -93,6 +98,40 @@ async def revenue_totals_endpoint(
 
     total, today = await revenue_totals(db, org_id=user.org_id)
     return {"total": total, "today": today}
+
+
+# --- self-service clock in/out (any signed-in user, self only) ---
+# Declared BEFORE the ``/{user_id}/...`` routes so FastAPI doesn't
+# parse ``"me"`` as a ``user_id``.
+
+
+@router.get("/me/attendance/open", response_model=AttendanceOut | None)
+async def my_open_attendance_endpoint(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> AttendanceOut | None:
+    row = await get_open_attendance(db, user.legacy_uuid)
+    return AttendanceOut.model_validate(row) if row is not None else None
+
+
+@router.post("/me/clock-in", response_model=AttendanceOut, status_code=201)
+async def my_clock_in_endpoint(
+    payload: ClockInPayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> AttendanceOut:
+    row = await svc_clock_in(db, org_id=user.org_id, user_id=user.legacy_uuid, payload=payload)
+    return AttendanceOut.model_validate(row)
+
+
+@router.post("/me/clock-out", response_model=AttendanceOut)
+async def my_clock_out_endpoint(
+    payload: ClockOutPayload,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> AttendanceOut:
+    row = await svc_clock_out(db, user_id=user.legacy_uuid, payload=payload)
+    return AttendanceOut.model_validate(row)
 
 
 @router.put("/{user_id}", response_model=StaffProfileOut)

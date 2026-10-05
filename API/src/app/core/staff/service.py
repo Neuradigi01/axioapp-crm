@@ -121,9 +121,7 @@ async def count_present_today(session: AsyncSession, *, org_id: uuid.UUID) -> in
     return await _da.count_present_today(session, org_id=org_id)
 
 
-async def revenue_totals(
-    session: AsyncSession, *, org_id: uuid.UUID
-) -> tuple[float, float]:
+async def revenue_totals(session: AsyncSession, *, org_id: uuid.UUID) -> tuple[float, float]:
     """``(total, today)`` revenue sums drawn from paid invoices.
     Powers the two right-most KPI cards on the Staff dashboard."""
     return await _da.sum_paid_revenue(session, org_id=org_id)
@@ -282,6 +280,12 @@ async def list_attendance(
     return await _da.list_attendance_for_user(
         session, user_id=user_id, from_dt=from_dt, to_dt=to_dt
     )
+
+
+async def get_open_attendance(session: AsyncSession, user_id: uuid.UUID) -> Attendance | None:
+    """The user's currently-open attendance session, or ``None`` when
+    they are clocked out. Drives the header Clock In/Out button."""
+    return await _da.find_open_attendance_session(session, user_id)
 
 
 async def list_activities_for(

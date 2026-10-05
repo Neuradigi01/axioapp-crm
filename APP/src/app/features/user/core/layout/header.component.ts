@@ -16,12 +16,14 @@ import { ThemeChoice, ThemeService } from '@core/services/theme.service';
 import { FurnitureAuthService, MeResponse } from '../auth/auth.service';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
 import { NotificationsPopoverComponent } from '../notifications/notifications-popover.component';
+import { ClockButtonComponent } from '../staff/clock-button.component';
 import { MyTasksPopoverComponent } from '../tasks/my-tasks-popover.component';
 
 @Component({
   selector: 'app-header',
   standalone: true,
   imports: [
+    ClockButtonComponent,
     LucideAngularModule,
     MyTasksPopoverComponent,
     NotificationsPopoverComponent,

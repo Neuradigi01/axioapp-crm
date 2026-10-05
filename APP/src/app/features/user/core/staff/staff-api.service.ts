@@ -141,6 +141,21 @@ export class StaffApiService {
     });
   }
 
+  /** Signed-in user's open attendance session, or `null` when clocked out. */
+  myOpenAttendance(): Observable<AttendanceOut | null> {
+    return this.http.get<AttendanceOut | null>(`${this.base}/me/attendance/open`);
+  }
+
+  /** Clock the signed-in user in. No `attendance.write` needed — self only. */
+  myClockIn(): Observable<AttendanceOut> {
+    return this.http.post<AttendanceOut>(`${this.base}/me/clock-in`, {});
+  }
+
+  /** Clock the signed-in user out of their open session. */
+  myClockOut(): Observable<AttendanceOut> {
+    return this.http.post<AttendanceOut>(`${this.base}/me/clock-out`, {});
+  }
+
   /**
    * Fetches the staff list and joins each row with its performance
    * payload. Uses the ``POST /staff/performance/bulk`` batch endpoint

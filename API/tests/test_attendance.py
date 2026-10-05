@@ -173,3 +173,64 @@ async def test_clock_in_requires_attendance_write(layered_client, seeded_admin):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_self_clock_in_out_needs_no_attendance_permission(layered_client, seeded_admin):
+    org = seeded_admin["org"]
+    user = seeded_admin["user"]
+    # No permissions granted — /me/* only needs a signed-in user.
+    token = await _login(
+        layered_client,
+        org_slug=org.slug,
+        email=user.email,
+        password=seeded_admin["password"],
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    before = await layered_client.get("/api/v1/staff/me/attendance/open", headers=headers)
+    assert before.status_code == 200, before.text
+    assert before.json() is None
+
+    opened = await layered_client.post("/api/v1/staff/me/clock-in", json={}, headers=headers)
+    assert opened.status_code == 201, opened.text
+
+    current = await layered_client.get("/api/v1/staff/me/attendance/open", headers=headers)
+    assert current.status_code == 200, current.text
+    assert current.json()["id"] == opened.json()["id"]
+
+    closed = await layered_client.post("/api/v1/staff/me/clock-out", json={}, headers=headers)
+    assert closed.status_code == 200, closed.text
+    assert closed.json()["clock_out_at"] is not None
+
+    after = await layered_client.get("/api/v1/staff/me/attendance/open", headers=headers)
+    assert after.json() is None
+
+
+@pytest.mark.asyncio
+async def test_self_clock_in_twice_returns_409_and_clock_out_when_closed_404(
+    layered_client, seeded_admin
+):
+    org = seeded_admin["org"]
+    user = seeded_admin["user"]
+    token = await _login(
+        layered_client,
+        org_slug=org.slug,
+        email=user.email,
+        password=seeded_admin["password"],
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    no_open = await layered_client.post("/api/v1/staff/me/clock-out", json={}, headers=headers)
+    assert no_open.status_code == 404, no_open.text
+
+    first = await layered_client.post("/api/v1/staff/me/clock-in", json={}, headers=headers)
+    assert first.status_code == 201, first.text
+    second = await layered_client.post("/api/v1/staff/me/clock-in", json={}, headers=headers)
+    assert second.status_code == 409, second.text
+
+
+@pytest.mark.asyncio
+async def test_self_clock_in_requires_authentication(layered_client):
+    resp = await layered_client.post("/api/v1/staff/me/clock-in", json={})
+    assert resp.status_code == 401
