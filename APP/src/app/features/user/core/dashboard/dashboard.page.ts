@@ -251,7 +251,12 @@ export class DashboardPageComponent {
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  /** Last-write-wins guard — rapid Today ↔ Next 5 flips could otherwise
+   *  paint the slower, older response. */
+  private loadSeq = 0;
+
   private load(isRefresh: boolean): void {
+    const seq = ++this.loadSeq;
     if (isRefresh) {
       this.refreshing.set(true);
     } else {
@@ -266,11 +271,13 @@ export class DashboardPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (s) => {
+          if (seq !== this.loadSeq) return;
           this.summary.set(s);
           this.loading.set(false);
           this.refreshing.set(false);
         },
         error: (err: HttpErrorResponse) => {
+          if (seq !== this.loadSeq) return;
           this.error.set(extractApiError(err) ?? "Couldn't load your dashboard.");
           this.loading.set(false);
           this.refreshing.set(false);

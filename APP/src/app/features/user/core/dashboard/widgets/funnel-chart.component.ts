@@ -24,6 +24,7 @@ import {
   NgApexchartsModule,
 } from 'ng-apexcharts';
 
+import { injectChartTheme, withAlpha } from '../shared/chart-theme';
 import { environment } from '../../../../../../environments/environment';
 import { extractApiError } from '@core/services/api-error.util';
 import { dashboardRange, type DashboardRange } from '../shared/dashboard-range.signal';
@@ -45,9 +46,9 @@ interface DashboardFunnelResponse {
   lost_count: number;
 }
 
-// Zinc ramp from dark → light. Cycles for stages beyond index 5 so the
-// chart stays readable even on pipelines with many stages.
-const FUNNEL_COLORS = ['#18181b', '#27272a', '#3f3f46', '#52525b', '#71717a', '#a1a1aa'];
+// Accent ramp, strongest → lightest (opacity steps). Cycles for stages
+// beyond index 5. Floor stays high enough for the white bar labels.
+const FUNNEL_ALPHAS = [1, 0.9, 0.8, 0.72, 0.64, 0.56];
 
 /**
  * Dashboard funnel widget: ApexCharts horizontal-bar chart styled as a
@@ -70,6 +71,9 @@ const FUNNEL_COLORS = ['#18181b', '#27272a', '#3f3f46', '#52525b', '#71717a', '#
 export class FunnelChartComponent {
   private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
+  /** Live theme colours — bars were a fixed dark-zinc ramp that
+   *  vanished on the dark theme. */
+  private readonly theme = injectChartTheme();
 
   protected readonly loading = signal<boolean>(true);
   protected readonly error = signal<string | null>(null);
@@ -104,7 +108,10 @@ export class FunnelChartComponent {
     },
   }));
 
-  protected readonly colors = computed<string[]>(() => FUNNEL_COLORS);
+  protected readonly colors = computed<string[]>(() => {
+    const accent = this.theme().accent;
+    return FUNNEL_ALPHAS.map((a) => withAlpha(accent, a));
+  });
 
   protected readonly dataLabels = computed<ApexDataLabels>(() => ({
     enabled: true,
@@ -121,7 +128,7 @@ export class FunnelChartComponent {
     return {
       categories: d ? d.stages.map((s) => s.stage_name) : [],
       labels: {
-        style: { colors: '#71717a', fontSize: '11px' },
+        style: { colors: this.theme().text, fontSize: '11px' },
       },
       axisBorder: { show: false },
       axisTicks: { show: false },
@@ -133,7 +140,7 @@ export class FunnelChartComponent {
   protected readonly tooltip = computed<ApexTooltip>(() => {
     const total = this.data()?.total_leads_in_range ?? 0;
     return {
-      theme: 'light',
+      theme: this.theme().dark ? 'dark' : 'light',
       y: {
         formatter: (val: number) => {
           const pct = total > 0 ? (val / total) * 100 : 0;
@@ -144,7 +151,7 @@ export class FunnelChartComponent {
   });
 
   protected readonly grid = computed<ApexGrid>(() => ({
-    borderColor: '#f4f4f5',
+    borderColor: this.theme().grid,
     strokeDashArray: 4,
     padding: { left: 8, right: 8 },
   }));

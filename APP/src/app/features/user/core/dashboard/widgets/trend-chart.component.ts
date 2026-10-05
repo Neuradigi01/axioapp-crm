@@ -27,6 +27,7 @@ import {
 import { environment } from '../../../../../../environments/environment';
 import { extractApiError } from '@core/services/api-error.util';
 import { dashboardRange, type DashboardRange } from '../shared/dashboard-range.signal';
+import { injectChartTheme } from '../shared/chart-theme';
 
 type TrendMetric = 'leads_created' | 'pipeline_value' | 'calls' | 'appointments';
 
@@ -58,6 +59,9 @@ interface DashboardTrendResponse {
 export class TrendChartComponent {
   private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
+  /** Live theme colours — the chart was hard-coded for light mode
+   *  (near-black line, white grid), unreadable on the dark theme. */
+  private readonly theme = injectChartTheme();
 
   protected readonly METRICS: ReadonlyArray<{ key: TrendMetric; label: string }> = [
     { key: 'leads_created', label: 'Leads created' },
@@ -95,7 +99,7 @@ export class TrendChartComponent {
     },
   }));
 
-  protected readonly colors = computed<string[]>(() => ['#18181b']);
+  protected readonly colors = computed<string[]>(() => [this.theme().accent]);
 
   protected readonly dataLabels = computed<ApexDataLabels>(() => ({
     enabled: false,
@@ -104,7 +108,7 @@ export class TrendChartComponent {
   protected readonly xaxis = computed<ApexXAxis>(() => ({
     type: 'datetime',
     labels: {
-      style: { colors: '#71717a', fontSize: '11px' },
+      style: { colors: this.theme().text, fontSize: '11px' },
       datetimeUTC: false,
     },
     axisBorder: { show: false },
@@ -115,7 +119,7 @@ export class TrendChartComponent {
     const m = this.metric();
     return {
       labels: {
-        style: { colors: '#71717a', fontSize: '11px' },
+        style: { colors: this.theme().text, fontSize: '11px' },
         formatter: (v: number) => {
           if (m === 'pipeline_value') {
             try {
@@ -135,12 +139,12 @@ export class TrendChartComponent {
   });
 
   protected readonly tooltip = computed<ApexTooltip>(() => ({
-    theme: 'light',
+    theme: this.theme().dark ? 'dark' : 'light',
     x: { format: 'dd MMM yyyy' },
   }));
 
   protected readonly grid = computed<ApexGrid>(() => ({
-    borderColor: '#f4f4f5',
+    borderColor: this.theme().grid,
     strokeDashArray: 4,
     padding: { left: 8, right: 8 },
   }));

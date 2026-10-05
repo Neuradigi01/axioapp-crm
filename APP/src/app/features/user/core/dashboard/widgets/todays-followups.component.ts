@@ -18,6 +18,8 @@ import { Subject, interval } from 'rxjs';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { format } from 'date-fns';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
 import { RescheduleInlineComponent } from './reschedule-inline.component';
@@ -90,6 +92,7 @@ const PRIORITY_LABELS: Record<FollowupPriority, { label: string; dot: string; te
 export class TodaysFollowupsComponent {
   private readonly api = inject(TodaysFollowupsApiService);
   private readonly router = inject(Router);
+  private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly buckets = BUCKET_CHIPS;
@@ -317,9 +320,20 @@ export class TodaysFollowupsComponent {
       .reschedule(row.id, isoValue)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => this.fetch({ silent: true }),
+        next: () => {
+          this.fetch({ silent: true });
+          const when = new Date(isoValue);
+          this.toast.success('Follow-up rescheduled', {
+            subtitle: Number.isNaN(when.getTime())
+              ? null
+              : `Now due ${format(when, 'd MMM, h:mm a')}.`,
+          });
+        },
+        // Toast, not `error` — that replaces the whole list.
         error: (err: HttpErrorResponse) => {
-          this.error.set(extractApiError(err) ?? 'Could not reschedule.');
+          this.toast.error('Could not reschedule', {
+            subtitle: extractApiError(err) ?? 'Please try again.',
+          });
         },
       });
   }
@@ -346,10 +360,15 @@ export class TodaysFollowupsComponent {
       .markDone(row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => this.fetch({ silent: true }),
+        next: () => {
+          this.fetch({ silent: true });
+          this.toast.success('Marked as done', { subtitle: row.title });
+        },
         error: (err: HttpErrorResponse) => {
           this.setOptimisticDone(row.id, false);
-          this.error.set(extractApiError(err) ?? 'Could not mark done.');
+          this.toast.error('Could not mark as done', {
+            subtitle: extractApiError(err) ?? 'The row was restored. Please try again.',
+          });
         },
       });
   }
@@ -381,10 +400,15 @@ export class TodaysFollowupsComponent {
       .markMissed(row.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => this.fetch({ silent: true }),
+        next: () => {
+          this.fetch({ silent: true });
+          this.toast.success('Marked as missed', { subtitle: row.title });
+        },
         error: (err: HttpErrorResponse) => {
           this.setOptimisticMissed(row.id, false);
-          this.error.set(extractApiError(err) ?? 'Could not mark missed.');
+          this.toast.error('Could not mark as missed', {
+            subtitle: extractApiError(err) ?? 'The row was restored. Please try again.',
+          });
         },
       });
   }
