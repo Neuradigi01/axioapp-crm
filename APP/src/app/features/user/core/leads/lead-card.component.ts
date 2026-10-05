@@ -178,11 +178,11 @@ export class LeadCardComponent {
   private classForStatus(status: LeadStatus): string {
     switch (status) {
       case 'won':
-        return 'bg-emerald-100 text-emerald-700 ring-emerald-200';
+        return 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30';
       case 'lost':
-        return 'bg-red-100 text-red-700 ring-red-200';
+        return 'bg-red-500/10 text-red-400 ring-red-500/30';
       default:
-        return 'bg-surface-2 text-default border-subtle';
+        return 'bg-blue-500/10 text-blue-400 ring-blue-500/30';
     }
   }
 
@@ -201,7 +201,7 @@ export class LeadCardComponent {
       case 'walk_in':
         return 'bg-teal-500/10 text-teal-400 ring-teal-500/30';
       default:
-        return 'bg-surface-2 text-default border-subtle';
+        return 'bg-blue-500/10 text-blue-400 ring-blue-500/30';
     }
   }
 

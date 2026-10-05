@@ -39,13 +39,14 @@
         </div>
       }
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
       <div
         class="inline-flex h-[34px] items-center rounded-[10px] border border-subtle bg-surface p-1"
       >
         <button
           type="button"
           (click)="setView('pipeline')"
+          [attr.aria-pressed]="view() === 'pipeline'"
           class="h-[26px] rounded-[7px] px-2.5 font-mono text-[12px] font-semibold transition"
           [class.bg-accent-soft]="view() === 'pipeline'"
           [class.text-accent]="view() === 'pipeline'"
@@ -56,6 +57,7 @@
         <button
           type="button"
           (click)="setView('list')"
+          [attr.aria-pressed]="view() === 'list'"
           class="h-[26px] rounded-[7px] px-2.5 font-mono text-[12px] font-semibold transition"
           [class.bg-accent-soft]="view() === 'list'"
           [class.text-accent]="view() === 'list'"
@@ -96,7 +98,7 @@
       <!-- Left: scope toggle (junior reps hidden) + no-activity dropdown -->
       <div class="flex flex-wrap items-center gap-2 text-xs">
         @if (canChangeScope()) {
-          <div class="inline-flex overflow-hidden rounded-full ring-1 border-subtle bg-surface">
+          <div class="inline-flex overflow-hidden rounded-full ring-1 ring-subtle bg-surface">
             @for (
               sc of [
                 { v: 'mine', label: 'Mine' },
@@ -108,6 +110,7 @@
               <button
                 type="button"
                 (click)="setScope(sc.v)"
+                [attr.aria-pressed]="scope() === sc.v"
                 class="px-2.5 py-1 transition"
                 [class.bg-accent]="scope() === sc.v"
                 [class.text-white]="scope() === sc.v"
@@ -129,6 +132,26 @@
       </div>
       <!-- Right: saved views + advanced filter + columns + export -->
       <div class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          (click)="toggleFilters()"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-default hover:bg-surface-2 md:hidden"
+          aria-controls="leads-filter-rows"
+          [attr.aria-expanded]="filtersOpen()"
+        >
+          <lucide-icon name="filter" class="h-4 w-4" />
+          Filters
+          @if (activeFilterChips().length > 0) {
+            <span
+              class="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-medium text-white"
+              >{{ activeFilterChips().length }}</span
+            >
+          }
+          <lucide-icon
+            [name]="filtersOpen() ? 'chevron-up' : 'chevron-down'"
+            class="h-3 w-3 text-faint"
+          />
+        </button>
         <div class="relative">
           <button
             type="button"
@@ -155,7 +178,7 @@
             ></button>
             <div
               role="menu"
-              class="absolute right-0 z-40 mt-1 w-72 rounded-lg border border-subtle bg-surface shadow-lg ring-1 ring-black ring-opacity-5"
+              class="absolute right-0 z-40 mt-1 w-72 rounded-lg border border-subtle bg-surface shadow-lg ring-1 ring-black/5"
             >
               @if (savedViews().length === 0) {
                 <p class="px-3 py-4 text-center text-xs text-muted">No saved views yet.</p>
@@ -281,7 +304,8 @@
       </div>
     </div>
 
-    <!-- Row 1: Date · Between · Order By/As · Data Search
+    <div id="leads-filter-rows" class="md:!block" [class.hidden]="!filtersOpen()">
+      <!-- Row 1: Date · Between · Order By/As · Data Search
          (+ Source Wise + Status ON PIPELINE VIEW ONLY).
 
          List view hides these two dropdowns because they moved to
@@ -291,145 +315,154 @@
 
          Grid grows to 6 columns on pipeline view so all 6 fields fit
          in one row on wide screens; list view stays at 4. -->
-    <div
-      class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3"
-      [class.lg:grid-cols-4]="view() === 'list'"
-      [class.lg:grid-cols-6]="view() === 'pipeline'"
-    >
-      <label class="block">
-        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Date (from)</span>
-        <div class="mt-1">
-          <crm-mobile-datetime
-            mode="date"
-            [formControl]="createdFromControl"
-            [max]="dateFromMax()"
-            placeholder="Pick a date"
+      <div
+        class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3"
+        [class.lg:grid-cols-4]="view() === 'list'"
+        [class.lg:grid-cols-6]="view() === 'pipeline'"
+      >
+        <label class="block">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-muted"
+            >Date (from)</span
+          >
+          <div class="mt-1">
+            <crm-mobile-datetime
+              mode="date"
+              [formControl]="createdFromControl"
+              [max]="dateFromMax()"
+              placeholder="Pick a date"
+            />
+          </div>
+        </label>
+        <label class="block">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-muted"
+            >Between (to)</span
+          >
+          <div class="mt-1">
+            <crm-mobile-datetime
+              mode="date"
+              [formControl]="createdToControl"
+              [min]="dateToMin()"
+              [max]="todayIso"
+              placeholder="Pick a date"
+            />
+          </div>
+        </label>
+        <div class="block">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-muted"
+            >Order By/As</span
+          >
+          <crm-mobile-select
+            class="mt-1 block"
+            [options]="sortFieldOptions"
+            [value]="sortKey()"
+            (valueChange)="setSortField($event)"
           />
         </div>
-      </label>
-      <label class="block">
-        <span class="text-[11px] font-medium uppercase tracking-wider text-muted"
-          >Between (to)</span
-        >
-        <div class="mt-1">
-          <crm-mobile-datetime
-            mode="date"
-            [formControl]="createdToControl"
-            [min]="dateToMin()"
-            [max]="todayIso"
-            placeholder="Pick a date"
-          />
-        </div>
-      </label>
-      <div class="block">
-        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Order By/As</span>
-        <crm-mobile-select
-          class="mt-1 block"
-          [options]="sortFieldOptions"
-          [value]="sortKey()"
-          (valueChange)="setSortField($event)"
-        />
+        <label class="block">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-muted"
+            >Data Search</span
+          >
+          <div class="relative mt-1">
+            <lucide-icon
+              name="search"
+              class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
+            />
+            <input
+              id="leads_q"
+              type="search"
+              [formControl]="searchControl"
+              (keyup.enter)="onToolbarSearch()"
+              placeholder="Name, phone, email…"
+              class="block w-full rounded-lg border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
+        </label>
+        @if (view() === 'pipeline') {
+          <div class="block">
+            <span class="text-[11px] font-medium uppercase tracking-wider text-muted">
+              Source Wise
+            </span>
+            <crm-mobile-select
+              class="mt-1 block"
+              [options]="sourceSelectOptions()"
+              [value]="sourceControl.value"
+              (valueChange)="sourceControl.setValue($event)"
+            />
+          </div>
+          <div class="block">
+            <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Status</span>
+            <crm-mobile-select
+              class="mt-1 block"
+              [options]="stageSelectOptions()"
+              [value]="stageControlValue()"
+              (valueChange)="onToolbarStageChange($event)"
+            />
+          </div>
+        }
       </div>
-      <label class="block">
-        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Data Search</span>
-        <div class="relative mt-1">
-          <lucide-icon
-            name="search"
-            class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
-          />
-          <input
-            id="leads_q"
-            type="search"
-            [formControl]="searchControl"
-            (keyup.enter)="onToolbarSearch()"
-            placeholder="Name, phone, email…"
-            class="block w-full rounded-lg border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-          />
-        </div>
-      </label>
-      @if (view() === 'pipeline') {
-        <div class="block">
-          <span class="text-[11px] font-medium uppercase tracking-wider text-muted">
-            Source Wise
-          </span>
-          <crm-mobile-select
-            class="mt-1 block"
-            [options]="sourceSelectOptions()"
-            [value]="sourceControl.value"
-            (valueChange)="sourceControl.setValue($event)"
-          />
-        </div>
-        <div class="block">
-          <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Status</span>
-          <crm-mobile-select
-            class="mt-1 block"
-            [options]="stageSelectOptions()"
-            [value]="stageControlValue()"
-            (valueChange)="onToolbarStageChange($event)"
-          />
-        </div>
-      }
-    </div>
 
-    <!-- Cross-field validation for the Date (from) / Between (to) pair.
+      <!-- Cross-field validation for the Date (from) / Between (to) pair.
          Shown when FROM > TO or either date is in the future; the auto-
          refetch is gated on the same computed so no request goes out
          while the range is invalid. -->
-    @if (dateRangeError(); as err) {
-      <p
-        class="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
-      >
-        {{ err }}
-      </p>
-    }
+      @if (dateRangeError(); as err) {
+        <p
+          class="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
+        >
+          {{ err }}
+        </p>
+      }
 
-    <!-- Row 2: Remarks · User · Order Type · Reset · Search -->
-    <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-      <label class="block">
-        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Remarks</span>
-        <input
-          type="text"
-          [formControl]="remarksControl"
-          (keyup.enter)="onToolbarSearch()"
-          placeholder="Note contains…"
-          maxlength="64"
-          class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-      </label>
-      @if (canFilterByOwner() && view() === 'pipeline') {
-        <!-- User (owner) filter — pipeline view only. On list view it
+      <!-- Row 2: Remarks · User · Order Type · Reset · Search -->
+      <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <label class="block">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Remarks</span>
+          <input
+            type="text"
+            [formControl]="remarksControl"
+            (keyup.enter)="onToolbarSearch()"
+            placeholder="Note contains…"
+            maxlength="64"
+            class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </label>
+        @if (canFilterByOwner() && view() === 'pipeline') {
+          <!-- User (owner) filter — pipeline view only. On list view it
              lives as an `app-column-filter` popover on the Owner
              column header, matching Source + Status. -->
+          <div class="block">
+            <span class="text-[11px] font-medium uppercase tracking-wider text-muted">User</span>
+            <crm-mobile-select
+              class="mt-1 block"
+              [options]="assigneeSelectOptions()"
+              [value]="assigneeControl.value"
+              (valueChange)="assigneeControl.setValue($event)"
+            />
+          </div>
+        }
         <div class="block">
-          <span class="text-[11px] font-medium uppercase tracking-wider text-muted">User</span>
+          <span class="text-[11px] font-medium uppercase tracking-wider text-muted"
+            >Order Type</span
+          >
           <crm-mobile-select
             class="mt-1 block"
-            [options]="assigneeSelectOptions()"
-            [value]="assigneeControl.value"
-            (valueChange)="assigneeControl.setValue($event)"
+            [options]="orderOptions"
+            [value]="sortOrder()"
+            (valueChange)="setSortOrder($event)"
           />
         </div>
-      }
-      <div class="block">
-        <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Order Type</span>
-        <crm-mobile-select
-          class="mt-1 block"
-          [options]="orderOptions"
-          [value]="sortOrder()"
-          (valueChange)="setSortOrder($event)"
-        />
-      </div>
-      <div
-        class="flex flex-col gap-2 sm:col-span-2 sm:flex-row sm:items-end sm:justify-end md:col-span-3 lg:col-span-3"
-      >
-        <button
-          type="button"
-          (click)="onToolbarReset()"
-          class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2 sm:w-auto"
+        <div
+          class="flex flex-col gap-2 sm:col-span-2 sm:flex-row sm:items-end sm:justify-end md:col-span-3 lg:col-span-3"
         >
-          <lucide-icon name="rotate-ccw" class="h-3.5 w-3.5" />
-          Reset Filters
-        </button>
+          <button
+            type="button"
+            (click)="onToolbarReset()"
+            class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2 sm:w-auto"
+          >
+            <lucide-icon name="rotate-ccw" class="h-3.5 w-3.5" />
+            Reset Filters
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -513,7 +546,7 @@
           (click)="dismissMergedNotice()"
           class="rounded-md px-2 py-1 text-xs text-emerald-700/60 hover:text-emerald-900 dark:text-emerald-300/70 dark:hover:text-emerald-100"
         >
-          ×
+          <lucide-icon name="x" class="h-4 w-4" />
         </button>
       </div>
     </div>
@@ -530,7 +563,7 @@
   }
 
   @if (state.loadError(); as err) {
-    <p class="rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 border-red-500/20">
+    <p class="rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 ring-red-500/20">
       {{ err }}
     </p>
   } @else if (state.loading() && state.items().length === 0) {
@@ -592,7 +625,7 @@
          pagination, sortable headers. Cells are looked up by column
          key so the customization menu's reorder/visibility flips
          everything live without re-rendering the page. -->
-    <div class="overflow-hidden rounded-lg ring-1 border-subtle bg-surface">
+    <div class="overflow-hidden rounded-lg ring-1 ring-subtle bg-surface">
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-subtle">
           <thead class="bg-surface-2">
@@ -612,6 +645,13 @@
                 <th
                   scope="col"
                   class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted whitespace-nowrap"
+                  [attr.aria-sort]="
+                    sortKey() === col.key
+                      ? sortOrder() === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : null
+                  "
                 >
                   @switch (col.key) {
                     @case ('contact_name') {
@@ -870,7 +910,7 @@
               }
             </select>
           </label>
-          <div class="inline-flex overflow-hidden rounded-md ring-1 border-subtle bg-surface">
+          <div class="inline-flex overflow-hidden rounded-md ring-1 ring-subtle bg-surface">
             <button
               type="button"
               (click)="onPrevPage()"
@@ -1042,7 +1082,7 @@
     aria-modal="true"
     aria-labelledby="save-view-title"
   >
-    <div class="w-full max-w-sm rounded-lg bg-surface p-5 shadow-xl ring-1 border-subtle">
+    <div class="w-full max-w-sm rounded-lg bg-surface p-5 shadow-xl ring-1 ring-subtle">
       <h2 id="save-view-title" class="text-base font-semibold text-default">Save view</h2>
       <p class="mt-1 text-[14px] text-muted">
         Captures the current filter, sort, scope, columns, and view mode.
@@ -1053,7 +1093,9 @@
           <input
             type="text"
             maxlength="80"
+            #saveViewNameInput
             [value]="saveViewName()"
+            (keydown.enter)="submitSaveView()"
             (input)="onSaveViewNameInput($any($event.target).value)"
             placeholder="e.g. Hot qualified"
             class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-default placeholder-zinc-400 shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
@@ -1071,7 +1113,7 @@
       </div>
       @if (saveViewError(); as err) {
         <p
-          class="mt-3 rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 border-red-500/20"
+          class="mt-3 rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 ring-red-500/20"
         >
           {{ err }}
         </p>

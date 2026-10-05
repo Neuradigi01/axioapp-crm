@@ -2,11 +2,16 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
+  HostListener,
   Injectable,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
@@ -397,6 +402,28 @@ export class LeadsPageComponent {
 
   /** Popover open/closed. */
   readonly viewsMenuOpen = signal(false);
+
+  /** Phones: the two filter rows fold behind a "Filters" toggle so the
+   *  results aren't pushed below the fold. Always shown from `md` up. */
+  readonly filtersOpen = signal(false);
+
+  protected toggleFilters(): void {
+    this.filtersOpen.update((v) => !v);
+  }
+
+  private readonly injector = inject(Injector);
+  private readonly saveViewNameInput = viewChild<ElementRef<HTMLInputElement>>('saveViewNameInput');
+
+  /** Esc closes the Save-view modal (unless it's mid-save), then the
+   *  Saved-views menu. Other modals on this page handle their own Esc. */
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this.saveViewModalOpen()) {
+      if (!this.saveViewSubmitting()) this.closeSaveViewModal();
+      return;
+    }
+    if (this.viewsMenuOpen()) this.closeViewsMenu();
+  }
 
   /** Mini "Save view" modal state. `null` = closed. */
   readonly saveViewModalOpen = signal(false);
@@ -1401,6 +1428,9 @@ export class LeadsPageComponent {
     this.saveViewShared.set(this.currentView()?.shared ?? false);
     this.saveViewError.set(null);
     this.saveViewModalOpen.set(true);
+    afterNextRender(() => this.saveViewNameInput()?.nativeElement.focus(), {
+      injector: this.injector,
+    });
     this.viewsMenuOpen.set(false);
   }
 
@@ -1419,6 +1449,8 @@ export class LeadsPageComponent {
   }
 
   protected submitSaveView(): void {
+    // Enter in the name field can fire while a save is in flight.
+    if (this.saveViewSubmitting()) return;
     const name = this.saveViewName().trim();
     if (!name) {
       this.saveViewError.set('Please enter a name for this view.');
