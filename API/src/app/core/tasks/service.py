@@ -28,7 +28,7 @@ from src.app.core import activities
 from src.app.core.activities.models import ActivityType
 from src.app.core.tasks import data_access as _da
 from src.app.core.tasks.models import Task, TaskPriority, TaskStatus
-from src.app.core.tasks.schemas import TaskCreate, TaskUpdate
+from src.app.core.tasks.schemas import TaskCreate, TaskOut, TaskUpdate
 from src.app.shared.audit import log_entity_change, snapshot
 from src.app.shared.custom_fields import validate_custom_data
 from src.app.shared.db.queries import ensure_found
@@ -135,9 +135,7 @@ def _task_snapshot_for_event(t: Task) -> dict[str, Any]:
         "status": t.status.value if hasattr(t.status, "value") else str(t.status),
         "assigned_to_id": str(t.assigned_to_id) if t.assigned_to_id else None,
         "related_entity_type": t.related_entity_type,
-        "related_entity_id": (
-            str(t.related_entity_id) if t.related_entity_id else None
-        ),
+        "related_entity_id": (str(t.related_entity_id) if t.related_entity_id else None),
         "followup_type": (
             t.followup_type.value
             if t.followup_type is not None and hasattr(t.followup_type, "value")
@@ -282,9 +280,7 @@ async def _notify_task_event(
         "priority": task.priority.value,
         "assigned_to_id": str(task.assigned_to_id),
         "related_entity_type": task.related_entity_type,
-        "related_entity_id": (
-            str(task.related_entity_id) if task.related_entity_id else None
-        ),
+        "related_entity_id": (str(task.related_entity_id) if task.related_entity_id else None),
     }
 
     from src.app.core.notifications import service as notifications
@@ -325,9 +321,7 @@ async def _notify_creator_of_delegation(
         "priority": task.priority.value,
         "assigned_to_id": str(task.assigned_to_id),
         "related_entity_type": task.related_entity_type,
-        "related_entity_id": (
-            str(task.related_entity_id) if task.related_entity_id else None
-        ),
+        "related_entity_id": (str(task.related_entity_id) if task.related_entity_id else None),
     }
     from src.app.core.notifications import service as notifications
 
@@ -373,14 +367,10 @@ async def notify_task_created(
         and actor_user_id is not None
         and actor_user_id != task.assigned_to_id
     ):
-        await _notify_creator_of_delegation(
-            org_id=org_id, task=task, actor_user_id=actor_user_id
-        )
+        await _notify_creator_of_delegation(org_id=org_id, task=task, actor_user_id=actor_user_id)
 
 
-async def _publish_task_assigned(
-    session: AsyncSession, *, org_id: uuid.UUID, task: Task
-) -> None:
+async def _publish_task_assigned(session: AsyncSession, *, org_id: uuid.UUID, task: Task) -> None:
     """Publish `task.assigned` to the events bus. Fires on both the
     initial assignment (task creation with a non-creator assignee) and
     every subsequent reassignment. The `event_id` includes the current
@@ -409,9 +399,7 @@ async def _publish_task_assigned(
         )
 
 
-async def _publish_task_completed(
-    session: AsyncSession, *, org_id: uuid.UUID, task: Task
-) -> None:
+async def _publish_task_completed(session: AsyncSession, *, org_id: uuid.UUID, task: Task) -> None:
     """Publish `task.completed` when a task's status transitions to
     ``done``. Idempotent per task — a duplicate publish is caught by
     the events bus dedupe on `event_id`."""
@@ -499,9 +487,7 @@ async def create_task(
     # self-assigned tasks stop at the single assignee bell — no double
     # noise for the rep making their own to-do. Detailed rules live in
     # `notify_task_created`.
-    await notify_task_created(
-        session, org_id=org_id, task=task, actor_user_id=current_user_id
-    )
+    await notify_task_created(session, org_id=org_id, task=task, actor_user_id=current_user_id)
     return task
 
 
@@ -572,20 +558,14 @@ async def update_task(
     # separate trigger event.
     if task.assigned_to_id != prior_assignee and task.assigned_to_id is not None:
         await _publish_task_assigned(session, org_id=task.org_id, task=task)
-        await _notify_task_event(
-            org_id=task.org_id, task=task, event_type="task.assigned"
-        )
+        await _notify_task_event(org_id=task.org_id, task=task, event_type="task.assigned")
     if task.status == TaskStatus.done and prior_status != TaskStatus.done:
         await _publish_task_completed(session, org_id=task.org_id, task=task)
-        await _notify_task_event(
-            org_id=task.org_id, task=task, event_type="task.completed"
-        )
+        await _notify_task_event(org_id=task.org_id, task=task, event_type="task.completed")
     return task
 
 
-async def mark_task_missed(
-    session: AsyncSession, *, task_id: uuid.UUID
-) -> Task:
+async def mark_task_missed(session: AsyncSession, *, task_id: uuid.UUID) -> Task:
     """Flip a task from ``open`` → ``missed``.
 
     Terminal-status transitions are refused with 409 so a stale click
@@ -602,9 +582,7 @@ async def mark_task_missed(
     if task.status != TaskStatus.open:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"Task is {task.status.value}; only open tasks can be marked missed."
-            ),
+            detail=(f"Task is {task.status.value}; only open tasks can be marked missed."),
         )
 
     before = _snapshot(task)
@@ -713,6 +691,62 @@ async def list_all_in_org(
         sort_dir=sort_dir,
     )
     return await _da.paginate_tasks_select(session, base, page=page, size=size)
+
+
+async def to_task_out_list(
+    session: AsyncSession, *, org_id: uuid.UUID, rows: list[Task]
+) -> list[TaskOut]:
+    """Serialise list rows with ``related_label`` — the linked contact's
+    name, or for a lead its contact's name. Two batched reads (leads,
+    then contacts) for the whole page; plain lookups, so the other
+    modules' DALs are used directly."""
+    from src.app.core.contacts import data_access as contacts_da
+    from src.app.core.leads import data_access as leads_da
+
+    lead_ids = [t.related_entity_id for t in rows if t.related_entity_type == "lead"]
+    leads = await leads_da.list_leads_by_ids_in_org(
+        session, ids=[i for i in set(lead_ids) if i], org_id=org_id
+    )
+    lead_contact = {lead.id: lead.contact_id for lead in leads}
+    contact_ids = {
+        t.related_entity_id
+        for t in rows
+        if t.related_entity_type == "contact" and t.related_entity_id
+    } | set(lead_contact.values())
+    contacts = await contacts_da.list_contacts_by_ids_in_org(
+        session, ids=list(contact_ids), org_id=org_id
+    )
+    names = {c.id: c.full_name for c in contacts}
+
+    out: list[TaskOut] = []
+    for t in rows:
+        label = None
+        if t.related_entity_type == "contact":
+            label = names.get(t.related_entity_id)
+        elif t.related_entity_type == "lead":
+            label = names.get(lead_contact.get(t.related_entity_id))
+        out.append(TaskOut.model_validate(t).model_copy(update={"related_label": label}))
+    return out
+
+
+async def count_task_buckets(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID | None = None,
+    org_id: uuid.UUID | None = None,
+    assigned_to_id: uuid.UUID | None = None,
+) -> dict[str, int]:
+    """Headline counts for the Tasks page. ``user_id`` scopes to the
+    caller's own tasks (`/tasks/me/counts`); ``org_id`` (+ optional
+    ``assigned_to_id``) scopes org-wide (`/tasks/all/counts`)."""
+    scope: list[Any] = []
+    if user_id is not None:
+        scope.append(Task.assigned_to_id == user_id)
+    if org_id is not None:
+        scope.append(Task.org_id == org_id)
+    if assigned_to_id is not None:
+        scope.append(Task.assigned_to_id == assigned_to_id)
+    return await _da.count_tasks_by_bucket(session, scope=scope)
 
 
 # --- Bulk actions ----------------------------------------------------------

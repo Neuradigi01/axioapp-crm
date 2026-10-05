@@ -7,16 +7,16 @@
       </h1>
       <p class="mt-1 flex items-center gap-3 text-xs text-muted">
         <span class="inline-flex items-center gap-1.5">
-          <span class="h-2 w-2 rounded-full bg-surface-2"></span>
-          {{ headlineCounts().open }} open
+          <span class="h-2 w-2 rounded-full bg-zinc-400"></span>
+          {{ counts()?.open ?? '–' }} open
         </span>
         <span class="inline-flex items-center gap-1.5">
           <span class="h-2 w-2 rounded-full bg-red-500"></span>
-          {{ headlineCounts().overdue }} overdue
+          {{ counts()?.overdue ?? '–' }} overdue
         </span>
         <span class="inline-flex items-center gap-1.5">
           <span class="h-2 w-2 rounded-full bg-amber-500"></span>
-          {{ headlineCounts().dueToday }} due today
+          {{ counts()?.due_today ?? '–' }} due today
         </span>
       </p>
     </div>
@@ -136,9 +136,13 @@
 
   @if (state.loadError(); as err) {
     <div
-      class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+      class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2"
     >
-      {{ err }}
+      <p class="text-sm text-red-600 dark:text-red-400">{{ err }}</p>
+      <button type="button" class="btn btn-secondary btn-sm" (click)="retry()">
+        <lucide-icon name="refresh-cw" class="h-3.5 w-3.5" />
+        Retry
+      </button>
     </div>
   }
 
@@ -216,21 +220,21 @@
               class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1"
               [class]="priorityClass(t.priority)"
             >
-              {{ t.priority }}
+              {{ priorityLabels[t.priority] }}
             </span>
             @if (t.followup_type) {
               <span
-                class="inline-flex items-center rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 ring-1 ring-sky-200"
-                [title]="'Follow-up type: ' + t.followup_type"
+                class="inline-flex items-center rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-300"
+                [title]="'Follow-up: ' + followupLabels[t.followup_type]"
               >
-                {{ t.followup_type }}
+                {{ followupLabels[t.followup_type] }}
               </span>
             }
             @if (t.status === 'missed') {
               <span
-                class="inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-400 ring-1 border-red-500/20"
+                class="inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-red-500/20 dark:text-red-300"
               >
-                missed
+                Missed
               </span>
             }
             <span
@@ -253,7 +257,12 @@
             <dt class="text-faint">Assignee</dt>
             <dd class="truncate text-default">{{ assigneeName(t) }}</dd>
             <dt class="text-faint">Related</dt>
-            <dd class="truncate text-muted">{{ t.related_entity_type || '—' }}</dd>
+            <dd class="truncate text-muted">
+              <ng-container
+                [ngTemplateOutlet]="relatedCell"
+                [ngTemplateOutletContext]="{ $implicit: t }"
+              />
+            </dd>
             <dt class="text-faint">Activity</dt>
             <dd class="font-mono text-muted tabular-nums">
               {{ t.last_activity_at | relativeTime }}
@@ -309,12 +318,6 @@
           </div>
         </li>
       }
-      <div class="border-t border-subtle bg-surface-2 px-3 py-2 text-[11px] text-muted">
-        Showing {{ state.items().length }} of {{ state.total() }}
-        @if (state.loading()) {
-          <span class="ml-2">refreshing…</span>
-        }
-      </div>
     </ul>
 
     <div
@@ -421,19 +424,19 @@
                        via `t.followup_type` (nullable). -->
                   @if (t.followup_type) {
                     <span
-                      class="inline-flex items-center rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 ring-1 ring-sky-200"
-                      [title]="'Follow-up type: ' + t.followup_type"
+                      class="inline-flex items-center rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-300"
+                      [title]="'Follow-up: ' + followupLabels[t.followup_type]"
                     >
-                      {{ t.followup_type }}
+                      {{ followupLabels[t.followup_type] }}
                     </span>
                   }
                   <!-- T1 — Missed badge, only visible once terminal. -->
                   @if (t.status === 'missed') {
                     <span
-                      class="inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-400 ring-1 border-red-500/20"
+                      class="inline-flex items-center rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-red-500/20 dark:text-red-300"
                       title="Task was marked missed"
                     >
-                      missed
+                      Missed
                     </span>
                   }
                 </div>
@@ -446,7 +449,7 @@
                   class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1"
                   [class]="priorityClass(t.priority)"
                 >
-                  {{ t.priority }}
+                  {{ priorityLabels[t.priority] }}
                 </span>
               </td>
               <td class="px-3 py-2 text-xs">
@@ -460,8 +463,11 @@
               <td class="px-3 py-2 text-xs text-muted">
                 {{ assigneeName(t) }}
               </td>
-              <td class="px-3 py-2 text-xs text-muted">
-                {{ t.related_entity_type || '—' }}
+              <td class="max-w-[14rem] truncate px-3 py-2 text-xs text-muted">
+                <ng-container
+                  [ngTemplateOutlet]="relatedCell"
+                  [ngTemplateOutletContext]="{ $implicit: t }"
+                />
               </td>
               <!-- T1/T2/T9 — row actions. Missed only visible for
                    open tasks (state machine terminal); snooze only
@@ -522,15 +528,60 @@
           }
         </tbody>
       </table>
-      <div class="border-t border-subtle bg-surface-2 px-3 py-2 text-[11px] text-muted">
-        Showing {{ state.items().length }} of {{ state.total() }}
-        @if (state.loading()) {
-          <span class="ml-2">refreshing…</span>
-        }
-      </div>
     </div>
+    <ng-container [ngTemplateOutlet]="listFooter" />
   }
 </div>
+
+<ng-template #listFooter>
+  <div
+    class="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-subtle bg-surface-2 px-3 py-2 text-[11px] text-muted"
+  >
+    <span>
+      Showing {{ state.items().length }} of {{ state.total() }}
+      @if (state.loading()) {
+        <span class="ml-2">refreshing…</span>
+      }
+    </span>
+    @if (hasMore()) {
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        [disabled]="loadingMore()"
+        (click)="loadMore()"
+      >
+        @if (loadingMore()) {
+          <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />
+          Loading…
+        } @else {
+          Load more
+        }
+      </button>
+    }
+  </div>
+</ng-template>
+
+<!-- Related record: linked name, "Deleted lead/contact" when it's gone. -->
+<ng-template #relatedCell let-t>
+  @if (!t.related_entity_type) {
+    <span class="text-faint">—</span>
+  } @else if (t.related_label && relatedLink(t); as link) {
+    <a
+      [routerLink]="link"
+      class="inline-flex max-w-full items-center gap-1 text-default hover:text-accent hover:underline"
+      [title]="'Open ' + t.related_entity_type"
+    >
+      <lucide-icon
+        [name]="t.related_entity_type === 'lead' ? 'target' : 'user'"
+        class="h-3 w-3 shrink-0 text-faint"
+        aria-hidden="true"
+      />
+      <span class="truncate">{{ t.related_label }}</span>
+    </a>
+  } @else {
+    <span class="text-faint italic">Deleted {{ t.related_entity_type }}</span>
+  }
+</ng-template>
 
 @if (modalOpen()) {
   <app-task-form-modal
@@ -577,6 +628,7 @@
     [body]="'Already-done tasks are skipped.'"
     [confirmLabel]="'Mark done'"
     [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
     (confirm)="onBulkMarkDone()"
     (cancel)="closeBulkModal()"
   />
@@ -592,6 +644,7 @@
     [confirmLabel]="'Delete'"
     [danger]="true"
     [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
     (confirm)="onBulkDelete()"
     (cancel)="closeBulkModal()"
   />

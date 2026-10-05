@@ -21,7 +21,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import delete, nulls_last, select
+from sqlalchemy import delete, func, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
@@ -65,6 +65,25 @@ async def list_tasks_for_entity_query(
         select(Task).where(*filters).order_by(nulls_last(Task.due_at.asc()), Task.created_at.desc())
     )
     return await paginate(session, base, page=page, size=size)
+
+
+async def count_tasks_by_bucket(session: AsyncSession, *, scope: list[Any]) -> dict[str, int]:
+    """Open / overdue / due-today / done / missed counts in one pass.
+    ``scope`` is the WHERE list the service composed (owner or org).
+    "Today" uses the database's current date, matching the list's
+    ``due_filter=today``."""
+    is_open = Task.status == TaskStatus.open
+    stmt = select(
+        func.count().filter(is_open).label("open"),
+        func.count().filter(is_open, Task.due_at < func.now()).label("overdue"),
+        func.count()
+        .filter(is_open, func.date(Task.due_at) == func.current_date())
+        .label("due_today"),
+        func.count().filter(Task.status == TaskStatus.done).label("done"),
+        func.count().filter(Task.status == TaskStatus.missed).label("missed"),
+    ).where(*scope)
+    row = (await session.execute(stmt)).one()
+    return dict(row._mapping)
 
 
 async def paginate_tasks_select(
@@ -123,9 +142,7 @@ async def list_tasks_by_ids_in_org(
     the service now uses."""
     if not ids:
         return []
-    result = await session.execute(
-        select(Task).where(Task.org_id == org_id, Task.id.in_(ids))
-    )
+    result = await session.execute(select(Task).where(Task.org_id == org_id, Task.id.in_(ids)))
     return list(result.scalars().all())
 
 

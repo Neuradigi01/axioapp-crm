@@ -31,6 +31,7 @@ from src.app.core.tasks.schemas import (
     TaskBulkMarkDoneResult,
     TaskBulkReassign,
     TaskBulkReassignResult,
+    TaskCountsOut,
     TaskCreate,
     TaskListResponse,
     TaskOut,
@@ -43,6 +44,7 @@ from src.app.core.tasks.service import (
     bulk_delete_tasks,
     bulk_mark_done_tasks,
     bulk_reassign_tasks,
+    count_task_buckets,
     create_task,
     delete_task,
     get_task,
@@ -50,12 +52,32 @@ from src.app.core.tasks.service import (
     list_my_tasks,
     list_tasks_for_entity,
     mark_task_missed,
+    to_task_out_list,
     update_task,
 )
 from src.app.core.users.models import User
 from src.app.shared.db import get_db
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
+
+
+@router.get("/me/counts", response_model=TaskCountsOut)
+async def my_task_counts(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("tasks.read")),
+) -> TaskCountsOut:
+    return TaskCountsOut(**await count_task_buckets(db, user_id=user.legacy_uuid))
+
+
+@router.get("/all/counts", response_model=TaskCountsOut)
+async def all_task_counts(
+    assigned_to_id: uuid.UUID | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_permissions("users.read")),
+) -> TaskCountsOut:
+    return TaskCountsOut(
+        **await count_task_buckets(db, org_id=user.org_id, assigned_to_id=assigned_to_id)
+    )
 
 
 @router.get("/me", response_model=TaskListResponse)
@@ -84,7 +106,7 @@ async def my_tasks(
         size=size,
     )
     return TaskListResponse(
-        items=[TaskOut.model_validate(r) for r in rows],
+        items=await to_task_out_list(db, org_id=user.org_id, rows=rows),
         total=total,
         page=page,
         size=size,
@@ -119,7 +141,7 @@ async def all_tasks(
         size=size,
     )
     return TaskListResponse(
-        items=[TaskOut.model_validate(r) for r in rows],
+        items=await to_task_out_list(db, org_id=user.org_id, rows=rows),
         total=total,
         page=page,
         size=size,

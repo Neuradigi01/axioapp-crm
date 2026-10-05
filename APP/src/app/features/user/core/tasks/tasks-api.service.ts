@@ -16,6 +16,30 @@ export type TaskStatus = 'open' | 'done' | 'cancelled' | 'missed';
 export type TaskPriority = 'low' | 'med' | 'high';
 /** T3 — the enum backend already has. Was previously not on the FE at all. */
 export type TaskFollowupType = 'call' | 'whatsapp' | 'email' | 'document' | 'meeting' | 'other';
+
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: 'Low',
+  med: 'Medium',
+  high: 'High',
+};
+
+export const TASK_FOLLOWUP_LABELS: Record<TaskFollowupType, string> = {
+  call: 'Call',
+  whatsapp: 'WhatsApp',
+  email: 'Email',
+  document: 'Document',
+  meeting: 'Meeting',
+  other: 'Other',
+};
+
+/** `GET /tasks/me/counts` · `/tasks/all/counts` — headline numbers. */
+export interface TaskCounts {
+  open: number;
+  overdue: number;
+  due_today: number;
+  done: number;
+  missed: number;
+}
 export type TaskDueFilter = 'today' | 'overdue' | 'upcoming';
 export type TaskSortBy = 'due_at' | 'priority' | 'title' | 'created_at' | 'last_activity_at';
 export type TaskSortDir = 'asc' | 'desc';
@@ -41,6 +65,9 @@ export interface Task {
   assigned_to_id: string;
   related_entity_type: string | null;
   related_entity_id: string | null;
+  /** Linked contact's name (a lead shows its contact's). List endpoints
+   *  only; null when the linked record no longer exists. */
+  related_label?: string | null;
   status: TaskStatus;
   priority: TaskPriority;
   /** T3 — the touchpoint channel type. Nullable = generic to-do. */
@@ -142,6 +169,18 @@ export class TasksApiService {
   listAll(filters: TaskListFilters = {}): Observable<TaskListResponse> {
     return this.http.get<TaskListResponse>(`${this.base}/all`, {
       params: toParams(filters),
+    });
+  }
+
+  /** Headline counts for the caller's own tasks. */
+  countsMine(): Observable<TaskCounts> {
+    return this.http.get<TaskCounts>(`${this.base}/me/counts`);
+  }
+
+  /** Org-wide headline counts (requires `users.read`), optionally for one owner. */
+  countsAll(assignedToId?: string): Observable<TaskCounts> {
+    return this.http.get<TaskCounts>(`${this.base}/all/counts`, {
+      params: assignedToId ? { assigned_to_id: assignedToId } : {},
     });
   }
 

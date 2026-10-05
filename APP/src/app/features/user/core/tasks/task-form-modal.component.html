@@ -4,7 +4,7 @@
   role="presentation"
 >
   <div
-    class="w-full max-w-2xl rounded-lg bg-surface shadow-xl ring-1 border-subtle"
+    class="w-full max-w-2xl rounded-lg border border-subtle bg-surface shadow-xl"
     (click)="$event.stopPropagation()"
     role="dialog"
     aria-label="Task form"
@@ -127,7 +127,7 @@
             <div class="mt-1">
               <crm-mobile-select
                 [options]="assigneeSelectOptions"
-                [value]="form.controls.assigned_to_id.value ?? ''"
+                [value]="form.controls.assigned_to_id.value"
                 (valueChange)="form.controls.assigned_to_id.setValue($event)"
               />
             </div>

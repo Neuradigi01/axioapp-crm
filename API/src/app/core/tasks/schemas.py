@@ -79,9 +79,20 @@ class TaskOut(TimestampedOrgScopedOut):
     followup_type: TaskFollowupType | None
     last_activity_at: datetime | None
     custom_data: dict[str, Any] = Field(default_factory=dict)
+    # Display name of the linked contact / lead (a lead shows its
+    # contact's name). Filled on the list endpoints only.
+    related_label: str | None = None
 
 
 TaskListResponse = PaginatedResponse[TaskOut]
+
+
+class TaskCountsOut(BaseModel):
+    open: int
+    overdue: int
+    due_today: int
+    done: int
+    missed: int
 
 
 # --- Bulk action shapes -----------------------------------------------------

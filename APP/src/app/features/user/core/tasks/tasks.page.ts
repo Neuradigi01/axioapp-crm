@@ -11,6 +11,7 @@ import {
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
@@ -19,6 +20,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
+import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
 import {
   UrlFilterStateConfig,
   UrlFilterStateDirective,
@@ -35,7 +37,10 @@ import { extractApiError } from '@core/services/api-error.util';
 
 import { SavedView, SavedViewConfig, SavedViewsApiService } from '../leads/saved-views-api.service';
 import {
+  TASK_FOLLOWUP_LABELS,
+  TASK_PRIORITY_LABELS,
   Task,
+  TaskCounts,
   TaskDueFilter,
   TaskListFilters,
   TaskListResponse,
@@ -50,6 +55,11 @@ class TasksListState extends ListPageState<Task> {}
 
 type Scope = 'all' | 'mine';
 type Chip = 'all' | 'mine' | 'overdue' | 'today' | 'done' | 'missed';
+
+const CHIP_KEYS: readonly Chip[] = ['all', 'mine', 'overdue', 'today', 'done', 'missed'];
+
+/** Rows per request; "Load more" fetches the next page. */
+const PAGE_SIZE = 100;
 
 interface ChipDef {
   key: Chip;
@@ -82,6 +92,7 @@ interface ChipDef {
     UrlFilterStateDirective,
     RelativeTimePipe,
     MobileSelectComponent,
+    RouterLink,
   ],
   providers: [TasksListState],
   templateUrl: './tasks.page.html',
@@ -93,8 +104,20 @@ export class TasksPageComponent {
   private readonly auth = inject(FurnitureAuthService);
   private readonly toast = inject(ToastService);
   private readonly usersDir = inject(UsersDirectoryService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly confirmDialog = inject(ConfirmDialogService);
 
   protected readonly state = inject(TasksListState);
+  protected readonly priorityLabels = TASK_PRIORITY_LABELS;
+  protected readonly followupLabels = TASK_FOLLOWUP_LABELS;
+
+  /** Server-side headline counts for the current scope / owner. */
+  protected readonly counts = signal<TaskCounts | null>(null);
+
+  /** Pages loaded so far; "Load more" fetches the next one. */
+  private readonly page = signal(1);
+  protected readonly loadingMore = signal(false);
+  protected readonly hasMore = computed(() => this.state.items().length < this.state.total());
 
   protected readonly canViewAll = signal(false);
   protected readonly callerUuid = signal<string | null>(null);
@@ -203,16 +226,7 @@ export class TasksPageComponent {
         // omitting a valid chip here silently no-ops the URL round-trip
         // and drops the chip's persistence (deep links + refresh reset
         // to the default). `missed` was the missing member.
-        if (
-          v === 'all' ||
-          v === 'mine' ||
-          v === 'overdue' ||
-          v === 'today' ||
-          v === 'done' ||
-          v === 'missed'
-        ) {
-          this.selectChip(v);
-        }
+        if ((CHIP_KEYS as readonly string[]).includes(v)) this.selectChip(v as Chip);
       },
       queryKey: 'chip',
     },
@@ -260,32 +274,6 @@ export class TasksPageComponent {
     return base;
   });
 
-  /** Headline counters — recomputed from the items signal so they
-   *  reflect whatever the current filter is showing. For richer counts
-   *  ("3 open across the whole org") we'd need extra endpoints. */
-  protected readonly headlineCounts = computed(() => {
-    const now = Date.now();
-    const startToday = new Date();
-    startToday.setHours(0, 0, 0, 0);
-    const endToday = new Date();
-    endToday.setHours(23, 59, 59, 999);
-
-    let open = 0;
-    let overdue = 0;
-    let dueToday = 0;
-    for (const t of this.state.items()) {
-      if (t.status === 'open') open += 1;
-      if (t.due_at) {
-        const due = new Date(t.due_at).getTime();
-        if (t.status === 'open' && due < now) overdue += 1;
-        if (t.status === 'open' && due >= startToday.getTime() && due <= endToday.getTime()) {
-          dueToday += 1;
-        }
-      }
-    }
-    return { open, overdue, dueToday };
-  });
-
   constructor() {
     this.state.bulkActions.set([
       // Delegation gate — Employees can only own their own tasks and
@@ -318,8 +306,14 @@ export class TasksPageComponent {
           this.canAssignOthers.set(me.permission_keys.includes('tasks.assign_others'));
           this.canDelete.set(me.permission_keys.includes('tasks.delete'));
           this.callerUuid.set(me.id);
-          this.activeChip.set(canView ? 'all' : 'mine');
+          // Default scope for the role, then honour a deep-linked chip
+          // (`?chip=overdue`) instead of overwriting it with the default.
           this.scope.set(canView ? 'all' : 'mine');
+          this.chipBusy.set(null);
+          const urlChip = this.route.snapshot.queryParamMap.get('chip') as Chip | null;
+          const chipAllowed =
+            urlChip !== null && CHIP_KEYS.includes(urlChip) && (urlChip !== 'all' || canView);
+          this.selectChip(chipAllowed ? urlChip : canView ? 'all' : 'mine');
           if (canView) this.loadAssignees();
           this.fetch();
           this.reloadSavedViews();
@@ -449,7 +443,6 @@ export class TasksPageComponent {
         error: (err: HttpErrorResponse) => {
           this.togglingId.set(null);
           const msg = extractApiError(err) ?? 'Could not update the task.';
-          this.state.loadError.set(msg);
           this.toast.error('Could not update the task.', { subtitle: msg });
         },
       });
@@ -561,7 +554,6 @@ export class TasksPageComponent {
         error: (err: HttpErrorResponse) => {
           this.togglingId.set(null);
           const msg = extractApiError(err) ?? 'Could not mark the task missed.';
-          this.state.loadError.set(msg);
           this.toast.error('Could not mark the task missed.', { subtitle: msg });
         },
       });
@@ -590,12 +582,13 @@ export class TasksPageComponent {
           this.deleteSubmitting.set(false);
           this.closeDeleteRow();
           this.state.items.update((rows) => rows.filter((r) => r.id !== t.id));
+          this.state.total.update((n) => Math.max(0, n - 1));
+          this.loadCounts();
           this.toast.success('Task deleted.', { subtitle: t.title });
         },
         error: (err: HttpErrorResponse) => {
           this.deleteSubmitting.set(false);
           const msg = extractApiError(err) ?? 'Could not delete the task.';
-          this.state.loadError.set(msg);
           this.toast.error('Could not delete the task.', { subtitle: msg });
         },
       });
@@ -638,7 +631,6 @@ export class TasksPageComponent {
         error: (err: HttpErrorResponse) => {
           this.togglingId.set(null);
           const msg = extractApiError(err) ?? 'Could not reschedule the task.';
-          this.state.loadError.set(msg);
           this.toast.error('Could not reschedule the task.', { subtitle: msg });
         },
       });
@@ -677,7 +669,6 @@ export class TasksPageComponent {
         error: (err: HttpErrorResponse) => {
           this.togglingId.set(null);
           const msg = extractApiError(err) ?? 'Could not reschedule the task.';
-          this.state.loadError.set(msg);
           this.toast.error('Could not reschedule the task.', { subtitle: msg });
         },
       });
@@ -792,15 +783,23 @@ export class TasksPageComponent {
           this.saveViewOpen.set(false);
         },
         error: (err: HttpErrorResponse) => {
-          this.state.loadError.set(extractApiError(err) ?? 'Could not save view.');
+          this.toast.error('Could not save the view', {
+            subtitle: extractApiError(err) ?? undefined,
+          });
         },
       });
   }
 
-  protected deleteCurrentView(): void {
+  protected async deleteCurrentView(): Promise<void> {
     const id = this.currentViewId();
     if (!id) return;
-    if (!confirm('Delete this saved view?')) return;
+    const ok = await this.confirmDialog.ask({
+      title: `Delete the view “${this.currentViewName() ?? ''}”?`,
+      body: 'Anyone it was shared with loses it too. Your tasks are not affected.',
+      confirmLabel: 'Delete view',
+      danger: true,
+    });
+    if (!ok) return;
     this.savedViewsApi
       .delete(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -810,18 +809,21 @@ export class TasksPageComponent {
           this.currentViewId.set(null);
           this.currentViewName.set(null);
         },
-        error: () => undefined,
+        error: (err: HttpErrorResponse) =>
+          this.toast.error('Could not delete the view', {
+            subtitle: extractApiError(err) ?? undefined,
+          }),
       });
   }
 
   protected priorityClass(p: TaskPriority): string {
     switch (p) {
       case 'high':
-        return 'bg-red-500/10 text-red-700 ring-red-500/20';
+        return 'bg-red-500/10 text-red-700 ring-red-500/20 dark:text-red-300';
       case 'med':
-        return 'bg-amber-500/10 text-amber-700 ring-amber-500/20';
+        return 'bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-300';
       default:
-        return 'bg-surface-2 text-default border-subtle';
+        return 'bg-surface-2 text-muted ring-subtle';
     }
   }
 
@@ -832,21 +834,13 @@ export class TasksPageComponent {
 
   private fetch(): void {
     const seq = ++this.fetchSeq;
+    this.page.set(1);
+    this.loadingMore.set(false);
     this.state.loading.set(true);
     this.state.loadError.set(null);
+    this.loadCounts();
 
-    const filters: TaskListFilters = {
-      status: this.status(),
-      priority: this.priorityFilter(),
-      q: this.q() || undefined,
-      due_filter: this.dueFilter(),
-      sort_by: this.sortBy(),
-      sort_dir: this.sortDir(),
-      assigned_to_id: this.resolveAssignee(),
-      size: 100,
-    };
-
-    const obs = this.scope() === 'all' ? this.api.listAll(filters) : this.api.listMine(filters);
+    const obs = this.listRequest(1);
 
     obs.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res: TaskListResponse) => {
@@ -878,6 +872,70 @@ export class TasksPageComponent {
         this.state.loadError.set(extractApiError(err) ?? 'Could not load tasks.');
       },
     });
+  }
+
+  protected retry(): void {
+    this.fetch();
+  }
+
+  /** List request for the current filters at a given page. */
+  private listRequest(page: number) {
+    const filters: TaskListFilters = {
+      status: this.status(),
+      priority: this.priorityFilter(),
+      q: this.q() || undefined,
+      due_filter: this.dueFilter(),
+      sort_by: this.sortBy(),
+      sort_dir: this.sortDir(),
+      assigned_to_id: this.resolveAssignee(),
+      page,
+      size: PAGE_SIZE,
+    };
+    return this.scope() === 'all' ? this.api.listAll(filters) : this.api.listMine(filters);
+  }
+
+  protected loadMore(): void {
+    if (this.loadingMore() || !this.hasMore()) return;
+    const seq = this.fetchSeq;
+    const next = this.page() + 1;
+    this.loadingMore.set(true);
+    this.listRequest(next)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res: TaskListResponse) => {
+          if (seq !== this.fetchSeq) return;
+          // De-dupe — a row changed since page 1 can shift server offsets.
+          const seen = new Set(this.state.items().map((t) => t.id));
+          this.state.items.update((cur) => [...cur, ...res.items.filter((t) => !seen.has(t.id))]);
+          this.state.total.set(res.total);
+          this.page.set(next);
+          this.loadingMore.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          if (seq !== this.fetchSeq) return;
+          this.loadingMore.set(false);
+          this.toast.error('Could not load more tasks', {
+            subtitle: extractApiError(err) ?? undefined,
+          });
+        },
+      });
+  }
+
+  /** Header counts for the scope being viewed (and owner, on "All"). */
+  private loadCounts(): void {
+    const obs =
+      this.scope() === 'all' ? this.api.countsAll(this.resolveAssignee()) : this.api.countsMine();
+    obs
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({ next: (c) => this.counts.set(c), error: () => this.counts.set(null) });
+  }
+
+  /** Router link for a task's linked record, or null when it has none. */
+  protected relatedLink(t: Task): string[] | null {
+    if (!t.related_entity_id) return null;
+    if (t.related_entity_type === 'contact') return ['/user/contacts', t.related_entity_id];
+    if (t.related_entity_type === 'lead') return ['/user/leads', t.related_entity_id];
+    return null;
   }
 
   private loadAssignees(): void {
@@ -973,9 +1031,9 @@ export class TasksPageComponent {
           this.clearSelection();
           this.closeBulkModal();
           if (result.skipped > 0) {
-            this.state.loadError.set(
-              `${result.done} marked done; ${result.skipped} skipped (already done).`,
-            );
+            this.toast.warn(`${result.done} marked done`, {
+              subtitle: `${result.skipped} skipped — already done.`,
+            });
           }
           this.fetch();
         },
