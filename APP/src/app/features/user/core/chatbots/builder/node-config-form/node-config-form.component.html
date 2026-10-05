@@ -66,6 +66,31 @@
           />
         }
 
+        @case ('ref') {
+          <crm-mobile-select
+            [options]="refOptions(field)"
+            [value]="getText(field.key)"
+            [searchable]="true"
+            searchPlaceholder="Search…"
+            [placeholder]="
+              refStatus(field) === 'loading' ? 'Loading…' : (field.emptyLabel ?? 'Choose…')
+            "
+            (valueChange)="onRefChange(field.key, $event)"
+          />
+          @if (refError(field); as refErr) {
+            <p class="mt-1 flex items-center gap-2 text-[10px] text-red-600 dark:text-red-400">
+              Couldn't load the list — {{ refErr }}
+              <button
+                type="button"
+                class="font-semibold underline hover:no-underline"
+                (click)="retryRef(field)"
+              >
+                Retry
+              </button>
+            </p>
+          }
+        }
+
         @case ('select') {
           <crm-mobile-select
             [options]="field.options ?? []"

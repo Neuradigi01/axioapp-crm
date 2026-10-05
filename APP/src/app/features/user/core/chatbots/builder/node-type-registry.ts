@@ -34,7 +34,12 @@ export type FieldType =
   | 'string_list'
   | 'button_list'
   | 'json'
-  | 'variable';
+  | 'variable'
+  | 'ref';
+
+/** What a `ref` field points at — rendered as a searchable picker
+ *  (see `BotRefOptionsService`) instead of a pasted UUID. */
+export type RefSource = 'template' | 'user' | 'chatbot' | 'ai_assistant' | 'lead_stage';
 
 export interface FieldSchema {
   key: string;
@@ -50,6 +55,11 @@ export interface FieldSchema {
   maxLength?: number;
   /** Cap for `button_list` / `string_list` (e.g. WA text_button = 3 buttons). */
   maxItems?: number;
+  /** `ref` fields: which list the picker offers. */
+  ref?: RefSource;
+  /** `ref` fields: label of the empty choice (stored as `null`), e.g.
+   *  "Contact owner" or "Org default". */
+  emptyLabel?: string;
   /** Show a red asterisk next to the label so the operator knows the
    *  backend will reject a Save with this field empty. Purely visual —
    *  actual validation stays on the backend so the two never drift. */
@@ -186,9 +196,9 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
     hint: 'Send an approved WA / Email template.',
     defaultConfig: { template_id: '', variables: {} },
     configSchema: [
-      { key: 'template_id', label: 'Template ID', type: 'text',
-        placeholder: 'UUID of an approved template',
-        help: 'Pick from /user/templates → Templates → copy ID.' },
+      { key: 'template_id', label: 'Template', type: 'ref', ref: 'template', required: true,
+        emptyLabel: '— Choose a template —',
+        help: 'Active WhatsApp and Email templates. WhatsApp templates must be approved by Meta to send.' },
       { key: 'variables', label: 'Variables', type: 'json',
         help: 'Object mapping template variable names to values or {{expressions}}.' },
     ],
@@ -416,8 +426,8 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
         { value: 'round_robin', label: 'Round-robin (any available)' },
         { value: 'contact_owner', label: 'Contact owner' },
       ] },
-      { key: 'user_id', label: 'Teammate user ID', type: 'text',
-        placeholder: 'UUID (leave empty for round-robin / owner modes)',
+      { key: 'user_id', label: 'Teammate', type: 'ref', ref: 'user',
+        emptyLabel: '— Choose a teammate —',
         help: 'Required only when Assign to = Specific teammate.' },
       { key: 'final_bot_message', label: 'Final bot message', type: 'textarea', rows: 2,
         maxLength: 1024,
@@ -437,9 +447,9 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
       { key: 'source', label: 'Lead source', type: 'text',
         placeholder: 'chatbot',
         help: 'Free-text; shows in reporting. Common: chatbot, website, whatsapp.' },
-      { key: 'pipeline_stage', label: 'Pipeline stage', type: 'text',
-        placeholder: 'stage-id or blank for org default',
-        help: 'Pipeline stage ID from /user/settings → Pipelines. Blank = default entry stage.' },
+      { key: 'pipeline_stage', label: 'Pipeline stage', type: 'ref', ref: 'lead_stage',
+        emptyLabel: 'Default first stage',
+        help: 'Stage of the Leads pipeline the new lead starts in.' },
       { key: 'budget_from', label: 'Budget from (answers path)', type: 'variable',
         placeholder: 'answers.budget',
         help: 'Read budget from a prior Ask Question answer, or a contact.custom.<key>.' },
@@ -467,9 +477,9 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
       { key: 'scheduled_at_from', label: 'Slot from (answers path)', type: 'variable',
         placeholder: 'answers.slot',
         help: 'Path to an ISO-8601 timestamp captured earlier in the flow.' },
-      { key: 'assigned_to_user_id', label: 'Assigned to (user ID)', type: 'text',
-        placeholder: 'Teammate UUID',
-        help: 'Whose calendar to check + book. Blank = contact owner.' },
+      { key: 'assigned_to_user_id', label: 'Assigned to', type: 'ref', ref: 'user',
+        emptyLabel: 'Contact owner',
+        help: 'Whose calendar to check + book.' },
     ],
   },
   {
@@ -490,8 +500,9 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
         { value: 'specific', label: 'Specific teammate' },
         { value: 'bot_creator', label: 'Bot creator' },
       ] },
-      { key: 'assignee_user_id', label: 'Teammate user ID', type: 'text',
-        placeholder: 'UUID (required when Assign to = Specific teammate)' },
+      { key: 'assignee_user_id', label: 'Teammate', type: 'ref', ref: 'user',
+        emptyLabel: '— Choose a teammate —',
+        help: 'Required only when Assign to = Specific teammate.' },
       { key: 'due_in_hours', label: 'Due in (hours)', type: 'number', min: 1, max: 720, step: 1 },
       { key: 'priority', label: 'Priority', type: 'select', options: [
         { value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' },
@@ -508,8 +519,8 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
     hint: 'Chain into another bot with answers passed through.',
     defaultConfig: { target_bot_id: '' },
     configSchema: [
-      { key: 'target_bot_id', label: 'Target bot ID', type: 'text',
-        placeholder: 'UUID of another bot in this org',
+      { key: 'target_bot_id', label: 'Target bot', type: 'ref', ref: 'chatbot', required: true,
+        emptyLabel: '— Choose a bot —',
         help: 'Chain another bot. Max chain depth = 5 (guards infinite loops).' },
     ],
   },
@@ -547,9 +558,9 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
       max_turns: 0,
     },
     configSchema: [
-      { key: 'assistant_id', label: 'Assistant ID', type: 'text',
-        placeholder: 'Leave blank for the org\'s first active assistant',
-        help: 'UUID of the AI Assistant to use (from /user/ai-assistants). Leave blank to auto-pick the org\'s first active assistant.' },
+      { key: 'assistant_id', label: 'AI Assistant', type: 'ref', ref: 'ai_assistant',
+        emptyLabel: 'First active assistant',
+        help: 'Which AI Assistant takes over. "First active assistant" auto-picks one.' },
       { key: 'max_turns', label: 'Max turns (0 = unlimited)', type: 'number', min: 0, max: 100, step: 1,
         placeholder: '0',
         help: '0 = AI stays on until a human takes over (recommended). Set a positive N to force the bot back to scripted mode after N customer messages.' },

@@ -4,16 +4,23 @@ import {
   Component,
   EventEmitter,
   Input,
+  OnChanges,
   Output,
+  inject,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
-import { MobileSelectComponent } from '../../../shared/forms/mobile-select.component';
+import {
+  MobileSelectComponent,
+  MobileSelectOption,
+} from '../../../shared/forms/mobile-select.component';
 import { BotVariable } from '../../../shared/variable-picker/variable-picker-api.service';
 import { VariablePickerComponent } from '../../../shared/variable-picker/variable-picker.component';
-import { FieldSchema } from '../node-type-registry';
+import { BotRefOptionsService } from '../bot-ref-options.service';
+import { CanvasStateService } from '../canvas-state.service';
+import { FieldSchema, RefSource } from '../node-type-registry';
 
 /**
  * Schema-driven per-node config form. Each node type declares its
@@ -45,7 +52,9 @@ interface ButtonRow {
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './node-config-form.component.html',
 })
-export class NodeConfigFormComponent {
+export class NodeConfigFormComponent implements OnChanges {
+  private readonly refOptionsService = inject(BotRefOptionsService);
+  private readonly canvas = inject(CanvasStateService);
   @Input({ required: true }) schema: readonly FieldSchema[] = [];
   @Input({ required: true }) config: Record<string, unknown> = {};
   /** When set, `button_list` rows render an inline output port on
@@ -70,6 +79,59 @@ export class NodeConfigFormComponent {
   @Output() readonly portRenamed = new EventEmitter<{ from: string; to: string }>();
   /** A button was removed — the canvas drops its edge. */
   @Output() readonly portRemoved = new EventEmitter<string>();
+
+  /** Load the option lists this node's picker fields need. */
+  ngOnChanges(): void {
+    for (const field of this.schema) {
+      if (field.type === 'ref' && field.ref) this.refOptionsService.ensure(field.ref);
+    }
+  }
+
+  /** Memoised per field so the picker gets a stable array between
+   *  change-detection passes (a fresh array would reset its search). */
+  private readonly refOptionCache = new Map<string, { sig: string; opts: MobileSelectOption[] }>();
+
+  /** Options for a `ref` picker: the empty choice, the loaded list, and
+   *  — if the stored value isn't in it (deleted / no access) — a
+   *  placeholder row so the current value is still visible. */
+  refOptions(field: FieldSchema): MobileSelectOption[] {
+    const source = field.ref as RefSource;
+    const state = this.refOptionsService.state(source)();
+    const value = this.getText(field.key);
+    const sig = `${state.status}|${state.options.length}|${value}|${this.canvas.bot()?.id ?? ''}`;
+    const hit = this.refOptionCache.get(field.key);
+    if (hit && hit.sig === sig) return hit.opts;
+    // A bot can't chain into itself.
+    const own = source === 'chatbot' ? this.canvas.bot()?.id : undefined;
+    const loaded = state.options.filter((o) => o.value !== own);
+    const opts: MobileSelectOption[] = [
+      { value: '', label: field.emptyLabel ?? '— None —' },
+      ...loaded,
+    ];
+    if (value && state.status === 'ready' && !loaded.some((o) => o.value === value)) {
+      opts.push({ value, label: `Unavailable (${value.slice(0, 8)}…)` });
+    }
+    this.refOptionCache.set(field.key, { sig, opts });
+    return opts;
+  }
+
+  refStatus(field: FieldSchema): 'idle' | 'loading' | 'ready' | 'error' {
+    return field.ref ? this.refOptionsService.state(field.ref)().status : 'ready';
+  }
+
+  refError(field: FieldSchema): string | null {
+    return field.ref ? this.refOptionsService.state(field.ref)().error : null;
+  }
+
+  retryRef(field: FieldSchema): void {
+    if (field.ref) this.refOptionsService.ensure(field.ref);
+  }
+
+  /** Empty choice is stored as `null` — what every node treats as unset
+   *  (`create_lead` would reject an empty-string stage key). */
+  onRefChange(key: string, value: string): void {
+    this.setValue(key, value || null);
+  }
 
   /** Read a possibly-nested value at `dot.path` from the config. */
   getValue(key: string): unknown {
