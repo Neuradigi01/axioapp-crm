@@ -990,15 +990,15 @@ export class WalkInsPageComponent {
   protected statusClass(status: WalkInStatus): string {
     switch (status) {
       case 'browsing':
-        return 'bg-surface-2 text-default border-subtle';
+        return 'bg-surface-2 text-default ring-subtle';
       case 'interested':
-        return 'bg-amber-100 text-amber-700 ring-amber-200';
+        return 'bg-amber-500/10 text-amber-400 ring-amber-500/30';
       case 'follow_up':
-        return 'bg-sky-100 text-sky-700 ring-sky-200';
+        return 'bg-sky-500/10 text-sky-400 ring-sky-500/30';
       case 'converted':
-        return 'bg-emerald-100 text-emerald-700 ring-emerald-200';
+        return 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30';
       case 'left':
-        return 'bg-red-100 text-red-700 ring-red-200';
+        return 'bg-red-500/10 text-red-400 ring-red-500/30';
     }
   }
 

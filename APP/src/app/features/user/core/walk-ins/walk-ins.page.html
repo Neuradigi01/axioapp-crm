@@ -19,20 +19,20 @@
   <!-- KPI cards -->
   <!-- W7 — KPI cards now read from `GET /walk-ins/rollup` (server-side
        aggregate over the full org, not the loaded page). -->
-  <section class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
+  <section class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 ring-subtle">
       <p class="text-xs font-medium uppercase tracking-wide text-muted">Today's Walk-ins</p>
       <p class="mt-2 text-2xl font-semibold text-default">{{ todayCount() }}</p>
     </div>
-    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
+    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 ring-subtle">
       <p class="text-xs font-medium uppercase tracking-wide text-muted">Converted today</p>
       <p class="mt-2 text-2xl font-semibold text-emerald-600">{{ convertedTodayCount() }}</p>
     </div>
-    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
+    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 ring-subtle">
       <p class="text-xs font-medium uppercase tracking-wide text-muted">Interested / Follow-up</p>
       <p class="mt-2 text-2xl font-semibold text-amber-600">{{ interestedOrFollowUpCount() }}</p>
     </div>
-    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
+    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 ring-subtle">
       <p class="text-xs font-medium uppercase tracking-wide text-muted">
         Conversion rate <span class="text-[10px] text-faint">(30d)</span>
       </p>
@@ -44,7 +44,7 @@
         }
       </p>
     </div>
-    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
+    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 ring-subtle">
       <p class="text-xs font-medium uppercase tracking-wide text-muted">
         Avg visit <span class="text-[10px] text-faint">(30d)</span>
       </p>
@@ -58,7 +58,7 @@
     </div>
     <!-- W9 — avg wait time (only meaningful for orgs that capture
          wait_started_at at reception). -->
-    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 border-subtle">
+    <div class="rounded-lg bg-surface p-4 shadow-sm ring-1 ring-subtle">
       <p class="text-xs font-medium uppercase tracking-wide text-muted">
         Avg wait <span class="text-[10px] text-faint">(30d)</span>
       </p>
@@ -78,13 +78,14 @@
       <button
         type="button"
         (click)="setFilter(chip.id)"
+        [attr.aria-pressed]="statusFilter() === chip.id"
         class="rounded-full px-3 py-1 font-medium ring-1 transition"
         [class.bg-accent]="statusFilter() === chip.id"
         [class.text-white]="statusFilter() === chip.id"
         [class.ring-accent]="statusFilter() === chip.id"
         [class.bg-surface]="statusFilter() !== chip.id"
         [class.text-default]="statusFilter() !== chip.id"
-        [class.border-subtle]="statusFilter() !== chip.id"
+        [class.ring-subtle]="statusFilter() !== chip.id"
         [class.hover:bg-surface-2]="statusFilter() !== chip.id"
       >
         {{ chip.label }}
@@ -92,7 +93,7 @@
     }
 
     <!-- Date chips: today / this week / this month -->
-    <div class="inline-flex overflow-hidden rounded-full ring-1 border-subtle bg-surface">
+    <div class="inline-flex overflow-hidden rounded-full ring-1 ring-subtle bg-surface">
       @for (
         d of [
           { v: '', label: 'All time' },
@@ -105,6 +106,7 @@
         <button
           type="button"
           (click)="setDateChip(d.v)"
+          [attr.aria-pressed]="dateChip() === d.v"
           class="px-2.5 py-1 transition"
           [class.bg-accent]="dateChip() === d.v"
           [class.text-white]="dateChip() === d.v"
@@ -118,7 +120,7 @@
 
     <!-- Scope toggle (admin/owner/manager only) -->
     @if (canChangeScope()) {
-      <div class="inline-flex overflow-hidden rounded-full ring-1 border-subtle bg-surface">
+      <div class="inline-flex overflow-hidden rounded-full ring-1 ring-subtle bg-surface">
         @for (
           sc of [
             { v: 'mine', label: 'Mine' },
@@ -130,6 +132,7 @@
           <button
             type="button"
             (click)="setScope(sc.v)"
+            [attr.aria-pressed]="scope() === sc.v"
             class="px-2.5 py-1 transition"
             [class.bg-accent]="scope() === sc.v"
             [class.text-white]="scope() === sc.v"
@@ -148,13 +151,14 @@
     <button
       type="button"
       (click)="toggleOpenOnly()"
+      [attr.aria-pressed]="openOnly()"
       class="rounded-full px-3 py-1 font-medium ring-1 transition"
       [class.bg-emerald-600]="openOnly()"
       [class.text-white]="openOnly()"
       [class.ring-emerald-600]="openOnly()"
       [class.bg-surface]="!openOnly()"
       [class.text-default]="!openOnly()"
-      [class.border-subtle]="!openOnly()"
+      [class.ring-subtle]="!openOnly()"
       [class.hover:bg-surface-2]="!openOnly()"
       title="Show only currently-in-store visitors"
     >
@@ -192,7 +196,7 @@
   }
 
   <!-- Body -->
-  <section class="overflow-hidden rounded-lg bg-surface shadow-sm ring-1 border-subtle">
+  <section class="overflow-hidden rounded-lg bg-surface shadow-sm ring-1 ring-subtle">
     @if (state.loadError(); as err) {
       <div class="px-4 md:px-6 py-4 text-sm text-red-400">{{ err }}</div>
     } @else if (state.loading() && visible().length === 0) {
@@ -317,7 +321,7 @@
                     class="h-4 w-4 cursor-pointer rounded border-subtle text-default focus:ring-accent"
                     [checked]="isSelected(w.id)"
                     (click)="toggleRow(w.id, $event)"
-                    [attr.aria-label]="'Select walk-in ' + (contact?.full_name ?? w.id)"
+                    [attr.aria-label]="'Select walk-in for ' + contactName(w.contact_id)"
                   />
                 </td>
                 <td class="hidden px-4 py-3 text-sm whitespace-nowrap text-muted md:table-cell">
@@ -349,7 +353,7 @@
                       </div>
                       @if (w.linked_lead_id) {
                         <span
-                          class="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-medium text-emerald-400 ring-1 border-emerald-500/20 md:text-[10px]"
+                          class="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-medium text-emerald-400 ring-1 ring-emerald-500/20 md:text-[10px]"
                           title="Linked to a lead"
                         >
                           <lucide-icon name="users" class="h-3 w-3" />
@@ -372,6 +376,7 @@
                       </a>
                       <a
                         [appWhatsappLink]="phone"
+                        [attr.aria-label]="'WhatsApp ' + phone"
                         class="hidden text-emerald-600 hover:text-emerald-400 md:inline"
                       >
                         <lucide-icon name="message-circle" class="h-3.5 w-3.5" />
@@ -403,7 +408,7 @@
                         (click)="openSingleReassign(w)"
                         class="hidden rounded p-0.5 text-faint hover:bg-surface-2 hover:text-default md:inline"
                         title="Reassign owner"
-                        [attr.aria-label]="'Reassign walk-in ' + w.id"
+                        [attr.aria-label]="'Reassign owner for ' + contactName(w.contact_id)"
                       >
                         <lucide-icon name="pencil" class="h-3 w-3" />
                       </button>
@@ -477,7 +482,7 @@
                       <button
                         type="button"
                         (click)="openConvert(w)"
-                        class="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-400 hover:bg-emerald-500/10"
+                        class="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-400 hover:bg-emerald-500/20"
                         title="Convert this walk-in to a lead"
                       >
                         <lucide-icon name="arrow-right-circle" class="h-3 w-3" />
@@ -491,10 +496,10 @@
                       type="button"
                       (click)="onScheduleAppointment(w)"
                       class="inline-flex items-center gap-1 rounded-lg border border-subtle bg-surface px-2 py-1 text-[11px] font-medium text-default hover:bg-surface-2"
-                      title="Schedule a follow-up appointment with this contact"
+                      title="Schedule a follow-up appointment"
+                      [attr.aria-label]="'Schedule appointment with ' + contactName(w.contact_id)"
                     >
                       <lucide-icon name="calendar-plus" class="h-3 w-3" />
-                      Schedule
                     </button>
                     <!-- W2 — single-row delete affordance. Was
                          previously only reachable via bulk-select
@@ -504,7 +509,7 @@
                       (click)="onDeleteRow(w)"
                       class="inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-surface px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-500/10"
                       title="Delete this walk-in"
-                      aria-label="Delete walk-in"
+                      [attr.aria-label]="'Delete walk-in for ' + contactName(w.contact_id)"
                     >
                       <lucide-icon name="trash-2" class="h-3 w-3" />
                     </button>
@@ -592,7 +597,7 @@
                       (click)="onDeleteRow(w)"
                       class="inline-flex min-w-0 items-center justify-center gap-1 rounded-md border border-red-500/20 bg-surface px-1.5 py-1 text-[10.5px] font-medium text-red-500 hover:bg-red-500/10"
                       title="Delete this walk-in"
-                      aria-label="Delete walk-in"
+                      [attr.aria-label]="'Delete walk-in for ' + contactName(w.contact_id)"
                     >
                       <lucide-icon name="trash-2" class="h-3 w-3 shrink-0" />
                       <span class="truncate">Delete</span>
