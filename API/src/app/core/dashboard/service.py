@@ -298,9 +298,9 @@ async def _assemble_org_cards(
     _appts_row = (
         await session.execute(
             select(
-                func.count(case((func.date(Appointment.scheduled_at) == today, Appointment.id))).label(
-                    "today_c"
-                ),
+                func.count(
+                    case((func.date(Appointment.scheduled_at) == today, Appointment.id))
+                ).label("today_c"),
                 func.count(
                     case((func.date(Appointment.scheduled_at) == yesterday, Appointment.id))
                 ).label("prev_c"),
@@ -337,7 +337,11 @@ async def _assemble_org_cards(
                 func.count(case((Call.started_at >= week_start, Call.id))).label("this_c"),
                 func.count(
                     case(
-                        ((Call.started_at >= prev_week_start) & (Call.started_at < prev_week_cutoff), Call.id)
+                        (
+                            (Call.started_at >= prev_week_start)
+                            & (Call.started_at < prev_week_cutoff),
+                            Call.id,
+                        )
                     )
                 ).label("prev_c"),
             ).where(
@@ -819,11 +823,11 @@ async def _recent_activity(
         else:
             actor = "System"
 
+        resolved = False
         if r.entity_type and r.entity_id:
-            label = label_map.get(
-                (r.entity_type, r.entity_id),
-                f"{r.entity_type}:{str(r.entity_id)[:8]}",
-            )
+            key = (r.entity_type, r.entity_id)
+            resolved = key in label_map
+            label = label_map.get(key, f"{r.entity_type}:{str(r.entity_id)[:8]}")
         else:
             label = r.entity_type or "—"
 
@@ -833,6 +837,8 @@ async def _recent_activity(
                 entity_label=label,
                 actor_name=actor,
                 at=r.created_at,
+                entity_type=r.entity_type if resolved else None,
+                entity_id=r.entity_id if resolved else None,
             )
         )
     return items
@@ -919,9 +925,7 @@ async def get_summary(
     if is_org_scope:
         cards = await _assemble_org_cards(session, org_id, now)
         recent = await _recent_activity(session, org_id, caller_uuid, personal_only=False)
-        upcoming = await _upcoming_appointments(
-            session, org_id, None, now, scope=upcoming_scope
-        )
+        upcoming = await _upcoming_appointments(session, org_id, None, now, scope=upcoming_scope)
         scope = "org"
     else:
         cards = await _assemble_personal_cards(session, org_id, caller_uuid, now)

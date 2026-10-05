@@ -61,6 +61,9 @@ class ActivityItem(BaseModel):
     entity_label: str
     actor_name: str
     at: datetime
+    # Set only when the entity still exists, so the UI can deep-link it.
+    entity_type: str | None = None
+    entity_id: uuid.UUID | None = None
 
 
 class UpcomingAppointment(ORMModel):

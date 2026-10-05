@@ -25,7 +25,10 @@
         <div class="mt-2 h-4 w-56 animate-pulse rounded bg-surface-2"></div>
       }
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      @if (updatedLabel(); as label) {
+        <span class="font-mono text-[11px] text-faint" aria-live="polite">{{ label }}</span>
+      }
       <app-dashboard-date-range />
       <button
         type="button"
@@ -200,17 +203,22 @@
         } @else {
           <ul class="divide-y divide-subtle">
             @for (u of s.upcoming_appointments; track u.id) {
-              <li class="flex items-start gap-3 py-2.5">
-                <div class="w-20 shrink-0 font-mono text-xs text-faint">
-                  {{ u.starts_at | date: 'EEE, MMM d' }}<br />
-                  <span class="text-muted">{{ u.starts_at | date: 'h:mm a' }}</span>
-                </div>
-                <div class="min-w-0">
-                  <p class="truncate text-sm font-medium text-default">{{ u.title }}</p>
-                  @if (u.with_contact_name) {
-                    <p class="truncate text-[11px] text-faint">with {{ u.with_contact_name }}</p>
-                  }
-                </div>
+              <li>
+                <a
+                  routerLink="/user/appointments"
+                  class="-mx-2 flex items-start gap-3 rounded-lg px-2 py-2.5 transition hover:bg-surface-2"
+                >
+                  <div class="w-20 shrink-0 font-mono text-xs text-faint">
+                    {{ u.starts_at | date: 'EEE, MMM d' }}<br />
+                    <span class="text-muted">{{ u.starts_at | date: 'h:mm a' }}</span>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-medium text-default">{{ u.title }}</p>
+                    @if (u.with_contact_name) {
+                      <p class="truncate text-[11px] text-faint">with {{ u.with_contact_name }}</p>
+                    }
+                  </div>
+                </a>
               </li>
             }
           </ul>
@@ -239,12 +247,25 @@
         } @else {
           <ul class="divide-y divide-subtle">
             @for (a of s.recent_activity; track $index) {
+              @let link = activityLink(a);
               <li class="flex items-start justify-between gap-3 py-2.5">
                 <div class="min-w-0">
                   <p class="truncate text-sm text-default">
                     <span class="font-medium">{{ a.actor_name }}</span>
                     {{ actionLabel(a.action) }}
-                    <span class="text-muted">{{ a.entity_label }}</span>
+                    @if (activityTarget(a); as target) {
+                      ·
+                      @if (link) {
+                        <a
+                          [routerLink]="link.path"
+                          [queryParams]="link.query"
+                          class="font-medium text-accent hover:underline"
+                          >{{ target }}</a
+                        >
+                      } @else {
+                        <span class="text-muted">{{ target }}</span>
+                      }
+                    }
                   </p>
                 </div>
                 <span class="shrink-0 whitespace-nowrap font-mono text-[11px] text-faint">

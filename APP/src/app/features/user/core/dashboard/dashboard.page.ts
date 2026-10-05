@@ -4,6 +4,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  HostListener,
   inject,
   signal,
   viewChild,
@@ -45,7 +46,48 @@ interface ActivityItem {
   entity_label: string;
   actor_name: string;
   at: string;
+  /** Present only when the entity still exists (deep-link target). */
+  entity_type?: string | null;
+  entity_id?: string | null;
 }
+
+/** Past-tense phrase per audit verb ("leads.marked_done" → "completed"). */
+const ACTION_VERBS: Record<string, string> = {
+  created: 'created',
+  updated: 'updated',
+  deleted: 'deleted',
+  rescheduled: 'rescheduled',
+  reassigned: 'reassigned',
+  marked_done: 'completed',
+  marked_missed: 'marked as missed',
+  auto_missed: 'auto-missed',
+  quick_registered: 'registered',
+  converted: 'converted',
+  checked_out: 'checked out',
+  opt_in_changed: 'changed opt-in for',
+  outcome_updated: 'updated the outcome of',
+  'import.uploaded': 'uploaded an import of',
+  'import.committed': 'imported',
+  'import.cancelled': 'cancelled an import of',
+};
+
+/** Audit module → singular noun. */
+const ACTION_NOUNS: Record<string, string> = {
+  leads: 'lead',
+  contacts: 'contact',
+  appointments: 'appointment',
+  tasks: 'task',
+  calls: 'call',
+  walk_ins: 'walk-in',
+  walkins: 'walk-in',
+  reviews: 'review',
+  invitations: 'invitation',
+  roles: 'role',
+  ownership: 'ownership',
+};
+
+/** Auto-refresh when the tab regains focus after this long. */
+const STALE_AFTER_MS = 5 * 60_000;
 
 interface UpcomingAppointment {
   id: string;
@@ -113,6 +155,31 @@ export class DashboardPageComponent {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly refreshing = signal(false);
+
+  /** When the summary last loaded successfully (drives "Updated …"). */
+  protected readonly loadedAt = signal<number | null>(null);
+  /** Minute tick so the "Updated Xm ago" label stays truthful. */
+  private readonly nowTick = signal(Date.now());
+  protected readonly updatedLabel = computed<string | null>(() => {
+    const at = this.loadedAt();
+    if (at === null) return null;
+    const min = Math.floor((this.nowTick() - at) / 60_000);
+    if (min < 1) return 'Updated just now';
+    if (min < 60) return `Updated ${min}m ago`;
+    return `Updated ${Math.floor(min / 60)}h ago`;
+  });
+
+  /** Coming back to a tab left open for a while refetches everything —
+   *  otherwise the morning's numbers sit there all afternoon. */
+  @HostListener('document:visibilitychange')
+  protected onVisibilityChange(): void {
+    if (document.hidden) return;
+    this.nowTick.set(Date.now());
+    const at = this.loadedAt();
+    if (at !== null && Date.now() - at > STALE_AFTER_MS && !this.refreshing()) {
+      this.refresh();
+    }
+  }
 
   /** Monotonic counter bumped on every user-initiated Refresh click.
    *  Trend / funnel / follow-ups widgets consume this via an `input`
@@ -209,6 +276,8 @@ export class DashboardPageComponent {
 
   constructor() {
     this.load(false);
+    const timer = setInterval(() => this.nowTick.set(Date.now()), 60_000);
+    this.destroyRef.onDestroy(() => clearInterval(timer));
   }
 
   protected refresh(): void {
@@ -273,6 +342,8 @@ export class DashboardPageComponent {
         next: (s) => {
           if (seq !== this.loadSeq) return;
           this.summary.set(s);
+          this.loadedAt.set(Date.now());
+          this.nowTick.set(Date.now());
           this.loading.set(false);
           this.refreshing.set(false);
         },
@@ -324,12 +395,38 @@ export class DashboardPageComponent {
     return new Date(iso).toLocaleDateString();
   }
 
-  /** A short human-readable action label ("created a lead", "scheduled appointment"). */
+  /** Human phrase for an audit action: "leads.created" → "created a lead". */
   protected actionLabel(action: string): string {
-    const tail = action.split('.').slice(1).join(' ');
-    const mod = action.split('.')[0];
-    const verb = tail.replace(/_/g, ' ') || 'updated';
-    const noun = mod.replace(/s$/, '').replace(/_/g, ' ');
-    return `${verb} ${noun}`;
+    const [mod, ...rest] = action.split('.');
+    const tail = rest.join('.');
+    const verb = ACTION_VERBS[tail] ?? (tail.replace(/[._]/g, ' ') || 'updated');
+    const noun = ACTION_NOUNS[mod] ?? mod.replace(/s$/, '').replace(/_/g, ' ');
+    const article = /^[aeiou]/i.test(noun) ? 'an' : 'a';
+    return `${verb} ${article} ${noun}`;
+  }
+
+  /** Fallback labels look like `task:25a0db3c` (entity since deleted) —
+   *  the phrase already names the type, so show nothing extra. */
+  protected activityTarget(a: ActivityItem): string | null {
+    return /^[a-z_]+:[0-9a-f]{8}$/.test(a.entity_label) ? null : a.entity_label;
+  }
+
+  /** Router link for an activity row, when its entity still exists. */
+  protected activityLink(
+    a: ActivityItem,
+  ): { path: string[]; query: Record<string, string> | null } | null {
+    if (!a.entity_id) return null;
+    switch (a.entity_type) {
+      case 'lead':
+        return { path: ['/user/leads', a.entity_id], query: null };
+      case 'contact':
+        return { path: ['/user/contacts', a.entity_id], query: null };
+      case 'task':
+        return { path: ['/user/tasks'], query: { task: a.entity_id } };
+      case 'appointment':
+        return { path: ['/user/appointments'], query: null };
+      default:
+        return null;
+    }
   }
 }
