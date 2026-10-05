@@ -181,6 +181,16 @@
          clamps their list to their own rows regardless. -->
   </section>
 
+  <!-- Refetch indicator: rows stay on screen while a filter change
+       loads, so show a thin bar instead of leaving it silent. -->
+  @if (state.loading() && visible().length > 0) {
+    <div
+      class="h-0.5 w-full animate-pulse rounded-full bg-accent/60"
+      role="progressbar"
+      aria-label="Loading walk-ins"
+    ></div>
+  }
+
   <!-- Body -->
   <section class="overflow-hidden rounded-lg bg-surface shadow-sm ring-1 border-subtle">
     @if (state.loadError(); as err) {
@@ -198,16 +208,43 @@
         }
       </div>
     } @else if (visible().length === 0) {
-      <div class="px-4 md:px-6 py-10 text-center text-sm text-muted">
-        No walk-ins yet.
-        <span class="block text-xs text-faint">Click "Register Walk-in" to start.</span>
-      </div>
+      @if (hasActiveFilters()) {
+        <app-empty-state
+          icon="filter-x"
+          title="No walk-ins match these filters"
+          subtitle="Try another status or date range — or clear the filters."
+        >
+          <button type="button" class="btn btn-secondary btn-sm" (click)="clearFilters()">
+            Clear filters
+          </button>
+        </app-empty-state>
+      } @else {
+        <app-empty-state
+          icon="user-check"
+          title="No walk-ins yet"
+          subtitle="Log each visitor at the reception desk to track visits and conversions."
+        >
+          <button type="button" class="btn btn-primary btn-sm" (click)="openRegister()">
+            <lucide-icon name="plus" class="h-4 w-4" />
+            Register Walk-in
+          </button>
+        </app-empty-state>
+      }
     } @else {
       <div class="overflow-hidden md:overflow-x-auto">
         <table class="w-full table-fixed divide-y divide-subtle md:table-auto md:min-w-full">
           <thead class="bg-surface-2">
             <tr>
-              <th class="hidden w-10 px-3 py-2.5 md:table-cell"></th>
+              <th class="hidden w-10 px-3 py-2.5 md:table-cell">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 cursor-pointer rounded border-subtle text-default focus:ring-accent"
+                  [checked]="allSelected()"
+                  [indeterminate]="someSelected()"
+                  (change)="toggleAll()"
+                  aria-label="Select all loaded walk-ins"
+                />
+              </th>
               <th
                 class="hidden px-4 py-2.5 text-left text-xs font-medium tracking-wider text-muted uppercase md:table-cell"
               >
@@ -299,7 +336,16 @@
                       <div
                         class="text-[11px] leading-tight font-medium text-default [overflow-wrap:anywhere] sm:text-[12px] md:truncate md:text-sm md:leading-normal"
                       >
-                        {{ contact?.full_name ?? 'Loading…' }}
+                        @if (contact) {
+                          <a
+                            [routerLink]="['/user/contacts', w.contact_id]"
+                            class="hover:underline focus:underline focus:outline-none"
+                            title="Open contact"
+                            >{{ contact.full_name }}</a
+                          >
+                        } @else {
+                          <span class="text-muted">{{ contactName(w.contact_id) }}</span>
+                        }
                       </div>
                       @if (w.linked_lead_id) {
                         <span

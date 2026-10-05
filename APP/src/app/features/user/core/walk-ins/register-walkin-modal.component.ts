@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
+  HostListener,
   Output,
   computed,
   inject,
@@ -15,6 +16,7 @@ import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
+import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { FormToastHelper } from '../shared/forms/form-toast.helper';
@@ -73,6 +75,9 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
   private readonly api = inject(WalkInsApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly formToast = inject(FormToastHelper);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  /** True while the discard-changes confirm is up, so Esc doesn't stack. */
+  private confirming = false;
 
   @Output() readonly registered = new EventEmitter<QuickRegisterResponse>();
 
@@ -306,6 +311,31 @@ export class RegisterWalkinModalComponent extends BaseFormModalComponent {
       email: m.email ?? '',
       source: m.source ?? 'walk_in',
     });
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (!this.confirming) void this.onCancel();
+  }
+
+  /** Cancel button / Esc. Asks before throwing away what was typed. */
+  protected async onCancel(): Promise<void> {
+    if (this._submitting()) return;
+    if (this.form.dirty) {
+      this.confirming = true;
+      try {
+        const ok = await this.confirmDialog.ask({
+          title: 'Discard this walk-in?',
+          body: 'The details you entered will be lost.',
+          confirmLabel: 'Discard',
+          danger: true,
+        });
+        if (!ok) return;
+      } finally {
+        this.confirming = false;
+      }
+    }
+    this.cancel.emit();
   }
 
   protected onSubmit(): void {

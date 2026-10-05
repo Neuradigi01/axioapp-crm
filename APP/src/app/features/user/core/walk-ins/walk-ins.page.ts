@@ -23,6 +23,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
 import { ContactsApiService } from '../contacts/contacts-api.service';
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
+import { EmptyStateComponent } from '../shared/empty-state/empty-state.component';
 import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
 import {
   UrlFilterStateConfig,
@@ -58,7 +59,7 @@ import {
 import { extractApiError } from '@core/services/api-error.util';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { initials } from '@core/services/text.util';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 /** FE mirror of `core/walk_ins/status_workflow.ALLOWED_TRANSITIONS`. The
  * row-level action buttons read this to decide which buttons to show;
@@ -109,6 +110,8 @@ class WalkInsListState extends ListPageState<WalkIn> {}
     UrlFilterStateDirective,
     MobileSelectComponent,
     ColumnFilterComponent,
+    EmptyStateComponent,
+    RouterLink,
   ],
   providers: [WalkInsListState],
   templateUrl: './walk-ins.page.html',
@@ -136,6 +139,15 @@ export class WalkInsPageComponent {
   readonly chips = FILTER_CHIPS;
 
   readonly contactsById = signal<Record<string, ContactSummary>>({});
+  /** Contact ids whose hydrate call has finished (found or not), so a
+   *  missing contact reads "Unknown contact" instead of "Loading…". */
+  private readonly hydratedIds = signal<ReadonlySet<string>>(new Set());
+
+  protected contactName(id: string): string {
+    const c = this.contactsById()[id];
+    if (c) return c.full_name;
+    return this.hydratedIds().has(id) ? 'Unknown contact' : 'Loading…';
+  }
   readonly modalOpen = signal(false);
 
   /** "Open only" filter — currently-in-store visitors (time_out IS
@@ -364,6 +376,24 @@ export class WalkInsPageComponent {
     });
   }
 
+  /** True when a filter (not scope / sort) narrows the list — picks
+   *  between the "no matches" and "nothing yet" empty states. */
+  readonly hasActiveFilters = computed(
+    () =>
+      this.statusFilter() !== 'all' ||
+      this.dateChip() !== '' ||
+      this.openOnly() ||
+      this.assigneeFilter().length > 0,
+  );
+
+  protected clearFilters(): void {
+    this.statusFilter.set('all');
+    this.dateChip.set('');
+    this.openOnly.set(false);
+    this.assigneeFilter.set([]);
+    this.applyFilters();
+  }
+
   /** Filter / sort / scope change: drop the row selection (so a bulk
    *  action can't hit rows the new filter hides) and refetch page 1. */
   private applyFilters(): void {
@@ -552,6 +582,23 @@ export class WalkInsPageComponent {
 
   protected isSelected(id: string): boolean {
     return this.state.selectedIds().has(id);
+  }
+
+  /** Header checkbox state over the loaded rows. */
+  readonly allSelected = computed(() => {
+    const items = this.state.items();
+    const sel = this.state.selectedIds();
+    return items.length > 0 && items.every((w) => sel.has(w.id));
+  });
+  readonly someSelected = computed(
+    () => !this.allSelected() && this.state.items().some((w) => this.isSelected(w.id)),
+  );
+
+  protected toggleAll(): void {
+    const selectAll = !this.allSelected();
+    this.state.selectedIds.set(
+      selectAll ? new Set(this.state.items().map((w) => w.id)) : new Set<string>(),
+    );
   }
 
   protected clearSelection(): void {
@@ -1098,6 +1145,10 @@ export class WalkInsPageComponent {
     });
   }
 
+  private markHydrated(ids: string[]): void {
+    this.hydratedIds.update((set) => new Set([...set, ...ids]));
+  }
+
   private fetchContacts(ids: string[]): void {
     // Single batched POST replaces the previous per-id fan-out (up to
     // 100 round-trips for a fully-loaded page). Backend caps id lists
@@ -1128,7 +1179,9 @@ export class WalkInsPageComponent {
           // is broken.
           error: (err: HttpErrorResponse) => {
             console.warn('[walk-ins] contact hydrate failed', err.status, err.message);
+            this.markHydrated(slice);
           },
+          complete: () => this.markHydrated(slice),
         });
     }
   }
