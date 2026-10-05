@@ -20,6 +20,7 @@ import {
 import { AbVariantComparisonComponent } from './ab-variant-comparison.component';
 import { FailuresTableComponent } from './failures-table.component';
 import { FunnelChartComponent } from './funnel-chart.component';
+import { LucideAngularModule } from 'lucide-angular';
 
 /**
  * Campaign-detail Analytics tab (Step 21).
@@ -37,11 +38,28 @@ import { FunnelChartComponent } from './funnel-chart.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
+    LucideAngularModule,
     FunnelChartComponent,
     FailuresTableComponent,
     AbVariantComparisonComponent,
   ],
   template: `
+    <div class="mb-3 flex justify-end">
+      <button
+        type="button"
+        (click)="refresh()"
+        [disabled]="funnelLoading() || failuresLoading()"
+        class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2.5 py-1 text-xs font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+      >
+        <lucide-icon
+          name="refresh-cw"
+          class="h-3 w-3"
+          [class.animate-spin]="funnelLoading() || failuresLoading()"
+        />
+        Refresh
+      </button>
+    </div>
+
     <!-- Step 29 — A/B variant comparison. Renders only for A/B
          campaigns (the component itself short-circuits when the
          API returns is_ab_test=false). -->
@@ -117,6 +135,12 @@ export class CampaignAnalyticsTabComponent {
       const id = this.campaignId();
       if (id) this.load(id);
     });
+  }
+
+  /** Re-fetch the funnel + failure breakdown (e.g. while sending). */
+  protected refresh(): void {
+    const id = this.campaignId();
+    if (id) this.load(id);
   }
 
   private load(id: string): void {

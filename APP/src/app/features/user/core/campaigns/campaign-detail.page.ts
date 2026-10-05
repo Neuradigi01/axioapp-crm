@@ -12,6 +12,10 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '@shared/components/toast/toast.service';
+import { finalize } from 'rxjs/operators';
+
+import { FurnitureAuthService } from '../auth/auth.service';
 
 import { CampaignAnalyticsTabComponent } from './detail/analytics-tab.component';
 import {
@@ -24,6 +28,9 @@ import {
 import { ContactsApiService } from '../contacts/contacts-api.service';
 
 const POLL_INTERVAL_MS = 5_000;
+/** A scheduled campaign further out than this isn't polled — nothing
+ *  can change until it starts (the first tick after that picks it up). */
+const POLL_SCHEDULE_HORIZON_MS = 5 * 60_000;
 
 /** Step 21 — campaign-detail page tabs. "Overview" is the existing
  *  stats + messages view; "Analytics" mounts the new funnel +
@@ -56,6 +63,17 @@ export class CampaignDetailPageComponent {
   private readonly contactsApi = inject(ContactsApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
+  private readonly auth = inject(FurnitureAuthService);
+
+  /** The Analytics endpoints need `whatsapp.analytics.read`; without it
+   *  the tab only rendered error boxes, so it's hidden instead. */
+  protected readonly canViewAnalytics = this.auth.hasPermission('whatsapp.analytics.read');
+
+  /** Requests still in flight from the last refresh — a poll tick is
+   *  skipped while > 0 so slow responses can't stack up or land out of
+   *  order. */
+  private inFlight = 0;
 
   protected readonly id: string = this.route.snapshot.paramMap.get('id') ?? '';
 
@@ -122,12 +140,21 @@ export class CampaignDetailPageComponent {
   }
 
   protected refreshStatsAndMessages(): void {
+    this.inFlight = 2;
+    const settle = (): void => {
+      this.inFlight = Math.max(0, this.inFlight - 1);
+    };
     this.api
       .stats(this.id)
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(finalize(settle), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (s) => {
           this.stats.set(s);
+          // Keep the header badge in step with the dispatch (it was
+          // fetched once, so it stayed "Running" after the send ended).
+          this.campaign.update((c) =>
+            c && c.status !== s.status ? { ...c, status: s.status } : c,
+          );
           // Stop polling if the campaign reached a terminal state.
           if (s.status === 'done' || s.status === 'failed') {
             this.stopPolling();
@@ -139,11 +166,13 @@ export class CampaignDetailPageComponent {
       });
     this.api
       .listMessages(this.id)
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(finalize(settle), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => {
           this.messages.set(rows);
           this.loading.set(false);
+          // A later successful refresh clears an earlier failed one.
+          if (this.campaign()) this.loadError.set(null);
           this._hydrateContactsForMessages(rows);
         },
         error: (err: HttpErrorResponse) => {
@@ -212,7 +241,7 @@ export class CampaignDetailPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.retryingId.set(null);
-          this.loadError.set(extractApiError(err) ?? 'Could not retry message.');
+          this.toast.error('Retry failed', { subtitle: extractApiError(err) ?? undefined });
         },
       });
   }
@@ -282,6 +311,39 @@ export class CampaignDetailPageComponent {
     }
   }
 
+  protected messageStatusLabel(s: CampaignMessageStatus): string {
+    const labels: Record<CampaignMessageStatus, string> = {
+      queued: 'Queued',
+      sent: 'Sent',
+      delivered: 'Delivered',
+      read: 'Read',
+      opened: 'Opened',
+      clicked: 'Clicked',
+      failed: 'Failed',
+    };
+    return labels[s] ?? s;
+  }
+
+  protected channelLabel(channel: string): string {
+    if (channel === 'whatsapp') return 'WhatsApp';
+    if (channel === 'email') return 'Email';
+    return channel.charAt(0).toUpperCase() + channel.slice(1);
+  }
+
+  /** Empty-messages copy that matches where the campaign actually is. */
+  protected emptyMessagesText(): string {
+    switch (this.campaign()?.status) {
+      case 'scheduled':
+        return 'Nothing sent yet — this campaign sends automatically at its scheduled time.';
+      case 'running':
+        return 'Sending has started — messages appear here as they go out.';
+      case 'draft':
+        return "This is a draft — start it from the Campaigns list when you're ready.";
+      default:
+        return 'No messages were recorded for this campaign.';
+    }
+  }
+
   protected formatDate(iso: string | null): string {
     if (!iso) return '—';
     return new Date(iso).toLocaleString();
@@ -296,10 +358,23 @@ export class CampaignDetailPageComponent {
     if (!c) return;
     if (c.status === 'scheduled' || c.status === 'running') {
       if (this.pollTimer !== null) return;
-      this.pollTimer = setInterval(() => this.refreshStatsAndMessages(), POLL_INTERVAL_MS);
+      this.pollTimer = setInterval(() => this.pollTick(), POLL_INTERVAL_MS);
     } else {
       this.stopPolling();
     }
+  }
+
+  /** One poll: skipped while the previous refresh is still in flight,
+   *  while the tab is hidden, and for a campaign scheduled well into
+   *  the future. */
+  private pollTick(): void {
+    if (this.inFlight > 0 || document.hidden) return;
+    const c = this.campaign();
+    if (c?.status === 'scheduled' && c.schedule_at) {
+      const until = new Date(c.schedule_at).getTime() - Date.now();
+      if (until > POLL_SCHEDULE_HORIZON_MS) return;
+    }
+    this.refreshStatsAndMessages();
   }
 
   private stopPolling(): void {

@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   EventEmitter,
+  HostListener,
   Output,
   computed,
   effect,
@@ -14,13 +15,17 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
-import { EMPTY, Subject, of } from 'rxjs';
+import { format } from 'date-fns';
+import { EMPTY, Subject, Subscription, of } from 'rxjs';
 import { catchError, debounceTime, switchMap } from 'rxjs/operators';
 
 import { ConversationChannel } from '../conversations/conversations-api.service';
 import { SendFromPickerComponent } from '../whatsapp/shared/send-from-picker.component';
 import { AbTestSectionComponent } from './ab/ab-test-section.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '@shared/components/toast/toast.service';
+import { FormToastHelper } from '../shared/forms/form-toast.helper';
+import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
 import { ContactGroup, ContactGroupsApiService } from '../contacts/groups/groups-api.service';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { PipelineStage, PipelinesApiService } from '../pipelines/pipelines-api.service';
@@ -157,6 +162,59 @@ export class CreateCampaignModalComponent {
   private readonly emailSendersApi = inject(EmailSendersApiService);
   private readonly settingsApi = inject(SettingsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
+  private readonly formToast = inject(FormToastHelper);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  /** True while the discard-changes confirm is up, so Esc doesn't stack. */
+  private confirming = false;
+
+  /** Filters the template list on step 2 (by name / body). */
+  protected readonly templateSearch = signal('');
+  protected readonly visibleTemplates = computed(() => {
+    const q = this.templateSearch().trim().toLowerCase();
+    const rows = this.templates();
+    if (!q) return rows;
+    return rows.filter((t) => t.name.toLowerCase().includes(q) || t.body.toLowerCase().includes(q));
+  });
+
+  /** Saved-group picker options (searchable). */
+  protected readonly groupOptions = computed(() =>
+    this.groups().map((g) => ({
+      value: g.id,
+      label:
+        `${g.name} (${g.is_dynamic ? 'Dynamic' : 'Static'}` +
+        `${g.member_count !== null ? ` · ${g.member_count} members` : ''})`,
+    })),
+  );
+
+  /** "Everyone" has no count preview, so the per-audience quota check
+   *  can't run — show today's remaining WhatsApp quota instead. */
+  protected readonly everyoneQuotaHint = computed<string | null>(() => {
+    if (this.audienceMode() !== 'everyone' || this.channelSignal() !== 'whatsapp') return null;
+    const c = this.capacity();
+    if (!c || c.is_unlimited) return null;
+    return (
+      `${c.remaining.toLocaleString()} WhatsApp sends left today. If "Everyone" is larger, ` +
+      `the rest are skipped or queue for tomorrow.`
+    );
+  });
+
+  /** Load failures for the step-1/2 pickers. Without these a network
+   *  blip rendered the "you have none yet — create one" empty state and
+   *  blocked the wizard. */
+  protected readonly templatesError = signal(false);
+  protected readonly groupsError = signal(false);
+  protected readonly emailAccountsError = signal(false);
+
+  /** In-flight audience "Load more" — cancelled when the filter changes
+   *  so rows from the old filter never land in the new list. */
+  private loadMoreSub: Subscription | null = null;
+
+  /** Earliest schedulable time (local `YYYY-MM-DDTHH:mm`) — the date
+   *  picker greys out the past. Computed when the modal opens. */
+  protected readonly minScheduleLocal = format(new Date(), "yyyy-MM-dd'T'HH:mm");
+  /** Current schedule value (signal mirror) for the "time has passed" note. */
+  protected readonly scheduleValue = signal<string | null>(null);
 
   @Output() readonly created = new EventEmitter<Campaign>();
   @Output() readonly cancel = new EventEmitter<void>();
@@ -165,7 +223,6 @@ export class CreateCampaignModalComponent {
   /** A future `schedule_at` makes the backend arm the campaign on
    *  create (status Scheduled) — the submit button + copy say so. */
   protected readonly hasFutureSchedule = signal(false);
-  protected readonly submitError = signal<string | null>(null);
 
   // --- Audience builder state (Step 3.5.9) --------------------------
 
@@ -547,6 +604,12 @@ export class CreateCampaignModalComponent {
    *  controls themselves aren't signals; without this bridge the
    *  ``canAdvance`` computed wouldn't invalidate on keystrokes. */
   protected readonly nameValue = signal<string>('');
+  /** Signal mirrors of the Custom-filter Search / Tag inputs. The gate
+   *  below used to read them via `form.getRawValue()` (not a signal), so
+   *  clearing the only condition kept Next enabled — and the campaign
+   *  saved with an empty filter, which the backend reads as EVERYONE. */
+  protected readonly audienceQValue = signal<string>('');
+  protected readonly audienceTagValue = signal<string>('');
 
   /** Step 1 (Basics) is complete when the campaign has a name AND the
    *  audience selection is coherent — "Everyone" is always valid, a
@@ -564,10 +627,9 @@ export class CreateCampaignModalComponent {
     if (mode === 'group') return this.selectedGroupId() !== null;
     // filter mode
     if (this.selectedContactMap().size > 0) return true;
-    const v = this.form.getRawValue();
     return Boolean(
-      v.audience_q?.trim() ||
-      v.audience_tag?.trim() ||
+      this.audienceQValue().trim() ||
+      this.audienceTagValue().trim() ||
       this.leadStatusFilter().length > 0 ||
       this.leadStageFilter().length > 0 ||
       this.leadSourceFilter().length > 0 ||
@@ -599,6 +661,90 @@ export class CreateCampaignModalComponent {
     if (target === 2 && !this.step1Complete()) return;
     if (target === 3 && (!this.step1Complete() || !this.step2Complete())) return;
     this.step.set(target);
+  }
+
+  /** Why the current step can't advance — names each missing piece. */
+  private missingForStep(step: 1 | 2 | 3): string[] {
+    const missing: string[] = [];
+    if (step === 1) {
+      if (!this.nameValue().trim()) missing.push('a campaign name');
+      if (!this.channelSignal()) missing.push('a channel');
+      const mode = this.audienceMode();
+      if (mode === 'group' && this.selectedGroupId() === null) missing.push('a saved group');
+      if (mode === 'filter' && !this.step1Complete() && this.nameValue().trim()) {
+        missing.push('at least one filter condition (or ticked contacts)');
+      }
+    }
+    if (step === 2) {
+      if (this.selectedTemplateId() === null) missing.push('a template');
+      const bindings = this.variables();
+      for (const n of this.templateVariableNumbers()) {
+        const b = bindings[String(n)];
+        if (!b || !b.value.trim()) missing.push(`a value for {{${n}}}`);
+      }
+      if (this.isEmailChannel()) {
+        const v = this.emailBranchState();
+        if (!v.email_account_id && !v.smtp_sender_id) missing.push('a sender identity');
+        if (!v.sender_name.trim()) missing.push('a sender name');
+        if (!v.subject.trim()) missing.push('a subject');
+        if (this.replyToInvalid()) missing.push('a valid Reply-to address');
+      }
+    }
+    return missing;
+  }
+
+  /** Next — advances, or says exactly what's missing (the old disabled
+   *  button only explained itself in a tooltip phones never show). */
+  protected onNextClick(): void {
+    const s = this.step();
+    const before = s;
+    this.nextStep();
+    if (this.step() !== before) return;
+    this.form.markAllAsTouched();
+    const missing = this.missingForStep(s);
+    if (missing.length) {
+      this.formToast.requiredFieldsMissing(`Still needed: ${missing.join(', ')}.`);
+    }
+  }
+
+  private cantSave(message: string): void {
+    this.toast.warn("Can't save the campaign yet", { subtitle: message });
+  }
+
+  /** True once the operator has entered anything worth keeping. */
+  private hasChanges(): boolean {
+    return (
+      this.form.dirty ||
+      this.step() > 1 ||
+      this.selectedTemplateId() !== null ||
+      this.audienceMode() !== 'everyone'
+    );
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (!this.confirming) void this.requestClose();
+  }
+
+  /** Cancel / Esc / backdrop — asks before throwing away a half-built
+   *  campaign; never while the create request is in flight. */
+  protected async requestClose(): Promise<void> {
+    if (this.submitting()) return;
+    if (this.hasChanges()) {
+      this.confirming = true;
+      try {
+        const ok = await this.confirmDialog.ask({
+          title: 'Discard this campaign?',
+          body: 'Everything you entered in this wizard will be lost.',
+          confirmLabel: 'Discard',
+          danger: true,
+        });
+        if (!ok) return;
+      } finally {
+        this.confirming = false;
+      }
+    }
+    this.close();
   }
 
   protected nextStep(): void {
@@ -707,7 +853,10 @@ export class CreateCampaignModalComponent {
       .subscribe(_pushEmailBranchState);
     this.form.controls.schedule_at.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((v) => this.hasFutureSchedule.set(!!v && new Date(v).getTime() > Date.now()));
+      .subscribe((v) => {
+        this.scheduleValue.set(v);
+        this.hasFutureSchedule.set(!!v && new Date(v).getTime() > Date.now());
+      });
 
     // Step 15 — load templates whenever the channel changes. Each
     // channel's published templates come from the central library;
@@ -730,6 +879,17 @@ export class CreateCampaignModalComponent {
         // first time the operator picks Email. When they switch away,
         // clear the mailbox selection so the payload never carries a
         // stale email_account_id on a WA campaign.
+        // Sender name + subject are required for Email (Save already
+        // insisted); as real validators the inline field errors show.
+        const isEmail = channel === 'email';
+        this.form.controls.sender_name.setValidators(
+          isEmail ? [Validators.required, Validators.maxLength(120)] : [Validators.maxLength(120)],
+        );
+        this.form.controls.subject.setValidators(
+          isEmail ? [Validators.required, Validators.maxLength(998)] : [Validators.maxLength(998)],
+        );
+        this.form.controls.sender_name.updateValueAndValidity({ emitEvent: false });
+        this.form.controls.subject.updateValueAndValidity({ emitEvent: false });
         if (channel === 'email') {
           if (this.emailAccounts() === null) {
             this._loadEmailAccounts();
@@ -808,10 +968,16 @@ export class CreateCampaignModalComponent {
     });
     this.form.controls.audience_q.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.audiencePreview$.next());
+      .subscribe((v) => {
+        this.audienceQValue.set(v ?? '');
+        this.audiencePreview$.next();
+      });
     this.form.controls.audience_tag.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.audiencePreview$.next());
+      .subscribe((v) => {
+        this.audienceTagValue.set(v ?? '');
+        this.audiencePreview$.next();
+      });
 
     // Reset variable bindings whenever the selected template changes
     // — pre-fill each `{{n}}` with an empty static binding.
@@ -892,7 +1058,12 @@ export class CreateCampaignModalComponent {
     if (!this.isEmailChannel()) return false;
     const v = this.emailBranchState().reply_to.trim();
     if (!v) return false; // Empty is fine — the field is optional.
-    return !CreateCampaignModalComponent.isPlausibleEmail(v);
+    // Also honour the form's own email validator: the loose check alone
+    // let addresses through that Save then silently refused.
+    return (
+      !CreateCampaignModalComponent.isPlausibleEmail(v) ||
+      this.form.controls.reply_to.hasError('email')
+    );
   });
 
   /** True when the Email branch is missing any of its required fields
@@ -918,13 +1089,21 @@ export class CreateCampaignModalComponent {
 
   private _loadEmailAccounts(): void {
     this.emailAccountsLoading.set(true);
+    this.emailAccountsError.set(false);
     this.emailSendersApi
       .list()
       .pipe(
-        catchError(() => of<UnifiedSender[]>([])),
+        catchError(() => {
+          this.emailAccountsError.set(true);
+          return of<UnifiedSender[] | null>(null);
+        }),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((rows) => {
+        if (rows === null) {
+          this.emailAccountsLoading.set(false);
+          return;
+        }
         // Only sendable senders — verified SMTP identities and OAuth
         // mailboxes with a live refresh token. Backend already skips
         // disconnected OAuth rows from the list, but filtering here
@@ -1083,16 +1262,31 @@ export class CreateCampaignModalComponent {
   }
 
   private _loadGroups(): void {
+    this.groupsError.set(false);
     this.groupsApi
-      .list(1, 100)
-      .pipe(
-        catchError(() => of({ items: [], total: 0, page: 1, size: 0 })),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe((response) => {
-        this.groups.set(response.items);
-        this.groupsLoaded.set(true);
+      .list(1, 200)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => {
+          this.groups.set(response.items);
+          this.groupsLoaded.set(true);
+        },
+        // A failure must not read as "No saved groups yet".
+        error: () => this.groupsError.set(true),
       });
+  }
+
+  protected retryGroups(): void {
+    this._loadGroups();
+  }
+
+  protected retryEmailAccounts(): void {
+    this._loadEmailAccounts();
+  }
+
+  protected retryTemplates(): void {
+    const channel = this.channelSignal();
+    if (channel) this._loadTemplates(channel);
   }
 
   private _currentAudiencePreviewObservable() {
@@ -1146,6 +1340,9 @@ export class CreateCampaignModalComponent {
     // page(1) is always the state that lands here from the debounced
     // filter subject.
     this.audiencePreviewPage.set(1);
+    this.loadMoreSub?.unsubscribe();
+    this.loadMoreSub = null;
+    this.audiencePreviewLoadingMore.set(false);
     this.audiencePreviewLoading.set(true);
     this.audienceCountLoading.set(true);
     return this._fetchAudiencePage(1).pipe(
@@ -1194,15 +1391,21 @@ export class CreateCampaignModalComponent {
     if (!this.hasMoreAudience()) return;
     const nextPage = this.audiencePreviewPage() + 1;
     this.audiencePreviewLoadingMore.set(true);
-    this._fetchAudiencePage(nextPage)
-      .pipe(
-        catchError(() => of({ items: [] as ContactListItem[], total: 0, page: nextPage, size: 0 })),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe((resp) => {
-        this.audiencePreviewRows.update((prev) => [...prev, ...resp.items]);
-        this.audiencePreviewPage.set(nextPage);
-        this.audiencePreviewLoadingMore.set(false);
+    this.loadMoreSub = this._fetchAudiencePage(nextPage)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resp) => {
+          this.audiencePreviewRows.update((prev) => [...prev, ...resp.items]);
+          this.audiencePreviewPage.set(nextPage);
+          this.audiencePreviewLoadingMore.set(false);
+        },
+        // Don't advance the page on failure — the next click retries it.
+        error: (err: HttpErrorResponse) => {
+          this.audiencePreviewLoadingMore.set(false);
+          this.toast.error('Could not load more contacts', {
+            subtitle: extractApiError(err) ?? undefined,
+          });
+        },
       });
   }
 
@@ -1250,6 +1453,7 @@ export class CreateCampaignModalComponent {
     }
     this.templatesLoading.set(true);
     this.templatesLoaded.set(false);
+    this.templatesError.set(false);
     this.templates.set([]);
     // The campaign channel set includes 'web' for the widget; the
     // central library doesn't carry web templates (push covers that
@@ -1280,16 +1484,20 @@ export class CreateCampaignModalComponent {
         next: (res) => {
           const rows: PickerRow[] = res.items.map((row) => toPickerRow(row));
           this.templatesCache.set(channel, rows);
+          // A late response for a channel the operator already switched
+          // away from must not replace the current channel's list.
+          if (this.channelSignal() !== channel) return;
           this.templates.set(rows);
           this.templatesLoaded.set(true);
           this.templatesLoading.set(false);
         },
         error: () => {
+          if (this.channelSignal() !== channel) return;
           this.templatesLoading.set(false);
-          this.templatesLoaded.set(true);
+          this.templatesLoaded.set(false);
           this.templates.set([]);
-          // Don't block the modal on template load failure — operator
-          // can still use the free-text fallback.
+          // Shown as "Couldn't load — Retry", not as "no templates yet".
+          this.templatesError.set(true);
         },
       });
   }
@@ -1371,9 +1579,38 @@ export class CreateCampaignModalComponent {
     return c.remaining === 0;
   });
 
+  /** Form submit (Enter key or the final button). Steps 1–2 have no
+   *  submit button, but Enter in a single text field still submits the
+   *  form — on those steps it means "Next", never "save now". */
+  protected onFormSubmit(): void {
+    if (this.step() !== 3) {
+      this.nextStep();
+      return;
+    }
+    this.save();
+  }
+
+  private static readonly FIELD_STEP: Record<string, { step: 1 | 2 | 3; label: string }> = {
+    name: { step: 1, label: 'Name' },
+    channel: { step: 1, label: 'Channel' },
+    sender_name: { step: 2, label: 'Sender name' },
+    reply_to: { step: 2, label: 'Reply-to' },
+    subject: { step: 2, label: 'Subject' },
+    preheader: { step: 2, label: 'Preheader' },
+  };
+
   protected save(): void {
     if (!this.form.valid) {
       this.form.markAllAsTouched();
+      // Say what's wrong and show it — the bad field is usually on an
+      // earlier step, so a silent refusal here looked like a dead button.
+      const bad = Object.entries(this.form.controls)
+        .filter(([, c]) => c.invalid)
+        .map(([k]) => CreateCampaignModalComponent.FIELD_STEP[k] ?? { step: 3, label: k });
+      if (bad.length) {
+        this.step.set(Math.min(...bad.map((b) => b.step)) as 1 | 2 | 3);
+        this.formToast.invalidFields(bad.map((b) => b.label));
+      }
       return;
     }
     const v = this.form.getRawValue();
@@ -1388,7 +1625,7 @@ export class CreateCampaignModalComponent {
     if (mode === 'group') {
       const gid = this.selectedGroupId();
       if (!gid) {
-        this.submitError.set('Pick a saved group, or switch to a different audience mode.');
+        this.cantSave('Pick a saved group, or switch to a different audience mode.');
         return;
       }
       audience.group_id = gid;
@@ -1406,6 +1643,15 @@ export class CreateCampaignModalComponent {
         if (this.leadSourceFilter().length) audience.lead_source = this.leadSourceFilter();
         if (this.leadFormFilter().length) audience.lead_form_id = this.leadFormFilter();
       }
+      // An empty filter means EVERYONE to the backend. Custom-filter mode
+      // must never fall through to that silently.
+      if (Object.keys(audience).length === 0) {
+        this.step.set(1);
+        this.cantSave(
+          'Your custom filter has no conditions — add one, or choose "Everyone" to message all contacts.',
+        );
+        return;
+      }
     }
     // 'everyone' mode leaves `audience` as {} — backend treats as
     // "all org contacts" (already the existing default behaviour).
@@ -1414,7 +1660,7 @@ export class CreateCampaignModalComponent {
     // gates progression, but a rogue Save keystroke could still fire —
     // catch it before we build a payload with a null channel.
     if (!v.channel) {
-      this.submitError.set('Pick a channel on step 1 before saving.');
+      this.cantSave('Pick a channel on step 1 before saving.');
       return;
     }
     const channel = v.channel;
@@ -1423,14 +1669,14 @@ export class CreateCampaignModalComponent {
     // the Next button on step 2 already blocks progression without a
     // template, so a rogue Save keystroke can't slip past.
     if (this.selectedTemplateId() === null) {
-      this.submitError.set('Pick a template on step 2 before saving.');
+      this.cantSave('Pick a template on step 2 before saving.');
       return;
     }
     const bindings = this.variables();
     for (const n of this.templateVariableNumbers()) {
       const b = bindings[String(n)];
       if (!b || !b.value.trim()) {
-        this.submitError.set(`Fill in a value for variable {{${n}}}.`);
+        this.cantSave(`Fill in a value for variable {{${n}}}.`);
         return;
       }
     }
@@ -1446,13 +1692,29 @@ export class CreateCampaignModalComponent {
       if (!(v.sender_name && v.sender_name.trim())) missing.push('a sender name');
       if (!(v.subject && v.subject.trim())) missing.push('a subject');
       if (missing.length) {
-        this.submitError.set(`Email campaigns need ${missing.join(', ')}.`);
+        this.cantSave(`Email campaigns need ${missing.join(', ')}.`);
+        return;
+      }
+    }
+
+    if (v.is_ab_test) {
+      const abProblem = !v.variant_a_template_id
+        ? 'Pick a template for Variant A.'
+        : !v.variant_b_template_id
+          ? 'Pick a template for Variant B.'
+          : v.variant_a_template_id === v.variant_b_template_id
+            ? 'Variants A and B use the same template — pick two different ones.'
+            : !v.winner_metric
+              ? 'Choose how the winner is decided.'
+              : null;
+      if (abProblem) {
+        this.step.set(3);
+        this.cantSave(abProblem);
         return;
       }
     }
 
     this.submitting.set(true);
-    this.submitError.set(null);
     this.api
       .create({
         name: v.name,
@@ -1492,16 +1754,24 @@ export class CreateCampaignModalComponent {
       .subscribe({
         next: (campaign) => {
           this.submitting.set(false);
+          this.toast.success(this.hasFutureSchedule() ? 'Campaign scheduled' : 'Draft saved', {
+            subtitle: campaign.name,
+          });
           this.created.emit(campaign);
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
-          this.submitError.set(extractApiError(err) ?? 'Could not create campaign.');
+          this.toast.error('Could not create the campaign', {
+            subtitle: extractApiError(err) ?? undefined,
+          });
         },
       });
   }
 
   protected close(): void {
+    // The create request is already on its way — closing now would drop
+    // the response and leave the new campaign missing from the list.
+    if (this.submitting()) return;
     this.cancel.emit();
   }
 }

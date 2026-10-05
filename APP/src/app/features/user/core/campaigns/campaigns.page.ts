@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   inject,
   signal,
@@ -13,6 +14,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { environment } from '../../../../../environments/environment';
 import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
+import { ToastService } from '@shared/components/toast/toast.service';
 import {
   Campaign,
   CampaignDashboardStats,
@@ -23,6 +25,9 @@ import { CreateCampaignModalComponent } from './create-campaign-modal.component'
 
 /** How often the list re-checks while a campaign is scheduled or running. */
 const LIVE_REFRESH_MS = 15_000;
+
+/** Campaigns per request; "Load more" fetches the next page. */
+const PAGE_SIZE = 100;
 
 /** Minimal shape returned by `GET /users` — enough to resolve
  *  `created_by_id` → display name for the Created By column. */
@@ -55,21 +60,21 @@ const CHANNEL_STYLES: Record<string, ChannelStyle> = {
   whatsapp: {
     label: 'WhatsApp',
     cls: 'bg-emerald-50 text-emerald-600',
-    icon: '💬',
+    icon: 'message-circle',
   },
   email: {
     label: 'Email',
     cls: 'bg-surface-2 text-muted',
-    icon: '✉',
+    icon: 'mail',
   },
-  sms: { label: 'SMS', cls: 'bg-surface-2 text-default', icon: '📱' },
-  facebook: { label: 'Facebook', cls: 'bg-blue-100 text-blue-700', icon: 'f' },
+  sms: { label: 'SMS', cls: 'bg-surface-2 text-default', icon: 'smartphone' },
+  facebook: { label: 'Facebook', cls: 'bg-blue-100 text-blue-700', icon: 'facebook' },
   instagram: {
     label: 'Instagram',
     cls: 'bg-fuchsia-100 text-fuchsia-700',
-    icon: '📸',
+    icon: 'instagram',
   },
-  web: { label: 'Web', cls: 'bg-sky-100 text-sky-700', icon: '🌐' },
+  web: { label: 'Web', cls: 'bg-sky-100 text-sky-700', icon: 'globe' },
 };
 
 /** Status pill palettes match preview Screen 1's ``.chip`` variants. */
@@ -124,10 +129,18 @@ export class CampaignsPageComponent {
   private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
   private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly toast = inject(ToastService);
 
   protected readonly items = signal<Campaign[]>([]);
   protected readonly loading = signal(false);
+  /** List load failure only — row actions report through toasts. */
   protected readonly loadError = signal<string | null>(null);
+
+  /** Server-side total for the current (archived / default) slice. */
+  protected readonly total = signal(0);
+  private readonly page = signal(1);
+  protected readonly loadingMore = signal(false);
+  protected readonly hasMore = computed(() => this.items().length < this.total());
   /** Aggregated this-month KPIs powering the top cards. `null` until
    *  the first fetch resolves; failure keeps it `null` so the cards
    *  render "—" without swallowing the list load. */
@@ -213,7 +226,8 @@ export class CampaignsPageComponent {
     const pct = (r: number | null | undefined): string =>
       r === null || r === undefined ? '—' : `${Math.round(r * 100)}%`;
     return {
-      thisMonth: ds?.sent ?? 0,
+      // "—" until the dashboard numbers arrive (it used to read 0).
+      thisMonth: ds ? ds.sent.toLocaleString() : '—',
       deliveryRate: pct(ds?.delivery_rate),
       readRate: pct(ds?.read_rate),
       running: byStatus('running'),
@@ -244,10 +258,22 @@ export class CampaignsPageComponent {
     const live = this.items().some((c) => c.status === 'scheduled' || c.status === 'running');
     if (!live) return;
     this.api
-      .list(1, 100, {})
+      .list(1, PAGE_SIZE, {})
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (resp) => this.applyItems(resp.items),
+        next: (resp) => {
+          // Merge rather than replace, so rows fetched via "Load more"
+          // stay on screen: refresh the ones we got back, add new ones
+          // at the top.
+          const current = this.items();
+          const fresh = new Map(resp.items.map((r) => [r.id, r]));
+          const known = new Set(current.map((r) => r.id));
+          this.applyItems([
+            ...resp.items.filter((r) => !known.has(r.id)),
+            ...current.map((r) => fresh.get(r.id) ?? r),
+          ]);
+          this.total.set(Math.max(resp.total, this.total()));
+        },
         error: () => undefined,
       });
     this.api
@@ -279,12 +305,14 @@ export class CampaignsPageComponent {
     // soft-archived rows out of the default response, so we swap in
     // ``archived_only=true`` when the operator picks it.
     const archivedOnly = this.statusFilter() === 'archived';
+    this.page.set(1);
     this.api
-      .list(1, 100, archivedOnly ? { archived_only: true } : {})
+      .list(1, PAGE_SIZE, archivedOnly ? { archived_only: true } : {})
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (resp) => {
           this.applyItems(resp.items);
+          this.total.set(resp.total);
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
@@ -315,6 +343,32 @@ export class CampaignsPageComponent {
       });
   }
 
+  /** Next page of campaigns (same archived / default slice). */
+  protected loadMore(): void {
+    if (this.loadingMore() || !this.hasMore()) return;
+    const next = this.page() + 1;
+    const archivedOnly = this.statusFilter() === 'archived';
+    this.loadingMore.set(true);
+    this.api
+      .list(next, PAGE_SIZE, archivedOnly ? { archived_only: true } : {})
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resp) => {
+          const known = new Set(this.items().map((r) => r.id));
+          this.items.update((rows) => [...rows, ...resp.items.filter((r) => !known.has(r.id))]);
+          this.total.set(resp.total);
+          this.page.set(next);
+          this.loadingMore.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.loadingMore.set(false);
+          this.toast.error('Could not load more campaigns', {
+            subtitle: extractApiError(err) ?? undefined,
+          });
+        },
+      });
+  }
+
   protected openModal(): void {
     this.modalOpen.set(true);
   }
@@ -322,6 +376,7 @@ export class CampaignsPageComponent {
   protected onCreated(campaign: Campaign): void {
     this.modalOpen.set(false);
     this.items.update((rows) => [campaign, ...rows]);
+    this.total.update((n) => n + 1);
   }
 
   protected onCancel(): void {
@@ -335,15 +390,51 @@ export class CampaignsPageComponent {
     // banner + link the user at Store Profile / Sender Setup rather
     // than dumping the raw 400 detail on them.
     this.busyId.set(c.id);
-    this.loadError.set(null);
     this.api
       .readiness(c.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (readiness) => {
+        next: async (readiness) => {
           if (readiness.blockers.length > 0) {
             this.busyId.set(null);
-            this.loadError.set(readiness.blockers[0].message);
+            this.toast.warn(`“${c.name}” can't start yet`, {
+              subtitle: readiness.blockers.map((b) => b.message).join(' · '),
+              durationMs: 10000,
+            });
+            return;
+          }
+          // Confirm before anything is sent — the pre-flight already
+          // knows who will (and won't) receive it.
+          const retry = c.status === 'failed';
+          const n = readiness.eligible_count;
+          if (!retry && n === 0) {
+            this.busyId.set(null);
+            this.toast.warn(`No one to send “${c.name}” to`, {
+              subtitle:
+                'Every contact in the audience is opted out, missing an address, or bounced.',
+            });
+            return;
+          }
+          const excluded = [
+            readiness.excluded_opted_out ? `${readiness.excluded_opted_out} opted out` : '',
+            readiness.excluded_no_email ? `${readiness.excluded_no_email} without an email` : '',
+            readiness.excluded_bounced ? `${readiness.excluded_bounced} bounced` : '',
+          ].filter(Boolean);
+          const lines = [
+            retry
+              ? 'Messages that failed are sent again.'
+              : `It goes out now to ${n.toLocaleString()} contact${n === 1 ? '' : 's'} on ${this.channelStyle(c.channel).label}.`,
+            excluded.length ? `Skipped: ${excluded.join(', ')}.` : '',
+            ...readiness.warnings.map((w) => `⚠ ${w.message}`),
+          ].filter(Boolean);
+          const ok = await this.confirmDialog.ask({
+            title: retry ? `Retry “${c.name}”?` : `Send “${c.name}” now?`,
+            body: lines.join(' '),
+            confirmLabel: retry ? 'Retry' : `Send to ${n.toLocaleString()}`,
+            cancelLabel: 'Not now',
+          });
+          if (!ok) {
+            this.busyId.set(null);
             return;
           }
           this.api
@@ -352,17 +443,24 @@ export class CampaignsPageComponent {
             .subscribe({
               next: () => {
                 this.busyId.set(null);
+                this.toast.success(retry ? 'Retry started' : 'Campaign started', {
+                  subtitle: c.name,
+                });
                 this.reload();
               },
               error: (err: HttpErrorResponse) => {
                 this.busyId.set(null);
-                this.loadError.set(extractApiError(err) ?? 'Could not start campaign.');
+                this.toast.error(`Could not start “${c.name}”`, {
+                  subtitle: extractApiError(err) ?? undefined,
+                });
               },
             });
         },
         error: (err: HttpErrorResponse) => {
           this.busyId.set(null);
-          this.loadError.set(extractApiError(err) ?? 'Could not check readiness.');
+          this.toast.error('Could not check the campaign before sending', {
+            subtitle: extractApiError(err) ?? undefined,
+          });
         },
       });
   }
@@ -409,10 +507,14 @@ export class CampaignsPageComponent {
         next: () => {
           this.busyId.set(null);
           this.items.update((rows) => rows.filter((r) => r.id !== c.id));
+          this.total.update((n) => Math.max(0, n - 1));
+          this.toast.success('Campaign deleted', { subtitle: c.name });
         },
         error: (err: HttpErrorResponse) => {
           this.busyId.set(null);
-          this.loadError.set(extractApiError(err) ?? 'Could not delete campaign.');
+          this.toast.error(`Could not delete “${c.name}”`, {
+            subtitle: extractApiError(err) ?? undefined,
+          });
         },
       });
   }
@@ -450,11 +552,17 @@ export class CampaignsPageComponent {
             this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           } else {
             this.items.update((rows) => rows.filter((r) => r.id !== updated.id));
+            this.total.update((n) => Math.max(0, n - 1));
           }
+          this.toast.success('Campaign archived', {
+            subtitle: 'Find it under the Archived filter.',
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.busyId.set(null);
-          this.loadError.set(extractApiError(err) ?? 'Could not archive campaign.');
+          this.toast.error(`Could not archive “${c.name}”`, {
+            subtitle: extractApiError(err) ?? undefined,
+          });
         },
       });
   }
@@ -480,13 +588,17 @@ export class CampaignsPageComponent {
           if (this.statusFilter() === 'archived') {
             // Row no longer matches the archived-only slice — drop it.
             this.items.update((rows) => rows.filter((r) => r.id !== updated.id));
+            this.total.update((n) => Math.max(0, n - 1));
           } else {
             this.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           }
+          this.toast.success('Campaign unarchived', { subtitle: c.name });
         },
         error: (err: HttpErrorResponse) => {
           this.busyId.set(null);
-          this.loadError.set(extractApiError(err) ?? 'Could not unarchive campaign.');
+          this.toast.error(`Could not unarchive “${c.name}”`, {
+            subtitle: extractApiError(err) ?? undefined,
+          });
         },
       });
   }
@@ -541,7 +653,9 @@ export class CampaignsPageComponent {
   protected downloadCsv(): void {
     const rows = this.filteredItems();
     if (rows.length === 0) {
-      this.loadError.set('Nothing to export — the current filter matches no campaigns.');
+      this.toast.info('Nothing to export', {
+        subtitle: 'The current filter matches no campaigns.',
+      });
       return;
     }
     const header = [
@@ -591,6 +705,7 @@ export class CampaignsPageComponent {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    this.toast.success('Export downloaded', { subtitle: link.download });
   }
 
   // --- Selection ---------------------------------------------------
@@ -703,6 +818,20 @@ export class CampaignsPageComponent {
     this.bulkBusy.set(true);
     let remaining = deletable.length;
     let failed = 0;
+    const settle = (): void => {
+      remaining -= 1;
+      if (remaining > 0) return;
+      this.bulkBusy.set(false);
+      const done = deletable.length - failed;
+      const plural = (n: number): string => `${n} campaign${n === 1 ? '' : 's'}`;
+      if (failed === 0) {
+        this.toast.success(`Deleted ${plural(done)}`);
+      } else {
+        this.toast.warn(`Deleted ${plural(done)}`, {
+          subtitle: `${plural(failed)} could not be deleted.`,
+        });
+      }
+    };
     for (const row of deletable) {
       this.api
         .delete(row.id)
@@ -710,31 +839,39 @@ export class CampaignsPageComponent {
         .subscribe({
           next: () => {
             this.items.update((items) => items.filter((i) => i.id !== row.id));
+            this.total.update((n) => Math.max(0, n - 1));
             this.selectedIds.update((set) => {
               const next = new Set(set);
               next.delete(row.id);
               return next;
             });
-            remaining -= 1;
-            if (remaining === 0) {
-              this.bulkBusy.set(false);
-              if (failed > 0) {
-                this.loadError.set(`${failed} campaign(s) could not be deleted.`);
-              }
-            }
+            settle();
           },
           error: () => {
             failed += 1;
-            remaining -= 1;
-            if (remaining === 0) {
-              this.bulkBusy.set(false);
-              if (failed > 0) {
-                this.loadError.set(`${failed} campaign(s) could not be deleted.`);
-              }
-            }
+            settle();
           },
         });
     }
+  }
+
+  /** Count shown on a status chip (loaded rows; none for All / Archived). */
+  protected chipCount(value: StatusFilter): number | null {
+    if (value === 'all' || value === 'archived' || this.statusFilter() === 'archived') return null;
+    const s = this.stats();
+    const map: Record<CampaignStatus, number> = {
+      draft: s.draft,
+      scheduled: s.scheduled,
+      running: s.running,
+      done: s.sent,
+      failed: s.failed,
+    };
+    return map[value];
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this.channelMenuOpen()) this.channelMenuOpen.set(false);
   }
 
   protected pickChannel(value: ChannelFilter): void {

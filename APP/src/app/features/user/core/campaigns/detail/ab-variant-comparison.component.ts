@@ -78,6 +78,13 @@ interface AbComparisonReport {
                 <lucide-icon name="check-check" class="h-3 w-3" />
                 Winner: Variant {{ r.winning_variant }}
               </span>
+            } @else if (r.a.sent + r.b.sent === 0) {
+              <span
+                class="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium text-muted ring-1 ring-subtle"
+              >
+                <lucide-icon name="clock" class="h-3 w-3" />
+                Not sent yet
+              </span>
             } @else {
               <span
                 class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200"

@@ -1,7 +1,16 @@
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-  <div class="w-full max-w-2xl rounded-lg bg-surface p-5 shadow-xl max-h-[90vh] overflow-y-auto">
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+  (click)="requestClose()"
+>
+  <div
+    class="w-full max-w-2xl rounded-lg bg-surface p-5 shadow-xl max-h-[90vh] overflow-y-auto"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="new_campaign_title"
+    (click)="$event.stopPropagation()"
+  >
     <header class="mb-4">
-      <h2 class="text-lg font-semibold text-default">New campaign</h2>
+      <h2 id="new_campaign_title" class="text-lg font-semibold text-default">New campaign</h2>
       <p class="mt-1 text-xs text-muted">
         Save as a draft and click <span class="font-medium">Start</span> from the list when you're
         ready, or pick a schedule time and it sends automatically.
@@ -41,7 +50,7 @@
       }
     </ol>
 
-    <form [formGroup]="form" (ngSubmit)="save()" class="space-y-3">
+    <form [formGroup]="form" (ngSubmit)="onFormSubmit()" class="space-y-3">
       @if (step() === 1) {
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label class="block text-sm">
@@ -51,6 +60,7 @@
             <input
               type="text"
               formControlName="name"
+              maxlength="255"
               class="mt-1 block w-full rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <crm-field-error
@@ -157,12 +167,21 @@
               (click)="onAudienceModeChange('filter')"
             >
               <span class="font-medium text-default">Custom filter</span>
-              <p class="mt-0.5 text-[10px] text-muted">q · lead status/stage/source · tag</p>
+              <p class="mt-0.5 text-[10px] text-muted">Search, lead status / stage / source, tag</p>
             </button>
           </div>
 
           @if (audienceMode() === 'group') {
-            @if (groups().length === 0 && groupsLoaded()) {
+            @if (groupsError()) {
+              <div
+                class="flex items-center justify-between gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1.5 text-xs text-red-700 dark:text-red-300"
+              >
+                Couldn't load your saved groups.
+                <button type="button" class="font-medium underline" (click)="retryGroups()">
+                  Retry
+                </button>
+              </div>
+            } @else if (groups().length === 0 && groupsLoaded()) {
               <div
                 class="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-400"
               >
@@ -173,19 +192,14 @@
                 first, then pick it here.
               </div>
             } @else {
-              <select
+              <crm-mobile-select
+                [options]="groupOptions()"
                 [value]="selectedGroupId() ?? ''"
-                (change)="onSelectedGroupChange($any($event.target).value)"
-                class="block w-full rounded-lg border border-subtle bg-surface px-2 py-1.5 text-xs shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
-              >
-                <option value="">— Pick a saved group —</option>
-                @for (g of groups(); track g.id) {
-                  <option [value]="g.id">
-                    {{ g.name }} ({{ g.is_dynamic ? 'Dynamic' : 'Static'
-                    }}{{ g.member_count !== null ? ' · ' + g.member_count + ' members' : '' }})
-                  </option>
-                }
-              </select>
+                [searchable]="groups().length > 8"
+                searchPlaceholder="Search groups…"
+                placeholder="— Pick a saved group —"
+                (valueChange)="onSelectedGroupChange($event)"
+              />
             }
           }
 
@@ -197,7 +211,7 @@
                  CRM; keep it, drop the free-text contact-source input. -->
             <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label class="block text-sm">
-                <span class="block text-[10px] text-muted">Search (q)</span>
+                <span class="block text-[10px] text-muted">Search</span>
                 <input
                   type="text"
                   formControlName="audience_q"
@@ -529,6 +543,10 @@
             }
           </div>
 
+          @if (everyoneQuotaHint(); as hint) {
+            <p class="rounded-md bg-surface-2 px-2 py-1.5 text-xs text-muted">{{ hint }}</p>
+          }
+
           @if (audienceQuotaWarning(); as w) {
             <div
               class="rounded-md border px-2 py-1.5 text-xs"
@@ -580,6 +598,15 @@
             @if (emailAccountsLoading()) {
               <div class="rounded-md bg-surface-2 px-2 py-1.5 text-xs text-muted">
                 Loading connected mailboxes…
+              </div>
+            } @else if (emailAccountsError()) {
+              <div
+                class="flex items-center justify-between gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1.5 text-xs text-red-700 dark:text-red-300"
+              >
+                Couldn't load your sender identities.
+                <button type="button" class="font-medium underline" (click)="retryEmailAccounts()">
+                  Retry
+                </button>
               </div>
             } @else if (emailAccounts() !== null && emailAccounts()!.length === 0) {
               <div
@@ -725,17 +752,25 @@
           <div class="space-y-3 rounded-md border border-subtle p-3">
             <div class="flex items-center justify-between">
               <span class="text-xs font-medium text-muted"> Template </span>
-              <span class="text-[10px] text-faint">
-                From your template library · /user/templates
-              </span>
+              <span class="text-[10px] text-faint"> From your template library </span>
             </div>
+            @if (templates().length > 6) {
+              <input
+                type="search"
+                [value]="templateSearch()"
+                (input)="templateSearch.set($any($event.target).value)"
+                placeholder="Search templates…"
+                aria-label="Search templates"
+                class="block w-full rounded-lg border border-subtle bg-surface px-2 py-1.5 text-xs text-default shadow-sm focus:border-muted focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            }
 
             <div
               role="listbox"
               aria-label="Template"
               class="max-h-64 divide-y divide-subtle overflow-y-auto rounded-lg border border-subtle bg-surface"
             >
-              @for (t of templates(); track t.id) {
+              @for (t of visibleTemplates(); track t.id) {
                 <button
                   type="button"
                   role="option"
@@ -776,6 +811,11 @@
                     </span>
                   }
                 </button>
+              }
+              @if (visibleTemplates().length === 0) {
+                <p class="px-3 py-4 text-center text-xs text-muted">
+                  No templates match "{{ templateSearch() }}".
+                </p>
               }
             </div>
 
@@ -839,17 +879,26 @@
               }
             }
           </div>
+        } @else if (templatesError()) {
+          <div
+            class="flex items-center justify-between gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-300"
+          >
+            Couldn't load templates.
+            <button type="button" class="font-medium underline" (click)="retryTemplates()">
+              Retry
+            </button>
+          </div>
         } @else if (templatesLoaded() && templates().length === 0) {
           <div
             class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
           >
             @if (isWhatsAppChannel()) {
               No WhatsApp templates yet. Create one in
-              <a routerLink="/user/templates" class="underline">/user/templates</a>, publish it,
-              then click "Submit to Meta" — only approved templates can be sent.
+              <a routerLink="/user/templates" class="underline">Templates</a>, publish it, then
+              click "Submit to Meta" — only approved templates can be sent.
             } @else {
               No published templates for this channel yet. Create one in
-              <a routerLink="/user/templates" class="underline">/user/templates</a>
+              <a routerLink="/user/templates" class="underline">Templates</a>
               and publish it, then come back here.
             }
           </div>
@@ -866,8 +915,18 @@
             Schedule (optional — leave blank to send when you click Start)
           </span>
           <div class="mt-1">
-            <crm-mobile-datetime formControlName="schedule_at" placeholder="Pick date & time" />
+            <crm-mobile-datetime
+              formControlName="schedule_at"
+              placeholder="Pick date & time"
+              [min]="minScheduleLocal"
+            />
           </div>
+          @if (scheduleValue() && !hasFutureSchedule()) {
+            <span class="mt-1 block text-xs text-amber-700 dark:text-amber-300">
+              This time has already passed — pick a future time, or clear it to send when you click
+              Start.
+            </span>
+          }
           @if (hasFutureSchedule()) {
             <span class="mt-1 block text-xs text-muted">
               The campaign is checked now and sends automatically at this time — no Start click
@@ -901,19 +960,12 @@
         }
       }
 
-      @if (submitError(); as err) {
-        <div
-          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
-        >
-          {{ err }}
-        </div>
-      }
-
       <div class="flex items-center justify-between gap-2 pt-2">
         <button
           type="button"
-          (click)="close()"
-          class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2"
+          (click)="requestClose()"
+          [disabled]="submitting()"
+          class="rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Cancel
         </button>
@@ -930,8 +982,13 @@
           @if (step() < 3) {
             <button
               type="button"
-              (click)="nextStep()"
-              [disabled]="(step() === 1 && !step1Complete()) || (step() === 2 && !step2Complete())"
+              (click)="onNextClick()"
+              [class.opacity-50]="
+                (step() === 1 && !step1Complete()) || (step() === 2 && !step2Complete())
+              "
+              [attr.aria-disabled]="
+                (step() === 1 && !step1Complete()) || (step() === 2 && !step2Complete())
+              "
               [title]="
                 step() === 1 && !step1Complete()
                   ? 'Fill in a name and pick an audience to continue.'

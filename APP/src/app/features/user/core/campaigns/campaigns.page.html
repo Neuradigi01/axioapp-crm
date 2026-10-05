@@ -18,18 +18,16 @@
       <button
         type="button"
         (click)="downloadCsv()"
-        class="rounded-md border border-subtle bg-surface px-2 py-1.5 text-[12px] text-default hover:bg-surface-2 sm:px-3 sm:text-[13px]"
+        class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface px-2 py-1.5 text-[12px] text-default hover:bg-surface-2 sm:px-3 sm:text-[13px]"
       >
-        <span class="sm:hidden">↓ CSV</span>
-        <span class="hidden sm:inline">↓ Download CSV</span>
+        <lucide-icon name="download" class="h-3.5 w-3.5" />
+        <span class="sm:hidden">CSV</span>
+        <span class="hidden sm:inline">Download CSV</span>
       </button>
-      <button
-        type="button"
-        (click)="openModal()"
-        class="rounded-md bg-accent px-2.5 py-1.5 text-[12px] font-medium text-white hover:brightness-95 sm:px-3 sm:text-[13px]"
-      >
-        <span class="sm:hidden">+ New</span>
-        <span class="hidden sm:inline">+ New Campaign</span>
+      <button type="button" (click)="openModal()" class="btn btn-primary btn-sm">
+        <lucide-icon name="plus" class="h-4 w-4" />
+        <span class="sm:hidden">New</span>
+        <span class="hidden sm:inline">New Campaign</span>
       </button>
     </div>
   </header>
@@ -62,9 +60,16 @@
 
   @if (loadError(); as err) {
     <div
-      class="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+      class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2"
     >
-      {{ err }}
+      <p class="text-sm text-red-700 dark:text-red-300">{{ err }}</p>
+      <button
+        type="button"
+        (click)="reload()"
+        class="rounded-md border border-subtle bg-surface px-2.5 py-1 text-[12px] font-medium text-default hover:bg-surface-2"
+      >
+        Retry
+      </button>
     </div>
   }
 
@@ -106,14 +111,23 @@
           <button
             type="button"
             (click)="setStatusFilter(chip.value)"
+            [attr.aria-pressed]="statusFilter() === chip.value"
             [class]="
-              'rounded-full border px-3 py-1 text-[12px] font-medium transition ' +
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-medium transition ' +
               (statusFilter() === chip.value
                 ? 'border-accent bg-accent text-white'
                 : 'border-subtle bg-surface text-default hover:bg-surface-2')
             "
           >
             {{ chip.label }}
+            @if (chipCount(chip.value); as n) {
+              <span
+                class="font-mono text-[10.5px] tabular-nums"
+                [class.opacity-80]="statusFilter() === chip.value"
+                [class.text-faint]="statusFilter() !== chip.value"
+                >{{ n }}</span
+              >
+            }
           </button>
         }
       </div>
@@ -135,12 +149,23 @@
             <path d="M21 21l-4.35-4.35" />
           </svg>
           <input
-            type="text"
+            type="search"
             [value]="search()"
             (input)="onSearchInput($event)"
             placeholder="Search campaigns…"
-            class="w-52 border-0 bg-transparent p-0 text-[12px] focus:outline-none focus:ring-0"
+            aria-label="Search campaigns"
+            class="w-40 border-0 bg-transparent p-0 text-[12px] text-default focus:outline-none focus:ring-0 sm:w-52 [&::-webkit-search-cancel-button]:hidden"
           />
+          @if (search()) {
+            <button
+              type="button"
+              (click)="search.set('')"
+              class="text-faint hover:text-default"
+              aria-label="Clear search"
+            >
+              <lucide-icon name="x" class="h-3.5 w-3.5" />
+            </button>
+          }
         </label>
 
         <!-- Channel dropdown -->
@@ -148,6 +173,8 @@
           <button
             type="button"
             (click)="toggleChannelMenu()"
+            aria-haspopup="menu"
+            [attr.aria-expanded]="channelMenuOpen()"
             [class]="
               'rounded-md border px-3 py-1.5 text-[12px] font-medium ' +
               (channelFilter() === 'all'
@@ -159,11 +186,19 @@
           </button>
           @if (channelMenuOpen()) {
             <div
-              class="absolute right-0 top-full z-10 mt-1 w-44 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
+              class="fixed inset-0 z-10"
+              (click)="channelMenuOpen.set(false)"
+              aria-hidden="true"
+            ></div>
+            <div
+              class="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
+              role="menu"
             >
               @for (opt of channelOptions; track opt.value) {
                 <button
                   type="button"
+                  role="menuitemradio"
+                  [attr.aria-checked]="channelFilter() === opt.value"
                   (click)="pickChannel(opt.value)"
                   [class]="
                     'block w-full px-3 py-1.5 text-left text-[12px] ' +
@@ -193,19 +228,48 @@
 
     <!-- Table / empty state / loading -->
     @if (loading()) {
-      <div class="p-10 text-center text-sm text-muted">Loading…</div>
+      <div class="divide-y divide-subtle" aria-busy="true" aria-label="Loading campaigns">
+        @for (i of [0, 1, 2, 3]; track i) {
+          <div class="flex items-center gap-4 px-4 py-4">
+            <div class="h-7 w-7 animate-pulse rounded-lg bg-surface-2"></div>
+            <div class="flex-1">
+              <div class="h-3 w-48 animate-pulse rounded bg-surface-2"></div>
+              <div class="mt-2 h-3 w-28 animate-pulse rounded bg-surface-2"></div>
+            </div>
+            <div class="h-5 w-16 animate-pulse rounded-full bg-surface-2"></div>
+          </div>
+        }
+      </div>
     } @else if (items().length === 0) {
-      <div class="p-14 text-center text-sm text-muted">
-        No campaigns yet. Click
-        <span class="font-medium text-default">+ New Campaign</span> to create your first one.
+      <div class="flex flex-col items-center gap-3 px-4 py-12 text-center">
+        <lucide-icon name="megaphone" class="h-8 w-8 text-faint" />
+        <div>
+          <p class="text-sm font-semibold text-default">
+            {{ statusFilter() === 'archived' ? 'No archived campaigns' : 'No campaigns yet' }}
+          </p>
+          <p class="mt-1 text-[13px] text-muted">
+            {{
+              statusFilter() === 'archived'
+                ? 'Campaigns you archive show up here.'
+                : 'Broadcast a WhatsApp template or an email to your contacts.'
+            }}
+          </p>
+        </div>
+        @if (statusFilter() !== 'archived') {
+          <button type="button" (click)="openModal()" class="btn btn-primary btn-sm">
+            <lucide-icon name="plus" class="h-4 w-4" />
+            New Campaign
+          </button>
+        }
       </div>
     } @else if (filteredItems().length === 0) {
-      <div class="p-14 text-center text-sm text-muted">
-        No campaigns match the current filters.
+      <div class="flex flex-col items-center gap-3 px-4 py-12 text-center">
+        <lucide-icon name="search" class="h-8 w-8 text-faint" />
+        <p class="text-sm font-semibold text-default">No campaigns match these filters</p>
         <button
           type="button"
           (click)="clearFilters()"
-          class="ml-1 font-medium text-default underline hover:text-default"
+          class="rounded-md border border-subtle bg-surface px-3 py-1.5 text-[12px] font-medium text-default hover:bg-surface-2"
         >
           Clear filters
         </button>
@@ -244,7 +308,7 @@
                 [attr.title]="cs.label"
                 [attr.aria-label]="cs.label"
               >
-                {{ cs.icon }}
+                <lucide-icon [name]="cs.icon" class="h-3.5 w-3.5" />
               </span>
             </div>
 
@@ -473,7 +537,7 @@
                     [attr.title]="cs.label"
                     [attr.aria-label]="cs.label"
                   >
-                    {{ cs.icon }}
+                    <lucide-icon [name]="cs.icon" class="h-3.5 w-3.5" />
                   </span>
                 </td>
                 <td class="hidden max-w-[220px] px-4 py-4 align-top md:table-cell">
@@ -605,26 +669,23 @@
         <span>
           Showing {{ filteredItems().length }}
           @if (filteredItems().length !== items().length) {
-            of {{ items().length }}
+            of {{ items().length }} loaded
           }
           {{ filteredItems().length === 1 ? 'campaign' : 'campaigns' }}
+          @if (hasMore()) {
+            · {{ total() }} in total
+          }
         </span>
-        <div class="flex items-center gap-1">
+        @if (hasMore()) {
           <button
             type="button"
-            disabled
-            class="rounded border border-subtle bg-surface px-2 py-0.5 text-[11px] text-faint"
+            (click)="loadMore()"
+            [disabled]="loadingMore()"
+            class="rounded border border-subtle bg-surface px-2.5 py-0.5 text-[11px] font-medium text-default hover:bg-surface-2 disabled:opacity-50"
           >
-            ‹ Prev
+            {{ loadingMore() ? 'Loading…' : 'Load more' }}
           </button>
-          <button
-            type="button"
-            disabled
-            class="rounded border border-subtle bg-surface px-2 py-0.5 text-[11px] text-faint"
-          >
-            Next ›
-          </button>
-        </div>
+        }
       </div>
     }
   </div>
