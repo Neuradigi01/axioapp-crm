@@ -2,6 +2,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  Injector,
+  afterNextRender,
   computed,
   inject,
   signal,
@@ -10,8 +12,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 
 import { Call, CallTranscript, CallsApiService } from '../calls-api.service';
+import { formatCallDuration, formatCallTime } from '../call-format.util';
 
 /**
  * Transcripts tab — left rail of calls (newest first), right pane shows
@@ -32,6 +37,9 @@ import { Call, CallTranscript, CallsApiService } from '../calls-api.service';
 export class CallTranscriptsTabComponent {
   private readonly api = inject(CallsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly injector = inject(Injector);
 
   protected readonly calls = signal<Call[]>([]);
   protected readonly callsLoading = signal(false);
@@ -56,9 +64,33 @@ export class CallTranscriptsTabComponent {
     this.reloadCalls();
   }
 
-  protected pick(id: string): void {
+  /** Switching calls reloads the editor — ask first if the current
+   *  transcript has unsaved edits. */
+  protected async pick(id: string): Promise<void> {
+    if (id === this.selectedId()) return;
+    if (this.textControl.dirty || this.langControl.dirty) {
+      const ok = await this.confirmDialog.ask({
+        title: 'Discard unsaved transcript?',
+        body: 'Your edits to this transcript have not been saved.',
+        confirmLabel: 'Discard',
+        danger: true,
+      });
+      if (!ok) return;
+    }
     this.selectedId.set(id);
     this.loadTranscript(id);
+    // Stacked layout (below `lg`): the editor sits under the list, so
+    // bring it into view instead of leaving the click looking inert.
+    afterNextRender(
+      () => {
+        if (window.matchMedia('(max-width: 1023px)').matches) {
+          document
+            .getElementById('call-transcript-pane')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      },
+      { injector: this.injector },
+    );
   }
 
   protected save(): void {
@@ -78,6 +110,9 @@ export class CallTranscriptsTabComponent {
           this.transcript.set(t);
           this.transcriptHas404.set(false);
           this.saving.set(false);
+          this.textControl.markAsPristine();
+          this.langControl.markAsPristine();
+          this.toast.success('Transcript saved');
         },
         error: (err: HttpErrorResponse) => {
           this.saving.set(false);
@@ -86,9 +121,8 @@ export class CallTranscriptsTabComponent {
       });
   }
 
-  protected formatTimestamp(iso: string): string {
-    return new Date(iso).toLocaleString();
-  }
+  protected readonly formatTimestamp = formatCallTime;
+  protected readonly formatDuration = formatCallDuration;
 
   /** Monotonic id for `reloadCalls()` — same last-write-wins guard as
    *  the sibling tabs. */
@@ -125,8 +159,8 @@ export class CallTranscriptsTabComponent {
     this.transcriptLoading.set(true);
     this.transcriptHas404.set(false);
     this.transcript.set(null);
-    this.textControl.setValue('');
-    this.langControl.setValue('en');
+    this.textControl.reset('');
+    this.langControl.reset('en');
     this.saveError.set(null);
     this.api
       .getTranscript(callId)

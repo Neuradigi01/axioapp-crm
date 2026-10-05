@@ -26,16 +26,35 @@
   }
 
   @if (loading()) {
-    <div
-      class="rounded-xl border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+    <ul
+      class="grid grid-cols-1 gap-3 animate-pulse md:grid-cols-2 lg:grid-cols-3"
+      aria-label="Loading contacts"
     >
-      Loading…
-    </div>
+      @for (i of [0, 1, 2, 3, 4, 5]; track i) {
+        <li class="h-16 rounded-xl border border-subtle bg-surface-2"></li>
+      }
+    </ul>
   } @else if (items().length === 0) {
-    <div
-      class="rounded-lg border border-dashed border-subtle bg-surface p-6 md:p-12 text-center text-sm text-muted"
-    >
-      No contacts with phone numbers to call.
+    <div class="rounded-xl border border-dashed border-subtle bg-surface">
+      @if (lastQuery()) {
+        <app-empty-state
+          icon="filter-x"
+          [title]="'No contacts match “' + lastQuery() + '”'"
+          subtitle="Search matches a contact's name or phone number."
+        >
+          <button type="button" class="btn btn-secondary btn-sm" (click)="clearSearch()">
+            Clear search
+          </button>
+        </app-empty-state>
+      } @else {
+        <app-empty-state
+          icon="phone"
+          title="No contacts with phone numbers yet"
+          subtitle="Contacts appear here once they have a phone number saved."
+        >
+          <a routerLink="/user/contacts" class="btn btn-secondary btn-sm">Go to Contacts</a>
+        </app-empty-state>
+      }
     </div>
   } @else {
     <ul class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">

@@ -6,7 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
@@ -67,6 +67,27 @@ export class CallAnalyticsTabComponent {
     nonNullable: true,
   });
   protected readonly toControl = new FormControl(this._isoDate(new Date()), { nonNullable: true });
+
+  protected readonly today = this._isoDate(new Date());
+  private readonly fromValue = toSignal(this.fromControl.valueChanges, {
+    initialValue: this.fromControl.value,
+  });
+  private readonly toValue = toSignal(this.toControl.valueChanges, {
+    initialValue: this.toControl.value,
+  });
+
+  /** Range check shown inline; `reload()` refuses to fetch while set. */
+  protected readonly rangeError = computed<string | null>(() => {
+    const from = (this.fromValue() || '').trim();
+    const to = (this.toValue() || '').trim();
+    if (!from || !to) return 'Pick both a From and a To date.';
+    if (from > to) return '"From" must be on or before "To".';
+    if (from > this.today) return '"From" cannot be in the future.';
+    return null;
+  });
+
+  /** Last-write-wins guard so overlapping refreshes can't paint old numbers. */
+  private reloadSeq = 0;
 
   // --- chart configs ----------------------------------------------------
 
@@ -133,6 +154,8 @@ export class CallAnalyticsTabComponent {
   }
 
   protected reload(): void {
+    if (this.rangeError()) return;
+    const seq = ++this.reloadSeq;
     this.loading.set(true);
     this.loadError.set(null);
     this.api
@@ -140,10 +163,12 @@ export class CallAnalyticsTabComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (d) => {
+          if (seq !== this.reloadSeq) return;
           this.data.set(d);
           this.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
+          if (seq !== this.reloadSeq) return;
           this.data.set(null);
           this.loading.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load analytics.');

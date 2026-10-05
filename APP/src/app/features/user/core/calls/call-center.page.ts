@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { CallLogsTabComponent } from './tabs/logs.component';
@@ -32,6 +34,10 @@ export type CallTabId = 'logs' | 'phone-book' | 'transcripts' | 'book-appointmen
   templateUrl: './call-center.page.html',
 })
 export class CallCenterPageComponent {
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+
   protected readonly activeTab = signal<CallTabId>('logs');
 
   /** Bumped whenever the header's "Log call" button is clicked so the
@@ -54,21 +60,39 @@ export class CallCenterPageComponent {
     label: t.label,
   }));
 
+  constructor() {
+    // `?tab=` keeps the open tab across refresh / shared links / back.
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const t = params.get('tab');
+      this.activeTab.set(this.isTab(t) ? t : 'logs');
+    });
+  }
+
+  private isTab(v: string | null): v is CallTabId {
+    return this.tabs.some((t) => t.id === v);
+  }
+
   protected setTab(t: CallTabId): void {
     this.activeTab.set(t);
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: t === 'logs' ? null : t },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   /** Bridge from the mobile-select `valueChange` (string) to the typed
-   *  `CallTabId`. Cast is safe: options are built directly from `tabs`. */
+   *  `CallTabId`. */
   protected setTabFromValue(v: string): void {
-    this.activeTab.set(v as CallTabId);
+    if (this.isTab(v)) this.setTab(v);
   }
 
   /** Page-header "Log call" click. Always jumps to the Logs tab first
    *  (so the modal appears in the right context) and then bumps the
    *  trigger the tab watches. */
   protected onLogCall(): void {
-    this.activeTab.set('logs');
+    this.setTab('logs');
     this.logCallTrigger.update((v) => v + 1);
   }
 }

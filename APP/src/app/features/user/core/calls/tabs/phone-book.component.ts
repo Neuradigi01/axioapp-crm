@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
+import { RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 import { ContactListItem, ContactsApiService } from '../../contacts/contacts-api.service';
@@ -10,7 +11,9 @@ import { CallOutcome, CallsApiService } from '../calls-api.service';
 import { CallPickerModalComponent } from '../call-picker-modal.component';
 import { LogCallModalComponent } from '../log-call-modal.component';
 import { initials } from '@core/services/text.util';
+import { EmptyStateComponent } from '../../shared/empty-state/empty-state.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
 
 /**
  * Phone Book tab — searchable contacts list with click-to-call. The
@@ -29,6 +32,8 @@ import { extractApiError } from '@core/services/api-error.util';
     LucideAngularModule,
     CallPickerModalComponent,
     LogCallModalComponent,
+    EmptyStateComponent,
+    RouterLink,
   ],
   templateUrl: './phone-book.component.html',
 })
@@ -37,6 +42,7 @@ export class CallPhoneBookTabComponent {
   private readonly contactsApi = inject(ContactsApiService);
   private readonly callsApi = inject(CallsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   protected readonly items = signal<ContactListItem[]>([]);
   protected readonly loading = signal(false);
@@ -49,6 +55,13 @@ export class CallPhoneBookTabComponent {
   protected readonly modalState = signal<ContactListItem | null>(null);
 
   protected readonly searchControl = new FormControl('', { nonNullable: true });
+
+  /** The query the current results were fetched for (empty-state copy). */
+  protected readonly lastQuery = signal('');
+
+  protected clearSearch(): void {
+    this.searchControl.setValue('');
+  }
 
   constructor() {
     this.reload();
@@ -105,6 +118,7 @@ export class CallPhoneBookTabComponent {
 
   protected onSaved(): void {
     this.modalState.set(null);
+    this.toast.success('Call logged');
   }
 
   /** Monotonic request id — bumped on every `reload()`, checked in
@@ -117,6 +131,7 @@ export class CallPhoneBookTabComponent {
     this.loading.set(true);
     this.loadError.set(null);
     const q = this.searchControl.value.trim();
+    this.lastQuery.set(q);
     this.contactsApi
       .list({ q: q || undefined, size: 200 })
       .pipe(takeUntilDestroyed(this.destroyRef))

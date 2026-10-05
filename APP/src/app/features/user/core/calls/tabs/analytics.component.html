@@ -7,7 +7,7 @@
           [formControl]="fromControl"
           mode="date"
           min="1900-01-01"
-          max="9999-12-31"
+          [max]="today"
           placeholder="Pick a date"
         />
       </div>
@@ -21,7 +21,8 @@
     <button
       type="button"
       (click)="reload()"
-      class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
+      [disabled]="!!rangeError() || loading()"
+      class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
     >
       Refresh
     </button>
@@ -30,6 +31,14 @@
       <span class="ml-1 font-semibold text-default">{{ totalCalls() }}</span>
     </div>
   </div>
+
+  @if (rangeError(); as err) {
+    <p
+      class="mb-3 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
+    >
+      {{ err }}
+    </p>
+  }
 
   @if (loadError(); as err) {
     <div

@@ -10,9 +10,16 @@
       <div class="px-3 py-2 text-xs text-red-400">{{ err }}</div>
     }
     @if (callsLoading()) {
-      <div class="px-3 py-4 md:py-6 text-center text-sm text-muted">Loading…</div>
+      <div class="space-y-2 p-3 animate-pulse" aria-label="Loading calls">
+        @for (i of [0, 1, 2, 3]; track i) {
+          <div class="h-10 rounded-lg bg-surface-2"></div>
+        }
+      </div>
     } @else if (calls().length === 0) {
-      <div class="px-3 py-4 md:py-6 text-center text-sm text-muted">No calls logged yet.</div>
+      <div class="px-3 py-6 text-center text-sm text-muted">
+        No calls logged yet.
+        <span class="mt-1 block text-xs text-faint">Log a call from the Call Logs tab first.</span>
+      </div>
     } @else {
       <ul class="max-h-[60vh] divide-y divide-subtle overflow-y-auto">
         @for (c of calls(); track c.id) {
@@ -25,15 +32,18 @@
                 (selectedId() === c.id ? 'bg-surface-2' : '')
               "
             >
-              <div class="flex items-baseline justify-between">
-                <span class="text-sm font-medium text-default">
-                  {{ c.direction === 'out' ? 'Outgoing' : 'Incoming' }}
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="truncate text-sm font-medium text-default">
+                  {{ c.contact_name || 'Unknown contact' }}
                 </span>
-                <span class="text-[10px] text-muted">
+                <span class="shrink-0 text-[10px] text-muted">
                   {{ formatTimestamp(c.started_at) }}
                 </span>
               </div>
-              <div class="mt-0.5 text-xs text-muted">{{ c.duration_sec }}s</div>
+              <div class="mt-0.5 text-xs text-muted">
+                {{ c.direction === 'out' ? 'Outgoing' : 'Incoming' }} ·
+                {{ formatDuration(c.duration_sec) }}
+              </div>
             </button>
           </li>
         }
@@ -42,16 +52,17 @@
   </aside>
 
   <!-- Right: transcript viewer / editor -->
-  <section class="lg:col-span-2">
+  <section id="call-transcript-pane" class="scroll-mt-4 lg:col-span-2">
     @if (selectedCall(); as call) {
       <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
         <div class="mb-3 flex items-baseline justify-between">
           <div>
             <h3 class="text-sm font-semibold text-default">
-              Transcript — {{ call.direction === 'out' ? 'Outgoing' : 'Incoming' }}
+              Transcript — {{ call.contact_name || 'Unknown contact' }}
             </h3>
             <p class="text-xs text-muted">
-              {{ formatTimestamp(call.started_at) }} · {{ call.duration_sec }}s
+              {{ call.direction === 'out' ? 'Outgoing' : 'Incoming' }} ·
+              {{ formatTimestamp(call.started_at) }} · {{ formatDuration(call.duration_sec) }}
             </p>
           </div>
         </div>

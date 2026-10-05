@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   computed,
@@ -24,6 +25,7 @@ import {
 } from '../contacts/contacts-api.service';
 import { commonValidators } from '../shared/validators';
 import { FormToastHelper } from '../shared/forms/form-toast.helper';
+import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
 import { MobileDateTimeComponent } from '../shared/forms/mobile-datetime.component';
 import { MobileSelectComponent, MobileSelectOption } from '../shared/forms/mobile-select.component';
 import { Call, CallOutcome, CallsApiService } from './calls-api.service';
@@ -67,6 +69,9 @@ export class LogCallModalComponent {
   private readonly contactsApi = inject(ContactsApiService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly formToast = inject(FormToastHelper);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  /** True while the discard-changes confirm is up, so Esc doesn't stack. */
+  private confirming = false;
 
   @Input() set outcomes(list: CallOutcome[]) {
     this._outcomes = list;
@@ -483,7 +488,14 @@ export class LogCallModalComponent {
       });
   }
 
-  protected close(): void {
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (!this.confirming) void this.close();
+  }
+
+  /** Cancel / Esc. Asks before throwing away what was typed. */
+  protected async close(): Promise<void> {
+    if (this.submitting()) return;
     // If the call already landed but the recording upload didn't,
     // treat close as a "give up on the recording" — emit saved so the
     // parent list picks up the new call row instead of leaving it
@@ -492,6 +504,20 @@ export class LogCallModalComponent {
     if (existing !== null) {
       this.saved.emit(existing);
       return;
+    }
+    if (this.form.dirty || this.recordingFile() !== null) {
+      this.confirming = true;
+      try {
+        const ok = await this.confirmDialog.ask({
+          title: 'Discard this call log?',
+          body: 'The details you entered will be lost.',
+          confirmLabel: 'Discard',
+          danger: true,
+        });
+        if (!ok) return;
+      } finally {
+        this.confirming = false;
+      }
     }
     this.cancel.emit();
   }

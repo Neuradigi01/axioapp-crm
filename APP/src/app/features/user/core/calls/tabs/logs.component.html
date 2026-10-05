@@ -1,4 +1,23 @@
 <div>
+  <div class="mb-3 flex flex-wrap items-center gap-2 text-xs" role="group" aria-label="Direction">
+    @for (d of directionChips; track d.v) {
+      <button
+        type="button"
+        (click)="setDirection(d.v)"
+        [attr.aria-pressed]="direction() === d.v"
+        class="rounded-full border px-3 py-1 font-medium transition"
+        [class.border-accent]="direction() === d.v"
+        [class.bg-accent]="direction() === d.v"
+        [class.text-white]="direction() === d.v"
+        [class.border-subtle]="direction() !== d.v"
+        [class.bg-surface]="direction() !== d.v"
+        [class.text-default]="direction() !== d.v"
+      >
+        {{ d.label }}
+      </button>
+    }
+  </div>
+
   @if (loadError(); as err) {
     <div
       class="mb-3 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400"
@@ -16,25 +35,35 @@
   }
 
   @if (loading()) {
-    <div
-      class="rounded-xl border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
-    >
-      Loading…
+    <div class="space-y-2 animate-pulse" aria-label="Loading calls">
+      @for (i of [0, 1, 2, 3, 4]; track i) {
+        <div class="h-12 rounded-xl border border-subtle bg-surface-2"></div>
+      }
     </div>
   } @else if (items().length === 0) {
-    <!-- AIXO empty state — big dashed panel with a phone icon
-         medallion and a CTA hint referencing the header's "Log call"
-         button. -->
-    <div
-      class="flex flex-col items-center justify-center rounded-xl border border-dashed border-subtle bg-surface px-6 py-16 text-center"
-    >
-      <span
-        class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-accent-soft text-accent ring-1 ring-accent/20"
-      >
-        <lucide-icon name="phone" size="22" aria-hidden="true"></lucide-icon>
-      </span>
-      <p class="text-[15px] font-semibold text-default">No calls logged yet</p>
-      <p class="mt-1 text-[13px] text-muted">Click "Log call" to record one.</p>
+    <div class="rounded-xl border border-dashed border-subtle bg-surface">
+      @if (direction()) {
+        <app-empty-state
+          icon="filter-x"
+          [title]="direction() === 'in' ? 'No incoming calls yet' : 'No outgoing calls yet'"
+          subtitle="Switch the filter back to All to see every call."
+        >
+          <button type="button" class="btn btn-secondary btn-sm" (click)="setDirection('')">
+            Show all calls
+          </button>
+        </app-empty-state>
+      } @else {
+        <app-empty-state
+          icon="phone"
+          title="No calls logged yet"
+          subtitle="Record each call to keep the contact's timeline complete."
+        >
+          <button type="button" class="btn btn-primary btn-sm" (click)="openModal()">
+            <lucide-icon name="plus" class="h-4 w-4" />
+            Log call
+          </button>
+        </app-empty-state>
+      }
     </div>
   } @else {
     <!-- Mobile: stacked card per call so every field stays visible on
@@ -69,7 +98,13 @@
               <lucide-icon name="user" class="h-3.5 w-3.5 shrink-0 text-faint" />
               <dt class="sr-only">Contact</dt>
               <dd class="min-w-0 truncate font-medium text-default">
-                {{ c.contact_name || '—' }}
+                @if (c.contact_id && c.contact_name) {
+                  <a [routerLink]="['/user/contacts', c.contact_id]" class="hover:underline">{{
+                    c.contact_name
+                  }}</a>
+                } @else {
+                  {{ c.contact_name || '—' }}
+                }
               </dd>
             </div>
 
@@ -175,7 +210,13 @@
                 {{ formatTimestamp(c.started_at) }}
               </td>
               <td class="max-w-[14rem] px-4 py-2">
-                @if (c.contact_name) {
+                @if (c.contact_name && c.contact_id) {
+                  <a
+                    [routerLink]="['/user/contacts', c.contact_id]"
+                    class="block truncate font-medium text-default hover:underline"
+                    >{{ c.contact_name }}</a
+                  >
+                } @else if (c.contact_name) {
                   <span class="block truncate font-medium text-default">{{ c.contact_name }}</span>
                 } @else {
                   <span class="text-xs text-faint">—</span>
@@ -244,6 +285,25 @@
           }
         </tbody>
       </table>
+    </div>
+
+    <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+      <span>Showing {{ items().length }} of {{ total() }} calls</span>
+      @if (hasMore()) {
+        <button
+          type="button"
+          (click)="loadMore()"
+          [disabled]="loadingMore()"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          @if (loadingMore()) {
+            <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />
+            Loading…
+          } @else {
+            Load more
+          }
+        </button>
+      }
     </div>
   }
 
