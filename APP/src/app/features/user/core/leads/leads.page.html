@@ -434,10 +434,23 @@
     </div>
   </div>
 
-  @if (exportError(); as err) {
-    <p class="rounded-md bg-red-500/10 px-4 py-2 text-xs text-red-400 ring-1 border-red-500/20">
-      {{ err }}
-    </p>
+  @if (pipelineHiddenCount() > 0 && !state.loading()) {
+    <div
+      class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400"
+    >
+      <span>
+        The board shows the first {{ state.items().length }} of {{ totalCount() }} matching leads
+        ({{ pipelineHiddenCount() }} not shown). Narrow the filters or switch to List view to see
+        them all.
+      </span>
+      <button
+        type="button"
+        (click)="setView('list')"
+        class="rounded-md border border-amber-500/30 px-2.5 py-1 font-medium hover:bg-amber-500/10"
+      >
+        Open List view
+      </button>
+    </div>
   }
 
   @if (mergedNotice(); as notice) {

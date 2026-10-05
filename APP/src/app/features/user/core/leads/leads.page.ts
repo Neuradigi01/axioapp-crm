@@ -15,7 +15,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { FurnitureAuthService } from '../auth/auth.service';
-import { of } from 'rxjs';
+import { of, Subscription } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { Contact, ContactsApiService } from '../contacts/contacts-api.service';
@@ -350,7 +350,15 @@ export class LeadsPageComponent {
 
   /** CSV export submit state. */
   readonly exporting = signal(false);
-  readonly exportError = signal<string | null>(null);
+
+  /** Pipeline view fetches at most 200 leads (server cap). When the
+   *  filter matches more, this is how many are not on the board. */
+  readonly pipelineHiddenCount = computed(() => {
+    if (this.view() !== 'pipeline') return 0;
+    const total = this.totalCount();
+    if (total === null) return 0;
+    return Math.max(0, total - this.state.items().length);
+  });
 
   // --- Step 7: saved views ------------------------------------------------
 
@@ -748,6 +756,10 @@ export class LeadsPageComponent {
       },
       queryKey: 'scope',
     },
+    // Signal-backed entries below don't fire `valueChanges` like the
+    // FormControls above, so a value restored from the URL (refresh,
+    // shared link, browser back) queues a reload itself — otherwise the
+    // page shows data fetched for the previous sort / view.
     sort: {
       read: () => this.sortKey(),
       write: (v) => {
@@ -755,9 +767,11 @@ export class LeadsPageComponent {
           v === 'created_at' ||
           v === 'last_activity_at' ||
           v === 'lead_score' ||
-          v === 'contact_name'
+          v === 'contact_name' ||
+          v === 'next_follow_up_due'
         ) {
           this.sortKey.set(v);
+          this.queueReload();
         }
       },
       queryKey: 'sort',
@@ -766,7 +780,10 @@ export class LeadsPageComponent {
     order: {
       read: () => this.sortOrder(),
       write: (v) => {
-        if (v === 'asc' || v === 'desc') this.sortOrder.set(v);
+        if (v === 'asc' || v === 'desc') {
+          this.sortOrder.set(v);
+          this.queueReload();
+        }
       },
       queryKey: 'order',
       defaultValue: 'desc',
@@ -776,19 +793,43 @@ export class LeadsPageComponent {
       write: (v) => {
         if (v === '' || v === '7d' || v === '14d' || v === '30d') {
           this.noActivityFilter.set(v);
+          this.queueReload();
         }
       },
       queryKey: 'no_activity',
     },
+    stage: {
+      read: () => this.stageControlValue(),
+      write: (v) => {
+        this.stageControlValue.set(v);
+        this.queueReload();
+      },
+      queryKey: 'stage',
+    },
     view: {
       read: () => this.view(),
       write: (v) => {
-        if (v === 'pipeline' || v === 'list') this.view.set(v);
+        if (v === 'pipeline' || v === 'list') {
+          this.view.set(v);
+          this.queueReload();
+        }
       },
       queryKey: 'view',
       defaultValue: 'pipeline',
     },
   };
+
+  /** Coalesces several URL-restored values (e.g. `?view=list&sort=…`)
+   *  into ONE refetch on the next microtask. */
+  private reloadQueued = false;
+  private queueReload(): void {
+    if (this.reloadQueued) return;
+    this.reloadQueued = true;
+    queueMicrotask(() => {
+      this.reloadQueued = false;
+      this.resetCursorAndReload();
+    });
+  }
 
   /** Cast Lead[] to PipelineItem[] for the board/list inputs. */
   readonly pipelineItems = computed<PipelineItem[]>(() => this.state.items() as PipelineItem[]);
@@ -866,8 +907,13 @@ export class LeadsPageComponent {
     });
   }
 
+  /** Pipeline and list fetch differently (one 200-row batch vs. paged
+   *  cursor walk), so switching views must refetch — otherwise list view
+   *  pages over the board's batch and the board shows one list page. */
   protected setView(v: View): void {
+    if (this.view() === v) return;
     this.view.set(v);
+    this.resetCursorAndReload();
   }
 
   /** Build the query for the current page. List view uses cursor
@@ -917,10 +963,15 @@ export class LeadsPageComponent {
     return base;
   }
 
+  /** In-flight list request. A newer reload cancels it so a slow,
+   *  stale response can never overwrite results for the current filter. */
+  private loadSub: Subscription | null = null;
+
   protected reload(): void {
+    this.loadSub?.unsubscribe();
     this.state.loading.set(true);
     this.state.loadError.set(null);
-    this.api
+    this.loadSub = this.api
       .list(this.buildQuery())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -945,8 +996,10 @@ export class LeadsPageComponent {
   }
 
   /** Reset the cursor stack before re-issuing — any filter / sort
-   * change invalidates the keyset bounds. */
+   * change invalidates the keyset bounds. Also drops the row selection
+   * so a bulk action can't hit rows the new filter no longer shows. */
   protected resetCursorAndReload(): void {
+    this.clearSelection();
     this.cursor.set(null);
     this.cursorHistory.set([]);
     this.totalCount.set(null);
@@ -1127,7 +1180,6 @@ export class LeadsPageComponent {
   protected onExportCsv(): void {
     if (!this.canExport()) return;
     this.exporting.set(true);
-    this.exportError.set(null);
     this.api
       .exportCsv(this.buildQuery())
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -1135,21 +1187,24 @@ export class LeadsPageComponent {
         next: (blob) => {
           this.exporting.set(false);
           this.api.triggerDownload(blob, this.suggestedExportFilename());
+          this.toast.success('Export ready', {
+            subtitle: 'The CSV has been downloaded — it opens in Excel.',
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.exporting.set(false);
-          this.exportError.set(extractApiError(err) ?? 'Could not export leads.');
+          this.toast.error('Could not export leads', {
+            subtitle: extractApiError(err) ?? 'Please try again.',
+          });
         },
       });
   }
 
-  /** UTC-dated default; the server's `Content-Disposition` overrides
-   * via the helper but only when the response is parsed — for blob
-   * downloads we set the filename ourselves. */
+  /** Local-dated default (matches the date the user sees); the
+   * server's `Content-Disposition` is not parsed for blob downloads,
+   * so we set the filename ourselves. */
   private suggestedExportFilename(): string {
-    const d = new Date();
-    const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-    return `leads-${iso}.csv`;
+    return `leads-${this.todayIso}.csv`;
   }
 
   private loadCustomFields(): void {
@@ -1237,10 +1292,7 @@ export class LeadsPageComponent {
     }
     this.currentViewId.set(view.id);
     this.viewsMenuOpen.set(false);
-    this.cursor.set(null);
-    this.cursorHistory.set([]);
-    this.totalCount.set(null);
-    this.reload();
+    this.resetCursorAndReload();
   }
 
   protected openSaveViewModal(): void {
@@ -1316,9 +1368,14 @@ export class LeadsPageComponent {
         next: (updated) => {
           this.savedViews.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.viewsMenuOpen.set(false);
+          this.toast.success('View updated', {
+            subtitle: `“${updated.name}” now matches the current filters.`,
+          });
         },
         error: (err: HttpErrorResponse) => {
-          this.state.loadError.set(extractApiError(err) ?? 'Could not update view.');
+          this.toast.error('Could not update view', {
+            subtitle: extractApiError(err) ?? 'Please try again.',
+          });
         },
       });
   }
@@ -1334,9 +1391,12 @@ export class LeadsPageComponent {
       .subscribe({
         next: (updated) => {
           this.savedViews.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+          this.toast.success(updated.shared ? 'View shared with team' : 'View is now private');
         },
         error: (err: HttpErrorResponse) => {
-          this.state.loadError.set(extractApiError(err) ?? 'Could not change sharing.');
+          this.toast.error('Could not change sharing', {
+            subtitle: extractApiError(err) ?? 'Please try again.',
+          });
         },
       });
   }
@@ -1364,10 +1424,13 @@ export class LeadsPageComponent {
           this.savedViews.update((rows) => rows.filter((r) => r.id !== view.id));
           this.currentViewId.set(null);
           this.closeDeleteViewConfirm();
+          this.toast.success('View deleted', { subtitle: `“${view.name}” was removed.` });
         },
         error: (err: HttpErrorResponse) => {
           this.deleteViewSubmitting.set(false);
-          this.state.loadError.set(extractApiError(err) ?? 'Could not delete view.');
+          this.toast.error('Could not delete view', {
+            subtitle: extractApiError(err) ?? 'Please try again.',
+          });
         },
       });
   }
@@ -1539,8 +1602,12 @@ export class LeadsPageComponent {
             this.lostReasonError.set(null);
             return;
           }
+          // Revert the card and keep the board visible — a toast, not
+          // `loadError`, which would replace the whole board.
           this.state.items.set(before);
-          this.state.loadError.set(detail || 'Could not move lead.');
+          this.toast.error('Could not move lead', {
+            subtitle: detail || 'The card was moved back. Please try again.',
+          });
         },
       });
   }
@@ -1652,6 +1719,7 @@ export class LeadsPageComponent {
           this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.lostReasonSubmitting.set(false);
           this.pendingLostMove.set(null);
+          this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
           this.lostReasonSubmitting.set(false);
@@ -1771,6 +1839,7 @@ export class LeadsPageComponent {
             this.showLeadCreatedToast(contactAction, contactName);
           }
           this.reload();
+          this.reloadRollup();
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);
@@ -1813,6 +1882,7 @@ export class LeadsPageComponent {
         this.submitting.set(false);
         this.closeModal();
         this.reload();
+        this.reloadRollup();
         this.toast.success('Lead updated.', {
           subtitle: 'Your changes are saved.',
         });
@@ -1874,6 +1944,7 @@ export class LeadsPageComponent {
   }): void {
     this.closeUpdateStatus();
     this.resetCursorAndReload();
+    this.reloadRollup();
     this.toast.success('Status updated.', {
       subtitle:
         event.next_follow_up_task_id !== null
@@ -1959,6 +2030,8 @@ export class LeadsPageComponent {
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
+          this.reloadRollup();
+          this.toast.success(`${this.leadCountLabel(ids.length)} reassigned`);
         },
         error: (err: HttpErrorResponse) => {
           this.state.bulkSubmitting.set(false);
@@ -1981,12 +2054,21 @@ export class LeadsPageComponent {
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
+          this.reloadRollup();
+          this.toast.success(`${this.leadCountLabel(ids.length)} deleted`);
         },
         error: (err: HttpErrorResponse) => {
           this.state.bulkSubmitting.set(false);
-          this.state.bulkError.set(extractApiError(err) ?? 'Could not delete.');
+          const msg = extractApiError(err) ?? 'Could not delete.';
+          this.state.bulkError.set(msg);
+          // The confirm dialog has no error slot — surface it here.
+          this.toast.error('Could not delete leads', { subtitle: msg });
         },
       });
+  }
+
+  private leadCountLabel(n: number): string {
+    return `${n} lead${n === 1 ? '' : 's'}`;
   }
 
   /** Ids currently being hydrated. Prevents the reactive effect from
