@@ -16,6 +16,9 @@ import { LucideAngularModule } from 'lucide-angular';
  *  submitting more so operators get a clean toast instead of a 422. */
 const BULK_ACTION_MAX = 200;
 
+/** Rows per fetch; "Load more" pulls the next page. */
+const PAGE_SIZE = 100;
+
 import { FurnitureAuthService } from '../auth/auth.service';
 import { ContactsApiService } from '../contacts/contacts-api.service';
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
@@ -40,6 +43,7 @@ import type { ColumnFilterOption } from '../shared/table-filters/column-filter.t
 import {
   QuickRegisterResponse,
   WalkIn,
+  WalkInListQuery,
   WalkInSortKey,
   WalkInStatus,
   WalkInsApiService,
@@ -52,6 +56,7 @@ import {
   WalkinConvertModalComponent,
 } from './walkin-convert-modal/walkin-convert-modal.component';
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { initials } from '@core/services/text.util';
 import { Router } from '@angular/router';
 
@@ -117,8 +122,15 @@ export class WalkInsPageComponent {
   private readonly auth = inject(FurnitureAuthService);
   private readonly usersDir = inject(UsersDirectoryService);
   private readonly router = inject(Router);
+  private readonly toast = inject(ToastService);
 
   protected readonly state = inject(WalkInsListState);
+
+  /** Paging: the server returns a bare array, so a full page means
+   *  there may be more. `page` is 1-based (server default). */
+  readonly page = signal(1);
+  readonly hasMore = signal(false);
+  readonly loadingMore = signal(false);
 
   readonly statusFilter = signal<StatusFilter>('all');
   readonly chips = FILTER_CHIPS;
@@ -270,6 +282,7 @@ export class WalkInsPageComponent {
           v === 'left'
         ) {
           this.statusFilter.set(v);
+          this.queueReload();
         }
       },
       queryKey: 'status',
@@ -280,7 +293,10 @@ export class WalkInsPageComponent {
       // shape stays a single string per key — matches contacts and
       // keeps shared URLs compact.
       read: () => this.assigneeFilter().join(','),
-      write: (v) => this.assigneeFilter.set(this.parseCsvFilter(v)),
+      write: (v) => {
+        this.assigneeFilter.set(this.parseCsvFilter(v));
+        this.queueReload();
+      },
       queryKey: 'assignee',
     },
     date_chip: {
@@ -288,6 +304,7 @@ export class WalkInsPageComponent {
       write: (v) => {
         if (v === '' || v === 'today' || v === 'week' || v === 'month') {
           this.dateChip.set(v);
+          this.queueReload();
         }
       },
       queryKey: 'date_chip',
@@ -295,7 +312,10 @@ export class WalkInsPageComponent {
     scope: {
       read: () => this.scope(),
       write: (v) => {
-        if (v === 'mine' || v === 'team' || v === 'all') this.scope.set(v);
+        if (v === 'mine' || v === 'team' || v === 'all') {
+          this.scope.set(v);
+          this.queueReload();
+        }
       },
       queryKey: 'scope',
     },
@@ -304,6 +324,7 @@ export class WalkInsPageComponent {
       write: (v) => {
         if (v === 'time_in' || v === 'created_at' || v === 'last_activity_at') {
           this.sortKey.set(v);
+          this.queueReload();
         }
       },
       queryKey: 'sort',
@@ -312,17 +333,43 @@ export class WalkInsPageComponent {
     order: {
       read: () => this.sortOrder(),
       write: (v) => {
-        if (v === 'asc' || v === 'desc') this.sortOrder.set(v);
+        if (v === 'asc' || v === 'desc') {
+          this.sortOrder.set(v);
+          this.queueReload();
+        }
       },
       queryKey: 'order',
       defaultValue: 'desc',
     },
     open_only: {
       read: () => (this.openOnly() ? '1' : ''),
-      write: (v) => this.openOnly.set(v === '1' || v === 'true'),
+      write: (v) => {
+        this.openOnly.set(v === '1' || v === 'true');
+        this.queueReload();
+      },
       queryKey: 'open_only',
     },
   };
+
+  /** Coalesces several URL-restored values into ONE refetch. Signal
+   *  writes don't fire `valueChanges`, so without this a refreshed
+   *  `?status=converted` showed the chip but listed every walk-in. */
+  private reloadQueued = false;
+  private queueReload(): void {
+    if (this.reloadQueued) return;
+    this.reloadQueued = true;
+    queueMicrotask(() => {
+      this.reloadQueued = false;
+      this.applyFilters();
+    });
+  }
+
+  /** Filter / sort / scope change: drop the row selection (so a bulk
+   *  action can't hit rows the new filter hides) and refetch page 1. */
+  private applyFilters(): void {
+    this.clearSelection();
+    this.reload();
+  }
 
   // --- KPI cards ---
   //
@@ -383,7 +430,7 @@ export class WalkInsPageComponent {
    *  refetch. Mirrors the contacts page pattern. */
   protected onOwnerFilterChange(values: string[]): void {
     this.assigneeFilter.set(values);
-    this.reload();
+    this.applyFilters();
   }
 
   /** Parse a comma-separated URL filter value into a de-duped
@@ -403,7 +450,7 @@ export class WalkInsPageComponent {
 
   protected setFilter(f: StatusFilter): void {
     this.statusFilter.set(f);
-    this.reload();
+    this.applyFilters();
   }
 
   protected setDateChip(value: string): void {
@@ -411,7 +458,7 @@ export class WalkInsPageComponent {
       return;
     }
     this.dateChip.set(value);
-    this.reload();
+    this.applyFilters();
   }
 
   protected setScope(value: string): void {
@@ -420,12 +467,12 @@ export class WalkInsPageComponent {
     // Scope is applied via `resolveAssignee()` on reload — 'mine'
     // collapses to the caller uuid; 'team' / 'all' clear the
     // assignee override (server-side row-visibility handles the rest).
-    this.reload();
+    this.applyFilters();
   }
 
   protected toggleOpenOnly(): void {
     this.openOnly.update((v) => !v);
-    this.reload();
+    this.applyFilters();
   }
 
   protected setSort(value: string): void {
@@ -436,7 +483,7 @@ export class WalkInsPageComponent {
     if (order !== 'asc' && order !== 'desc') return;
     this.sortKey.set(key);
     this.sortOrder.set(order);
-    this.reload();
+    this.applyFilters();
   }
 
   /** Default visibility based on role. Same heuristic as leads.page. */
@@ -547,12 +594,12 @@ export class WalkInsPageComponent {
           // reassigning to a user who already owns 5 of them sees the
           // honest "15 reassigned, 5 already owned this seat" summary
           // instead of a misleading "20 reassigned".
-          if (result.already_assigned > 0) {
-            this.state.loadError.set(
-              `Reassigned ${result.reassigned}. ` +
-                `${result.already_assigned} already owned this seat.`,
-            );
-          }
+          this.toast.success(`${this.walkInCountLabel(result.reassigned)} reassigned`, {
+            subtitle:
+              result.already_assigned > 0
+                ? `${result.already_assigned} already belonged to that owner.`
+                : null,
+          });
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
@@ -574,8 +621,14 @@ export class WalkInsPageComponent {
       .bulkCheckout(ids)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
+        next: (result) => {
           this.state.bulkSubmitting.set(false);
+          this.toast.success(`${this.walkInCountLabel(result.checked_out)} checked out`, {
+            subtitle:
+              result.already_checked_out > 0
+                ? `${result.already_checked_out} had already checked out.`
+                : null,
+          });
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
@@ -583,7 +636,10 @@ export class WalkInsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.state.bulkSubmitting.set(false);
-          this.state.bulkError.set(extractApiError(err) ?? 'Could not check out.');
+          const msg = extractApiError(err) ?? 'Could not check out.';
+          this.state.bulkError.set(msg);
+          // The confirm dialog has no error slot — surface it here.
+          this.toast.error('Could not check out walk-ins', { subtitle: msg });
         },
       });
   }
@@ -599,8 +655,9 @@ export class WalkInsPageComponent {
       .bulkDelete(ids)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
+        next: (result) => {
           this.state.bulkSubmitting.set(false);
+          this.toast.success(`${this.walkInCountLabel(result.deleted)} deleted`);
           this.clearSelection();
           this.closeBulkModal();
           this.reload();
@@ -608,7 +665,9 @@ export class WalkInsPageComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.state.bulkSubmitting.set(false);
-          this.state.bulkError.set(extractApiError(err) ?? 'Could not delete walk-ins.');
+          const msg = extractApiError(err) ?? 'Could not delete walk-ins.';
+          this.state.bulkError.set(msg);
+          this.toast.error('Could not delete walk-ins', { subtitle: msg });
         },
       });
   }
@@ -642,6 +701,7 @@ export class WalkInsPageComponent {
           this.state.items.update((rows) => rows.filter((r) => r.id !== target.id));
           this.pendingDelete.set(null);
           this.reloadRollup();
+          this.toast.success('Walk-in deleted');
         },
         error: (err: HttpErrorResponse) => {
           this.deleteSubmitting.set(false);
@@ -678,6 +738,9 @@ export class WalkInsPageComponent {
           this.singleReassignSubmitting.set(false);
           this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.closeSingleReassign();
+          this.toast.success('Owner updated', {
+            subtitle: `Now assigned to ${this.ownerLabel(updated.assigned_to_id)}.`,
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.singleReassignSubmitting.set(false);
@@ -727,6 +790,7 @@ export class WalkInsPageComponent {
           );
           this.reloadRollup();
           this.closeConvert();
+          this.toast.success('Converted to lead', { subtitle: 'Opening the new lead…' });
           // Send the user straight to the new lead detail page so
           // they can fill in the details. Previously navigated to the
           // list page with `?q=<uuid>` which relied on the search box
@@ -774,6 +838,7 @@ export class WalkInsPageComponent {
           this.pendingStatusAdvance.set(null);
           this.state.items.update((rows) => rows.map((w) => (w.id === updated.id ? updated : w)));
           this.reloadRollup();
+          this.toast.success(`Marked as ${this.statusLabel(updated.status)}`);
         },
         error: (err: HttpErrorResponse) => {
           this.rowActionSubmitting.set(false);
@@ -781,7 +846,10 @@ export class WalkInsPageComponent {
           this.state.items.update((rows) =>
             rows.map((w) => (w.id === beforeRow.id ? beforeRow : w)),
           );
-          this.state.loadError.set(extractApiError(err) ?? 'Could not update walk-in status.');
+          // Toast, not `loadError` — that would replace the whole list.
+          this.toast.error('Could not update status', {
+            subtitle: extractApiError(err) ?? 'The row was restored. Please try again.',
+          });
         },
       });
   }
@@ -811,8 +879,13 @@ export class WalkInsPageComponent {
     this.modalOpen.set(false);
   }
 
-  protected onRegistered(_event: QuickRegisterResponse): void {
+  protected onRegistered(event: QuickRegisterResponse): void {
     this.modalOpen.set(false);
+    this.toast.success('Walk-in registered', {
+      subtitle: event.contact_was_created
+        ? `New contact “${event.contact.full_name}” was created.`
+        : `Linked to existing contact “${event.contact.full_name}”.`,
+    });
     this.reload();
     this.reloadRollup();
   }
@@ -850,6 +923,9 @@ export class WalkInsPageComponent {
           this.pendingCheckout.set(null);
           this.state.items.update((rows) => rows.map((w) => (w.id === updated.id ? updated : w)));
           this.reloadRollup();
+          this.toast.success('Checked out', {
+            subtitle: `Visit lasted ${this.formatDuration(updated.duration_min)}.`,
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.rowActionSubmitting.set(false);
@@ -857,7 +933,9 @@ export class WalkInsPageComponent {
           this.state.items.update((rows) =>
             rows.map((w) => (w.id === beforeRow.id ? beforeRow : w)),
           );
-          this.state.loadError.set(extractApiError(err) ?? 'Could not check out walk-in.');
+          this.toast.error('Could not check out', {
+            subtitle: extractApiError(err) ?? 'The row was restored. Please try again.',
+          });
         },
       });
   }
@@ -875,6 +953,15 @@ export class WalkInsPageComponent {
       case 'left':
         return 'bg-red-100 text-red-700 ring-red-200';
     }
+  }
+
+  /** Pill text — the raw enum read as `follow_up`. */
+  protected statusLabel(status: WalkInStatus): string {
+    return status === 'browsing' ? 'Browsing' : this.labelForStatus(status);
+  }
+
+  private walkInCountLabel(n: number): string {
+    return `${n} walk-in${n === 1 ? '' : 's'}`;
   }
 
   protected contactFor(id: string): ContactSummary | null {
@@ -916,33 +1003,72 @@ export class WalkInsPageComponent {
    *  a faster later one when scope/sort/date-chip is toggled rapidly. */
   private reloadSeq = 0;
 
+  private listQuery(page: number): WalkInListQuery {
+    const filter = this.statusFilter();
+    return {
+      status: filter === 'all' ? undefined : filter,
+      assigned_to: this.resolveAssignee(),
+      open_only: this.openOnly() || undefined,
+      date_from: this.resolveDateFrom() ?? undefined,
+      sort: this.sortKey(),
+      order: this.sortOrder(),
+      page,
+      size: PAGE_SIZE,
+    };
+  }
+
   private reload(): void {
     const seq = ++this.reloadSeq;
     this.state.loading.set(true);
     this.state.loadError.set(null);
-    const filter = this.statusFilter();
+    this.loadingMore.set(false);
     this.api
-      .list({
-        status: filter === 'all' ? undefined : filter,
-        assigned_to: this.resolveAssignee(),
-        open_only: this.openOnly() || undefined,
-        date_from: this.resolveDateFrom() ?? undefined,
-        sort: this.sortKey(),
-        order: this.sortOrder(),
-        size: 100,
-      })
+      .list(this.listQuery(1))
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => {
           if (seq !== this.reloadSeq) return;
           this.state.items.set(rows);
+          this.page.set(1);
+          this.hasMore.set(rows.length === PAGE_SIZE);
           this.state.loading.set(false);
         },
         error: (err: HttpErrorResponse) => {
           if (seq !== this.reloadSeq) return;
           this.state.items.set([]);
+          this.hasMore.set(false);
           this.state.loading.set(false);
           this.state.loadError.set(extractApiError(err) ?? 'Could not load walk-ins.');
+        },
+      });
+  }
+
+  /** Append the next page. Shares `reloadSeq` with `reload()` so a
+   *  filter change mid-flight discards this (now stale) page. */
+  protected loadMore(): void {
+    if (this.loadingMore() || !this.hasMore()) return;
+    const seq = this.reloadSeq;
+    const next = this.page() + 1;
+    this.loadingMore.set(true);
+    this.api
+      .list(this.listQuery(next))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          if (seq !== this.reloadSeq) return;
+          // Rows can shift between pages (new check-ins); skip dupes.
+          const seen = new Set(this.state.items().map((w) => w.id));
+          this.state.items.update((cur) => [...cur, ...rows.filter((w) => !seen.has(w.id))]);
+          this.page.set(next);
+          this.hasMore.set(rows.length === PAGE_SIZE);
+          this.loadingMore.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          if (seq !== this.reloadSeq) return;
+          this.loadingMore.set(false);
+          this.toast.error('Could not load more walk-ins', {
+            subtitle: extractApiError(err) ?? 'Please try again.',
+          });
         },
       });
   }

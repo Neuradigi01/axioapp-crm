@@ -374,7 +374,7 @@
                     class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium whitespace-nowrap ring-1 md:px-2 md:text-[10px]"
                     [class]="statusClass(w.status)"
                   >
-                    {{ w.status }}
+                    {{ statusLabel(w.status) }}
                   </span>
                 </td>
                 <td
@@ -558,6 +558,23 @@
           </tbody>
         </table>
       </div>
+      @if (hasMore()) {
+        <div class="flex justify-center border-t border-subtle px-4 py-3">
+          <button
+            type="button"
+            (click)="loadMore()"
+            [disabled]="loadingMore()"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            @if (loadingMore()) {
+              <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />
+              Loading…
+            } @else {
+              Load more
+            }
+          </button>
+        </div>
+      }
     }
   </section>
 </div>
