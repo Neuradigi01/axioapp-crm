@@ -7,6 +7,9 @@
       <p class="mt-1 text-[14px] text-muted">
         {{ state.items().length | number }}{{ hasMore() ? '+' : '' }}
         {{ state.items().length === 1 && !hasMore() ? 'appointment' : 'appointments' }}
+        @if (view() === 'calendar') {
+          <span class="text-faint">in this month</span>
+        }
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -72,8 +75,17 @@
         [class.text-default]="statusFilter() !== chip.id"
         [class.border-subtle]="statusFilter() !== chip.id"
         [class.hover:bg-surface-2]="statusFilter() !== chip.id"
+        [attr.aria-pressed]="statusFilter() === chip.id"
       >
         {{ chip.label }}
+        @if (chip.id === 'overdue' && overdueCount() > 0) {
+          <span
+            class="ml-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500/15 px-1 font-mono text-[10.5px] text-red-700 dark:text-red-300"
+            [attr.aria-label]="overdueBadge() + ' need an outcome'"
+          >
+            {{ overdueBadge() }}
+          </span>
+        }
       </button>
     }
 
@@ -90,6 +102,7 @@
           <button
             type="button"
             (click)="setScope(sc.v)"
+            [attr.aria-pressed]="scope() === sc.v"
             class="px-2.5 py-1 transition"
             [class.bg-accent]="scope() === sc.v"
             [class.text-white]="scope() === sc.v"
@@ -122,7 +135,7 @@
       <crm-mobile-select
         [options]="assigneeSelectOptions()"
         [value]="assigneeControl.value"
-        (valueChange)="assigneeControl.setValue($event)"
+        (valueChange)="onOwnerChange($event)"
       />
     </div>
   </section>
@@ -163,10 +176,14 @@
             @for (a of daysAppointments(); track a.id) {
               @let palette = ownerPalette(a.assigned_to_id);
               <li
-                class="cursor-pointer rounded-md border px-3 py-2.5 shadow-sm ring-1 hover:brightness-95"
+                class="cursor-pointer rounded-md border px-3 py-2.5 shadow-sm ring-1 hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 [class]="palette.bg + ' ' + palette.ring + ' border-transparent'"
                 [title]="'Owner: ' + ownerLabel(a.assigned_to_id)"
+                tabindex="0"
+                role="button"
+                [attr.aria-label]="'Open actions for ' + a.title"
                 (click)="openPopover(a, $event)"
+                (keydown.enter)="openPopover(a, $event)"
               >
                 <div class="flex items-start justify-between gap-2">
                   <div class="min-w-0">
@@ -234,10 +251,28 @@
           }
         </div>
       } @else if (state.items().length === 0) {
-        <div class="px-4 py-10 text-center text-sm text-muted md:px-6">
-          No appointments match the current filters.
-          <span class="block text-xs text-faint">Try "All" status + "All" scope.</span>
-        </div>
+        @if (hasActiveFilters()) {
+          <app-empty-state
+            icon="filter-x"
+            title="No appointments match these filters"
+            subtitle="Try another status or owner, or clear the filters to see everything."
+          >
+            <button type="button" class="btn btn-secondary btn-sm" (click)="clearFilters()">
+              Clear filters
+            </button>
+          </app-empty-state>
+        } @else {
+          <app-empty-state
+            icon="calendar"
+            title="No appointments yet"
+            subtitle="Book a visit, call or demo with a contact — it shows up here and on the calendar."
+          >
+            <button type="button" class="btn btn-primary btn-sm" (click)="openBook()">
+              <lucide-icon name="plus" class="h-4 w-4" />
+              Book appointment
+            </button>
+          </app-empty-state>
+        }
       } @else {
         @for (group of listGroups(); track group.key) {
           @if (group.label) {
@@ -264,10 +299,11 @@
                 role="button"
                 [attr.aria-label]="'Open actions for ' + a.title"
               >
-                <!-- Checkbox — hidden on mobile (bulk actions live on md+ only) -->
+                <!-- Checkbox — always shown on phones; on desktop it appears on
+                     hover / once anything is selected. -->
                 <input
                   type="checkbox"
-                  class="hidden h-4 w-4 shrink-0 cursor-pointer rounded border-subtle text-default focus:ring-accent md:block"
+                  class="block h-4 w-4 shrink-0 cursor-pointer rounded border-subtle text-default focus:ring-accent"
                   [class.md:invisible]="!isSelected(a.id) && state.selectedCount() === 0"
                   [class.md:group-hover:visible]="!isSelected(a.id)"
                   [checked]="isSelected(a.id)"
@@ -324,29 +360,32 @@
                     @if (contactPhone(a.contact_id); as phone) {
                       <a
                         [appPhoneLink]="phone"
-                        class="hidden text-faint hover:text-default md:inline"
+                        class="-m-1 inline-flex shrink-0 p-1.5 text-faint hover:text-default md:m-0 md:p-0"
                         (click)="$event.stopPropagation()"
                         title="Call"
+                        [attr.aria-label]="'Call ' + contactName(a.contact_id)"
                       >
-                        <lucide-icon name="phone" class="h-3 w-3" />
+                        <lucide-icon name="phone" class="h-3.5 w-3.5 md:h-3 md:w-3" />
                       </a>
                       <a
                         [appWhatsappLink]="phone"
-                        class="hidden text-emerald-500 hover:text-emerald-400 md:inline"
+                        class="-m-1 inline-flex shrink-0 p-1.5 text-emerald-600 hover:text-emerald-500 md:m-0 md:p-0 dark:text-emerald-400"
                         (click)="$event.stopPropagation()"
                         title="WhatsApp"
+                        [attr.aria-label]="'WhatsApp ' + contactName(a.contact_id)"
                       >
-                        <lucide-icon name="message-circle" class="h-3 w-3" />
+                        <lucide-icon name="message-circle" class="h-3.5 w-3.5 md:h-3 md:w-3" />
                       </a>
                     }
                     @if (contactEmail(a.contact_id); as email) {
                       <a
                         [appMailLink]="email"
-                        class="hidden text-faint hover:text-default md:inline"
+                        class="-m-1 inline-flex shrink-0 p-1.5 text-faint hover:text-default md:m-0 md:p-0"
                         (click)="$event.stopPropagation()"
                         title="Email"
+                        [attr.aria-label]="'Email ' + contactName(a.contact_id)"
                       >
-                        <lucide-icon name="mail" class="h-3 w-3" />
+                        <lucide-icon name="mail" class="h-3.5 w-3.5 md:h-3 md:w-3" />
                       </a>
                     }
                   </div>

@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   computed,
@@ -70,6 +71,11 @@ export class AppointmentPopoverComponent {
   @Output() readonly cancelAppt = new EventEmitter<void>();
   @Output() readonly deleteAppt = new EventEmitter<void>();
   @Output() readonly dismiss = new EventEmitter<void>();
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this._appointment()) this.dismiss.emit();
+  }
 
   protected readonly canWrite = computed(() => this.auth.hasPermission('appointments.write'));
 

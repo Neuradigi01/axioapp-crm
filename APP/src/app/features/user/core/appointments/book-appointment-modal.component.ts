@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   computed,
@@ -20,6 +21,7 @@ import { FurnitureAuthService, MeResponse } from '../auth/auth.service';
 import { extractApiError } from '@core/services/api-error.util';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
+import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
 import { FormToastHelper } from '../shared/forms/form-toast.helper';
@@ -142,6 +144,35 @@ export class BookAppointmentModalComponent extends BaseFormModalComponent {
   @Input() conflictTitleFor: (id: string) => string | null = () => null;
 
   @Output() readonly created = new EventEmitter<Appointment>();
+
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  /** True while the discard-changes confirm is up, so Esc doesn't stack. */
+  private confirming = false;
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (!this.confirming) void this.requestClose();
+  }
+
+  /** Cancel / Esc / backdrop. Asks before throwing away a half-filled booking. */
+  protected async requestClose(): Promise<void> {
+    if (this.submitting$()) return;
+    if (this.form.dirty) {
+      this.confirming = true;
+      try {
+        const ok = await this.confirmDialog.ask({
+          title: 'Discard this booking?',
+          body: 'The details you entered will be lost.',
+          confirmLabel: 'Discard',
+          danger: true,
+        });
+        if (!ok) return;
+      } finally {
+        this.confirming = false;
+      }
+    }
+    this.cancel.emit();
+  }
 
   protected readonly me = signal<MeResponse | null>(null);
   protected readonly conflicts = signal<string[]>([]);

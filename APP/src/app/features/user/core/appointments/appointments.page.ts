@@ -18,6 +18,7 @@ import {
   endOfWeek,
   format,
   isSameDay,
+  isSameMonth,
   isToday,
   isTomorrow,
   isYesterday,
@@ -34,6 +35,7 @@ import { FurnitureAuthService } from '../auth/auth.service';
 import { BulkActionBarComponent } from '../shared/bulk-action-bar/bulk-action-bar.component';
 import { CalendarComponent, CalendarEvent } from '../shared/calendar/calendar.component';
 import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
+import { EmptyStateComponent } from '../shared/empty-state/empty-state.component';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { MailLinkDirective } from '../shared/directives/mail-link.directive';
 import { PhoneLinkDirective } from '../shared/directives/phone-link.directive';
@@ -73,10 +75,13 @@ interface ContactSummary {
 }
 
 type AppointmentStatusValue = 'scheduled' | 'completed' | 'no_show' | 'cancelled';
-type StatusFilter = 'all' | 'upcoming' | AppointmentStatusValue;
+type StatusFilter = 'all' | 'upcoming' | 'overdue' | AppointmentStatusValue;
 
 /** List-view page size. The calendar reads a bounded month window instead. */
 const LIST_PAGE_SIZE = 100;
+
+/** "Needs outcome" badge counts up to this many rows, then shows "99+". */
+const OVERDUE_COUNT_CAP = 100;
 
 /** A run of list rows under one day heading (`label` null = ungrouped). */
 interface ListGroup {
@@ -89,6 +94,7 @@ interface ListGroup {
 const FILTER_CHIPS: ReadonlyArray<{ id: StatusFilter; label: string }> = [
   { id: 'all', label: 'All' },
   { id: 'upcoming', label: 'Upcoming' },
+  { id: 'overdue', label: 'Needs outcome' },
   { id: 'completed', label: 'Completed' },
   { id: 'no_show', label: 'No-show' },
   { id: 'cancelled', label: 'Cancelled' },
@@ -118,6 +124,7 @@ class AppointmentsListState extends ListPageState<Appointment> {}
     UrlFilterStateDirective,
     RelativeTimePipe,
     MobileSelectComponent,
+    EmptyStateComponent,
   ],
   providers: [AppointmentsListState],
   templateUrl: './appointments.page.html',
@@ -256,6 +263,25 @@ export class AppointmentsPageComponent {
     return groups;
   });
 
+  /** Past appointments still marked `scheduled` — the "Needs outcome"
+   *  chip's badge. Capped at `OVERDUE_COUNT_CAP` (shown as "99+"). */
+  readonly overdueCount = signal(0);
+
+  /** Scope this role starts on — "Clear filters" returns here. */
+  private readonly defaultScope = this.defaultScopeForRole();
+
+  /** True when status / owner / scope narrow the list — picks between
+   *  the "no matches" and "nothing booked yet" empty states. */
+  readonly hasActiveFilters = computed(
+    () =>
+      this.statusFilter() !== 'all' || !!this.assigneeValue() || this.scope() !== this.defaultScope,
+  );
+
+  /** Signal mirror of the owner dropdown (a FormControl) for computeds. */
+  private readonly assigneeValue = toSignal(this.assigneeControl.valueChanges, {
+    initialValue: this.assigneeControl.value,
+  });
+
   /** More list rows exist on the server ("Load more"). */
   readonly hasMore = signal(false);
   readonly loadingMore = signal(false);
@@ -303,6 +329,7 @@ export class AppointmentsPageComponent {
         if (
           v === 'all' ||
           v === 'upcoming' ||
+          v === 'overdue' ||
           v === 'scheduled' ||
           v === 'completed' ||
           v === 'no_show' ||
@@ -429,11 +456,32 @@ export class AppointmentsPageComponent {
 
   protected setFilter(f: StatusFilter): void {
     this.statusFilter.set(f);
+    // Time-based chips read best in time order — soonest / oldest first.
+    if (f === 'upcoming' || f === 'overdue') {
+      this.sortKey.set('scheduled_at');
+      this.sortOrder.set('asc');
+    }
   }
 
+  /** Scope and the Owner dropdown both decide whose appointments show.
+   *  Picking a scope clears a specific owner, so the two never fight. */
   protected setScope(value: string): void {
     if (value !== 'mine' && value !== 'team' && value !== 'all') return;
     this.scope.set(value);
+    if (this.assigneeControl.value) this.assigneeControl.setValue('');
+  }
+
+  /** Picking a specific owner widens scope to All, so "Mine" can't
+   *  silently hide the owner that was just chosen. */
+  protected onOwnerChange(value: string): void {
+    this.assigneeControl.setValue(value);
+    if (value && this.canChangeScope() && this.scope() !== 'all') this.scope.set('all');
+  }
+
+  protected clearFilters(): void {
+    this.statusFilter.set('all');
+    this.scope.set(this.defaultScope);
+    if (this.assigneeControl.value) this.assigneeControl.setValue('');
   }
 
   protected setSort(value: string): void {
@@ -446,8 +494,12 @@ export class AppointmentsPageComponent {
     this.sortOrder.set(order);
   }
 
+  /** Keep the side panel on a day inside the shown month — today when
+   *  it's the current month, otherwise the 1st. */
   protected onMonthChange(d: Date): void {
     this.viewMonth.set(d);
+    const today = new Date();
+    this.selectedDay.set(isSameMonth(d, today) ? today : startOfMonth(d));
   }
 
   protected onDaySelected(d: Date): void {
@@ -562,6 +614,9 @@ export class AppointmentsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
+          this.toast.success(`Reassigned ${this.apptCount(ids.length)}`, {
+            subtitle: `Now owned by ${this.ownerLabel(payload.userId)}.`,
+          });
           this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
@@ -587,7 +642,9 @@ export class AppointmentsPageComponent {
           this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
-          if (result.skipped > 0) {
+          if (result.skipped === 0) {
+            this.toast.success(`Cancelled ${this.apptCount(result.cancelled)}`);
+          } else {
             this.toast.warn('Some appointments were not cancelled', {
               subtitle: this.formatBulkCancelSkipMessage(
                 result.cancelled,
@@ -614,6 +671,7 @@ export class AppointmentsPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
+          this.toast.success(`Deleted ${this.apptCount(ids.length)}`);
           this.state.bulkSubmitting.set(false);
           this.clearSelection();
           this.closeBulkModal();
@@ -843,6 +901,7 @@ export class AppointmentsPageComponent {
           this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.closeCancelConfirm();
           this.toast.success('Appointment cancelled.', { subtitle: appt.title });
+          this.loadOverdueCount();
         },
         error: (err: HttpErrorResponse) => {
           this.cancelSubmitting.set(false);
@@ -871,6 +930,7 @@ export class AppointmentsPageComponent {
         next: (updated) => {
           this.state.items.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
           this.toast.success(successTitle, { subtitle: appt.title });
+          this.loadOverdueCount();
         },
         error: (err: HttpErrorResponse) => {
           this.state.items.set(before);
@@ -991,19 +1051,20 @@ export class AppointmentsPageComponent {
   private resolveStatusAndFrom(): {
     status?: AppointmentStatusValue;
     extraFrom?: string;
+    extraTo?: string;
   } {
     const f = this.statusFilter();
     if (f === 'all') return {};
-    if (f === 'upcoming') {
-      return {
-        status: 'scheduled',
-        extraFrom: new Date().toISOString(),
-      };
-    }
+    const now = new Date().toISOString();
+    if (f === 'upcoming') return { status: 'scheduled', extraFrom: now };
+    if (f === 'overdue') return { status: 'scheduled', extraTo: now };
     return { status: f };
   }
 
-  private resolveDateWindow(extraFrom: string | undefined): {
+  private resolveDateWindow(
+    extraFrom: string | undefined,
+    extraTo: string | undefined,
+  ): {
     scheduledFrom?: string;
     scheduledTo?: string;
   } {
@@ -1012,9 +1073,32 @@ export class AppointmentsPageComponent {
       const fromDt = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
       const toDt = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
       const lower = extraFrom && new Date(extraFrom) > fromDt ? extraFrom : fromDt.toISOString();
-      return { scheduledFrom: lower, scheduledTo: toDt.toISOString() };
+      const upper = extraTo && new Date(extraTo) < toDt ? extraTo : toDt.toISOString();
+      return { scheduledFrom: lower, scheduledTo: upper };
     }
-    return extraFrom ? { scheduledFrom: extraFrom } : {};
+    return { scheduledFrom: extraFrom, scheduledTo: extraTo };
+  }
+
+  /** Badge for the "Needs outcome" chip, scoped like the list. */
+  private loadOverdueCount(): void {
+    this.api
+      .list({
+        status: 'scheduled',
+        scheduledTo: new Date().toISOString(),
+        assignedTo: this.resolveAssignee(),
+        limit: OVERDUE_COUNT_CAP,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({ next: (rows) => this.overdueCount.set(rows.length), error: () => undefined });
+  }
+
+  protected overdueBadge(): string {
+    const n = this.overdueCount();
+    return n >= OVERDUE_COUNT_CAP ? `${OVERDUE_COUNT_CAP - 1}+` : String(n);
+  }
+
+  private apptCount(n: number): string {
+    return `${n} appointment${n === 1 ? '' : 's'}`;
   }
 
   /** Bumped on every reload so a slow earlier response can't overwrite
@@ -1024,8 +1108,8 @@ export class AppointmentsPageComponent {
   /** Shared query for reload + load-more. The list view pages
    *  (`LIST_PAGE_SIZE`); the calendar reads its whole month window. */
   private listQuery(offset: number) {
-    const { status, extraFrom } = this.resolveStatusAndFrom();
-    const { scheduledFrom, scheduledTo } = this.resolveDateWindow(extraFrom);
+    const { status, extraFrom, extraTo } = this.resolveStatusAndFrom();
+    const { scheduledFrom, scheduledTo } = this.resolveDateWindow(extraFrom, extraTo);
     const paged = this.view() === 'list';
     return {
       scheduledFrom,
@@ -1045,6 +1129,7 @@ export class AppointmentsPageComponent {
     this.state.loading.set(true);
     this.state.loadError.set(null);
     this.loadingMore.set(false);
+    this.loadOverdueCount();
     this.api
       .list(query)
       .pipe(takeUntilDestroyed(this.destroyRef))

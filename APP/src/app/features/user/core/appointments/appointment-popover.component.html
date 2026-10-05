@@ -2,6 +2,8 @@
   <div class="fixed inset-0 z-40" (click)="dismiss.emit()" aria-hidden="true"></div>
   <div
     role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="a.title"
     class="fixed left-1/2 top-1/2 z-50 w-80 max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-subtle bg-surface p-3 shadow-xl"
     (click)="$event.stopPropagation()"
   >

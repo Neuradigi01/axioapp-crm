@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   computed,
@@ -58,6 +59,11 @@ export class RescheduleModalComponent {
 
   @Output() readonly confirm = new EventEmitter<RescheduleConfirm>();
   @Output() readonly cancel = new EventEmitter<void>();
+
+  @HostListener('document:keydown.escape')
+  protected requestClose(): void {
+    if (!this._submitting()) this.cancel.emit();
+  }
 
   protected readonly scheduledAtControl = new FormControl<string>('', {
     nonNullable: true,
