@@ -12,6 +12,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
 
 import { environment } from '../../../../../environments/environment';
 import { extractApiError } from '@core/services/api-error.util';
@@ -130,6 +131,7 @@ interface DashboardSummary {
     CommonModule,
     RouterLink,
     DecimalPipe,
+    LucideAngularModule,
     DashboardDateRangeComponent,
     DashboardKpiTileComponent,
     DealPipelineStripComponent,

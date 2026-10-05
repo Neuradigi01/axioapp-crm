@@ -36,6 +36,7 @@
         <button
           type="button"
           (click)="pickBucket(chip.key)"
+          [attr.aria-pressed]="bucket() === chip.key"
           [class]="bucket() === chip.key ? 'chip chip-active' : 'chip'"
         >
           {{ chip.label }}

@@ -71,8 +71,8 @@ const FOLLOWUP_TYPE_LABELS: Record<FollowupType, { label: string; icon: string }
 
 const PRIORITY_LABELS: Record<FollowupPriority, { label: string; dot: string; text: string }> = {
   high: { label: 'High', dot: 'bg-red-500', text: 'text-red-400' },
-  med: { label: 'Med', dot: 'bg-amber-500', text: 'text-amber-700' },
-  low: { label: 'Low', dot: 'bg-sky-500', text: 'text-sky-700' },
+  med: { label: 'Med', dot: 'bg-amber-500', text: 'text-amber-400' },
+  low: { label: 'Low', dot: 'bg-sky-500', text: 'text-sky-400' },
 };
 
 @Component({
@@ -213,31 +213,31 @@ export class TodaysFollowupsComponent {
     if (row.status === 'done') {
       return {
         label: 'Completed',
-        classes: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+        classes: 'bg-emerald-500/10 text-emerald-400',
       };
     }
     if (row.status === 'missed') {
       return {
         label: 'Missed',
-        classes: 'bg-red-500/10 text-red-400 ring-red-500/20',
+        classes: 'bg-red-500/10 text-red-400',
       };
     }
     if (row.status === 'cancelled') {
       return {
         label: 'Cancelled',
-        classes: 'bg-surface-2 text-muted border-subtle',
+        classes: 'bg-surface-2 text-muted',
       };
     }
     // open — decide Overdue vs Pending from the due_at.
     if (row.due_at && new Date(row.due_at).getTime() < Date.now()) {
       return {
         label: 'Overdue',
-        classes: 'bg-red-500/10 text-red-400 ring-red-500/20',
+        classes: 'bg-red-500/10 text-red-400',
       };
     }
     return {
       label: 'Pending',
-      classes: 'bg-amber-50 text-amber-700 ring-amber-200',
+      classes: 'bg-amber-500/10 text-amber-400',
     };
   }
 

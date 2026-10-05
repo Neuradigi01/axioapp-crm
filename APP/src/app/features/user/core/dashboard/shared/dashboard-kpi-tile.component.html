@@ -27,10 +27,13 @@
       >{{ deltaLabel() }}</span
     >
   }
-  <div class="text-[12.5px] font-medium text-muted">
+  <div class="truncate text-[12.5px] font-medium text-muted" [class.pr-14]="!!deltaLabel()">
     {{ label }}
   </div>
-  <div class="font-mono text-[26px] font-semibold leading-none tracking-[-.02em] text-default">
+  <div
+    class="truncate font-mono text-[20px] font-semibold leading-none tracking-[-.02em] text-default sm:text-[26px]"
+    [attr.title]="formattedValue()"
+  >
     {{ formattedValue() }}
   </div>
 </ng-template>
