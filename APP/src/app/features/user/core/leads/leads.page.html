@@ -434,6 +434,33 @@
     </div>
   </div>
 
+  @if (activeFilterChips().length > 0) {
+    <div class="flex flex-wrap items-center gap-2" aria-label="Active filters">
+      @for (chip of activeFilterChips(); track chip.key) {
+        <span
+          class="inline-flex max-w-full items-center gap-1 rounded-full border border-subtle bg-surface py-0.5 pl-2.5 pr-1 text-xs text-default"
+        >
+          <span class="truncate">{{ chip.label }}</span>
+          <button
+            type="button"
+            (click)="clearFilterChip(chip.key)"
+            class="rounded-full p-0.5 text-faint hover:bg-surface-2 hover:text-default"
+            [attr.aria-label]="'Remove filter ' + chip.label"
+          >
+            <lucide-icon name="x" class="h-3 w-3" />
+          </button>
+        </span>
+      }
+      <button
+        type="button"
+        (click)="onToolbarReset()"
+        class="text-xs font-medium text-accent hover:underline"
+      >
+        Clear all
+      </button>
+    </div>
+  }
+
   @if (pipelineHiddenCount() > 0 && !state.loading()) {
     <div
       class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400"
@@ -492,15 +519,37 @@
     </div>
   }
 
+  <!-- Refetch indicator: results stay on screen while a filter change
+       loads, so show a thin bar instead of leaving it silent. -->
+  @if (state.loading() && state.items().length > 0) {
+    <div
+      class="h-0.5 w-full animate-pulse rounded-full bg-accent/60"
+      role="progressbar"
+      aria-label="Loading leads"
+    ></div>
+  }
+
   @if (state.loadError(); as err) {
     <p class="rounded-md bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 border-red-500/20">
       {{ err }}
     </p>
   } @else if (state.loading() && state.items().length === 0) {
-    <div class="flex gap-3 overflow-x-auto animate-pulse">
-      @for (i of [0, 1, 2, 3]; track i) {
-        <div class="h-48 w-64 shrink-0 rounded-lg bg-surface-2"></div>
-      }
+    @if (view() === 'list') {
+      <div class="space-y-2 animate-pulse" aria-label="Loading leads">
+        @for (i of [0, 1, 2, 3, 4, 5]; track i) {
+          <div class="h-11 rounded-lg border border-subtle bg-surface-2"></div>
+        }
+      </div>
+    } @else {
+      <div class="flex gap-3 overflow-x-auto animate-pulse" aria-label="Loading leads">
+        @for (i of [0, 1, 2, 3]; track i) {
+          <div class="h-48 w-64 shrink-0 rounded-lg bg-surface-2"></div>
+        }
+      </div>
+    }
+  } @else if (view() === 'pipeline' && state.items().length === 0) {
+    <div class="rounded-xl border border-dashed border-subtle bg-surface">
+      <ng-container *ngTemplateOutlet="leadsEmpty" />
     </div>
   } @else if (view() === 'pipeline') {
     <app-pipeline-board
@@ -549,7 +598,15 @@
           <thead class="bg-surface-2">
             <tr>
               <th scope="col" class="w-10 px-3 py-2.5">
-                <span class="sr-only">Select</span>
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 cursor-pointer rounded border-subtle text-default focus:ring-accent disabled:cursor-not-allowed"
+                  [checked]="allOnPageSelected()"
+                  [indeterminate]="someOnPageSelected()"
+                  [disabled]="state.items().length === 0"
+                  (change)="toggleAllOnPage()"
+                  aria-label="Select all leads on this page"
+                />
               </th>
               @for (col of visibleColumns(); track col.key) {
                 <th
@@ -675,9 +732,14 @@
                   <td class="px-4 py-2.5 text-sm text-default align-top whitespace-nowrap">
                     @switch (col.key) {
                       @case ('contact_name') {
-                        <span class="font-medium">{{
-                          contact?.full_name ?? 'Unknown contact'
-                        }}</span>
+                        <!-- Real link: keyboard-focusable and Ctrl/middle-click
+                             opens the lead in a new tab. -->
+                        <a
+                          [routerLink]="['/user/leads', lead.id]"
+                          (click)="$event.stopPropagation()"
+                          class="font-medium hover:underline focus:underline focus:outline-none"
+                          >{{ contact?.full_name ?? 'Unknown contact' }}</a
+                        >
                       }
                       @case ('status') {
                         <span
@@ -772,11 +834,8 @@
               </tr>
             } @empty {
               <tr>
-                <td
-                  [attr.colspan]="visibleColumns().length + 1"
-                  class="px-4 md:px-6 py-10 text-center text-sm text-muted"
-                >
-                  No leads match the current filter.
+                <td [attr.colspan]="visibleColumns().length + 1">
+                  <ng-container *ngTemplateOutlet="leadsEmpty" />
                 </td>
               </tr>
             }
@@ -838,6 +897,41 @@
     </div>
   }
 </div>
+
+<!-- Shared empty state for both views: "no matches" offers to clear
+     the filters; a truly empty org gets the add / import CTAs. -->
+<ng-template #leadsEmpty>
+  @if (hasActiveFilters()) {
+    <app-empty-state
+      icon="filter-x"
+      title="No leads match these filters"
+      subtitle="Try a different search or date range — or clear the filters."
+    >
+      <button type="button" class="btn btn-secondary btn-sm" (click)="onToolbarReset()">
+        Clear filters
+      </button>
+    </app-empty-state>
+  } @else {
+    <app-empty-state
+      icon="target"
+      title="No leads yet"
+      subtitle="Add a lead by hand, or import a spreadsheet of existing leads."
+    >
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <button type="button" class="btn btn-primary btn-sm" (click)="openCreate()">
+          <lucide-icon name="plus" class="h-4 w-4" />
+          Add Lead
+        </button>
+        @if (canImport()) {
+          <a routerLink="/user/leads/import" class="btn btn-secondary btn-sm">
+            <lucide-icon name="upload" class="h-4 w-4" />
+            Import
+          </a>
+        }
+      </div>
+    </app-empty-state>
+  }
+</ng-template>
 
 @if (modalOpen()) {
   <app-lead-form-modal

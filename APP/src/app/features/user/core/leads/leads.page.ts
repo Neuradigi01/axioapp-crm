@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -36,6 +37,7 @@ import {
 } from '../shared/directives/url-filter-state.directive';
 import { WhatsappLinkDirective } from '../shared/directives/whatsapp-link.directive';
 import { FieldDef } from '../shared/dynamic-form/types';
+import { EmptyStateComponent } from '../shared/empty-state/empty-state.component';
 import { clauseCount, FilterDsl } from '../shared/filter-dsl.types';
 import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 import {
@@ -152,6 +154,8 @@ class LeadsListState extends ListPageState<Lead> {}
     AdvancedFilterModalComponent,
     MobileSelectComponent,
     MobileDateTimeComponent,
+    EmptyStateComponent,
+    NgTemplateOutlet,
   ],
   providers: [LeadsListState],
   templateUrl: './leads.page.html',
@@ -627,6 +631,102 @@ export class LeadsPageComponent {
   /** Header subtitle counts: `loadedCount` is what's on screen now,
    * `totalCount` is server-reported for the active filter. */
   readonly loadedCount = computed(() => this.state.items().length);
+
+  /** Signal mirrors of the remaining text/status controls so the
+   *  active-filter chips recompute when they change. */
+  private readonly searchValue = toSignal(this.searchControl.valueChanges, {
+    initialValue: this.searchControl.value,
+  });
+  private readonly remarksValue = toSignal(this.remarksControl.valueChanges, {
+    initialValue: this.remarksControl.value,
+  });
+  private readonly statusValue = toSignal(this.statusControl.valueChanges, {
+    initialValue: this.statusControl.value,
+  });
+
+  /** One removable chip per active filter, shown under the toolbar —
+   *  in list view Source / Status / Owner live in column headers and
+   *  are otherwise easy to miss. */
+  readonly activeFilterChips = computed<{ key: string; label: string }[]>(() => {
+    const chips: { key: string; label: string }[] = [];
+    const q = this.searchValue().trim();
+    if (q) chips.push({ key: 'q', label: `Search: “${q}”` });
+    const src = this.sourceControlValue();
+    if (src) {
+      const name = this.sourceOptions().find((o) => o.value === src)?.label ?? src;
+      chips.push({ key: 'source', label: `Source: ${name}` });
+    }
+    const stage = this.stageControlValue();
+    if (stage) {
+      const name = this.pipelineStages().find((s) => s.key === stage)?.name ?? stage;
+      chips.push({ key: 'stage', label: `Status: ${name}` });
+    }
+    const status = this.statusValue();
+    if (status === 'active' || status === 'won' || status === 'lost') {
+      chips.push({ key: 'status', label: `Status: ${this.statusLabel(status)}` });
+    }
+    const owner = this.assigneeControlValue();
+    if (owner) {
+      const name = this.assigneeSelectOptions().find((o) => o.value === owner)?.label ?? 'User';
+      chips.push({ key: 'assignee', label: `Owner: ${name}` });
+    }
+    const from = (this.createdFromValue() || '').trim();
+    const to = (this.createdToValue() || '').trim();
+    if (from || to) {
+      const label = from && to ? `${from} → ${to}` : from ? `from ${from}` : `until ${to}`;
+      chips.push({ key: 'dates', label: `Created ${label}` });
+    }
+    const remarks = this.remarksValue().trim();
+    if (remarks) chips.push({ key: 'remarks', label: `Remarks: “${remarks}”` });
+    const noAct = this.noActivityFilter();
+    if (noAct) {
+      const name = this.noActivityOptions.find((o) => o.value === noAct)?.label ?? noAct;
+      chips.push({ key: 'no_activity', label: name });
+    }
+    const adv = this.advancedFilterCount();
+    if (adv > 0) {
+      chips.push({ key: 'advanced', label: `Advanced: ${adv} rule${adv === 1 ? '' : 's'}` });
+    }
+    return chips;
+  });
+
+  readonly hasActiveFilters = computed(() => this.activeFilterChips().length > 0);
+
+  /** Remove one chip's filter. FormControl-backed filters refetch via
+   *  their `valueChanges` subscriptions; signal-backed ones reload here. */
+  protected clearFilterChip(key: string): void {
+    switch (key) {
+      case 'q':
+        this.searchControl.setValue('');
+        break;
+      case 'source':
+        this.sourceControl.setValue('');
+        break;
+      case 'stage':
+        this.onToolbarStageChange('');
+        break;
+      case 'status':
+        this.statusControl.setValue('');
+        break;
+      case 'assignee':
+        this.assigneeControl.setValue('');
+        break;
+      case 'dates':
+        this.createdFromControl.setValue('');
+        this.createdToControl.setValue('');
+        break;
+      case 'remarks':
+        this.remarksControl.setValue('');
+        break;
+      case 'no_activity':
+        this.setNoActivity('');
+        break;
+      case 'advanced':
+        this.advancedFilter.set({});
+        this.resetCursorAndReload();
+        break;
+    }
+  }
   readonly newTodayCount = computed(() => {
     const todayKey = this.todayKey();
     return this.state.items().filter((l) => this.dateKey(l.created_at) === todayKey).length;
@@ -1025,9 +1125,9 @@ export class LeadsPageComponent {
   }
 
   /** Leads Center toolbar Reset button. Clears the new date-range +
-   *  the shared filter controls back to defaults + re-fetches. Does
-   *  NOT touch scope / saved view / advanced-filter DSL — those have
-   *  their own dedicated reset affordances. */
+   *  the shared filter controls + advanced-filter DSL back to defaults
+   *  and re-fetches. Does NOT touch scope / saved view — those have
+   *  their own dedicated affordances. */
   protected onToolbarReset(): void {
     this.createdFromControl.setValue('', { emitEvent: false });
     this.createdToControl.setValue('', { emitEvent: false });
@@ -1038,6 +1138,7 @@ export class LeadsPageComponent {
     this.statusControl.setValue('', { emitEvent: false });
     this.stageControlValue.set('');
     this.noActivityFilter.set('');
+    this.advancedFilter.set({});
     this.sortKey.set('created_at');
     this.sortOrder.set('desc');
     this.resetCursorAndReload();
@@ -1998,6 +2099,29 @@ export class LeadsPageComponent {
 
   protected isSelected(id: string): boolean {
     return this.state.selectedIds().has(id);
+  }
+
+  /** Header checkbox state for the rows on the current page. */
+  readonly allOnPageSelected = computed(() => {
+    const items = this.state.items();
+    const sel = this.state.selectedIds();
+    return items.length > 0 && items.every((l) => sel.has(l.id));
+  });
+  readonly someOnPageSelected = computed(
+    () => !this.allOnPageSelected() && this.state.items().some((l) => this.isSelected(l.id)),
+  );
+
+  protected toggleAllOnPage(): void {
+    const ids = this.state.items().map((l) => l.id);
+    const selectAll = !this.allOnPageSelected();
+    this.state.selectedIds.update((set) => {
+      const next = new Set(set);
+      for (const id of ids) {
+        if (selectAll) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
   }
 
   protected clearSelection(): void {
