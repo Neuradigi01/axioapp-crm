@@ -80,11 +80,12 @@
               [class]="
                 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ' +
                 (c.direction === 'out'
-                  ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
-                  : 'bg-sky-500/10 text-sky-700 ring-sky-200')
+                  ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30'
+                  : 'bg-sky-500/10 text-sky-400 ring-sky-500/30')
               "
             >
-              {{ c.direction === 'out' ? '↗ Outgoing' : '↘ Incoming' }}
+              <span aria-hidden="true">{{ c.direction === 'out' ? '↗' : '↘' }}</span>
+              {{ c.direction === 'out' ? 'Outgoing' : 'Incoming' }}
             </span>
             <span class="text-right text-[11px] text-faint">{{
               formatTimestamp(c.started_at)
@@ -159,7 +160,7 @@
                   [href]="c.recording_url"
                   target="_blank"
                   rel="noopener"
-                  class="inline-flex items-center gap-1 text-[11px] font-medium text-sky-700 hover:underline"
+                  class="inline-flex items-center gap-1 text-[11px] font-medium text-sky-500 hover:underline"
                 >
                   External recording ↗
                 </a>
@@ -227,11 +228,12 @@
                   [class]="
                     'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ' +
                     (c.direction === 'out'
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                      : 'bg-sky-500/10 text-sky-700 ring-sky-200')
+                      ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/30'
+                      : 'bg-sky-500/10 text-sky-400 ring-sky-500/30')
                   "
                 >
-                  {{ c.direction === 'out' ? '↗ Outgoing' : '↘ Incoming' }}
+                  <span aria-hidden="true">{{ c.direction === 'out' ? '↗' : '↘' }}</span>
+                  {{ c.direction === 'out' ? 'Outgoing' : 'Incoming' }}
                 </span>
               </td>
               <td class="whitespace-nowrap px-4 py-2 text-right font-medium text-default">
@@ -243,7 +245,7 @@
                   <span
                     [style.background-color]="outcome.color + '20'"
                     [style.color]="outcome.color"
-                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 border-subtle"
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                   >
                     {{ outcome.label }}
                   </span>
@@ -273,7 +275,7 @@
                     [href]="c.recording_url"
                     target="_blank"
                     rel="noopener"
-                    class="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:underline"
+                    class="inline-flex items-center gap-1 text-xs font-medium text-sky-500 hover:underline"
                   >
                     External link ↗
                   </a>

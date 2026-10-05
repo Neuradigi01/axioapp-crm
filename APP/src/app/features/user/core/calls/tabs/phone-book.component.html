@@ -64,8 +64,9 @@
         >
           <div class="flex min-w-0 items-center gap-3">
             <span
+              aria-hidden="true"
               [class]="
-                'flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ' +
+                'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ' +
                 avatarBg(c.id)
               "
             >
@@ -79,6 +80,7 @@
           <button
             type="button"
             (click)="call(c)"
+            [attr.aria-label]="'Call ' + c.full_name"
             class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
           >
             <lucide-icon name="phone" class="h-3.5 w-3.5"></lucide-icon>

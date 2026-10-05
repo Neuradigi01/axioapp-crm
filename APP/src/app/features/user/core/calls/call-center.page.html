@@ -13,8 +13,9 @@
     <button
       type="button"
       (click)="onLogCall()"
-      class="shrink-0 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-95 md:px-4 md:text-sm"
+      class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-95 md:px-4 md:text-sm"
     >
+      <lucide-icon name="phone" class="h-4 w-4" aria-hidden="true" />
       Log call
     </button>
   </header>
@@ -22,8 +23,9 @@
   <!-- Mobile: single-line select picker so all 5 tabs are reachable
        without horizontal scrolling. -->
   <div class="mb-4 md:hidden">
-    <label class="sr-only" for="call-center-tab">Section</label>
     <crm-mobile-select
+      role="group"
+      aria-label="Call Center section"
       [options]="tabOptions"
       [value]="activeTab()"
       (valueChange)="setTabFromValue($event)"
@@ -32,11 +34,13 @@
 
   <!-- Desktop: full horizontal tab strip -->
   <div class="mb-4 hidden overflow-x-auto border-b border-subtle md:block">
-    <nav class="-mb-px flex gap-6" aria-label="Tabs">
+    <nav class="-mb-px flex gap-6" role="tablist" aria-label="Call Center sections">
       @for (t of tabs; track t.id) {
         <button
           type="button"
           (click)="setTab(t.id)"
+          role="tab"
+          [attr.aria-selected]="activeTab() === t.id"
           [class]="
             'whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ' +
             (activeTab() === t.id

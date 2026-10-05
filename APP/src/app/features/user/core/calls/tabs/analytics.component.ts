@@ -23,6 +23,7 @@ import {
 } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
 import { extractApiError } from '@core/services/api-error.util';
+import { ThemeService } from '@core/services/theme.service';
 
 import { MobileDateTimeComponent } from '../../shared/forms/mobile-datetime.component';
 import { CallAnalytics, CallsApiService } from '../calls-api.service';
@@ -58,6 +59,18 @@ Chart.register(
 export class CallAnalyticsTabComponent {
   private readonly api = inject(CallsApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly theme = inject(ThemeService);
+
+  /** Chart.js draws text on a canvas, so CSS colours don't reach it —
+   *  read the theme tokens and rebuild when the theme choice changes. */
+  private readonly chartColors = computed(() => {
+    this.theme.choice();
+    const css = getComputedStyle(document.documentElement);
+    return {
+      text: css.getPropertyValue('--text-muted').trim() || '#667085',
+      grid: css.getPropertyValue('--border').trim() || '#e4e7ec',
+    };
+  });
 
   protected readonly data = signal<CallAnalytics | null>(null);
   protected readonly loading = signal(false);
@@ -134,20 +147,26 @@ export class CallAnalyticsTabComponent {
     };
   });
 
-  protected readonly doughnutOptions: ChartConfiguration<'doughnut'>['options'] = {
+  protected readonly doughnutOptions = computed<ChartConfiguration<'doughnut'>['options']>(() => ({
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { position: 'bottom' } },
-  };
-
-  protected readonly barOptions: ChartConfiguration<'bar'>['options'] = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      y: { beginAtZero: true, ticks: { precision: 0 } },
+    plugins: {
+      legend: { position: 'bottom', labels: { color: this.chartColors().text } },
     },
-  };
+  }));
+
+  protected readonly barOptions = computed<ChartConfiguration<'bar'>['options']>(() => {
+    const { text, grid } = this.chartColors();
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: text }, grid: { color: grid } },
+        y: { beginAtZero: true, ticks: { precision: 0, color: text }, grid: { color: grid } },
+      },
+    };
+  });
 
   constructor() {
     this.reload();

@@ -81,12 +81,12 @@ export class CallPhoneBookTabComponent {
 
   protected avatarBg(id: string): string {
     const palette = [
-      'bg-red-500/10 text-red-400',
-      'bg-amber-100 text-amber-700',
-      'bg-emerald-100 text-emerald-700',
-      'bg-sky-100 text-sky-700',
-      'bg-violet-100 text-violet-700',
-      'bg-fuchsia-100 text-fuchsia-700',
+      'bg-red-500/15 text-red-400',
+      'bg-amber-500/15 text-amber-400',
+      'bg-emerald-500/15 text-emerald-400',
+      'bg-sky-500/15 text-sky-400',
+      'bg-violet-500/15 text-violet-400',
+      'bg-fuchsia-500/15 text-fuchsia-400',
     ];
     let h = 0;
     for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
