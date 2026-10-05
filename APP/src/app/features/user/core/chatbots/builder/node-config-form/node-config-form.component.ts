@@ -59,6 +59,10 @@ export class NodeConfigFormComponent {
 
   @Output() readonly patch = new EventEmitter<Record<string, unknown>>();
   @Output() readonly portClick = new EventEmitter<{ label: string; event: MouseEvent }>();
+  /** A button id (= its port label) changed — the canvas re-points the edge. */
+  @Output() readonly portRenamed = new EventEmitter<{ from: string; to: string }>();
+  /** A button was removed — the canvas drops its edge. */
+  @Output() readonly portRemoved = new EventEmitter<string>();
 
   /** Read a possibly-nested value at `dot.path` from the config. */
   getValue(key: string): unknown {
@@ -202,10 +206,12 @@ export class NodeConfigFormComponent {
 
   removeButtonItem(key: string, idx: number): void {
     const list = this.getButtonList(key);
+    const removed = list[idx];
     this.setValue(
       key,
       list.filter((_, i) => i !== idx),
     );
+    if (removed?.id) this.portRemoved.emit(removed.id);
   }
 
   updateButtonTitle(key: string, idx: number, title: string): void {
@@ -215,10 +221,30 @@ export class NodeConfigFormComponent {
     this.setValue(key, list);
   }
 
-  updateButtonId(key: string, idx: number, id: string): void {
-    const clean = id.trim() || `btn_${idx + 1}`;
-    const list = this.getButtonList(key).map((row, i) => (i === idx ? { ...row, id: clean } : row));
-    this.setValue(key, list);
+  /** Commit an edited button id (on change / blur, not per keystroke —
+   *  the id is the port label, so the edge is re-pointed once).
+   *  Blank reverts; a clash with a sibling gets a `_2` / `_3` suffix. */
+  commitButtonId(key: string, idx: number, input: HTMLInputElement): void {
+    const list = this.getButtonList(key);
+    const old = list[idx]?.id ?? '';
+    let next = input.value.trim().replace(/\s+/g, '_').slice(0, 32);
+    if (!next) {
+      input.value = old;
+      return;
+    }
+    const taken = new Set(list.filter((_, i) => i !== idx).map((b) => b.id));
+    if (taken.has(next)) {
+      let n = 2;
+      while (taken.has(`${next}_${n}`)) n += 1;
+      next = `${next}_${n}`;
+    }
+    input.value = next;
+    if (next === old) return;
+    this.setValue(
+      key,
+      list.map((row, i) => (i === idx ? { ...row, id: next } : row)),
+    );
+    if (old) this.portRenamed.emit({ from: old, to: next });
   }
 
   /** JSON field — parse on every keystroke; if it parses, patch;

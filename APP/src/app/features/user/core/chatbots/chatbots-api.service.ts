@@ -44,6 +44,10 @@ export interface ChatbotGraph {
     target: string;
     label?: string | null;
   }>;
+  /** Node the trigger hands off to (the trigger card's wire). Absent on
+   *  bots saved before it existed — the engine then falls back to the
+   *  first node with no incoming edge. */
+  entry_node_id?: string | null;
 }
 
 export interface ChatbotListItem {

@@ -19,6 +19,8 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
+import { HasUnsavedChanges } from '../../shared/guards/unsaved-changes.guard';
 import { ChatbotsApiService, TriggerConfig } from '../chatbots-api.service';
 import { CanvasNode, CanvasStateService } from './canvas-state.service';
 import { NodeConfigFormComponent } from './node-config-form/node-config-form.component';
@@ -71,16 +73,30 @@ import { BotVariable } from '../../shared/variable-picker/variable-picker-api.se
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './builder.page.html',
 })
-export class ChatbotBuilderPageComponent {
+export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
   private readonly api = inject(ChatbotsApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
   readonly canvas = inject(CanvasStateService);
 
   readonly loading = signal<boolean>(true);
   readonly error = signal<string | null>(null);
+  /** Why the bot couldn't be loaded (body error state with Retry). */
+  readonly loadError = signal<string | null>(null);
+  /** Publish / pause request in flight — blocks a double submit. */
+  readonly statusChanging = signal<boolean>(false);
+
+  /** Id of the bot being edited (from the route) — Retry reloads it. */
+  private botId: string | null = null;
+  /** Saving a Live bot updates what customers get immediately; ask once
+   *  per page visit before the first manual save of a Live bot. */
+  private liveSaveConfirmed = false;
+  /** Revision whose auto-save failed — auto-save waits for a new edit
+   *  instead of retrying the same failing payload every 30 s. */
+  private autoSaveFailedRevision: number | null = null;
   readonly triggerModalOpen = signal<boolean>(false);
   readonly deleteNodeId = signal<string | null>(null);
   readonly testModalOpen = signal<boolean>(false);
@@ -610,8 +626,7 @@ export class ChatbotBuilderPageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.canvas.bot.set(updated);
-          this.canvas.markSaved(updated.version_number);
+          this.canvas.acceptServerBot(updated);
           this.showToast(`Renamed to "${updated.name}".`);
         },
         error: (err) => {
@@ -635,9 +650,10 @@ export class ChatbotBuilderPageComponent {
   readonly isLive = computed(() => this.bot()?.status === 'live');
 
   /** Auto-save timer handle. Every 30 s the timer checks ``dirty()``
-   *  and fires a save if the operator has pending changes AND no save
-   *  is already in flight. Silent — only the normal Save toast fires
-   *  on success. Cleared on component destroy via ``destroyRef``. */
+   *  and saves silently when there are pending changes, no save is in
+   *  flight, and the bot is NOT Live — a Live bot's save goes straight
+   *  to customers, so it only saves when the operator clicks Save.
+   *  Cleared on component destroy via ``destroyRef``. */
   private autoSaveTimer: ReturnType<typeof setInterval> | null = null;
   private readonly AUTO_SAVE_INTERVAL_MS = 30_000;
 
@@ -659,11 +675,22 @@ export class ChatbotBuilderPageComponent {
       if (id) this.loadBot(id);
     });
 
+    // The canvas store is app-wide: clear it on the way out so the next
+    // bot never starts with this one's graph, name or "Saving…" state.
+    this.destroyRef.onDestroy(() => this.canvas.reset());
+
     // Kick off the auto-save loop. Interval fires forever; the guard
     // inside skips when there's nothing to save.
     this.autoSaveTimer = setInterval(() => {
-      if (this.dirty() && !this.saving() && this.bot() && !this.loading()) {
-        this.save();
+      if (
+        this.dirty() &&
+        !this.saving() &&
+        this.bot() &&
+        !this.loading() &&
+        !this.isLive() &&
+        this.autoSaveFailedRevision !== this.canvas.revision
+      ) {
+        void this.save({ auto: true });
       }
     }, this.AUTO_SAVE_INTERVAL_MS);
 
@@ -678,8 +705,15 @@ export class ChatbotBuilderPageComponent {
   }
 
   private loadBot(id: string): void {
+    this.botId = id;
+    // Never show (or save into) the previously opened bot while this
+    // one loads — or if it fails to load.
+    this.canvas.reset();
+    this.liveSaveConfirmed = false;
+    this.autoSaveFailedRevision = null;
     this.loading.set(true);
     this.error.set(null);
+    this.loadError.set(null);
     this.api
       .get(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -691,17 +725,40 @@ export class ChatbotBuilderPageComponent {
           this.canvas.applyViewportDefaults(this.phoneQuery.matches);
         },
         error: (err) => {
-          this.error.set(extractApiError(err) ?? 'Failed to load bot.');
+          this.loadError.set(extractApiError(err) ?? 'Could not load this bot.');
           this.loading.set(false);
         },
       });
   }
 
-  save(): void {
+  retryLoad(): void {
+    if (this.botId) this.loadBot(this.botId);
+  }
+
+  /** Unsaved-changes guard (in-app navigation) — tab close is covered
+   *  by `onBeforeUnload`. */
+  hasUnsavedChanges(): boolean {
+    return this.dirty();
+  }
+
+  /** Save the graph. Manual saves of a Live bot confirm first (the change
+   *  reaches customers immediately); auto-saves are silent and never
+   *  run on Live bots. */
+  async save(opts: { auto?: boolean } = {}): Promise<void> {
     const bot = this.bot();
-    if (!bot) return;
+    if (!bot || this.saving()) return;
+    if (!opts.auto && this.isLive() && !this.liveSaveConfirmed) {
+      const ok = await this.confirmDialog.ask({
+        title: 'Save changes to a Live bot?',
+        body: 'This bot is replying to customers right now — saving updates it for every new conversation immediately. To edit safely, Pause it first.',
+        confirmLabel: 'Save to Live bot',
+      });
+      if (!ok) return;
+      this.liveSaveConfirmed = true;
+    }
     this.canvas.saving.set(true);
     this.error.set(null);
+    const revision = this.canvas.revision;
     const graph = this.canvas.serializeGraph();
     const trigger = this.triggerConfig();
     this.api
@@ -715,8 +772,11 @@ export class ChatbotBuilderPageComponent {
       .subscribe({
         next: (updated) => {
           this.canvas.bot.set(updated);
-          this.canvas.markSaved(updated.version_number);
-          this.showToast(`Your bot has been saved (v${updated.version_number}).`);
+          this.canvas.markSaved(updated.version_number, revision);
+          this.autoSaveFailedRevision = null;
+          if (!opts.auto) {
+            this.showToast(`Your bot has been saved (v${updated.version_number}).`);
+          }
         },
         error: (err) => {
           // Console-log the raw error so operators (or us) can dig into
@@ -726,6 +786,7 @@ export class ChatbotBuilderPageComponent {
           console.error('chatbot.save.failed', err);
           this.error.set(extractApiError(err) ?? 'Save failed.');
           this.canvas.saving.set(false);
+          if (opts.auto) this.autoSaveFailedRevision = revision;
         },
       });
   }
@@ -758,17 +819,20 @@ export class ChatbotBuilderPageComponent {
 
   private applyStatusChange(goingLive: boolean): void {
     const bot = this.bot();
-    if (!bot) return;
+    if (!bot || this.statusChanging()) return;
+    this.statusChanging.set(true);
     const call = goingLive ? this.api.publish(bot.id) : this.api.pause(bot.id);
     call.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (updated) => {
-        this.canvas.bot.set(updated);
-        this.canvas.markSaved(updated.version_number);
+        this.statusChanging.set(false);
+        this.canvas.acceptServerBot(updated);
+        this.liveSaveConfirmed = false;
         this.showToast(
           goingLive ? 'Your bot is now live and ready to reply.' : 'Your bot has been paused.',
         );
       },
       error: (err) => {
+        this.statusChanging.set(false);
         console.error('chatbot.toggleLive.failed', err);
         this.error.set(extractApiError(err) ?? 'Status change failed.');
       },
@@ -799,6 +863,17 @@ export class ChatbotBuilderPageComponent {
 
   openTriggerModal(): void {
     this.triggerModalOpen.set(true);
+  }
+
+  /** Trigger card click — ignored when it is the tail of a drag or a
+   *  card resize, so moving / resizing doesn't pop the settings modal. */
+  onTriggerCardClick(evt: MouseEvent): void {
+    evt.stopPropagation();
+    if (this.suppressNextClick) {
+      this.suppressNextClick = false;
+      return;
+    }
+    this.openTriggerModal();
   }
 
   openTestModal(): void {

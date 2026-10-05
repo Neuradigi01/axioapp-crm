@@ -39,6 +39,25 @@ def test_pick_entry_returns_none_on_empty_graph() -> None:
     assert _pick_entry_node_id({"nodes": [], "edges": []}) is None
 
 
+def test_pick_entry_prefers_explicit_entry_over_earlier_orphan() -> None:
+    # "b" is an earlier orphan; the trigger is wired to "c".
+    graph = {
+        "nodes": [{"id": "b"}, {"id": "c"}, {"id": "d"}],
+        "edges": [{"id": "e1", "source": "c", "target": "d"}],
+        "entry_node_id": "c",
+    }
+    assert _pick_entry_node_id(graph) == "c"
+
+
+def test_pick_entry_ignores_unknown_entry_and_falls_back() -> None:
+    graph = {
+        "nodes": [{"id": "a"}, {"id": "b"}],
+        "edges": [{"id": "e1", "source": "a", "target": "b"}],
+        "entry_node_id": "gone",
+    }
+    assert _pick_entry_node_id(graph) == "a"
+
+
 def test_pick_entry_returns_single_node() -> None:
     graph = {"nodes": [{"id": "a", "type": "text_button"}], "edges": []}
     assert _pick_entry_node_id(graph) == "a"

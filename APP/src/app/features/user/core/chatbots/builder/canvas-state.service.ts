@@ -42,6 +42,19 @@ export class CanvasStateService {
   readonly saving = signal<boolean>(false);
   readonly expectedVersion = signal<number>(1);
 
+  /** Bumped on every graph / trigger mutation. A save records the
+   *  revision it serialised; `markSaved` only clears `dirty` when no
+   *  edit landed while the request was in flight. */
+  private revisionCounter = 0;
+  get revision(): number {
+    return this.revisionCounter;
+  }
+
+  private markDirty(): void {
+    this.revisionCounter += 1;
+    this.dirty.set(true);
+  }
+
   /** Session-only position of the trigger card on the canvas. The
    *  trigger isn't a node in the backend graph (see
    *  `serializeGraph` — trigger-sourced edges are UI-only), so its
@@ -205,12 +218,14 @@ export class CanvasStateService {
       label: e.label ?? null,
     }));
 
-    // Re-derive the UI-only trigger→entry edge on load. The entry
-    // point is the first node that has no incoming edge; `addNode`
-    // wired one in for empty graphs, but stored bots may have been
-    // built via API or older UI so we walk the topology here.
+    // Re-derive the UI-only trigger→entry edge on load: the saved
+    // `entry_node_id` (what the engine starts from) when it names a
+    // node, else the engine's fallback — first node with no incoming
+    // edge — for bots saved before the field existed.
     const incomingIds = new Set(loadedEdges.map((e) => e.target));
-    const entry = loadedNodes.find((n) => !incomingIds.has(n.id));
+    const entry =
+      loadedNodes.find((n) => n.id === graph.entry_node_id) ??
+      loadedNodes.find((n) => !incomingIds.has(n.id));
     if (entry) {
       loadedEdges.push({
         id: `e_trigger_${entry.id}`,
@@ -224,6 +239,9 @@ export class CanvasStateService {
     this.edges.set(loadedEdges);
     this.selectedNodeId.set(null);
     this.dirty.set(false);
+    this.saving.set(false);
+    this.pendingSourceId.set(null);
+    this.pendingSourceLabel.set(null);
     this.expectedVersion.set(bot.version_number);
     this.triggerPosition.set({ x: 0, y: 0 });
   }
@@ -258,7 +276,7 @@ export class CanvasStateService {
     const triggerAlreadyWired = this.edges().some((e) => e.source === 'trigger');
     this.nodes.update((rows) => [...rows, node]);
     this.selectedNodeId.set(id);
-    this.dirty.set(true);
+    this.markDirty();
     // First node on a fresh canvas auto-wires from the trigger so the
     // flow visually reads "Trigger → this node" without a manual
     // click-to-connect gesture. Skipped if the operator already
@@ -305,40 +323,58 @@ export class CanvasStateService {
         n.id === nodeId ? { ...n, config: { ...this.clone(n.config), ...patch } } : n,
       ),
     );
-    this.dirty.set(true);
+    this.markDirty();
   }
 
   updateNodePosition(nodeId: string, position: { x: number; y: number }): void {
     this.nodes.update((rows) => rows.map((n) => (n.id === nodeId ? { ...n, position } : n)));
-    this.dirty.set(true);
+    this.markDirty();
   }
 
   deleteNode(nodeId: string): void {
     this.nodes.update((rows) => rows.filter((n) => n.id !== nodeId));
     this.edges.update((rows) => rows.filter((e) => e.source !== nodeId && e.target !== nodeId));
     if (this.selectedNodeId() === nodeId) this.selectedNodeId.set(null);
-    this.dirty.set(true);
+    this.markDirty();
   }
 
   addEdge(source: string, target: string, label: string | null = null): CanvasEdge {
     const id = this.generateEdgeId();
     const edge: CanvasEdge = { id, source, target, label };
     this.edges.update((rows) => [...rows, edge]);
-    this.dirty.set(true);
+    this.markDirty();
     return edge;
   }
 
   deleteEdge(edgeId: string): void {
     this.edges.update((rows) => rows.filter((e) => e.id !== edgeId));
-    this.dirty.set(true);
+    this.markDirty();
   }
 
   setTriggerConfig(cfg: TriggerConfig): void {
     this.triggerConfig.set(cfg);
-    this.dirty.set(true);
+    this.markDirty();
   }
 
-  serializeGraph(): { nodes: CanvasNode[]; edges: CanvasEdge[] } {
+  /** A button / port id changed — keep its outgoing edge attached. */
+  renamePortLabel(nodeId: string, from: string, to: string): void {
+    this.edges.update((rows) =>
+      rows.map((e) => (e.source === nodeId && e.label === from ? { ...e, label: to } : e)),
+    );
+    this.markDirty();
+  }
+
+  /** A button / port was removed — drop the edge that hung off it. */
+  dropPortEdges(nodeId: string, label: string): void {
+    this.edges.update((rows) => rows.filter((e) => !(e.source === nodeId && e.label === label)));
+    this.markDirty();
+  }
+
+  serializeGraph(): {
+    nodes: CanvasNode[];
+    edges: CanvasEdge[];
+    entry_node_id: string | null;
+  } {
     // `source: 'trigger'` is a UI-only virtual edge that lets the
     // canvas draw "Trigger → first node" cleanly. The backend graph
     // schema is a DAG of real nodes only (`core/chatbots/graph.py`
@@ -349,13 +385,27 @@ export class CanvasStateService {
       edges: this.edges()
         .filter((e) => e.source !== 'trigger')
         .map((e) => this.clone(e)),
+      // …but where the trigger points IS persisted: the engine starts
+      // runs from `entry_node_id`.
+      entry_node_id: this.edges().find((e) => e.source === 'trigger')?.target ?? null,
     };
   }
 
-  markSaved(newVersion: number): void {
-    this.dirty.set(false);
+  /** A graph save succeeded. `savedRevision` is the revision that was
+   *  serialised — edits made while the request was in flight keep the
+   *  canvas dirty so they are saved next time. */
+  markSaved(newVersion: number, savedRevision: number): void {
     this.saving.set(false);
     this.expectedVersion.set(newVersion);
+    if (savedRevision === this.revisionCounter) this.dirty.set(false);
+  }
+
+  /** Server returned the bot after a non-graph change (rename, publish,
+   *  pause). Takes the new row + version cursor; never touches `dirty`,
+   *  so pending graph edits stay pending. */
+  acceptServerBot(bot: ChatbotRead): void {
+    this.bot.set(bot);
+    this.expectedVersion.set(bot.version_number);
   }
 
   private generateNodeId(type: string): string {

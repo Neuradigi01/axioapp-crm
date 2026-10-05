@@ -250,9 +250,7 @@ async def process_step(run_id: uuid.UUID) -> dict[str, Any]:
             reset_context(token)
 
 
-async def _process_step_inner(
-    session: AsyncSession, *, run: ChatbotRun
-) -> dict[str, Any]:
+async def _process_step_inner(session: AsyncSession, *, run: ChatbotRun) -> dict[str, Any]:
     if run.status not in ("running", "parked"):
         logger.info(
             "chatbots.engine.process_step_skipped run=%s status=%s",
@@ -515,9 +513,7 @@ async def cancel_parked_runs_for_conversation(
     """Cancel every parked run on the given conversation. Used by
     the human-takeover hook in ``conversations.service.send_outbound``
     (Case #10). Returns the count canceled."""
-    runs = await _dal.list_parked_runs_for_conversation(
-        session, conversation_id=conversation_id
-    )
+    runs = await _dal.list_parked_runs_for_conversation(session, conversation_id=conversation_id)
     for run in runs:
         run.status = "canceled"
         run.canceled_reason = reason
@@ -530,9 +526,7 @@ async def cancel_parked_runs_for_conversation(
 # --- Internal helpers ----------------------------------------------------
 
 
-async def _cancel_run(
-    session: AsyncSession, run: ChatbotRun, *, reason: str
-) -> None:
+async def _cancel_run(session: AsyncSession, run: ChatbotRun, *, reason: str) -> None:
     run.status = "canceled"
     run.canceled_reason = reason
     run.completed_at = datetime.now(UTC)
@@ -540,9 +534,7 @@ async def _cancel_run(
     logger.info("chatbots.engine.canceled run=%s reason=%s", run.id, reason)
 
 
-async def _mark_errored(
-    session: AsyncSession, run: ChatbotRun, *, error: str
-) -> None:
+async def _mark_errored(session: AsyncSession, run: ChatbotRun, *, error: str) -> None:
     run.status = "errored"
     run.error = error
     run.completed_at = datetime.now(UTC)
@@ -550,13 +542,20 @@ async def _mark_errored(
 
 
 def _pick_entry_node_id(graph: dict[str, Any]) -> str | None:
-    """Return the id of the entry node — the node with in-degree 0.
-    If multiple such nodes exist, picks the first in the ``nodes``
-    array (canvas save order). ``None`` on empty graph."""
+    """Return the id of the entry node.
+
+    ``graph.entry_node_id`` — the node the builder's trigger card is
+    wired to — wins when it names a node in the graph. Otherwise (bots
+    saved before the field existed) fall back to the node with
+    in-degree 0, first in the ``nodes`` array (canvas save order) when
+    several qualify. ``None`` on empty graph."""
     nodes = graph.get("nodes") or []
     edges = graph.get("edges") or []
     if not nodes:
         return None
+    explicit = graph.get("entry_node_id")
+    if explicit and any(node.get("id") == explicit for node in nodes):
+        return explicit
     targets = {e.get("target") for e in edges if e.get("target")}
     for node in nodes:
         node_id = node.get("id")

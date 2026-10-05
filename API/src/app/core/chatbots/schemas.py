@@ -111,6 +111,7 @@ class ChatbotGraph(BaseModel):
       * No duplicate node ids.
       * No duplicate edge ids.
       * Every edge references node ids present in the graph.
+      * ``entry_node_id`` (when set) references a node in the graph.
 
     Semantic rules (DAG, node-type parity, chain depth) live in
     :func:`core.chatbots.graph.validate_graph`.
@@ -120,6 +121,10 @@ class ChatbotGraph(BaseModel):
 
     nodes: list[ChatbotNode] = Field(default_factory=list)
     edges: list[ChatbotEdge] = Field(default_factory=list)
+    # The node the trigger hands off to — what the builder's trigger card
+    # is wired to. Optional so bots saved before it existed keep the
+    # engine's in-degree-0 fallback.
+    entry_node_id: str | None = Field(default=None, min_length=1, max_length=64)
 
     @model_validator(mode="after")
     def _structural_checks(self) -> ChatbotGraph:
@@ -135,6 +140,8 @@ class ChatbotGraph(BaseModel):
                 raise ValueError(f"edge '{e.id}' source '{e.source}' not in nodes")
             if e.target not in node_id_set:
                 raise ValueError(f"edge '{e.id}' target '{e.target}' not in nodes")
+        if self.entry_node_id is not None and self.entry_node_id not in node_id_set:
+            raise ValueError(f"entry_node_id '{self.entry_node_id}' not in nodes")
         return self
 
 

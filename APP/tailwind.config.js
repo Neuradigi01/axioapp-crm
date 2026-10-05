@@ -1,3 +1,19 @@
+/**
+ * CSS-variable colour that still honours Tailwind's opacity modifier.
+ * A plain `'var(--accent)'` silently drops `/NN` utilities
+ * (`bg-accent/20`, `ring-accent/25`, `bg-surface/90` never got
+ * generated). With a literal opacity we mix the variable toward
+ * transparent; without one (plain `bg-accent`, where Tailwind passes
+ * its own `var(--tw-…-opacity)`), the output is the bare variable,
+ * exactly as before.
+ */
+const token =
+  (name) =>
+  ({ opacityValue }) =>
+    opacityValue === undefined || String(opacityValue).startsWith('var(')
+      ? `var(${name})`
+      : `color-mix(in srgb, var(${name}) calc(${opacityValue} * 100%), transparent)`;
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -22,24 +38,24 @@ module.exports = {
       // `border-subtle`, `bg-accent`, `bg-accent-soft`, `text-accent`
       // in place of raw palette utilities (`bg-white`, `text-zinc-500`).
       colors: {
-        app: 'var(--bg)',
-        surface: 'var(--surface)',
-        'surface-2': 'var(--surface-2)',
-        subtle: 'var(--border)',
-        default: 'var(--text)',
-        muted: 'var(--text-muted)',
-        faint: 'var(--text-faint)',
-        accent: 'var(--accent)',
-        'accent-soft': 'var(--accent-soft)',
+        app: token('--bg'),
+        surface: token('--surface'),
+        'surface-2': token('--surface-2'),
+        subtle: token('--border'),
+        default: token('--text'),
+        muted: token('--text-muted'),
+        faint: token('--text-faint'),
+        accent: token('--accent'),
+        'accent-soft': token('--accent-soft'),
       },
       borderColor: {
-        subtle: 'var(--border)',
-        muted: 'var(--text-muted)',
-        accent: 'var(--accent)',
+        subtle: token('--border'),
+        muted: token('--text-muted'),
+        accent: token('--accent'),
       },
       ringColor: {
-        accent: 'var(--accent)',
-        subtle: 'var(--border)',
+        accent: token('--accent'),
+        subtle: token('--border'),
       },
       fontFamily: {
         // Emoji fonts are appended to every family so inline emojis

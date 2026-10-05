@@ -45,7 +45,16 @@
         </span>
       }
       @if (dirty()) {
-        <span class="text-[11px] text-amber-500">• Unsaved</span>
+        <span
+          class="text-[11px] text-amber-700 dark:text-amber-300"
+          [title]="
+            isLive()
+              ? 'Auto-save is off while the bot is Live — click Save to publish your changes.'
+              : 'Changes auto-save every 30 seconds.'
+          "
+        >
+          • Unsaved{{ isLive() ? ' (auto-save off while Live)' : '' }}
+        </span>
       }
     </div>
 
@@ -108,7 +117,7 @@
     <button
       type="button"
       (click)="toggleLive()"
-      [disabled]="!bot() || dirty() || saving()"
+      [disabled]="!bot() || dirty() || saving() || statusChanging()"
       [class]="
         'px-2 md:px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ' +
         (isLive()
@@ -117,6 +126,9 @@
         ' disabled:opacity-40 disabled:cursor-not-allowed'
       "
     >
+      @if (statusChanging()) {
+        <lucide-icon name="loader-2" size="12" class="mr-1 inline animate-spin"></lucide-icon>
+      }
       {{ isLive() ? 'Pause' : 'Make Live' }}
     </button>
 
@@ -138,7 +150,27 @@
         Loading builder…
       </div>
     } @else if (!bot()) {
-      <div class="flex-1 flex items-center justify-center text-sm text-red-500">Bot not found.</div>
+      <div class="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <p class="text-sm text-red-600 dark:text-red-400">
+          {{ loadError() ?? 'Could not load this bot.' }}
+        </p>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            (click)="retryLoad()"
+            class="inline-flex items-center gap-1.5 rounded-md border border-subtle px-3 py-1.5 text-xs font-semibold text-default hover:bg-surface-2"
+          >
+            <lucide-icon name="refresh-cw" size="12"></lucide-icon>
+            Retry
+          </button>
+          <a
+            routerLink="/user/chatbots"
+            class="rounded-md px-3 py-1.5 text-xs font-semibold text-muted hover:bg-surface-2"
+          >
+            Back to chat bots
+          </a>
+        </div>
+      </div>
     } @else {
       <!-- Palette -->
       <app-chatbot-palette (add)="onPaletteAdd($event)"></app-chatbot-palette>
@@ -386,7 +418,7 @@
                anchor "this is where it all starts". Draggable. -->
           <button
             type="button"
-            (click)="openTriggerModal(); $event.stopPropagation()"
+            (click)="onTriggerCardClick($event)"
             (mousedown)="onNodeHeaderMouseDown('trigger', $event)"
             data-cb-card
             [style.left.px]="triggerPosition().x"
@@ -577,6 +609,8 @@
                     [sessionVariables]="sessionVariables()"
                     (patch)="patchNodeConfig(node.id, $event)"
                     (portClick)="onOutputPortClick(node.id, $event.label, $event.event)"
+                    (portRenamed)="canvas.renamePortLabel(node.id, $event.from, $event.to)"
+                    (portRemoved)="canvas.dropPortEdges(node.id, $event)"
                   ></app-node-config-form>
                 } @else {
                   <label class="block text-[10px] font-medium text-muted uppercase tracking-wide">

@@ -377,6 +377,7 @@ export const userRoutes: Routes = [
         // see disabled "Edit" affordances there.
         path: 'chatbots/:id/edit',
         canActivate: [permissionGuard('chatbots.edit')],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./core/chatbots/builder/builder.page').then((m) => m.ChatbotBuilderPageComponent),
       },

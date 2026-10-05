@@ -15,6 +15,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, distinctUntilChanged, skip, switchMap, tap } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { ToastService } from '@shared/components/toast/toast.service';
 
 import { FurnitureAuthService } from '../../auth/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog/confirm-dialog.component';
@@ -71,10 +72,12 @@ export class ChatbotsListPageComponent {
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
+  private readonly toast = inject(ToastService);
 
   readonly statusFilters = STATUS_FILTERS;
 
   readonly loading = signal<boolean>(true);
+  /** List load failure only — row actions report through toasts. */
   readonly error = signal<string | null>(null);
   readonly rows = signal<ChatbotListItem[]>([]);
   readonly search = signal<string>('');
@@ -122,13 +125,16 @@ export class ChatbotsListPageComponent {
   readonly emptyState = computed(
     () =>
       !this.loading() &&
+      !this.error() &&
       this.rows().length === 0 &&
       this.selectedStatus() === '' &&
       !this.search().trim(),
   );
   /** Org has rows but the current filter/search produced nothing —
    *  show a smaller "no matches" panel, NOT the empty-org CTA. */
-  readonly filteredEmpty = computed(() => !this.loading() && !this.hasRows() && !this.emptyState());
+  readonly filteredEmpty = computed(
+    () => !this.loading() && !this.error() && !this.hasRows() && !this.emptyState(),
+  );
 
   constructor() {
     // Reactive refetch on status change. skip(1) drops toObservable's
@@ -160,6 +166,10 @@ export class ChatbotsListPageComponent {
           this.loading.set(false);
         },
       });
+    this.reload(this.selectedStatus());
+  }
+
+  retry(): void {
     this.reload(this.selectedStatus());
   }
 
@@ -231,7 +241,9 @@ export class ChatbotsListPageComponent {
         },
         error: (err) => {
           this.actionInFlight.set(null);
-          this.error.set(extractApiError(err) ?? 'Publish failed.');
+          this.toast.error(`Could not publish “${row.name}”`, {
+            subtitle: extractApiError(err) ?? undefined,
+          });
         },
       });
   }
@@ -252,7 +264,9 @@ export class ChatbotsListPageComponent {
         },
         error: (err) => {
           this.actionInFlight.set(null);
-          this.error.set(extractApiError(err) ?? 'Pause failed.');
+          this.toast.error(`Could not pause “${row.name}”`, {
+            subtitle: extractApiError(err) ?? undefined,
+          });
         },
       });
   }
@@ -314,7 +328,8 @@ export class ChatbotsListPageComponent {
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
         },
-        error: (err) => this.error.set(extractApiError(err) ?? 'Export failed.'),
+        error: (err) =>
+          this.toast.error('Export failed', { subtitle: extractApiError(err) ?? undefined }),
       });
   }
 
@@ -330,7 +345,9 @@ export class ChatbotsListPageComponent {
         try {
           envelope = JSON.parse(text);
         } catch {
-          this.error.set('Selected file is not valid JSON.');
+          this.toast.error('Import failed', {
+            subtitle: `“${file.name}” is not a valid chatbot export (JSON).`,
+          });
           return;
         }
         this.api
@@ -338,13 +355,19 @@ export class ChatbotsListPageComponent {
           .pipe(takeUntilDestroyed(this.destroyRef))
           .subscribe({
             next: (result) => {
+              // Toasts outlive the navigation below — a banner on this
+              // page would be destroyed before anyone could read it.
               if (result.conflicts.length) {
                 const msg = result.conflicts.map((c) => `${c.kind}: ${c.detail}`).join(' · ');
-                this.error.set(`Imported with conflicts: ${msg}`);
+                this.toast.warn('Imported with conflicts — review before going live', {
+                  subtitle: msg,
+                  durationMs: 12000,
+                });
               }
               this.router.navigate(['/user/chatbots', result.created_bot_id, 'edit']);
             },
-            error: (err) => this.error.set(extractApiError(err) ?? 'Import failed.'),
+            error: (err) =>
+              this.toast.error('Import failed', { subtitle: extractApiError(err) ?? undefined }),
           });
       })
       .finally(() => {

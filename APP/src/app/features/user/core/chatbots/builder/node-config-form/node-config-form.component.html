@@ -117,7 +117,9 @@
 
         @case ('button_list') {
           <div class="space-y-1.5">
-            @for (btn of getButtonList(field.key); track btn.id; let i = $index) {
+            <!-- Tracked by position: the id is editable, so tracking by it
+                 would recreate the row (and drop focus) on every edit. -->
+            @for (btn of getButtonList(field.key); track $index; let i = $index) {
               <div
                 class="relative flex items-center gap-2 p-2 pr-4 border border-subtle bg-app rounded-md"
               >
@@ -136,7 +138,8 @@
                 <input
                   type="text"
                   [value]="btn.id"
-                  (input)="updateButtonId(field.key, i, $any($event.target).value)"
+                  (change)="commitButtonId(field.key, i, $any($event.target))"
+                  title="Button id — the reply value the bot matches on"
                   placeholder="id"
                   maxlength="32"
                   class="w-20 px-1.5 py-1 text-[10px] font-mono bg-surface text-muted border border-subtle rounded focus:outline-none focus:border-accent"
