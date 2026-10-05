@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   computed,
@@ -19,11 +20,13 @@ import {
   ValidationErrors,
   ValidatorFn,
 } from '@angular/forms';
+import { format } from 'date-fns';
 import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { BaseFormModalComponent } from '../shared/components/base-form-modal.component';
+import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
 import { ContactListItem, ContactsApiService } from '../contacts/contacts-api.service';
 import { DynamicFormComponent } from '../shared/dynamic-form/dynamic-form.component';
 import { FieldDef, FormValue } from '../shared/dynamic-form/types';
@@ -99,6 +102,9 @@ export class TaskFormModalComponent extends BaseFormModalComponent implements On
   private readonly fb = inject(FormBuilder);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly formToast = inject(FormToastHelper);
+  private readonly confirmDialog = inject(ConfirmDialogService);
+  /** True while the discard-changes confirm is up, so Esc doesn't stack. */
+  private confirming = false;
 
   /** T4 — Task custom fields backed by the standard
    *  `GET /custom-fields/task/render` endpoint (added by the tasks
@@ -290,9 +296,11 @@ export class TaskFormModalComponent extends BaseFormModalComponent implements On
 
   ngOnChanges(): void {
     if (this.task) {
-      // datetime-local needs `YYYY-MM-DDTHH:mm` — strip seconds / Z.
+      // datetime-local wants local `YYYY-MM-DDTHH:mm`. Must be local
+      // time: submit parses it as local, so a UTC string here shifted
+      // the due time by the UTC offset on every edit + save.
       const dueLocal = this.task.due_at
-        ? new Date(this.task.due_at).toISOString().slice(0, 16)
+        ? format(new Date(this.task.due_at), "yyyy-MM-dd'T'HH:mm")
         : '';
       this.form.reset({
         title: this.task.title,
@@ -434,7 +442,28 @@ export class TaskFormModalComponent extends BaseFormModalComponent implements On
     }
   }
 
-  protected onCancel(): void {
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (!this.confirming) void this.onCancel();
+  }
+
+  /** Cancel / Esc / backdrop. Asks before throwing away typed changes. */
+  protected async onCancel(): Promise<void> {
+    if (this.saving()) return;
+    if (this.form.dirty) {
+      this.confirming = true;
+      try {
+        const ok = await this.confirmDialog.ask({
+          title: 'Discard changes?',
+          body: 'What you entered for this task will be lost.',
+          confirmLabel: 'Discard',
+          danger: true,
+        });
+        if (!ok) return;
+      } finally {
+        this.confirming = false;
+      }
+    }
     this.cancelled.emit();
   }
 }

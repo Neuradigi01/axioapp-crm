@@ -1,16 +1,17 @@
 <div
   class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
-  (click)="saving() ? null : onCancel()"
+  (click)="onCancel()"
   role="presentation"
 >
   <div
     class="w-full max-w-2xl rounded-lg border border-subtle bg-surface shadow-xl"
     (click)="$event.stopPropagation()"
     role="dialog"
-    aria-label="Task form"
+    aria-modal="true"
+    aria-labelledby="task_form_title"
   >
     <header class="border-b border-subtle px-4 md:px-6 py-4">
-      <h2 class="text-base font-semibold text-default">
+      <h2 id="task_form_title" class="text-base font-semibold text-default">
         {{ isEdit() ? 'Edit task' : 'Create task' }}
       </h2>
       <p class="mt-1 text-xs text-muted">

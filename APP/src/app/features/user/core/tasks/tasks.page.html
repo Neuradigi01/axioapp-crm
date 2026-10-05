@@ -110,11 +110,14 @@
           <div class="fixed inset-0 z-30" (click)="toggleViewsMenu()" role="presentation"></div>
           <div
             class="absolute right-0 z-40 mt-1 w-64 rounded-lg border border-subtle bg-surface shadow-lg"
+            role="menu"
+            aria-label="Saved views"
           >
             <div class="max-h-64 overflow-auto py-1">
               @for (v of savedViews(); track v.id) {
                 <button
                   type="button"
+                  role="menuitem"
                   (click)="applyView(v); toggleViewsMenu()"
                   class="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-default hover:bg-surface-2"
                   [class.font-medium]="v.id === currentViewId()"
@@ -140,7 +143,7 @@
                 <button
                   type="button"
                   (click)="deleteCurrentView(); toggleViewsMenu()"
-                  class="ml-3 text-xs font-medium text-red-500 hover:underline"
+                  class="ml-3 text-xs font-medium text-red-600 hover:underline dark:text-red-400"
                 >
                   Delete this view
                 </button>
@@ -256,7 +259,7 @@
               (click)="toggleComplete(t, t.status !== 'done')"
               [disabled]="togglingId() !== null"
               [class]="
-                'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition disabled:cursor-not-allowed ' +
+                'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ' +
                 (t.status === 'done'
                   ? 'border-emerald-500 bg-emerald-500 text-white'
                   : 'border-muted bg-surface text-transparent hover:border-emerald-500 hover:text-emerald-500')
@@ -271,7 +274,7 @@
             <button
               type="button"
               (click)="openEdit(t)"
-              class="min-w-0 flex-1 text-left text-[13px] leading-tight font-semibold text-default [overflow-wrap:anywhere] hover:underline"
+              class="min-w-0 flex-1 text-left text-[13px] leading-tight font-semibold text-default [overflow-wrap:anywhere] hover:underline focus:outline-none focus-visible:underline focus-visible:decoration-2"
               [class.line-through]="t.status === 'done' || t.status === 'missed'"
               [class.text-faint]="t.status === 'done' || t.status === 'missed'"
             >
@@ -354,7 +357,7 @@
                 type="button"
                 (click)="onMarkMissed(t)"
                 [disabled]="togglingId() !== null"
-                class="inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-surface px-2 py-1 text-[10.5px] font-medium text-red-500 hover:bg-red-500/10 disabled:cursor-not-allowed"
+                class="inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-surface px-2 py-1 text-[10.5px] font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400 disabled:cursor-not-allowed"
                 title="Mark as missed"
               >
                 <lucide-icon name="clock-alert" class="h-3 w-3" />
@@ -365,7 +368,7 @@
               <button
                 type="button"
                 (click)="openDeleteRow(t)"
-                class="ml-auto inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-surface px-2 py-1 text-[10.5px] font-medium text-red-500 hover:bg-red-500/10"
+                class="ml-auto inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-surface px-2 py-1 text-[10.5px] font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400"
                 title="Delete task"
                 aria-label="Delete task"
               >
@@ -493,7 +496,7 @@
                   (click)="toggleComplete(t, t.status !== 'done')"
                   [disabled]="togglingId() !== null"
                   [class]="
-                    'flex h-5 w-5 items-center justify-center rounded-full border transition disabled:cursor-not-allowed ' +
+                    'flex h-5 w-5 items-center justify-center rounded-full border transition disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 ' +
                     (t.status === 'done'
                       ? 'border-emerald-500 bg-emerald-500 text-white'
                       : 'border-muted bg-surface text-transparent hover:border-emerald-500 hover:text-emerald-500')
@@ -511,7 +514,7 @@
                   <button
                     type="button"
                     (click)="openEdit(t)"
-                    class="text-left text-sm font-medium text-default hover:underline"
+                    class="text-left text-sm font-medium text-default hover:underline focus:outline-none focus-visible:underline focus-visible:decoration-2"
                     [class.line-through]="t.status === 'done' || t.status === 'missed'"
                     [class.text-faint]="t.status === 'done' || t.status === 'missed'"
                   >
@@ -583,7 +586,7 @@
                       type="button"
                       (click)="snoozeToTomorrow(t)"
                       [disabled]="togglingId() !== null"
-                      class="rounded-md p-1 text-faint hover:bg-surface-2 hover:text-default disabled:cursor-not-allowed"
+                      class="rounded-md p-1 text-faint focus:outline-none focus-visible:ring-2 focus-visible:ring-accent hover:bg-surface-2 hover:text-default disabled:cursor-not-allowed"
                       title="Snooze to tomorrow 9am"
                       aria-label="Snooze to tomorrow"
                     >
@@ -594,7 +597,7 @@
                       type="button"
                       (click)="snoozeTask(t, 60 * 24 * 7)"
                       [disabled]="togglingId() !== null"
-                      class="rounded-md p-1 text-faint hover:bg-surface-2 hover:text-default disabled:cursor-not-allowed"
+                      class="rounded-md p-1 text-faint focus:outline-none focus-visible:ring-2 focus-visible:ring-accent hover:bg-surface-2 hover:text-default disabled:cursor-not-allowed"
                       title="Snooze +1 week"
                       aria-label="Snooze +1 week"
                     >
@@ -605,7 +608,7 @@
                       type="button"
                       (click)="onMarkMissed(t)"
                       [disabled]="togglingId() !== null"
-                      class="rounded-md p-1 text-faint hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed"
+                      class="rounded-md p-1 text-faint focus:outline-none focus-visible:ring-2 focus-visible:ring-accent hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 disabled:cursor-not-allowed"
                       title="Mark as missed"
                       aria-label="Mark task missed"
                     >
@@ -617,7 +620,7 @@
                     <button
                       type="button"
                       (click)="openDeleteRow(t)"
-                      class="rounded-md p-1 text-faint hover:bg-red-500/10 hover:text-red-400"
+                      class="rounded-md p-1 text-faint focus:outline-none focus-visible:ring-2 focus-visible:ring-accent hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
                       title="Delete task"
                       aria-label="Delete task"
                     >
@@ -823,15 +826,17 @@
 @if (saveViewOpen()) {
   <div class="fixed inset-0 z-40 bg-black/40" (click)="closeSaveView()" role="presentation"></div>
   <div
-    class="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-surface shadow-2xl"
+    class="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-subtle bg-surface shadow-2xl"
     role="dialog"
-    aria-label="Save view"
+    aria-modal="true"
+    aria-labelledby="save_view_title"
   >
     <div class="border-b border-subtle px-5 py-3">
-      <h3 class="text-sm font-semibold text-default">Save current filters as a view</h3>
+      <h3 id="save_view_title" class="text-sm font-semibold text-default">
+        Save current filters as a view
+      </h3>
       <p class="mt-1 text-[14px] text-muted">
-        Captures the active chip, status, due filter, priority, and sort. Restore by picking the
-        view from the bookmark menu.
+        Captures Mine/All, the active tab, priority and sort. Restore it from the bookmark menu.
       </p>
     </div>
     <div class="space-y-3 px-5 py-4">
@@ -842,7 +847,8 @@
           [formControl]="saveViewName"
           placeholder="e.g. My overdue high-priority"
           maxlength="80"
-          class="w-full rounded-md border border-subtle px-2.5 py-1.5 text-sm focus:border-muted focus:outline-none"
+          class="w-full rounded-md border border-subtle bg-surface px-2.5 py-1.5 text-sm text-default placeholder:text-faint focus:border-muted focus:outline-none"
+          (keydown.enter)="submitSaveView()"
         />
       </label>
       <label class="flex items-center gap-2 text-xs text-default">

@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   effect,
   inject,
@@ -796,6 +797,14 @@ export class TasksPageComponent {
         next: (rows) => this.savedViews.set(rows),
         error: () => this.savedViews.set([]),
       });
+  }
+
+  /** Esc closes the save-view dialog, else the views menu. (The task
+   *  form and confirm dialogs handle their own Esc.) */
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this.saveViewOpen()) this.closeSaveView();
+    else if (this.viewsMenuOpen()) this.viewsMenuOpen.set(false);
   }
 
   protected toggleViewsMenu(): void {
