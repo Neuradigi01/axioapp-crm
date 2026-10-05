@@ -46,11 +46,21 @@ interface StatusFilter {
 
 const STATUS_FILTERS: StatusFilter[] = [
   { value: '', label: 'All', tone: 'bg-surface-2 text-default' },
-  { value: 'draft', label: 'Draft', tone: 'bg-amber-500/15 text-amber-500' },
-  { value: 'live', label: 'Live', tone: 'bg-emerald-500/15 text-emerald-500' },
-  { value: 'paused', label: 'Paused', tone: 'bg-sky-500/15 text-sky-500' },
+  { value: 'draft', label: 'Draft', tone: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' },
+  {
+    value: 'live',
+    label: 'Live',
+    tone: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  },
+  { value: 'paused', label: 'Paused', tone: 'bg-sky-500/10 text-sky-700 dark:text-sky-300' },
   { value: 'archived', label: 'Archived', tone: 'bg-surface-2 text-muted' },
 ];
+
+const CHANNEL_LABELS: Record<string, string> = {
+  any: 'Any channel',
+  whatsapp: 'WhatsApp',
+  email: 'Email',
+};
 
 @Component({
   selector: 'app-chatbots-list',
@@ -80,6 +90,9 @@ export class ChatbotsListPageComponent {
   /** List load failure only — row actions report through toasts. */
   readonly error = signal<string | null>(null);
   readonly rows = signal<ChatbotListItem[]>([]);
+  /** The last page came back full — there may be more bots to load. */
+  readonly hasMore = signal<boolean>(false);
+  readonly loadingMore = signal<boolean>(false);
   readonly search = signal<string>('');
   readonly selectedStatus = signal<'' | ChatbotStatus>('');
   readonly actionsMenuFor = signal<string | null>(null);
@@ -159,6 +172,7 @@ export class ChatbotsListPageComponent {
       .subscribe({
         next: (rows) => {
           this.rows.set(rows);
+          this.hasMore.set(rows.length === PAGE_SIZE);
           this.loading.set(false);
         },
         error: (err) => {
@@ -182,6 +196,7 @@ export class ChatbotsListPageComponent {
       .subscribe({
         next: (rows) => {
           this.rows.set(rows);
+          this.hasMore.set(rows.length === PAGE_SIZE);
           this.loading.set(false);
         },
         error: (err) => {
@@ -238,6 +253,9 @@ export class ChatbotsListPageComponent {
           this.rows.update((rows) =>
             rows.map((r) => (r.id === row.id ? { ...r, status: updated.status } : r)),
           );
+          this.toast.success(`“${row.name}” is now Live`, {
+            subtitle: 'It replies to matching inbound messages from now on.',
+          });
         },
         error: (err) => {
           this.actionInFlight.set(null);
@@ -250,6 +268,7 @@ export class ChatbotsListPageComponent {
 
   pause(row: ChatbotListItem): void {
     if (!this.canEdit() || this.actionInFlight()) return;
+    const restoring = row.status === 'archived';
     this.actionsMenuFor.set(null);
     this.actionInFlight.set(row.id);
     this.api
@@ -261,10 +280,15 @@ export class ChatbotsListPageComponent {
           this.rows.update((rows) =>
             rows.map((r) => (r.id === row.id ? { ...r, status: updated.status } : r)),
           );
+          this.toast.success(restoring ? `“${row.name}” restored` : `“${row.name}” paused`, {
+            subtitle: restoring
+              ? 'It is back as Paused — make it Live when you’re ready.'
+              : 'It stops starting new conversations.',
+          });
         },
         error: (err) => {
           this.actionInFlight.set(null);
-          this.toast.error(`Could not pause “${row.name}”`, {
+          this.toast.error(`Could not ${restoring ? 'restore' : 'pause'} “${row.name}”`, {
             subtitle: extractApiError(err) ?? undefined,
           });
         },
@@ -300,6 +324,9 @@ export class ChatbotsListPageComponent {
           this.rows.update((rows) =>
             rows.map((r) => (r.id === row.id ? { ...r, status: 'archived' as ChatbotStatus } : r)),
           );
+          this.toast.success(`“${row.name}” archived`, {
+            subtitle: 'Restore it from the ⋯ menu any time.',
+          });
         },
         error: (err) => {
           this.archiveError.set(extractApiError(err) ?? 'Archive failed.');
@@ -327,6 +354,7 @@ export class ChatbotsListPageComponent {
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
+          this.toast.success('Export downloaded', { subtitle: a.download });
         },
         error: (err) =>
           this.toast.error('Export failed', { subtitle: extractApiError(err) ?? undefined }),
@@ -373,6 +401,80 @@ export class ChatbotsListPageComponent {
       .finally(() => {
         input.value = ''; // reset picker so the same file can be re-selected
       });
+  }
+
+  /** Copy a bot as a new Draft — export + import with a new name, so
+   *  the copy goes through the same validation as an uploaded file. */
+  duplicate(row: ChatbotListItem): void {
+    if (!this.canEdit() || this.actionInFlight()) return;
+    this.actionsMenuFor.set(null);
+    this.actionInFlight.set(row.id);
+    const copyName = `${row.name} (copy)`.slice(0, 200);
+    this.api
+      .export(row.id)
+      .pipe(
+        switchMap((envelope) => this.api.import({ envelope, name_override: copyName })),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (result) => {
+          this.actionInFlight.set(null);
+          this.toast.success('Bot duplicated', {
+            subtitle: `“${copyName}” was created as a Draft.`,
+          });
+          if (result.conflicts.length) {
+            this.toast.warn('Copied with conflicts — review before going live', {
+              subtitle: result.conflicts.map((c) => `${c.kind}: ${c.detail}`).join(' · '),
+              durationMs: 12000,
+            });
+          }
+          this.retry();
+        },
+        error: (err) => {
+          this.actionInFlight.set(null);
+          this.toast.error(`Could not duplicate “${row.name}”`, {
+            subtitle: extractApiError(err) ?? undefined,
+          });
+        },
+      });
+  }
+
+  /** Next page of bots (same status filter), appended to the list. */
+  loadMore(): void {
+    if (this.loadingMore() || !this.hasMore()) return;
+    this.loadingMore.set(true);
+    const status = this.selectedStatus();
+    this.api
+      .list({ status: status || undefined, limit: PAGE_SIZE, offset: this.rows().length })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => {
+          if (status !== this.selectedStatus()) return; // filter changed meanwhile
+          const seen = new Set(this.rows().map((r) => r.id));
+          this.rows.update((cur) => [...cur, ...rows.filter((r) => !seen.has(r.id))]);
+          this.hasMore.set(rows.length === PAGE_SIZE);
+          this.loadingMore.set(false);
+        },
+        error: (err) => {
+          this.loadingMore.set(false);
+          this.toast.error('Could not load more bots', {
+            subtitle: extractApiError(err) ?? undefined,
+          });
+        },
+      });
+  }
+
+  channelLabel(channel: string | null | undefined): string {
+    return CHANNEL_LABELS[channel ?? 'any'] ?? channel ?? '';
+  }
+
+  statusLabel(status: ChatbotStatus): string {
+    return STATUS_FILTERS.find((f) => f.value === status)?.label ?? status;
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.actionsMenuFor()) this.actionsMenuFor.set(null);
   }
 
   toggleActionsMenu(botId: string, event: MouseEvent): void {

@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -247,18 +254,34 @@ export class NodeConfigFormComponent {
     if (old) this.portRenamed.emit({ from: old, to: next });
   }
 
-  /** JSON field — parse on every keystroke; if it parses, patch;
-   *  otherwise swallow the update so the graph stays valid. Errors
-   *  render inline. */
+  /** What the operator is typing into each JSON field. The textarea
+   *  shows this (not the re-formatted stored value) so the cursor never
+   *  jumps; an invalid draft keeps the last good value stored and shows
+   *  its parse error. Cleared on blur once valid. */
+  protected readonly jsonDrafts = signal<Record<string, string>>({});
+
+  jsonText(key: string): string {
+    return this.jsonDrafts()[key] ?? this.getRawJson(key) ?? '';
+  }
+
   jsonError(key: string): string | null {
-    const raw = this.getRawJson(key);
-    if (raw === null) return null;
+    const raw = this.jsonDrafts()[key];
+    if (raw === undefined || raw.trim() === '') return null;
     try {
       JSON.parse(raw);
       return null;
     } catch (e) {
       return e instanceof Error ? e.message : 'Invalid JSON';
     }
+  }
+
+  onJsonBlur(key: string): void {
+    if (this.jsonError(key)) return;
+    this.jsonDrafts.update((d) => {
+      const next = { ...d };
+      delete next[key];
+      return next;
+    });
   }
 
   getRawJson(key: string): string | null {
@@ -272,6 +295,7 @@ export class NodeConfigFormComponent {
   }
 
   onJson(key: string, raw: string): void {
+    this.jsonDrafts.update((d) => ({ ...d, [key]: raw }));
     try {
       const parsed = raw.trim() === '' ? null : JSON.parse(raw);
       this.setValue(key, parsed);

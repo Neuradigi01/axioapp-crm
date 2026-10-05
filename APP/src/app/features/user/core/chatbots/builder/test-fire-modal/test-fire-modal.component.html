@@ -110,7 +110,7 @@
               statusTone(res.final_status)
             "
           >
-            {{ res.final_status }}
+            {{ humanize(res.final_status) }}
           </span>
           @if (res.canceled_reason) {
             <span class="text-[11px] text-muted">· {{ res.canceled_reason }}</span>
@@ -137,7 +137,9 @@
                 </span>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-xs font-semibold text-default">{{ step.node_type }}</span>
+                    <span class="text-xs font-semibold text-default">{{
+                      nodeLabel(step.node_type)
+                    }}</span>
                     <span
                       class="text-[10px] font-mono text-muted truncate max-w-[220px]"
                       [title]="step.node_id"
@@ -145,13 +147,13 @@
                       {{ step.node_id }}
                     </span>
                     <span [class]="'text-[10px] font-semibold ' + stepTone(step.status)">
-                      · {{ step.status }}
+                      · {{ humanize(step.status) }}
                     </span>
                     @if (step.output_edge_label) {
                       <span
                         class="text-[10px] px-1.5 py-px rounded-full bg-accent-soft text-accent"
                       >
-                        → {{ step.output_edge_label }}
+                        → {{ humanize(step.output_edge_label) }}
                       </span>
                     }
                   </div>

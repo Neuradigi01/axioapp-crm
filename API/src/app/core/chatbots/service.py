@@ -31,9 +31,7 @@ from src.app.core.chatbots.exceptions import (
     ChatbotVersionConflict,
     InvalidGraph,
 )
-from src.app.shared.audit import log_entity_change
 from src.app.core.chatbots.graph import validate_graph_with_db
-from src.app.core.chatbots.trigger_matcher import UnsafeRegex, lint_regex_pattern
 from src.app.core.chatbots.models import Chatbot, ChatbotVersion
 from src.app.core.chatbots.schemas import (
     ChatbotCreate,
@@ -41,6 +39,8 @@ from src.app.core.chatbots.schemas import (
     ChatbotUpdate,
     TriggerConfig,
 )
+from src.app.core.chatbots.trigger_matcher import UnsafeRegex, lint_regex_pattern
+from src.app.shared.audit import log_entity_change
 
 
 async def create_chatbot_service(
@@ -152,20 +152,19 @@ async def save_chatbot_service(
 ) -> Chatbot:
     """The load-bearing endpoint. Runs:
 
-      1. Optimistic-lock check against ``expected_version``.
-      2. Graph + save-target validation on the incoming graph (only
-         when graph or trigger_config actually changed).
-      3. Version-history append with the PRIOR blobs (so rollback
-         can restore what was live just before this save).
-      4. Field application + ``version_number`` bump.
-      5. Single commit.
+    1. Optimistic-lock check against ``expected_version``.
+    2. Graph + save-target validation on the incoming graph (only
+       when graph or trigger_config actually changed).
+    3. Version-history append with the PRIOR blobs (so rollback
+       can restore what was live just before this save).
+    4. Field application + ``version_number`` bump.
+    5. Single commit.
     """
     bot = await get_chatbot_service(session, org_id=org_id, chatbot_id=chatbot_id)
 
     if bot.version_number != payload.expected_version:
         raise ChatbotVersionConflict(
-            f"stale expected_version {payload.expected_version}; "
-            f"current is {bot.version_number}"
+            f"stale expected_version {payload.expected_version}; current is {bot.version_number}"
         )
 
     graph_changed = payload.graph is not None
@@ -212,12 +211,8 @@ async def save_chatbot_service(
         # semantics clean and avoids the unique-constraint collision
         # with the version-1 row that `create_chatbot_service`
         # (and imports / seeds) write at bot creation time.
-        new_graph = (
-            payload.graph.model_dump() if graph_changed else bot.graph
-        )
-        new_trigger = (
-            payload.trigger_config.model_dump() if trigger_changed else bot.trigger_config
-        )
+        new_graph = payload.graph.model_dump() if graph_changed else bot.graph
+        new_trigger = payload.trigger_config.model_dump() if trigger_changed else bot.trigger_config
         await dal.insert_chatbot_version(
             session,
             org_id=org_id,
@@ -382,12 +377,8 @@ async def get_stats_service(
     queries; suitable for on-open modal load without background
     pre-compute."""
     await get_chatbot_service(session, org_id=org_id, chatbot_id=chatbot_id)
-    by_status = await dal.count_runs_by_status(
-        session, org_id=org_id, chatbot_id=chatbot_id
-    )
-    top = await dal.top_executed_nodes(
-        session, org_id=org_id, chatbot_id=chatbot_id, limit=5
-    )
+    by_status = await dal.count_runs_by_status(session, org_id=org_id, chatbot_id=chatbot_id)
+    top = await dal.top_executed_nodes(session, org_id=org_id, chatbot_id=chatbot_id, limit=5)
     completed = by_status.get("completed", 0)
     canceled = by_status.get("canceled", 0)
     errored = by_status.get("errored", 0)
@@ -402,8 +393,7 @@ async def get_stats_service(
         "errored": errored,
         "completion_rate": round(completion_rate, 3),
         "top_nodes": [
-            {"node_id": nid, "node_type": ntype, "executions": count}
-            for nid, ntype, count in top
+            {"node_id": nid, "node_type": ntype, "executions": count} for nid, ntype, count in top
         ],
     }
 
@@ -542,9 +532,7 @@ async def import_chatbot_service(
     """
     version = envelope.get("chatbot_export_version")
     if version != 1:
-        raise InvalidGraph(
-            f"unsupported chatbot_export_version: {version!r} (expected 1)"
-        )
+        raise InvalidGraph(f"unsupported chatbot_export_version: {version!r} (expected 1)")
 
     bot_payload = envelope.get("bot") or {}
     if not isinstance(bot_payload, dict) or not bot_payload.get("name"):
@@ -587,9 +575,7 @@ async def import_chatbot_service(
     # override.
     final_name = (name_override or bot_payload["name"]).strip()
     existing = await dal.list_chatbots(session, org_id=org_id, search=final_name, limit=1)
-    if existing[0] and any(
-        (row.name or "").lower() == final_name.lower() for row in existing[0]
-    ):
+    if existing[0] and any((row.name or "").lower() == final_name.lower() for row in existing[0]):
         conflicts.append(
             {
                 "kind": "name_collision",
@@ -638,7 +624,8 @@ async def import_chatbot_service(
 def _regenerate_graph_ids(graph: dict[str, Any]) -> dict[str, Any]:
     """Replace node + edge IDs with fresh short random ones. Edges
     get their source/target references remapped in lockstep so the
-    graph shape is preserved."""
+    graph shape is preserved, and ``entry_node_id`` (the node the
+    trigger hands off to) follows its node."""
     import secrets
 
     nodes = graph.get("nodes") or []
@@ -668,7 +655,11 @@ def _regenerate_graph_ids(graph: dict[str, Any]) -> dict[str, Any]:
                 "target": new_target,
             }
         )
-    return {"nodes": new_nodes, "edges": new_edges}
+    return {
+        "nodes": new_nodes,
+        "edges": new_edges,
+        "entry_node_id": id_map.get(graph.get("entry_node_id") or ""),
+    }
 
 
 # --- Test-fire (Step 6) ---------------------------------------------------
@@ -702,9 +693,7 @@ async def test_fire_service(
 
     synthetic_event = {
         "org_id": str(org_id),
-        "conversation_id": (
-            str(simulated_conversation_id) if simulated_conversation_id else None
-        ),
+        "conversation_id": (str(simulated_conversation_id) if simulated_conversation_id else None),
         "contact_id": str(simulated_contact_id) if simulated_contact_id else None,
         "message_id": None,
         "text": simulated_inbound_text,
@@ -730,9 +719,7 @@ async def test_fire_service(
         # Reload run — process_step opens its own session + commits.
         await session.refresh(run)
 
-    steps = await dal.list_step_runs_for_run(
-        session, org_id=org_id, run_id=run.id
-    )
+    steps = await dal.list_step_runs_for_run(session, org_id=org_id, run_id=run.id)
 
     return {
         "run_id": run.id,

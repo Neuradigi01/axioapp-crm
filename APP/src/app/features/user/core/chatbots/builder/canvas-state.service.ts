@@ -92,6 +92,11 @@ export class CanvasStateService {
    *  canvas read as unfinished. */
   readonly cardWidth = signal<number>(320);
 
+  /** Rendered height of each node card (px, unscaled), measured by the
+   *  builder page — new nodes drop below the real bottom of the column
+   *  instead of a fixed guess that overlapped tall cards. */
+  readonly cardHeights = signal<Record<string, number>>({});
+
   private readonly ZOOM_MIN = 0.25;
   private readonly ZOOM_MAX = 2;
   private readonly ZOOM_STEPS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -262,6 +267,7 @@ export class CanvasStateService {
     this.paletteCollapsed.set(false);
     this.paletteWidth.set(280);
     this.cardWidth.set(320);
+    this.cardHeights.set({});
   }
 
   addNode(meta: NodeTypeMeta, position: { x: number; y: number }): CanvasNode {

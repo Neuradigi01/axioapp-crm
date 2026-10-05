@@ -557,6 +557,18 @@ export const NODE_TYPES: readonly NodeTypeMeta[] = [
   },
 ] as const;
 
+/** `handed_off` → `Handed off` — display text for raw port / status keys. */
+export function humanizeKey(value: string | null | undefined): string {
+  if (!value) return '';
+  const s = value.replace(/_/g, ' ').trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Palette label for a node type (`ask_question` → `Ask Question`). */
+export function nodeTypeLabel(type: string): string {
+  return getNodeType(type)?.label ?? humanizeKey(type);
+}
+
 export function getNodeType(type: string): NodeTypeMeta | undefined {
   return NODE_TYPES.find((n) => n.type === type);
 }

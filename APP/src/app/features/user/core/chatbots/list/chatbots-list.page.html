@@ -24,11 +24,7 @@
           (change)="onImportFile($event)"
         />
       </label>
-      <button
-        type="button"
-        (click)="openCreateModal()"
-        class="inline-flex items-center gap-2 px-3 md:px-3.5 py-2 rounded-lg bg-accent-soft text-accent text-sm font-medium hover:brightness-110"
-      >
+      <button type="button" (click)="openCreateModal()" class="btn btn-primary">
         <lucide-icon name="plus" size="16"></lucide-icon>
         <span class="hidden sm:inline">New bot</span>
         <span class="sm:hidden">New</span>
@@ -56,6 +52,7 @@
         <button
           type="button"
           (click)="selectedStatus.set(filter.value)"
+          [attr.aria-pressed]="selectedStatus() === filter.value"
           [class]="
             'px-3 py-1.5 rounded-full text-xs font-medium transition-colors ' +
             (selectedStatus() === filter.value
@@ -78,6 +75,7 @@
         type="text"
         [ngModel]="search()"
         (ngModelChange)="search.set($event)"
+        aria-label="Search bots"
         placeholder="Search bots…"
         class="pl-9 pr-3 py-2 w-full sm:w-64 text-sm bg-surface text-default border border-subtle rounded-lg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
       />
@@ -85,7 +83,7 @@
   </div>
 
   <!-- Body -->
-  <main class="flex-1 overflow-auto">
+  <main class="flex-1 overflow-auto" (scroll)="closeKebab()">
     @if (loading()) {
       <div class="flex items-center justify-center h-full text-sm text-muted">
         <lucide-icon name="loader-2" size="16" class="animate-spin mr-2"></lucide-icon>
@@ -176,7 +174,7 @@
                   {{ triggerSummary(row) }}
                   <span class="text-xs text-muted ml-1"
                     >·
-                    {{ row.trigger_config.channel }}
+                    {{ channelLabel(row.trigger_config.channel) }}
                   </span>
                 </td>
                 <td class="px-6 py-3">
@@ -187,7 +185,7 @@
                     "
                   >
                     <span class="w-1.5 h-1.5 rounded-full bg-current opacity-60"></span>
-                    {{ row.status }}
+                    {{ statusLabel(row.status) }}
                   </span>
                 </td>
                 <td class="hidden lg:table-cell px-6 py-3 text-default">{{ row.category }}</td>
@@ -199,19 +197,23 @@
                     type="button"
                     (click)="toggleActionsMenu(row.id, $event)"
                     class="p-1.5 rounded hover:bg-surface-2 text-muted"
-                    aria-label="Row actions"
+                    [attr.aria-label]="'Actions for ' + row.name"
+                    aria-haspopup="menu"
+                    [attr.aria-expanded]="actionsMenuFor() === row.id"
                   >
                     <lucide-icon name="more-vertical" size="16"></lucide-icon>
                   </button>
                   @if (actionsMenuFor() === row.id) {
                     <div
                       class="fixed z-50 w-48 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
+                      role="menu"
                       [style.top]="actionsMenuPos().top"
                       [style.bottom]="actionsMenuPos().bottom"
                       [style.right]="actionsMenuPos().right"
                       (click)="$event.stopPropagation()"
                     >
                       <a
+                        role="menuitem"
                         [routerLink]="['/user/chatbots', row.id, 'edit']"
                         class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
                       >
@@ -220,23 +222,53 @@
                       </a>
                       <button
                         type="button"
+                        role="menuitem"
                         (click)="exportBot(row)"
                         class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
                       >
                         <lucide-icon name="download" size="12" aria-hidden="true"></lucide-icon>
                         Export JSON
                       </button>
+                      @if (canEdit()) {
+                        <button
+                          type="button"
+                          role="menuitem"
+                          [disabled]="actionInFlight() === row.id"
+                          (click)="duplicate(row)"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
+                        >
+                          <lucide-icon name="copy" size="12" aria-hidden="true"></lucide-icon>
+                          Duplicate
+                        </button>
+                      }
+                      @if (canEdit() && row.status === 'archived') {
+                        <button
+                          type="button"
+                          role="menuitem"
+                          [disabled]="actionInFlight() === row.id"
+                          (click)="pause(row)"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
+                        >
+                          <lucide-icon
+                            name="archive-restore"
+                            size="12"
+                            aria-hidden="true"
+                          ></lucide-icon>
+                          Restore (as Paused)
+                        </button>
+                      }
                       @if (canPublish() && (row.status === 'draft' || row.status === 'paused')) {
                         <button
                           type="button"
                           [disabled]="actionInFlight() === row.id"
+                          role="menuitem"
                           (click)="publish(row)"
                           class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                         >
                           <lucide-icon
                             name="play"
                             size="12"
-                            class="text-emerald-400"
+                            class="text-emerald-600 dark:text-emerald-400"
                             aria-hidden="true"
                           ></lucide-icon>
                           Publish (make Live)
@@ -246,13 +278,14 @@
                         <button
                           type="button"
                           [disabled]="actionInFlight() === row.id"
+                          role="menuitem"
                           (click)="pause(row)"
                           class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                         >
                           <lucide-icon
                             name="pause-circle"
                             size="12"
-                            class="text-sky-400"
+                            class="text-sky-600 dark:text-sky-400"
                             aria-hidden="true"
                           ></lucide-icon>
                           Pause
@@ -263,6 +296,7 @@
                         <button
                           type="button"
                           [disabled]="actionInFlight() === row.id"
+                          role="menuitem"
                           (click)="archive(row)"
                           class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                         >
@@ -304,7 +338,7 @@
                     "
                   >
                     <span class="w-1.5 h-1.5 rounded-full bg-current opacity-60"></span>
-                    {{ row.status }}
+                    {{ statusLabel(row.status) }}
                   </span>
                   <span
                     class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-2 text-muted"
@@ -316,7 +350,7 @@
                   <dt class="text-muted">Trigger</dt>
                   <dd class="text-default text-right">
                     {{ triggerSummary(row) }}
-                    <span class="text-muted">· {{ row.trigger_config.channel }}</span>
+                    <span class="text-muted">· {{ channelLabel(row.trigger_config.channel) }}</span>
                   </dd>
                   <dt class="text-muted">Updated</dt>
                   <dd class="text-default text-right">
@@ -330,19 +364,23 @@
                   type="button"
                   (click)="toggleActionsMenu(row.id, $event)"
                   class="p-2 rounded hover:bg-surface-2 text-muted"
-                  aria-label="Row actions"
+                  [attr.aria-label]="'Actions for ' + row.name"
+                  aria-haspopup="menu"
+                  [attr.aria-expanded]="actionsMenuFor() === row.id"
                 >
                   <lucide-icon name="more-vertical" size="16"></lucide-icon>
                 </button>
                 @if (actionsMenuFor() === row.id) {
                   <div
                     class="fixed z-50 w-48 overflow-hidden rounded-lg border border-subtle bg-surface shadow-lg"
+                    role="menu"
                     [style.top]="actionsMenuPos().top"
                     [style.bottom]="actionsMenuPos().bottom"
                     [style.right]="actionsMenuPos().right"
                     (click)="$event.stopPropagation()"
                   >
                     <a
+                      role="menuitem"
                       [routerLink]="['/user/chatbots', row.id, 'edit']"
                       class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
                     >
@@ -351,23 +389,53 @@
                     </a>
                     <button
                       type="button"
+                      role="menuitem"
                       (click)="exportBot(row)"
                       class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2"
                     >
                       <lucide-icon name="download" size="12" aria-hidden="true"></lucide-icon>
                       Export JSON
                     </button>
+                    @if (canEdit()) {
+                      <button
+                        type="button"
+                        role="menuitem"
+                        [disabled]="actionInFlight() === row.id"
+                        (click)="duplicate(row)"
+                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
+                      >
+                        <lucide-icon name="copy" size="12" aria-hidden="true"></lucide-icon>
+                        Duplicate
+                      </button>
+                    }
+                    @if (canEdit() && row.status === 'archived') {
+                      <button
+                        type="button"
+                        role="menuitem"
+                        [disabled]="actionInFlight() === row.id"
+                        (click)="pause(row)"
+                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
+                      >
+                        <lucide-icon
+                          name="archive-restore"
+                          size="12"
+                          aria-hidden="true"
+                        ></lucide-icon>
+                        Restore (as Paused)
+                      </button>
+                    }
                     @if (canPublish() && (row.status === 'draft' || row.status === 'paused')) {
                       <button
                         type="button"
                         [disabled]="actionInFlight() === row.id"
+                        role="menuitem"
                         (click)="publish(row)"
                         class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                       >
                         <lucide-icon
                           name="play"
                           size="12"
-                          class="text-emerald-400"
+                          class="text-emerald-600 dark:text-emerald-400"
                           aria-hidden="true"
                         ></lucide-icon>
                         Publish (make Live)
@@ -377,13 +445,14 @@
                       <button
                         type="button"
                         [disabled]="actionInFlight() === row.id"
+                        role="menuitem"
                         (click)="pause(row)"
                         class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                       >
                         <lucide-icon
                           name="pause-circle"
                           size="12"
-                          class="text-sky-400"
+                          class="text-sky-600 dark:text-sky-400"
                           aria-hidden="true"
                         ></lucide-icon>
                         Pause
@@ -394,6 +463,7 @@
                       <button
                         type="button"
                         [disabled]="actionInFlight() === row.id"
+                        role="menuitem"
                         (click)="archive(row)"
                         class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-default hover:bg-surface-2 disabled:opacity-50"
                       >
@@ -408,6 +478,23 @@
           </li>
         }
       </ul>
+      @if (hasMore()) {
+        <div class="flex justify-center px-4 py-4">
+          <button
+            type="button"
+            (click)="loadMore()"
+            [disabled]="loadingMore()"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface px-3 py-1.5 text-sm font-medium text-default hover:bg-surface-2 disabled:opacity-50"
+          >
+            @if (loadingMore()) {
+              <lucide-icon name="loader-2" size="14" class="animate-spin"></lucide-icon>
+              Loading…
+            } @else {
+              Load more
+            }
+          </button>
+        </div>
+      }
     }
   </main>
 </div>

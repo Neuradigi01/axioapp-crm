@@ -4,14 +4,17 @@ import {
   Component,
   ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   Output,
   ViewChild,
   signal,
+  inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { ConfirmDialogService } from '../../../shared/confirm-dialog/confirm-dialog.service';
 import { MobileSelectComponent } from '../../../shared/forms/mobile-select.component';
 import { TriggerConfig } from '../../chatbots-api.service';
 
@@ -47,6 +50,9 @@ const MODE_OPTIONS = [
     >
       <div
         class="bg-surface border border-subtle rounded-xl w-[520px] max-w-[92vw] shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cb_trigger_title"
         (click)="$event.stopPropagation()"
       >
         <header class="flex items-center gap-3 px-5 py-4 border-b border-subtle">
@@ -56,12 +62,12 @@ const MODE_OPTIONS = [
             <lucide-icon name="zap" size="16"></lucide-icon>
           </span>
           <div class="flex-1">
-            <h2 class="text-sm font-semibold text-default">Trigger</h2>
+            <h2 id="cb_trigger_title" class="text-sm font-semibold text-default">Trigger</h2>
             <p class="text-[11px] text-muted mt-0.5">When should this bot start?</p>
           </div>
           <button
             type="button"
-            (click)="close.emit()"
+            (click)="requestClose()"
             class="p-1.5 rounded hover:bg-surface-2 text-muted hover:text-default"
             aria-label="Close"
           >
@@ -97,7 +103,7 @@ const MODE_OPTIONS = [
 
           @if (mode() === 'any') {
             <div
-              class="rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-400 p-3 text-[11px] leading-relaxed"
+              class="rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300 p-3 text-[11px] leading-relaxed"
             >
               <div class="flex items-start gap-2">
                 <lucide-icon
@@ -166,13 +172,23 @@ const MODE_OPTIONS = [
                 type="text"
                 [ngModel]="regexPattern()"
                 (ngModelChange)="regexPattern.set($event)"
-                placeholder="^(help|support)"
+                placeholder="^(help|support)"
+                maxlength="500"
                 class="w-full px-3 py-2 text-xs font-mono bg-app text-default border border-subtle rounded-md focus:outline-none focus:border-accent"
               />
               <p class="text-[11px] text-muted mt-1">
                 Max 500 chars. Runs on the first 4 KB of every inbound message.
               </p>
             </div>
+          }
+
+          @if (validationError(); as v) {
+            <p
+              class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-[11px] text-red-700 dark:text-red-300"
+              role="alert"
+            >
+              {{ v }}
+            </p>
           }
 
           <div class="flex items-center justify-between gap-3">
@@ -185,6 +201,7 @@ const MODE_OPTIONS = [
               [checked]="caseSensitive()"
               (change)="caseSensitive.set(!caseSensitive())"
               class="h-4 w-4 accent-current"
+              aria-label="Case sensitive"
             />
           </div>
 
@@ -200,6 +217,7 @@ const MODE_OPTIONS = [
               [checked]="firstMessageOnly()"
               (change)="firstMessageOnly.set(!firstMessageOnly())"
               class="h-4 w-4 accent-current"
+              aria-label="First message only"
             />
           </div>
         </div>
@@ -207,7 +225,7 @@ const MODE_OPTIONS = [
         <footer class="flex justify-end gap-2 px-5 py-3 border-t border-subtle">
           <button
             type="button"
-            (click)="close.emit()"
+            (click)="requestClose()"
             class="px-3.5 py-1.5 text-xs font-medium text-muted hover:text-default"
           >
             Cancel
@@ -225,7 +243,13 @@ const MODE_OPTIONS = [
   `,
 })
 export class TriggerConfigModalComponent {
+  private readonly confirmDialog = inject(ConfirmDialogService);
   private _initial: TriggerConfig | null = null;
+  /** True while the discard confirm is up, so Esc doesn't stack. */
+  private confirming = false;
+
+  /** Inline reason Save was refused (set by `onSave`). */
+  readonly validationError = signal<string | null>(null);
 
   @Input({ required: true })
   set config(value: TriggerConfig) {
@@ -286,17 +310,48 @@ export class TriggerConfigModalComponent {
 
   onBackdropClick(evt: MouseEvent): void {
     if (evt.target !== evt.currentTarget) return;
-    // Same flush-on-close behaviour as `onSave` — a keyword typed but
-    // not Enter-submitted is otherwise dropped when the operator dismisses
-    // the modal by clicking outside.
-    if (this.mode() === 'keyword' && this.kwInputRef) {
-      const pending = this.kwInputRef.nativeElement.value;
-      if (pending.trim()) {
-        this.addKeyword(pending);
-        this.kwInputRef.nativeElement.value = '';
+    void this.requestClose();
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (!this.confirming) void this.requestClose();
+  }
+
+  /** Cancel / ✕ / Esc / backdrop — asks before discarding edits. */
+  async requestClose(): Promise<void> {
+    if (this.isChanged()) {
+      this.confirming = true;
+      try {
+        const ok = await this.confirmDialog.ask({
+          title: 'Discard trigger changes?',
+          body: 'Your edits to this trigger will be lost.',
+          confirmLabel: 'Discard',
+          danger: true,
+        });
+        if (!ok) return;
+      } finally {
+        this.confirming = false;
       }
     }
     this.close.emit();
+  }
+
+  /** Any difference from the config the modal opened with (including a
+   *  keyword typed but not yet added). */
+  private isChanged(): boolean {
+    const init = this._initial;
+    if (!init) return false;
+    const pending = this.kwInputRef?.nativeElement.value.trim() ?? '';
+    return (
+      pending !== '' ||
+      this.channel() !== init.channel ||
+      this.mode() !== init.mode ||
+      JSON.stringify(this.keywords()) !== JSON.stringify(init.keywords ?? []) ||
+      this.regexPattern() !== (init.regex_pattern ?? '') ||
+      this.caseSensitive() !== !!init.case_sensitive ||
+      this.firstMessageOnly() !== !!init.first_message_only
+    );
   }
 
   onSave(): void {
@@ -310,6 +365,15 @@ export class TriggerConfigModalComponent {
         this.kwInputRef.nativeElement.value = '';
       }
     }
+    if (this.mode() === 'keyword' && this.keywords().length === 0) {
+      this.validationError.set('Add at least one keyword — or switch to "Any inbound message".');
+      return;
+    }
+    if (this.mode() === 'regex' && !this.regexPattern().trim()) {
+      this.validationError.set('Enter a regex pattern — or switch match mode.');
+      return;
+    }
+    this.validationError.set(null);
     const cfg: TriggerConfig = {
       channel: this.channel(),
       mode: this.mode(),

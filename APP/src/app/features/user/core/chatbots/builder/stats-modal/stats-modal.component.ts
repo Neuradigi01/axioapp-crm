@@ -15,6 +15,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { extractApiError } from '@core/services/api-error.util';
 
 import { ChatbotStats, ChatbotsApiService } from '../../chatbots-api.service';
+import { nodeTypeLabel } from '../node-type-registry';
 
 /**
  * Bot analytics modal — aggregates run counts by status, completion
@@ -133,8 +134,9 @@ import { ChatbotStats, ChatbotsApiService } from '../../chatbots-api.service';
                       class="flex items-center justify-between px-3 py-2 rounded bg-app border border-subtle text-[12px]"
                     >
                       <div class="flex flex-col">
-                        <span class="text-default font-semibold">{{ n.node_type }}</span>
-                        <span class="text-[10px] text-muted font-mono">{{ n.node_id }}</span>
+                        <span class="text-default font-semibold" [title]="n.node_id">{{
+                          nodeLabel(n.node_type)
+                        }}</span>
                       </div>
                       <span class="font-mono text-accent">{{ n.executions }}×</span>
                     </li>
@@ -149,6 +151,8 @@ import { ChatbotStats, ChatbotsApiService } from '../../chatbots-api.service';
   `,
 })
 export class ChatbotStatsModalComponent {
+  protected readonly nodeLabel = nodeTypeLabel;
+
   private readonly api = inject(ChatbotsApiService);
   private readonly destroyRef = inject(DestroyRef);
 

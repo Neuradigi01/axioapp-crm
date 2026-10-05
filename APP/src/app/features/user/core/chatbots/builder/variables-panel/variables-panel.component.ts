@@ -4,12 +4,12 @@ import {
   Component,
   DestroyRef,
   EventEmitter,
-  Input,
   OnInit,
   Output,
   computed,
   inject,
   signal,
+  input,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -122,7 +122,8 @@ export class VariablesPanelComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   /** Per-graph session variables (from the bot's Ask-* nodes). */
-  @Input() sessionVariables: BotVariable[] = [];
+  /** Signal input so the Session group updates while the panel is open. */
+  readonly sessionVariables = input<BotVariable[]>([]);
 
   @Output() close = new EventEmitter<void>();
 
@@ -151,11 +152,12 @@ export class VariablesPanelComponent implements OnInit {
   protected readonly filteredGroups = computed<BotVariableGroup[]>(() => {
     const q = this.search().trim().toLowerCase();
     const groups: BotVariableGroup[] = [...this.apiGroups()];
-    if (this.sessionVariables.length > 0) {
+    const session = this.sessionVariables();
+    if (session.length > 0) {
       groups.push({
         key: 'session',
         label: 'Session (answers)',
-        variables: this.sessionVariables,
+        variables: session,
       });
     }
     if (!q) return groups;

@@ -5,11 +5,15 @@ import {
   DestroyRef,
   ElementRef,
   HostListener,
+  Injector,
   ViewChild,
+  afterEveryRender,
+  afterNextRender,
   computed,
   inject,
   signal,
 } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -24,7 +28,7 @@ import { HasUnsavedChanges } from '../../shared/guards/unsaved-changes.guard';
 import { ChatbotsApiService, TriggerConfig } from '../chatbots-api.service';
 import { CanvasNode, CanvasStateService } from './canvas-state.service';
 import { NodeConfigFormComponent } from './node-config-form/node-config-form.component';
-import { NodeTypeMeta, getNodeType } from './node-type-registry';
+import { NodeTypeMeta, getNodeType, humanizeKey } from './node-type-registry';
 import { ChatbotHistoryModalComponent } from './history-modal/history-modal.component';
 import { ChatbotMinimapComponent } from './minimap/minimap.component';
 import { ChatbotStatsModalComponent } from './stats-modal/stats-modal.component';
@@ -80,10 +84,10 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
   private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly injector = inject(Injector);
   readonly canvas = inject(CanvasStateService);
 
   readonly loading = signal<boolean>(true);
-  readonly error = signal<string | null>(null);
   /** Why the bot couldn't be loaded (body error state with Retry). */
   readonly loadError = signal<string | null>(null);
   /** Publish / pause request in flight — blocks a double submit. */
@@ -126,7 +130,7 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
         out.push({
           path,
           label: path.slice('answers.'.length) || path,
-          description: `Answer captured earlier in this bot (from node "${node.type}").`,
+          description: `Answer captured earlier in this bot (from the "${getNodeType(node.type)?.label ?? humanizeKey(node.type)}" step).`,
         });
       }
     }
@@ -141,6 +145,23 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
   /** Node search box (visible pill at top of canvas). Empty string
    *  hides the dropdown. */
   readonly searchQuery = signal<string>('');
+  /** Results dropdown visibility — closes on canvas click / Esc while
+   *  keeping the typed query. */
+  readonly searchOpen = signal<boolean>(false);
+
+  /** Drafts for the raw-JSON fallback editor (unknown node types),
+   *  keyed by node id — keeps the cursor still and the parse error
+   *  visible while typing. */
+  readonly fallbackJsonDrafts = signal<Record<string, string>>({});
+
+  /** Each connection dot's centre RELATIVE TO ITS CARD (unscaled px),
+   *  measured from the DOM after render. Wires add this to the card's
+   *  live position, so they hit the real dots — including while a card
+   *  is dragged — instead of fixed guesses. Keys: `out:<node>::<label>`,
+   *  `in:<node>`; the trigger card is node `trigger`. */
+  private readonly portOffsets = signal<Record<string, { x: number; y: number }>>({});
+  private cardObserver: ResizeObserver | null = null;
+  private readonly observedCards = new WeakSet<Element>();
 
   /** Active drag gesture, if any. Set on node-header mousedown, read
    *  by the document-level mousemove listener, cleared on mouseup. */
@@ -195,8 +216,6 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
    *  nodes) are shared via the `cardWidth` signal so a resize on any
    *  card grip rescales the whole graph consistently. */
   private readonly CANVAS_PAD = 24;
-  private readonly TRIGGER_LEFT = this.CANVAS_PAD;
-  private readonly TRIGGER_TOP = this.CANVAS_PAD;
   private readonly TRIGGER_HEIGHT = 118;
   private readonly NODE_HEADER_H = 44;
   /** Gap between the trigger card's right edge and the first node
@@ -249,15 +268,67 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     };
   }
 
+  /** Fallback trigger port (before the dot has been measured). The
+   *  card's `left/top` are `triggerPosition` itself. */
   triggerPortPos(): { x: number; y: number } {
-    // Trigger card is absolutely positioned at CANVAS_PAD + user
-    // drag offset (`triggerPosition` — session-only). Port sits on
-    // the right edge, centered vertically.
     const pos = this.triggerPosition();
     return {
-      x: this.TRIGGER_LEFT + pos.x + this.cardWidth(),
-      y: this.TRIGGER_TOP + pos.y + this.TRIGGER_HEIGHT / 2,
+      x: pos.x + this.cardWidth(),
+      y: pos.y + this.TRIGGER_HEIGHT / 2,
     };
+  }
+
+  /** Card top-left in canvas coords — the base the measured port
+   *  offsets are relative to. */
+  private cardOrigin(nodeId: string, node?: CanvasNode): { x: number; y: number } {
+    if (nodeId === 'trigger') return this.triggerPosition();
+    return { x: this.nodeLeftOffset() + (node?.position.x ?? 0), y: node?.position.y ?? 0 };
+  }
+
+  private portAt(
+    key: string,
+    origin: { x: number; y: number },
+    fallback: { x: number; y: number },
+  ): { x: number; y: number } {
+    const o = this.portOffsets()[key];
+    return o ? { x: origin.x + o.x, y: origin.y + o.y } : fallback;
+  }
+
+  /** Measure every `[data-port]` dot relative to its card, plus each
+   *  node card's height (for the palette's drop position). Runs after
+   *  every render and when a card resizes; only writes signals when
+   *  something actually moved, so it can't loop. */
+  private measurePorts(): void {
+    const content = this.canvasContentRef?.nativeElement;
+    if (!content) return;
+    const z = this.zoom() || 1;
+    const offsets: Record<string, { x: number; y: number }> = {};
+    content.querySelectorAll<HTMLElement>('[data-port]').forEach((dot) => {
+      const card = dot.closest<HTMLElement>('[data-cb-card]');
+      const key = dot.dataset['port'];
+      if (!card || !key) return;
+      const c = card.getBoundingClientRect();
+      const r = dot.getBoundingClientRect();
+      offsets[key] = {
+        x: Math.round((r.left + r.width / 2 - c.left) / z),
+        y: Math.round((r.top + r.height / 2 - c.top) / z),
+      };
+    });
+    const heights: Record<string, number> = {};
+    content.querySelectorAll<HTMLElement>('[data-node-id]').forEach((card) => {
+      const id = card.dataset['nodeId'];
+      if (id) heights[id] = card.offsetHeight;
+      if (!this.observedCards.has(card)) {
+        this.observedCards.add(card);
+        this.cardObserver?.observe(card);
+      }
+    });
+    if (JSON.stringify(offsets) !== JSON.stringify(this.portOffsets())) {
+      this.portOffsets.set(offsets);
+    }
+    if (JSON.stringify(heights) !== JSON.stringify(this.canvas.cardHeights())) {
+      this.canvas.cardHeights.set(heights);
+    }
   }
 
   /** Build the SVG path `d` attribute for a smooth cubic between two
@@ -281,7 +352,7 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     if (!meta) return [{ label: null, title: 'next' }];
     if (meta.outputs === 'single') return [{ label: null, title: 'next' }];
     if (meta.outputs === 'labeled') {
-      return (meta.labels ?? []).map((l) => ({ label: l, title: l }));
+      return (meta.labels ?? []).map((l) => ({ label: l, title: humanizeKey(l) }));
     }
     // dynamic — read the config to enumerate ports.
     const cfg = node.config ?? {};
@@ -325,23 +396,34 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
       .map((e) => {
         const target = nodesById.get(e.target);
         if (!target) return null;
-        const to = this.inputPortPos(target);
-        const from =
-          e.source === 'trigger'
-            ? this.triggerPortPos()
-            : (() => {
-                const src = nodesById.get(e.source);
-                if (!src) return null;
-                const ports = this.outputPortsFor(src);
-                const idx = e.label
-                  ? Math.max(
-                      0,
-                      ports.findIndex((p) => p.label === e.label),
-                    )
-                  : 0;
-                return this.outputPortPos(src, idx);
-              })();
-        if (!from) return null;
+        const to = this.portAt(
+          `in:${target.id}`,
+          this.cardOrigin(target.id, target),
+          this.inputPortPos(target),
+        );
+        let title: string | null = null;
+        let from: { x: number; y: number } | null = null;
+        if (e.source === 'trigger') {
+          from = this.portAt('out:trigger::', this.cardOrigin('trigger'), this.triggerPortPos());
+        } else {
+          const src = nodesById.get(e.source);
+          if (!src) return null;
+          const ports = this.outputPortsFor(src);
+          const idx = e.label
+            ? Math.max(
+                0,
+                ports.findIndex((p) => p.label === e.label),
+              )
+            : 0;
+          // Show what the customer sees (button title / port name),
+          // not the stored id.
+          title = e.label ? (ports.find((p) => p.label === e.label)?.title ?? e.label) : null;
+          from = this.portAt(
+            `out:${src.id}::${e.label ?? ''}`,
+            this.cardOrigin(src.id, src),
+            this.outputPortPos(src, idx),
+          );
+        }
         // Midpoint for the edge label — cubic Bézier control points
         // are horizontal so the true midpoint is close to the linear
         // midpoint; good enough for a visual label anchor.
@@ -349,7 +431,7 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
         const midY = (from.y + to.y) / 2;
         return {
           id: e.id,
-          label: e.label ?? null,
+          label: title,
           d: this.edgePath(from, to),
           midX,
           midY,
@@ -410,6 +492,11 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
   isOrphan(nodeId: string): boolean {
     return !this.reachableNodeIds().has(nodeId);
   }
+
+  /** Steps the trigger can never reach — called out before going Live. */
+  readonly unreachableCount = computed(
+    () => this.nodes().filter((n) => !this.reachableNodeIds().has(n.id)).length,
+  );
 
   /** True when the node's config is missing any field marked
    *  ``required: true`` in its schema. Read as ``[has red badge in
@@ -519,7 +606,11 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     evt.preventDefault();
     evt.stopPropagation();
     this.contextMenuNodeId.set(nodeId);
-    this.contextMenuPos.set({ x: evt.clientX, y: evt.clientY });
+    // Keep the menu (~170 × 90 px) on screen near the right / bottom edge.
+    this.contextMenuPos.set({
+      x: Math.max(4, Math.min(evt.clientX, window.innerWidth - 176)),
+      y: Math.max(4, Math.min(evt.clientY, window.innerHeight - 96)),
+    });
   }
 
   closeContextMenu(): void {
@@ -581,7 +672,8 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     const bot = this.bot();
     if (!bot) return;
     this.showToast('Version restored.');
-    this.loadBot(bot.id);
+    // Same bot — keep the operator's zoom / palette / card width.
+    this.loadBot(bot.id, { keepView: true });
   }
 
   openStats(): void {
@@ -618,6 +710,9 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
       return;
     }
     this.renaming.set(false);
+    // Show the new name straight away; put the old one back on failure.
+    const previousName = bot.name;
+    this.canvas.bot.set({ ...bot, name: next });
     this.api
       .update(bot.id, {
         expected_version: this.canvas.expectedVersion(),
@@ -631,7 +726,9 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
         },
         error: (err) => {
           console.error('chatbot.rename.failed', err);
-          this.error.set(extractApiError(err) ?? 'Rename failed.');
+          const current = this.bot();
+          if (current) this.canvas.bot.set({ ...current, name: previousName });
+          this.toast.error('Rename failed', { subtitle: extractApiError(err) ?? undefined });
         },
       });
   }
@@ -679,6 +776,12 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     // bot never starts with this one's graph, name or "Saving…" state.
     this.destroyRef.onDestroy(() => this.canvas.reset());
 
+    // Wire geometry: measure the real dot positions after each render
+    // and whenever a card's size changes (typing, resize-y, width grip).
+    this.cardObserver = new ResizeObserver(() => this.measurePorts());
+    this.destroyRef.onDestroy(() => this.cardObserver?.disconnect());
+    afterEveryRender(() => this.measurePorts());
+
     // Kick off the auto-save loop. Interval fires forever; the guard
     // inside skips when there's nothing to save.
     this.autoSaveTimer = setInterval(() => {
@@ -704,15 +807,17 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     });
   }
 
-  private loadBot(id: string): void {
+  /** `keepView` (history restore of the same bot) keeps zoom, palette
+   *  and card width instead of resetting to screen defaults. */
+  private loadBot(id: string, opts: { keepView?: boolean } = {}): void {
     this.botId = id;
     // Never show (or save into) the previously opened bot while this
     // one loads — or if it fails to load.
-    this.canvas.reset();
+    if (!opts.keepView) this.canvas.reset();
     this.liveSaveConfirmed = false;
     this.autoSaveFailedRevision = null;
+    this.fallbackJsonDrafts.set({});
     this.loading.set(true);
-    this.error.set(null);
     this.loadError.set(null);
     this.api
       .get(id)
@@ -721,8 +826,14 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
         next: (bot) => {
           this.canvas.loadFrom(bot);
           this.loading.set(false);
-          // Opening zoom / palette / minimap for this screen class.
+          if (opts.keepView) return;
+          // Opening zoom / palette / minimap for this screen class; on
+          // desktop also fit a large graph on screen once it's rendered
+          // (fitToScreen never zooms in past 100 %).
           this.canvas.applyViewportDefaults(this.phoneQuery.matches);
+          if (!this.phoneQuery.matches) {
+            afterNextRender(() => this.fitToScreen(), { injector: this.injector });
+          }
         },
         error: (err) => {
           this.loadError.set(extractApiError(err) ?? 'Could not load this bot.');
@@ -757,7 +868,6 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
       this.liveSaveConfirmed = true;
     }
     this.canvas.saving.set(true);
-    this.error.set(null);
     const revision = this.canvas.revision;
     const graph = this.canvas.serializeGraph();
     const trigger = this.triggerConfig();
@@ -784,11 +894,31 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
           // is the extracted API detail so version-conflict / validation
           // messages surface directly.
           console.error('chatbot.save.failed', err);
-          this.error.set(extractApiError(err) ?? 'Save failed.');
           this.canvas.saving.set(false);
           if (opts.auto) this.autoSaveFailedRevision = revision;
+          if (err instanceof HttpErrorResponse && err.status === 409) {
+            void this.onSaveConflict();
+            return;
+          }
+          this.toast.error(opts.auto ? 'Auto-save failed' : 'Save failed', {
+            subtitle:
+              (extractApiError(err) ?? 'Please try again.') +
+              (opts.auto ? ' Auto-save resumes after your next edit.' : ''),
+          });
         },
       });
+  }
+
+  /** Someone (another tab / teammate) saved a newer version — the
+   *  optimistic lock refused ours. Offer to reload the latest. */
+  private async onSaveConflict(): Promise<void> {
+    const ok = await this.confirmDialog.ask({
+      title: 'This bot was changed somewhere else',
+      body: 'A newer version was saved in another tab or by a teammate, so your save was blocked. Reload the latest version? Your unsaved changes here will be lost.',
+      confirmLabel: 'Reload latest',
+      danger: true,
+    });
+    if (ok && this.botId) this.loadBot(this.botId, { keepView: true });
   }
 
   /** Guard: publishing (going Live) opens a confirmation dialog first —
@@ -798,7 +928,9 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     const bot = this.bot();
     if (!bot) return;
     if (this.dirty()) {
-      this.error.set('Save your unsaved changes before toggling Live.');
+      this.toast.warn('Save your changes first', {
+        subtitle: 'Going Live / pausing applies to the saved version.',
+      });
       return;
     }
     if (!this.isLive()) {
@@ -834,7 +966,9 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
       error: (err) => {
         this.statusChanging.set(false);
         console.error('chatbot.toggleLive.failed', err);
-        this.error.set(extractApiError(err) ?? 'Status change failed.');
+        this.toast.error(goingLive ? 'Could not make the bot Live' : 'Could not pause the bot', {
+          subtitle: extractApiError(err) ?? undefined,
+        });
       },
     });
   }
@@ -878,7 +1012,9 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
 
   openTestModal(): void {
     if (this.dirty()) {
-      this.error.set('Save your unsaved changes before running a test.');
+      this.toast.warn('Save your changes first', {
+        subtitle: 'Tests run the saved version of the bot.',
+      });
       return;
     }
     this.testModalOpen.set(true);
@@ -932,11 +1068,44 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
   /** Click on empty canvas — clears any pending connect gesture and
    *  deselects the current node. */
   onCanvasClick(): void {
+    this.searchOpen.set(false);
     if (this.pendingSourceId()) {
       this.canvas.cancelConnect();
       return;
     }
     this.canvas.selectedNodeId.set(null);
+  }
+
+  /** Builder shortcuts: Ctrl/⌘+S saves; Delete / Backspace removes the
+   *  selected step (with the usual confirm) unless you're typing or a
+   *  dialog is open. */
+  @HostListener('document:keydown', ['$event'])
+  onKeydown(evt: KeyboardEvent): void {
+    if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 's') {
+      evt.preventDefault();
+      if (this.dirty() && !this.saving()) void this.save();
+      return;
+    }
+    if (evt.key !== 'Delete' && evt.key !== 'Backspace') return;
+    const target = evt.target as HTMLElement | null;
+    if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+    const selected = this.selectedNodeId();
+    if (!selected || this.anyDialogOpen()) return;
+    evt.preventDefault();
+    this.deleteNodeId.set(selected);
+  }
+
+  private anyDialogOpen(): boolean {
+    return (
+      this.triggerModalOpen() ||
+      this.testModalOpen() ||
+      this.helpModalOpen() ||
+      this.historyModalOpen() ||
+      this.statsModalOpen() ||
+      this.publishConfirmOpen() ||
+      this.deleteNodeId() !== null ||
+      this.contextMenuNodeId() !== null
+    );
   }
 
   deleteEdge(edgeId: string, evt: MouseEvent): void {
@@ -1033,6 +1202,18 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    if (this.contextMenuNodeId()) {
+      this.closeContextMenu();
+      return;
+    }
+    if (this.helpModalOpen()) {
+      this.closeHelp();
+      return;
+    }
+    if (this.searchOpen()) {
+      this.searchOpen.set(false);
+      return;
+    }
     if (this.pendingSourceId()) {
       this.canvas.cancelConnect();
       return;
@@ -1081,15 +1262,44 @@ export class ChatbotBuilderPageComponent implements HasUnsavedChanges {
     return getNodeType(type);
   }
 
-  updateNodeConfigJson(nodeId: string, raw: string): void {
+  fallbackJsonText(node: CanvasNode): string {
+    return this.fallbackJsonDrafts()[node.id] ?? JSON.stringify(node.config, null, 2);
+  }
+
+  /** Parse error for the fallback editor's current draft, if any. */
+  fallbackJsonError(nodeId: string): string | null {
+    const raw = this.fallbackJsonDrafts()[nodeId];
+    if (raw === undefined) return null;
     try {
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        this.canvas.updateNodeConfig(nodeId, parsed);
-      }
-    } catch {
-      // Invalid JSON — silently ignore. A future Step 14 per-node
-      // form UI replaces this fallback.
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? null
+        : 'Config must be a JSON object ({ … }).';
+    } catch (e) {
+      return e instanceof Error ? e.message : 'Invalid JSON';
     }
+  }
+
+  updateNodeConfigJson(nodeId: string, raw: string): void {
+    this.fallbackJsonDrafts.update((d) => ({ ...d, [nodeId]: raw }));
+    if (this.fallbackJsonError(nodeId)) return;
+    this.canvas.updateNodeConfig(nodeId, JSON.parse(raw) as Record<string, unknown>);
+  }
+
+  /** On blur, drop a valid draft so the editor shows the formatted value. */
+  onFallbackJsonBlur(nodeId: string): void {
+    if (this.fallbackJsonError(nodeId)) return;
+    this.fallbackJsonDrafts.update((d) => {
+      const next = { ...d };
+      delete next[nodeId];
+      return next;
+    });
+  }
+
+  /** Display name for the trigger's channel. */
+  channelLabel(channel: string | null | undefined): string {
+    if (channel === 'whatsapp') return 'WhatsApp';
+    if (channel === 'email') return 'Email';
+    return 'Any channel';
   }
 }

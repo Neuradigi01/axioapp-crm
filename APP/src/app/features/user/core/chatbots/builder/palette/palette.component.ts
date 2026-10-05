@@ -83,17 +83,14 @@ export class ChatbotPaletteComponent {
   }
 
   private nextDropPosition(): { x: number; y: number } {
-    // Cards are 320px wide × ~260px tall on average. A 30px cascade
-    // (the original v1) stacks them almost on top of each other; a
-    // proper flow reads top-to-bottom in a single column so operators
-    // don't have to hunt for the last-added node.
-    //
-    // Strategy: drop each new node directly below the last one in a
-    // column, snapping y to 240px increments. `updateNodePosition`
-    // takes over once the operator drags a card manually.
+    // Drop each new node 40px below the lowest card in the column so
+    // the flow reads top-to-bottom. Uses the builder's measured card
+    // heights (button / ask cards run 350–500px); 260px is the guess
+    // for a card that hasn't rendered yet.
     const existing = this.canvas.nodes();
     if (!existing.length) return { x: 0, y: 0 };
-    const lastY = Math.max(...existing.map((n) => n.position.y));
-    return { x: 0, y: lastY + 240 };
+    const heights = this.canvas.cardHeights();
+    const bottom = Math.max(...existing.map((n) => n.position.y + (heights[n.id] ?? 260)));
+    return { x: 0, y: bottom + 40 };
   }
 }

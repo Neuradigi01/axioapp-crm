@@ -17,6 +17,7 @@ import { extractApiError } from '@core/services/api-error.util';
 
 import { MobileSelectComponent } from '../../../shared/forms/mobile-select.component';
 import { ChatbotsApiService, TestFireResponse, TriggerConfig } from '../../chatbots-api.service';
+import { humanizeKey, nodeTypeLabel } from '../node-type-registry';
 
 /**
  * Test-fire modal — sends a fake inbound message through the bot in
@@ -105,6 +106,9 @@ export class ChatbotTestFireModalComponent {
   onBackdropClick(evt: MouseEvent): void {
     if (evt.target === evt.currentTarget && !this.running()) this.close.emit();
   }
+
+  protected readonly humanize = humanizeKey;
+  protected readonly nodeLabel = nodeTypeLabel;
 
   statusTone(status: string): string {
     switch (status) {
