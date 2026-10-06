@@ -1,13 +1,11 @@
-import { Injectable, inject } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
+import { Injectable, Injector, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { TwoFactorApiService } from '@app/services/two-factor-api.service';
-import { ActionVerifyDialogComponent } from '@shared/components/action-verify-dialog/action-verify-dialog.component';
 import { TwoFactorMethod, IActionVerifyDialogData } from '@app/schemas/common';
 
 @Injectable({ providedIn: 'root' })
 export class ActionVerifyService {
-  private readonly dialog = inject(MatDialog);
+  private readonly injector = inject(Injector);
   private readonly tfaApi = inject(TwoFactorApiService);
 
   async getActionToken(): Promise<string | null> {
@@ -35,7 +33,15 @@ export class ActionVerifyService {
       availableMethods,
     };
 
-    const dialogRef = this.dialog.open(ActionVerifyDialogComponent, {
+    // Loaded on demand: this service is injected by the eager auth
+    // interceptor, so static imports would put MatDialog and the dialog
+    // component in the initial bundle for a rarely-shown prompt.
+    const [{ MatDialog }, { ActionVerifyDialogComponent }] = await Promise.all([
+      import('@angular/material/dialog'),
+      import('@shared/components/action-verify-dialog/action-verify-dialog.component'),
+    ]);
+
+    const dialogRef = this.injector.get(MatDialog).open(ActionVerifyDialogComponent, {
       width: '420px',
       disableClose: true,
       data: dialogData,
