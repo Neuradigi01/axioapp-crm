@@ -55,7 +55,7 @@
                     }
                     @if (n.quality_rating) {
                       <span
-                        class="rounded bg-surface px-1.5 py-0.5 text-default ring-1 border-subtle"
+                        class="rounded bg-surface px-1.5 py-0.5 text-default ring-1 ring-subtle"
                       >
                         Quality: {{ n.quality_rating }}
                       </span>
@@ -75,7 +75,7 @@
     <div class="flex shrink-0 items-center gap-2">
       @if (isDisconnected()) {
         <span
-          class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted ring-1 border-subtle"
+          class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted ring-1 ring-subtle"
         >
           Not connected
         </span>
@@ -498,21 +498,21 @@
                           }
                           @case ('PAUSED') {
                             <span
-                              class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 border-subtle"
+                              class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 ring-subtle"
                             >
                               PAUSED
                             </span>
                           }
                           @case ('DISABLED') {
                             <span
-                              class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 border-subtle"
+                              class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 ring-subtle"
                             >
                               DISABLED
                             </span>
                           }
                           @default {
                             <span
-                              class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 border-subtle"
+                              class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-default ring-1 ring-subtle"
                             >
                               {{ t.status }}
                             </span>

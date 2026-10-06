@@ -92,6 +92,23 @@ export interface CreateSmtpSenderPayload {
   tls_mode: SmtpTlsMode;
 }
 
+/** True iff this OAuth sender's grant is dead — Google/Microsoft
+ *  rejected the refresh token, so the next send will 401. Shared by
+ *  the sender card's "Reconnect needed" pill and the Integrations
+ *  page's Email tile status. */
+export function isSenderOauthRevoked(row: UnifiedSender): boolean {
+  if (row.kind === 'smtp') return false;
+  if (row.sync_state === 'error') return true;
+  const err = (row.last_sync_error ?? '').toLowerCase();
+  if (!err) return false;
+  return (
+    err.includes('invalid_grant') ||
+    err.includes('revoked') ||
+    err.includes('unauthorized') ||
+    err.includes('token has been expired')
+  );
+}
+
 @Injectable({ providedIn: 'root' })
 export class EmailSendersApiService {
   private readonly http = inject(HttpClient);

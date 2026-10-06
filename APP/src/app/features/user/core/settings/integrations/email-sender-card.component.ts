@@ -39,6 +39,7 @@ import { AddSenderIdentityModalComponent } from './add-sender-identity-modal.com
 import { EmailAccountsApiService } from '../../services/email-accounts-api.service';
 import {
   EmailSendersApiService,
+  isSenderOauthRevoked,
   SmtpSender,
   UnifiedSender,
   UnifiedSenderKind,
@@ -513,7 +514,7 @@ export class EmailSenderCardComponent implements OnInit {
   protected providerBadgeClasses(kind: UnifiedSenderKind): string {
     if (kind === 'gmail') return 'bg-blue-50 text-blue-700 ring-1 ring-blue-200';
     if (kind === 'microsoft') return 'bg-sky-50 text-sky-700 ring-1 ring-sky-200';
-    return 'bg-surface-2 text-default ring-1 border-subtle';
+    return 'bg-surface-2 text-default ring-1 ring-subtle';
   }
 
   /** True iff this OAuth sender's grant is dead — Google/Microsoft
@@ -522,16 +523,7 @@ export class EmailSenderCardComponent implements OnInit {
    *  when this is true, instead of the misleading green "Connected"
    *  pill that used to hide the problem until send failed. */
   protected isOauthRevoked(row: UnifiedSender): boolean {
-    if (row.kind === 'smtp') return false;
-    if (row.sync_state === 'error') return true;
-    const err = (row.last_sync_error ?? '').toLowerCase();
-    if (!err) return false;
-    return (
-      err.includes('invalid_grant') ||
-      err.includes('revoked') ||
-      err.includes('unauthorized') ||
-      err.includes('token has been expired')
-    );
+    return isSenderOauthRevoked(row);
   }
 
   /** Human "10 min" / "2 hr" / "1 day" formatted time until the
@@ -570,7 +562,7 @@ export class EmailSenderCardComponent implements OnInit {
   protected domainToneClass(tone: 'green' | 'amber' | 'zinc'): string {
     if (tone === 'green') return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
     if (tone === 'amber') return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200';
-    return 'bg-surface-2 text-muted ring-1 border-subtle';
+    return 'bg-surface-2 text-muted ring-1 ring-subtle';
   }
 
   // --- internals ----------------------------------------------

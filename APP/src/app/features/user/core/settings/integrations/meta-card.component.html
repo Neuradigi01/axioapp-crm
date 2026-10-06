@@ -30,7 +30,7 @@
     <div class="flex shrink-0 items-center gap-2">
       @if (integration() === null || integration()?.status === 'disconnected') {
         <span
-          class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted ring-1 border-subtle"
+          class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted ring-1 ring-subtle"
         >
           Not connected
         </span>
@@ -146,7 +146,7 @@
         </p>
         <div class="mt-2 flex items-center gap-2">
           <code
-            class="block w-full overflow-x-auto rounded bg-surface px-2 py-1.5 font-mono text-xs text-default ring-1 border-subtle"
+            class="block w-full overflow-x-auto rounded bg-surface px-2 py-1.5 font-mono text-xs text-default ring-1 ring-subtle"
           >
             {{ url }}
           </code>
@@ -288,7 +288,7 @@
                       </div>
                       <div class="flex shrink-0 items-center gap-2">
                         <span
-                          class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted ring-1 border-subtle"
+                          class="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted ring-1 ring-subtle"
                         >
                           {{ form.status }}
                         </span>

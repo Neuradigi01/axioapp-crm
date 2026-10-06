@@ -5,7 +5,7 @@
   <header class="flex items-start justify-between gap-4">
     <div class="flex items-start gap-3">
       <span
-        class="flex h-10 w-10 items-center justify-center rounded-md bg-surface-2 text-default ring-1 border-subtle"
+        class="flex h-10 w-10 items-center justify-center rounded-md bg-surface-2 text-default ring-1 ring-subtle"
         aria-hidden="true"
       >
         <lucide-icon name="mail" size="18" aria-hidden="true"></lucide-icon>
@@ -481,7 +481,7 @@
                         [class]="
                           row.spf_verified
                             ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'
-                            : 'bg-surface-2 text-muted ring-1 border-subtle'
+                            : 'bg-surface-2 text-muted ring-1 ring-subtle'
                         "
                       >
                         {{ row.spf_verified ? 'OK' : '—' }}
@@ -493,7 +493,7 @@
                         [class]="
                           row.dkim_verified
                             ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'
-                            : 'bg-surface-2 text-muted ring-1 border-subtle'
+                            : 'bg-surface-2 text-muted ring-1 ring-subtle'
                         "
                       >
                         {{ row.dkim_verified ? 'OK' : '—' }}
@@ -505,7 +505,7 @@
                         [class]="
                           row.dmarc_verified
                             ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'
-                            : 'bg-surface-2 text-muted ring-1 border-subtle'
+                            : 'bg-surface-2 text-muted ring-1 ring-subtle'
                         "
                       >
                         {{ row.dmarc_verified ? 'OK' : '—' }}

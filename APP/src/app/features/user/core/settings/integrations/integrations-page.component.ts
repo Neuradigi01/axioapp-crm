@@ -65,12 +65,44 @@ import { GoogleCardComponent } from './google-card.component';
 import { IntegrationStatusComponent } from './integration-status.component';
 import { MetaCardComponent } from './meta-card.component';
 import { WhatsAppCardComponent } from './whatsapp-card.component';
+import { AiProvidersApiService } from './ai-providers-api.service';
+import { EmailSendersApiService, isSenderOauthRevoked } from './email-senders-api.service';
 import {
   Integration,
   IntegrationsApiService,
   IntegrationSubscription,
   WhatsAppStatus,
 } from './integrations-api.service';
+
+/** Rolled-up connection state shown on a summary tile. `checking`
+ *  covers the moment between page load and the status call landing. */
+interface TileStatus {
+  status: 'connected' | 'error' | 'not_connected' | 'checking';
+  label: string;
+}
+
+interface ConnectorTile {
+  id: string;
+  status: TileStatus['status'];
+  label: string;
+  type: string;
+  description: string;
+  /** When set, renders this letter as the icon (used for brands
+   *  best identified by initials — Google's `G`, Meta's `f`). */
+  letter: string | null;
+  /** When `letter` is null, this lucide icon renders instead. */
+  icon: string | null;
+  iconBg: string;
+  iconText: string;
+  statusLabel: string;
+  /** Button copy while not connected ("Connect", "Add key", …). */
+  connectLabel: string;
+}
+
+const CHECKING: TileStatus = { status: 'checking', label: 'Checking…' };
+const UNAVAILABLE: TileStatus = { status: 'not_connected', label: 'Status unavailable' };
+
+const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 type CallbackStatus =
   | 'google_connected'
@@ -112,6 +144,8 @@ type CallbackStatus =
 })
 export class IntegrationsPageComponent {
   private readonly api = inject(IntegrationsApiService);
+  private readonly emailSendersApi = inject(EmailSendersApiService);
+  private readonly aiProvidersApi = inject(AiProvidersApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -176,9 +210,17 @@ export class IntegrationsPageComponent {
    *  fetch their own state and stay usable. */
   protected readonly loadError = signal<string | null>(null);
 
-  /** Panel anchor to scroll to once the first load renders it — set
+  /** Scroll to the open panel once the first load renders it — set
    *  when an OAuth callback auto-opens a connector. */
-  private pendingScrollAnchor: string | null = null;
+  private pendingPanelScroll = false;
+
+  /** Tile statuses for the connectors whose detail cards fetch their
+   *  own data (they aren't part of the org fan-out). Loaded from the
+   *  same endpoints those cards call; refreshed when their panel
+   *  closes so the tile reflects whatever was changed inside it. */
+  protected readonly calendarTile = signal<TileStatus>(CHECKING);
+  protected readonly emailTile = signal<TileStatus>(CHECKING);
+  protected readonly aiTile = signal<TileStatus>(CHECKING);
 
   /** Inline DLQ list toggle (Step 8). Status panel emits `openDlq`
    *  on the banner click; toggles `true` and the list lazy-loads on
@@ -220,24 +262,7 @@ export class IntegrationsPageComponent {
    *  below where the actual connect / disconnect / subscribe UI
    *  lives. Kept as a computed so status pill re-renders when the
    *  underlying integration signal changes. */
-  protected readonly connectors = computed<
-    Array<{
-      id: string;
-      label: string;
-      type: string;
-      description: string;
-      /** When set, renders this letter as the icon (used for brands
-       *  best identified by initials — Google's `G`, Meta's `f`). */
-      letter: string | null;
-      /** When `letter` is null, this lucide icon renders instead. */
-      icon: string | null;
-      iconBg: string;
-      iconText: string;
-      status: 'connected' | 'error' | 'not_connected';
-      statusLabel: string;
-      anchor: string;
-    }>
-  >(() => {
+  protected readonly connectors = computed<ConnectorTile[]>(() => {
     const g = this.google();
     const m = this.meta();
     const w = this.whatsapp();
@@ -268,19 +293,7 @@ export class IntegrationsPageComponent {
     // Build the tile list with per-permission gating so the summary
     // grid matches the detail cards below — Employees / custom roles
     // without the manage keys see only the Google Calendar tile.
-    const tiles: Array<{
-      id: string;
-      label: string;
-      type: string;
-      description: string;
-      letter: string | null;
-      icon: string | null;
-      iconBg: string;
-      iconText: string;
-      status: 'connected' | 'error' | 'not_connected';
-      statusLabel: string;
-      anchor: string;
-    }> = [];
+    const tiles: ConnectorTile[] = [];
     // These three tiles read the org fan-out; when it failed to load
     // they'd show a false "Not connected", so drop them until retry.
     if (this.canManageOrgIntegrations() && !this.loadError()) {
@@ -297,7 +310,7 @@ export class IntegrationsPageComponent {
           iconText: 'text-blue-600',
           status: gs.status,
           statusLabel: gs.label,
-          anchor: 'card-google-ads',
+          connectLabel: 'Connect',
         },
         {
           id: 'meta_ads',
@@ -311,7 +324,7 @@ export class IntegrationsPageComponent {
           iconText: 'text-white',
           status: ms.status,
           statusLabel: ms.label,
-          anchor: 'card-meta-ads',
+          connectLabel: 'Connect',
         },
         {
           id: 'whatsapp',
@@ -325,7 +338,7 @@ export class IntegrationsPageComponent {
           iconText: 'text-white',
           status: ws.status,
           statusLabel: ws.label,
-          anchor: 'card-whatsapp',
+          connectLabel: 'Connect',
         },
       );
     }
@@ -339,9 +352,9 @@ export class IntegrationsPageComponent {
       icon: 'calendar',
       iconBg: 'bg-white',
       iconText: 'text-blue-600',
-      status: 'not_connected',
-      statusLabel: 'Per-user',
-      anchor: 'card-google-calendar',
+      status: this.calendarTile().status,
+      statusLabel: this.calendarTile().label,
+      connectLabel: 'Connect',
     });
     if (this.canManageEmailSenders()) {
       tiles.push({
@@ -354,9 +367,9 @@ export class IntegrationsPageComponent {
         icon: 'mail',
         iconBg: 'bg-violet-500',
         iconText: 'text-white',
-        status: 'not_connected',
-        statusLabel: 'Manage below',
-        anchor: 'card-email-sender',
+        status: this.emailTile().status,
+        statusLabel: this.emailTile().label,
+        connectLabel: 'Set up',
       });
     }
     if (this.canManageAiProviders()) {
@@ -370,22 +383,57 @@ export class IntegrationsPageComponent {
         icon: 'sparkles',
         iconBg: 'bg-emerald-500',
         iconText: 'text-white',
-        status: 'not_connected',
-        statusLabel: 'Manage below',
-        anchor: 'card-ai-providers',
+        status: this.aiTile().status,
+        statusLabel: this.aiTile().label,
+        connectLabel: 'Add key',
       });
     }
     return tiles;
   });
 
+  /** The tile whose panel is open — drives the panel's title bar. */
+  protected readonly expandedTile = computed(
+    () => this.connectors().find((c) => c.id === this.expandedConnector()) ?? null,
+  );
+
   /** Expand the clicked connector's detailed card (toggle: clicking
    *  the same tile again collapses it). After expand, next tick,
    *  scroll it into view so the operator lands on the flow they just
-   *  chose without hunting for it on long pages. */
-  toggleConnector(id: string, anchor: string): void {
-    const same = this.expandedConnector() === id;
+   *  chose without hunting for it on long pages. The panel being left
+   *  re-reads its tile status so changes made inside it show up. */
+  toggleConnector(id: string): void {
+    const previous = this.expandedConnector();
+    const same = previous === id;
     this.expandedConnector.set(same ? null : id);
-    if (!same) this.scrollToAnchor(anchor);
+    if (previous) this._loadTile(previous);
+    if (!same) this.scrollToAnchor('connector-panel');
+  }
+
+  closeConnector(): void {
+    const previous = this.expandedConnector();
+    if (!previous) return;
+    this.expandedConnector.set(null);
+    this._loadTile(previous);
+  }
+
+  /** Tile button copy: Close while open, Reconnect on error, Manage
+   *  when connected, otherwise the connector's own connect verb. */
+  protected ctaFor(c: ConnectorTile): string {
+    if (this.expandedConnector() === c.id) return 'Close';
+    if (c.status === 'error') return 'Reconnect';
+    if (c.status === 'not_connected') return c.connectLabel;
+    return 'Manage';
+  }
+
+  /** Primary accent for "connect", amber for "reconnect", quiet
+   *  secondary for "manage" / "close" so the grid highlights only the
+   *  tiles that need action. */
+  protected ctaClasses(c: ConnectorTile): string {
+    if (this.expandedConnector() !== c.id) {
+      if (c.status === 'error') return 'bg-amber-500 text-white hover:bg-amber-600';
+      if (c.status === 'not_connected') return 'bg-accent text-white hover:brightness-95';
+    }
+    return 'border border-subtle bg-surface text-default hover:bg-surface-2';
   }
 
   /** rAF gives Angular one CD tick to render the @if block before we
@@ -405,6 +453,9 @@ export class IntegrationsPageComponent {
   constructor() {
     this._readCallbackQuery();
     this._refresh();
+    this._loadTile('google_calendar');
+    this._loadTile('email');
+    this._loadTile('ai_providers');
   }
 
   // --- handlers -----------------------------------------------------
@@ -414,6 +465,9 @@ export class IntegrationsPageComponent {
    *  picks up the new state in a single round trip. */
   onCardChanged(): void {
     this._refresh();
+    // The Calendar card emits `changed` too; its tile isn't part of
+    // the fan-out above.
+    this._loadTile('google_calendar');
   }
 
   /** Opened from the status panel (top) or the summary card (bottom);
@@ -508,21 +562,81 @@ export class IntegrationsPageComponent {
   private _markLoaded(): void {
     this.hasLoaded = true;
     this.loading.set(false);
-    if (this.pendingScrollAnchor) {
-      this.scrollToAnchor(this.pendingScrollAnchor);
-      this.pendingScrollAnchor = null;
+    if (this.pendingPanelScroll) {
+      this.scrollToAnchor('connector-panel');
+      this.pendingPanelScroll = false;
+    }
+  }
+
+  /** (Re)load the status for a self-fetching tile. No-op for tiles fed
+   *  by the org fan-out, and for tiles the caller can't see. Failures
+   *  degrade to "Status unavailable" — the panel itself still works. */
+  private _loadTile(id: string): void {
+    if (id === 'google_calendar') {
+      this.api
+        .getGoogleCalendarStatus()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (st) => {
+            if (!st.connected) {
+              this.calendarTile.set({ status: 'not_connected', label: 'Not connected' });
+            } else if (st.last_error) {
+              this.calendarTile.set({ status: 'error', label: 'Reconnect required' });
+            } else {
+              this.calendarTile.set({ status: 'connected', label: 'Connected' });
+            }
+          },
+          error: () => this.calendarTile.set(UNAVAILABLE),
+        });
+    } else if (id === 'email' && this.canManageEmailSenders()) {
+      this.emailSendersApi
+        .list()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (rows) => {
+            const live = rows.filter((r) => r.verified && !isSenderOauthRevoked(r));
+            if (rows.length === 0) {
+              this.emailTile.set({ status: 'not_connected', label: 'No sender yet' });
+            } else if (rows.some(isSenderOauthRevoked)) {
+              this.emailTile.set({ status: 'error', label: 'Reconnect required' });
+            } else if (live.length > 0) {
+              this.emailTile.set({ status: 'connected', label: plural(live.length, 'sender') });
+            } else {
+              this.emailTile.set({ status: 'error', label: 'Verification pending' });
+            }
+          },
+          error: () => this.emailTile.set(UNAVAILABLE),
+        });
+    } else if (id === 'ai_providers' && this.canManageAiProviders()) {
+      this.aiProvidersApi
+        .list()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (keys) => {
+            const live = keys.filter((k) => !k.revoked_at);
+            if (live.length === 0) {
+              this.aiTile.set({ status: 'not_connected', label: 'No key yet' });
+            } else if (
+              live.some((k) => k.test_status === 'failed') &&
+              !live.some((k) => k.test_status === 'success')
+            ) {
+              this.aiTile.set({ status: 'error', label: 'Key test failed' });
+            } else {
+              this.aiTile.set({ status: 'connected', label: plural(live.length, 'key') });
+            }
+          },
+          error: () => this.aiTile.set(UNAVAILABLE),
+        });
     }
   }
 
   /** OAuth callback status → the connector tile whose panel holds the
    *  next step (pick forms / pages, see the new sender, …). */
-  private _connectorFor(status: CallbackStatus): { id: string; anchor: string } {
-    if (status.startsWith('google_calendar_')) {
-      return { id: 'google_calendar', anchor: 'card-google-calendar' };
-    }
-    if (status.startsWith('google_')) return { id: 'google_ads', anchor: 'card-google-ads' };
-    if (status.startsWith('meta_')) return { id: 'meta_ads', anchor: 'card-meta-ads' };
-    return { id: 'email', anchor: 'card-email-sender' };
+  private _connectorFor(status: CallbackStatus): string {
+    if (status.startsWith('google_calendar_')) return 'google_calendar';
+    if (status.startsWith('google_')) return 'google_ads';
+    if (status.startsWith('meta_')) return 'meta_ads';
+    return 'email';
   }
 
   private _readCallbackQuery(): void {
@@ -539,9 +653,8 @@ export class IntegrationsPageComponent {
     else this.toast.error(msg.title, { subtitle });
     // Open the connector the user just came back from, and scroll to it
     // once the first load has rendered the panel.
-    const target = this._connectorFor(status);
-    this.expandedConnector.set(target.id);
-    this.pendingScrollAnchor = target.anchor;
+    this.expandedConnector.set(this._connectorFor(status));
+    this.pendingPanelScroll = true;
     // Bump the calendar card's refresh signal when the callback is a
     // calendar one so the card refetches its status immediately (no
     // wait for the 5s poll).
