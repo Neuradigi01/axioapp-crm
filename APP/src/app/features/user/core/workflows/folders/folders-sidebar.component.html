@@ -78,8 +78,9 @@
                 <button
                   type="button"
                   (click)="onDelete(folder, $event)"
-                  class="invisible -mr-1 rounded p-0.5 text-faint hover:text-red-500 group-hover:visible"
+                  class="-mr-1 rounded p-0.5 text-faint hover:text-red-500 focus:visible sm:invisible sm:group-focus-within:visible sm:group-hover:visible"
                   title="Delete folder"
+                  aria-label="Delete folder"
                 >
                   <lucide-icon name="x" size="10" />
                 </button>
@@ -111,8 +112,9 @@
                 <button
                   type="button"
                   (click)="onDelete(child, $event)"
-                  class="invisible -mr-1 rounded p-0.5 text-faint hover:text-red-500 group-hover:visible"
+                  class="-mr-1 rounded p-0.5 text-faint hover:text-red-500 focus:visible sm:invisible sm:group-focus-within:visible sm:group-hover:visible"
                   title="Delete folder"
+                  aria-label="Delete folder"
                 >
                   <lucide-icon name="x" size="10" />
                 </button>

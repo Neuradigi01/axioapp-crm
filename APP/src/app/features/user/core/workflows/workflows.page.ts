@@ -4,16 +4,17 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   effect,
   inject,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideAngularModule } from 'lucide-angular';
-import { forkJoin } from 'rxjs';
+import { forkJoin, fromEvent, merge } from 'rxjs';
 
 import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../auth/auth.service';
@@ -90,6 +91,7 @@ export class WorkflowsPageComponent {
   private readonly auth = inject(FurnitureAuthService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly confirmDialog = inject(ConfirmDialogService);
+  private readonly router = inject(Router);
 
   protected readonly STATUS_OPTIONS = STATUS_OPTIONS;
   protected readonly CATEGORY_OPTIONS = CATEGORY_OPTIONS;
@@ -151,8 +153,20 @@ export class WorkflowsPageComponent {
   // Run-history drawer.
   protected readonly runHistoryWorkflow = signal<WorkflowRead | null>(null);
 
-  // Per-row "more" menu.
+  // Per-row "more" menu. Rendered once at page level with fixed
+  // positioning so the table's overflow wrapper can't clip it, and so
+  // desktop rows + mobile cards share one menu definition.
   protected readonly openMenuId = signal<string | null>(null);
+  protected readonly menuPos = signal<{ top: number | null; bottom: number | null; right: number }>(
+    { top: null, bottom: null, right: 0 },
+  );
+  protected readonly openMenuRow = computed(() => {
+    const id = this.openMenuId();
+    return id ? (this.items().find((r) => r.id === id) ?? null) : null;
+  });
+
+  // Row whose inline activate / pause toggle is in flight.
+  protected readonly rowBusyId = signal<string | null>(null);
 
   protected readonly canWrite = computed(() => this.auth.hasPermission('workflows.write'));
   protected readonly canActivate = computed(
@@ -165,6 +179,12 @@ export class WorkflowsPageComponent {
   protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / PAGE_SIZE)));
   protected readonly hasPrev = computed(() => this.pageIndex() > 0);
   protected readonly hasNext = computed(() => this.pageIndex() < this.totalPages() - 1);
+  protected readonly rangeStart = computed(() =>
+    this.total() === 0 ? 0 : this.pageIndex() * PAGE_SIZE + 1,
+  );
+  protected readonly rangeEnd = computed(() =>
+    Math.min(this.total(), this.pageIndex() * PAGE_SIZE + this.items().length),
+  );
 
   protected readonly hasFilters = computed(
     () =>
@@ -203,8 +223,30 @@ export class WorkflowsPageComponent {
       void q;
       void scheduled;
       void page;
+      // A selection only refers to rows on screen — drop it whenever the
+      // visible set changes so bulk actions never hit hidden rows.
+      this.selectedIds.set(new Set());
       this.reload();
     });
+
+    // A fixed-position menu would drift away from its row on scroll /
+    // resize, so close it instead. Capture phase catches scrolls of the
+    // shell's inner scroll container, not just the window.
+    merge(fromEvent(document, 'scroll', { capture: true }), fromEvent(window, 'resize'))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        if (this.openMenuId() !== null) this.closeMenu();
+      });
+  }
+
+  @HostListener('document:click')
+  protected onDocumentClick(): void {
+    if (this.openMenuId() !== null) this.closeMenu();
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this.openMenuId() !== null) this.closeMenu();
   }
 
   // --- filters / search ---------------------------------------------
@@ -251,8 +293,8 @@ export class WorkflowsPageComponent {
   /** Human label for the current Scheduled chip state. */
   protected scheduledChipLabel(): string {
     const s = this.scheduledFilter();
-    if (s === null) return 'Any';
-    return s ? 'Scheduled only' : 'Unscheduled only';
+    if (s === null) return 'Schedule: Any';
+    return s ? 'Schedule: Scheduled' : 'Schedule: Unscheduled';
   }
 
   protected onFolderSelected(id: string | null): void {
@@ -316,6 +358,47 @@ export class WorkflowsPageComponent {
     return this.items().length > 0 && this.selectedIds().size === this.items().length;
   }
 
+  protected get isSomeSelected(): boolean {
+    const n = this.selectedIds().size;
+    return n > 0 && n < this.items().length;
+  }
+
+  protected clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  // --- row navigation ----------------------------------------------
+
+  /** Whole row / card opens the canvas. Clicks on interactive children
+   *  (name link, A/B link, checkbox, kebab, toggle) keep their own
+   *  behaviour, and a text selection drag doesn't navigate. */
+  protected onRowClick(row: WorkflowRead, event: MouseEvent): void {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('a, button, input, label, [data-no-row-nav]')) return;
+    if (window.getSelection()?.toString()) return;
+    void this.router.navigate(['/user/workflows', row.id]);
+  }
+
+  // --- inline activate / pause -------------------------------------
+
+  protected toggleRowActive(row: WorkflowRead, event: MouseEvent): void {
+    event.stopPropagation();
+    if (!this.canActivate() || this.rowBusyId() !== null || row.status === 'archived') return;
+    this.rowBusyId.set(row.id);
+    this.loadError.set(null);
+    const call = row.status === 'active' ? this.api.pause(row.id) : this.api.activate(row.id);
+    call.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (updated) => {
+        this.rowBusyId.set(null);
+        this.items.update((rows) => rows.map((r) => (r.id === row.id ? updated : r)));
+      },
+      error: (err: HttpErrorResponse) => {
+        this.rowBusyId.set(null);
+        this.loadError.set(extractApiError(err) ?? 'Could not update workflow status.');
+      },
+    });
+  }
+
   // --- bulk actions -------------------------------------------------
 
   protected bulkActivate(): void {
@@ -377,7 +460,20 @@ export class WorkflowsPageComponent {
 
   protected toggleMenu(id: string, event: MouseEvent): void {
     event.stopPropagation();
-    this.openMenuId.update((current) => (current === id ? null : id));
+    if (this.openMenuId() === id) {
+      this.closeMenu();
+      return;
+    }
+    // Anchor the fixed menu to the kebab; flip upward when there isn't
+    // room below (~260px covers the tallest menu variant).
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const openUp = window.innerHeight - rect.bottom < 260;
+    this.menuPos.set({
+      top: openUp ? null : rect.bottom + 4,
+      bottom: openUp ? window.innerHeight - rect.top + 4 : null,
+      right: window.innerWidth - rect.right,
+    });
+    this.openMenuId.set(id);
   }
 
   protected closeMenu(): void {
