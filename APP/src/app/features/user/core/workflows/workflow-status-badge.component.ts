@@ -10,6 +10,8 @@ import type { WorkflowStatus } from './workflows-api.service';
 interface BadgeDescriptor {
   label: string;
   classes: string;
+  /** Leading dot colour — only on Active, so live workflows stand out. */
+  dot?: string;
 }
 
 const STATUS_BADGES: Record<WorkflowStatus, BadgeDescriptor> = {
@@ -20,6 +22,7 @@ const STATUS_BADGES: Record<WorkflowStatus, BadgeDescriptor> = {
   active: {
     label: 'Active',
     classes: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20',
+    dot: 'bg-emerald-500',
   },
   paused: {
     label: 'Paused',

@@ -1,8 +1,11 @@
 @if (descriptor(); as d) {
   <span
-    class="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
+    class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
     [class]="d.classes"
   >
+    @if (d.dot) {
+      <span class="h-1.5 w-1.5 shrink-0 rounded-full" [class]="d.dot" aria-hidden="true"></span>
+    }
     {{ d.label }}
   </span>
 }

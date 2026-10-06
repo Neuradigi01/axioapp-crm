@@ -4,11 +4,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   HostListener,
   computed,
   effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -20,6 +22,7 @@ import { extractApiError } from '@core/services/api-error.util';
 import { FurnitureAuthService } from '../auth/auth.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog/confirm-dialog.service';
 import { MobileSelectComponent } from '../shared/forms/mobile-select.component';
+import { RelativeTimePipe } from '../shared/pipes/relative-time.pipe';
 
 import { FolderCreateModalComponent } from './folders/folder-create.modal.component';
 import { FoldersSidebarComponent } from './folders/folders-sidebar.component';
@@ -68,6 +71,25 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'Custom', label: 'Custom' },
 ];
 
+/** Channel chip label + lucide icon, keyed by event-type prefix. */
+const CHANNEL_META: Record<string, { label: string; icon: string }> = {
+  email: { label: 'Email', icon: 'mail' },
+  whatsapp: { label: 'WhatsApp', icon: 'message-circle' },
+  sms: { label: 'SMS', icon: 'smartphone' },
+  facebook: { label: 'Facebook', icon: 'facebook' },
+  instagram: { label: 'Instagram', icon: 'instagram' },
+  push: { label: 'Push', icon: 'bell' },
+};
+
+/** Category dot colour — a quick visual key when scanning the list. */
+const CATEGORY_DOTS: Record<string, string> = {
+  Sales: 'bg-sky-500',
+  Marketing: 'bg-violet-500',
+  Service: 'bg-emerald-500',
+  Internal: 'bg-amber-500',
+};
+const CATEGORY_DOT_FALLBACK = 'bg-zinc-400';
+
 @Component({
   selector: 'app-workflows-page',
   standalone: true,
@@ -83,6 +105,7 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
     FolderCreateModalComponent,
     RunHistoryDrawerComponent,
     MobileSelectComponent,
+    RelativeTimePipe,
   ],
   templateUrl: './workflows.page.html',
 })
@@ -96,6 +119,7 @@ export class WorkflowsPageComponent {
   protected readonly STATUS_OPTIONS = STATUS_OPTIONS;
   protected readonly CATEGORY_OPTIONS = CATEGORY_OPTIONS;
   protected readonly PAGE_SIZE = PAGE_SIZE;
+  protected readonly SKELETON_ROWS = [0, 1, 2, 3, 4, 5];
 
   // List state.
   protected readonly items = signal<WorkflowRead[]>([]);
@@ -164,6 +188,10 @@ export class WorkflowsPageComponent {
     const id = this.openMenuId();
     return id ? (this.items().find((r) => r.id === id) ?? null) : null;
   });
+
+  private readonly rowMenu = viewChild<ElementRef<HTMLElement>>('rowMenu');
+  /** Kebab that opened the menu — focus returns here on Esc. */
+  private menuTrigger: HTMLElement | null = null;
 
   // Row whose inline activate / pause toggle is in flight.
   protected readonly rowBusyId = signal<string | null>(null);
@@ -246,7 +274,33 @@ export class WorkflowsPageComponent {
 
   @HostListener('document:keydown.escape')
   protected onEscape(): void {
-    if (this.openMenuId() !== null) this.closeMenu();
+    if (this.openMenuId() === null) return;
+    this.closeMenu();
+    this.menuTrigger?.focus();
+  }
+
+  /** Arrow / Home / End move focus between menu items; Tab leaves the
+   *  menu and closes it. Esc is handled by the document listener. */
+  protected onMenuKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Tab') {
+      this.closeMenu();
+      return;
+    }
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    const items = this.menuItems();
+    if (items.length === 0) return;
+    event.preventDefault();
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    let next = 0;
+    if (event.key === 'End') next = items.length - 1;
+    else if (event.key === 'ArrowDown') next = (current + 1) % items.length;
+    else if (event.key === 'ArrowUp') next = (current - 1 + items.length) % items.length;
+    items[next].focus();
+  }
+
+  private menuItems(): HTMLElement[] {
+    const host = this.rowMenu()?.nativeElement;
+    return host ? Array.from(host.querySelectorAll<HTMLElement>('[role="menuitem"]')) : [];
   }
 
   // --- filters / search ---------------------------------------------
@@ -466,7 +520,8 @@ export class WorkflowsPageComponent {
     }
     // Anchor the fixed menu to the kebab; flip upward when there isn't
     // room below (~260px covers the tallest menu variant).
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.menuTrigger = event.currentTarget as HTMLElement;
+    const rect = this.menuTrigger.getBoundingClientRect();
     const openUp = window.innerHeight - rect.bottom < 260;
     this.menuPos.set({
       top: openUp ? null : rect.bottom + 4,
@@ -474,6 +529,9 @@ export class WorkflowsPageComponent {
       right: window.innerWidth - rect.right,
     });
     this.openMenuId.set(id);
+    // Move focus into the menu once it renders so keyboard users can
+    // arrow through it straight away.
+    setTimeout(() => this.menuItems()[0]?.focus());
   }
 
   protected closeMenu(): void {
@@ -686,14 +744,16 @@ export class WorkflowsPageComponent {
   // --- derived helpers ---------------------------------------------
 
   /** Pick a representative channel chip from `enabled_event_types`. */
-  protected channelOf(row: WorkflowRead): string | null {
+  protected channelOf(row: WorkflowRead): { label: string; icon: string } | null {
     for (const evt of row.enabled_event_types) {
-      const prefix = evt.split('.')[0];
-      if (['email', 'whatsapp', 'sms', 'facebook', 'instagram', 'push'].includes(prefix)) {
-        return prefix;
-      }
+      const meta = CHANNEL_META[evt.split('.')[0]];
+      if (meta) return meta;
     }
     return null;
+  }
+
+  protected categoryDot(category: string): string {
+    return CATEGORY_DOTS[category] ?? CATEGORY_DOT_FALLBACK;
   }
 
   // --- fetch --------------------------------------------------------
