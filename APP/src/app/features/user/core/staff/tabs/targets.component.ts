@@ -12,6 +12,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 
+import { ConfirmDialogService } from '../../shared/confirm-dialog/confirm-dialog.service';
 import { FieldErrorComponent } from '../../shared/forms/field-error.component';
 import {
   MobileSelectComponent,
@@ -30,7 +31,7 @@ import { StaffApiService, StaffWithPerformance } from '../staff-api.service';
  * list.
  *
  * Only one row is editable at a time — picking another row collapses
- * the previous one.
+ * the previous one, after confirming if it has unsaved changes.
  */
 @Component({
   selector: 'app-staff-targets-tab',
@@ -42,6 +43,7 @@ import { StaffApiService, StaffWithPerformance } from '../staff-api.service';
 export class StaffTargetsTabComponent {
   private readonly api = inject(StaffApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly fb = inject(FormBuilder);
 
   readonly rows = input.required<StaffWithPerformance[]>();
@@ -75,7 +77,18 @@ export class StaffTargetsTabComponent {
     }),
   });
 
-  protected startEdit(row: StaffWithPerformance): void {
+  protected async startEdit(row: StaffWithPerformance): Promise<void> {
+    const current = this.editingId();
+    if (current && current !== row.staff.id && this.form.dirty) {
+      const name = this.rows().find((r) => r.staff.id === current)?.staff.full_name ?? 'this row';
+      const ok = await this.confirmDialog.ask({
+        title: 'Discard unsaved changes?',
+        body: `Your edits to ${name} haven't been saved.`,
+        confirmLabel: 'Discard',
+        danger: true,
+      });
+      if (!ok) return;
+    }
     this.submitError.set(null);
     this.form.reset({
       commission_rate: row.performance.commission_rate ?? '0',

@@ -8,6 +8,8 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
+import { ActivatedRoute, Router } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { InrPipe } from '../shared/pipes/inr.pipe';
@@ -39,14 +41,18 @@ export type StaffTabId =
  * Phase 4.4 / 4.10 / 5.6 ship.
  *
  * KPI header mirrors the Vercel reference layout — Present-today,
- * total staff, total revenue (placeholder zero until invoices land),
- * avg conversion %, today's revenue (also zero today).
+ * total staff, total revenue, avg target progress, today's revenue.
+ * Each KPI is `undefined` while loading and `null` when its call
+ * failed, so the header never passes off a failure as a real "0".
+ *
+ * The active tab lives in `?tab=` so a reload or shared link keeps it.
  */
 @Component({
   selector: 'app-staff-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
     LucideAngularModule,
     InrPipe,
     StaffOverviewTabComponent,
@@ -62,21 +68,27 @@ export type StaffTabId =
 export class StaffPageComponent {
   private readonly api = inject(StaffApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   protected readonly rows = signal<StaffWithPerformance[]>([]);
+  /** First load only — replaces the tab body with a loader. */
   protected readonly loading = signal(false);
+  /** Refresh after the first load — tabs stay mounted (so pickers /
+   *  open editors keep their state) and only the button spins. */
+  protected readonly refreshing = signal(false);
   protected readonly loadError = signal<string | null>(null);
+  private hasLoaded = false;
 
-  /** Present-today headcount from `/staff/present-today`. Loaded
-   * alongside the roster; falls back to 0 on failure so a bad
-   * attendance query never blanks the whole dashboard. */
-  private readonly presentTodayCount = signal(0);
+  /** Present-today headcount from `/staff/present-today`. Independent
+   * of the roster so a bad attendance query never blanks the page.
+   * `undefined` = loading, `null` = failed. */
+  private readonly presentTodayCount = signal<number | null | undefined>(undefined);
 
   /** Sums of paid-invoice `Invoice.total` from `/staff/revenue-totals`.
-   * Same fall-back-to-zero pattern as `presentTodayCount` — a broken
-   * billing query shouldn't wipe the roster. */
-  private readonly revenueTotal = signal(0);
-  private readonly revenueToday = signal(0);
+   * Same independent pattern — a broken billing query shouldn't wipe
+   * the roster. `undefined` = loading, `null` = failed. */
+  private readonly revenue = signal<{ total: number; today: number } | null | undefined>(undefined);
 
   protected readonly activeTab = signal<StaffTabId>('overview');
 
@@ -94,29 +106,58 @@ export class StaffPageComponent {
     { id: 'field-ops', label: 'Field Operations' },
   ];
 
-  // --- KPI header (computed from the joined rows) ---
+  // --- KPI header — `undefined` = loading, `null` = unavailable ---
 
-  protected readonly totalStaff = computed(() => this.rows().length);
+  /** Roster-derived KPIs are unknown until the first load lands, and
+   *  unavailable if it failed with nothing on screen. */
+  private readonly rosterState = computed<'loading' | 'error' | 'ok'>(() => {
+    if (this.loading()) return 'loading';
+    if (this.loadError() && this.rows().length === 0) return 'error';
+    return 'ok';
+  });
+
+  protected readonly totalStaff = computed<number | null | undefined>(() => {
+    const st = this.rosterState();
+    return st === 'loading' ? undefined : st === 'error' ? null : this.rows().length;
+  });
 
   protected readonly presentToday = computed(() => this.presentTodayCount());
 
-  protected readonly totalRevenue = computed(() => this.revenueTotal());
-
-  protected readonly avgConversionPct = computed(() => {
-    const rs = this.rows();
-    if (rs.length === 0) return 0;
-    const total = rs.reduce((acc, r) => acc + (r.performance.target_progress_pct ?? 0), 0);
-    return Math.round(total / rs.length);
+  protected readonly totalRevenue = computed(() => {
+    const r = this.revenue();
+    return r === undefined || r === null ? r : r.total;
   });
 
-  protected readonly todaysRevenue = computed(() => this.revenueToday());
+  protected readonly todaysRevenue = computed(() => {
+    const r = this.revenue();
+    return r === undefined || r === null ? r : r.today;
+  });
+
+  /** Average target progress across staff who actually have a target —
+   *  people without a profile (`null`) would otherwise count as 0%
+   *  and drag the average down. `null` when nobody has a target. */
+  protected readonly avgTargetProgressPct = computed<number | null | undefined>(() => {
+    const st = this.rosterState();
+    if (st !== 'ok') return st === 'loading' ? undefined : null;
+    const pcts = this.rows()
+      .map((r) => r.performance.target_progress_pct)
+      .filter((p): p is number => p !== null);
+    if (pcts.length === 0) return null;
+    return Math.round(pcts.reduce((acc, p) => acc + p, 0) / pcts.length);
+  });
 
   constructor() {
+    const fromUrl = this.route.snapshot.queryParamMap.get('tab');
+    if (fromUrl && this.tabs.some((t) => t.id === fromUrl)) {
+      this.activeTab.set(fromUrl as StaffTabId);
+    }
     this.reload();
   }
 
   protected reload(): void {
-    this.loading.set(true);
+    if (this.loading() || this.refreshing()) return;
+    if (this.hasLoaded) this.refreshing.set(true);
+    else this.loading.set(true);
     this.loadError.set(null);
     this.api
       .loadWithPerformance()
@@ -124,22 +165,27 @@ export class StaffPageComponent {
       .subscribe({
         next: (rows) => {
           this.rows.set(rows);
+          this.hasLoaded = true;
           this.loading.set(false);
+          this.refreshing.set(false);
         },
         error: (err: HttpErrorResponse) => {
-          this.rows.set([]);
+          // A failed refresh keeps the roster already on screen; only a
+          // failed first load leaves the page empty.
+          if (!this.hasLoaded) this.rows.set([]);
           this.loading.set(false);
+          this.refreshing.set(false);
           this.loadError.set(extractApiError(err) ?? 'Could not load staff.');
         },
       });
     // Present-today is an independent call — errors here don't blank
-    // the roster, they just leave the KPI at 0.
+    // the roster; the KPI shows "—" instead of a fake 0.
     this.api
       .presentToday()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (r) => this.presentTodayCount.set(r.count),
-        error: () => this.presentTodayCount.set(0),
+        error: () => this.presentTodayCount.set(null),
       });
     // Revenue KPIs — same independent-load pattern; a billing outage
     // shouldn't blank the whole staff page.
@@ -147,18 +193,18 @@ export class StaffPageComponent {
       .revenueTotals()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (r) => {
-          this.revenueTotal.set(r.total);
-          this.revenueToday.set(r.today);
-        },
-        error: () => {
-          this.revenueTotal.set(0);
-          this.revenueToday.set(0);
-        },
+        next: (r) => this.revenue.set({ total: r.total, today: r.today }),
+        error: () => this.revenue.set(null),
       });
   }
 
   protected setTab(tab: StaffTabId): void {
     this.activeTab.set(tab);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: tab === 'overview' ? null : tab },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 }

@@ -63,7 +63,7 @@ export class StaffOverviewTabComponent {
       default:
         return {
           label: 'No profile',
-          cls: 'bg-surface-2 text-muted border-subtle',
+          cls: 'bg-surface-2 text-muted ring-subtle',
         };
     }
   }

@@ -51,7 +51,7 @@ const TYPE_META: Record<string, TypeMeta> = {
   status_change: {
     icon: 'check-square',
     label: 'Status change',
-    ring: 'bg-surface-2 text-default border-subtle',
+    ring: 'bg-surface-2 text-default ring-subtle',
   },
   task: {
     icon: 'check',
@@ -63,7 +63,7 @@ const TYPE_META: Record<string, TypeMeta> = {
 const FALLBACK_META: TypeMeta = {
   icon: 'sticky-note',
   label: 'Activity',
-  ring: 'bg-surface-2 text-default border-subtle',
+  ring: 'bg-surface-2 text-default ring-subtle',
 };
 
 interface DayGroup {

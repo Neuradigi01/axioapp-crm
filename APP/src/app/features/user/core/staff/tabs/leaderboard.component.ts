@@ -28,8 +28,8 @@ export class StaffLeaderboardTabComponent {
 
   protected rankBadge(idx: number): string {
     if (idx === 0) return 'bg-amber-100 text-amber-700 ring-amber-200';
-    if (idx === 1) return 'bg-surface-2 text-default border-subtle';
+    if (idx === 1) return 'bg-surface-2 text-default ring-subtle';
     if (idx === 2) return 'bg-orange-100 text-orange-700 ring-orange-200';
-    return 'bg-surface-2 text-muted border-subtle';
+    return 'bg-surface-2 text-muted ring-subtle';
   }
 }

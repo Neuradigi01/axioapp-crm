@@ -6,16 +6,22 @@
         Staff Dashboard
       </h1>
       <p class="mt-1 text-[14px] text-muted">
-        Performance, attendance, field ops, inventory &amp; marketing
+        Performance, targets, attendance, activity &amp; field ops
       </p>
     </div>
     <button
       type="button"
       (click)="reload()"
-      class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2"
+      [disabled]="loading() || refreshing()"
+      class="inline-flex items-center gap-2 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-medium text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
     >
-      <lucide-icon name="users" class="h-4 w-4"></lucide-icon>
-      Refresh
+      <lucide-icon
+        name="refresh-cw"
+        class="h-4 w-4"
+        [class.animate-spin]="refreshing()"
+        aria-hidden="true"
+      ></lucide-icon>
+      {{ refreshing() ? 'Refreshing…' : 'Refresh' }}
     </button>
   </div>
 
@@ -27,7 +33,15 @@
         Present Today
       </div>
       <div class="mt-2 text-2xl font-semibold text-default">
-        {{ presentToday() }}/{{ totalStaff() }}
+        @let present = presentToday();
+        @let total = totalStaff();
+        @if (present === undefined || total === undefined) {
+          <ng-container *ngTemplateOutlet="kpiPending; context: { $implicit: undefined }" />
+        } @else if (present === null || total === null) {
+          <ng-container *ngTemplateOutlet="kpiPending; context: { $implicit: null }" />
+        } @else {
+          {{ present }}/{{ total }}
+        }
       </div>
     </div>
     <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
@@ -36,7 +50,12 @@
         Total Staff
       </div>
       <div class="mt-2 text-2xl font-semibold text-default">
-        {{ totalStaff() }}
+        @let staffCount = totalStaff();
+        @if (staffCount === undefined || staffCount === null) {
+          <ng-container *ngTemplateOutlet="kpiPending; context: { $implicit: staffCount }" />
+        } @else {
+          {{ staffCount }}
+        }
       </div>
     </div>
     <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
@@ -45,7 +64,12 @@
         Total Revenue
       </div>
       <div class="mt-2 text-2xl font-semibold text-default">
-        {{ totalRevenue() | formatINR: true }}
+        @let revTotal = totalRevenue();
+        @if (revTotal === undefined || revTotal === null) {
+          <ng-container *ngTemplateOutlet="kpiPending; context: { $implicit: revTotal }" />
+        } @else {
+          {{ revTotal | formatINR: true }}
+        }
       </div>
     </div>
     <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
@@ -53,7 +77,14 @@
         <lucide-icon name="check-square" class="h-4 w-4 text-amber-600"></lucide-icon>
         Avg Target Progress
       </div>
-      <div class="mt-2 text-2xl font-semibold text-default">{{ avgConversionPct() }}%</div>
+      <div class="mt-2 text-2xl font-semibold text-default">
+        @let avg = avgTargetProgressPct();
+        @if (avg === undefined || avg === null) {
+          <ng-container *ngTemplateOutlet="kpiPending; context: { $implicit: avg }" />
+        } @else {
+          {{ avg }}%
+        }
+      </div>
     </div>
     <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
       <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
@@ -61,7 +92,12 @@
         Today's Revenue
       </div>
       <div class="mt-2 text-2xl font-semibold text-default">
-        {{ todaysRevenue() | formatINR: true }}
+        @let revToday = todaysRevenue();
+        @if (revToday === undefined || revToday === null) {
+          <ng-container *ngTemplateOutlet="kpiPending; context: { $implicit: revToday }" />
+        } @else {
+          {{ revToday | formatINR: true }}
+        }
       </div>
     </div>
   </div>
@@ -89,16 +125,18 @@
   <!-- Errors -->
   @if (loadError(); as err) {
     <div
+      role="alert"
       class="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
     >
       {{ err }}
     </div>
   }
 
-  <!-- Loading -->
+  <!-- First load only — later refreshes update the open tab in place. -->
   @if (loading()) {
     <div
       class="rounded-lg border border-subtle bg-surface p-4 md:p-6 text-center text-sm text-muted"
+      role="status"
     >
       Loading…
     </div>
@@ -137,3 +175,17 @@
     }
   }
 </div>
+
+<!-- KPI value placeholder: pulse bar while loading (undefined), muted
+     dash when the call failed (null) — never a fake "0". -->
+<ng-template #kpiPending let-state>
+  @if (state === undefined) {
+    <span
+      class="inline-block h-7 w-16 animate-pulse rounded bg-surface-2"
+      aria-hidden="true"
+    ></span>
+    <span class="sr-only">Loading</span>
+  } @else {
+    <span class="text-muted" title="Couldn't load this figure">—</span>
+  }
+</ng-template>
