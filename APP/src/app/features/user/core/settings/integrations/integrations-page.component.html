@@ -12,54 +12,6 @@
   </header>
 
   <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4 md:space-y-8 md:px-6 md:py-8">
-    <!-- OAuth callback banner (dismissible). -->
-    @if (callbackBanner(); as b) {
-      <div
-        class="flex items-start justify-between gap-3 rounded-md border p-3 text-sm"
-        [class.border-emerald-500/20]="b.kind === 'success'"
-        [class.bg-emerald-500/10]="b.kind === 'success'"
-        [class.text-emerald-300]="b.kind === 'success'"
-        [class.border-amber-500/20]="b.kind === 'warn'"
-        [class.bg-amber-500/10]="b.kind === 'warn'"
-        [class.text-amber-300]="b.kind === 'warn'"
-        [class.border-red-500/20]="b.kind === 'error'"
-        [class.bg-red-500/10]="b.kind === 'error'"
-        [class.text-red-300]="b.kind === 'error'"
-      >
-        <div class="flex items-start gap-2">
-          @if (b.kind === 'success') {
-            <lucide-icon
-              name="check-circle-2"
-              size="16"
-              class="mt-0.5 shrink-0"
-              aria-hidden="true"
-            ></lucide-icon>
-          } @else {
-            <lucide-icon
-              name="alert-triangle"
-              size="16"
-              class="mt-0.5 shrink-0"
-              aria-hidden="true"
-            ></lucide-icon>
-          }
-          <div>
-            <p class="font-medium">{{ b.title }}</p>
-            @if (b.detail) {
-              <p class="mt-0.5 text-xs opacity-90">{{ b.detail }}</p>
-            }
-          </div>
-        </div>
-        <button
-          type="button"
-          class="shrink-0 rounded p-1 hover:bg-black/5"
-          (click)="dismissBanner()"
-          aria-label="Dismiss notification"
-        >
-          <lucide-icon name="x" size="14" aria-hidden="true"></lucide-icon>
-        </button>
-      </div>
-    }
-
     @if (loading()) {
       <p class="flex items-center gap-2 text-sm text-muted">
         <lucide-icon
@@ -70,23 +22,33 @@
         ></lucide-icon>
         Loading integrations…
       </p>
-    } @else if (loadError()) {
-      <div class="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
-        Could not load integrations: {{ loadError() }}
-      </div>
     } @else {
-      @if (canManageOrgIntegrations()) {
+      <!-- First-load failure of the org fan-out. Only the cards that
+           depend on it (Google Ads / Meta / WhatsApp / delivery status)
+           are hidden — Calendar, Email and AI Providers stay usable. -->
+      @if (loadError(); as err) {
+        <div
+          role="alert"
+          class="flex items-start justify-between gap-3 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300"
+        >
+          <span>Could not load Google Ads, Meta and WhatsApp status: {{ err }}</span>
+          <button
+            type="button"
+            (click)="retryLoad()"
+            class="inline-flex shrink-0 items-center gap-1 rounded-md border border-red-500/30 px-2 py-1 text-xs font-medium hover:bg-red-500/10"
+          >
+            <lucide-icon name="refresh-cw" size="12" aria-hidden="true"></lucide-icon>
+            Retry
+          </button>
+        </div>
+      }
+
+      @if (canManageOrgIntegrations() && !loadError()) {
         <!-- Step 8: Delivery status dashboard panel. Above the provider
            cards so an Owner glances at it first. Hidden for roles
            without `settings.integrations.manage` — they don't own the
            org connectors those metrics summarise. -->
         <app-integration-status (openDlq)="toggleDlq()"></app-integration-status>
-
-        <!-- Step 8: Inline DLQ table — visible only when the operator
-           clicks the status banner or the bottom-card link. -->
-        @if (dlqVisible()) {
-          <app-dlq-list [visible]="dlqVisible()" (changed)="onDlqChanged()"></app-dlq-list>
-        }
       }
 
       <!-- Employees / custom roles without any org-manage keys land
@@ -197,7 +159,7 @@
            clean grid). Each block reveals when its summary tile above
            is clicked. Anchor ids let the tile's toggle scroll the
            opened block into view. -->
-      @if (canManageOrgIntegrations() && expandedConnector() === 'google_ads') {
+      @if (canManageOrgIntegrations() && !loadError() && expandedConnector() === 'google_ads') {
         <div id="card-google-ads">
           <app-google-card
             [integration]="google()"
@@ -219,7 +181,7 @@
         </div>
       }
 
-      @if (canManageOrgIntegrations() && expandedConnector() === 'meta_ads') {
+      @if (canManageOrgIntegrations() && !loadError() && expandedConnector() === 'meta_ads') {
         <div id="card-meta-ads">
           <app-meta-card
             [integration]="meta()"
@@ -232,7 +194,7 @@
         </div>
       }
 
-      @if (canManageOrgIntegrations() && expandedConnector() === 'whatsapp') {
+      @if (canManageOrgIntegrations() && !loadError() && expandedConnector() === 'whatsapp') {
         <div id="card-whatsapp">
           <app-whatsapp-card [status]="whatsapp()" (changed)="onCardChanged()"></app-whatsapp-card>
         </div>
@@ -265,7 +227,7 @@
          link to expand the inline table even when the status banner
          isn't showing. Hidden for roles without the org-integrations
          manage key; there's nothing they can act on there. -->
-      @if (canManageOrgIntegrations()) {
+      @if (canManageOrgIntegrations() && !loadError()) {
         <section
           class="rounded-xl border border-subtle bg-surface p-4 shadow-sm"
           data-testid="dlq-summary"
@@ -284,14 +246,14 @@
               @if (dlqTotal()! > 0) {
                 <button
                   type="button"
-                  class="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 ring-1 border-amber-500/20 hover:bg-amber-500/10"
+                  class="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 ring-1 ring-amber-500/20 hover:bg-amber-500/20"
                   (click)="toggleDlq()"
                 >
                   {{ dlqTotal() }} payload{{ dlqTotal() === 1 ? '' : 's' }} total · view table
                 </button>
               } @else {
                 <span
-                  class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20"
+                  class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/20"
                 >
                   All clear
                 </span>
@@ -303,6 +265,15 @@
             a row's Replay button to re-enqueue, or Discard to silence (the row stays for audit).
           </p>
         </section>
+
+        <!-- Inline DLQ table — opened from the status panel or the
+             summary card above; lives here (not at the top) so it opens
+             next to the button that revealed it. -->
+        @if (dlqVisible()) {
+          <div id="dlq-table" class="scroll-mt-4">
+            <app-dlq-list [visible]="dlqVisible()" (changed)="onDlqChanged()"></app-dlq-list>
+          </div>
+        }
       }
     }
 

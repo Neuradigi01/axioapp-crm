@@ -156,13 +156,13 @@
                   @if (row.kind === 'smtp') {
                     @if (row.verified) {
                       <span
-                        class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400 ring-1 border-emerald-500/20"
+                        class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400 ring-1 ring-emerald-500/20"
                       >
                         Verified
                       </span>
                     } @else {
                       <span
-                        class="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400 ring-1 border-amber-500/20"
+                        class="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400 ring-1 ring-amber-500/20"
                       >
                         Pending
                       </span>
@@ -176,7 +176,7 @@
                            pill + inline error message + a "reconnect
                            now" hint solve that. -->
                       <span
-                        class="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-400 ring-1 border-red-500/30"
+                        class="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-400 ring-1 ring-red-500/30"
                         [attr.title]="row.last_sync_error ?? 'Google/Microsoft revoked the grant.'"
                       >
                         <lucide-icon
@@ -193,7 +193,7 @@
                       }
                     } @else if (row.verified) {
                       <span
-                        class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400 ring-1 border-emerald-500/20"
+                        class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400 ring-1 ring-emerald-500/20"
                       >
                         Connected
                       </span>
@@ -204,7 +204,7 @@
                       }
                     } @else {
                       <span
-                        class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400 ring-1 border-amber-500/20"
+                        class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400 ring-1 ring-amber-500/20"
                         title="OAuth granted, but the initial sync hasn't completed. Auto-recovers within ~1 minute — click Reconnect if it stays this way."
                       >
                         <lucide-icon
@@ -480,7 +480,7 @@
                         class="rounded px-2 py-0.5 text-[11px] font-medium"
                         [class]="
                           row.spf_verified
-                            ? 'bg-emerald-500/10 text-emerald-400 ring-1 border-emerald-500/20'
+                            ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'
                             : 'bg-surface-2 text-muted ring-1 border-subtle'
                         "
                       >
@@ -492,7 +492,7 @@
                         class="rounded px-2 py-0.5 text-[11px] font-medium"
                         [class]="
                           row.dkim_verified
-                            ? 'bg-emerald-500/10 text-emerald-400 ring-1 border-emerald-500/20'
+                            ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'
                             : 'bg-surface-2 text-muted ring-1 border-subtle'
                         "
                       >
@@ -504,7 +504,7 @@
                         class="rounded px-2 py-0.5 text-[11px] font-medium"
                         [class]="
                           row.dmarc_verified
-                            ? 'bg-emerald-500/10 text-emerald-400 ring-1 border-emerald-500/20'
+                            ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'
                             : 'bg-surface-2 text-muted ring-1 border-subtle'
                         "
                       >

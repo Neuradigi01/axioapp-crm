@@ -81,13 +81,13 @@
         </span>
       } @else if (isConnected()) {
         <span
-          class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20"
+          class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/20"
         >
           Connected
         </span>
       } @else {
         <span
-          class="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-400 ring-1 border-red-500/20"
+          class="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-400 ring-1 ring-red-500/20"
         >
           Error
         </span>
@@ -393,21 +393,21 @@
           <span class="flex flex-wrap items-center gap-1.5 text-xs">
             @if (templateCounts().APPROVED > 0) {
               <span
-                class="rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-400 ring-1 border-emerald-500/20"
+                class="rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-400 ring-1 ring-emerald-500/20"
               >
                 {{ templateCounts().APPROVED }} approved
               </span>
             }
             @if (templateCounts().PENDING > 0) {
               <span
-                class="rounded-full bg-amber-500/10 px-2 py-0.5 font-medium text-amber-400 ring-1 border-amber-500/20"
+                class="rounded-full bg-amber-500/10 px-2 py-0.5 font-medium text-amber-400 ring-1 ring-amber-500/20"
               >
                 {{ templateCounts().PENDING }} pending
               </span>
             }
             @if (templateCounts().REJECTED > 0) {
               <span
-                class="rounded-full bg-red-500/10 px-2 py-0.5 font-medium text-red-400 ring-1 border-red-500/20"
+                class="rounded-full bg-red-500/10 px-2 py-0.5 font-medium text-red-400 ring-1 ring-red-500/20"
               >
                 {{ templateCounts().REJECTED }} rejected
               </span>
@@ -477,21 +477,21 @@
                         @switch (t.status) {
                           @case ('APPROVED') {
                             <span
-                              class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20"
+                              class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/20"
                             >
                               APPROVED
                             </span>
                           }
                           @case ('PENDING') {
                             <span
-                              class="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 ring-1 border-amber-500/20"
+                              class="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 ring-1 ring-amber-500/20"
                             >
                               PENDING
                             </span>
                           }
                           @case ('REJECTED') {
                             <span
-                              class="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-400 ring-1 border-red-500/20"
+                              class="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-400 ring-1 ring-red-500/20"
                             >
                               REJECTED
                             </span>

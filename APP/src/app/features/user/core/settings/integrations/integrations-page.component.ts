@@ -24,9 +24,10 @@
  *   `google_connected` / `google_denied` / `google_error`
  *   `meta_connected`   / `meta_denied`   / `meta_error`
  *   `google_calendar_connected` / `google_calendar_denied` / `google_calendar_error`
- * Shows a one-line banner accordingly, then refetches (subject to
- * the permission gate above) so each card re-renders from the new
- * state.
+ * Shows a toast accordingly, opens the matching connector's panel
+ * (so "pick the Lead Forms below" is actually below), then refetches
+ * (subject to the permission gate above) so each card re-renders from
+ * the new state.
  *
  * Loads `subscriptions` once + passes the array down to each card.
  * Each card filters to its own `integration_id` client-side — keeps
@@ -166,18 +167,18 @@ export class IntegrationsPageComponent {
   protected readonly subscriptions = signal<IntegrationSubscription[]>([]);
   protected readonly whatsapp = signal<WhatsAppStatus | null>(null);
   protected readonly dlqTotal = signal<number | null>(null);
+  /** First load only. Later refetches (after a card action) run in the
+   *  background so open panels aren't torn down and rebuilt. */
   protected readonly loading = signal(true);
+  private hasLoaded = false;
+  /** First-load failure of the org-integrations fan-out. Hides only the
+   *  cards that depend on that data — Calendar / Email / AI Providers
+   *  fetch their own state and stay usable. */
   protected readonly loadError = signal<string | null>(null);
 
-  /** OAuth-callback banner. Set from query-string on init; cleared
-   *  when the user dismisses or after 8s (timeout in the template's
-   *  CSS-only path would be nicer, but a setTimeout in the
-   *  constructor is fine for one-shot UX). */
-  protected readonly callbackBanner = signal<{
-    kind: 'success' | 'warn' | 'error';
-    title: string;
-    detail: string | null;
-  } | null>(null);
+  /** Panel anchor to scroll to once the first load renders it — set
+   *  when an OAuth callback auto-opens a connector. */
+  private pendingScrollAnchor: string | null = null;
 
   /** Inline DLQ list toggle (Step 8). Status panel emits `openDlq`
    *  on the banner click; toggles `true` and the list lazy-loads on
@@ -280,7 +281,9 @@ export class IntegrationsPageComponent {
       statusLabel: string;
       anchor: string;
     }> = [];
-    if (this.canManageOrgIntegrations()) {
+    // These three tiles read the org fan-out; when it failed to load
+    // they'd show a false "Not connected", so drop them until retry.
+    if (this.canManageOrgIntegrations() && !this.loadError()) {
       tiles.push(
         {
           id: 'google_ads',
@@ -382,14 +385,21 @@ export class IntegrationsPageComponent {
   toggleConnector(id: string, anchor: string): void {
     const same = this.expandedConnector() === id;
     this.expandedConnector.set(same ? null : id);
-    if (!same) {
-      // rAF gives Angular one CD tick to render the @if block before we
-      // measure + scroll — otherwise the element doesn't exist yet.
-      requestAnimationFrame(() => {
-        const el = document.getElementById(anchor);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    }
+    if (!same) this.scrollToAnchor(anchor);
+  }
+
+  /** rAF gives Angular one CD tick to render the @if block before we
+   *  measure + scroll — otherwise the element doesn't exist yet. */
+  private scrollToAnchor(anchor: string): void {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(anchor);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  /** Re-run the first load after a failure (Retry button). */
+  retryLoad(): void {
+    this._refresh();
   }
 
   constructor() {
@@ -406,12 +416,11 @@ export class IntegrationsPageComponent {
     this._refresh();
   }
 
-  dismissBanner(): void {
-    this.callbackBanner.set(null);
-  }
-
+  /** Opened from the status panel (top) or the summary card (bottom);
+   *  the table renders under the summary card, so scroll it into view. */
   toggleDlq(): void {
     this.dlqVisible.update((v) => !v);
+    if (this.dlqVisible()) this.scrollToAnchor('dlq-table');
   }
 
   /** Card emits this with the form-field list when the user clicks
@@ -444,8 +453,12 @@ export class IntegrationsPageComponent {
   // --- internals ----------------------------------------------------
 
   private _refresh(): void {
-    this.loading.set(true);
-    this.loadError.set(null);
+    // Full-page loader only until the first successful load; after that
+    // the refetch runs silently and the cards update in place.
+    if (!this.hasLoaded) {
+      this.loading.set(true);
+      this.loadError.set(null);
+    }
     // Every one of these endpoints requires `settings.integrations.manage`
     // server-side (they hydrate the Google Ads / Meta Ads / WhatsApp /
     // status-panel / DLQ cards, all of which are hidden for roles
@@ -459,7 +472,7 @@ export class IntegrationsPageComponent {
       this.subscriptions.set([]);
       this.dlqTotal.set(null);
       this.whatsapp.set(null);
-      this.loading.set(false);
+      this._markLoaded();
       return;
     }
     forkJoin({
@@ -475,13 +488,41 @@ export class IntegrationsPageComponent {
           this.subscriptions.set(subscriptions);
           this.dlqTotal.set(dlq.total);
           this.whatsapp.set(whatsapp);
-          this.loading.set(false);
+          this.loadError.set(null);
+          this._markLoaded();
         },
         error: (err: HttpErrorResponse) => {
+          const message = extractApiError(err) ?? 'Could not load integrations.';
+          if (this.hasLoaded) {
+            // Background refetch failed — keep the current (slightly
+            // stale) cards on screen and just tell the user.
+            this.toast.error('Could not refresh integrations.', { subtitle: message });
+            return;
+          }
           this.loading.set(false);
-          this.loadError.set(extractApiError(err));
+          this.loadError.set(message);
         },
       });
+  }
+
+  private _markLoaded(): void {
+    this.hasLoaded = true;
+    this.loading.set(false);
+    if (this.pendingScrollAnchor) {
+      this.scrollToAnchor(this.pendingScrollAnchor);
+      this.pendingScrollAnchor = null;
+    }
+  }
+
+  /** OAuth callback status → the connector tile whose panel holds the
+   *  next step (pick forms / pages, see the new sender, …). */
+  private _connectorFor(status: CallbackStatus): { id: string; anchor: string } {
+    if (status.startsWith('google_calendar_')) {
+      return { id: 'google_calendar', anchor: 'card-google-calendar' };
+    }
+    if (status.startsWith('google_')) return { id: 'google_ads', anchor: 'card-google-ads' };
+    if (status.startsWith('meta_')) return { id: 'meta_ads', anchor: 'card-meta-ads' };
+    return { id: 'email', anchor: 'card-email-sender' };
   }
 
   private _readCallbackQuery(): void {
@@ -489,22 +530,25 @@ export class IntegrationsPageComponent {
     const status = params.get('status') as CallbackStatus | null;
     if (!status) return;
     const reason = params.get('reason');
-    const banner = this._bannerFor(status, reason);
-    this.callbackBanner.set(banner);
-    // Mirror the callback outcome as a standardised toast so the
-    // user gets the same visual language they see everywhere else
-    // in the app (create/update/delete flows all toast).
-    const subtitle = banner.detail ?? undefined;
-    if (banner.kind === 'success') this.toast.success(banner.title, { subtitle });
-    else if (banner.kind === 'warn') this.toast.warn(banner.title, { subtitle });
-    else this.toast.error(banner.title, { subtitle });
+    // One notification per outcome — the standard toast used across
+    // the app (previously an inline banner duplicated the same text).
+    const msg = this._messageFor(status, reason);
+    const subtitle = msg.detail ?? undefined;
+    if (msg.kind === 'success') this.toast.success(msg.title, { subtitle });
+    else if (msg.kind === 'warn') this.toast.warn(msg.title, { subtitle });
+    else this.toast.error(msg.title, { subtitle });
+    // Open the connector the user just came back from, and scroll to it
+    // once the first load has rendered the panel.
+    const target = this._connectorFor(status);
+    this.expandedConnector.set(target.id);
+    this.pendingScrollAnchor = target.anchor;
     // Bump the calendar card's refresh signal when the callback is a
     // calendar one so the card refetches its status immediately (no
     // wait for the 5s poll).
     if (status.startsWith('google_calendar_')) {
       this.calendarRefreshTick.update((v) => v + 1);
     }
-    // Strip the query params so a reload doesn't re-banner. Router
+    // Strip the query params so a reload doesn't re-toast. Router
     // navigation preserves the path; `queryParams: {}` + `queryParamsHandling:
     // ''` clears them.
     void this.router.navigate([], {
@@ -514,7 +558,7 @@ export class IntegrationsPageComponent {
     });
   }
 
-  private _bannerFor(
+  private _messageFor(
     status: CallbackStatus,
     reason: string | null,
   ): { kind: 'success' | 'warn' | 'error'; title: string; detail: string | null } {

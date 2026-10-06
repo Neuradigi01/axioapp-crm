@@ -36,19 +36,19 @@
         </span>
       } @else if (integration()?.status === 'connected') {
         <span
-          class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20"
+          class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/20"
         >
           Connected
         </span>
       } @else if (integration()?.status === 'expired') {
         <span
-          class="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 ring-1 border-amber-500/20"
+          class="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400 ring-1 ring-amber-500/20"
         >
           Reconnect required
         </span>
       } @else {
         <span
-          class="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-400 ring-1 border-red-500/20"
+          class="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-400 ring-1 ring-red-500/20"
         >
           Error
         </span>
@@ -219,7 +219,7 @@
             <div class="flex items-center gap-2">
               @if (pageSubscribedMap()[page.page_id]) {
                 <span
-                  class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 border-emerald-500/20"
+                  class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/20"
                 >
                   <lucide-icon name="check" size="12" aria-hidden="true"></lucide-icon>
                   Subscribed
