@@ -31,22 +31,44 @@
       </thead>
       <tbody class="divide-y divide-subtle bg-surface">
         @for (row of rows(); track row.staff.id) {
-          <tr>
+          @let noProfile = row.staff.employment_status === null;
+          @let badge = statusBadge(row.staff.employment_status);
+          <tr [class.bg-surface-2]="editingId() === row.staff.id">
             <td class="px-4 py-3 text-sm">
               <div class="font-medium text-default">{{ row.staff.full_name }}</div>
               <div class="text-xs text-muted">{{ row.staff.email }}</div>
             </td>
             <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-default">
-              {{ row.performance.commission_rate }}%
+              @if (noProfile) {
+                <span class="text-faint">—</span>
+              } @else {
+                {{ row.performance.commission_rate }}%
+              }
             </td>
             <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-default">
-              {{ row.performance.monthly_target | formatINR: true }}
+              @if (noProfile) {
+                <span class="text-faint">—</span>
+              } @else {
+                {{ row.performance.monthly_target | formatINR: true }}
+              }
             </td>
             <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-default">
-              {{ row.performance.rating }} <span class="text-amber-500">★</span>
+              @if (noProfile) {
+                <span class="text-faint">—</span>
+              } @else {
+                {{ row.performance.rating }}
+                <span class="text-amber-500" aria-hidden="true">★</span>
+              }
             </td>
-            <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-default">
-              {{ row.staff.employment_status ?? '—' }}
+            <td class="whitespace-nowrap px-4 py-3 text-right text-sm">
+              <span
+                [class]="
+                  'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ' +
+                  badge.cls
+                "
+              >
+                {{ badge.label }}
+              </span>
             </td>
             <td class="whitespace-nowrap px-4 py-3 text-right text-sm">
               @if (editingId() !== row.staff.id) {
@@ -54,8 +76,11 @@
                   type="button"
                   (click)="startEdit(row)"
                   class="rounded-lg border border-subtle bg-surface px-3 py-1 text-xs font-medium text-default hover:bg-surface-2"
+                  [attr.aria-label]="
+                    (noProfile ? 'Set up targets for ' : 'Edit targets for ') + row.staff.full_name
+                  "
                 >
-                  Edit
+                  {{ noProfile ? 'Set up' : 'Edit' }}
                 </button>
               }
             </td>
@@ -115,18 +140,22 @@
                         message="Enter a rating between 0 and 5."
                       />
                     </label>
-                    <label class="block text-sm">
-                      <span class="block text-xs font-medium text-muted">Status</span>
+                    <div class="block text-sm">
+                      <span class="block text-xs font-medium text-muted" aria-hidden="true"
+                        >Status</span
+                      >
                       <div class="mt-1">
                         <crm-mobile-select
+                          ariaLabel="Employment status"
                           [options]="employmentStatusOptions"
                           formControlName="employment_status"
                         />
                       </div>
-                    </label>
+                    </div>
                   </div>
                   @if (submitError(); as err) {
                     <div
+                      role="alert"
                       class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400"
                     >
                       {{ err }}

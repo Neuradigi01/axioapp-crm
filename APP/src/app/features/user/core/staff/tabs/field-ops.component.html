@@ -6,7 +6,7 @@
     </div>
     <a
       routerLink="/user/field-ops"
-      class="inline-flex items-center gap-1 text-xs font-medium text-default hover:text-default"
+      class="inline-flex items-center gap-1 text-xs font-medium text-default hover:text-accent hover:underline"
     >
       Open full view
       <lucide-icon name="chevron-right" class="h-3.5 w-3.5" />
@@ -29,7 +29,10 @@
   </div>
 
   @if (loadError(); as err) {
-    <p class="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400 ring-1 ring-red-500/20">
+    <p
+      role="alert"
+      class="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400 ring-1 ring-red-500/20"
+    >
       {{ err }}
     </p>
   } @else if (loading() && visits().length === 0) {

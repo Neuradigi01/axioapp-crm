@@ -5,8 +5,15 @@
     No staff to rank yet.
   </div>
 } @else {
+  <p class="mb-2 text-xs text-muted">
+    Ranked by <span class="font-medium text-default">target progress</span> this month. Staff
+    without a target are listed last, unranked.
+  </p>
   <div class="overflow-x-auto rounded-xl border border-subtle bg-surface shadow-sm">
     <table class="min-w-full divide-y divide-subtle">
+      <caption class="sr-only">
+        Staff leaderboard, ranked by target progress
+      </caption>
       <thead class="bg-surface-2">
         <tr>
           <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">
@@ -24,8 +31,11 @@
           <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-muted">
             Sales (MTD)
           </th>
-          <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-muted">
-            Target progress
+          <th
+            class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-default"
+            aria-sort="descending"
+          >
+            Target progress ↓
           </th>
           <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wide text-muted">
             Rating
@@ -34,16 +44,25 @@
       </thead>
       <tbody class="divide-y divide-subtle bg-surface">
         @for (row of ranked(); track row.staff.id; let i = $index) {
+          @let pct = row.performance.target_progress_pct;
           <tr>
             <td class="whitespace-nowrap px-4 py-3 text-sm">
-              <span
-                [class]="
-                  'inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ring-1 ' +
-                  rankBadge(i)
-                "
-              >
-                {{ i + 1 }}
-              </span>
+              @if (pct === null) {
+                <span
+                  class="inline-flex h-7 w-7 items-center justify-center text-xs text-faint"
+                  aria-label="Unranked"
+                  >—</span
+                >
+              } @else {
+                <span
+                  [class]="
+                    'inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ring-1 ' +
+                    rankBadge(i)
+                  "
+                >
+                  {{ i + 1 }}
+                </span>
+              }
             </td>
             <td class="px-4 py-3 text-sm">
               <div class="font-medium text-default">{{ row.staff.full_name }}</div>
@@ -59,11 +78,31 @@
               {{ row.performance.sales | formatINR: true }}
             </td>
             <td class="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-default">
-              {{ row.performance.target_progress_pct ?? 0 }}%
+              @if (pct === null) {
+                <span class="text-faint">No target</span>
+              } @else {
+                <div class="flex items-center justify-end gap-2">
+                  <div
+                    class="hidden h-1.5 w-20 overflow-hidden rounded-full bg-surface-2 sm:block"
+                    aria-hidden="true"
+                  >
+                    <div
+                      class="h-full"
+                      [class]="progressTone(pct)"
+                      [style.width.%]="progressWidth(pct)"
+                    ></div>
+                  </div>
+                  <span class="w-12 tabular-nums">{{ pct }}%</span>
+                </div>
+              }
             </td>
             <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-default">
-              {{ row.performance.rating }}
-              <span class="ml-0.5 text-amber-500">★</span>
+              @if (row.staff.employment_status === null) {
+                <span class="text-faint">—</span>
+              } @else {
+                {{ row.performance.rating }}
+                <span class="ml-0.5 text-amber-500" aria-hidden="true">★</span>
+              }
             </td>
           </tr>
         }

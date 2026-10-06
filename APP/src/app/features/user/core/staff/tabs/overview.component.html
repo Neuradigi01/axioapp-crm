@@ -5,8 +5,46 @@
     No staff members yet.
   </div>
 } @else {
+  <div class="mb-4 flex flex-wrap items-center gap-3">
+    <div class="relative w-full sm:w-72">
+      <lucide-icon
+        name="search"
+        class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint"
+        aria-hidden="true"
+      />
+      <input
+        type="search"
+        [value]="query()"
+        (input)="query.set($any($event.target).value)"
+        placeholder="Search staff by name or email…"
+        aria-label="Search staff"
+        class="w-full rounded-lg border border-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-default placeholder-zinc-400 focus:border-muted focus:outline-none"
+      />
+    </div>
+    @if (query()) {
+      <span class="text-xs text-muted" role="status">
+        {{ visibleRows().length }} of {{ sortedRows().length }} staff
+      </span>
+    }
+  </div>
+
+  @if (visibleRows().length === 0) {
+    <div
+      class="rounded-lg border border-dashed border-subtle bg-surface p-6 text-center text-sm text-muted"
+    >
+      No staff match “{{ query() }}”.
+      <button
+        type="button"
+        (click)="query.set('')"
+        class="ml-1 font-medium text-default underline-offset-2 hover:underline"
+      >
+        Clear search
+      </button>
+    </div>
+  }
+
   <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-    @for (row of sortedRows(); track row.staff.id) {
+    @for (row of visibleRows(); track row.staff.id) {
       <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
         <div class="flex items-start justify-between">
           <div class="flex items-center gap-3">
@@ -44,6 +82,11 @@
             <dd class="font-medium text-default">
               {{ row.performance.leads_converted }} /
               {{ row.performance.leads_converted + row.performance.leads_active }}
+              @let conv =
+                conversionPct(row.performance.leads_converted, row.performance.leads_active);
+              @if (conv !== null) {
+                <span class="ml-1 text-xs font-normal text-muted">({{ conv }}%)</span>
+              }
             </dd>
           </div>
           <div>
@@ -75,23 +118,37 @@
           </div>
         </dl>
 
+        @let pct = row.performance.target_progress_pct;
         <div class="mt-4">
-          <div class="mb-1 flex justify-between text-xs text-muted">
+          <div class="mb-1 flex items-center justify-between text-xs text-muted">
             <span>Target progress</span>
-            <span class="font-medium text-default">
-              {{ row.performance.target_progress_pct ?? 0 }}%
-            </span>
+            @if (pct === null) {
+              <span class="text-faint">No target</span>
+            } @else {
+              <span class="flex items-center gap-1.5 font-medium text-default">
+                @if (pct > 100) {
+                  <span
+                    class="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 ring-1 ring-emerald-500/20"
+                  >
+                    Target exceeded
+                  </span>
+                }
+                {{ pct }}%
+              </span>
+            }
           </div>
-          <div class="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+          <div
+            class="h-1.5 w-full overflow-hidden rounded-full bg-surface-2"
+            role="progressbar"
+            [attr.aria-valuenow]="pct ?? 0"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            [attr.aria-label]="row.staff.full_name + ' target progress'"
+          >
             <div
-              class="h-full bg-emerald-500"
-              [style.width.%]="
-                row.performance.target_progress_pct === null
-                  ? 0
-                  : row.performance.target_progress_pct > 100
-                    ? 100
-                    : row.performance.target_progress_pct
-              "
+              class="h-full transition-all"
+              [class]="progressTone(pct)"
+              [style.width.%]="progressWidth(pct)"
             ></div>
           </div>
         </div>

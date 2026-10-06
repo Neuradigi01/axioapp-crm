@@ -123,6 +123,15 @@ export class StaffPageComponent {
 
   protected readonly presentToday = computed(() => this.presentTodayCount());
 
+  /** Share of the roster clocked in today — drives the mini bar on the
+   *  merged Present card. Null until both numbers are known. */
+  protected readonly presentPct = computed<number | null>(() => {
+    const present = this.presentTodayCount();
+    const total = this.totalStaff();
+    if (present == null || total == null || total === 0) return null;
+    return Math.min(100, Math.round((present / total) * 100));
+  });
+
   protected readonly totalRevenue = computed(() => {
     const r = this.revenue();
     return r === undefined || r === null ? r : r.total;
@@ -196,6 +205,23 @@ export class StaffPageComponent {
         next: (r) => this.revenue.set({ total: r.total, today: r.today }),
         error: () => this.revenue.set(null),
       });
+  }
+
+  /** Roving-focus keyboard support for the tab strip (WAI-ARIA tabs):
+   *  ←/→ move between tabs, Home/End jump to the ends. */
+  protected onTabKeydown(event: KeyboardEvent): void {
+    const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const ids = this.tabs.map((t) => t.id);
+    const cur = ids.indexOf(this.activeTab());
+    let next = cur;
+    if (event.key === 'ArrowRight') next = (cur + 1) % ids.length;
+    else if (event.key === 'ArrowLeft') next = (cur - 1 + ids.length) % ids.length;
+    else if (event.key === 'Home') next = 0;
+    else next = ids.length - 1;
+    this.setTab(ids[next]);
+    document.getElementById(`staff-tab-${ids[next]}`)?.focus();
   }
 
   protected setTab(tab: StaffTabId): void {

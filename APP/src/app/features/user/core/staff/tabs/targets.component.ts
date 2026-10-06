@@ -21,6 +21,7 @@ import {
 import { InrPipe } from '../../shared/pipes/inr.pipe';
 import { extractApiError } from '@core/services/api-error.util';
 import { StaffApiService, StaffWithPerformance } from '../staff-api.service';
+import { employmentStatusBadge } from '../staff-display.util';
 
 /**
  * Targets & Commission tab — table of staff with an inline editor.
@@ -49,6 +50,7 @@ export class StaffTargetsTabComponent {
   readonly rows = input.required<StaffWithPerformance[]>();
   @Output() readonly saved = new EventEmitter<void>();
 
+  protected readonly statusBadge = employmentStatusBadge;
   protected readonly editingId = signal<string | null>(null);
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);

@@ -25,14 +25,15 @@
     </button>
   </div>
 
-  <!-- KPI cards -->
-  <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+  <!-- KPI cards — 2 per row on phones, 4 across on desktop. Present
+       and total headcount share one card ("4 of 9" + mini bar). -->
+  <div class="mb-6 grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
     <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
       <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
         <lucide-icon name="footprints" class="h-4 w-4 text-emerald-600"></lucide-icon>
         Present Today
       </div>
-      <div class="mt-2 text-2xl font-semibold text-default">
+      <div class="mt-2 text-xl font-semibold text-default md:text-2xl">
         @let present = presentToday();
         @let total = totalStaff();
         @if (present === undefined || total === undefined) {
@@ -40,30 +41,31 @@
         } @else if (present === null || total === null) {
           <ng-container *ngTemplateOutlet="kpiPending; context: { $implicit: null }" />
         } @else {
-          {{ present }}/{{ total }}
+          {{ present }}
+          <span class="text-sm font-medium text-muted">of {{ total }}</span>
         }
       </div>
-    </div>
-    <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
-      <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
-        <lucide-icon name="users" class="h-4 w-4 text-blue-600"></lucide-icon>
-        Total Staff
-      </div>
-      <div class="mt-2 text-2xl font-semibold text-default">
-        @let staffCount = totalStaff();
-        @if (staffCount === undefined || staffCount === null) {
-          <ng-container *ngTemplateOutlet="kpiPending; context: { $implicit: staffCount }" />
-        } @else {
-          {{ staffCount }}
-        }
-      </div>
+      @if (presentPct(); as pp) {
+        <div
+          class="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-2"
+          role="progressbar"
+          [attr.aria-valuenow]="pp"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-label="Staff present today"
+        >
+          <div class="h-full bg-emerald-500" [style.width.%]="pp"></div>
+        </div>
+      } @else if (presentPct() === 0) {
+        <div class="mt-2 h-1 w-full rounded-full bg-surface-2" aria-hidden="true"></div>
+      }
     </div>
     <div class="rounded-xl border border-subtle bg-surface p-4 shadow-sm">
       <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted">
         <lucide-icon name="target" class="h-4 w-4 text-violet-600"></lucide-icon>
         Total Revenue
       </div>
-      <div class="mt-2 text-2xl font-semibold text-default">
+      <div class="mt-2 text-xl font-semibold text-default md:text-2xl">
         @let revTotal = totalRevenue();
         @if (revTotal === undefined || revTotal === null) {
           <ng-container *ngTemplateOutlet="kpiPending; context: { $implicit: revTotal }" />
@@ -77,7 +79,7 @@
         <lucide-icon name="check-square" class="h-4 w-4 text-amber-600"></lucide-icon>
         Avg Target Progress
       </div>
-      <div class="mt-2 text-2xl font-semibold text-default">
+      <div class="mt-2 text-xl font-semibold text-default md:text-2xl">
         @let avg = avgTargetProgressPct();
         @if (avg === undefined || avg === null) {
           <ng-container *ngTemplateOutlet="kpiPending; context: { $implicit: avg }" />
@@ -91,7 +93,7 @@
         <lucide-icon name="calendar" class="h-4 w-4 text-red-500"></lucide-icon>
         Today's Revenue
       </div>
-      <div class="mt-2 text-2xl font-semibold text-default">
+      <div class="mt-2 text-xl font-semibold text-default md:text-2xl">
         @let revToday = todaysRevenue();
         @if (revToday === undefined || revToday === null) {
           <ng-container *ngTemplateOutlet="kpiPending; context: { $implicit: revToday }" />
@@ -104,11 +106,17 @@
 
   <!-- Tab strip -->
   <div class="mb-4 overflow-x-auto border-b border-subtle">
-    <nav class="-mb-px flex gap-6" aria-label="Tabs">
+    <div class="-mb-px flex gap-6" role="tablist" aria-label="Staff dashboard sections">
       @for (t of tabs; track t.id) {
         <button
           type="button"
+          role="tab"
+          [id]="'staff-tab-' + t.id"
+          [attr.aria-selected]="activeTab() === t.id"
+          aria-controls="staff-tabpanel"
+          [attr.tabindex]="activeTab() === t.id ? 0 : -1"
           (click)="setTab(t.id)"
+          (keydown)="onTabKeydown($event)"
           [class]="
             'whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ' +
             (activeTab() === t.id
@@ -119,7 +127,7 @@
           {{ t.label }}
         </button>
       }
-    </nav>
+    </div>
   </div>
 
   <!-- Errors -->
@@ -141,38 +149,40 @@
       Loading…
     </div>
   } @else {
-    @switch (activeTab()) {
-      @case ('overview') {
-        <app-staff-overview-tab [rows]="rows()" />
+    <div id="staff-tabpanel" role="tabpanel" [attr.aria-labelledby]="'staff-tab-' + activeTab()">
+      @switch (activeTab()) {
+        @case ('overview') {
+          <app-staff-overview-tab [rows]="rows()" />
+        }
+        @case ('leaderboard') {
+          <app-staff-leaderboard-tab [rows]="rows()" />
+        }
+        @case ('targets') {
+          <app-staff-targets-tab [rows]="rows()" (saved)="reload()" />
+        }
+        @case ('attendance') {
+          <app-staff-attendance-tab [rows]="rows()" />
+        }
+        @case ('activity') {
+          <app-staff-activity-tab [rows]="rows()" />
+        }
+        @case ('field-ops') {
+          <app-staff-field-ops-tab />
+        }
+        @case ('stock-updates') {
+          <app-staff-placeholder-tab
+            title="Stock Updates"
+            message="Per-staff inventory adjustments and pickups land in Phase 4.4 alongside the multi-location inventory module."
+          />
+        }
+        @case ('store-marketing') {
+          <app-staff-placeholder-tab
+            title="Store Marketing"
+            message="Campaign attribution and per-staff marketing actions arrive in Phase 5.6 with the campaigns module."
+          />
+        }
       }
-      @case ('leaderboard') {
-        <app-staff-leaderboard-tab [rows]="rows()" />
-      }
-      @case ('targets') {
-        <app-staff-targets-tab [rows]="rows()" (saved)="reload()" />
-      }
-      @case ('attendance') {
-        <app-staff-attendance-tab [rows]="rows()" />
-      }
-      @case ('activity') {
-        <app-staff-activity-tab [rows]="rows()" />
-      }
-      @case ('field-ops') {
-        <app-staff-field-ops-tab />
-      }
-      @case ('stock-updates') {
-        <app-staff-placeholder-tab
-          title="Stock Updates"
-          message="Per-staff inventory adjustments and pickups land in Phase 4.4 alongside the multi-location inventory module."
-        />
-      }
-      @case ('store-marketing') {
-        <app-staff-placeholder-tab
-          title="Store Marketing"
-          message="Campaign attribution and per-staff marketing actions arrive in Phase 5.6 with the campaigns module."
-        />
-      }
-    }
+    </div>
   }
 </div>
 

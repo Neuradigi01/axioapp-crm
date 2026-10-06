@@ -67,6 +67,7 @@ export interface MobileSelectOption {
         class="flex w-full items-center justify-between rounded border border-subtle bg-surface px-2 py-1.5 text-left text-xs text-default hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
         [attr.aria-expanded]="open()"
         [attr.aria-haspopup]="'listbox'"
+        [attr.aria-label]="ariaLabel()"
         [disabled]="disabled()"
         (click)="toggle()"
       >
@@ -135,6 +136,9 @@ export class MobileSelectComponent implements ControlValueAccessor {
   /** `[value]` binding — used by callers who don't want a FormControl. */
   readonly value = input<string>('');
   readonly placeholder = input<string>('Select…');
+  /** Accessible name for the trigger when no `<label for>` can point
+   *  at it (it's a custom component). Omitted from the DOM when null. */
+  readonly ariaLabel = input<string | null>(null);
   /** When true, renders a search box at the top of the panel that
    *  filters options by (case-insensitive) substring match on label.
    *  Off by default — small option lists don't need it. */

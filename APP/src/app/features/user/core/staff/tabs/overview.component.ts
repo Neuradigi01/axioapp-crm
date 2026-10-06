@@ -1,8 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { InrPipe } from '../../shared/pipes/inr.pipe';
 import { StaffWithPerformance } from '../staff-api.service';
+import {
+  conversionPct,
+  employmentStatusBadge,
+  progressTone,
+  progressWidth,
+} from '../staff-display.util';
 import { initials } from '@core/services/text.util';
 
 /**
@@ -20,11 +26,28 @@ import { initials } from '@core/services/text.util';
 })
 export class StaffOverviewTabComponent {
   protected readonly initials = initials;
+  protected readonly statusBadge = employmentStatusBadge;
+  protected readonly progressTone = progressTone;
+  protected readonly progressWidth = progressWidth;
+  protected readonly conversionPct = conversionPct;
   readonly rows = input.required<StaffWithPerformance[]>();
+
+  /** Client-side name / email filter — the roster is already loaded. */
+  protected readonly query = signal('');
 
   protected readonly sortedRows = computed(() =>
     [...this.rows()].sort((a, b) => a.staff.full_name.localeCompare(b.staff.full_name)),
   );
+
+  protected readonly visibleRows = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    if (!q) return this.sortedRows();
+    return this.sortedRows().filter(
+      (r) =>
+        r.staff.full_name.toLowerCase().includes(q) ||
+        (r.staff.email ?? '').toLowerCase().includes(q),
+    );
+  });
 
   protected avatarBg(id: string): string {
     const palette = [
@@ -38,33 +61,5 @@ export class StaffOverviewTabComponent {
     let h = 0;
     for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
     return palette[h % palette.length];
-  }
-
-  protected statusBadge(status: string | null): {
-    label: string;
-    cls: string;
-  } {
-    switch (status) {
-      case 'active':
-        return {
-          label: 'Active',
-          cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-        };
-      case 'leave':
-        return {
-          label: 'On Leave',
-          cls: 'bg-amber-50 text-amber-700 ring-amber-200',
-        };
-      case 'terminated':
-        return {
-          label: 'Off-boarded',
-          cls: 'bg-red-500/10 text-red-400 ring-red-500/20',
-        };
-      default:
-        return {
-          label: 'No profile',
-          cls: 'bg-surface-2 text-muted ring-subtle',
-        };
-    }
   }
 }
