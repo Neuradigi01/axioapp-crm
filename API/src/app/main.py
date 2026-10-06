@@ -12,7 +12,7 @@ import os
 from contextlib import asynccontextmanager
 
 import sentry_sdk
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi import Request as FastAPIRequest
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -258,6 +258,7 @@ from src.app.core.module_registry import discover_modules, registry
 from src.app.core.modules_router import router as modules_router
 from src.app.core.notifications.router import router as notifications_router
 from src.app.core.notifications.ws import ws_router as notifications_ws_router
+from src.app.core.packs.dependencies import require_pack
 from src.app.core.packs.router import router as packs_router
 from src.app.core.permissions.router import (
     permissions_router,
@@ -593,13 +594,17 @@ app.include_router(campaigns_router, prefix="/api/v1")
 app.include_router(saved_views_router, prefix="/api/v1")
 app.include_router(settings_router, prefix="/api/v1")
 app.include_router(standard_fields_router, prefix="/api/v1")
-app.include_router(fp_inventory_router, prefix="/api/v1")
-app.include_router(fp_custom_orders_router, prefix="/api/v1")
-app.include_router(fp_field_ops_router, prefix="/api/v1")
-app.include_router(fp_field_ops_staff_portal_router, prefix="/api/v1")
+# Pack routers are tenant-gated: a pack's endpoints 404 for orgs that
+# are not on that pack, regardless of permission grants.
+_FURNITURE = [Depends(require_pack("furniture"))]
+_REAL_ESTATE = [Depends(require_pack("real_estate"))]
+app.include_router(fp_inventory_router, prefix="/api/v1", dependencies=_FURNITURE)
+app.include_router(fp_custom_orders_router, prefix="/api/v1", dependencies=_FURNITURE)
+app.include_router(fp_field_ops_router, prefix="/api/v1", dependencies=_FURNITURE)
+app.include_router(fp_field_ops_staff_portal_router, prefix="/api/v1", dependencies=_FURNITURE)
 app.include_router(billing_router, prefix="/api/v1")
-app.include_router(fp_pos_router, prefix="/api/v1")
-app.include_router(rp_property_router, prefix="/api/v1")
+app.include_router(fp_pos_router, prefix="/api/v1", dependencies=_FURNITURE)
+app.include_router(rp_property_router, prefix="/api/v1", dependencies=_REAL_ESTATE)
 app.include_router(rp_property_public_router, prefix="/api")
 app.include_router(plans_router, prefix="/api/v1")
 app.include_router(stripe_webhooks_router, prefix="/api/v1")

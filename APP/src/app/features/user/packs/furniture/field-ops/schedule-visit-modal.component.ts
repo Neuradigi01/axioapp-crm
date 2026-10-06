@@ -11,7 +11,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
@@ -127,6 +127,7 @@ export class ScheduleVisitModalComponent implements OnInit {
     setReq('purpose', map['purpose']);
     setReq('location', map['location']);
     setReq('notes', map['notes']);
+    this.form.updateValueAndValidity();
   }
 
   @Input() set submitting(value: boolean) {
@@ -178,7 +179,15 @@ export class ScheduleVisitModalComponent implements OnInit {
     notes: this.fb.control<string>('', { nonNullable: true }),
   });
 
-  protected readonly canSubmit = computed(() => this.form.valid && this.selectedContact() !== null);
+  /** `form.valid` is a plain getter and won't refresh a computed on its
+   *  own, so bridge status changes through a signal. */
+  private readonly formStatus = toSignal(this.form.statusChanges, {
+    initialValue: this.form.status,
+  });
+
+  protected readonly canSubmit = computed(
+    () => this.formStatus() === 'VALID' && this.selectedContact() !== null,
+  );
 
   ngOnInit(): void {
     // Staff list for the assignee picker.

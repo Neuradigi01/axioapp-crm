@@ -351,3 +351,26 @@ async def seeded_admin():
         user = result.scalar_one()
 
     return {"org": org, "role": role, "user": user, "password": "Admin@123"}
+
+
+@pytest_asyncio.fixture
+async def furniture_org(layered_client, seeded_admin):
+    """Stamp `seeded_admin`'s org onto the furniture pack.
+
+    Furniture routers are tenant-gated by `require_pack("furniture")`,
+    so HTTP tests against them need the org on that pack. Depends on
+    `layered_client` so the schema exists before `seeded_admin` inserts
+    (usefixtures-marked fixtures instantiate before test arguments).
+    """
+    from sqlalchemy import update
+
+    from src.app.core.tenants.models import Organization
+
+    async with TestSession() as session:
+        await session.execute(
+            update(Organization)
+            .where(Organization.id == seeded_admin["org"].id)
+            .values(template_id="furniture")
+        )
+        await session.commit()
+    return seeded_admin

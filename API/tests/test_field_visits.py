@@ -32,6 +32,8 @@ from src.app.packs.furniture.modules.custom_orders.models import (
 )
 from src.app.shared.context import RequestContext, reset_context, set_context
 
+pytestmark = pytest.mark.usefixtures("furniture_org")
+
 
 async def _grant(role_id: uuid.UUID, *keys: str) -> None:
     from tests.conftest import TestSession

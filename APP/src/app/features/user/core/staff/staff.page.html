@@ -107,7 +107,7 @@
   <!-- Tab strip -->
   <div class="mb-4 overflow-x-auto border-b border-subtle">
     <div class="-mb-px flex gap-6" role="tablist" aria-label="Staff dashboard sections">
-      @for (t of tabs; track t.id) {
+      @for (t of tabs(); track t.id) {
         <button
           type="button"
           role="tab"

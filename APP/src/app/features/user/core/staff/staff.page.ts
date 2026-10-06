@@ -12,6 +12,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
 import { LucideAngularModule } from 'lucide-angular';
 
+import { FurnitureAuthService } from '../auth/auth.service';
 import { InrPipe } from '../shared/pipes/inr.pipe';
 import { StaffApiService, StaffWithPerformance } from './staff-api.service';
 import { StaffOverviewTabComponent } from './tabs/overview.component';
@@ -70,6 +71,7 @@ export class StaffPageComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly auth = inject(FurnitureAuthService);
 
   protected readonly rows = signal<StaffWithPerformance[]>([]);
   /** First load only — replaces the tab body with a loader. */
@@ -97,14 +99,19 @@ export class StaffPageComponent {
   // prompt Phase 4.4 / 5.6). Leave the tab-id enum in place so the
   // template's @switch keeps compiling until the modules ship; then
   // just re-add the entries here.
-  protected readonly tabs: ReadonlyArray<{ id: StaffTabId; label: string }> = [
+  //
+  // Field Operations is a furniture-pack module — only orgs on that
+  // pack see its tab (its API 404s for every other pack).
+  protected readonly tabs = computed<ReadonlyArray<{ id: StaffTabId; label: string }>>(() => [
     { id: 'overview', label: 'Overview' },
     { id: 'leaderboard', label: 'Leaderboard' },
     { id: 'targets', label: 'Targets & Commission' },
     { id: 'attendance', label: 'Attendance' },
     { id: 'activity', label: 'Activity Log' },
-    { id: 'field-ops', label: 'Field Operations' },
-  ];
+    ...(this.auth.currentOrg()?.template_id === 'furniture'
+      ? [{ id: 'field-ops' as const, label: 'Field Operations' }]
+      : []),
+  ]);
 
   // --- KPI header — `undefined` = loading, `null` = unavailable ---
 
@@ -157,7 +164,7 @@ export class StaffPageComponent {
 
   constructor() {
     const fromUrl = this.route.snapshot.queryParamMap.get('tab');
-    if (fromUrl && this.tabs.some((t) => t.id === fromUrl)) {
+    if (fromUrl && this.tabs().some((t) => t.id === fromUrl)) {
       this.activeTab.set(fromUrl as StaffTabId);
     }
     this.reload();
@@ -213,7 +220,7 @@ export class StaffPageComponent {
     const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
     if (!keys.includes(event.key)) return;
     event.preventDefault();
-    const ids = this.tabs.map((t) => t.id);
+    const ids = this.tabs().map((t) => t.id);
     const cur = ids.indexOf(this.activeTab());
     let next = cur;
     if (event.key === 'ArrowRight') next = (cur + 1) % ids.length;

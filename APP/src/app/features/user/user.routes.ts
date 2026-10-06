@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 
 import { environment } from '../../../environments/environment';
 import { furnitureAuthGuard } from './core/auth/auth.guard';
+import { packGuard } from './core/auth/pack.guard';
 import { permissionGuard } from './core/auth/permission.guard';
 import { noOrgGuard } from './core/shared/guards/no-org.guard';
 import { unsavedChangesGuard } from './core/shared/guards/unsaved-changes.guard';
@@ -631,7 +632,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'inventory',
-        canActivate: [permissionGuard('inventory.read')],
+        canActivate: [packGuard('furniture'), permissionGuard('inventory.read')],
         loadComponent: () =>
           import('./packs/furniture/inventory/inventory.page').then(
             (m) => m.InventoryPageComponent,
@@ -639,7 +640,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'custom-orders',
-        canActivate: [permissionGuard('custom_orders.read')],
+        canActivate: [packGuard('furniture'), permissionGuard('custom_orders.read')],
         loadComponent: () =>
           import('./packs/furniture/custom-orders/custom-orders.page').then(
             (m) => m.CustomOrdersPageComponent,
@@ -647,7 +648,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'custom-orders/:id',
-        canActivate: [permissionGuard('custom_orders.read')],
+        canActivate: [packGuard('furniture'), permissionGuard('custom_orders.read')],
         loadComponent: () =>
           import('./packs/furniture/custom-orders/custom-order-detail.page').then(
             (m) => m.CustomOrderDetailPageComponent,
@@ -655,13 +656,13 @@ export const userRoutes: Routes = [
       },
       {
         path: 'field-ops',
-        canActivate: [permissionGuard('field_visits.read')],
+        canActivate: [packGuard('furniture'), permissionGuard('field_visits.read')],
         loadComponent: () =>
           import('./packs/furniture/field-ops/field-ops.page').then((m) => m.FieldOpsPageComponent),
       },
       {
         path: 'field-ops/:id',
-        canActivate: [permissionGuard('field_visits.read')],
+        canActivate: [packGuard('furniture'), permissionGuard('field_visits.read')],
         loadComponent: () =>
           import('./packs/furniture/field-ops/field-visit-detail.page').then(
             (m) => m.FieldVisitDetailPageComponent,
@@ -669,13 +670,13 @@ export const userRoutes: Routes = [
       },
       {
         path: 'billing',
-        canActivate: [permissionGuard('billing.read')],
+        canActivate: [packGuard('furniture'), permissionGuard('billing.read')],
         loadComponent: () =>
           import('./packs/furniture/billing/billing.page').then((m) => m.BillingPageComponent),
       },
       {
         path: 'billing/invoices/:id',
-        canActivate: [permissionGuard('billing.read')],
+        canActivate: [packGuard('furniture'), permissionGuard('billing.read')],
         loadComponent: () =>
           import('./packs/furniture/billing/invoice-detail.page').then(
             (m) => m.InvoiceDetailPageComponent,
@@ -683,7 +684,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'properties',
-        canActivate: [permissionGuard('property.read')],
+        canActivate: [packGuard('real_estate'), permissionGuard('property.read')],
         loadComponent: () =>
           import('./packs/real_estate/property/property-list.page').then(
             (m) => m.PropertyListPageComponent,
@@ -691,7 +692,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'properties/new',
-        canActivate: [permissionGuard('property.write')],
+        canActivate: [packGuard('real_estate'), permissionGuard('property.write')],
         loadComponent: () =>
           import('./packs/real_estate/property/property-form.page').then(
             (m) => m.PropertyFormPageComponent,
@@ -699,7 +700,7 @@ export const userRoutes: Routes = [
       },
       {
         path: 'properties/:id/edit',
-        canActivate: [permissionGuard('property.write')],
+        canActivate: [packGuard('real_estate'), permissionGuard('property.write')],
         loadComponent: () =>
           import('./packs/real_estate/property/property-form.page').then(
             (m) => m.PropertyFormPageComponent,
