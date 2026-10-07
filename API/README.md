@@ -35,8 +35,15 @@ run.cmd up-api        # Windows
 ## Stopping the App
 
 ```
-run.cmd down          # Windows
+run.cmd down          # Windows      (keeps the local DB data)
 ./run.sh down         # Linux / Mac
+```
+
+To also wipe the volumes (local DB data is lost — start from an empty database):
+
+```
+run.cmd down reset    # Windows
+./run.sh down reset   # Linux / Mac
 ```
 
 ## What Happens on Startup

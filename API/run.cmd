@@ -39,7 +39,6 @@ if /i "%CMD%"=="env"            goto :do_env
 if /i "%CMD%"=="up"             goto :do_up
 if /i "%CMD%"=="up-api"         goto :do_up_api
 if /i "%CMD%"=="down"           goto :do_down
-if /i "%CMD%"=="down-keep"      goto :do_down_keep
 if /i "%CMD%"=="restart"        goto :do_restart
 if /i "%CMD%"=="logs"           goto :do_logs
 if /i "%CMD%"=="shell"          goto :do_shell
@@ -70,9 +69,9 @@ echo.
 echo Stack
 echo   up                   Start full stack (api + redis + celery + beat + flower [+ db if local])
 echo   up-api               Start api + redis [+ db if local] only
-echo   down                 Stop and remove stack + WIPE volumes (local DB data lost)
-echo   down-keep            Stop and remove stack, KEEP volumes (local DB data preserved)
-echo   restart              down-keep + up
+echo   down                 Stop and remove stack, KEEP volumes (local DB data preserved)
+echo   down reset           Stop and remove stack + WIPE volumes (local DB data lost)
+echo   restart              down + up (keeps volumes)
 echo   logs [service]       Follow logs (default: api)
 echo   shell [service]      Open bash shell in service (default: api)
 echo   ps                   Show running containers
@@ -150,11 +149,12 @@ exit /b !errorlevel!
 
 
 :do_down
-call :require_secrets
-if errorlevel 1 exit /b 1
-echo Stopping stack + WIPING volumes (env: !APP_ENV!)...
-sops exec-env "!SECRETS_FILE!" "docker compose !ENV_FILE_FLAGS! !COMPOSE_FILES! --profile celery down -v"
-exit /b !errorlevel!
+if /i "%~2"=="reset" goto :do_down_reset
+if not "%~2"=="" (
+    echo ERROR: Unknown option '%~2' for down. Use 'down' or 'down reset'.
+    exit /b 1
+)
+goto :do_down_keep
 
 
 :do_down_keep
@@ -162,6 +162,14 @@ call :require_secrets
 if errorlevel 1 exit /b 1
 echo Stopping stack, KEEPING volumes (env: !APP_ENV!)...
 sops exec-env "!SECRETS_FILE!" "docker compose !ENV_FILE_FLAGS! !COMPOSE_FILES! --profile celery down"
+exit /b !errorlevel!
+
+
+:do_down_reset
+call :require_secrets
+if errorlevel 1 exit /b 1
+echo Stopping stack + WIPING volumes - local DB data will be lost (env: !APP_ENV!)...
+sops exec-env "!SECRETS_FILE!" "docker compose !ENV_FILE_FLAGS! !COMPOSE_FILES! --profile celery down -v"
 exit /b !errorlevel!
 
 

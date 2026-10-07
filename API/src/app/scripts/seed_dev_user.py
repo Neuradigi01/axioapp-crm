@@ -1,9 +1,9 @@
 """Seed one real developer login, so a rebuilt local database is usable
 without registering through the UI first.
 
-Local databases get destroyed often — `run.cmd down` removes the `db_data`
-volume, and `run.cmd restart` is `down` + `up`, so it wipes too. Every rebuild
-previously meant re-registering by hand before you could see a single page.
+`run.cmd down reset` removes the `db_data` volume (plain `down` and `restart`
+keep it). Every rebuild previously meant re-registering by hand before you
+could see a single page.
 
 This runs BOTH stages of the real signup flow rather than inserting rows
 directly:

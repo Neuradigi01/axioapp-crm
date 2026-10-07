@@ -57,8 +57,9 @@ print_help() {
     echo "${C_SECTION}Stack${C_RESET}"
     echo "  ${C_CMD}up${C_RESET}                 Start the full stack (api + redis + celery + beat + flower [+ db if local])"
     echo "  ${C_CMD}up-api${C_RESET}             Start API + Redis [+ db if local] only (no celery / beat / flower)"
-    echo "  ${C_CMD}down${C_RESET}               Stop and remove the stack (with volumes)"
-    echo "  ${C_CMD}restart${C_RESET}            Down then up (clean reload of code/config)"
+    echo "  ${C_CMD}down${C_RESET}               Stop and remove the stack, KEEP volumes (local DB data preserved)"
+    echo "  ${C_CMD}down reset${C_RESET}         Stop and remove the stack + WIPE volumes (local DB data lost)"
+    echo "  ${C_CMD}restart${C_RESET}            Down then up (clean reload of code/config, keeps volumes)"
     echo "  ${C_CMD}shell [service]${C_RESET}    Open a shell in a running service (default: api)"
     echo ""
     echo "${C_SECTION}Database${C_RESET}"
@@ -199,14 +200,21 @@ do_lint_fix() {
 
 do_up()     { require_secrets; ensure_hooks; ensure_dirs; echo "Starting the full API stack (env: $APP_ENV)..."; dc --profile celery up --build -d; echo "Started."; }
 do_up_api() { require_secrets; ensure_hooks; ensure_dirs; echo "Starting the API stack (env: $APP_ENV, api + redis [+ db if local] only)..."; dc up --build -d; echo "Started."; }
-do_down()   { require_secrets; echo "Stopping the full API stack (env: $APP_ENV)..."; dc --profile celery down -v; echo "Stopped."; }
+do_down() {
+    case "${1:-}" in
+        "") require_secrets; echo "Stopping the full API stack, keeping volumes (env: $APP_ENV)..."; dc --profile celery down ;;
+        reset) require_secrets; echo "Stopping the full API stack + WIPING volumes - local DB data will be lost (env: $APP_ENV)..."; dc --profile celery down -v ;;
+        *) echo "${C_ERR}Error: unknown option '$1' for down. Use 'down' or 'down reset'.${C_RESET}"; exit 1 ;;
+    esac
+    echo "Stopped."
+}
 
 case "$1" in
     ""|help|-h|--help) print_help ;;
     env) do_env "${2:-}" ;;
     up) do_up ;;
     up-api) do_up_api ;;
-    down) do_down ;;
+    down) do_down "${2:-}" ;;
     restart) echo "Restarting (env: $APP_ENV)..."; do_down; do_up ;;
     shell) SERVICE="${2:-api}"; echo "Opening a shell in '$SERVICE' (env: $APP_ENV)..."; dc exec "$SERVICE" bash ;;
     migrate)
