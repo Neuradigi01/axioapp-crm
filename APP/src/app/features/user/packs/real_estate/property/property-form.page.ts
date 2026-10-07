@@ -7,7 +7,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
@@ -22,6 +22,8 @@ import { LucideAngularModule } from 'lucide-angular';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 
 import { extractApiError } from '@core/services/api-error.util';
+import { LocationApiService } from '@app/services/location-api.service';
+import type { ICountry, IState } from '@app/schemas/common';
 
 import { FormToastHelper } from '../../../core/shared/forms/form-toast.helper';
 import {
@@ -104,6 +106,7 @@ export class PropertyFormPageComponent {
   private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly formToast = inject(FormToastHelper);
+  private readonly locationApi = inject(LocationApiService);
 
   protected readonly TYPE_OPTIONS = PROPERTY_TYPE_OPTIONS;
   protected readonly CATEGORY_OPTIONS = PROPERTY_CATEGORY_OPTIONS;
@@ -170,6 +173,37 @@ export class PropertyFormPageComponent {
     contact_email: this.fb.nonNullable.control('', [Validators.email, Validators.maxLength(200)]),
   });
 
+  // Country / State pickers — same `/location` reference data the
+  // registration form uses. The property row stores plain names, so
+  // option values are names (not ids); the id is only needed to fetch
+  // a country's states.
+  private readonly countries = signal<ICountry[]>([]);
+  private readonly states = signal<IState[]>([]);
+  protected readonly statesLoading = signal(false);
+  private readonly countriesReady = this.loadCountries();
+  /** Bumped on every states fetch so a slow response for a previously
+   *  picked country can't overwrite the list for the current one. */
+  private statesRequest = 0;
+
+  private readonly countryValue = toSignal(this.form.controls.country.valueChanges, {
+    initialValue: this.form.controls.country.value,
+  });
+  private readonly stateValue = toSignal(this.form.controls.state.valueChanges, {
+    initialValue: this.form.controls.state.value,
+  });
+  protected readonly countryOptions = computed<MobileSelectOption[]>(() =>
+    withCurrentValue(
+      this.countries().map((c) => c.name),
+      this.countryValue(),
+    ),
+  );
+  protected readonly stateOptions = computed<MobileSelectOption[]>(() =>
+    withCurrentValue(
+      this.states().map((s) => s.name),
+      this.stateValue(),
+    ),
+  );
+
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
@@ -199,6 +233,7 @@ export class PropertyFormPageComponent {
           contact_phone: '',
           contact_email: '',
         });
+        void this.loadStates('');
         this.initialImages.set([]);
       }
     });
@@ -290,6 +325,48 @@ export class PropertyFormPageComponent {
       contact_phone: p.contact_phone ?? '',
       contact_email: p.contact_email ?? '',
     });
+    void this.loadStates(p.country ?? '');
+  }
+
+  protected onCountryChange(): void {
+    this.form.controls.state.setValue('');
+    void this.loadStates(this.form.controls.country.value);
+  }
+
+  private async loadCountries(): Promise<void> {
+    try {
+      const res = await this.locationApi.getCountries();
+      this.countries.set(res.success ? res.data : []);
+    } catch {
+      this.countries.set([]);
+    }
+  }
+
+  /** Fetch the states for `countryName`; the State picker stays
+   *  disabled until a country with states is selected. Leaves the
+   *  current State value untouched so an edit-mode hydrate keeps it. */
+  private async loadStates(countryName: string): Promise<void> {
+    const request = ++this.statesRequest;
+    const stateControl = this.form.controls.state;
+    this.states.set([]);
+    stateControl.disable({ emitEvent: false });
+    this.statesLoading.set(!!countryName);
+    if (!countryName) return;
+
+    try {
+      await this.countriesReady;
+      const target = countryName.trim().toLowerCase();
+      const country = this.countries().find((c) => c.name.toLowerCase() === target);
+      if (!country) return;
+      const res = await this.locationApi.getStates(country.id);
+      if (request !== this.statesRequest || !res.success) return;
+      this.states.set(res.data);
+      if (res.data.length > 0) stateControl.enable({ emitEvent: false });
+    } catch {
+      if (request === this.statesRequest) this.states.set([]);
+    } finally {
+      if (request === this.statesRequest) this.statesLoading.set(false);
+    }
   }
 
   protected submit(): void {
@@ -402,4 +479,13 @@ export class PropertyFormPageComponent {
     }
     return 'Invalid value.';
   }
+}
+
+/** Map location names to picker options, appending `current` when it
+ *  isn't in the reference list so a free-text value saved before the
+ *  pickers existed still renders (and round-trips) instead of blanking. */
+function withCurrentValue(names: readonly string[], current: string): MobileSelectOption[] {
+  const options = names.map((name) => ({ value: name, label: name }));
+  if (current && !names.includes(current)) options.push({ value: current, label: current });
+  return options;
 }

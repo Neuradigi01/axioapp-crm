@@ -119,7 +119,7 @@
       <section class="space-y-4 rounded-xl border border-subtle bg-surface p-5 shadow-sm">
         <div>
           <h2 class="text-sm font-semibold text-default">Location</h2>
-          <p class="text-xs text-muted">Address, city, state, country, pincode.</p>
+          <p class="text-xs text-muted">Address, country, state, city, pincode.</p>
         </div>
 
         <label class="block">
@@ -132,27 +132,34 @@
         </label>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <span class="mb-1 block text-xs font-medium text-muted">Country</span>
+            <crm-mobile-select
+              formControlName="country"
+              ariaLabel="Country"
+              [options]="countryOptions()"
+              placeholder="Select country…"
+              [searchable]="true"
+              searchPlaceholder="Search country…"
+              (valueChange)="onCountryChange()"
+            />
+          </div>
+          <div>
+            <span class="mb-1 block text-xs font-medium text-muted">State</span>
+            <crm-mobile-select
+              formControlName="state"
+              ariaLabel="State"
+              [options]="stateOptions()"
+              [placeholder]="statesLoading() ? 'Loading…' : 'Select state…'"
+              [searchable]="true"
+              searchPlaceholder="Search state…"
+            />
+          </div>
           <label class="block">
             <span class="mb-1 block text-xs font-medium text-muted">City</span>
             <input
               type="text"
               formControlName="city"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
-            />
-          </label>
-          <label class="block">
-            <span class="mb-1 block text-xs font-medium text-muted">State</span>
-            <input
-              type="text"
-              formControlName="state"
-              class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
-            />
-          </label>
-          <label class="block">
-            <span class="mb-1 block text-xs font-medium text-muted">Country</span>
-            <input
-              type="text"
-              formControlName="country"
               class="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm text-default shadow-sm focus:border-muted focus:outline-none focus:ring-2 focus:border-subtle"
             />
           </label>
