@@ -113,6 +113,7 @@ class _FakeRedis:
         self.store: dict[str, str] = {}
         self.set_calls: list[dict] = []
         self.delete_calls: list[str] = []
+        self.closed = False
 
     async def set(self, key, value, *, nx=False, ex=None):
         self.set_calls.append({"key": key, "nx": nx, "ex": ex})
@@ -124,6 +125,9 @@ class _FakeRedis:
     async def delete(self, key):
         self.delete_calls.append(key)
         self.store.pop(key, None)
+
+    async def aclose(self):
+        self.closed = True
 
 
 class _RedisRaisingSet(_FakeRedis):
@@ -162,6 +166,30 @@ class TestAccountLock:
         async with sync_daemon.account_lock(uuid.uuid4()) as acquired:
             # Fail-open: caller proceeds as if it had the lock.
             assert acquired is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("fake_cls", [_FakeRedis, _RedisRaisingSet])
+    async def test_client_closed_on_exit(self, monkeypatch, fake_cls):
+        fake = fake_cls()
+        monkeypatch.setattr(sync_daemon, "_redis", lambda: fake)
+        async with sync_daemon.account_lock(uuid.uuid4()):
+            assert fake.closed is False
+        assert fake.closed is True
+
+    @pytest.mark.asyncio
+    async def test_client_closed_when_lock_contended(self, monkeypatch):
+        fake = _FakeRedis()
+        aid = uuid.uuid4()
+        fake.store[f"email_sync:{aid}"] = "held"
+        monkeypatch.setattr(sync_daemon, "_redis", lambda: fake)
+        async with sync_daemon.account_lock(aid) as acquired:
+            assert acquired is False
+        assert fake.closed is True
+
+    def test_redis_factory_returns_fresh_client_per_call(self):
+        # A client shared across Celery tasks is bound to the first
+        # task's event loop and fails on every later `asyncio.run`.
+        assert sync_daemon._redis() is not sync_daemon._redis()
 
 
 # --- 3. Inbound handler registry ----------------------------------------

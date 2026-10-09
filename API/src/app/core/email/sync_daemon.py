@@ -48,26 +48,24 @@ logger = logging.getLogger(__name__)
 _LOCK_TTL_SECONDS = 300
 
 
-# --- Redis client (lazy module-level) ------------------------------------
-
-
-_redis_client: aioredis.Redis | None = None
+# --- Redis client (one per lock) -----------------------------------------
 
 
 def _redis() -> aioredis.Redis:
-    """Lazy module-level Redis client. Connection is reused across
-    locks in the same process; the broker DB is shared with Celery's
-    own broker connection (different keyspace prefix)."""
-    global _redis_client
-    if _redis_client is None:
-        _redis_client = aioredis.Redis(
-            host=REDIS_HOST,
-            port=int(REDIS_PORT),
-            db=REDIS_DB_BROKER,
-            password=REDIS_PASSWORD or None,
-            decode_responses=True,
-        )
-    return _redis_client
+    """Fresh Redis client for the calling event loop. Every Celery sync
+    task runs under its own ``asyncio.run`` loop, and a redis-py asyncio
+    connection stays bound to the loop that opened it — a client cached
+    across tasks fails with "attached to a different loop" from the
+    second task on. ``account_lock`` closes the client on exit. The
+    broker DB is shared with Celery's own broker connection (different
+    keyspace prefix)."""
+    return aioredis.Redis(
+        host=REDIS_HOST,
+        port=int(REDIS_PORT),
+        db=REDIS_DB_BROKER,
+        password=REDIS_PASSWORD or None,
+        decode_responses=True,
+    )
 
 
 # --- Enqueue helpers -----------------------------------------------------
@@ -134,30 +132,33 @@ async def account_lock(account_id: uuid.UUID):
     key = f"email_sync:{account_id}"
     client = _redis()
     try:
-        acquired = await client.set(key, "1", nx=True, ex=_LOCK_TTL_SECONDS)
-    except Exception:
-        # Redis transient failure — fail open. Better to risk a
-        # double-sync (idempotent because the cursor + matched-set
-        # are deterministic) than to drop the sync entirely.
-        logger.exception(
-            "account_lock: Redis SET failed for %s — failing open",
-            account_id,
-        )
-        yield True
-        return
-    if not acquired:
-        yield False
-        return
-    try:
-        yield True
-    finally:
         try:
-            await client.delete(key)
+            acquired = await client.set(key, "1", nx=True, ex=_LOCK_TTL_SECONDS)
         except Exception:
+            # Redis transient failure — fail open. Better to risk a
+            # double-sync (idempotent because the cursor + matched-set
+            # are deterministic) than to drop the sync entirely.
             logger.exception(
-                "account_lock: Redis DEL failed for %s (lock expires via TTL anyway)",
+                "account_lock: Redis SET failed for %s — failing open",
                 account_id,
             )
+            yield True
+            return
+        if not acquired:
+            yield False
+            return
+        try:
+            yield True
+        finally:
+            try:
+                await client.delete(key)
+            except Exception:
+                logger.exception(
+                    "account_lock: Redis DEL failed for %s (lock expires via TTL anyway)",
+                    account_id,
+                )
+    finally:
+        await client.aclose()
 
 
 # --- Inbound handler registry (Step 5 hook) -----------------------------
