@@ -192,7 +192,10 @@ class OrgSettingsPatch(BaseModel):
             return None
         upper = value.upper()
         if not GSTIN_RE.match(upper):
-            raise ValueError("GSTIN must be 15 characters (e.g. 29ABCDE1234F1Z5).")
+            raise ValueError(
+                "GSTIN must be a 2-digit state code, 10-character PAN, "
+                "then 3 characters (e.g. 29ABCDE1234F1Z5)."
+            )
         return upper
 
     @field_validator("postal_code")

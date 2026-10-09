@@ -33,7 +33,8 @@ export const REASON = {
     'variables must be numbered {{1}}, {{2}}, … sequentially without gaps (max 10)',
   invalidHostname: 'must be a valid hostname (e.g. example.com)',
   hostnameNotApex: 'enter the apex domain only (e.g. example.com, not mail.example.com)',
-  invalidGstin: 'GSTIN must be 15 characters (e.g. 29ABCDE1234F1Z5)',
+  invalidGstin:
+    'GSTIN must be a 2-digit state code, 10-character PAN, then 3 characters (e.g. 29ABCDE1234F1Z5)',
   invalidCurrency: 'currency must be a 3-letter ISO code (e.g. INR)',
   invalidTimezone: 'timezone must be an IANA name (e.g. Asia/Kolkata)',
   invalidLocale: 'locale must look like en or en-IN',

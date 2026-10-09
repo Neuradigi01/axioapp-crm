@@ -260,7 +260,9 @@ export class StoreProfileTabComponent {
     if (errors['emailInvalid']) return 'Enter a valid email address, e.g. store@company.com.';
     if (errors['phoneInvalid']) return 'Include the country code, e.g. +919876543210.';
     if (errors['urlInvalid']) return 'Enter a full link starting with https://';
-    if (errors['gstinInvalid']) return 'Enter a 15-character GSTIN, e.g. 29ABCDE1234F1Z5.';
+    if (errors['gstinInvalid']) {
+      return 'Enter a valid GSTIN: 2-digit state code, 10-character PAN, then 3 characters, e.g. 29ABCDE1234F1Z5.';
+    }
     if (errors['postalCodeInvalid']) return 'Use 3–10 letters or digits, e.g. 560001.';
     if (errors['currencyInvalid']) return 'Use a 3-letter currency code, e.g. INR or USD.';
     if (errors['invalidNumber'] || errors['outOfRange']) return 'Enter a rate from 0 to 100.';
