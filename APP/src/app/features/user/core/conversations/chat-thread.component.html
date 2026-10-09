@@ -150,7 +150,7 @@
                 [class]="
                   'group relative flex outline-none ' +
                   (m.direction === 'out' ? 'justify-end' : 'justify-start') +
-                  (pickerOpenFor() === m.id ? ' z-30' : '')
+                  (pickerOpenFor() === m.id || reactionsOpenFor() === m.id ? ' z-30' : '')
                 "
               >
                 <!-- Action bar (Step 7). Revealed on hover, on keyboard
@@ -221,7 +221,8 @@
                       ? 'bg-accent text-white'
                       : 'bg-surface text-default ring-1 ring-subtle') +
                     (isPending(m) ? ' opacity-60' : '') +
-                    (flashId() === m.id ? ' ring-2 ring-amber-400' : '')
+                    (flashId() === m.id ? ' ring-2 ring-amber-400' : '') +
+                    (m.reactions.length > 0 ? ' mb-3' : '')
                   "
                 >
                   @if (m.reply_to_message_id) {
@@ -368,29 +369,6 @@
                       </div>
                     }
                   }
-                  @if (groupedReactions(m); as reactions) {
-                    @if (reactions.length > 0) {
-                      <div
-                        [class]="
-                          'mt-1 flex flex-wrap items-center gap-1 ' +
-                          (m.direction === 'out' ? 'justify-end' : 'justify-start')
-                        "
-                      >
-                        @for (r of reactions; track r.emoji) {
-                          <span
-                            class="inline-flex items-center gap-0.5 rounded-full bg-surface px-1.5 py-0.5 text-[11px] text-default shadow-sm ring-1 ring-subtle"
-                          >
-                            <span>{{ r.emoji }}</span>
-                            @if (r.count > 1) {
-                              <span class="text-[10px] font-medium text-muted">
-                                {{ r.count }}
-                              </span>
-                            }
-                          </span>
-                        }
-                      </div>
-                    }
-                  }
                   <p
                     [class]="
                       'mt-1.5 flex flex-wrap items-center justify-end gap-1.5 text-[11px] ' +
@@ -429,6 +407,70 @@
                       }
                     }
                   </p>
+                  <!-- WhatsApp-style reaction pill on the bubble's bottom
+                       edge. Click opens who-reacted; your own row removes. -->
+                  @if (reactionSummary(m); as summary) {
+                    <div
+                      [class]="
+                        'absolute -bottom-3.5 ' + (m.direction === 'out' ? 'right-3' : 'left-3')
+                      "
+                    >
+                      <button
+                        type="button"
+                        (click)="openReactions(m.id)"
+                        class="inline-flex items-center gap-0.5 rounded-full bg-surface px-1.5 py-0.5 text-sm leading-none text-default shadow-sm ring-1 ring-subtle transition hover:bg-surface-2"
+                        [attr.aria-label]="'Reactions: ' + summary.emojis.join(' ')"
+                        aria-haspopup="dialog"
+                        [attr.aria-expanded]="reactionsOpenFor() === m.id"
+                      >
+                        @for (emoji of summary.emojis; track emoji) {
+                          <span>{{ emoji }}</span>
+                        }
+                        @if (summary.total > 1) {
+                          <span class="ml-0.5 text-[11px] font-medium text-muted">
+                            {{ summary.total }}
+                          </span>
+                        }
+                      </button>
+                      @if (reactionsOpenFor() === m.id) {
+                        <button
+                          type="button"
+                          class="fixed inset-0 z-10 cursor-default"
+                          aria-label="Close reactions"
+                          (click)="closeReactions()"
+                        ></button>
+                        <div
+                          role="dialog"
+                          aria-label="Reactions"
+                          [class]="
+                            'absolute bottom-full z-20 mb-1.5 w-56 rounded-xl border border-subtle bg-surface p-1 text-default shadow-md ' +
+                            (m.direction === 'out' ? 'right-0' : 'left-0')
+                          "
+                        >
+                          @for (r of reactionRows(m); track r.actor) {
+                            @if (r.mine) {
+                              <button
+                                type="button"
+                                (click)="pickReaction(m.id, null)"
+                                class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-2"
+                              >
+                                <span class="min-w-0 flex-1">
+                                  <span class="block text-sm font-medium">You</span>
+                                  <span class="block text-[11px] text-muted">Click to remove</span>
+                                </span>
+                                <span class="text-lg leading-none">{{ r.emoji }}</span>
+                              </button>
+                            } @else {
+                              <div class="flex items-center gap-2 px-2 py-1.5">
+                                <span class="min-w-0 flex-1 truncate text-sm">{{ r.label }}</span>
+                                <span class="text-lg leading-none">{{ r.emoji }}</span>
+                              </div>
+                            }
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
                 </div>
               </div>
             }

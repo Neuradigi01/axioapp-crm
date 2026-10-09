@@ -168,6 +168,10 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
    *  Toggled by the React button on the hover action bar. */
   protected readonly pickerOpenFor = signal<string | null>(null);
 
+  /** Which message has its who-reacted popover open (opened from the
+   *  reaction pill on the bubble's edge). Null = none. */
+  protected readonly reactionsOpenFor = signal<string | null>(null);
+
   /** Take-Over-from-AI button gate. Locked to Owner / Admin only —
    * Employees never see the button (product rule 2026-09-10: only
    * Owner/Admin can explicitly take over). Employees can still
@@ -661,15 +665,33 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
     }
   }
 
-  /** Aggregate the reactions list into `{emoji → count}` for the badge
-   *  row. Order preserved by first-seen so the row stays stable across
-   *  re-renders. */
-  protected groupedReactions(m: ConversationMessage): Array<{ emoji: string; count: number }> {
-    const counts = new Map<string, number>();
-    for (const r of m.reactions ?? []) {
-      counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
-    }
-    return Array.from(counts, ([emoji, count]) => ({ emoji, count }));
+  /** WhatsApp-style pill content: up to 3 distinct emojis (first-seen
+   *  order, so the pill stays stable across re-renders) plus the total
+   *  reaction count. Null when the message has no reactions. */
+  protected reactionSummary(m: ConversationMessage): { emojis: string[]; total: number } | null {
+    const reactions = m.reactions ?? [];
+    if (reactions.length === 0) return null;
+    const emojis = [...new Set(reactions.map((r) => r.emoji))].slice(0, 3);
+    return { emojis, total: reactions.length };
+  }
+
+  /** Who-reacted rows for the pill's popover, the caller's own first.
+   *  Staff actors resolve to their name; any other actor is the
+   *  customer (inbound reactions carry the reactor's phone). */
+  protected reactionRows(
+    m: ConversationMessage,
+  ): Array<{ actor: string; emoji: string; mine: boolean; label: string }> {
+    const me = this.auth.currentUserId();
+    return (m.reactions ?? [])
+      .map((r: MessageReaction) => ({
+        actor: r.actor,
+        emoji: r.emoji,
+        mine: r.actor === me,
+        label:
+          this.staffById.get(r.actor)?.full_name ??
+          (this.contactName || this.displayHandle || r.actor),
+      }))
+      .sort((a, b) => Number(b.mine) - Number(a.mine));
   }
 
   /** The current user's reaction on a message, if any — used by the
@@ -683,6 +705,7 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
   }
 
   protected openPicker(messageId: string): void {
+    this.reactionsOpenFor.set(null);
     this.pickerOpenFor.update((cur) => (cur === messageId ? null : messageId));
   }
 
@@ -690,8 +713,20 @@ export class ChatThreadComponent implements AfterViewChecked, OnChanges {
     this.pickerOpenFor.set(null);
   }
 
+  protected openReactions(messageId: string): void {
+    this.pickerOpenFor.set(null);
+    this.reactionsOpenFor.update((cur) => (cur === messageId ? null : messageId));
+  }
+
+  protected closeReactions(): void {
+    this.reactionsOpenFor.set(null);
+  }
+
+  /** `emoji = null` removes the caller's reaction (picker re-tap or the
+   *  "Click to remove" row in the who-reacted popover). */
   protected pickReaction(messageId: string, emoji: string | null): void {
     this.closePicker();
+    this.closeReactions();
     this.react.emit({ messageId, emoji });
   }
 
