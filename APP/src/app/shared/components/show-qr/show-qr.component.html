@@ -1,0 +1,7 @@
+@if (isLoading()) {
+  <div class="qr-loading">
+    <mat-spinner diameter="40" />
+  </div>
+} @else if (qrImage()) {
+  <img [src]="'data:image/png;base64,' + qrImage()" alt="QR Code" class="qr-image" />
+}

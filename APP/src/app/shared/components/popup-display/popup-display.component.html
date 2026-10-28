@@ -1,0 +1,11 @@
+<div class="popup-display">
+  <button mat-icon-button class="popup-display__close" (click)="close()">
+    <mat-icon>close</mat-icon>
+  </button>
+
+  @if (data.title) {
+    <h2 class="popup-display__title">{{ data.title }}</h2>
+  }
+
+  <img class="popup-display__image" [src]="imageUrl" [alt]="data.title || 'Popup'" />
+</div>

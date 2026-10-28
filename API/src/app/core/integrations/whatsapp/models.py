@@ -1,0 +1,800 @@
+"""ORM model for `whatsapp_account_configs` — WA-specific fields sidecar
+to the generic `integrations` row.
+
+Held outside `core/integrations/models.py` for the same reason
+`MetaPageToken` is: keeping the parent `models.py` provider-agnostic so
+a future channel (Telegram, SMS gateway, …) doesn't accrete columns on
+the central table.
+
+`app_secret_enc` is Fernet ciphertext — same encryption key
+(`INTEGRATIONS_ENCRYPTION_KEY`) as the parent row's `access_token_enc`.
+The plaintext is decrypted ONLY inside the WhatsApp webhook signature
+verifier (Step 3.5.12).
+
+The UNIQUE(integration_id) index enforces one config per integration —
+multiple WhatsApp phone numbers per org is a future surface (P2);
+today, one row per org per provider is the rule, and that propagates
+to one sidecar per integration row.
+"""
+
+from __future__ import annotations
+
+import enum
+import re
+import uuid
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.dialects.postgresql import ARRAY, ENUM, JSONB, UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from src.app.shared.db import Base
+from src.app.shared.orm import TenantScoped
+
+
+class WhatsAppTemplateSubmissionStatus(str, enum.Enum):
+    """Operator-side lifecycle for a WhatsApp template
+    (whatsapp-platform-upgrade Step 8).
+
+    Distinct from the legacy ``status`` column, which carries Meta's
+    raw status text verbatim. The two coexist: ``status`` reflects
+    what Meta last told us; ``submission_status`` reflects what the
+    operator did in the CRM. They diverge during the brief window
+    between a Submit click and the next ``message_template_status_update``
+    webhook (status='PENDING' / submission_status='pending_review')."""
+
+    draft = "draft"
+    pending_review = "pending_review"
+    approved = "approved"
+    rejected = "rejected"
+    paused = "paused"
+    disabled = "disabled"
+
+
+whatsapp_template_submission_status_enum = ENUM(
+    WhatsAppTemplateSubmissionStatus,
+    name="whatsapp_template_submission_status",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+_VARIABLE_RE = re.compile(r"\{\{(\d+)\}\}")
+
+
+class WhatsAppAccountConfig(Base, TenantScoped):
+    """Per-(org, integration) WhatsApp Business Account config.
+
+    Survives `disconnect` so a reconnect can pre-fill the phone_id /
+    waba_id from history. The plaintext bearer token does NOT survive —
+    it lives only inside the parent `Integration.access_token_enc`,
+    which the parent's `disconnect` nulls."""
+
+    __tablename__ = "tbl_whatsapp_account_configs"
+    # whatsapp-platform-upgrade Step 27a — multi-number per org.
+    # Identity is now (integration_id, phone_id) rather than
+    # integration_id alone, so the same integration can fan out to
+    # multiple WhatsApp phones (typically one per store / region).
+    # Migration 0115 dropped the legacy `integration_id`-only unique
+    # index and added this composite constraint in its place.
+    __table_args__ = (
+        UniqueConstraint(
+            "integration_id",
+            "phone_id",
+            name="uq_wa_config_integration_phone",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    integration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_integrations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    phone_id: Mapped[str] = mapped_column(Text, nullable=False)
+    waba_id: Mapped[str] = mapped_column(Text, nullable=False)
+    display_phone_number: Mapped[str] = mapped_column(Text, nullable=False)
+    verified_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Fernet ciphertext — same key as parent integration's access_token_enc.
+    # Nullable since whatsapp-platform-upgrade Step 2: Embedded Signup
+    # orgs share one platform-level secret via env (`WHATSAPP_APP_SECRET`)
+    # and don't need a per-org row here. Legacy manually-connected orgs
+    # keep their per-org ciphertext as the signature-verifier fallback.
+    app_secret_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    verify_token: Mapped[str] = mapped_column(Text, nullable=False)
+    api_version: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'v18.0'"))
+    # Step 3.5.15 — per-org outbound rate cap (msg/sec). Operator-set
+    # in Settings → Integrations → WhatsApp → Advanced. Free-tier Meta
+    # WABAs are ~50/sec; business-verified can go up to 1000.
+    rate_limit_per_sec: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("50")
+    )
+    # Step 3.5.16 — cache of Meta's `messaging_limit_tier` (TIER_50,
+    # TIER_250, TIER_1K, TIER_10K, TIER_100K, TIER_UNLIMITED). NULL
+    # until the first capacity lookup populates it. Refreshed when
+    # `tier_synced_at` is older than 1 hour to keep the Graph API call
+    # rate well under Meta's per-token throttle.
+    messaging_limit_tier: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tier_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # whatsapp-platform-upgrade Step 12 — phone health snapshot.
+    # Cached per hourly refresh by `health_service.refresh_from_meta`.
+    # `health_synced_at` lets the UI render staleness; the event log
+    # in `tbl_whatsapp_phone_health_events` carries the timeline of
+    # changes.
+    quality_rating: Mapped[str | None] = mapped_column(String(length=16), nullable=True)
+    name_status: Mapped[str | None] = mapped_column(String(length=32), nullable=True)
+    throughput: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    restrictions: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    health_synced_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # whatsapp-platform-upgrade Step 11 — Meta Business profile editor.
+    # Mirrors the `whatsapp_business_profile` Graph endpoint shape;
+    # populated by `business_profile.refresh_from_meta` on first open
+    # and on the operator-side Refresh button.
+    profile_about: Mapped[str | None] = mapped_column(String(length=139), nullable=True)
+    profile_description: Mapped[str | None] = mapped_column(String(length=512), nullable=True)
+    profile_address: Mapped[str | None] = mapped_column(String(length=256), nullable=True)
+    profile_email: Mapped[str | None] = mapped_column(String(length=128), nullable=True)
+    profile_websites: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    profile_vertical: Mapped[str | None] = mapped_column(String(length=64), nullable=True)
+    profile_picture_url: Mapped[str | None] = mapped_column(String(length=512), nullable=True)
+    profile_last_synced_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Day-of-week schedule (storage only — Step 16 reads to decide
+    # whether the away message fires). Shape:
+    #   [{day: 0..6, intervals: [{open: "10:00", close: "19:00"}, …]}]
+    # Day 0 = Monday. Closed days omit intervals.
+    business_hours: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    # Free-text storage for the Step-16 automation. Variable
+    # substitution ({{contact.first_name}} etc.) happens at send time;
+    # Step 11 only persists the template text.
+    greeting_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    away_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # whatsapp-platform-upgrade Step 16 — auto-reply pipeline toggles
+    # + out-of-session template fallbacks. The greeting / away text
+    # above is used in-session (free-text reply); when the contact
+    # is outside their 24-hour session window, the linked approved
+    # template fires instead.
+    greeting_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    away_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    greeting_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    away_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_whatsapp_templates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    # whatsapp-platform-upgrade Step 19 — AI agent settings. The
+    # per-conversation toggle lives on ``tbl_conversations.ai_handling``
+    # (existing column); these are the org-wide knobs the operator
+    # tunes via Automation → AI Settings.
+    ai_handling_default_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    ai_confidence_threshold: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default=text("0.6")
+    )
+    ai_handover_keywords: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
+    ai_system_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        onupdate=text("now()"),
+    )
+
+
+class WhatsAppTemplate(Base, TenantScoped):
+    """Per-(org, integration) cache of one Meta-approved WhatsApp
+    message template.
+
+    Populated by `templates.sync_templates`; read by the campaign
+    template picker (Step 3.5.5) and by `dispatch_chunk`'s template
+    branch (Step 3.5.6).
+
+    `variable_count` is precomputed at sync time from the `{{n}}`
+    placeholder count in `body` so the picker doesn't re-parse the
+    body on every render. `meta_template_id` is kept for forensic
+    traceability; idempotent upsert is keyed on
+    `(integration_id, name, language)` because Meta's id can change
+    when a template is edited."""
+
+    __tablename__ = "tbl_whatsapp_templates"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    integration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_integrations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    language: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    header_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    header_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    footer_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    variable_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    meta_template_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # whatsapp-platform-upgrade Step 8 — structured Meta component
+    # payload. NULL for legacy sync rows (the next sync round repops);
+    # populated on every new draft so we can resubmit verbatim. Each
+    # element is a `{type, format?, text?, buttons?[]}` dict matching
+    # Meta's `/{waba_id}/message_templates` POST shape.
+    body_components: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    submission_status: Mapped[WhatsAppTemplateSubmissionStatus] = mapped_column(
+        whatsapp_template_submission_status_enum,
+        nullable=False,
+        server_default=text("'draft'"),
+    )
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    submitted_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    # tasks/template-library Step 9 — reciprocal link to the central
+    # ``tbl_message_templates`` row. Populated by migration 0120 for
+    # every existing WA template; new templates get the link set at
+    # create-draft time. ON DELETE CASCADE so removing the central
+    # row also removes its WA extension.
+    message_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_message_templates.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        onupdate=text("now()"),
+    )
+
+    @property
+    def variables(self) -> list[int]:
+        """Sorted unique placeholder numbers found in the body — the
+        picker (Step 3.5.5) uses this to render one input per variable."""
+        return sorted({int(m) for m in _VARIABLE_RE.findall(self.body)})
+
+
+class WhatsAppPhoneHealthEventType(str, enum.Enum):
+    """Phone-health event-log discriminator
+    (whatsapp-platform-upgrade Step 12)."""
+
+    quality_change = "quality_change"
+    tier_change = "tier_change"
+    name_status_change = "name_status_change"
+    restriction_added = "restriction_added"
+    restriction_lifted = "restriction_lifted"
+
+
+whatsapp_phone_health_event_type_enum = ENUM(
+    WhatsAppPhoneHealthEventType,
+    name="whatsapp_phone_health_event_type",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+class WhatsAppPhoneHealthEvent(Base, TenantScoped):
+    """Append-only audit log of phone-health changes.
+
+    Written by the hourly refresh task and the
+    ``phone_number_quality_update`` webhook handler whenever a field
+    moves. `occurred_at` is the wall-clock from Meta's payload (when
+    available) so timeline rendering survives out-of-order webhook
+    delivery. `recorded_at` is the row insert time."""
+
+    __tablename__ = "tbl_whatsapp_phone_health_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    phone_id: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    event_type: Mapped[WhatsAppPhoneHealthEventType] = mapped_column(
+        whatsapp_phone_health_event_type_enum, nullable=False
+    )
+    old_value: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    new_value: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class KeywordMatchType(str, enum.Enum):
+    """How a rule's keyword list is tested against inbound text
+    (whatsapp-platform-upgrade Step 17).
+
+    * ``contains`` — case-insensitive substring; matches if ANY
+      keyword is found inside the text.
+    * ``exact`` — case-insensitive exact match against the whole
+      message body.
+    * ``regex`` — Python ``re.search`` with the keyword as a regex.
+      Length-capped + try/except-wrapped at evaluation time to
+      survive operator typos."""
+
+    contains = "contains"
+    exact = "exact"
+    regex = "regex"
+
+
+class KeywordActionType(str, enum.Enum):
+    reply_text = "reply_text"
+    reply_template = "reply_template"
+    tag_conversation = "tag_conversation"
+    assign_to_user = "assign_to_user"
+    escalate_to_ai = "escalate_to_ai"
+
+
+whatsapp_keyword_match_type_enum = ENUM(
+    KeywordMatchType,
+    name="whatsapp_keyword_match_type",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+whatsapp_keyword_action_type_enum = ENUM(
+    KeywordActionType,
+    name="whatsapp_keyword_action_type",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+class WhatsAppKeywordRule(Base, TenantScoped):
+    """One operator-defined rule
+    (whatsapp-platform-upgrade Step 17).
+
+    Evaluated in `priority` ascending order — lower number = higher
+    priority. The first rule that matches an inbound message fires
+    its actions and short-circuits the rest of the evaluation loop
+    (Step 17 spec; future "continue on match" toggle would live on
+    this row)."""
+
+    __tablename__ = "tbl_whatsapp_keyword_rules"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    name: Mapped[str] = mapped_column(String(length=128), nullable=False)
+    keywords: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
+    match_type: Mapped[KeywordMatchType] = mapped_column(
+        whatsapp_keyword_match_type_enum,
+        nullable=False,
+        server_default=text("'contains'"),
+    )
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("100"))
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        onupdate=text("now()"),
+    )
+
+
+class WhatsAppKeywordAction(Base, TenantScoped):
+    """One action attached to a rule. Multiple actions per rule run
+    in `position` order — a rule can reply with a template, tag the
+    conversation, AND escalate to AI on one match."""
+
+    __tablename__ = "tbl_whatsapp_keyword_actions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    rule_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_whatsapp_keyword_rules.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    action_type: Mapped[KeywordActionType] = mapped_column(
+        whatsapp_keyword_action_type_enum, nullable=False
+    )
+    action_config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class AssignmentStrategy(str, enum.Enum):
+    """Auto-assignment strategy
+    (whatsapp-platform-upgrade Step 18).
+
+    Each strategy reads a different shape of ``config`` JSONB; the
+    engine + schema layer enforce per-strategy config validation."""
+
+    round_robin = "round_robin"
+    load_balanced = "load_balanced"
+    tag_based = "tag_based"
+    team_based = "team_based"
+
+
+whatsapp_assignment_strategy_enum = ENUM(
+    AssignmentStrategy,
+    name="whatsapp_assignment_strategy",
+    values_callable=lambda obj: [m.value for m in obj],
+    create_type=False,
+)
+
+
+class WhatsAppAssignmentRule(Base, TenantScoped):
+    """One operator-defined assignment rule
+    (whatsapp-platform-upgrade Step 18).
+
+    The engine walks active rules in `priority` ascending order on
+    every new (still-unassigned) conversation. ``last_assigned_user_id``
+    is the round-robin cursor — the engine reads + writes it under
+    a ``SELECT FOR UPDATE`` lock so concurrent webhooks don't all
+    pick the same user."""
+
+    __tablename__ = "tbl_whatsapp_assignment_rules"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    name: Mapped[str] = mapped_column(String(length=128), nullable=False)
+    strategy: Mapped[AssignmentStrategy] = mapped_column(
+        whatsapp_assignment_strategy_enum, nullable=False
+    )
+    config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("100"))
+    skip_outside_hours: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    last_assigned_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+        onupdate=text("now()"),
+    )
+
+
+class WhatsAppBlockListEntry(Base, TenantScoped):
+    """Per-org WhatsApp block list
+    (whatsapp-platform-upgrade Step 23).
+
+    Inbound from a number in this table is dropped before any
+    conversation row is written. Outbound to a blocked number is
+    refused by the campaign send-guard + the WA adapter
+    pre-send check, so a stray manual reply or a campaign that
+    snuck past audience filters still can't reach a blocked phone.
+
+    ``phone_number`` is stored as digits-only (no leading ``+``),
+    matching the normalisation we already do on contact phone +
+    the inbound external_id. Unique per org (a different tenant
+    can independently block the same number). RLS via
+    ``app.org_id``.
+    """
+
+    __tablename__ = "tbl_whatsapp_block_list"
+    __table_args__ = (UniqueConstraint("org_id", "phone_number", name="uq_block_list_org_phone"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    phone_number: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(
+        ENUM(
+            "spam",
+            "fraud",
+            "requested",
+            "harassment",
+            "other",
+            name="whatsapp_block_reason",
+            create_type=False,
+        ),
+        nullable=False,
+        server_default=text("'other'"),
+    )
+    blocked_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class WhatsAppFlow(Base, TenantScoped):
+    """Operator-defined WhatsApp Flow (Step 25).
+
+    Stores the Meta Flow JSON definition + a friendly category +
+    the published Meta flow id (NULL until the first publish).
+    Unique per org by name so the operator can't accidentally
+    create two "Booking" flows on the same WABA.
+
+    `json_definition` is Meta-spec'd JSON (not our custom-field
+    engine) — the builder UI only mutates a small subset of fields
+    (labels / options / terminal action); the rest of the JSON
+    comes from a bundled template under
+    ``integrations/whatsapp/flow_templates/``.
+    """
+
+    __tablename__ = "tbl_whatsapp_flows"
+    __table_args__ = (UniqueConstraint("org_id", "name", name="uq_wa_flows_org_name"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    category: Mapped[str] = mapped_column(
+        ENUM(
+            "appointment_booking",
+            "lead_capture",
+            "feedback",
+            "signup",
+            "custom",
+            name="whatsapp_flow_category",
+            create_type=False,
+        ),
+        nullable=False,
+        server_default=text("'custom'"),
+    )
+    status: Mapped[str] = mapped_column(
+        ENUM(
+            "draft",
+            "published",
+            "archived",
+            name="whatsapp_flow_status",
+            create_type=False,
+        ),
+        nullable=False,
+        server_default=text("'draft'"),
+    )
+    json_definition: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    )
+    meta_flow_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class WhatsAppFlowSubmission(Base, TenantScoped):
+    """Inbound flow-response (Step 25).
+
+    Append-only: one row per Meta ``nfm_reply`` webhook event.
+    Carries the resolved local ``flow_id`` when we still have the
+    matching row + Meta's ``flow_token`` as a fallback when the
+    local row was deleted. ``action_taken`` + ``action_entity_id``
+    capture the downstream auto-action so an operator can drill
+    from a submission → the lead / appointment / review it
+    produced.
+    """
+
+    __tablename__ = "tbl_whatsapp_flow_submissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    flow_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_whatsapp_flows.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    flow_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_contacts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_conversations.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    response_data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    )
+    action_taken: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    action_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class WhatsAppQuickLink(Base, TenantScoped):
+    """Operator-defined wa.me / QR tracking link
+    (whatsapp-platform-upgrade Step 26).
+
+    Each row owns a base62 slug that resolves at the public
+    ``/wa/{code}`` endpoint to a 302 redirect at
+    ``wa.me/{phone}?text=...``. The slug is globally unique so the
+    public endpoint can resolve without a tenant context.
+
+    Counters (``click_count`` / ``scan_count`` /
+    ``attributed_conversation_count``) are denormalised for the
+    stats card. Authoritative tallies live in
+    ``tbl_whatsapp_quick_link_clicks`` — the counters are bumped
+    on each insert as a fast read path."""
+
+    __tablename__ = "tbl_whatsapp_quick_links"
+    __table_args__ = (UniqueConstraint("code", name="uq_wa_quick_links_code"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
+    label: Mapped[str] = mapped_column(String(128), nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(32), nullable=False)
+    prefilled_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prefilled_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    click_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    scan_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    attributed_conversation_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+class WhatsAppQuickLinkClick(Base, TenantScoped):
+    """Append-only click / scan log for the quick-contact links
+    (whatsapp-platform-upgrade Step 26).
+
+    Captures anonymised UA family + optional referrer + IP hash so
+    the inbound-attribution match can pair a recent click with the
+    matching customer message without storing PII. The
+    ``matched_at`` + ``matched_conversation_id`` fields are filled
+    in by ``receive_webhook`` when an inbound text matches the
+    link's ``prefilled_hash`` within the 10-minute window."""
+
+    __tablename__ = "tbl_whatsapp_quick_link_clicks"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    link_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tbl_whatsapp_quick_links.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source: Mapped[str] = mapped_column(String(8), nullable=False, server_default=text("'link'"))
+    ua_family: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    region: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    referrer: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    ip_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    matched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    matched_conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
+__all__ = [
+    "AssignmentStrategy",
+    "KeywordActionType",
+    "KeywordMatchType",
+    "WhatsAppAccountConfig",
+    "WhatsAppAssignmentRule",
+    "WhatsAppBlockListEntry",
+    "WhatsAppFlow",
+    "WhatsAppFlowSubmission",
+    "WhatsAppKeywordAction",
+    "WhatsAppKeywordRule",
+    "WhatsAppPhoneHealthEvent",
+    "WhatsAppPhoneHealthEventType",
+    "WhatsAppQuickLink",
+    "WhatsAppQuickLinkClick",
+    "WhatsAppTemplate",
+    "WhatsAppTemplateSubmissionStatus",
+]

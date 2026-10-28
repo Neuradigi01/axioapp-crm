@@ -1,0 +1,822 @@
+<div class="mx-auto max-w-7xl p-6 space-y-5" [appUrlFilterState]="urlState">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="text-lg font-semibold text-zinc-900">Leads</h1>
+      <p class="mt-0.5 text-xs text-zinc-500">
+        @if (totalCount() !== null) {
+          {{ totalCount() }} total leads · {{ newTodayCount() }} new today
+        } @else {
+          {{ loadedCount() }} loaded · {{ newTodayCount() }} new today
+        }
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="inline-flex overflow-hidden rounded-md ring-1 ring-zinc-300">
+        <button
+          type="button"
+          (click)="setView('pipeline')"
+          class="px-3 py-1.5 text-xs font-medium transition"
+          [class.bg-zinc-900]="view() === 'pipeline'"
+          [class.text-white]="view() === 'pipeline'"
+          [class.text-zinc-700]="view() !== 'pipeline'"
+          [class.bg-white]="view() !== 'pipeline'"
+        >
+          Pipeline
+        </button>
+        <button
+          type="button"
+          (click)="setView('list')"
+          class="px-3 py-1.5 text-xs font-medium transition"
+          [class.bg-zinc-900]="view() === 'list'"
+          [class.text-white]="view() === 'list'"
+          [class.text-zinc-700]="view() !== 'list'"
+          [class.bg-white]="view() !== 'list'"
+        >
+          List
+        </button>
+      </div>
+      @if (canImport()) {
+        <a
+          routerLink="/user/leads/import"
+          class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          <lucide-icon name="upload" class="h-4 w-4" />
+          Import
+        </a>
+      }
+      <button
+        type="button"
+        (click)="openCreate()"
+        class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+      >
+        <lucide-icon name="plus" class="h-4 w-4" />
+        Add Lead
+      </button>
+    </div>
+  </header>
+
+  <!-- Chip strip: status / scope / no-activity / sort -->
+  <div class="flex flex-wrap items-center gap-2 text-xs">
+    <!-- Status chips -->
+    <div class="inline-flex overflow-hidden rounded-full ring-1 ring-zinc-200 bg-white">
+      @for (
+        s of [
+          { v: '', label: 'All' },
+          { v: 'active', label: 'Active' },
+          { v: 'won', label: 'Won' },
+          { v: 'lost', label: 'Lost' },
+        ];
+        track s.v
+      ) {
+        <button
+          type="button"
+          (click)="setStatus(s.v)"
+          class="px-2.5 py-1 transition"
+          [class.bg-zinc-900]="statusControl.value === s.v"
+          [class.text-white]="statusControl.value === s.v"
+          [class.text-zinc-700]="statusControl.value !== s.v"
+          [class.hover:bg-zinc-50]="statusControl.value !== s.v"
+        >
+          {{ s.label }}
+        </button>
+      }
+    </div>
+
+    <!-- Scope toggle (hidden for junior staff) -->
+    @if (canChangeScope()) {
+      <div class="inline-flex overflow-hidden rounded-full ring-1 ring-zinc-200 bg-white">
+        @for (
+          sc of [
+            { v: 'mine', label: 'Mine' },
+            { v: 'team', label: 'Team' },
+            { v: 'all', label: 'All' },
+          ];
+          track sc.v
+        ) {
+          <button
+            type="button"
+            (click)="setScope(sc.v)"
+            class="px-2.5 py-1 transition"
+            [class.bg-zinc-900]="scope() === sc.v"
+            [class.text-white]="scope() === sc.v"
+            [class.text-zinc-700]="scope() !== sc.v"
+            [class.hover:bg-zinc-50]="scope() !== sc.v"
+          >
+            {{ sc.label }}
+          </button>
+        }
+      </div>
+    }
+
+    <!-- No-activity chip -->
+    <select
+      [value]="noActivityFilter()"
+      (change)="setNoActivity($any($event.target).value)"
+      class="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      aria-label="No activity filter"
+    >
+      <option value="">Any activity</option>
+      <option value="7d">No activity 7d+</option>
+      <option value="14d">No activity 14d+</option>
+      <option value="30d">No activity 30d+</option>
+    </select>
+
+    <!-- Sort dropdown — applies to both pipeline (within-stage order)
+         and list views. -->
+    <select
+      [value]="sortKey() + ':' + sortOrder()"
+      (change)="setSort($any($event.target).value)"
+      class="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      aria-label="Sort"
+    >
+      <option value="created_at:desc">Newest first</option>
+      <option value="created_at:asc">Oldest first</option>
+      <option value="last_activity_at:desc">Recent activity</option>
+      <option value="last_activity_at:asc">Stale (oldest activity)</option>
+      <option value="lead_score:desc">Hottest score</option>
+      <option value="lead_score:asc">Coldest score</option>
+      <option value="contact_name:asc">Contact A→Z</option>
+      <option value="contact_name:desc">Contact Z→A</option>
+    </select>
+
+    <!-- Spacer pushes power-user buttons to the right. -->
+    <div class="ml-auto flex items-center gap-2">
+      <!-- Saved views (Step 7) — popover lists owned + shared.
+           Click outside to close is wired via the global doc listener
+           on the trigger button. -->
+      <div class="relative">
+        <button
+          type="button"
+          (click)="toggleViewsMenu()"
+          class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          title="Saved views"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="viewsMenuOpen()"
+        >
+          <lucide-icon [name]="currentViewName() ? 'bookmark-check' : 'bookmark'" class="h-4 w-4" />
+          {{ currentViewName() ?? 'Default view' }}
+          <lucide-icon name="chevron-down" class="h-3 w-3 text-zinc-400" />
+        </button>
+        @if (viewsMenuOpen()) {
+          <!-- Click-catcher closes the menu when the user clicks
+               outside. Sits behind the panel so panel clicks don't
+               bubble through. -->
+          <button
+            type="button"
+            aria-hidden="true"
+            tabindex="-1"
+            class="fixed inset-0 z-30 cursor-default bg-transparent"
+            (click)="closeViewsMenu()"
+          ></button>
+          <div
+            role="menu"
+            class="absolute right-0 z-40 mt-1 w-72 rounded-md border border-zinc-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5"
+          >
+            @if (savedViews().length === 0) {
+              <p class="px-3 py-4 text-center text-xs text-zinc-500">No saved views yet.</p>
+            } @else {
+              <ul class="max-h-60 overflow-auto py-1 text-xs">
+                @for (view of savedViews(); track view.id) {
+                  <li>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      (click)="applyView(view)"
+                      class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-zinc-50"
+                      [class.bg-zinc-50]="view.id === currentViewId()"
+                    >
+                      @if (view.id === currentViewId()) {
+                        <lucide-icon name="check" class="h-3.5 w-3.5 text-zinc-900" />
+                      } @else {
+                        <span class="inline-block h-3.5 w-3.5"></span>
+                      }
+                      <span class="flex-1 truncate text-zinc-800">{{ view.name }}</span>
+                      @if (view.shared) {
+                        <lucide-icon
+                          name="users"
+                          class="h-3.5 w-3.5 text-zinc-400"
+                          aria-label="Shared with team"
+                        />
+                      }
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+            @if (isCurrentViewOwner()) {
+              <div class="border-t border-zinc-100 py-1 text-xs">
+                <button
+                  type="button"
+                  role="menuitem"
+                  (click)="updateCurrentView()"
+                  class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-zinc-700 hover:bg-zinc-50"
+                >
+                  <lucide-icon name="pencil" class="h-3.5 w-3.5" />
+                  Update this view
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  (click)="toggleCurrentViewShared()"
+                  class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-zinc-700 hover:bg-zinc-50"
+                >
+                  <lucide-icon name="users" class="h-3.5 w-3.5" />
+                  @if (currentView()?.shared) {
+                    Make private
+                  } @else {
+                    Share with team
+                  }
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  (click)="openDeleteViewConfirm()"
+                  class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-red-600 hover:bg-red-50"
+                >
+                  <lucide-icon name="trash-2" class="h-3.5 w-3.5" />
+                  Delete this view
+                </button>
+              </div>
+            }
+            <div class="border-t border-zinc-100 py-1 text-xs">
+              <button
+                type="button"
+                role="menuitem"
+                (click)="openSaveViewModal()"
+                class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-zinc-700 hover:bg-zinc-50"
+              >
+                <lucide-icon name="plus" class="h-3.5 w-3.5" />
+                Save current as view…
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Advanced filter (DSL) -->
+      <button
+        type="button"
+        (click)="openAdvancedFilter()"
+        class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+        title="Advanced filter"
+      >
+        <lucide-icon name="sliders-horizontal" class="h-4 w-4" />
+        Advanced
+        @if (advancedFilterCount() > 0) {
+          <span
+            class="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-zinc-900 px-1 text-[10px] font-medium text-white"
+            aria-label="active filter clauses"
+          >
+            {{ advancedFilterCount() }}
+          </span>
+        }
+      </button>
+
+      <!-- Column customization (list view only) -->
+      @if (view() === 'list') {
+        <app-column-customization-menu
+          [columns]="columns()"
+          pageKey="leads"
+          [defaults]="defaultColumns"
+          (columnsChange)="onColumnsChange($event)"
+        />
+      }
+
+      <!-- Export CSV — permission-gated; backend re-enforces. -->
+      @if (canExport()) {
+        <button
+          type="button"
+          (click)="onExportCsv()"
+          [disabled]="exporting()"
+          class="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+          title="Export current filter as CSV"
+        >
+          <lucide-icon name="download" class="h-4 w-4" />
+          @if (exporting()) {
+            Exporting…
+          } @else {
+            Export CSV
+          }
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (exportError(); as err) {
+    <p class="rounded-md bg-red-50 px-4 py-2 text-xs text-red-700 ring-1 ring-red-200">
+      {{ err }}
+    </p>
+  }
+
+  <!-- Filters -->
+  <div class="grid grid-cols-1 gap-3 sm:grid-cols-5">
+    <div class="sm:col-span-2">
+      <label for="leads_q" class="sr-only">Search</label>
+      <div class="relative">
+        <lucide-icon
+          name="search"
+          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+        />
+        <input
+          id="leads_q"
+          type="search"
+          [formControl]="searchControl"
+          placeholder="Search by contact name, phone, or email…"
+          class="block w-full rounded-md border border-zinc-300 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        />
+      </div>
+    </div>
+    <div>
+      <label for="leads_source" class="sr-only">Source</label>
+      <select
+        id="leads_source"
+        [formControl]="sourceControl"
+        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      >
+        <option value="">All sources</option>
+        @for (s of sourceOptions(); track s) {
+          <option [value]="s">{{ s }}</option>
+        }
+      </select>
+    </div>
+    <div>
+      <label for="leads_assignee" class="sr-only">Owner</label>
+      <select
+        id="leads_assignee"
+        [formControl]="assigneeControl"
+        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      >
+        <option value="">All owners</option>
+        <option value="me">Me</option>
+        @for (u of users(); track u.id) {
+          <option [value]="u.id">{{ u.full_name }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  @if (state.loadError(); as err) {
+    <p class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+      {{ err }}
+    </p>
+  } @else if (state.loading() && state.items().length === 0) {
+    <div class="flex gap-3 overflow-x-auto animate-pulse">
+      @for (i of [0, 1, 2, 3]; track i) {
+        <div class="h-48 w-64 shrink-0 rounded-lg bg-zinc-100"></div>
+      }
+    </div>
+  } @else if (view() === 'pipeline') {
+    <app-pipeline-board
+      pipelineKey="leads"
+      [items]="pipelineItems()"
+      (itemMoved)="onItemMoved($event)"
+    >
+      <ng-template let-item>
+        @let contact = contactFor(item.contact_id);
+        <button type="button" (click)="openEdit(item)" class="block w-full text-left">
+          <app-lead-card
+            [lead]="item"
+            [contactName]="contact?.full_name ?? null"
+            [contactPhone]="contact?.phone ?? null"
+            [contactSource]="contact?.source ?? null"
+            [ownerName]="ownerLabel($any(item).assigned_to_id)"
+            (reassignClick)="openSingleReassign(item)"
+          />
+        </button>
+      </ng-template>
+    </app-pipeline-board>
+  } @else {
+    <!-- LIST VIEW: power-user table with dynamic columns, row select,
+         pagination, sortable headers. Cells are looked up by column
+         key so the customization menu's reorder/visibility flips
+         everything live without re-rendering the page. -->
+    <div class="overflow-hidden rounded-lg ring-1 ring-zinc-200 bg-white">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-zinc-200">
+          <thead class="bg-zinc-50">
+            <tr>
+              <th scope="col" class="w-10 px-3 py-2.5">
+                <span class="sr-only">Select</span>
+              </th>
+              @for (col of visibleColumns(); track col.key) {
+                <th
+                  scope="col"
+                  class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 whitespace-nowrap"
+                >
+                  @switch (col.key) {
+                    @case ('contact_name') {
+                      <button
+                        type="button"
+                        (click)="toggleSort('contact_name')"
+                        class="inline-flex items-center gap-1 hover:text-zinc-700"
+                      >
+                        {{ col.label }}
+                        @if (sortKey() === 'contact_name') {
+                          <lucide-icon
+                            [name]="sortOrder() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                            class="h-3 w-3"
+                          />
+                        }
+                      </button>
+                    }
+                    @case ('lead_score') {
+                      <button
+                        type="button"
+                        (click)="toggleSort('lead_score')"
+                        class="inline-flex items-center gap-1 hover:text-zinc-700"
+                      >
+                        {{ col.label }}
+                        @if (sortKey() === 'lead_score') {
+                          <lucide-icon
+                            [name]="sortOrder() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                            class="h-3 w-3"
+                          />
+                        }
+                      </button>
+                    }
+                    @case ('last_activity_at') {
+                      <button
+                        type="button"
+                        (click)="toggleSort('last_activity_at')"
+                        class="inline-flex items-center gap-1 hover:text-zinc-700"
+                      >
+                        {{ col.label }}
+                        @if (sortKey() === 'last_activity_at') {
+                          <lucide-icon
+                            [name]="sortOrder() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                            class="h-3 w-3"
+                          />
+                        }
+                      </button>
+                    }
+                    @case ('created_at') {
+                      <button
+                        type="button"
+                        (click)="toggleSort('created_at')"
+                        class="inline-flex items-center gap-1 hover:text-zinc-700"
+                      >
+                        {{ col.label }}
+                        @if (sortKey() === 'created_at') {
+                          <lucide-icon
+                            [name]="sortOrder() === 'asc' ? 'chevron-up' : 'chevron-down'"
+                            class="h-3 w-3"
+                          />
+                        }
+                      </button>
+                    }
+                    @default {
+                      {{ col.label }}
+                    }
+                  }
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100">
+            @for (lead of state.items(); track lead.id) {
+              @let contact = contactFor(lead.contact_id);
+              <tr
+                class="hover:bg-zinc-50 cursor-pointer"
+                [class.bg-zinc-50]="isSelected(lead.id)"
+                (click)="openEdit(lead)"
+              >
+                <td class="w-10 px-3 py-2.5 align-top">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                    [checked]="isSelected(lead.id)"
+                    (click)="toggleRow(lead.id, $event)"
+                    (change)="$event.stopPropagation()"
+                    [attr.aria-label]="'Select ' + (contact?.full_name ?? 'lead')"
+                  />
+                </td>
+                @for (col of visibleColumns(); track col.key) {
+                  <td class="px-4 py-2.5 text-sm text-zinc-900 align-top whitespace-nowrap">
+                    @switch (col.key) {
+                      @case ('contact_name') {
+                        <span class="font-medium">{{
+                          contact?.full_name ?? 'Unknown contact'
+                        }}</span>
+                      }
+                      @case ('status') {
+                        <span
+                          class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1"
+                          [class]="statusClass(lead.status)"
+                        >
+                          {{ statusLabel(lead.status) }}
+                        </span>
+                      }
+                      @case ('owner') {
+                        <span class="inline-flex items-center gap-1 text-zinc-700">
+                          <lucide-icon name="user" class="h-3 w-3 text-zinc-400" />
+                          {{ ownerLabel(lead.assigned_to_id) }}
+                        </span>
+                      }
+                      @case ('source') {
+                        @if (contact?.source; as src) {
+                          <span
+                            class="inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200"
+                          >
+                            {{ src }}
+                          </span>
+                        } @else {
+                          <span class="text-zinc-400">—</span>
+                        }
+                      }
+                      @case ('lead_score') {
+                        <span
+                          class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums ring-1"
+                          [class]="scoreClass(lead.lead_score)"
+                        >
+                          {{ lead.lead_score }}
+                        </span>
+                      }
+                      @case ('budget') {
+                        <span class="tabular-nums text-zinc-700">{{ lead.budget ?? '—' }}</span>
+                      }
+                      @case ('last_activity_at') {
+                        <span class="tabular-nums text-zinc-500">
+                          {{ lead.last_activity_at | relativeTime }}
+                        </span>
+                      }
+                      @case ('created_at') {
+                        <span class="tabular-nums text-zinc-500">
+                          {{ lead.created_at | relativeTime }}
+                        </span>
+                      }
+                      @case ('phone') {
+                        @if (contact?.phone; as phone) {
+                          <span class="flex items-center gap-1">
+                            <a
+                              [appPhoneLink]="phone"
+                              class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                              (click)="$event.stopPropagation()"
+                            >
+                              {{ phone }}
+                            </a>
+                            <a
+                              [appWhatsappLink]="phone"
+                              class="text-emerald-600 hover:text-emerald-800"
+                              (click)="$event.stopPropagation()"
+                              aria-label="WhatsApp"
+                            >
+                              <lucide-icon name="message-circle" class="h-3 w-3" />
+                            </a>
+                          </span>
+                        } @else {
+                          <span class="text-zinc-400">—</span>
+                        }
+                      }
+                      @case ('email') {
+                        @let email = $any(contact)?.email;
+                        @if (email) {
+                          <a
+                            [attr.href]="'mailto:' + email"
+                            class="text-zinc-700 hover:text-zinc-900 hover:underline"
+                            (click)="$event.stopPropagation()"
+                          >
+                            {{ email }}
+                          </a>
+                        } @else {
+                          <span class="text-zinc-400">—</span>
+                        }
+                      }
+                      @default {
+                        <span class="text-zinc-400">—</span>
+                      }
+                    }
+                  </td>
+                }
+              </tr>
+            } @empty {
+              <tr>
+                <td
+                  [attr.colspan]="visibleColumns().length + 1"
+                  class="px-6 py-10 text-center text-sm text-zinc-500"
+                >
+                  No leads match the current filter.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination footer -->
+      <div
+        class="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 bg-zinc-50 px-4 py-2.5 text-xs text-zinc-600"
+      >
+        <div>
+          @if (totalCount() !== null && state.items().length > 0) {
+            Showing {{ pageRangeStart() }}–{{ pageRangeEnd() }} of {{ totalCount() }}
+          } @else if (state.items().length > 0) {
+            Showing {{ pageRangeStart() }}–{{ pageRangeEnd() }}
+          } @else {
+            No results
+          }
+        </div>
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-1.5">
+            <span class="text-zinc-500">Page size</span>
+            <select
+              [value]="state.pageSize()"
+              (change)="onPageSizeChange($any($event.target).value)"
+              class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              aria-label="Page size"
+            >
+              @for (n of pageSizeOptions; track n) {
+                <option [value]="n">{{ n }}</option>
+              }
+            </select>
+          </label>
+          <div class="inline-flex overflow-hidden rounded-md ring-1 ring-zinc-300 bg-white">
+            <button
+              type="button"
+              (click)="onPrevPage()"
+              [disabled]="!canGoPrev()"
+              class="inline-flex items-center gap-1 px-2.5 py-1 text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white"
+              aria-label="Previous page"
+            >
+              <lucide-icon name="chevron-left" class="h-3.5 w-3.5" />
+              Previous
+            </button>
+            <button
+              type="button"
+              (click)="onNextPage()"
+              [disabled]="!canGoNext()"
+              class="inline-flex items-center gap-1 border-l border-zinc-300 px-2.5 py-1 text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white"
+              aria-label="Next page"
+            >
+              Next
+              <lucide-icon name="chevron-right" class="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-lead-form-modal
+    [lead]="editingLead()"
+    [submitting]="submitting()"
+    [submitError]="formError()"
+    (save)="onSave($event)"
+    (cancel)="closeModal()"
+  />
+}
+
+<!-- Bulk action bar: visible whenever rows are selected on list view. -->
+<app-bulk-action-bar
+  [selectedCount]="state.selectedCount()"
+  [actions]="state.bulkActions()"
+  (action)="onBulkAction($event)"
+  (clear)="clearSelection()"
+/>
+
+<!-- Bulk reassign modal — shared `ReassignModal`. -->
+@if (state.bulkModal() === 'reassign') {
+  <app-reassign-modal
+    [entityLabel]="'lead'"
+    [count]="state.selectedCount()"
+    [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
+    (confirm)="onBulkReassign($event)"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Bulk delete confirm. -->
+@if (state.bulkModal() === 'delete') {
+  <app-confirm-dialog
+    [title]="
+      'Delete ' + state.selectedCount() + ' lead' + (state.selectedCount() === 1 ? '' : 's') + '?'
+    "
+    [body]="'This cannot be undone. Contacts and activities linked to these leads remain in their respective timelines.'"
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    [submitting]="state.bulkSubmitting()"
+    (confirm)="onBulkDelete()"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Single-lead reassign (from pencil on a card / list row). -->
+@if (singleReassignLead(); as lead) {
+  <app-reassign-modal
+    [entityLabel]="'lead'"
+    [count]="1"
+    [currentOwnerId]="lead.assigned_to_id"
+    [submitting]="singleReassignSubmitting()"
+    [error]="singleReassignError()"
+    (confirm)="onSingleReassign($event)"
+    (cancel)="closeSingleReassign()"
+  />
+}
+
+<!-- Lost-reason modal: opens when the user moves a lead into a stage
+     marked is_lost=true. The kanban drag fires onItemMoved which calls
+     the backend; on 422 ("lost_reason required") we hold the pending
+     move here and prompt. Cancel reloads to revert; Confirm re-issues
+     move-stage with the reason. -->
+@if (pendingLostMove()) {
+  <app-lost-reason-modal
+    [submitting]="lostReasonSubmitting()"
+    [error]="lostReasonError()"
+    (confirm)="onLostReasonConfirm($event)"
+    (cancel)="onLostReasonCancel()"
+  />
+}
+
+<!-- Advanced filter modal: builds the JSON filter DSL the backend
+     consumes. Hosted at root so its z-50 overlay lays over the rest. -->
+@if (advancedFilterOpen()) {
+  <app-advanced-filter-modal
+    [initial]="advancedFilter()"
+    [customFields]="customFields()"
+    (apply)="onAdvancedFilterApply($event)"
+    (cancel)="closeAdvancedFilter()"
+  />
+}
+
+<!-- Save-view mini-modal (Step 7). Takes a name and a share-with-team
+     toggle, then POSTs `buildCurrentConfig()` as a new saved view. -->
+@if (saveViewModalOpen()) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 px-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="save-view-title"
+  >
+    <div class="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl ring-1 ring-zinc-200">
+      <h2 id="save-view-title" class="text-base font-semibold text-zinc-900">Save view</h2>
+      <p class="mt-1 text-xs text-zinc-500">
+        Captures the current filter, sort, scope, columns, and view mode.
+      </p>
+      <div class="mt-4 space-y-3">
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-700">Name</span>
+          <input
+            type="text"
+            maxlength="80"
+            [value]="saveViewName()"
+            (input)="onSaveViewNameInput($any($event.target).value)"
+            placeholder="e.g. Hot qualified"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          />
+        </label>
+        <label class="flex items-center gap-2 text-xs text-zinc-700">
+          <input
+            type="checkbox"
+            class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+            [checked]="saveViewShared()"
+            (change)="onSaveViewSharedChange($any($event.target).checked)"
+          />
+          Share with team
+        </label>
+      </div>
+      @if (saveViewError(); as err) {
+        <p class="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+          {{ err }}
+        </p>
+      }
+      <div class="mt-5 flex justify-end gap-2">
+        <button
+          type="button"
+          (click)="closeSaveViewModal()"
+          [disabled]="saveViewSubmitting()"
+          class="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          (click)="submitSaveView()"
+          [disabled]="saveViewSubmitting()"
+          class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          @if (saveViewSubmitting()) {
+            <lucide-icon name="loader-2" class="h-3.5 w-3.5 animate-spin" />
+            Saving…
+          } @else {
+            Save
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Delete-view confirm. -->
+@if (deleteViewConfirmOpen()) {
+  <app-confirm-dialog
+    [title]="'Delete view “' + (currentViewName() ?? '') + '”?'"
+    [body]="'This removes the view for you and (if shared) everyone in your org. Lead data is unaffected.'"
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    [submitting]="deleteViewSubmitting()"
+    (confirm)="confirmDeleteView()"
+    (cancel)="closeDeleteViewConfirm()"
+  />
+}

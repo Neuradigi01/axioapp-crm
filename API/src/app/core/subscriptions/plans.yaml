@@ -1,0 +1,209 @@
+# Source of truth for subscription plans, caps, features, and prices.
+#
+# Editing this file is the way pricing or feature placement changes ship.
+# The Pydantic loader in `plans.py` validates the file at process boot;
+# unknown feature keys, missing required pricing fields, or duplicate
+# plan codes raise immediately and the API refuses to start.
+#
+# Conventions:
+#   - Caps that are unlimited use the sentinel value -1.
+#     Code: prefer `Cap.is_unlimited(value)` over inline `== -1` checks.
+#   - Prices are display USD here for readability. The loader converts
+#     to integer cents internally to avoid float drift.
+#   - The set of valid `features.*` keys is declared in `plans.py` as
+#     `KNOWN_FEATURE_KEYS`. Adding a new feature requires updating both
+#     this file and that set.
+#   - `code: trial` deliberately mirrors `code: basic`'s feature flags
+#     (founder decision: the 14-day trial gives a taste of Basic, not
+#     Standard). The caps differ — trial is tighter.
+#
+# Last reviewed: 2026-06-05.
+
+version: 1
+currency: USD
+annual_discount_pct: 20
+
+plans:
+  # -------------------------------------------------------------------
+  - code: trial
+    name: 14-day Trial
+    display_order: 0
+    is_public: false               # not listed on /pricing; assigned at signup
+    trial_duration_days: 14
+    pricing:
+      monthly_bundle_usd: 0
+      annual_bundle_usd: 0
+      included_seats: 3
+      extra_seat_monthly_usd: 0    # extra seats not purchasable during trial
+      extra_seat_annual_usd: 0
+    caps:
+      contacts: 500
+      leads_per_month: 50
+      storage_mb: 100
+      pipelines: 1
+      custom_fields_per_entity: 5
+      form_widgets: 0
+      form_submissions_per_month: 0
+      automation_runs_per_month: 0
+      api_calls_per_day: 0
+      branches: 1
+      email_sends_per_month: 100
+      sms_sends_per_month: 0
+    features:
+      contacts.read: true
+      contacts.write: true
+      leads.manual_entry: true
+      tasks.read: true
+      tasks.write: true
+      walkins.read: true
+      pipelines.read: true
+      automation.workflows: false
+      conversations.unified_inbox: false
+      integrations.whatsapp: false
+      integrations.email_imap_smtp: false
+      ads.google_webhook: false
+      ads.meta_webhook: false
+      calls.recording: false
+      campaigns.email: false
+      sso.saml: false
+      audit.full_log: false
+      multi_branch: false
+      white_label: false
+
+  # -------------------------------------------------------------------
+  - code: basic
+    name: Basic
+    display_order: 1
+    is_public: true
+    trial_duration_days: 0
+    pricing:
+      monthly_bundle_usd: 60
+      annual_bundle_usd: 576       # $48/mo equivalent
+      included_seats: 5
+      extra_seat_monthly_usd: 12
+      extra_seat_annual_usd: 120   # $10/mo equivalent
+    caps:
+      contacts: 5000
+      leads_per_month: 1000
+      storage_mb: 5120
+      pipelines: 1
+      custom_fields_per_entity: 5
+      form_widgets: 1
+      form_submissions_per_month: 100
+      automation_runs_per_month: 0
+      api_calls_per_day: 0
+      branches: 1
+      email_sends_per_month: 1000
+      sms_sends_per_month: 0
+    features:
+      contacts.read: true
+      contacts.write: true
+      leads.manual_entry: true
+      tasks.read: true
+      tasks.write: true
+      walkins.read: true
+      pipelines.read: true
+      automation.workflows: false
+      conversations.unified_inbox: false
+      integrations.whatsapp: false
+      integrations.email_imap_smtp: false
+      ads.google_webhook: false
+      ads.meta_webhook: false
+      calls.recording: false
+      campaigns.email: false
+      sso.saml: false
+      audit.full_log: false
+      multi_branch: false
+      white_label: false
+
+  # -------------------------------------------------------------------
+  - code: standard
+    name: Standard
+    display_order: 2
+    is_public: true
+    trial_duration_days: 0
+    pricing:
+      monthly_bundle_usd: 145
+      annual_bundle_usd: 1392      # $116/mo equivalent
+      included_seats: 5
+      extra_seat_monthly_usd: 29
+      extra_seat_annual_usd: 276   # $23/mo equivalent
+    caps:
+      contacts: 50000
+      leads_per_month: 10000
+      storage_mb: 51200
+      pipelines: 5
+      custom_fields_per_entity: 9999
+      form_widgets: 10
+      form_submissions_per_month: 5000
+      automation_runs_per_month: 5000
+      api_calls_per_day: 1000
+      branches: 1
+      email_sends_per_month: 10000
+      sms_sends_per_month: 500
+    features:
+      contacts.read: true
+      contacts.write: true
+      leads.manual_entry: true
+      tasks.read: true
+      tasks.write: true
+      walkins.read: true
+      pipelines.read: true
+      automation.workflows: true
+      conversations.unified_inbox: true
+      integrations.whatsapp: true
+      integrations.email_imap_smtp: true
+      ads.google_webhook: true
+      ads.meta_webhook: true
+      calls.recording: true
+      campaigns.email: true
+      sso.saml: false
+      audit.full_log: false
+      multi_branch: false
+      white_label: false
+
+  # -------------------------------------------------------------------
+  - code: enterprise
+    name: Enterprise
+    display_order: 3
+    is_public: true
+    trial_duration_days: 0
+    pricing:
+      monthly_bundle_usd: 295
+      annual_bundle_usd: 2832      # $236/mo equivalent
+      included_seats: 5
+      extra_seat_monthly_usd: 59
+      extra_seat_annual_usd: 588   # $49/mo equivalent
+    caps:
+      contacts: -1
+      leads_per_month: -1
+      storage_mb: 524288           # 512 GB
+      pipelines: -1
+      custom_fields_per_entity: -1
+      form_widgets: -1
+      form_submissions_per_month: -1
+      automation_runs_per_month: -1
+      api_calls_per_day: -1
+      branches: -1
+      email_sends_per_month: 100000
+      sms_sends_per_month: 5000
+    features:
+      contacts.read: true
+      contacts.write: true
+      leads.manual_entry: true
+      tasks.read: true
+      tasks.write: true
+      walkins.read: true
+      pipelines.read: true
+      automation.workflows: true
+      conversations.unified_inbox: true
+      integrations.whatsapp: true
+      integrations.email_imap_smtp: true
+      ads.google_webhook: true
+      ads.meta_webhook: true
+      calls.recording: true
+      campaigns.email: true
+      sso.saml: true
+      audit.full_log: true
+      multi_branch: true
+      white_label: true

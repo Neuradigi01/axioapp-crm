@@ -1,0 +1,42 @@
+:host {
+  display: block;
+}
+
+.encryption {
+  &__input {
+    width: 100%;
+  }
+
+  &__actions {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+  }
+
+  &__result {
+    background-color: var(--surface-1);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+  }
+
+  &__result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-xs);
+  }
+
+  &__result-label {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--page-text-secondary);
+  }
+
+  &__result-text {
+    font-family: monospace;
+    font-size: var(--font-size-sm);
+    word-break: break-all;
+    color: var(--page-text);
+    line-height: 1.6;
+  }
+}

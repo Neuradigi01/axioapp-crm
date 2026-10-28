@@ -1,0 +1,698 @@
+<section
+  class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm"
+  data-testid="whatsapp-card"
+>
+  <header class="flex items-start justify-between gap-4">
+    <div class="flex items-start gap-3">
+      <span
+        class="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-50 font-bold text-emerald-700"
+        aria-hidden="true"
+      >
+        W
+      </span>
+      <div>
+        <h3 class="text-base font-semibold text-zinc-900">
+          WhatsApp Business
+          <span class="text-zinc-500 font-normal">(Cloud API)</span>
+        </h3>
+        <p class="mt-0.5 text-sm text-zinc-600">
+          Connect your WhatsApp Business Account so campaigns can send template messages from your
+          verified number. Sign in to Meta in a popup and pick your number — no tokens to copy.
+          Self- hosted Meta App? Use the Advanced option below.
+        </p>
+        @if (status()?.display_phone_number) {
+          <p class="mt-1 text-xs text-zinc-500">
+            Connected as
+            <span class="font-mono">{{ status()?.display_phone_number }}</span>
+            @if (status()?.verified_name) {
+              · <span>{{ status()?.verified_name }}</span>
+            }
+          </p>
+        }
+        <!-- Step 27b — multi-number list. Renders only when 2+ phones
+             are connected so single-number orgs see no visual change. -->
+        @if (hasMultiple()) {
+          <div class="mt-2 rounded-md border border-zinc-200 bg-zinc-50 p-2 text-xs">
+            <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+              All connected numbers ({{ numbers()?.length }})
+            </p>
+            <ul class="space-y-0.5">
+              @for (n of numbers(); track n.phone_id) {
+                <li class="flex items-center justify-between">
+                  <span class="font-mono text-zinc-700">
+                    +{{ n.display_phone_number }}
+                    @if (n.verified_name) {
+                      <span class="ml-1 font-sans text-zinc-500"> — {{ n.verified_name }} </span>
+                    }
+                  </span>
+                  <span class="flex items-center gap-1 text-[10px]">
+                    @if (n.is_default) {
+                      <span
+                        class="rounded-full bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium text-white"
+                      >
+                        Default
+                      </span>
+                    }
+                    @if (n.quality_rating) {
+                      <span
+                        class="rounded bg-white px-1.5 py-0.5 text-zinc-700 ring-1 ring-zinc-200"
+                      >
+                        Quality: {{ n.quality_rating }}
+                      </span>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+            <p class="mt-1 text-[10px] text-zinc-500">
+              Use the Send-From picker on the composer / campaign create modal to choose which
+              number to send from.
+            </p>
+          </div>
+        }
+      </div>
+    </div>
+    <div class="flex shrink-0 items-center gap-2">
+      @if (isDisconnected()) {
+        <span
+          class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200"
+        >
+          Not connected
+        </span>
+      } @else if (isConnected()) {
+        <span
+          class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+        >
+          Connected
+        </span>
+      } @else {
+        <span
+          class="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
+        >
+          Error
+        </span>
+      }
+    </div>
+  </header>
+
+  @if (inlineError(); as err) {
+    <div
+      class="mt-4 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+    >
+      <lucide-icon
+        name="alert-triangle"
+        size="16"
+        class="mt-0.5 shrink-0"
+        aria-hidden="true"
+      ></lucide-icon>
+      <span>{{ err }}</span>
+    </div>
+  }
+
+  @if (syncResult(); as r) {
+    <div
+      class="mt-4 flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
+    >
+      <lucide-icon
+        name="check-circle-2"
+        size="16"
+        class="mt-0.5 shrink-0"
+        aria-hidden="true"
+      ></lucide-icon>
+      <span>
+        Templates synced — {{ r.added }} added, {{ r.updated }} updated, {{ r.removed }} removed.
+      </span>
+    </div>
+  }
+
+  @if (isError() && status()?.last_error && !inlineError()) {
+    <div class="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+      <p class="font-medium">Last Meta call failed.</p>
+      <p class="mt-1 text-xs">{{ status()?.last_error }}</p>
+      <p class="mt-2 text-xs">
+        Reconnect to mint a fresh token, or Disconnect to clear the broken state. Campaigns won't
+        send while this card is red.
+      </p>
+    </div>
+  }
+
+  <!-- Disconnected state — hero Embedded Signup CTA + collapsible
+       manual fallback for self-hosted / on-prem operators. -->
+  @if (isDisconnected() && !formExpanded()) {
+    <div class="mt-5">
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60"
+        aria-label="Connect WhatsApp via Meta Embedded Signup"
+        [disabled]="embeddedConnecting()"
+        (click)="connectEmbedded()"
+        data-testid="whatsapp-connect-embedded"
+      >
+        @if (embeddedConnecting()) {
+          <lucide-icon
+            name="loader-2"
+            size="16"
+            class="animate-spin"
+            aria-hidden="true"
+          ></lucide-icon>
+          Connecting…
+        } @else {
+          <lucide-icon name="message-circle" size="16" aria-hidden="true"></lucide-icon>
+          Connect WhatsApp
+        }
+      </button>
+      <p class="mt-2 text-xs text-zinc-500">
+        You'll sign in to Meta in a popup and pick your WhatsApp Business number. Takes about 2
+        minutes — no tokens to copy.
+      </p>
+
+      <!-- Advanced (self-host) — collapsible wrapper around the
+           existing 5-field manual paste form. Kept verbatim so the
+           on-prem path isn't a regression. -->
+      <div class="mt-4 overflow-hidden rounded-md border border-zinc-200">
+        <button
+          type="button"
+          class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          (click)="toggleManualAdvanced()"
+          [attr.aria-expanded]="manualAdvancedExpanded()"
+          data-testid="whatsapp-manual-advanced-toggle"
+        >
+          <span class="flex items-center gap-2">
+            <lucide-icon
+              [name]="manualAdvancedExpanded() ? 'chevron-down' : 'chevron-right'"
+              size="14"
+              aria-hidden="true"
+            ></lucide-icon>
+            Advanced — paste credentials manually
+          </span>
+          <span class="text-xs text-zinc-500">For self-hosted Meta Apps</span>
+        </button>
+        @if (manualAdvancedExpanded()) {
+          <div class="border-t border-zinc-200 p-3">
+            <p class="mb-3 text-xs text-zinc-500">
+              Use this path when you've registered your own Meta App and want to bring your own
+              tokens. Paste the five values from Meta's WhatsApp Manager.
+            </p>
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              (click)="openForm()"
+              data-testid="whatsapp-open-manual-form"
+            >
+              <lucide-icon name="plug" size="14" aria-hidden="true"></lucide-icon>
+              Paste credentials
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- whatsapp-platform-upgrade Step 12 — phone health strip.
+       Visible only when connected; the card handles its own
+       loading / error / empty states. -->
+  @if (isConnected() && !formExpanded()) {
+    <div class="mt-4">
+      <app-phone-health-card />
+    </div>
+  }
+
+  <!-- Action row: top-level CTAs (Test / Reconnect / Disconnect) for
+       connected + error states. The disconnected hero CTA above
+       replaces what used to live here. -->
+  @if (!formExpanded() && !isDisconnected()) {
+    <div class="mt-5 flex flex-wrap items-center gap-2">
+      @if (isConnected()) {
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          [disabled]="testing()"
+          (click)="test()"
+        >
+          @if (testing()) {
+            <lucide-icon
+              name="loader-2"
+              size="16"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+            Testing…
+          } @else {
+            <lucide-icon name="zap" size="16" aria-hidden="true"></lucide-icon>
+            Test connection
+          }
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          [disabled]="syncing()"
+          (click)="syncTemplates()"
+        >
+          @if (syncing()) {
+            <lucide-icon
+              name="loader-2"
+              size="16"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+            Syncing…
+          } @else {
+            <lucide-icon name="download" size="16" aria-hidden="true"></lucide-icon>
+            Sync templates
+          }
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          [disabled]="disconnecting()"
+          (click)="disconnect()"
+        >
+          @if (disconnecting()) {
+            <lucide-icon
+              name="loader-2"
+              size="16"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+            Disconnecting…
+          } @else {
+            <lucide-icon name="trash-2" size="16" aria-hidden="true"></lucide-icon>
+            Disconnect
+          }
+        </button>
+      } @else {
+        <!-- Error state -->
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-md bg-amber-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-700"
+          (click)="reconnect()"
+        >
+          <lucide-icon name="refresh-cw" size="16" aria-hidden="true"></lucide-icon>
+          Reconnect
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          [disabled]="disconnecting()"
+          (click)="disconnect()"
+        >
+          @if (disconnecting()) {
+            <lucide-icon
+              name="loader-2"
+              size="16"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+            Disconnecting…
+          } @else {
+            <lucide-icon name="trash-2" size="16" aria-hidden="true"></lucide-icon>
+            Disconnect
+          }
+        </button>
+      }
+    </div>
+  }
+
+  <!-- Connected details panel (phone_id, waba_id — copyable). -->
+  @if (isConnected() && !formExpanded()) {
+    <dl
+      class="mt-5 grid grid-cols-1 gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 sm:grid-cols-2"
+    >
+      <div>
+        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Phone Number ID</dt>
+        <dd class="mt-0.5 font-mono text-sm text-zinc-800">
+          {{ status()?.phone_id }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">WABA ID</dt>
+        <dd class="mt-0.5 font-mono text-sm text-zinc-800">
+          {{ status()?.waba_id }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Display number</dt>
+        <dd class="mt-0.5 text-sm text-zinc-800">
+          {{ status()?.display_phone_number }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Graph API version</dt>
+        <dd class="mt-0.5 font-mono text-sm text-zinc-800">
+          {{ status()?.api_version }}
+        </dd>
+      </div>
+      @if (status()?.connected_at; as connectedAt) {
+        <div>
+          <dt class="text-xs font-medium uppercase tracking-wide text-zinc-500">Connected</dt>
+          <dd class="mt-0.5 text-sm text-zinc-800">
+            {{ connectedAt | date: 'medium' }}
+          </dd>
+        </div>
+      }
+    </dl>
+
+    <!-- Phone health strip placeholder — Phase 4 wires quality_rating
+         + messaging_limit_tier badges + last-webhook timestamp here.
+         Kept as an empty surface so the slot is visible during Phase
+         4 development without restyling the card. -->
+    <div
+      class="mt-3 hidden rounded-md border border-dashed border-zinc-200 bg-zinc-50 p-3"
+      data-testid="whatsapp-phone-health-placeholder"
+    ></div>
+
+    <!-- Synced templates — collapsible. Auto-loads on connect so the
+         status badges render without an explicit expand. -->
+    <div class="mt-4 overflow-hidden rounded-md border border-zinc-200">
+      <button
+        type="button"
+        class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        (click)="toggleTemplates()"
+        [attr.aria-expanded]="templatesExpanded()"
+        data-testid="whatsapp-templates-toggle"
+      >
+        <span class="flex items-center gap-2">
+          <lucide-icon
+            [name]="templatesExpanded() ? 'chevron-down' : 'chevron-right'"
+            size="16"
+            aria-hidden="true"
+          ></lucide-icon>
+          Synced templates
+          @if (templatesLoaded()) {
+            <span class="text-xs font-normal text-zinc-500"> ({{ templates().length }}) </span>
+          }
+        </span>
+        @if (templatesLoading() && !templatesLoaded()) {
+          <lucide-icon
+            name="loader-2"
+            size="14"
+            class="animate-spin text-zinc-400"
+            aria-hidden="true"
+          ></lucide-icon>
+        } @else if (templatesLoaded() && templates().length > 0) {
+          <span class="flex flex-wrap items-center gap-1.5 text-xs">
+            @if (templateCounts().APPROVED > 0) {
+              <span
+                class="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700 ring-1 ring-emerald-200"
+              >
+                {{ templateCounts().APPROVED }} approved
+              </span>
+            }
+            @if (templateCounts().PENDING > 0) {
+              <span
+                class="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700 ring-1 ring-amber-200"
+              >
+                {{ templateCounts().PENDING }} pending
+              </span>
+            }
+            @if (templateCounts().REJECTED > 0) {
+              <span
+                class="rounded-full bg-rose-50 px-2 py-0.5 font-medium text-rose-700 ring-1 ring-rose-200"
+              >
+                {{ templateCounts().REJECTED }} rejected
+              </span>
+            }
+          </span>
+        }
+      </button>
+
+      @if (templatesExpanded()) {
+        <div class="border-t border-zinc-200">
+          @if (templatesError(); as err) {
+            <div
+              class="flex items-start gap-2 border-b border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800"
+            >
+              <lucide-icon
+                name="alert-triangle"
+                size="14"
+                class="mt-0.5 shrink-0"
+                aria-hidden="true"
+              ></lucide-icon>
+              <span>{{ err }}</span>
+            </div>
+          }
+
+          @if (templatesLoading()) {
+            <div class="flex items-center gap-2 px-3 py-4 text-sm text-zinc-500">
+              <lucide-icon
+                name="loader-2"
+                size="14"
+                class="animate-spin"
+                aria-hidden="true"
+              ></lucide-icon>
+              Loading templates…
+            </div>
+          } @else if (templatesLoaded() && templates().length === 0) {
+            <div class="px-3 py-4 text-sm text-zinc-500">
+              No templates cached yet. Click
+              <span class="font-medium text-zinc-700">Sync templates</span>
+              above to pull from Meta.
+            </div>
+          } @else if (templates().length > 0) {
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead class="bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  <tr>
+                    <th class="px-3 py-2 text-left">Name</th>
+                    <th class="px-3 py-2 text-left">Language</th>
+                    <th class="px-3 py-2 text-left">Category</th>
+                    <th class="px-3 py-2 text-left">Status</th>
+                    <th class="px-3 py-2 text-right">Vars</th>
+                    <th class="px-3 py-2 text-left">Last synced</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100">
+                  @for (t of templates(); track t.id) {
+                    <tr>
+                      <td class="px-3 py-2 font-mono text-xs text-zinc-800">
+                        {{ t.name }}
+                      </td>
+                      <td class="px-3 py-2 font-mono text-xs text-zinc-700">
+                        {{ t.language }}
+                      </td>
+                      <td class="px-3 py-2 text-xs text-zinc-700">
+                        {{ t.category }}
+                      </td>
+                      <td class="px-3 py-2">
+                        @switch (t.status) {
+                          @case ('APPROVED') {
+                            <span
+                              class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+                            >
+                              APPROVED
+                            </span>
+                          }
+                          @case ('PENDING') {
+                            <span
+                              class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200"
+                            >
+                              PENDING
+                            </span>
+                          }
+                          @case ('REJECTED') {
+                            <span
+                              class="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
+                            >
+                              REJECTED
+                            </span>
+                          }
+                          @case ('PAUSED') {
+                            <span
+                              class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+                            >
+                              PAUSED
+                            </span>
+                          }
+                          @case ('DISABLED') {
+                            <span
+                              class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+                            >
+                              DISABLED
+                            </span>
+                          }
+                          @default {
+                            <span
+                              class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200"
+                            >
+                              {{ t.status }}
+                            </span>
+                          }
+                        }
+                      </td>
+                      <td class="px-3 py-2 text-right font-mono text-xs text-zinc-700">
+                        {{ t.variable_count }}
+                      </td>
+                      <td class="px-3 py-2 text-xs text-zinc-600">
+                        {{ t.last_synced_at | date: 'medium' }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Inline connect form. -->
+  @if (formExpanded()) {
+    <form
+      class="mt-5 space-y-4 rounded-md border border-zinc-200 bg-zinc-50 p-4"
+      [formGroup]="form"
+      (ngSubmit)="connect()"
+    >
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-700">
+            Phone Number ID <span class="text-rose-600">*</span>
+          </span>
+          <input
+            type="text"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            placeholder="123456789012345"
+            formControlName="phone_id"
+            autocomplete="off"
+          />
+        </label>
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-700">
+            WABA ID <span class="text-rose-600">*</span>
+          </span>
+          <input
+            type="text"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            placeholder="987654321098765"
+            formControlName="waba_id"
+            autocomplete="off"
+          />
+        </label>
+      </div>
+
+      <label class="block">
+        <span class="text-xs font-medium text-zinc-700">
+          Access Token <span class="text-rose-600">*</span>
+        </span>
+        <input
+          type="password"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          placeholder="EAA… (System User permanent token)"
+          formControlName="access_token"
+          autocomplete="off"
+        />
+        <span class="mt-1 block text-xs text-zinc-500">
+          Generate in Meta Business Settings → System Users → Add Token. Scopes:
+          <code>whatsapp_business_messaging</code> + <code>whatsapp_business_management</code>.
+        </span>
+      </label>
+
+      <label class="block">
+        <span class="text-xs font-medium text-zinc-700">
+          App Secret <span class="text-rose-600">*</span>
+        </span>
+        <input
+          type="password"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          placeholder="Meta App → Settings → Basic → App Secret"
+          formControlName="app_secret"
+          autocomplete="off"
+        />
+        <span class="mt-1 block text-xs text-zinc-500">
+          Used to verify incoming webhook signatures from Meta.
+        </span>
+      </label>
+
+      <label class="block">
+        <span class="text-xs font-medium text-zinc-700">
+          Verify Token <span class="text-rose-600">*</span>
+        </span>
+        <input
+          type="text"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          placeholder="furniturecrm-verify-xyz123"
+          formControlName="verify_token"
+          autocomplete="off"
+        />
+        <span class="mt-1 block text-xs text-zinc-500">
+          Any random string — you'll paste the same value into Meta's webhook console when wiring up
+          delivery events.
+        </span>
+      </label>
+
+      <div>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 text-xs font-medium text-zinc-600 hover:text-zinc-900"
+          (click)="toggleAdvanced()"
+        >
+          <lucide-icon
+            [name]="advancedExpanded() ? 'chevron-down' : 'chevron-right'"
+            size="12"
+            aria-hidden="true"
+          ></lucide-icon>
+          Advanced
+        </button>
+        @if (advancedExpanded()) {
+          <label class="mt-2 block">
+            <span class="text-xs font-medium text-zinc-700"> Graph API version </span>
+            <input
+              type="text"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              formControlName="api_version"
+              autocomplete="off"
+            />
+            <span class="mt-1 block text-xs text-zinc-500">
+              Default <code>v18.0</code>. Bump only if Meta deprecates it.
+            </span>
+          </label>
+
+          <label class="mt-3 block">
+            <span class="text-xs font-medium text-zinc-700"> Rate limit (msg/sec) </span>
+            <input
+              type="number"
+              min="1"
+              max="1000"
+              class="mt-1 block w-32 rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              formControlName="rate_limit_per_sec"
+              autocomplete="off"
+            />
+            <span class="mt-1 block text-xs text-zinc-500">
+              Default <code>50</code>. Free-tier WABAs ~50/sec; business- verified can bump up to
+              <code>1000</code>. Higher values risk Meta rate-limit (429) errors.
+            </span>
+          </label>
+        }
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          [disabled]="connecting()"
+          (click)="cancelForm()"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+          [disabled]="connecting() || form.invalid"
+        >
+          @if (connecting()) {
+            <lucide-icon
+              name="loader-2"
+              size="16"
+              class="animate-spin"
+              aria-hidden="true"
+            ></lucide-icon>
+            Connecting…
+          } @else {
+            <lucide-icon name="check" size="16" aria-hidden="true"></lucide-icon>
+            Connect WhatsApp
+          }
+        </button>
+      </div>
+    </form>
+  }
+</section>

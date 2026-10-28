@@ -1,0 +1,10 @@
+debugpy
+pytest
+pytest-asyncio
+
+# Code-quality tooling — pinned so the container and CI install identical
+# versions (this file is the pip "lockfile" for dev tools; CLAUDE.md uses pip,
+# not uv). Bump deliberately, never float.
+ruff==0.15.20
+pyright==1.1.411
+bandit==1.9.4

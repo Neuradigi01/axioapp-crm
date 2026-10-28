@@ -1,0 +1,115 @@
+.action-verify {
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+
+    mat-icon {
+      color: var(--brand-grad-2);
+    }
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 320px;
+  }
+
+  &__subtitle {
+    text-align: center;
+    color: var(--page-text-secondary);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-lg);
+  }
+
+  &__digits {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+  }
+
+  &__digit-input {
+    width: 48px;
+    height: 56px;
+    text-align: center;
+    font-size: var(--font-size-2xl);
+    font-weight: 600;
+    border: 2px solid var(--input-border);
+    border-radius: var(--radius-md);
+    background-color: var(--input-bg);
+    color: var(--page-text);
+    outline: none;
+    transition: border-color var(--transition-normal);
+
+    &:focus {
+      border-color: var(--brand-grad-2);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 400px) {
+      width: 40px;
+      height: 48px;
+      font-size: var(--font-size-xl);
+    }
+  }
+
+  &__error {
+    text-align: center;
+    color: var(--feedback-error);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-sm);
+  }
+
+  &__loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    color: var(--page-text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  &__resend {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  &__try-another {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+  }
+
+  &__try-another-toggle {
+    font-size: var(--font-size-sm);
+    color: var(--page-text-secondary);
+  }
+
+  &__method-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    width: 100%;
+  }
+
+  &__method-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    justify-content: flex-start;
+  }
+
+  &__actions {
+    padding: var(--spacing-sm) var(--spacing-lg);
+  }
+}

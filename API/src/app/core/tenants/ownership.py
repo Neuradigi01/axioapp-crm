@@ -1,0 +1,143 @@
+"""Ownership transfer — atomic Owner-row swap.
+
+The caller (current Owner) hands their org over to another active
+member. Net effect in one transaction:
+
+  - caller's `tbl_organization_members.role_id` ← `demote_to_role_id`
+    (defaults to the org's Admin role)
+  - target's `tbl_organization_members.role_id` ← Owner role
+  - one `ownership.transferred` audit row written with both sides
+
+Authorization is intentionally *not* gated on a permission key — Owner
+is fixed (CLAUDE.md / rule 7), so handing the keys to anyone holding
+`users.write` would let Admins seize the org. Only the actual Owner of
+this org can fire this endpoint, enforced here by checking the
+caller's `Role.name == 'Owner' AND is_system=True` row.
+"""
+
+from __future__ import annotations
+
+import uuid
+
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.app.core import audit
+from src.app.core.permissions.models import Role
+from src.app.core.users import data_access
+from src.app.core.users import service as users_service
+from src.app.core.users.models import OrganizationMember, User
+
+
+class _Forbidden(HTTPException):
+    def __init__(self, detail: str) -> None:
+        super().__init__(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+
+
+class _Invalid(HTTPException):
+    def __init__(self, detail: str) -> None:
+        super().__init__(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
+
+
+async def transfer_ownership(
+    session: AsyncSession,
+    *,
+    caller: User,
+    target_user_uuid: uuid.UUID,
+    demote_to_role_id: uuid.UUID | None,
+    ip: str | None = None,
+    ua: str | None = None,
+) -> tuple[OrganizationMember, OrganizationMember]:
+    """Atomically swap Owner from caller → target. Returns `(new_owner, demoted)`."""
+    org_id = caller.org_id
+    if org_id is None:
+        raise _Forbidden("Caller has no active org membership.")
+
+    owner_role = await data_access.get_owner_role(session, org_id)
+    if owner_role is None:
+        raise _Invalid("This org has no Owner role — cannot transfer.")
+
+    # Caller must be the current Owner — checked off their role, not a
+    # permission key. Admin holding `users.write` is NOT enough.
+    if caller.role_id != owner_role.id:
+        raise _Forbidden("Only the Owner can transfer ownership.")
+
+    if caller.legacy_uuid == target_user_uuid:
+        raise _Invalid("Cannot transfer ownership to yourself.")
+
+    # Resolve target user + active membership in one shot.
+    _, target_membership = await users_service.require_membership(
+        session,
+        user_uuid=target_user_uuid,
+        org_id=org_id,
+        active_only=True,
+        on_missing=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        not_found_detail="Target user not found.",
+        not_member_detail="Target is not an active member of this org.",
+    )
+    if target_membership.role_id == owner_role.id:
+        raise _Invalid("Target is already Owner — multiple Owner rows detected. Contact support.")
+
+    # Resolve caller's own membership row (the one we'll demote). The
+    # caller User is already loaded, so we go straight by bigint id.
+    caller_membership = await data_access.get_membership(
+        session,
+        user_member_id=caller.id,
+        org_id=org_id,
+        active_only=True,
+    )
+    if caller_membership is None:
+        raise _Forbidden("Caller has no active membership row to demote.")
+
+    # Resolve demote role.
+    if demote_to_role_id is None:
+        admin_role = await data_access.get_admin_role(session, org_id)
+        if admin_role is None:
+            raise _Invalid(
+                "No Admin role exists in this org. Pass demote_to_role_id "
+                "explicitly with the role you want for yourself."
+            )
+        demote_role = admin_role
+    else:
+        # Explicit role-id lookup kept inline so the 422 wording stays
+        # specific to the `demote_to_role_id` field name; sliced into
+        # data_access in a later sweep with the other Role.id callers.
+        demote_role = (
+            await session.execute(
+                select(Role).where(Role.org_id == org_id, Role.id == demote_to_role_id)
+            )
+        ).scalar_one_or_none()
+        if demote_role is None:
+            raise _Invalid(f"demote_to_role_id {demote_to_role_id} is not a role in this org.")
+        if demote_role.id == owner_role.id:
+            raise _Invalid("demote_to_role_id cannot be the Owner role.")
+
+    # Atomic swap. Both UPDATEs share the same outer transaction.
+    before = {
+        "caller_role_id": str(caller_membership.role_id),
+        "target_role_id": str(target_membership.role_id),
+    }
+    caller_membership.role_id = demote_role.id
+    target_membership.role_id = owner_role.id
+
+    await session.commit()
+    await session.refresh(caller_membership)
+    await session.refresh(target_membership)
+
+    await audit.log(
+        "ownership.transferred",
+        entity_type="organization",
+        entity_id=org_id,
+        before=before,
+        after={
+            "new_owner_user_uuid": str(target_user_uuid),
+            "demoted_user_uuid": str(caller.legacy_uuid),
+            "demoted_to_role_id": str(demote_role.id),
+            "demoted_to_role_name": demote_role.name,
+        },
+        ip=ip,
+        ua=ua,
+    )
+
+    return target_membership, caller_membership

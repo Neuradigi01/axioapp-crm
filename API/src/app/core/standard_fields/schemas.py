@@ -1,0 +1,110 @@
+"""Pydantic v2 schemas for `StandardFieldOverride`.
+
+Only presentational shape lives here. Per-field `overridable_props`
+enforcement is dynamic against the code-defined registry and happens
+in the service layer at upsert time — Pydantic alone can't express
+"this prop is allowed only if the field's registry def lists it."
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+
+from src.app.shared.schemas import ORMModel
+
+
+class StandardFieldOverrideIn(BaseModel):
+    """PUT body. Every key is optional — only non-None entries are written.
+
+    Setting a value to NULL via this surface is not supported; to clear
+    an override, DELETE the row (the field then inherits the registry
+    default).
+    """
+
+    label: str | None = Field(default=None, max_length=255)
+    placeholder: str | None = Field(default=None, max_length=255)
+    help_text: str | None = None
+    is_required: bool | None = None
+    is_hidden: bool | None = None
+    min_value: float | None = None
+    max_value: float | None = None
+    step_value: float | None = None
+    display_order: int | None = Field(default=None, ge=0, le=999)
+
+
+class StandardFieldOverrideOut(ORMModel):
+    """List / detail row. Mirrors the DB columns, plus identity fields."""
+
+    id: uuid.UUID
+    entity: str
+    field_key: str
+
+    label: str | None = None
+    placeholder: str | None = None
+    help_text: str | None = None
+    is_required: bool | None = None
+    is_hidden: bool | None = None
+    min_value: float | None = None
+    max_value: float | None = None
+    step_value: float | None = None
+    display_order: int | None = None
+
+    created_at: datetime
+    updated_at: datetime
+    created_by: uuid.UUID | None = None
+    updated_by: uuid.UUID | None = None
+
+
+class StandardFieldOverrideListResponse(BaseModel):
+    items: list[StandardFieldOverrideOut]
+    total: int
+
+
+class StandardFieldRendered(BaseModel):
+    """One field, with registry defaults coalesced with the caller-org's
+    override row. This is what every form modal renders against.
+
+    `is_overridden` is true if an override row exists with at least one
+    non-NULL column — drives the "Reset" affordance in the Settings UI.
+    `overridable_props` is copied straight from the registry so the UI
+    can grey out locked knobs.
+    """
+
+    entity: str
+    field_key: str
+    field_type: str
+
+    label: str
+    placeholder: str | None = None
+    help_text: str | None = None
+    is_required: bool
+    is_hidden: bool
+    min_value: float | None = None
+    max_value: float | None = None
+    step_value: float | None = None
+    display_order: int
+
+    backend_required: bool
+    backend_validators: list[str]
+
+    is_overridden: bool
+    overridable_props: list[str]
+
+
+class StandardFieldRenderedListResponse(BaseModel):
+    entity: str
+    items: list[StandardFieldRendered]
+
+
+class StandardFieldEntity(BaseModel):
+    """One registered entity, for the Settings page entity-selector dropdown."""
+
+    entity: str
+    field_count: int
+
+
+class StandardFieldEntitiesResponse(BaseModel):
+    items: list[StandardFieldEntity]

@@ -1,0 +1,216 @@
+<div class="flex min-h-[calc(100vh-4rem)] flex-col bg-zinc-50">
+  <header class="border-b border-zinc-200 bg-white px-6 py-4">
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <a
+          [routerLink]="['/user/automations', triggerId()]"
+          class="inline-flex items-center gap-1 rounded text-xs text-zinc-500 hover:text-zinc-900"
+        >
+          <lucide-icon name="arrow-left" size="12" />
+          Back to editor
+        </a>
+        <span class="text-zinc-300">·</span>
+        <h1 class="text-lg font-semibold text-zinc-900">
+          Run history
+          @if (trigger(); as t) {
+            <span class="ml-1 text-zinc-500">— {{ t.name }}</span>
+          }
+        </h1>
+      </div>
+    </div>
+
+    @if (loadError(); as err) {
+      <div
+        class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+      >
+        {{ err }}
+      </div>
+    }
+  </header>
+
+  <section class="border-b border-zinc-200 bg-white px-6 py-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <select
+        [value]="statusFilter()"
+        (change)="onStatusChange($any($event.target).value)"
+        class="rounded-md border border-zinc-300 bg-white py-1.5 px-2 text-sm text-zinc-700"
+      >
+        @for (opt of STATUS_OPTIONS; track opt.value) {
+          <option [value]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+      <select
+        [value]="sinceFilter()"
+        (change)="onSinceChange($any($event.target).value)"
+        class="rounded-md border border-zinc-300 bg-white py-1.5 px-2 text-sm text-zinc-700"
+      >
+        @for (opt of SINCE_OPTIONS; track opt.value) {
+          <option [value]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+    </div>
+  </section>
+
+  <section class="flex-1 px-6 py-4">
+    @if (loading() && items().length === 0) {
+      <div
+        class="rounded-md border border-zinc-200 bg-white px-4 py-6 text-center text-sm text-zinc-500"
+      >
+        Loading runs…
+      </div>
+    } @else if (items().length === 0) {
+      <div class="rounded-md border border-dashed border-zinc-300 bg-white px-6 py-10 text-center">
+        <lucide-icon name="clock" size="28" class="mx-auto mb-2 text-zinc-400" />
+        <p class="text-sm font-medium text-zinc-700">No runs match your filters.</p>
+        <p class="mt-1 text-xs text-zinc-500">
+          When the trigger fires, every attempt lands here with the rendered payload and status.
+        </p>
+      </div>
+    } @else {
+      <div class="overflow-hidden rounded-md border border-zinc-200 bg-white">
+        <table class="min-w-full divide-y divide-zinc-200 text-sm">
+          <thead class="bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-500">
+            <tr>
+              <th class="px-4 py-2 font-medium w-6"></th>
+              <th class="px-4 py-2 font-medium">Scheduled</th>
+              <th class="px-4 py-2 font-medium">Status</th>
+              <th class="px-4 py-2 font-medium">Contact</th>
+              <th class="px-4 py-2 font-medium">Provider id</th>
+              <th class="px-4 py-2 font-medium">Error</th>
+              <th class="px-4 py-2 font-medium text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100">
+            @for (row of items(); track trackById($index, row)) {
+              <tr class="hover:bg-zinc-50">
+                <td class="px-2 py-2.5 text-center">
+                  <button
+                    type="button"
+                    (click)="toggleExpanded(row.id)"
+                    class="rounded p-1 text-zinc-500 hover:bg-zinc-100"
+                    [attr.aria-expanded]="expandedId() === row.id"
+                  >
+                    @if (expandedId() === row.id) {
+                      <lucide-icon name="chevron-down" size="12" />
+                    } @else {
+                      <lucide-icon name="chevron-right" size="12" />
+                    }
+                  </button>
+                </td>
+                <td class="px-4 py-2.5 text-xs text-zinc-700 whitespace-nowrap">
+                  {{ row.scheduled_at | date: 'medium' }}
+                </td>
+                <td class="px-4 py-2.5">
+                  <span
+                    class="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
+                    [class]="STATUS_PALETTE[row.status]"
+                  >
+                    {{ row.status }}
+                  </span>
+                </td>
+                <td class="px-4 py-2.5 text-xs text-zinc-700">
+                  @if (row.contact_id) {
+                    <a
+                      [routerLink]="['/user/contacts', row.contact_id]"
+                      class="text-zinc-700 underline hover:text-zinc-900"
+                    >
+                      View
+                    </a>
+                  } @else {
+                    <span class="text-zinc-400">—</span>
+                  }
+                </td>
+                <td class="px-4 py-2.5 text-xs font-mono text-zinc-600 max-w-[180px] truncate">
+                  {{ row.channel_message_id ?? '—' }}
+                </td>
+                <td class="px-4 py-2.5 text-xs text-rose-600 max-w-[260px] truncate">
+                  {{ row.error ?? '' }}
+                </td>
+                <td class="px-4 py-2.5 text-right">
+                  @if (row.status === 'failed' && canWrite()) {
+                    <button
+                      type="button"
+                      (click)="openRetry(row)"
+                      class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] text-zinc-700 hover:bg-zinc-50"
+                    >
+                      <lucide-icon name="refresh-cw" size="10" />
+                      Retry
+                    </button>
+                  }
+                </td>
+              </tr>
+              @if (expandedId() === row.id) {
+                <tr class="bg-zinc-50">
+                  <td colspan="7" class="px-6 py-3">
+                    <div class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                      Event payload
+                    </div>
+                    <pre
+                      class="mt-1 overflow-x-auto rounded bg-white px-3 py-2 font-mono text-[11px] leading-snug text-zinc-700 ring-1 ring-zinc-200"
+                      >{{ payloadJson(row) }}</pre
+                    >
+                    <div class="mt-3 grid grid-cols-2 gap-3 text-xs text-zinc-600">
+                      <div>
+                        <span class="font-semibold text-zinc-700">Event id:</span>
+                        <code class="ml-1 rounded bg-white px-1 font-mono">{{ row.event_id }}</code>
+                      </div>
+                      <div>
+                        <span class="font-semibold text-zinc-700">Dispatched:</span>
+                        @if (row.dispatched_at) {
+                          {{ row.dispatched_at | date: 'medium' }}
+                        } @else {
+                          <span class="text-zinc-400">not yet</span>
+                        }
+                      </div>
+                      <div>
+                        <span class="font-semibold text-zinc-700">Completed:</span>
+                        @if (row.completed_at) {
+                          {{ row.completed_at | date: 'medium' }}
+                        } @else {
+                          <span class="text-zinc-400">not yet</span>
+                        }
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (totalPages() > 1) {
+        <div class="mt-3 flex items-center justify-between text-xs text-zinc-600">
+          <span>
+            Showing {{ items().length }} of {{ total() }} • Page {{ pageIndex() + 1 }} /
+            {{ totalPages() }}
+          </span>
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              (click)="prevPage()"
+              [disabled]="!hasPrev()"
+              class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 hover:bg-zinc-50 disabled:opacity-40"
+            >
+              <lucide-icon name="chevron-left" size="12" />
+              Prev
+            </button>
+            <button
+              type="button"
+              (click)="nextPage()"
+              [disabled]="!hasNext()"
+              class="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1 hover:bg-zinc-50 disabled:opacity-40"
+            >
+              Next
+              <lucide-icon name="chevron-right" size="12" />
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </section>
+</div>
+
+@if (retryTarget(); as r) {
+  <app-retry-modal [run]="r" (closed)="closeRetry()" (retried)="onRetried($event)" />
+}

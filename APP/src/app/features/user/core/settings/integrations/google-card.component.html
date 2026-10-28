@@ -1,0 +1,279 @@
+<section
+  class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm"
+  data-testid="google-ads-card"
+>
+  <!-- Card header: logo-ish badge + status pill + action button. -->
+  <header class="flex items-start justify-between gap-4">
+    <div class="flex items-start gap-3">
+      <span
+        class="flex h-10 w-10 items-center justify-center rounded-md bg-blue-50 font-bold text-blue-700"
+        aria-hidden="true"
+      >
+        G
+      </span>
+      <div>
+        <h3 class="text-base font-semibold text-zinc-900">Google Ads</h3>
+        <p class="mt-0.5 text-sm text-zinc-600">
+          Lead Form Extensions → CRM. Reads `extension_feed_item` Lead Forms; paste the webhook URL
+          into each form in Google Ads.
+        </p>
+        @if (integration()?.status === 'connected' && integration()?.account_label) {
+          <p class="mt-1 text-xs text-zinc-500">
+            Connected as
+            <span class="font-mono">{{ integration()?.account_label }}</span>
+          </p>
+        }
+      </div>
+    </div>
+    <div class="flex shrink-0 items-center gap-2">
+      @if (integration() === null || integration()?.status === 'disconnected') {
+        <span
+          class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200"
+        >
+          Not connected
+        </span>
+      } @else if (integration()?.status === 'connected') {
+        <span
+          class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+        >
+          Connected
+        </span>
+      } @else if (integration()?.status === 'expired') {
+        <span
+          class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200"
+        >
+          Reconnect required
+        </span>
+      } @else {
+        <span
+          class="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
+        >
+          Error
+        </span>
+      }
+    </div>
+  </header>
+
+  @if (inlineError(); as err) {
+    <div
+      class="mt-4 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+    >
+      <lucide-icon
+        name="alert-triangle"
+        size="16"
+        class="mt-0.5 shrink-0"
+        aria-hidden="true"
+      ></lucide-icon>
+      <span>{{ err }}</span>
+    </div>
+  }
+
+  @if (needsReconnect()) {
+    <div class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+      <p class="font-medium">Your Google Ads connection has expired.</p>
+      @if (integration()?.last_error) {
+        <p class="mt-1 text-xs text-amber-700">
+          {{ integration()?.last_error }}
+        </p>
+      }
+      <p class="mt-2 text-xs">
+        Reconnect to issue a fresh refresh token. Existing form subscriptions persist — Google Ads
+        keeps the same form ids across reconnects.
+      </p>
+    </div>
+  }
+
+  <!-- Action buttons. -->
+  <div class="mt-5 flex flex-wrap items-center gap-2">
+    @if (integration() === null || integration()?.status === 'disconnected') {
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+        (click)="connect()"
+      >
+        <lucide-icon name="arrow-right" size="16" aria-hidden="true"></lucide-icon>
+        Connect Google Ads
+      </button>
+    } @else if (needsReconnect()) {
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-md bg-amber-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-700"
+        (click)="reconnect()"
+      >
+        <lucide-icon name="refresh-cw" size="16" aria-hidden="true"></lucide-icon>
+        Reconnect
+      </button>
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        (click)="disconnect()"
+      >
+        <lucide-icon name="trash-2" size="16" aria-hidden="true"></lucide-icon>
+        Disconnect
+      </button>
+    } @else {
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        (click)="disconnect()"
+      >
+        <lucide-icon name="trash-2" size="16" aria-hidden="true"></lucide-icon>
+        Disconnect
+      </button>
+    }
+  </div>
+
+  @if (isConnected()) {
+    <!-- Webhook URL panel — admin pastes into Google Ads UI. -->
+    @if (webhookUrl(); as url) {
+      <div class="mt-5 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+        <p class="text-xs font-medium text-zinc-700">Webhook URL</p>
+        <p class="mt-1 text-xs text-zinc-600">
+          Paste this into each Google Ads Lead Form's "Webhook URL" field. Disconnect rotates the
+          secret — the old URL stops authenticating.
+        </p>
+        <div class="mt-2 flex items-center gap-2">
+          <code
+            class="block w-full overflow-x-auto rounded bg-white px-2 py-1.5 font-mono text-xs text-zinc-800 ring-1 ring-zinc-200"
+          >
+            {{ url }}
+          </code>
+          <button
+            type="button"
+            class="inline-flex shrink-0 items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+            (click)="copyWebhookUrl()"
+            aria-label="Copy webhook URL"
+          >
+            <lucide-icon name="copy" size="14" aria-hidden="true"></lucide-icon>
+            Copy
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Accounts + Lead Forms tree. -->
+    <div class="mt-5">
+      <div class="flex items-center justify-between">
+        <h4 class="text-sm font-medium text-zinc-900">Accounts &amp; Forms</h4>
+        @if (!accountsLoaded() && !accountsLoading()) {
+          <button
+            type="button"
+            class="text-xs font-medium text-blue-600 hover:text-blue-700"
+            (click)="loadAccounts()"
+          >
+            Load
+          </button>
+        }
+      </div>
+
+      @if (accountsLoading()) {
+        <p class="mt-2 flex items-center gap-2 text-xs text-zinc-500">
+          <lucide-icon
+            name="loader-2"
+            size="14"
+            class="animate-spin"
+            aria-hidden="true"
+          ></lucide-icon>
+          Loading accounts…
+        </p>
+      }
+
+      @if (accountsLoaded() && accounts().length === 0) {
+        <p class="mt-2 text-xs text-zinc-500">
+          No accessible Google Ads accounts. Confirm the connected Google user has access to at
+          least one Ads account.
+        </p>
+      }
+
+      @for (acc of accounts(); track acc.customer_id) {
+        <div class="mt-3 rounded-md border border-zinc-200">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-zinc-50"
+            (click)="toggleAccountExpansion(acc.customer_id)"
+          >
+            <div class="flex items-center gap-2">
+              <lucide-icon
+                [name]="expandedAccounts().has(acc.customer_id) ? 'chevron-down' : 'chevron-right'"
+                size="14"
+                class="text-zinc-500"
+                aria-hidden="true"
+              ></lucide-icon>
+              <span class="text-sm font-mono text-zinc-800">
+                {{ acc.customer_id }}
+              </span>
+            </div>
+          </button>
+          @if (expandedAccounts().has(acc.customer_id)) {
+            <div class="border-t border-zinc-200 px-3 py-2">
+              @if (formsLoadingFor() === acc.customer_id) {
+                <p class="flex items-center gap-2 text-xs text-zinc-500">
+                  <lucide-icon
+                    name="loader-2"
+                    size="14"
+                    class="animate-spin"
+                    aria-hidden="true"
+                  ></lucide-icon>
+                  Loading forms…
+                </p>
+              } @else if ((formsByAccount()[acc.customer_id] || []).length === 0) {
+                <p class="text-xs text-zinc-500">No Lead Forms on this account.</p>
+              } @else {
+                <ul class="divide-y divide-zinc-100">
+                  @for (form of formsByAccount()[acc.customer_id]; track form.form_id) {
+                    <li class="flex items-center justify-between py-2">
+                      <div>
+                        <p class="text-sm text-zinc-800">
+                          {{ form.name || '(unnamed form)' }}
+                        </p>
+                        <p class="text-xs text-zinc-500 font-mono">
+                          {{ form.form_id }}
+                        </p>
+                      </div>
+                      <div class="flex items-center gap-1">
+                        @if (subscriptionsByForm()[form.form_id]) {
+                          <button
+                            type="button"
+                            class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                            (click)="openMapping(form)"
+                          >
+                            Edit mapping
+                          </button>
+                        }
+                        <button
+                          type="button"
+                          class="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium"
+                          [class.border-emerald-300]="subscriptionsByForm()[form.form_id]"
+                          [class.bg-emerald-50]="subscriptionsByForm()[form.form_id]"
+                          [class.text-emerald-700]="subscriptionsByForm()[form.form_id]"
+                          [class.border-zinc-300]="!subscriptionsByForm()[form.form_id]"
+                          [class.text-zinc-700]="!subscriptionsByForm()[form.form_id]"
+                          [disabled]="toggleInFlightFor() === form.form_id"
+                          (click)="toggleSubscribe(form)"
+                        >
+                          @if (toggleInFlightFor() === form.form_id) {
+                            <lucide-icon
+                              name="loader-2"
+                              size="14"
+                              class="animate-spin"
+                              aria-hidden="true"
+                            ></lucide-icon>
+                          } @else if (subscriptionsByForm()[form.form_id]) {
+                            <lucide-icon name="check" size="14" aria-hidden="true"></lucide-icon>
+                            Subscribed
+                          } @else {
+                            Subscribe
+                          }
+                        </button>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+</section>

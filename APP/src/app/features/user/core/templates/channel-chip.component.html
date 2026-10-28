@@ -1,0 +1,8 @@
+@let d = descriptor();
+<span
+  class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset"
+  [class]="d.classes"
+>
+  <lucide-icon [name]="d.icon" size="12" />
+  {{ d.label }}
+</span>

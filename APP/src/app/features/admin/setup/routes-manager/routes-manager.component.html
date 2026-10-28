@@ -1,0 +1,92 @@
+<div class="routes-manager">
+  <div class="routes-manager__header">
+    <mat-icon class="routes-manager__header-icon">route</mat-icon>
+    <div class="routes-manager__header-titles">
+      <h2 class="routes-manager__title">Route Management</h2>
+      <p class="routes-manager__subtitle">Manage application routes and access control</p>
+    </div>
+  </div>
+
+  <div class="routes-manager__body">
+  <div class="routes-manager__toolbar">
+    <mat-form-field appearance="outline" class="routes-manager__filter">
+      <mat-label>Filter routes</mat-label>
+      <input matInput placeholder="Search by name or control ID" [ngModel]="filterText()" (ngModelChange)="onFilterChange($event)" />
+      <mat-icon matPrefix>search</mat-icon>
+    </mat-form-field>
+
+    <button mat-flat-button color="primary" (click)="openAddDialog()">
+      <mat-icon>add</mat-icon>
+      Add Route
+    </button>
+  </div>
+
+  @if (isLoading()) {
+    <div class="routes-manager__loading">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+  } @else {
+    <mat-tab-group>
+      @for (tab of tabs; track tab; let i = $index) {
+        <mat-tab [label]="tab">
+          <div class="routes-manager__tab-content">
+            @if (getTreeForTab(i).length === 0) {
+              <div class="routes-manager__empty">No routes found</div>
+            } @else {
+              <ng-container *ngTemplateOutlet="treeTemplate; context: { $implicit: getTreeForTab(i), level: 0 }"></ng-container>
+            }
+          </div>
+        </mat-tab>
+      }
+    </mat-tab-group>
+  }
+  </div>
+</div>
+
+<ng-template #treeTemplate let-nodes let-level="level">
+  @for (node of nodes; track node.route.id) {
+    <div class="routes-manager__node" [style.padding-left.px]="level * 24">
+      <div class="routes-manager__node-row">
+        @if (node.children.length > 0) {
+          <button mat-icon-button class="routes-manager__expand-btn" (click)="toggleExpand(node)">
+            <mat-icon>{{ node.expanded ? 'expand_more' : 'chevron_right' }}</mat-icon>
+          </button>
+        } @else {
+          <span class="routes-manager__expand-placeholder"></span>
+        }
+
+        <mat-checkbox
+          [checked]="node.route.is_active"
+          (change)="toggleActive(node.route)"
+          matTooltip="Toggle active status">
+        </mat-checkbox>
+
+        @if (node.route.mat_icon) {
+          <mat-icon class="routes-manager__node-icon">{{ node.route.mat_icon }}</mat-icon>
+        }
+
+        <span class="routes-manager__node-name" (click)="openEditDialog(node.route)">
+          {{ node.route.name }}
+        </span>
+
+        <span class="routes-manager__node-path">{{ node.route.path }}</span>
+        <span class="routes-manager__node-control-id">{{ node.route.control_id }}</span>
+
+        <span class="routes-manager__node-spacer"></span>
+
+        <div class="routes-manager__node-actions">
+          <button mat-icon-button matTooltip="Edit" (click)="openEditDialog(node.route)">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button mat-icon-button matTooltip="Delete" (click)="deleteRoute(node.route)">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      @if (node.expanded && node.children.length > 0) {
+        <ng-container *ngTemplateOutlet="treeTemplate; context: { $implicit: node.children, level: level + 1 }"></ng-container>
+      }
+    </div>
+  }
+</ng-template>

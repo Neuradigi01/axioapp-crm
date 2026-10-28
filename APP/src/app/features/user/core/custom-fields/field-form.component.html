@@ -1,0 +1,127 @@
+<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-lg rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
+    <header class="border-b border-zinc-200 px-6 py-4">
+      <h2 class="text-base font-semibold text-zinc-900">
+        {{ isEdit() ? 'Edit field' : 'Add field' }}
+      </h2>
+      <p class="mt-1 text-xs text-zinc-500">
+        {{
+          isEdit()
+            ? 'Field key and type are locked. Label, required, hidden, and choices can change.'
+            : 'New fields are user-scoped and fully editable later.'
+        }}
+      </p>
+    </header>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4 px-6 py-5">
+      <div>
+        <label class="block text-xs font-medium text-zinc-700" for="field_key"> Field key </label>
+        <input
+          id="field_key"
+          type="text"
+          formControlName="field_key"
+          autocomplete="off"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-500"
+          placeholder="e.g. preferred_wood_type"
+        />
+        @if (form.controls.field_key.touched && form.controls.field_key.invalid) {
+          <p class="mt-1 text-xs text-red-600">
+            Must be lowercase, start with a letter, and use only letters, digits, or underscores
+            (2–50 chars).
+          </p>
+        }
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-zinc-700" for="field_label">
+          Label shown to users
+        </label>
+        <input
+          id="field_label"
+          type="text"
+          formControlName="field_label"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          placeholder="e.g. Preferred wood type"
+        />
+        @if (form.controls.field_label.touched && form.controls.field_label.invalid) {
+          <p class="mt-1 text-xs text-red-600">A label is required.</p>
+        }
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-zinc-700" for="field_type">Type</label>
+        <select
+          id="field_type"
+          formControlName="field_type"
+          class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-500"
+        >
+          @for (t of fieldTypes; track t.value) {
+            <option [value]="t.value">{{ t.label }}</option>
+          }
+        </select>
+      </div>
+
+      @if (needsChoices()) {
+        <div>
+          <label class="block text-xs font-medium text-zinc-700" for="choices_csv">
+            Choices (comma-separated)
+          </label>
+          <textarea
+            id="choices_csv"
+            formControlName="choices_csv"
+            rows="2"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            placeholder="Teak, Oak, Mahogany"
+          ></textarea>
+          <p class="mt-1 text-xs text-zinc-500">
+            Persisted as <code class="font-mono">options.choices</code>.
+          </p>
+        </div>
+      }
+
+      <div class="flex items-center gap-6">
+        <label class="flex items-center gap-2 text-sm text-zinc-700">
+          <input
+            type="checkbox"
+            formControlName="is_required"
+            class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+          />
+          Required
+        </label>
+        <label class="flex items-center gap-2 text-sm text-zinc-700">
+          <input
+            type="checkbox"
+            formControlName="is_hidden"
+            class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+          />
+          Hidden
+        </label>
+      </div>
+
+      @if (submitError$()) {
+        <div class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+          {{ submitError$() }}
+        </div>
+      }
+
+      <footer
+        class="-mx-6 -mb-5 flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg"
+      >
+        <button
+          type="button"
+          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          (click)="cancel.emit()"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          [disabled]="submitting$()"
+          class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+        >
+          {{ isEdit() ? 'Save' : 'Add field' }}
+        </button>
+      </footer>
+    </form>
+  </div>
+</div>

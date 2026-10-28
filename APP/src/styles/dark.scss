@@ -1,0 +1,133 @@
+// =============================================================================
+// Dark Theme — Semantic Token Mappings
+// =============================================================================
+// Maps semantic tokens to dark primitive values from tokens.scss.
+// Loaded as a separate bundle (inject: false) and swapped at runtime.
+// =============================================================================
+
+@use 'tokens';
+
+:root {
+  // ---------------------------------------------------------------------------
+  // Page
+  // ---------------------------------------------------------------------------
+  --page-bg: var(--c-dark-bg);
+  --page-text: var(--c-dark-text-primary);
+  --page-text-secondary: var(--c-dark-text-secondary);
+  --page-text-muted: var(--c-dark-text-muted);
+
+  // ---------------------------------------------------------------------------
+  // Surfaces
+  // ---------------------------------------------------------------------------
+  --surface-1: var(--c-dark-surface-1);
+  --surface-2: var(--c-dark-surface-2);
+  --surface-3: var(--c-dark-surface-3);
+
+  // ---------------------------------------------------------------------------
+  // Borders & Dividers
+  // ---------------------------------------------------------------------------
+  --border-color: var(--c-dark-border);
+  --divider-color: var(--c-dark-divider);
+
+  // ---------------------------------------------------------------------------
+  // Shadows
+  // ---------------------------------------------------------------------------
+  --shadow-card: var(--shadow-card-dark);
+  --shadow-card-blue: var(--shadow-card-blue-dark);
+  --shadow-elevated: var(--shadow-elevated-dark);
+
+  // ---------------------------------------------------------------------------
+  // Feedback
+  // ---------------------------------------------------------------------------
+  --feedback-success-bg: var(--feedback-success-bg-dark);
+  --feedback-error-bg: var(--feedback-error-bg-dark);
+  --feedback-warning-bg: var(--feedback-warning-bg-dark);
+  --feedback-info-bg: var(--feedback-info-bg-dark);
+
+  // ---------------------------------------------------------------------------
+  // Material Overrides
+  // ---------------------------------------------------------------------------
+  --mat-card-background-color: var(--c-dark-surface-1);
+  --mat-card-border: 1px solid var(--c-dark-border);
+  --mat-card-box-shadow: var(--shadow-card-dark);
+
+  // ---------------------------------------------------------------------------
+  // Scrollbar
+  // ---------------------------------------------------------------------------
+  --scrollbar-track: var(--c-dark-surface-2);
+  --scrollbar-thumb: var(--c-dark-surface-3);
+
+  // ---------------------------------------------------------------------------
+  // Sidenav
+  // ---------------------------------------------------------------------------
+  --sidenav-bg: var(--c-dark-surface-1);
+  --sidenav-text: var(--c-dark-text-secondary);
+  --sidenav-hover-bg: var(--c-dark-surface-2);
+  --sidenav-active-bg: rgba(79, 119, 251, 0.1);
+  --sidenav-active-accent: var(--sidenav-active-accent-dark);
+  --sidenav-active-text: var(--sidenav-active-text-dark);
+  --sidenav-shadow: var(--sidenav-shadow-dark);
+
+  // ---------------------------------------------------------------------------
+  // Toolbar
+  // ---------------------------------------------------------------------------
+  --toolbar-bg: var(--c-dark-surface-1);
+  --toolbar-text: var(--c-dark-text-primary);
+  --toolbar-shadow: var(--toolbar-shadow-dark);
+
+  // ---------------------------------------------------------------------------
+  // Input
+  // ---------------------------------------------------------------------------
+  --input-bg: var(--c-dark-surface-2);
+  --input-border: var(--c-dark-border);
+  --input-text: var(--c-dark-text-primary);
+  --input-placeholder: var(--c-dark-text-muted);
+
+  // ---------------------------------------------------------------------------
+  // Auth Card
+  // ---------------------------------------------------------------------------
+  --auth-card-bg: var(--auth-card-bg-dark);
+  --auth-card-border: 1px solid var(--auth-card-border-dark);
+  --auth-card-shadow: var(--auth-card-shadow-dark);
+
+  // ---------------------------------------------------------------------------
+  // Dashboard Tiles
+  // ---------------------------------------------------------------------------
+  --tile-bg: var(--tile-bg-dark);
+  --tile-border: 1px solid var(--tile-border-dark);
+  --tile-shadow: var(--tile-shadow-dark);
+  --tile-hover-shadow: var(--tile-hover-shadow-dark);
+
+  // ---------------------------------------------------------------------------
+  // Form Card
+  // ---------------------------------------------------------------------------
+  --form-card-bg: var(--form-card-bg-dark);
+  --form-card-border: 1px solid var(--form-card-border-dark);
+  --form-card-shadow: var(--form-card-shadow-dark);
+  --form-card-header-bg: var(--form-card-header-bg-dark);
+  --form-card-header-border: 1px solid var(--form-card-header-border-dark);
+
+  // ---------------------------------------------------------------------------
+  // Page Layout / Table
+  // ---------------------------------------------------------------------------
+  --table-header-bg: var(--table-header-bg-dark);
+  --table-row-hover: var(--table-row-hover-dark);
+  --table-row-alt: var(--table-row-alt-dark);
+
+  // ---------------------------------------------------------------------------
+  // File Upload / Drop Zone
+  // ---------------------------------------------------------------------------
+  --drop-zone-hover-bg: var(--drop-zone-hover-bg-dark);
+
+  // ---------------------------------------------------------------------------
+  // Status Badge
+  // ---------------------------------------------------------------------------
+  --badge-active-bg: var(--badge-active-bg-dark);
+  --badge-inactive-bg: var(--badge-inactive-bg-dark);
+  --badge-open-bg: var(--badge-open-bg-dark);
+  --badge-in-progress-bg: var(--badge-in-progress-bg-dark);
+  --badge-resolved-bg: var(--badge-resolved-bg-dark);
+  --badge-closed-bg: var(--badge-closed-bg-dark);
+
+  color-scheme: dark;
+}

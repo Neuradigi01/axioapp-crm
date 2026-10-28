@@ -1,0 +1,29 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.compose {
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  &__attachments {
+    margin: var(--spacing-xs) 0 var(--spacing-sm);
+  }
+
+  &__submit {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
+  }
+}
+
+.full-width {
+  width: 100%;
+}

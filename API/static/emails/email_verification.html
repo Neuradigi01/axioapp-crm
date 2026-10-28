@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Verify Your Email</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    body { margin: 0; padding: 0; width: 100% !important; height: 100% !important; background-color: #f0f4fa; }
+    @media only screen and (max-width: 620px) {
+      .email-container { width: 100% !important; padding: 0 12px !important; }
+      .content-cell { padding: 32px 24px !important; }
+      .hero-icon { width: 56px !important; height: 56px !important; line-height: 56px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background-color:#f0f4fa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+
+  <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">
+    Verify your email address for {{app_name}}. This link expires in 24 hours.
+  </div>
+
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f0f4fa;">
+    <tr>
+      <td align="center" style="padding: 40px 16px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="560" class="email-container" style="max-width:560px; width:100%;">
+
+          <!-- Logo -->
+          <tr>
+            <td align="center" style="padding: 0 0 28px 0;">
+              <img src="{{logo_url}}" alt="{{app_name}}" width="180" style="display:block; width:180px; max-width:180px; height:auto;">
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background-color:#ffffff; border-radius:12px; box-shadow: 0 2px 12px rgba(0,0,0,0.07);">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+
+                <!-- Accent Bar -->
+                <tr>
+                  <td style="background-color:#004BB2; height:4px; border-radius:12px 12px 0 0; font-size:0; line-height:0;">&nbsp;</td>
+                </tr>
+
+                <!-- Content -->
+                <tr>
+                  <td class="content-cell" style="padding: 44px 40px;">
+
+                    <!-- Icon -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                      <tr>
+                        <td align="center" style="padding-bottom: 20px;">
+                          <div class="hero-icon" style="width:72px; height:72px; border-radius:50%; background-color:#22c55e; text-align:center; line-height:72px;">
+                            <span style="font-size:32px; color:#ffffff;">&#9993;</span>
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <h1 style="margin:0 0 6px 0; font-size:22px; font-weight:700; color:#1a1a2e; text-align:center; line-height:1.3;">
+                      Verify Your Email
+                    </h1>
+                    <p style="margin:0 0 28px 0; font-size:14px; color:#6b7280; text-align:center; line-height:1.6;">
+                      Hi {{user_name}}, please verify your email address to activate your account.
+                    </p>
+
+                    <!-- Divider -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                      <tr><td style="border-top: 1px solid #e8edf5; padding-top: 24px;">
+                        <p style="margin:0 0 14px 0; font-size:15px; color:#374151; line-height:1.7;">
+                          Click the button below to verify your email address. This link is valid for <strong>24 hours</strong>.
+                        </p>
+                      </td></tr>
+                    </table>
+
+                    <!-- CTA Button -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 24px 0;">
+                      <tr>
+                        <td align="center">
+                          <!--[if mso]>
+                          <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{verification_link}}" style="height:46px;v-text-anchor:middle;width:200px;" arcsize="17%" fillcolor="#004BB2" stroke="f">
+                            <w:anchorlock/>
+                            <center style="color:#ffffff;font-family:sans-serif;font-size:15px;font-weight:600;">Verify Email</center>
+                          </v:roundrect>
+                          <![endif]-->
+                          <!--[if !mso]><!-->
+                          <a href="{{verification_link}}" target="_blank" style="display:inline-block; background-color:#004BB2; color:#ffffff; font-size:15px; font-weight:600; text-decoration:none; padding:13px 32px; border-radius:8px;">
+                            Verify Email
+                          </a>
+                          <!--<![endif]-->
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Fallback Link -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 0 0 24px 0;">
+                      <tr>
+                        <td style="background-color:#f0f4fa; border-radius:8px; padding: 14px 20px;">
+                          <p style="margin:0 0 6px 0; font-size:12px; color:#6b7280;">If the button doesn't work, copy and paste this link into your browser:</p>
+                          <p style="margin:0; font-size:12px; color:#004BB2; word-break:break-all; line-height:1.5;">{{verification_link}}</p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Security Notice -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                      <tr><td style="border-top: 1px solid #e8edf5; padding-top: 20px;">
+                        <p style="margin:0; font-size:13px; color:#9ca3af; line-height:1.7;">
+                          If you did not create this account, you can safely ignore this email.
+                        </p>
+                      </td></tr>
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding: 28px 16px;">
+              <p style="margin:0 0 6px 0; font-size:12px; color:#9ca3af; line-height:1.6;">
+                &copy; {{year}} {{app_name}}. All rights reserved.
+              </p>
+              <p style="margin:0; font-size:11px; color:#d1d5db; line-height:1.6;">
+                This is an automated message. Please do not reply to this email.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

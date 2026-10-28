@@ -1,0 +1,99 @@
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold text-zinc-900">Field Operations</h2>
+      <p class="text-xs text-zinc-500">Recent and upcoming site visits across the team</p>
+    </div>
+    <a
+      routerLink="/user/field-ops"
+      class="inline-flex items-center gap-1 text-xs font-medium text-zinc-700 hover:text-zinc-900"
+    >
+      Open full view
+      <lucide-icon name="chevron-right" class="h-3.5 w-3.5" />
+    </a>
+  </div>
+
+  <div class="grid grid-cols-3 gap-3">
+    <div class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+      <p class="text-[11px] uppercase tracking-wide text-zinc-500">Open</p>
+      <p class="mt-1 text-xl font-semibold text-zinc-900">{{ counts().open }}</p>
+    </div>
+    <div class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+      <p class="text-[11px] uppercase tracking-wide text-zinc-500">Completed</p>
+      <p class="mt-1 text-xl font-semibold text-emerald-700">{{ counts().done }}</p>
+    </div>
+    <div class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+      <p class="text-[11px] uppercase tracking-wide text-zinc-500">Total</p>
+      <p class="mt-1 text-xl font-semibold text-zinc-900">{{ counts().total }}</p>
+    </div>
+  </div>
+
+  @if (loadError(); as err) {
+    <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">{{ err }}</p>
+  } @else if (loading() && visits().length === 0) {
+    <div class="space-y-2 animate-pulse">
+      @for (i of [0, 1, 2]; track i) {
+        <div class="h-14 rounded-md bg-zinc-100"></div>
+      }
+    </div>
+  } @else if (visits().length === 0) {
+    <p
+      class="rounded-md border border-dashed border-zinc-300 bg-white py-8 text-center text-sm text-zinc-500"
+    >
+      No field visits yet. Schedule one from the Field Operations page.
+    </p>
+  } @else {
+    <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <table class="min-w-full divide-y divide-zinc-200 text-sm">
+        <thead class="bg-zinc-50 text-[11px] uppercase tracking-wide text-zinc-500">
+          <tr>
+            <th class="px-3 py-2 text-left font-medium">Visit</th>
+            <th class="px-3 py-2 text-left font-medium">Status</th>
+            <th class="px-3 py-2 text-right font-medium">Updated</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-100">
+          @for (v of visits(); track v.id) {
+            <tr>
+              <td class="px-3 py-2">
+                <a
+                  [routerLink]="['/user/field-ops', v.id]"
+                  class="font-medium text-zinc-900 hover:underline"
+                >
+                  Visit {{ v.id.slice(0, 8) }}…
+                </a>
+                <span
+                  [class]="
+                    'ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ring-1 ' +
+                    purposeBadgeClass(v.purpose)
+                  "
+                >
+                  {{ v.purpose }}
+                </span>
+              </td>
+              <td class="px-3 py-2">
+                @if (v.completed_at) {
+                  <span
+                    class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200"
+                  >
+                    <lucide-icon name="check" class="h-3 w-3" />
+                    Completed
+                  </span>
+                } @else {
+                  <span
+                    class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200"
+                  >
+                    Open
+                  </span>
+                }
+              </td>
+              <td class="px-3 py-2 text-right text-xs text-zinc-500">
+                {{ formatRelative(v.completed_at ?? v.updated_at) }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

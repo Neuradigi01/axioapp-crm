@@ -1,0 +1,200 @@
+<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-lg rounded-lg bg-white shadow-xl ring-1 ring-zinc-200">
+    <header class="border-b border-zinc-200 px-6 py-4">
+      <h2 class="text-base font-semibold text-zinc-900">
+        {{ isEdit() ? 'Edit product' : 'Add product' }}
+      </h2>
+      <p class="mt-1 text-xs text-zinc-500">
+        {{
+          isEdit()
+            ? 'SKU is locked. Change name, category, price, or active state.'
+            : 'Pick a unique SKU, give it a name, set the price.'
+        }}
+      </p>
+    </header>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4 px-6 py-5">
+      <div>
+        <label class="block text-xs font-medium text-zinc-700">Product image</label>
+        <div class="mt-1 flex items-start gap-3">
+          @if (displayImage(); as src) {
+            <img
+              [src]="src"
+              alt="Product preview"
+              class="h-20 w-20 shrink-0 rounded-md object-cover ring-1 ring-zinc-200"
+            />
+          } @else {
+            <div
+              class="flex h-20 w-20 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-xs text-zinc-400 ring-1 ring-dashed ring-zinc-300"
+            >
+              No image
+            </div>
+          }
+          <div
+            class="flex-1 rounded-md border border-dashed border-zinc-300 px-3 py-3 text-center text-xs text-zinc-500 hover:border-zinc-400"
+            (drop)="onFileDropped($event)"
+            (dragover)="onDragOver($event)"
+          >
+            <label class="cursor-pointer">
+              <span class="font-medium text-zinc-700">Click to upload</span>
+              <span> or drag &amp; drop</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                class="hidden"
+                (change)="onFileSelected($event)"
+              />
+            </label>
+            <p class="mt-1 text-[11px] text-zinc-400">JPEG, PNG, or WebP · up to 5 MB</p>
+            @if (selectedFile(); as f) {
+              <button
+                type="button"
+                (click)="clearImage()"
+                class="mt-1 text-[11px] font-medium text-red-600 hover:underline"
+              >
+                Remove "{{ f.name }}"
+              </button>
+            }
+          </div>
+        </div>
+        @if (imageError(); as err) {
+          <p class="mt-1 text-xs text-red-600">{{ err }}</p>
+        }
+      </div>
+
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        @if (!isHidden('sku')) {
+          <div>
+            <label class="block text-xs font-medium text-zinc-700" for="ci_sku">
+              {{ stdField('sku')?.label ?? 'SKU' }} <span class="text-red-600">*</span>
+            </label>
+            <input
+              id="ci_sku"
+              type="text"
+              formControlName="sku"
+              [attr.placeholder]="stdField('sku')?.placeholder ?? 'e.g. SOF001'"
+              autocomplete="off"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm uppercase text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100"
+            />
+            @if (stdField('sku')?.help_text; as help) {
+              <p class="mt-1 text-xs text-zinc-500">{{ help }}</p>
+            }
+          </div>
+        }
+        @if (!isHidden('category')) {
+          <div>
+            <label class="block text-xs font-medium text-zinc-700" for="ci_category">
+              {{ stdField('category')?.label ?? 'Category' }}
+              @if (stdField('category')?.is_required) {
+                <span class="text-red-600">*</span>
+              }
+            </label>
+            <input
+              id="ci_category"
+              type="text"
+              formControlName="category"
+              [attr.placeholder]="stdField('category')?.placeholder ?? 'e.g. Sofa'"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+            @if (stdField('category')?.help_text; as help) {
+              <p class="mt-1 text-xs text-zinc-500">{{ help }}</p>
+            }
+          </div>
+        }
+      </div>
+
+      @if (!isHidden('name')) {
+        <div>
+          <label class="block text-xs font-medium text-zinc-700" for="ci_name">
+            {{ stdField('name')?.label ?? 'Name' }} <span class="text-red-600">*</span>
+          </label>
+          <input
+            id="ci_name"
+            type="text"
+            formControlName="name"
+            [attr.placeholder]="stdField('name')?.placeholder ?? 'e.g. 3-seater Sofa'"
+            class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          />
+          @if (stdField('name')?.help_text; as help) {
+            <p class="mt-1 text-xs text-zinc-500">{{ help }}</p>
+          }
+        </div>
+      }
+
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        @if (!isHidden('price')) {
+          <div>
+            <label class="block text-xs font-medium text-zinc-700" for="ci_price">
+              {{ stdField('price')?.label ?? 'Price (₹)' }} <span class="text-red-600">*</span>
+            </label>
+            <input
+              id="ci_price"
+              type="number"
+              [attr.min]="stdField('price')?.min_value ?? 0"
+              [attr.max]="stdField('price')?.max_value"
+              [attr.step]="stdField('price')?.step_value ?? 0.01"
+              formControlName="price"
+              [attr.placeholder]="stdField('price')?.placeholder ?? '0.00'"
+              class="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            />
+            @if (form.controls.price.touched && form.controls.price.invalid) {
+              <p class="mt-1 text-xs text-red-600">
+                @if (form.controls.price.errors?.['required']) {
+                  A price is required.
+                } @else if (form.controls.price.errors?.['min']; as e) {
+                  Must be at least {{ e['min'] }}.
+                } @else if (form.controls.price.errors?.['max']; as e) {
+                  Must be at most {{ e['max'] }}.
+                } @else {
+                  Invalid value.
+                }
+              </p>
+            }
+            @if (stdField('price')?.help_text; as help) {
+              <p class="mt-1 text-xs text-zinc-500">{{ help }}</p>
+            }
+          </div>
+        }
+        @if (!isHidden('is_active')) {
+          <div class="flex items-end">
+            <label class="flex items-center gap-2 text-sm text-zinc-700">
+              <input
+                type="checkbox"
+                formControlName="is_active"
+                class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+              />
+              {{ stdField('is_active')?.label ?? 'Active' }}
+              <span class="text-xs text-zinc-500">(shown in pickers + lists)</span>
+            </label>
+          </div>
+        }
+      </div>
+
+      @if (submitError(); as err) {
+        <div class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">
+          {{ err }}
+        </div>
+      }
+    </form>
+
+    <footer
+      class="flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-6 py-3 rounded-b-lg"
+    >
+      <button
+        type="button"
+        (click)="cancel.emit()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        [disabled]="submitting()"
+        (click)="onSubmit()"
+        class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+      >
+        {{ isEdit() ? 'Save' : 'Add Product' }}
+      </button>
+    </footer>
+  </div>
+</div>

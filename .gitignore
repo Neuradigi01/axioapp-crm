@@ -1,0 +1,84 @@
+# Legacy
+Template/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Angular
+.angular/cache/
+.angular/
+
+# Build artifacts
+/dist
+/tmp
+/out-tsc
+/bazel-out
+
+# IDEs
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.iml
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Storage (runtime file uploads). Anchored to the API root's upload dir
+# (created by main.py as ./storage relative to the runtime CWD). A bare,
+# unanchored `storage/` also matched the SOURCE package
+# src/app/shared/storage/ and silently un-tracked it — it never got
+# committed, never shipped in the image, and prod died with
+# ModuleNotFoundError: 'src.app.shared.storage'. Keep these anchored.
+/API/storage/
+/api/storage/
+/storage/
+
+# Sidecar services (Node). node_modules/ is already ignored globally;
+# dist/ and storage/ are anchored above, so name them explicitly per
+# sidecar so the patterns also match sidecars/<name>/dist and
+# sidecars/<name>/storage.
+sidecars/*/node_modules/
+sidecars/*/dist/
+sidecars/*/storage/
+
+# Docker volumes
+postgres-data/
+redis-data/
+
+# Widget bundle (already covered by node_modules/ + dist/ above; listed
+# explicitly for discoverability — keep widget/package-lock.json IN tree).
+widget/node_modules/
+widget/dist/
+
+# Logs
+logs/
+*.log

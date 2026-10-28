@@ -1,0 +1,451 @@
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+  <!-- Wizard form (left) -->
+  <div class="flex min-h-0 flex-col">
+    <!-- Step indicator -->
+    <ol class="mb-4 flex items-center gap-1 overflow-x-auto text-[11px] font-medium">
+      @for (
+        label of ['Basics', 'Header', 'Body', 'Footer', 'Buttons', 'Samples', 'Review'];
+        track label;
+        let i = $index
+      ) {
+        <li
+          [class]="
+            'flex items-center gap-1.5 rounded-full px-2.5 py-1 ring-1 ' +
+            (step() === i + 1
+              ? 'bg-zinc-900 text-white ring-zinc-900'
+              : step() > i + 1
+                ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                : 'bg-white text-zinc-500 ring-zinc-200')
+          "
+        >
+          <span>{{ i + 1 }}</span>
+          <span>{{ label }}</span>
+        </li>
+      }
+    </ol>
+
+    <div class="flex-1 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-4">
+      @switch (step()) {
+        <!-- 1. Basics -->
+        @case (1) {
+          <h3 class="text-base font-semibold text-zinc-900">Basics</h3>
+          <p class="mb-3 text-xs text-zinc-500">
+            Choose a unique name (lowercase, underscores), the language, and the category that best
+            fits the template's purpose.
+          </p>
+
+          <label class="mb-1 block text-xs font-medium text-zinc-700">Name</label>
+          <input
+            type="text"
+            [ngModel]="name()"
+            (ngModelChange)="name.set($event)"
+            placeholder="diwali_sale_2026"
+            class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          />
+          @if (nameError(); as err) {
+            <p class="mt-1 text-xs text-rose-600">{{ err }}</p>
+          }
+
+          <label class="mb-1 mt-4 block text-xs font-medium text-zinc-700">Language</label>
+          <select
+            [ngModel]="language()"
+            (ngModelChange)="language.set($event)"
+            class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+          >
+            @for (l of LANGUAGES; track l.code) {
+              <option [value]="l.code">{{ l.label }} ({{ l.code }})</option>
+            }
+          </select>
+
+          <label class="mb-1 mt-4 block text-xs font-medium text-zinc-700">Category</label>
+          <div class="grid grid-cols-3 gap-2">
+            @for (c of ['MARKETING', 'UTILITY', 'AUTHENTICATION']; track c) {
+              <button
+                type="button"
+                (click)="category.set($any(c))"
+                [class]="
+                  'rounded-md border px-3 py-2 text-xs font-medium transition ' +
+                  (category() === c
+                    ? 'border-zinc-900 bg-zinc-900 text-white'
+                    : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+                "
+              >
+                {{ c }}
+              </button>
+            }
+          </div>
+        }
+
+        <!-- 2. Header -->
+        @case (2) {
+          <h3 class="text-base font-semibold text-zinc-900">Header</h3>
+          <p class="mb-3 text-xs text-zinc-500">
+            Optional. TEXT supports a short line at the top of the bubble; media headers attach a
+            sample asset at submit time.
+          </p>
+
+          <div class="mb-3 grid grid-cols-5 gap-2">
+            @for (t of [null, 'TEXT', 'IMAGE', 'VIDEO', 'DOCUMENT']; track t) {
+              <button
+                type="button"
+                (click)="pickHeaderType($any(t))"
+                [class]="
+                  'rounded-md border px-3 py-2 text-xs font-medium transition ' +
+                  (headerType() === t
+                    ? 'border-zinc-900 bg-zinc-900 text-white'
+                    : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+                "
+              >
+                {{ t || 'None' }}
+              </button>
+            }
+          </div>
+
+          @if (headerType() === 'TEXT') {
+            <label class="mb-1 block text-xs font-medium text-zinc-700">
+              Header text ({{ LIMITS.headerMax }} chars max)
+            </label>
+            <input
+              type="text"
+              [ngModel]="headerText()"
+              (ngModelChange)="headerText.set($event)"
+              [maxlength]="LIMITS.headerMax"
+              placeholder="Diwali Sale"
+              class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            />
+            <p class="mt-1 text-right text-[10px] text-zinc-400">
+              {{ headerText().length }}/{{ LIMITS.headerMax }}
+            </p>
+            @if (headerError(); as err) {
+              <p class="mt-1 text-xs text-rose-600">{{ err }}</p>
+            }
+          } @else if (headerType() && headerType() !== 'TEXT') {
+            <div class="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Media headers ({{ headerType() }}) need a sample asset attached when submitting to
+              Meta. The current builder uses Meta's default — operators with a custom asset can
+              attach it via the Meta Business Manager after submit.
+            </div>
+          }
+        }
+
+        <!-- 3. Body -->
+        @case (3) {
+          <h3 class="text-base font-semibold text-zinc-900">Body</h3>
+          <p class="mb-3 text-xs text-zinc-500">
+            Use <code class="rounded bg-zinc-100 px-1 py-0.5">{{ '{{1}}' }}</code>,
+            <code class="rounded bg-zinc-100 px-1 py-0.5">{{ '{{2}}' }}</code>… for variables. Up to
+            {{ LIMITS.bodyMax }} characters.
+          </p>
+
+          <textarea
+            [ngModel]="body()"
+            (ngModelChange)="body.set($event)"
+            rows="6"
+            [maxlength]="LIMITS.bodyMax"
+            placeholder="Hi {{ '{{1}}' }}, enjoy 30% off on all {{ '{{2}}' }} this Diwali!"
+            class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm font-mono"
+          ></textarea>
+          <div class="mt-1 flex items-center justify-between text-[10px] text-zinc-400">
+            <button
+              type="button"
+              (click)="insertVariable()"
+              class="rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50"
+            >
+              + Variable
+            </button>
+            <span>{{ bodyChars() }}/{{ LIMITS.bodyMax }}</span>
+          </div>
+          @if (bodyError(); as err) {
+            <p class="mt-1 text-xs text-rose-600">{{ err }}</p>
+          }
+        }
+
+        <!-- 4. Footer -->
+        @case (4) {
+          <h3 class="text-base font-semibold text-zinc-900">Footer</h3>
+          <p class="mb-3 text-xs text-zinc-500">
+            Optional. Up to {{ LIMITS.footerMax }} characters — typically used for fine-print or
+            branding.
+          </p>
+          <input
+            type="text"
+            [ngModel]="footerText()"
+            (ngModelChange)="footerText.set($event)"
+            [maxlength]="LIMITS.footerMax"
+            placeholder="Sharma Furniture"
+            class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+          />
+          <p class="mt-1 text-right text-[10px] text-zinc-400">
+            {{ footerText().length }}/{{ LIMITS.footerMax }}
+          </p>
+        }
+
+        <!-- 5. Buttons -->
+        @case (5) {
+          <h3 class="text-base font-semibold text-zinc-900">Buttons</h3>
+          <p class="mb-3 text-xs text-zinc-500">
+            Quick-reply buttons and CTAs (URL / phone) cannot be mixed in the same template — Meta's
+            rule.
+          </p>
+
+          <div class="mb-3 grid grid-cols-3 gap-2">
+            @for (
+              g of [
+                { key: 'NONE', label: 'None' },
+                { key: 'QUICK_REPLY', label: 'Quick reply' },
+                { key: 'CTA', label: 'Call-to-action' },
+              ];
+              track g.key
+            ) {
+              <button
+                type="button"
+                (click)="pickButtonGroup($any(g.key))"
+                [class]="
+                  'rounded-md border px-3 py-2 text-xs font-medium transition ' +
+                  (buttonGroup() === g.key
+                    ? 'border-zinc-900 bg-zinc-900 text-white'
+                    : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50')
+                "
+              >
+                {{ g.label }}
+              </button>
+            }
+          </div>
+
+          @if (buttonGroup() === 'QUICK_REPLY') {
+            <div class="space-y-2">
+              @for (btn of quickReplyButtons(); track $index) {
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    [ngModel]="btn"
+                    (ngModelChange)="updateQuickReply($index, $event)"
+                    [maxlength]="LIMITS.buttonTextMax"
+                    placeholder="Yes"
+                    class="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    (click)="removeQuickReply($index)"
+                    class="rounded p-1.5 text-zinc-500 hover:bg-zinc-100"
+                    aria-label="Remove"
+                  >
+                    <lucide-icon name="x" size="14" />
+                  </button>
+                </div>
+              }
+              @if (quickReplyButtons().length < 3) {
+                <button
+                  type="button"
+                  (click)="addQuickReply()"
+                  class="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-xs text-zinc-600 hover:bg-zinc-50"
+                >
+                  + Add quick reply
+                </button>
+              }
+            </div>
+          }
+
+          @if (buttonGroup() === 'CTA') {
+            <div class="space-y-3">
+              @for (btn of ctaButtons(); track $index) {
+                <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                  <div class="mb-2 flex items-center justify-between">
+                    <select
+                      [ngModel]="btn.type"
+                      (ngModelChange)="updateCta($index, { type: $event })"
+                      class="rounded-md border border-zinc-300 px-2 py-1 text-xs"
+                    >
+                      <option value="URL">URL</option>
+                      <option value="PHONE_NUMBER">Phone</option>
+                    </select>
+                    <button
+                      type="button"
+                      (click)="removeCta($index)"
+                      class="rounded p-1 text-zinc-500 hover:bg-zinc-100"
+                      aria-label="Remove"
+                    >
+                      <lucide-icon name="x" size="14" />
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    [ngModel]="btn.text"
+                    (ngModelChange)="updateCta($index, { text: $event })"
+                    [maxlength]="LIMITS.buttonTextMax"
+                    placeholder="Label (e.g. Open catalogue)"
+                    class="mb-2 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                  />
+                  @if (btn.type === 'URL') {
+                    <input
+                      type="url"
+                      [ngModel]="btn.url"
+                      (ngModelChange)="updateCta($index, { url: $event })"
+                      [maxlength]="LIMITS.ctaUrlMax"
+                      placeholder="https://example.com/sale"
+                      class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                    />
+                  } @else {
+                    <input
+                      type="tel"
+                      [ngModel]="btn.phone_number"
+                      (ngModelChange)="updateCta($index, { phone_number: $event })"
+                      [maxlength]="LIMITS.ctaPhoneMax"
+                      placeholder="+919876543210"
+                      class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                    />
+                  }
+                </div>
+              }
+              @if (ctaButtons().length < 2) {
+                <button
+                  type="button"
+                  (click)="addCta()"
+                  class="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-xs text-zinc-600 hover:bg-zinc-50"
+                >
+                  + Add CTA
+                </button>
+              }
+            </div>
+          }
+
+          @if (buttonsError(); as err) {
+            <p class="mt-2 text-xs text-rose-600">{{ err }}</p>
+          }
+        }
+
+        <!-- 6. Samples -->
+        @case (6) {
+          <h3 class="text-base font-semibold text-zinc-900">Sample values</h3>
+          <p class="mb-3 text-xs text-zinc-500">
+            Meta uses these to render an example when reviewing your template. The preview pane to
+            the right also uses them.
+          </p>
+
+          @if (variableSlots().length === 0) {
+            <div class="rounded-md bg-zinc-50 px-3 py-4 text-center text-xs text-zinc-500">
+              No <code class="rounded bg-zinc-100 px-1 py-0.5">{{ '{{n}}' }}</code>
+              placeholders in your body — nothing to sample.
+            </div>
+          } @else {
+            <div class="space-y-2">
+              @for (n of variableSlots(); track n) {
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-zinc-700">
+                    Sample for
+                    <code class="rounded bg-zinc-100 px-1 py-0.5">{{ '{{' + n + '}}' }}</code>
+                  </label>
+                  <input
+                    type="text"
+                    [ngModel]="sampleValues()[n] || ''"
+                    (ngModelChange)="updateSample(n, $event)"
+                    placeholder="Example value"
+                    class="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              }
+            </div>
+          }
+          @if (samplesError(); as err) {
+            <p class="mt-2 text-xs text-rose-600">{{ err }}</p>
+          }
+        }
+
+        <!-- 7. Review -->
+        @case (7) {
+          <h3 class="text-base font-semibold text-zinc-900">Review &amp; submit</h3>
+          <p class="mb-3 text-xs text-zinc-500">
+            Double-check the preview on the right. Once you submit, Meta will review (typically 30
+            minutes to 24 hours).
+          </p>
+          <dl class="space-y-2 text-xs">
+            <div class="flex justify-between border-b border-zinc-100 pb-1">
+              <dt class="font-medium text-zinc-700">Name</dt>
+              <dd class="font-mono text-zinc-900">{{ name() }}</dd>
+            </div>
+            <div class="flex justify-between border-b border-zinc-100 pb-1">
+              <dt class="font-medium text-zinc-700">Language · Category</dt>
+              <dd class="text-zinc-900">{{ language() }} · {{ category() }}</dd>
+            </div>
+            <div class="flex justify-between border-b border-zinc-100 pb-1">
+              <dt class="font-medium text-zinc-700">Header</dt>
+              <dd class="text-zinc-900">{{ headerType() || 'None' }}</dd>
+            </div>
+            <div class="flex justify-between border-b border-zinc-100 pb-1">
+              <dt class="font-medium text-zinc-700">Buttons</dt>
+              <dd class="text-zinc-900">
+                {{ assembledButtons().length }}
+                {{ buttonGroup() === 'NONE' ? '' : '(' + buttonGroup() + ')' }}
+              </dd>
+            </div>
+          </dl>
+
+          @if (serverError) {
+            <div
+              class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+            >
+              {{ serverError }}
+            </div>
+          }
+        }
+      }
+    </div>
+
+    <div class="mt-3 flex items-center justify-between">
+      <button
+        type="button"
+        (click)="onCancel()"
+        class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+      >
+        Cancel
+      </button>
+      <div class="flex items-center gap-2">
+        @if (step() > 1) {
+          <button
+            type="button"
+            (click)="goPrev()"
+            class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            Back
+          </button>
+        }
+        @if (step() < maxStep) {
+          <button
+            type="button"
+            (click)="goNext()"
+            [disabled]="!canAdvance()"
+            class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+          >
+            Next
+          </button>
+        } @else {
+          <button
+            type="button"
+            (click)="onSubmit()"
+            [disabled]="!canSubmit() || submitting"
+            class="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {{ submitting ? 'Saving…' : editingId() ? 'Save changes' : 'Save as draft' }}
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview (right) -->
+  <aside class="hidden lg:block">
+    <div class="sticky top-4">
+      <app-template-preview
+        [body]="body()"
+        [headerType]="headerType()"
+        [headerText]="headerText()"
+        [footerText]="footerText()"
+        [buttons]="assembledButtons()"
+        [sampleValues]="sampleValues()"
+      />
+      <p class="mt-2 text-center text-[10px] text-zinc-500">
+        Approximation — actual rendering varies across iOS / Android / Web.
+      </p>
+    </div>
+  </aside>
+</div>

@@ -1,0 +1,809 @@
+"""Auth service: login / refresh / logout.
+
+Each function takes an `AsyncSession` so the router can inject the
+test DB via `Depends(get_db)`. No mutable module state.
+
+`org_slug` resolves the tenant for login (default decision noted in
+the step file). All queries inside the login flow scope by `org_id`
+explicitly — the auto-tenant ORM filter is a no-op here because the
+request enters with no tenant context yet (no JWT decoded).
+"""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from datetime import UTC, datetime
+from pathlib import Path
+
+from fastapi import HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.app.core import audit
+from src.app.core.auth import data_access as auth_da
+from src.app.core.auth.models import AuthSession
+from src.app.core.auth.schemas import (
+    LoginResponse,
+    OnboardingCompleteRequest,
+    OnboardingCompleteResponse,
+    RefreshResponse,
+    RegisterRequest,
+    RegisterResponse,
+    TwoFactorChallengeResponse,
+)
+from src.app.core.auth.tokens import ACCESS_TOKEN_TTL, TokenClaims, encode_token
+from src.app.core.auth.two_factor import service as two_factor_service
+from src.app.core.packs.installer import install as install_pack
+from src.app.core.packs.loader import PackLoadError, load_pack
+from src.app.core.packs.service import get_catalog
+from src.app.core.permissions import role_templates
+from src.app.core.subscriptions.signup_hook import create_trial_subscription
+from src.app.core.tenants import service as tenants_service
+from src.app.core.tenants.service import create_organization
+from src.app.core.users import service as users_service
+from src.app.core.users.models import OrganizationMember, User, UserInfo
+from src.app.shared.context import RequestContext, reset_context, set_context
+from src.app.shared.security.password import hash_password, verify_password
+
+logger = logging.getLogger(__name__)
+
+# Path is relative to the container's WORKDIR (/app). The base pack
+# ships with the core CRM and supplies the default Leads pipeline,
+# lead sources, and call outcomes any new tenant needs out of the box.
+_BASE_PACK_FILE = Path("src/app/packs/base/pack.yaml")
+
+
+async def resolve_org_for_email(db: AsyncSession, email: str):
+    """Find the org by walking email → active membership → org.
+
+    Public service wrapper around the auth DAL helper so 2FA flows
+    (switch-method, etc.) can call into the same email-to-org
+    resolution the login path uses without reaching into the DAL
+    directly.
+    """
+    return await auth_da.get_organization_for_email(db, email)
+
+
+async def login(
+    db: AsyncSession,
+    *,
+    email: str,
+    password: str,
+    org_slug: str | None,
+    two_factor_code: str | None = None,
+    two_factor_method: str | None = None,
+    ip: str | None = None,
+    ua: str | None = None,
+) -> LoginResponse | TwoFactorChallengeResponse:
+    invalid = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid credentials",
+    )
+
+    if org_slug:
+        org = await tenants_service.get_organization_by_slug(db, org_slug)
+    else:
+        org = await auth_da.get_organization_for_email(db, email)
+    if org is None:
+        # No tenant known → can't attribute to a row, intentionally skip audit.
+        raise invalid
+
+    user = await users_service.get_user_by_email(db, email, org_id=org.id, active_only=True)
+    if user is None or not user.is_active:
+        await audit.log(
+            "auth.login.failure",
+            org_id=org.id,
+            user_id=None,
+            before={"email": email, "reason": "unknown_or_inactive_user"},
+            ip=ip,
+            ua=ua,
+        )
+        raise invalid
+    if not verify_password(password, user.password_hash):
+        await audit.log(
+            "auth.login.failure",
+            org_id=org.id,
+            user_id=None,
+            before={"email": email, "reason": "bad_password"},
+            ip=ip,
+            ua=ua,
+        )
+        raise invalid
+
+    # 2FA gate. When `two_factor_enabled` is true on the user's
+    # `tbl_user_login` row, this either returns a challenge (no code yet)
+    # or raises 401 (bad code). On success / 2FA disabled it returns None
+    # and we continue to mint the token.
+    challenge = await two_factor_service.enforce_at_login(
+        db,
+        member_id=user.id,
+        email=user.info.email if user.info else None,
+        mobile=user.info.mobile_no if user.info else None,
+        submitted_code=two_factor_code,
+        submitted_method=two_factor_method,
+    )
+    if challenge is not None:
+        await audit.log(
+            "auth.login.2fa_challenge",
+            org_id=org.id,
+            user_id=user.legacy_uuid,
+            after={"method": challenge.method},
+            ip=ip,
+            ua=ua,
+        )
+        return TwoFactorChallengeResponse(
+            method=challenge.method,
+            available_methods=challenge.available_methods,
+        )
+
+    token_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    expires_at = now + ACCESS_TOKEN_TTL
+
+    # `user.id` is the bigint storage PK of `tbl_user_login` (DR.6.3).
+    # Every UUID-typed `user_id` FK (AuthSession.user_id → users.id,
+    # audit_logs.user_id, JWT `sub`) references the user by the UUID
+    # identity preserved in `user.legacy_uuid`.
+    user_uuid = user.legacy_uuid
+
+    auth_da.add_auth_session(
+        db,
+        AuthSession(
+            id=token_id,
+            org_id=org.id,
+            user_id=user_uuid,
+            expires_at=expires_at,
+            ip=ip,
+            ua=ua,
+        ),
+    )
+    await db.commit()
+
+    await audit.log(
+        "auth.login.success",
+        org_id=org.id,
+        user_id=user_uuid,
+        after={"token_id": str(token_id)},
+        ip=ip,
+        ua=ua,
+    )
+
+    encoded, exp = encode_token(user_id=user_uuid, org_id=org.id, token_id=token_id, now=now)
+    return LoginResponse(access_token=encoded, expires_at=exp)
+
+
+async def refresh(db: AsyncSession, claims: TokenClaims) -> RefreshResponse:
+    """Revoke the current session and issue a fresh JWT with a new token_id."""
+    invalid = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or revoked token",
+    )
+
+    session = await auth_da.get_auth_session(db, session_id=claims.token_id)
+    if session is None or session.revoked_at is not None:
+        raise invalid
+
+    now = datetime.now(UTC)
+    if session.expires_at <= now:
+        raise invalid
+
+    # Revoke old, issue new.
+    session.revoked_at = now
+    new_token_id = uuid.uuid4()
+    new_expires_at = now + ACCESS_TOKEN_TTL
+    auth_da.add_auth_session(
+        db,
+        AuthSession(
+            id=new_token_id,
+            org_id=session.org_id,
+            user_id=session.user_id,
+            expires_at=new_expires_at,
+            ip=session.ip,
+            ua=session.ua,
+        ),
+    )
+    await db.commit()
+
+    encoded, exp = encode_token(
+        user_id=session.user_id,
+        org_id=session.org_id,
+        token_id=new_token_id,
+        now=now,
+    )
+    return RefreshResponse(access_token=encoded, expires_at=exp)
+
+
+async def logout(db: AsyncSession, token_id: uuid.UUID) -> None:
+    """Idempotent — sets `revoked_at` to now if the row exists and isn't already revoked."""
+    await auth_da.revoke_auth_session_by_id(db, token_id=token_id, now=datetime.now(UTC))
+    await db.commit()
+
+
+async def list_user_sessions(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    current_token_id: uuid.UUID,
+    limit: int = 50,
+) -> list[dict]:
+    """Most recent `auth_sessions` rows for one user (newest first).
+
+    Each row carries an `is_current` flag for the JWT making the request
+    so the Settings → Login history tab can hide the Sign-out button on
+    that row. RLS auto-scopes the underlying SELECT to the caller's org.
+    """
+    rows = await auth_da.list_auth_sessions_for_user(db, user_id=user_id, limit=limit)
+    return [
+        {
+            "id": row.id,
+            "created_at": row.created_at,
+            "expires_at": row.expires_at,
+            "revoked_at": row.revoked_at,
+            "ip": row.ip,
+            "ua": row.ua,
+            "is_current": row.id == current_token_id,
+        }
+        for row in rows
+    ]
+
+
+async def get_user_two_factor_status(
+    db: AsyncSession, *, member_id: int
+) -> tuple[bool, str | None]:
+    """Read `(enabled, method)` from `tbl_user_login` for the given user."""
+    return await auth_da.get_user_two_factor_flags(db, member_id=member_id)
+
+
+async def revoke_user_session(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    session_id: uuid.UUID,
+) -> bool:
+    """Revoke a specific session belonging to `user_id`.
+
+    Returns True if a row was updated (idempotent — already-revoked is
+    treated as a no-op success). 404 surfaced by the router when the
+    session id doesn't belong to the user (we don't leak existence —
+    same row check as `notifications.mark_read`).
+    """
+    row = await auth_da.get_auth_session(db, session_id=session_id, user_id=user_id)
+    if row is None:
+        return False
+    if row.revoked_at is None:
+        row.revoked_at = datetime.now(UTC)
+        await db.commit()
+    return True
+
+
+async def register_with_new_org(
+    db: AsyncSession,
+    *,
+    req: RegisterRequest,
+    ip: str | None = None,
+    ua: str | None = None,
+) -> RegisterResponse:
+    """Atomic signup: org + Owner role-template seed + user + membership.
+
+    Either every insert lands or none do. On success returns a JWT for
+    the newly-created Owner, ready to be carried by the frontend into
+    `/user/dashboard`.
+    """
+    if await users_service.email_exists(db, req.email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists.",
+        )
+
+    workspace_name = (req.organization_name or "").strip() or (
+        f"{req.first_name.strip()}'s Workspace"
+    )
+
+    org = await create_organization(
+        db,
+        name=workspace_name,
+        created_via="normal_signup",
+        # Legacy single-step flow: the org gets the base template
+        # immediately; the pack installer below seeds its defaults.
+        template_id="base",
+    )
+
+    # Role-template install + base-pack install are both tenant-scoped
+    # via the auto-filter; set the request context to the new org so
+    # all reads/writes resolve against this org's rows.
+    token = set_context(RequestContext(org_id=org.id))
+    try:
+        installed = await role_templates.install(db, org_id=org.id)
+    except role_templates.UnknownPermissionKey as exc:
+        await db.rollback()
+        reset_context(token)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"role template install failed: {exc}",
+        ) from exc
+
+    # Base pack — installs the default Leads pipeline + 6 stages, lead
+    # sources, call outcomes. Best-effort: if the manifest can't be
+    # loaded or the install reports errors, log and continue rather
+    # than fail signup. The Owner can re-run `install_pack --pack base`
+    # later to recover. (No equivalent admin endpoint exists yet; a
+    # follow-up could surface this through the Settings UI.)
+    try:
+        manifest = load_pack(_BASE_PACK_FILE)
+        report = await install_pack(db, org_id=org.id, manifest=manifest)
+        if report.errors:
+            logger.warning(
+                "base pack install reported errors for org %s: %s",
+                org.id,
+                report.errors,
+            )
+    except PackLoadError as exc:
+        logger.warning("base pack manifest unreadable: %s", exc)
+    except Exception:
+        logger.exception("base pack install failed for org %s", org.id)
+
+    reset_context(token)
+
+    owner_role = installed.get("owner")
+    if owner_role is None:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="role template install did not produce an Owner role",
+        )
+
+    # `User` (layered mapper) hides legacy `user_id` / 2FA columns —
+    # the DAL inserts at the table level so we can populate them.
+    user_uuid = uuid.uuid4()
+    bigint_id = await users_service.insert_user_login_row(
+        db,
+        legacy_uuid=user_uuid,
+        user_handle=f"usr_{user_uuid.hex}",
+        password_hash=hash_password(req.password),
+    )
+
+    users_service.add_user_info(
+        db,
+        UserInfo(
+            member_id=bigint_id,
+            first_name=req.first_name.strip(),
+            last_name=req.last_name.strip(),
+            email=req.email,
+            mobile_no=req.phone,
+            is_email_verified=False,
+            is_mobile_verified=False,
+        ),
+    )
+    users_service.add_organization_member(
+        db,
+        OrganizationMember(
+            organization_id=org.id,
+            user_member_id=bigint_id,
+            role_id=owner_role.id,
+            status="active",
+            is_active=True,
+            is_demo=False,
+        ),
+    )
+
+    # Pricing-and-Billing Step 6 — every new org starts a 14-day trial.
+    # The subscription row lands inside this signup transaction so a
+    # later insert failure rolls back the trial too; orgs never exist
+    # without an active subscription.
+    await create_trial_subscription(db, org_id=org.id)
+
+    token_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    expires_at = now + ACCESS_TOKEN_TTL
+    auth_da.add_auth_session(
+        db,
+        AuthSession(
+            id=token_id,
+            org_id=org.id,
+            user_id=user_uuid,
+            expires_at=expires_at,
+            ip=ip,
+            ua=ua,
+        ),
+    )
+
+    await db.commit()
+
+    await audit.log(
+        "auth.signup",
+        org_id=org.id,
+        user_id=user_uuid,
+        after={
+            "email": req.email,
+            "organization_name": org.name,
+            "organization_slug": org.slug,
+            "role": owner_role.name,
+        },
+        ip=ip,
+        ua=ua,
+    )
+
+    encoded, exp = encode_token(user_id=user_uuid, org_id=org.id, token_id=token_id, now=now)
+    return RegisterResponse(
+        access_token=encoded,
+        expires_at=exp,
+        organization_id=org.id,
+        organization_slug=org.slug,
+        role_name=owner_role.name,
+        # Legacy single-step signup ships a fully-set-up org with the
+        # base pack installed — onboarding is already done.
+        needs_onboarding=False,
+    )
+
+
+# --- Step 2: split signup + onboarding -----------------------------------
+#
+# `register_user_only` and `complete_onboarding` together implement the
+# two-stage flow the onboarding picker needs. They share the user-create
+# primitives with `register_with_new_org` above but defer pack selection
+# (and the matching pack install) to the onboarding endpoint.
+#
+# Architectural note: the spec called for a JWT carrying
+# `needs_onboarding=true` and *no* org. But `AuthSession` is TenantScoped
+# (RLS-enforced) and `encode_token` requires `org_id` — issuing a
+# tokenless flow would require schema + RLS changes well outside Step 2.
+# Pivot: create the org during register with `template_id="pending"`,
+# install role templates so a real Owner role + membership exist, issue
+# a normal JWT. The onboarding endpoint then *finalizes* the org
+# (rename, set template_id, run pack installer) and rotates the JWT.
+# `needs_onboarding` derives server-side from `org.template_id == "pending"`
+# in `/users/me` — same UX, no JWT schema change.
+
+PENDING_TEMPLATE_ID = "pending"
+
+
+async def register_user_only(
+    db: AsyncSession,
+    *,
+    req: RegisterRequest,
+    ip: str | None = None,
+    ua: str | None = None,
+) -> RegisterResponse:
+    """Self-signup stage 1: create the user + a pending-template org.
+
+    Inserts a placeholder organization with `template_id="pending"`
+    (no pack data seeded). Role templates land so an Owner role +
+    active membership exist; the resulting JWT is a normal admin
+    token. The user is expected to call `complete_onboarding` next,
+    which renames the org, sets a real `template_id`, and runs the
+    matching pack installer.
+    """
+    if await users_service.email_exists(db, req.email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists.",
+        )
+
+    # Placeholder workspace name — the onboarding page renames it
+    # immediately, so the user never sees this string.
+    workspace_name = f"{req.first_name.strip()}'s Workspace"
+
+    org = await create_organization(
+        db,
+        name=workspace_name,
+        created_via="normal_signup",
+        template_id=PENDING_TEMPLATE_ID,
+    )
+
+    token = set_context(RequestContext(org_id=org.id))
+    try:
+        installed = await role_templates.install(db, org_id=org.id)
+    except role_templates.UnknownPermissionKey as exc:
+        await db.rollback()
+        reset_context(token)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"role template install failed: {exc}",
+        ) from exc
+    reset_context(token)
+
+    owner_role = installed.get("owner")
+    if owner_role is None:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="role template install did not produce an Owner role",
+        )
+
+    user_uuid = uuid.uuid4()
+    bigint_id = await users_service.insert_user_login_row(
+        db,
+        legacy_uuid=user_uuid,
+        user_handle=f"usr_{user_uuid.hex}",
+        password_hash=hash_password(req.password),
+    )
+
+    users_service.add_user_info(
+        db,
+        UserInfo(
+            member_id=bigint_id,
+            first_name=req.first_name.strip(),
+            last_name=req.last_name.strip(),
+            email=req.email,
+            mobile_no=req.phone,
+            is_email_verified=False,
+            is_mobile_verified=False,
+        ),
+    )
+    users_service.add_organization_member(
+        db,
+        OrganizationMember(
+            organization_id=org.id,
+            user_member_id=bigint_id,
+            role_id=owner_role.id,
+            status="active",
+            is_active=True,
+            is_demo=False,
+        ),
+    )
+
+    # Pricing-and-Billing Step 6 — every new org starts a 14-day trial,
+    # including orgs in the two-stage onboarding flow. The subscription
+    # row lands inside this signup transaction so a later failure rolls
+    # the trial back along with the rest of the bootstrap.
+    await create_trial_subscription(db, org_id=org.id)
+
+    token_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    expires_at = now + ACCESS_TOKEN_TTL
+    auth_da.add_auth_session(
+        db,
+        AuthSession(
+            id=token_id,
+            org_id=org.id,
+            user_id=user_uuid,
+            expires_at=expires_at,
+            ip=ip,
+            ua=ua,
+        ),
+    )
+
+    await db.commit()
+
+    await audit.log(
+        "auth.signup",
+        org_id=org.id,
+        user_id=user_uuid,
+        after={
+            "email": req.email,
+            "organization_name": org.name,
+            "organization_slug": org.slug,
+            "role": owner_role.name,
+            "pending_onboarding": True,
+        },
+        ip=ip,
+        ua=ua,
+    )
+
+    # tasks/automation-engine Step 5 — publish the user.signed_up
+    # event AFTER commit so a publish failure doesn't roll back the
+    # signup. The bus is fire-and-forget — handler exceptions are
+    # logged + swallowed inside ``events.bus.publish``. The seeded
+    # Welcome trigger picks this up + dispatches the welcome email.
+    await _publish_user_signed_up(
+        org=org,
+        user_uuid=user_uuid,
+        email=req.email,
+        full_name=f"{req.first_name.strip()} {req.last_name.strip()}",
+    )
+
+    encoded, exp = encode_token(user_id=user_uuid, org_id=org.id, token_id=token_id, now=now)
+    return RegisterResponse(
+        access_token=encoded,
+        expires_at=exp,
+        organization_id=org.id,
+        organization_slug=org.slug,
+        role_name=owner_role.name,
+        needs_onboarding=True,
+    )
+
+
+async def _publish_user_signed_up(
+    *,
+    org,
+    user_uuid: uuid.UUID,
+    email: str,
+    full_name: str,
+) -> None:
+    """Wrapper around ``events.bus.publish`` that catches every
+    exception so a misbehaving subscriber + a missing bus module
+    can't roll back the freshly-committed signup. Mirrors the
+    audit.log call-site pattern."""
+    try:
+        from src.app.core.events.bus import publish as events_publish
+
+        await events_publish(
+            "user.signed_up",
+            {
+                "user_id": str(user_uuid),
+                "user": {
+                    "id": str(user_uuid),
+                    "full_name": full_name,
+                    "email": email,
+                },
+                "org": {
+                    "id": str(org.id),
+                    "name": org.name,
+                    "slug": org.slug,
+                },
+                "signed_up_at": datetime.now(UTC).isoformat(),
+            },
+            org_id=org.id,
+            event_id=f"signup:{user_uuid}",
+        )
+    except Exception:
+        logger.exception(
+            "auth.signup events_publish_failed org=%s user=%s",
+            org.id,
+            user_uuid,
+        )
+
+
+def _validate_template_choice(template_id: str) -> dict:
+    """Resolve `template_id` against the catalog. Returns the tile
+    dict on success. Raises HTTPException 400 for unknown or
+    coming-soon templates.
+    """
+    catalog = get_catalog()
+    for tile in catalog.packs:
+        if tile.template_id == template_id:
+            if tile.status != "available":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "error": "template_not_available",
+                        "message": f"{tile.name} is coming soon.",
+                    },
+                )
+            return tile.model_dump()
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail={"error": "template_not_found", "template_id": template_id},
+    )
+
+
+async def complete_onboarding(
+    db: AsyncSession,
+    *,
+    user: User,
+    current_token_id: uuid.UUID,
+    req: OnboardingCompleteRequest,
+    ip: str | None = None,
+    ua: str | None = None,
+) -> OnboardingCompleteResponse:
+    """Self-signup stage 2: finalize the pending-template org.
+
+    Renames the org, sets `template_id` from the user's pick, applies
+    pack defaults (currency, tax_rate) unless the request overrides
+    them, and runs `packs.installer.install` so the chosen vertical's
+    pipelines / custom fields / lead sources / call outcomes / org
+    settings land. Rotates the JWT so the next response is a normal
+    onboarding-complete token. Idempotent: a user whose org is no
+    longer in `template_id="pending"` gets 409 (already onboarded).
+    """
+    tile = _validate_template_choice(req.template_id)
+
+    org = await tenants_service.get_organization_by_id(db, user.org_id)
+    if org is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="organization not found",
+        )
+
+    if org.template_id != PENDING_TEMPLATE_ID:
+        # Already onboarded — single org per signup; second call is a
+        # conflict, not a re-install.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": "already_onboarded"},
+        )
+
+    # Apply user-supplied overrides, else fall back to the catalog
+    # tile's defaults. `default_tax_rate` from the catalog is a float;
+    # the org column is Numeric — SQLAlchemy coerces on write.
+    org.name = req.organization_name.strip()
+    org.template_id = req.template_id
+    org.currency = req.currency or tile["default_currency"]
+    org.tax_rate = tile["default_tax_rate"]
+
+    # Pack install runs in the same transaction; the installer wraps
+    # each section in its own try/except internally and reports errors
+    # via `InstallReport.errors` rather than raising — so a partial
+    # seed is loud but does not roll back the org rename. (Matching
+    # the existing `register_with_new_org` policy.)
+    manifest_path = Path(f"src/app/packs/{req.template_id}/pack.yaml")
+    try:
+        manifest = load_pack(manifest_path)
+    except PackLoadError as exc:
+        # Catalog said this pack was `available` but its manifest is
+        # unreadable — fall back to 500 so the user can retry.
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"pack manifest unreadable: {exc}",
+        ) from exc
+
+    ctx_token = set_context(RequestContext(org_id=org.id))
+    try:
+        report = await install_pack(db, org_id=org.id, manifest=manifest)
+        if report.errors:
+            logger.warning(
+                "pack install reported errors for org %s template %s: %s",
+                org.id,
+                req.template_id,
+                report.errors,
+            )
+    finally:
+        reset_context(ctx_token)
+
+    # Rotate JWT: revoke the current session, issue a new one. The new
+    # token reflects the onboarded state so the frontend route guard
+    # passes on next navigation.
+    now = datetime.now(UTC)
+    await auth_da.revoke_auth_session_by_id(db, token_id=current_token_id, now=now)
+
+    new_token_id = uuid.uuid4()
+    new_expires_at = now + ACCESS_TOKEN_TTL
+    auth_da.add_auth_session(
+        db,
+        AuthSession(
+            id=new_token_id,
+            org_id=org.id,
+            user_id=user.legacy_uuid,
+            expires_at=new_expires_at,
+            ip=ip,
+            ua=ua,
+        ),
+    )
+
+    await db.commit()
+
+    await audit.log(
+        "org.created_via_onboarding",
+        org_id=org.id,
+        user_id=user.legacy_uuid,
+        after={
+            "org_name": org.name,
+            "template_id": req.template_id,
+            "country": req.country,
+            "currency": org.currency,
+            "team_size": req.team_size,
+        },
+        ip=ip,
+        ua=ua,
+    )
+    await audit.log(
+        "pack.installed_via_onboarding",
+        org_id=org.id,
+        user_id=user.legacy_uuid,
+        after={
+            "template_id": manifest.template_id,
+            "template_version": manifest.version,
+            "pipelines_created": report.pipelines_created,
+            "custom_fields_created": report.custom_fields_created,
+            "roles_created": report.roles_created,
+            "errors": report.errors,
+        },
+        ip=ip,
+        ua=ua,
+    )
+
+    encoded, exp = encode_token(
+        user_id=user.legacy_uuid,
+        org_id=org.id,
+        token_id=new_token_id,
+        now=now,
+    )
+    role_name = await users_service.get_role_name_by_id(db, user.role_id) or ""
+    return OnboardingCompleteResponse(
+        access_token=encoded,
+        expires_at=exp,
+        organization_id=org.id,
+        organization_slug=org.slug,
+        role_name=role_name,
+    )

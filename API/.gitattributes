@@ -1,0 +1,10 @@
+# Pin line endings so the stack helpers and dotenv files stay valid on every
+# platform. run.cmd MUST be CRLF (cmd.exe mis-parses LF batch files); run.sh
+# MUST be LF (a CRLF shebang fails with "/bin/bash^M: bad interpreter").
+* text=auto
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.sh   text eol=lf
+*.env  text eol=lf
+.env.* text eol=lf

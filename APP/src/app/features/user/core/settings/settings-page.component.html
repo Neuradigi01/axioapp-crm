@@ -1,0 +1,71 @@
+<div class="p-8">
+  <header class="mb-6">
+    <h1 class="text-2xl font-semibold text-zinc-900">Settings</h1>
+    <p class="mt-1 text-sm text-zinc-500">Tenant configuration for this organisation.</p>
+  </header>
+
+  <nav class="mb-6 flex flex-wrap gap-2 border-b border-zinc-200">
+    @for (tab of tabs(); track tab.id) {
+      <button
+        type="button"
+        class="-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+        [class.border-zinc-900]="active() === tab.id"
+        [class.text-zinc-900]="active() === tab.id"
+        [class.border-transparent]="active() !== tab.id"
+        [class.text-zinc-500]="active() !== tab.id"
+        [class.hover:text-zinc-900]="active() !== tab.id"
+        (click)="active.set(tab.id)"
+      >
+        {{ tab.label }}
+      </button>
+    }
+  </nav>
+
+  @switch (active()) {
+    @case ('profile') {
+      <app-settings-profile-tab />
+    }
+    @case ('appearance') {
+      <app-settings-appearance-tab />
+    }
+    @case ('two-factor') {
+      <app-settings-two-factor-tab />
+    }
+    @case ('login-history') {
+      <app-settings-login-history-tab />
+    }
+    @case ('store') {
+      <app-settings-store-profile-tab />
+    }
+    @case ('team') {
+      <app-settings-team-tab />
+    }
+    @case ('roles') {
+      <app-settings-roles-tab />
+    }
+    @case ('email-accounts') {
+      <app-email-accounts-tab />
+    }
+    @case ('email-sequences') {
+      <app-email-sequences-list />
+    }
+    @case ('notifications') {
+      <app-settings-notifications-tab />
+    }
+    @case ('ai') {
+      <app-settings-ai-tab />
+    }
+    @case ('send-rules') {
+      <app-settings-automation-tab />
+    }
+    @case ('custom-fields') {
+      <app-custom-fields-page />
+    }
+    @case ('standard-fields') {
+      <app-settings-standard-fields-tab />
+    }
+    @case ('embed') {
+      <app-settings-embed-tab />
+    }
+  }
+</div>

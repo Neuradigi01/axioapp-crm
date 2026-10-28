@@ -1,0 +1,31 @@
+fastapi
+python-multipart
+uvicorn[standard]
+gunicorn
+sqlalchemy[asyncio]
+asyncpg
+alembic
+python-jose[cryptography]
+bcrypt
+pyotp
+pyqrcode
+pypng
+aiosmtplib
+pydantic[email]
+orjson
+python-dotenv
+pycryptodome
+httpx
+aiofiles
+qrcode[pil]
+captcha
+firebase-admin
+reportlab
+openpyxl
+celery[redis]
+flower
+psycopg2-binary
+pyyaml
+python-magic==0.4.27; sys_platform != "win32"
+python-magic-bin==0.4.14; sys_platform == "win32"
+stripe>=10.0.0

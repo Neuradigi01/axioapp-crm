@@ -1,0 +1,130 @@
+<div class="space-y-4">
+  <!-- Summary tiles -->
+  <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+      <p class="text-[11px] uppercase tracking-wide text-zinc-500">Total Invoices</p>
+      <p class="mt-1 text-xl font-semibold text-zinc-900">{{ tiles().total }}</p>
+    </div>
+    <div class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+      <p class="text-[11px] uppercase tracking-wide text-zinc-500">Total Billed</p>
+      <p class="mt-1 text-xl font-semibold text-zinc-900">
+        {{ tiles().billed | formatINR: true }}
+      </p>
+    </div>
+    <div class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+      <p class="text-[11px] uppercase tracking-wide text-zinc-500">Collected</p>
+      <p class="mt-1 text-xl font-semibold text-emerald-700">
+        {{ tiles().collected | formatINR: true }}
+      </p>
+    </div>
+    <div class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+      <p class="text-[11px] uppercase tracking-wide text-zinc-500">Pending</p>
+      <p class="mt-1 text-xl font-semibold text-amber-700">
+        {{ tiles().pending | formatINR: true }}
+      </p>
+    </div>
+  </div>
+
+  <!-- Status filter pills -->
+  <div class="flex items-center gap-1 border-b border-zinc-200">
+    @for (f of filters; track f.id) {
+      <button
+        type="button"
+        (click)="setFilter(f.id)"
+        [class]="
+          'inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ' +
+          (statusFilter() === f.id
+            ? 'border-zinc-900 text-zinc-900'
+            : 'border-transparent text-zinc-500 hover:text-zinc-700')
+        "
+      >
+        {{ f.label }}
+      </button>
+    }
+  </div>
+
+  @if (loadError(); as err) {
+    <p class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+      {{ err }}
+    </p>
+  } @else if (loading() && invoices().length === 0) {
+    <div class="space-y-2 animate-pulse">
+      @for (i of [0, 1, 2, 3]; track i) {
+        <div class="h-12 rounded bg-zinc-100"></div>
+      }
+    </div>
+  } @else if (view().length === 0) {
+    <div
+      class="rounded-lg border border-dashed border-zinc-300 bg-white py-12 text-center text-sm text-zinc-500"
+    >
+      No invoices match this filter. Create one from the POS tab.
+    </div>
+  } @else {
+    <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <table class="min-w-full divide-y divide-zinc-200 text-sm">
+        <thead class="bg-zinc-50 text-[11px] uppercase tracking-wide text-zinc-500">
+          <tr>
+            <th class="px-3 py-2 text-left font-medium">Invoice</th>
+            <th class="px-3 py-2 text-left font-medium">Customer</th>
+            <th class="px-3 py-2 text-right font-medium">Subtotal</th>
+            <th class="px-3 py-2 text-right font-medium">Tax</th>
+            <th class="px-3 py-2 text-right font-medium">Discount</th>
+            <th class="px-3 py-2 text-right font-medium">Total</th>
+            <th class="px-3 py-2 text-left font-medium">Payment</th>
+            <th class="px-3 py-2 text-left font-medium">Status</th>
+            <th class="px-3 py-2 text-right font-medium">Issued</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-100">
+          @for (inv of view(); track inv.id) {
+            <tr class="hover:bg-zinc-50/50">
+              <td class="px-3 py-2 font-medium text-zinc-900">
+                <a [routerLink]="['/user/billing/invoices', inv.id]" class="hover:underline">
+                  {{ invoiceNumber(inv) }}
+                </a>
+              </td>
+              <td class="px-3 py-2">
+                <div class="text-zinc-900">{{ contactName(inv.contact_id) }}</div>
+                @if (contactPhone(inv.contact_id); as ph) {
+                  <div class="text-[11px] text-zinc-500">{{ ph }}</div>
+                }
+              </td>
+              <td class="px-3 py-2 text-right text-zinc-800">
+                {{ inv.subtotal | formatINR }}
+              </td>
+              <td class="px-3 py-2 text-right text-zinc-800">
+                {{ inv.tax_amount | formatINR }}
+              </td>
+              <td class="px-3 py-2 text-right text-amber-700">
+                @if (+inv.discount_amount > 0) {
+                  -{{ inv.discount_amount | formatINR }}
+                } @else {
+                  —
+                }
+              </td>
+              <td class="px-3 py-2 text-right font-semibold text-zinc-900">
+                {{ inv.total | formatINR }}
+              </td>
+              <td class="px-3 py-2 text-xs uppercase text-zinc-700">
+                {{ paymentLabel(inv.payment_method) }}
+              </td>
+              <td class="px-3 py-2">
+                <span
+                  [class]="
+                    'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ring-1 ' +
+                    statusBadgeClass(inv.status)
+                  "
+                >
+                  {{ inv.status }}
+                </span>
+              </td>
+              <td class="px-3 py-2 text-right text-xs text-zinc-500">
+                {{ formatDate(inv.issued_at ?? inv.created_at) }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

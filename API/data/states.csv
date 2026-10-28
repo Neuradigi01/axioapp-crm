@@ -1,0 +1,3567 @@
+srno,name,country_id,code,adm1_code,is_active
+1,Victoria,14,VI,AS07,true
+2,Tasmania,14,TS,AS06,true
+3,Queensland,14,QL,AS04,true
+4,New South Wales,14,NS,AS02,true
+5,South Australia,14,SA,AS05,true
+6,Western Australia,14,WA,AS08,true
+7,Northern Territory,14,NT,AS03,true
+8,Acre,33,AC,BR01,true
+10,Amapß,33,AP,BR03,true
+11,Bahia,33,BA,BR05,true
+12,Goißs,33,GO,BR10,true
+13,PiauÝ,33,PI,BR20,true
+14,Cearß,33,CE,BR06,true
+15,Paranß,33,PR,BR18,true
+16,Alagoas,33,AL,BR02,true
+17,ParaÝba,33,PB,BR17,true
+18,Roraima,33,RR,BR25,true
+19,Sergipe,33,SE,BR28,true
+20,Amazonas,33,AM,BR04,true
+21,MaranhÒo,33,MA,BR13,true
+22,Rond¶nia,33,RO,BR24,true
+24,SÒo Paulo,33,SP,BR27,true
+25,Tocantins,33,TO,BR31,true
+26,Mato Grosso,33,MT,BR14,true
+27,Minas Gerais,33,MG,BR15,true
+28,EspÝrito Santo,33,ES,BR08,true
+29,Rio de Janeiro,33,RJ,BR21,true
+30,Santa Catarina,33,SC,BR26,true
+32,Rio Grande do Sul,33,RS,BR23,true
+33,Mato Grosso do Sul,33,MS,BR11,true
+34,Rio Grande do Norte,33,RN,BR22,true
+35,Quebec,43,QC,CA10,true
+36,Alberta,43,AB,CA01,true
+37,Ontario,43,ON,CA08,true
+38,Manitoba,43,MB,CA03,true
+39,Nova Scotia,43,NS,CA07,true
+40,Saskatchewan,43,SK,CA11,true
+41,Newfoundland and Labrador,43,NF,CA05,true
+42,New Brunswick,43,NB,CA04,true
+43,British Columbia,43,BC,CA02,true
+45,Prince Edward Island,43,PE,CA09,true
+46,Northwest Territories,43,NT,CA13,true
+49,Bali,114,BA,ID02,true
+56,Sonora,159,SO,MX26,true
+59,Jalisco,159,JA,MX14,true
+60,Hidalgo,159,HI,MX13,true
+61,Morelos,159,MR,MX17,true
+62,Chiapas,159,CP,MX05,true
+63,Tabasco,159,TB,MX27,true
+66,Guerrero,159,GR,MX12,true
+69,Nuevo Leon,159,NL,MX19,true
+70,Tamaulipas,159,TM,MX28,true
+71,Guanajuato,159,GJ,MX11,true
+72,Quintana Roo,159,QR,MX23,true
+73,Baja California,159,BN,MX02,true
+74,Baja California Sur,159,BS,MX03,true
+75,Tov,165,TO,MG18,true
+76,Uvs,165,UV,MG19,true
+80,Dornod,165,DD,MG06,true
+81,Hovsgol,165,HG,MG13,true
+82,Selenge,165,SL,MG16,true
+86,Suhbaatar,165,SB,MG17,true
+91,Komi,203,KO,RS34,true
+105,Dagestan,203,DA,RS17,true
+106,Mariy-El,203,ME,RS45,true
+110,Tatarstan,203,TT,RS73,true
+122,Alabama,254,AL,    ,true
+123,Alaska,254,AK,    ,true
+124,Arizona,254,AZ,    ,true
+125,Arkansas,254,AR,    ,true
+126,California,254,CA,    ,true
+127,Colorado,254,CO,    ,true
+128,Connecticut,254,CT,    ,true
+129,Delaware,254,DE,    ,true
+130,District of Columbia,254,DC,    ,true
+131,Florida,254,FL,    ,true
+133,Hawaii,254,HI,    ,true
+134,Idaho,254,ID,    ,true
+135,Illinois,254,IL,    ,true
+136,Indiana,254,IN,    ,true
+137,Iowa,254,IA,    ,true
+138,Kansas,254,KS,    ,true
+139,Kentucky,254,KY,    ,true
+140,Louisiana,254,LA,    ,true
+141,Maine,254,ME,    ,true
+142,Maryland,254,MD,    ,true
+143,Massachusetts,254,MA,    ,true
+144,Michigan,254,MI,    ,true
+145,Minnesota,254,MN,    ,true
+146,Mississippi,254,MS,    ,true
+147,Missouri,254,MO,    ,true
+148,Montana,254,MT,    ,true
+149,Nebraska,254,NE,    ,true
+150,Nevada,254,NV,    ,true
+151,New Hampshire,254,NH,    ,true
+152,New Jersey,254,NJ,    ,true
+153,New Mexico,254,NM,    ,true
+154,New York,254,NY,    ,true
+155,North Carolina,254,NC,    ,true
+156,North Dakota,254,ND,    ,true
+157,Ohio,254,OH,    ,true
+158,Oklahoma,254,OK,    ,true
+159,Oregon,254,OR,    ,true
+160,Pennsylvania,254,PA,    ,true
+161,Rhode Island,254,RI,    ,true
+162,South Carolina,254,SC,    ,true
+163,South Dakota,254,SD,    ,true
+164,Tennessee,254,TN,    ,true
+165,Texas,254,TX,    ,true
+166,Utah,254,UT,    ,true
+167,Virginia,254,VA,    ,true
+168,Washington,254,WA,    ,true
+169,West Virginia,254,WV,    ,true
+170,Wisconsin,254,WI,    ,true
+171,Wyoming,254,WY,    ,true
+172,Vermont,254,VT,    ,true
+174,Australian Capital Territory,14,CT,AS01,true
+189,Papua,114,IJ,ID09,true
+193,Bulgan,165,BU,MG21,true
+194,Hovd,165,HD,MG12,true
+196,Chihuahua,159,CH,MX06,true
+197,Colima,159,CL,MX08,true
+198,Durango,159,DU,MX10,true
+201,Oaxaca,159,OA,MX20,true
+203,San Luis Potosi,159,SL,MX24,true
+204,Tlaxcala,159,TL,MX29,true
+206,Zacatecas,159,ZA,MX32,true
+592,Democratic Republic of the Congo,55,CD,    ,true
+593,Republic of the Congo,56,CG,    ,true
+620,Metropolitan France,83,FX,    ,true
+669,North Korea,132,KP,    ,true
+670,South Korea,133,KR,    ,true
+683,The Former Yugoslav Republic of Macedonia,146,MK,    ,true
+690,Isle of Man,153,IM,    ,true
+697,Federated States of Micronesia,160,FM,    ,true
+712,The Netherlands,175,NL,    ,true
+815,Yukon Territory,43,YT,CA12,true
+816,Barbuda,9,BB,AC01,true
+817,Saint George,9,GE,AC03,true
+818,Saint John,9,JO,AC04,true
+819,Saint Mary,9,MA,AC05,true
+820,Saint Paul,9,PA,AC06,true
+821,Saint Peter,9,PE,AC07,true
+822,Saint Philip,9,PH,AC08,true
+823,Badakhshan,1,BD,AF01,true
+824,Badghis,1,BG,AF02,true
+825,Baghlan,1,BL,AF03,true
+827,Bamian,1,BM,AF05,true
+828,Farah,1,FH,AF06,true
+829,Faryab,1,FB,AF07,true
+830,Ghazni,1,GZ,AF08,true
+831,Ghowr,1,GR,AF09,true
+832,Helmand,1,HM,AF10,true
+833,Herat,1,HR,AF11,true
+835,Kabol,1,KB,AF13,true
+836,Kapisa,1,KP,AF14,true
+837,Konar,1,KR,AF15,true
+838,Laghman,1,LA,AF16,true
+839,Lowgar,1,LW,AF17,true
+840,Nangarhar,1,NG,AF18,true
+841,Nimruz,1,NM,AF19,true
+842,Oruzgan,1,OR,AF20,true
+843,Paktia,1,PT,AF21,true
+844,Parvan,1,PR,AF22,true
+845,Kandahar,1,KD,AF23,true
+846,Kondoz,1,KZ,AF24,true
+848,Takhar,1,TK,AF26,true
+849,Vardak,1,VR,AF27,true
+850,Zabol,1,ZB,AF28,true
+851,Paktika,1,PK,AF29,true
+852,Balkh,1,BK,AF30,true
+853,Jowzjan,1,JW,AF31,true
+854,Samangan,1,SM,AF32,true
+855,Sare Pol,1,SP,AF33,true
+856,Alger,3,AL,AG01,true
+857,Batna,3,BT,AG03,true
+858,Constantine,3,CO,AG04,true
+859,Medea,3,MD,AG06,true
+860,Mostaganem,3,MG,AG07,true
+861,Oran,3,OR,AG09,true
+862,Saida,3,SD,AG10,true
+863,Setif,3,SF,AG12,true
+864,Tiaret,3,TR,AG13,true
+865,Tizi Ouzou,3,TO,AG14,true
+866,Tlemcen,3,TL,AG15,true
+867,Bejaia,3,BJ,AG18,true
+868,Biskra,3,BS,AG19,true
+869,Blida,3,BL,AG20,true
+870,Bouira,3,BU,AG21,true
+871,Djelfa,3,DJ,AG22,true
+872,Guelma,3,GL,AG23,true
+873,Jijel,3,JJ,AG24,true
+874,Laghouat,3,LG,AG25,true
+875,Mascara,3,MC,AG26,true
+876,M'Sila,3,MS,AG27,true
+877,Oum el Bouaghi,3,OB,AG29,true
+878,Sidi Bel Abbes,3,SB,AG30,true
+879,Skikda,3,SK,AG31,true
+880,Tebessa,3,TB,AG33,true
+881,Adrar,3,AR,AG34,true
+882,Ain Defla,3,AD,AG35,true
+883,Ain Temouchent,3,AT,AG36,true
+884,Annaba,3,AN,AG37,true
+885,Bechar,3,BC,AG38,true
+886,Bordj Bou Arreridj,3,BB,AG39,true
+887,Boumerdes,3,BM,AG40,true
+888,Chlef,3,CH,AG41,true
+889,El Bayadh,3,EB,AG42,true
+890,El Oued,3,EO,AG43,true
+891,El Tarf,3,ET,AG44,true
+892,Ghardaia,3,GR,AG45,true
+893,Illizi,3,IL,AG46,true
+894,Khenchela,3,KH,AG47,true
+895,Mila,3,ML,AG48,true
+896,Naama,3,NA,AG49,true
+897,Ouargla,3,OG,AG50,true
+898,Relizane,3,RE,AG51,true
+899,Souk Ahras,3,SA,AG52,true
+900,Tamanghasset,3,TM,AG53,true
+901,Tindouf,3,TN,AG54,true
+902,Tipaza,3,TP,AG55,true
+903,Tissemsilt,3,TS,AG56,true
+904,Abseron,16,AR,AJ01,true
+905,Agcabadi,16,AC,AJ02,true
+906,Agdam,16,AM,AJ03,true
+907,Agdas,16,AS,AJ04,true
+908,Agstafa,16,AF,AJ05,true
+909,Agsu,16,AU,AJ06,true
+910,Ali Bayramli,16,AB,AJ07,true
+911,Astara,16,AA,AJ08,true
+912,Baki,16,BA,AJ09,true
+913,Balakan,16,BL,AJ10,true
+914,Barda,16,BR,AJ11,true
+915,Beylaqan,16,BQ,AJ12,true
+916,Bilasuvar,16,BS,AJ13,true
+917,Cabrayil,16,CB,AJ14,true
+918,Calilabad,16,CL,AJ15,true
+919,Daskasan,16,DS,AJ16,true
+920,Davaci,16,DV,AJ17,true
+921,Fuzuli,16,FU,AJ18,true
+922,Gadabay,16,GD,AJ19,true
+923,Ganca,16,GA,AJ20,true
+924,Goranboy,16,GR,AJ21,true
+925,Goycay,16,GY,AJ22,true
+926,Haciqabul,16,HA,AJ23,true
+927,Imisli,16,IM,AJ24,true
+928,Ismayilli,16,IS,AJ25,true
+929,Kalbacar,16,KA,AJ26,true
+930,Kurdamir,16,KU,AJ27,true
+931,Lacin,16,LC,AJ28,true
+932,Lankaran,16,LA,AJ30,true
+934,Lerik,16,LE,AJ31,true
+935,Masalli,16,MA,AJ32,true
+936,Mingacevir,16,MI,AJ33,true
+937,Naftalan,16,NA,AJ34,true
+938,Naxcivan,16,NX,AJ35,true
+939,Neftcala,16,NE,AJ36,true
+940,Oguz,16,OG,AJ37,true
+941,Qabala,16,QA,AJ38,true
+942,Qax,16,QX,AJ39,true
+943,Qazax,16,QZ,AJ40,true
+944,Qobustan,16,QO,AJ41,true
+945,Quba,16,QB,AJ42,true
+946,Qubadli,16,QD,AJ43,true
+947,Qusar,16,QR,AJ44,true
+948,Saatli,16,ST,AJ45,true
+949,Sabirabad,16,SB,AJ46,true
+950,Saki,16,SA,AJ48,true
+952,Salyan,16,SL,AJ49,true
+953,Samaxi,16,SI,AJ50,true
+954,Samkir,16,SM,AJ51,true
+955,Samux,16,SX,AJ52,true
+956,Siyazan,16,SY,AJ53,true
+957,Sumqayit,16,SQ,AJ54,true
+958,Susa,16,SS,AJ56,true
+960,Tartar,16,TA,AJ57,true
+961,Tovuz,16,TO,AJ58,true
+962,Ucar,16,UC,AJ59,true
+963,Xacmaz,16,XZ,AJ60,true
+964,Xankandi,16,XA,AJ61,true
+965,Xanlar,16,XR,AJ62,true
+966,Xizi,16,XI,AJ63,true
+967,Xocali,16,XC,AJ64,true
+968,Xocavand,16,XD,AJ65,true
+969,Yardimli,16,YR,AJ66,true
+970,Yevlax,16,YE,AJ68,true
+972,Zangilan,16,ZG,AJ69,true
+973,Zaqatala,16,ZQ,AJ70,true
+974,Zardab,16,ZR,AJ71,true
+975,Berat,2,BR,AL01,true
+976,Diber,2,DI,AL02,true
+977,Durres,2,DR,AL03,true
+978,Elbasan,2,EL,AL04,true
+979,Fier,2,FR,AL05,true
+980,Gjirokaster,2,GJ,AL06,true
+981,Gramsh,2,GR,AL07,true
+982,Kolonje,2,ER,AL08,true
+983,Korce,2,KO,AL09,true
+984,Kruje,2,KR,AL10,true
+985,Kukes,2,KU,AL11,true
+986,Lezhe,2,LE,AL12,true
+987,Librazhd,2,LB,AL13,true
+988,Lushnje,2,LU,AL14,true
+989,Mat,2,MT,AL15,true
+990,Mirdite,2,MR,AL16,true
+991,Permet,2,PR,AL17,true
+992,Pogradec,2,PG,AL18,true
+993,Puke,2,PU,AL19,true
+994,Sarande,2,SR,AL20,true
+995,Shkoder,2,SH,AL21,true
+996,Skrapar,2,SK,AL22,true
+997,Tepelene,2,TE,AL23,true
+998,Tropoje,2,TP,AL26,true
+999,Vlore,2,VL,AL27,true
+1000,Tiran,2,TI,AL28,true
+1001,Bulqize,2,BU,AL29,true
+1002,Delvine,2,DL,AL30,true
+1003,Devoll,2,DV,AL31,true
+1004,Has,2,HA,AL32,true
+1005,Kavaje,2,KA,AL33,true
+1006,Kucove,2,KC,AL34,true
+1007,Kurbin,2,KB,AL35,true
+1008,Malesi e Madhe,2,MM,AL36,true
+1009,Mallakaster,2,MK,AL37,true
+1010,Peqin,2,PQ,AL38,true
+1011,Tirane,2,TR,AL39,true
+1012,Aragatsotn,11,AG,AM01,true
+1013,Ararat,11,AR,AM02,true
+1014,Armavir,11,AV,AM03,true
+1015,Geghark'unik',11,GR,AM04,true
+1016,Kotayk',11,KT,AM05,true
+1017,Lorri,11,LO,AM06,true
+1018,Shirak,11,SH,AM07,true
+1019,Syunik',11,SU,AM08,true
+1020,Tavush,11,TV,AM09,true
+1021,Vayots' Dzor,11,VD,AM10,true
+1022,Yerevan,11,ER,AM11,true
+1023,Andorra la Vella,5,AN,AN07,true
+1024,Canillo,5,CA,AN02,true
+1025,Encamp,5,EN,AN03,true
+1026,La Massana,5,MA,AN04,true
+1027,Ordino,5,OR,AN05,true
+1028,Sant Julia de Loria,5,JL,AN06,true
+1029,Benguela,6,BG,AO01,true
+1030,Bie,6,BI,AO02,true
+1031,Cabinda,6,CB,AO03,true
+1032,Cuando Cubango,6,CC,AO04,true
+1033,Cuanza Norte,6,CN,AO05,true
+1034,Cuanza Sul,6,CS,AO06,true
+1035,Cunene,6,CU,AO07,true
+1036,Huambo,6,HM,AO08,true
+1037,Huila,6,HL,AO09,true
+1038,Luanda,6,LU,AO10,true
+1039,Malanje,6,ML,AO12,true
+1040,Namibe,6,NA,AO13,true
+1041,Moxico,6,MX,AO14,true
+1046,Uige,6,UI,AO15,true
+1048,Lunda Norte,6,LN,AO17,true
+1049,Lunda Sul,6,LS,AO18,true
+1050,Bengo,6,BO,AO19,true
+1051,Buenos Aires,10,BA,AR01,true
+1052,Catamarca,10,CT,AR02,true
+1053,Chaco,10,CC,AR03,true
+1054,Chubut,10,CH,AR04,true
+1055,Cordoba,10,CB,AR05,true
+1056,Corrientes,10,CN,AR06,true
+1057,Distrito Federal,10,DF,AR07,true
+1058,Entre Rios,10,ER,AR08,true
+1059,Formosa,10,FM,AR09,true
+1060,Jujuy,10,JY,AR10,true
+1061,La Pampa,10,LP,AR11,true
+1062,La Rioja,10,LR,AR12,true
+1063,Mendoza,10,MZ,AR13,true
+1064,Misiones,10,MN,AR14,true
+1065,Neuquen,10,NQ,AR15,true
+1066,Rio Negro,10,RN,AR16,true
+1067,Salta,10,SA,AR17,true
+1068,San Juan,10,SJ,AR18,true
+1069,San Luis,10,SL,AR19,true
+1070,Santa Cruz,10,SC,AR20,true
+1071,Santa Fe,10,SF,AR21,true
+1072,Santiago del Estero,10,SE,AR22,true
+1073,Antartida e Islas del Atlan Tierra del Fuego,10,TF,AR23,true
+1074,Tucuman,10,TM,AR24,true
+1075,Burgenland,15,BU,AU01,true
+1076,Karnten,15,KA,AU02,true
+1077,Niederosterreich,15,NO,AU03,true
+1078,Oberosterreich,15,OO,AU04,true
+1079,Salzburg,15,SZ,AU05,true
+1080,Steiermark,15,ST,AU06,true
+1081,Tirol,15,TR,AU07,true
+1082,Vorarlberg,15,VO,AU08,true
+1083,Wien,15,WI,AU09,true
+1084,Al Hadd,18,HD,BA01,true
+1085,Al Manamah,18,MN,BA02,true
+1086,Al Muharraq,18,MQ,BA03,true
+1087,Jidd Hafs,18,JH,BA05,true
+1088,Sitrah,18,ST,BA06,true
+1090,Al Mintaqah al Gharbiyah,18,MG,BA08,true
+1091,Mintaqat Juzur Hawar,18,MJ,BA09,true
+1092,Al Mintaqah ash Shamaliyah,18,MS,BA10,true
+1093,Al Mintaqah al Wusta,18,MW,BA11,true
+1094,Madinat Isa,18,MI,BA12,true
+1096,Madinat Hamad,18,MH,BA14,true
+1097,Christ Church,21,CC,BB01,true
+1098,Saint Andrew,21,AN,BB02,true
+1100,Saint James,21,JM,BB04,true
+1102,Saint Joseph,21,JS,BB06,true
+1103,Saint Lucy,21,LU,BB07,true
+1104,Saint Michael,21,MI,BB08,true
+1107,Saint Thomas,21,TH,BB11,true
+1108,Central,31,CE,BC01,true
+1109,Chobe,31,CH,BC02,true
+1110,Ghanzi,31,GH,BC03,true
+1111,Kgalagadi,31,KG,BC04,true
+1112,Kgatleng,31,KL,BC05,true
+1113,Kweneng,31,KW,BC06,true
+1114,Ngamiland,31,NG,BC07,true
+1115,NorthEast,31,NE,BC08,true
+1116,SouthEast,31,SE,BC09,true
+1117,Southern,31,SO,BC10,true
+1118,Devonshire,27,DE,BD01,true
+1119,Hamilton Municipality,27,HC,BD03,true
+1121,Paget,27,PA,BD04,true
+1122,Pembroke,27,PE,BD05,true
+1124,Saint George's,27,SC,BD07,true
+1125,Sandys,27,SA,BD08,true
+1126,Smiths,27,SM,BD09,true
+1127,Southampton,27,SO,BD10,true
+1128,Warwick,27,WA,BD11,true
+1129,Antwerpen,24,AN,BE01,true
+1131,Hainaut,24,HT,BE03,true
+1132,Liege,24,LG,BE04,true
+1133,Limburg,24,LI,BE05,true
+1135,Namur,24,NA,BE07,true
+1136,Oost-Vlaanderen,24,OV,BE08,true
+1137,West-Vlaanderen,24,WV,BE09,true
+1138,Bimini,17,BI,BF05,true
+1139,Cat Island,17,CI,BF06,true
+1140,Exuma,17,EX,BF10,true
+1143,Inagua,17,IN,BF13,true
+1144,Long Island,17,LI,BF15,true
+1145,Mayaguana,17,MG,BF16,true
+1146,Ragged Island,17,RI,BF18,true
+1147,Harbour Island,17,HI,BF22,true
+1148,New Providence,17,NP,BF23,true
+1149,Acklins and Crooked Islands,17,AC,BF24,true
+1150,Freeport,17,FP,BF25,true
+1151,Fresh Creek,17,FC,BF26,true
+1152,Governor's Harbour,17,GH,BF27,true
+1153,Green Turtle Cay,17,GT,BF28,true
+1154,High Rock,17,HR,BF29,true
+1155,Kemps Bay,17,KB,BF30,true
+1156,Marsh Harbour,17,MH,BF31,true
+1157,Nichollstown and Berry Islands,17,NB,BF32,true
+1158,Rock Sound,17,RS,BF33,true
+1159,Sandy Point,17,SP,BF34,true
+1160,San Salvador and Rum Cay,17,SR,BF35,true
+1161,Chittagong,20,CG,BG80,true
+1162,Dhaka,20,DA,BG81,true
+1163,Khulna,20,KH,BG82,true
+1164,Rajshahi,20,RJ,BG83,true
+1166,Cayo,25,CY,BH02,true
+1167,Corozal,25,CZ,BH03,true
+1168,Orange Walk,25,OW,BH04,true
+1169,Stann Creek,25,SC,BH05,true
+1170,Toledo,25,TO,BH06,true
+1171,Chuquisaca,29,CQ,BL01,true
+1172,Cochabamba,29,CB,BL02,true
+1173,El Beni,29,EB,BL03,true
+1174,La Paz,29,LP,BL04,true
+1175,Oruro,29,OR,BL05,true
+1176,Pando,29,PA,BL06,true
+1177,Potosi,29,PO,BL07,true
+1179,Tarija,29,TR,BL09,true
+1180,Rakhine State,39,RA,BM01,true
+1181,Chin State,39,CH,BM02,true
+1182,Ayeyarwady,39,AY,BM03,true
+1183,Kachin State,39,KC,BM04,true
+1184,Kayin State,39,KN,BM05,true
+1185,Kayah State,39,KH,BM06,true
+1187,Mandalay,39,MD,BM08,true
+1189,Sagaing,39,SA,BM10,true
+1190,Shan State,39,SH,BM11,true
+1191,Tanintharyi,39,TN,BM12,true
+1192,Mon State,39,MO,BM13,true
+1194,Magway,39,MG,BM15,true
+1195,Bago,39,BA,BM16,true
+1196,Yangon,39,YA,BM17,true
+1197,Atakora,26,AK,BN01,true
+1198,Atlantique,26,AQ,BN02,true
+1199,Borgou,26,BO,BN03,true
+1200,Mono,26,MO,BN04,true
+1201,Oueme,26,OU,BN05,true
+1202,Zou,26,ZO,BN06,true
+1203,Brestskaya Voblasts',23,BR,BO01,true
+1204,Homyel'skaya Voblasts',23,HO,BO02,true
+1205,Hrodzyenskaya Voblasts',23,HR,BO03,true
+1206,Minsk,23,HM,BO04,true
+1207,Minskaya Voblasts',23,MI,BO05,true
+1208,Mahilyowskaya Voblasts',23,MA,BO06,true
+1209,Vitsyebskaya Voblasts',23,VI,BO07,true
+1210,Malaita,222,ML,BP03,true
+1211,Western,222,WE,BP04,true
+1213,Guadalcanal,222,GC,BP06,true
+1214,Isabel,222,IS,BP07,true
+1215,Makira,222,MK,BP08,true
+1216,Temotu,222,TE,BP09,true
+1219,Paro,33,PA,BR16,true
+1220,Pernambuco,33,PE,BR19,true
+1221,Bumthang,28,BU,BT05,true
+1222,Chhukha,28,CK,BT06,true
+1223,Chirang,28,CR,BT07,true
+1224,Daga,28,DA,BT08,true
+1225,Geylegphug,28,GE,BT09,true
+1226,Ha,28,HA,BT10,true
+1227,Lhuntshi,28,LH,BT11,true
+1228,Mongar,28,MO,BT12,true
+1230,Pemagatsel,28,PM,BT14,true
+1231,Punakha,28,PN,BT15,true
+1232,Samchi,28,SM,BT16,true
+1233,Samdrup,28,SJ,BT17,true
+1234,Shemgang,28,SG,BT18,true
+1235,Tashigang,28,TA,BT19,true
+1236,Thimphu,28,TM,BT20,true
+1237,Tongsa,28,TO,BT21,true
+1238,Wangdi Phodrang,28,WP,BT22,true
+1239,Burgas,37,BR,BU39,true
+1240,Sofiya-Grad,37,SG,BU42,true
+1241,Khaskovo,37,KK,BU43,true
+1242,Lovech,37,LV,BU46,true
+1244,Plovdiv,37,PD,BU51,true
+1245,Razgrad,37,RG,BU52,true
+1246,Sofiya,37,SF,BU58,true
+1247,Varna,37,VN,BU61,true
+1248,Belait,36,BE,BX01,true
+1249,Brunei and Muara,36,BM,BX02,true
+1250,Temburong,36,TE,BX03,true
+1251,Tutong,36,TU,BX04,true
+1252,Bujumbura,40,BU,BY02,true
+1253,Muramvya,40,MV,BY22,true
+1254,Bubanza,40,BB,BY09,true
+1255,Bururi,40,BR,BY10,true
+1256,Cankuzo,40,CA,BY11,true
+1257,Cibitoke,40,CI,BY12,true
+1258,Gitega,40,GI,BY13,true
+1259,Karuzi,40,KR,BY14,true
+1260,Kayanza,40,KY,BY15,true
+1261,Kirundo,40,KI,BY16,true
+1262,Makamba,40,MA,BY17,true
+1263,Muyinga,40,MY,BY18,true
+1264,Ngozi,40,NG,BY19,true
+1265,Rutana,40,RT,BY20,true
+1266,Ruyigi,40,RY,BY21,true
+1267,Batdambang,41,BA,CB29,true
+1268,Kampong Cham,41,KM,CB02,true
+1269,Kampong Chhnang,41,KG,CB03,true
+1270,Kampong Spoe,41,KS,CB04,true
+1271,Kampong Thum,41,KT,CB05,true
+1272,Kampot,41,KP,CB21,true
+1273,Kandal,41,KN,CB07,true
+1274,Kaoh Kong,41,KK,CB08,true
+1275,Krachen,41,KR,CB09,true
+1276,Mondol Kiri,41,MK,CB10,true
+1277,Phnum Penh,41,PP,CB22,true
+1278,Pouthisat,41,PO,CB12,true
+1279,Preah Vihear,41,PH,CB13,true
+1280,Prey Veng,41,PY,CB14,true
+1283,Stoeng Treng,41,ST,CB17,true
+1284,Svay Rieng,41,SR,CB18,true
+1285,Takev,41,TA,CB19,true
+1286,Rotanah Kiri,41,RO,CB23,true
+1287,Siem Reab,41,SI,CB24,true
+1288,Banteay Mean Cheay,41,OM,CB25,true
+1289,Keb,41,KB,CB26,true
+1290,Otdar Mean Cheay,41,OC,CB27,true
+1291,Preah Seihanu,41,KA,CB28,true
+1292,Batha,47,BA,CD01,true
+1293,Biltine,47,BI,CD02,true
+1294,Borkou-Ennedi-Tibesti,47,BT,CD03,true
+1295,ChariBaguirmi,47,CB,CD04,true
+1296,Guera,47,GR,CD05,true
+1297,Kanem,47,KA,CD06,true
+1298,Lac,47,LC,CD07,true
+1299,Logone Occidental,47,LO,CD08,true
+1300,Logone Oriental,47,LR,CD09,true
+1301,Mayo-Kebbi,47,MK,CD10,true
+1302,Moyen-Chari,47,MC,CD11,true
+1303,Ouaddai,47,OD,CD12,true
+1304,Salamat,47,SA,CD13,true
+1305,Tandjile,47,TA,CD14,true
+1307,North Central,228,NC,CE30,true
+1308,North Eastern,228,NE,CE31,true
+1309,North Western,228,NW,CE32,true
+1310,Sabaragamuwa,228,SA,CE33,true
+1312,Uva,228,UV,CE35,true
+1314,Bouenza,56,BO,CF01,true
+1315,Cuvette,56,CU,CF03,true
+1316,Kouilou,56,KO,CF04,true
+1317,Lekoumou,56,LE,CF05,true
+1318,Likouala,56,LI,CF06,true
+1319,Niari,56,NI,CF07,true
+1320,Plateaux,56,PL,CF08,true
+1321,Sangha,56,SA,CF10,true
+1322,Pool,56,PO,CF11,true
+1323,Brazzaville,56,BR,CF12,true
+1324,Bandundu,55,BN,CG01,true
+1325,Equateur,55,EQ,CG02,true
+1326,Kasai-Occidental,55,KC,CG03,true
+1327,Kasai-Oriental,55,KR,CG04,true
+1328,Katanga,55,KT,CG05,true
+1329,Kinshasa,55,KN,CG06,true
+1331,Bas-Congo,55,BC,CG08,true
+1332,Orientale,55,HC,CG09,true
+1333,Anhui,49,AH,CH01,true
+1334,Zhejiang,49,ZJ,CH02,true
+1335,Jiangxi,49,JX,CH03,true
+1336,Jiangsu,49,JS,CH04,true
+1337,Jilin,49,JL,CH05,true
+1338,Qinghai,49,QH,CH06,true
+1339,Fujian,49,FJ,CH07,true
+1340,Heilongjiang,49,HL,CH08,true
+1341,Henan,49,HE,CH09,true
+1342,Hebei,49,HB,CH10,true
+1343,Hunan,49,HN,CH11,true
+1344,Hubei,49,HU,CH12,true
+1345,Xinjiang,49,XJ,CH13,true
+1346,Xizang,49,XZ,CH14,true
+1347,Gansu,49,GS,CH15,true
+1348,Guangxi,49,GX,CH16,true
+1349,Guizhou,49,GZ,CH18,true
+1350,Liaoning,49,LN,CH19,true
+1351,Nei Mongol,49,NM,CH20,true
+1352,Ningxia,49,NX,CH21,true
+1353,Beijing,49,BJ,CH22,true
+1354,Shanghai,49,SH,CH23,true
+1355,Shanxi,49,SX,CH24,true
+1356,Shandong,49,SD,CH25,true
+1357,Shaanxi,49,SA,CH26,true
+1358,Sichuan,49,SC,CH32,true
+1359,Tianjin,49,TJ,CH28,true
+1360,Yunnan,49,YN,CH29,true
+1361,Guangdong,49,GD,CH30,true
+1362,Hainan,49,HA,CH31,true
+1363,Chongqing,49,CQ,CH33,true
+1364,Valparaiso,48,VS,CI01,true
+1365,Aisen del General Carlos Ibanez del Campo,48,AI,CI02,true
+1366,Antofagasta,48,AN,CI03,true
+1367,Araucania,48,AR,CI04,true
+1368,Atacama,48,AT,CI05,true
+1369,Bio-Bio,48,BI,CI06,true
+1370,Coquimbo,48,CO,CI07,true
+1371,Libertador General Bernardo O'Higgins,48,LI,CI08,true
+1372,Los Lagos,48,LL,CI09,true
+1373,Magallanes y de la Antartica Chilena,48,MA,CI10,true
+1374,Maule,48,ML,CI11,true
+1375,Region Metropolitana,48,RM,CI12,true
+1376,Tarapaca,48,TA,CI13,true
+1377,Creek,45,CR,CJ01,true
+1378,Eastern,45,EA,CJ02,true
+1379,Midland,45,MI,CJ03,true
+1380,South Town,45,SO,CJ04,true
+1381,Spot Bay,45,SP,CJ05,true
+1382,Stake Bay,45,ST,CJ06,true
+1383,West End,45,WD,CJ07,true
+1385,Est,42,ES,CM04,true
+1386,Littoral,42,LT,CM05,true
+1387,NordOuest,42,NW,CM07,true
+1388,Ouest,42,OU,CM08,true
+1389,SudOuest,42,SW,CM09,true
+1390,Adamaoua,42,AD,CM10,true
+1391,Centre,42,CE,CM11,true
+1392,ExtremeNord,42,EN,CM12,true
+1393,Nord,42,NO,CM13,true
+1394,Sud,42,SU,CM14,true
+1395,Anjouan,54,AN,CN01,true
+1396,Grande Comore,54,GC,CN02,true
+1397,Moheli,54,MO,CN03,true
+1399,Antioquia,53,AN,CO02,true
+1400,Arauca,53,AR,CO03,true
+1401,Atlantico,53,AT,CO04,true
+1402,Caqueta,53,CQ,CO08,true
+1403,Cauca,53,CA,CO09,true
+1404,Cesar,53,CE,CO10,true
+1405,Choco,53,CH,CO11,true
+1408,Guaviare,53,GV,CO14,true
+1409,Guainia,53,GN,CO15,true
+1411,La Guajira,53,LG,CO17,true
+1412,Meta,53,ME,CO19,true
+1413,Narino,53,NA,CO20,true
+1414,Norte de Santander,53,NS,CO21,true
+1415,Putumayo,53,PU,CO22,true
+1416,Quindio,53,QD,CO23,true
+1417,Risaralda,53,RI,CO24,true
+1418,San Andres y Providencia,53,SA,CO25,true
+1419,Santander,53,ST,CO26,true
+1420,Sucre,53,SU,CO27,true
+1421,Tolima,53,TO,CO28,true
+1422,Valle del Cauca,53,VC,CO29,true
+1423,Vaupes,53,VP,CO30,true
+1424,Vichada,53,VD,CO31,true
+1425,Casanare,53,CS,CO32,true
+1426,Cundinamarca,53,CU,CO33,true
+1427,Distrito Capital,53,DC,CO34,true
+1428,Bolivar,53,BL,CO35,true
+1429,Boyaca,53,BY,CO36,true
+1430,Caldas,53,CL,CO37,true
+1431,Magdalena,53,MA,CO38,true
+1432,Alajuela,59,AL,CS01,true
+1433,Cartago,59,CA,CS02,true
+1434,Guanacaste,59,GU,CS03,true
+1435,Heredia,59,HE,CS04,true
+1436,Limon,59,LI,CS06,true
+1437,Puntarenas,59,PU,CS07,true
+1438,San Jose,59,SJ,CS08,true
+1439,Bamingui-Bangoran,46,BB,CT01,true
+1440,Basse-Kotto,46,BK,CT02,true
+1441,Haute-Kotto,46,HK,CT03,true
+1442,Haute-Sangha,46,HS,CT04,true
+1443,Haut-Mbomou,46,HM,CT05,true
+1444,Kemo-Gribingui,46,KG,CT06,true
+1445,Lobaye,46,LB,CT07,true
+1446,Mbomou,46,MB,CT08,true
+1447,Nana-Mambere,46,NM,CT09,true
+1448,Ouaka,46,UK,CT11,true
+1449,Ouham,46,AC,CT12,true
+1450,Ouham-Pende,46,OP,CT13,true
+1451,Vakaga,46,VK,CT14,true
+1452,Gribingui,46,KB,CT15,true
+1454,Ombella-Mpoko,46,MP,CT17,true
+1455,Bangui,46,BG,CT18,true
+1456,Pinar del Rio,62,PR,CU01,true
+1457,Ciudad de La Habana,62,CH,CU02,true
+1458,Matanzas,62,MA,CU03,true
+1459,Isla de la Juventud,62,IJ,CU04,true
+1460,Camaguey,62,CM,CU05,true
+1461,Ciego de Avila,62,CA,CU07,true
+1462,Cienfuegos,62,CF,CU08,true
+1463,Granma,62,GR,CU09,true
+1464,Guantanamo,62,GU,CU10,true
+1465,La Habana,62,LH,CU11,true
+1466,Holguin,62,HO,CU12,true
+1467,Las Tunas,62,LT,CU13,true
+1468,Sancti Spiritus,62,SS,CU14,true
+1469,Santiago de Cuba,62,SC,CU15,true
+1470,Villa Clara,62,VC,CU16,true
+1471,Boa Vista,44,BV,CV01,true
+1472,Brava,44,BR,CV02,true
+1473,Calheta de SÒo Miguel,44,SM,CV03,true
+1474,Maio,44,MA,CV04,true
+1475,Paul,44,PA,CV05,true
+1476,Praia,44,PI,CV06,true
+1477,Ribeira Grande,44,RG,CV07,true
+1478,Sal,44,SL,CV08,true
+1480,Sao Nicolau,44,SN,CV10,true
+1481,Sao Vicente,44,SV,CV11,true
+1482,Tarrafal,44,TF,CV12,true
+1483,Famagusta,63,FA,CY01,true
+1484,Kyrenia,63,KY,CY02,true
+1485,Larnaca,63,LA,CY03,true
+1486,Nicosia,63,NI,CY04,true
+1487,Limassol,63,LI,CY05,true
+1488,Paphos,63,PA,CY06,true
+1489,Arhus,65,AR,DA01,true
+1490,Bornholm,65,BO,DA02,true
+1491,Frederiksborg,65,FR,DA03,true
+1492,Fyn,65,FY,DA04,true
+1493,Kobenhavn,65,SK,DA06,true
+1494,Nordjylland,65,NJ,DA07,true
+1495,Ribe,65,RB,DA08,true
+1496,Ringkobing,65,RK,DA09,true
+1497,Roskilde,65,RS,DA10,true
+1498,Sonderjylland,65,SJ,DA11,true
+1499,Storstrom,65,ST,DA12,true
+1500,Vejle,65,VJ,DA13,true
+1501,Vestsjalland,65,VS,DA14,true
+1502,Viborg,65,VB,DA15,true
+1503,Fredericksberg,65,SF,DA16,true
+1504,'Ali Sabih,66,AS,DJ01,true
+1505,Dikhil,66,DI,DJ02,true
+1507,Obock,66,OB,DJ04,true
+1508,Tadjoura,66,TA,DJ05,true
+1510,Saint David,67,DA,DO03,true
+1514,Saint Luke,67,LU,DO07,true
+1515,Saint Mark,67,MA,DO08,true
+1516,Saint Patrick,67,PK,DO09,true
+1519,Azua,68,AZ,DR01,true
+1520,Baoruco,68,BR,DR02,true
+1521,Barahona,68,BH,DR03,true
+1522,Dajabon,68,DA,DR04,true
+1523,Distrito Nacional,68,DN,DR05,true
+1524,Duarte,68,DU,DR06,true
+1525,Espaillat,68,ES,DR08,true
+1526,Independencia,68,IN,DR09,true
+1527,La Altagracia,68,AL,DR10,true
+1528,Elias Pina,68,EP,DR11,true
+1529,La Romana,68,RO,DR12,true
+1530,Maria Trinidad Sanchez,68,MT,DR14,true
+1531,Monte Cristi,68,MC,DR15,true
+1532,Pedernales,68,PN,DR16,true
+1533,Peravia,68,PR,DR17,true
+1534,Puerto Plata,68,PP,DR18,true
+1535,Salcedo,68,SC,DR19,true
+1536,Samana,68,SM,DR20,true
+1537,Sanchez Ramirez,68,SZ,DR21,true
+1539,San Pedro de Macoris,68,PM,DR24,true
+1540,Santiago,68,ST,DR25,true
+1541,Santiago Rodriguez,68,SR,DR26,true
+1542,Valverde,68,VA,DR27,true
+1543,El Seibo,68,SE,DR28,true
+1544,Hato Mayor,68,HM,DR29,true
+1545,La Vega,68,VE,DR30,true
+1546,Monsenor Nouel,68,MN,DR31,true
+1547,Monte Plata,68,MP,DR32,true
+1548,San Cristobal,68,CR,DR33,true
+1549,Galapagos,70,GA,EC01,true
+1550,Azuay,70,AZ,EC02,true
+1552,Canar,70,CN,EC04,true
+1553,Carchi,70,CR,EC05,true
+1554,Chimborazo,70,CB,EC06,true
+1555,Cotopaxi,70,CT,EC07,true
+1556,El Oro,70,EO,EC08,true
+1557,Esmeraldas,70,ES,EC09,true
+1558,Guayas,70,GU,EC10,true
+1559,Imbabura,70,IM,EC11,true
+1560,Loja,70,LJ,EC12,true
+1561,Los Rios,70,LR,EC13,true
+1562,Manabi,70,MN,EC14,true
+1563,Morona-Santiago,70,MS,EC15,true
+1564,Pastaza,70,PA,EC17,true
+1565,Pichincha,70,PI,EC18,true
+1566,Tungurahua,70,TU,EC19,true
+1567,Zamora-Chinchipe,70,ZC,EC20,true
+1568,Napo,70,NA,EC23,true
+1569,Sucumbios,70,SU,EC22,true
+1570,Ad Daqahliyah,71,DQ,EG01,true
+1571,Al Bahr al Ahmar,71,BA,EG02,true
+1572,Al Buhayrah,71,BH,EG03,true
+1573,Al Fayyum,71,FY,EG04,true
+1574,Al Gharbiyah,71,GH,EG05,true
+1575,Al Iskandariyah,71,IK,EG06,true
+1576,Al Isma'iliyah,71,IS,EG07,true
+1577,Al Jizah,71,JZ,EG08,true
+1578,Al Minufiyah,71,MF,EG09,true
+1579,Al Minya,71,MN,EG10,true
+1580,Al Qahirah,71,QH,EG11,true
+1581,Al Qaly»biyah,71,QL,EG12,true
+1582,Al Wadi al Jadid,71,WJ,EG13,true
+1583,Ash Sharqiyah,71,SQ,EG14,true
+1584,As Suways,71,SW,EG15,true
+1585,Aswan,71,AN,EG16,true
+1586,Asyut,71,AT,EG17,true
+1587,Bani Suwayf,71,BN,EG18,true
+1588,Bur Sa'id,71,BS,EG19,true
+1589,Dumyat,71,DT,EG20,true
+1590,Kafr ash Shaykh,71,KS,EG21,true
+1591,Matruh,71,MT,EG22,true
+1592,Qina,71,QN,EG23,true
+1593,Suhaj,71,SJ,EG24,true
+1594,Janub Sina',71,JS,EG26,true
+1595,Shamal Sina',71,SS,EG27,true
+1596,Carlow,117,CW,EI01,true
+1597,Cavan,117,CN,EI02,true
+1598,Clare,117,CE,EI03,true
+1599,Cork,117,CK,EI04,true
+1600,Donegal,117,DL,EI06,true
+1601,Dublin,117,DN,EI07,true
+1602,Galway,117,GY,EI10,true
+1603,Kerry,117,KY,EI11,true
+1604,Kildare,117,KE,EI12,true
+1605,Kilkenny,117,KK,EI13,true
+1606,Leitrim,117,LM,EI14,true
+1607,Laois,117,LS,EI15,true
+1608,Limerick,117,LK,EI16,true
+1609,Longford,117,LD,EI18,true
+1610,Louth,117,LH,EI19,true
+1611,Mayo,117,MO,EI20,true
+1612,Meath,117,MH,EI21,true
+1613,Monaghan,117,MN,EI22,true
+1614,Offaly,117,OY,EI23,true
+1615,Roscommon,117,RN,EI24,true
+1616,Sligo,117,SO,EI25,true
+1617,Tipperary,117,TY,EI26,true
+1618,Waterford,117,WD,EI27,true
+1619,Westmeath,117,WH,EI29,true
+1620,Wexford,117,WX,EI30,true
+1621,Wicklow,117,WW,EI31,true
+1622,Annobon,73,AN,EK03,true
+1623,Bioko Norte,73,BN,EK04,true
+1624,Bioko Sur,73,BS,EK05,true
+1625,Centro Sur,73,CS,EK06,true
+1626,Kie-Ntem,73,KN,EK07,true
+1627,Litoral,73,LI,EK08,true
+1628,Wele-Nzas,73,WN,EK09,true
+1629,Harjumaa,75,HA,EN01,true
+1630,Hiiumaa,75,HI,EN02,true
+1631,Ida-Virumaa,75,IV,EN03,true
+1632,Jarvamaa,75,JR,EN04,true
+1633,Jogevamaa,75,JN,EN05,true
+1634,Laanemaa,75,LN,EN07,true
+1635,Laane-Virumaa,75,LV,EN08,true
+1636,Parnumaa,75,PR,EN11,true
+1637,Polvamaa,75,PL,EN12,true
+1638,Raplamaa,75,RA,EN13,true
+1639,Saaremaa,75,SA,EN14,true
+1640,Tartumaa,75,TA,EN18,true
+1641,Valgamaa,75,VG,EN19,true
+1642,Viljandimaa,75,VD,EN20,true
+1643,Vorumaa,75,VR,EN21,true
+1644,Ahuachapan,72,AH,ES01,true
+1645,Cabanas,72,CA,ES02,true
+1646,Chalatenango,72,CH,ES03,true
+1647,Cuscatlan,72,CU,ES04,true
+1648,La Libertad,72,LI,ES05,true
+1650,La Union,72,UN,ES07,true
+1651,Morazan,72,MO,ES08,true
+1652,San Miguel,72,SM,ES09,true
+1653,San Salvador,72,SS,ES10,true
+1654,Santa Ana,72,SA,ES11,true
+1655,San Vicente,72,SI,ES12,true
+1656,Sonsonate,72,SO,ES13,true
+1657,Usulutan,72,US,ES14,true
+1687,Harari People,76,HA,ET50,true
+1688,Gambela Peoples,76,GA,ET49,true
+1690,Benshangul-Gumaz,76,BE,ET47,true
+1691,Tigray,76,TI,ET53,true
+1692,Amhara,76,AM,ET46,true
+1693,Afar,76,AF,ET45,true
+1694,Oromia,76,OR,ET51,true
+1695,Somali,76,SO,ET52,true
+1696,Addis Ababa,76,AA,ET44,true
+1697,Southern Nations,76,SN,ET54,true
+1746,Hlavni Mesto Praha,64,PR,EZ52,true
+1772,Ahvenanmaa,81,AV,FI01,true
+1777,Lappi,81,LP,FI06,true
+1779,Oulu Laani,81,OU,FI08,true
+1786,Northern,80,NO,FJ03,true
+1787,Rotuma,80,RO,FJ04,true
+1789,Kosrae,160,KO,FM01,true
+1790,Pohnpei,160,PO,FM02,true
+1791,Chuuk,160,CH,FM03,true
+1792,Yap,160,YA,FM04,true
+1793,Aquitaine,82,AQ,FR97,true
+1794,Auvergne,82,AU,FR98,true
+1795,Basse-Normandie,82,BA,FR99,true
+1796,Bourgogne,82,BO,FRA1,true
+1797,Bretagne,82,BR,FRA2,true
+1799,Champagne-Ardenne,82,CH,FRA4,true
+1800,Corse,82,CO,FRA5,true
+1801,Franche-Comte,82,FC,FRA6,true
+1802,Haute-Normandie,82,HA,FRA7,true
+1803,Ile-De-France,82,IL,FRA8,true
+1804,Languedoc-Roussillon,82,LA,FRA9,true
+1805,Limousin,82,LI,FRB1,true
+1806,Lorraine,82,LO,FRB2,true
+1807,Midi-Pyrenees,82,MI,FRB3,true
+1808,Nord-Pas-de-Calais,82,NO,FRB4,true
+1809,Pays de la Loire,82,PA,FRB5,true
+1810,Picardie,82,PI,FRB6,true
+1811,Poitou-Charentes,82,PO,FRB7,true
+1812,Provence-Alpes-Cote d'Azur,82,PR,FRB8,true
+1813,Rhone-Alpes,82,RH,FRB9,true
+1814,Alsace,82,AL,FRC1,true
+1815,Banjul,88,BJ,GA01,true
+1816,Lower River,88,LR,GA02,true
+1817,MacCarthy Island,88,MC,GA03,true
+1818,Upper River,88,UR,GA04,true
+1820,North Bank,88,NB,GA07,true
+1821,Estuaire,87,ES,GB01,true
+1822,Haut-Ogooue,87,HO,GB02,true
+1823,Moyen-Ogooue,87,MO,GB03,true
+1824,Ngounie,87,NG,GB04,true
+1825,Nyanga,87,NY,GB05,true
+1826,Ogooue-Ivindo,87,OI,GB06,true
+1827,Ogooue-Lolo,87,OL,GB07,true
+1828,Ogooue-Maritime,87,OM,GB08,true
+1829,Woleu-Ntem,87,WN,GB09,true
+1831,Abkhazia,90,AB,GG02,true
+1833,Ajaria,90,AJ,GG04,true
+1879,T'bilisi,90,TB,GG51,true
+1893,Greater Accra,92,AA,GH01,true
+1894,Ashanti,92,AH,GH02,true
+1895,Brong-Ahafo,92,BA,GH03,true
+1899,Volta,92,TV,GH08,true
+1901,Upper East,92,UE,GH10,true
+1902,Upper West,92,UW,GH11,true
+1909,Nordgronland,96,NG,GL01,true
+1910,Ostgronland,96,EG,GL02,true
+1911,Vestgronland,96,VG,GL03,true
+1912,Baden-Wurttemberg,91,BW,GM01,true
+1913,Bayern,91,BY,GM02,true
+1914,Bremen,91,HB,GM03,true
+1915,Hamburg,91,HH,GM04,true
+1916,Hessen,91,HE,GM05,true
+1917,Niedersachsen,91,NI,GM06,true
+1918,Nordrhein-Westfalen,91,NW,GM07,true
+1919,Rheinland-Pfalz,91,RP,GM08,true
+1920,Saarland,91,SL,GM09,true
+1921,Schleswig-Holstein,91,SH,GM10,true
+1922,Brandenburg,91,BB,GM11,true
+1923,Mecklenburg-Vorpommern,91,MY,GM12,true
+1924,Sachsen,91,SN,GM13,true
+1925,Sachsen-Anhalt,91,ST,GM14,true
+1926,Thuringen,91,TH,GM15,true
+1927,Berlin,91,BE,GM16,true
+1928,Evros,95,ES,GR01,true
+1929,Rodhopi,95,RD,GR02,true
+1930,Xanthi,95,XN,GR03,true
+1931,Drama,95,DR,GR04,true
+1932,Serrai,95,SR,GR05,true
+1933,Kilkis,95,KK,GR06,true
+1934,Pella,95,PL,GR07,true
+1935,Florina,95,FL,GR08,true
+1936,Kastoria,95,KS,GR09,true
+1937,Grevena,95,GE,GR10,true
+1938,Kozani,95,KZ,GR11,true
+1939,Imathia,95,IM,GR12,true
+1940,Thessaloniki,95,TN,GR13,true
+1941,Kavala,95,KV,GR14,true
+1942,Khalkidhiki,95,KD,GR15,true
+1943,Pieria,95,PI,GR16,true
+1944,Ioannina,95,IO,GR17,true
+1945,Thesprotia,95,TP,GR18,true
+1946,Preveza,95,PV,GR19,true
+1947,Arta,95,AR,GR20,true
+1948,Larisa,95,LR,GR21,true
+1949,Trikala,95,TR,GR22,true
+1950,Kardhitsa,95,KT,GR23,true
+1951,Magnisia,95,MG,GR24,true
+1952,Kerkira,95,KE,GR25,true
+1953,Levkas,95,LV,GR26,true
+1954,Kefallinia,95,KF,GR27,true
+1955,Zakinthos,95,ZK,GR28,true
+1956,Fthiotis,95,FT,GR29,true
+1957,Evritania,95,ET,GR30,true
+1958,Aitolia kai Akarnania,95,AA,GR31,true
+1959,Fokis,95,FK,GR32,true
+1960,Voiotia,95,VT,GR33,true
+1961,Evvoia,95,EV,GR34,true
+1962,Attiki,95,AT,GR35,true
+1963,Argolis,95,AG,GR36,true
+1964,Korinthia,95,KO,GR37,true
+1965,Akhaia,95,AK,GR38,true
+1966,Ilia,95,IL,GR39,true
+1967,Messinia,95,MS,GR40,true
+1968,Arkadhia,95,AD,GR41,true
+1969,Lakonia,95,LC,GR42,true
+1970,Khania,95,KN,GR43,true
+1971,Rethimni,95,RT,GR44,true
+1972,Iraklion (Crete),95,IR,GR45,true
+1973,Lasithi,95,LT,GR46,true
+1974,Dhodhekanisos,95,DO,GR47,true
+1975,Samos,95,SM,GR48,true
+1976,Kikladhes,95,KY,GR49,true
+1977,Khios,95,KH,GR50,true
+1978,Lesvos,95,LS,GR51,true
+1979,Alta Verapaz,100,AV,GT01,true
+1980,Baja Verapaz,100,BV,GT02,true
+1981,Chimaltenango,100,CM,GT03,true
+1982,Chiquimula,100,CQ,GT04,true
+1983,El Progreso,100,PR,GT05,true
+1984,Escuintla,100,ES,GT06,true
+1986,Huehuetenango,100,HU,GT08,true
+1987,Izabal,100,IZ,GT09,true
+1988,Jalapa,100,JA,GT10,true
+1989,Jutiapa,100,JU,GT11,true
+1990,Peten,100,PE,GT12,true
+1991,Quetzaltenango,100,QZ,GT13,true
+1992,Quiche,100,QC,GT14,true
+1993,Retalhuleu,100,RE,GT15,true
+1994,Sacatepequez,100,SA,GT16,true
+1995,San Marcos,100,SM,GT17,true
+1996,Santa Rosa,100,SR,GT18,true
+1997,Solola,100,SO,GT19,true
+1998,Suchitepequez,100,SU,GT20,true
+1999,Totonicapan,100,TO,GT21,true
+2000,Zacapa,100,ZA,GT22,true
+2001,Beyla,102,BE,GV01,true
+2002,Boffa,102,BF,GV02,true
+2003,Boke,102,BK,GV03,true
+2004,Conakry,102,CK,GV04,true
+2005,Dabola,102,DB,GV05,true
+2006,Dalaba,102,DL,GV06,true
+2007,Dinguiraye,102,DI,GV07,true
+2008,Dubreka,102,DU,GV31,true
+2009,Faranah,102,FA,GV09,true
+2010,Forecariah,102,FO,GV10,true
+2011,Fria,102,FR,GV11,true
+2012,Gaoual,102,GA,GV12,true
+2013,Gueckedou,102,GU,GV13,true
+2014,Kankan,102,KA,GV32,true
+2015,Kerouane,102,KE,GV15,true
+2016,Kindia,102,KD,GV16,true
+2017,Kissidougou,102,KS,GV17,true
+2018,Koundara,102,KN,GV18,true
+2019,Kouroussa,102,KO,GV19,true
+2020,Labe,102,LA,GV34,true
+2021,Macenta,102,MC,GV21,true
+2023,Mamou,102,MM,GV23,true
+2024,Nzerekore,102,NZ,GV38,true
+2025,Pita,102,PI,GV25,true
+2026,Siguiri,102,SI,GV39,true
+2027,Telimele,102,TE,GV27,true
+2028,Tougue,102,TO,GV28,true
+2029,Yomou,102,YO,GV29,true
+2030,Barima-Waini,104,BA,GY10,true
+2031,Cuyuni-Mazaruni,104,CU,GY11,true
+2032,Demerara-Mahaica,104,DE,GY12,true
+2033,East Berbice-Corentyne,104,EB,GY13,true
+2034,Essequibo Islands-West Demerara,104,ES,GY14,true
+2035,Mahaica-Berbice,104,MA,GY15,true
+2036,Pomeroon-Supenaam,104,PM,GY16,true
+2037,Potaro-Siparuni,104,PT,GY17,true
+2038,Upper Demerara-Berbice,104,UD,GY18,true
+2039,Upper Takutu-Upper Essequibo,104,UT,GY19,true
+2040,Nord-Ouest,105,NO,HA03,true
+2041,Artibonite,105,AR,HA06,true
+2043,Grand'Anse,105,GA,HA08,true
+2045,Nord-Est,105,NE,HA10,true
+2048,Sud-Est,105,SE,HA13,true
+2049,Atlantida,108,AT,HO01,true
+2050,Choluteca,108,CH,HO02,true
+2051,Colon,108,CL,HO03,true
+2052,Comayagua,108,CM,HO04,true
+2053,Copan,108,CP,HO05,true
+2054,Cortes,108,CR,HO06,true
+2055,El Paraiso,108,EP,HO07,true
+2056,Francisco Morazan,108,FM,HO08,true
+2057,Gracias a Dios,108,GD,HO09,true
+2058,Intibuca,108,IN,HO10,true
+2059,Islas de la Bahia,108,IB,HO11,true
+2061,Lempira,108,LE,HO13,true
+2062,Ocotepeque,108,OC,HO14,true
+2063,Olancho,108,OL,HO15,true
+2064,Santa Barbara,108,SB,HO16,true
+2065,Valle,108,VA,HO17,true
+2066,Yoro,108,YO,HO18,true
+2067,Bacs-Kiskun,111,BK,HU01,true
+2068,Baranya,111,BA,HU02,true
+2069,Bekes,111,BE,HU03,true
+2070,Borsod-Abauj-Zemplen,111,BZ,HU04,true
+2071,Budapest,111,BU,HU05,true
+2072,Csongrad,111,CS,HU06,true
+2073,Debrecen,111,DE,HU07,true
+2074,Fejer,111,FE,HU08,true
+2075,Gyor-Moson-Sopron,111,GS,HU09,true
+2076,Hajdu-Bihar,111,HB,HU10,true
+2077,Heves,111,HE,HU11,true
+2078,Komarom-Esztergom,111,KE,HU12,true
+2079,Miskolc,111,MI,HU13,true
+2080,Nograd,111,NO,HU14,true
+2081,Pees,111,PS,HU15,true
+2082,Pest,111,PE,HU16,true
+2083,Somogy,111,SO,HU17,true
+2084,Szabolcs-Szatmar-Bereg,111,SZ,HU18,true
+2085,Szeged,111,SD,HU19,true
+2086,Jasz-Nagykun-Szolnok,111,JN,HU20,true
+2087,Tolna,111,TO,HU21,true
+2088,Vas,111,VA,HU22,true
+2089,Veszprem,111,VM,HU39,true
+2090,Zala,111,ZA,HU24,true
+2091,Gyor,111,GY,HU25,true
+2092,Bekescsaba,111,BC,HU26,true
+2093,Dunaujvaros,111,DU,HU27,true
+2094,Eger,111,EG,HU28,true
+2095,Hodmezovasarhely,111,HV,HU29,true
+2096,Kaposvar,111,KV,HU30,true
+2097,Kecskemet,111,KM,HU31,true
+2098,Nagykanizsa,111,NK,HU32,true
+2099,Nyiregyhaza,111,NY,HU33,true
+2100,Sopron,111,SN,HU34,true
+2101,Szekesfehervar,111,SF,HU35,true
+2102,Szolnok,111,SK,HU36,true
+2103,Szombathely,111,SH,HU37,true
+2104,Tatabanya,111,TB,HU38,true
+2105,Zalaegerszeg,111,ZE,HU40,true
+2106,Akranes,112,AK,IC01,true
+2107,Akureyri,112,AU,IC02,true
+2108,Arnessysla,112,AR,IC03,true
+2109,Austur-Bardastrandarsysla,112,AB,IC04,true
+2110,Austur-Hunavatnssysla,112,AH,IC05,true
+2111,Austur-Skaftafellssysla,112,AS,IC06,true
+2112,Borgarfjardarsysla,112,BF,IC07,true
+2113,Dalasysla,112,DS,IC08,true
+2114,Eyjafjardarsysla,112,EY,IC09,true
+2115,Gullbringusysla,112,GU,IC10,true
+2116,Hafnarfjordur,112,HA,IC11,true
+2117,Husavik,112,HU,IC12,true
+2118,Isafjordur,112,IA,IC13,true
+2119,Keflavik,112,KE,IC14,true
+2120,Kjosarsysla,112,KJ,IC15,true
+2121,Kopavogur,112,KO,IC16,true
+2122,Myrasysla,112,MY,IC17,true
+2123,Neskaupstadur,112,NE,IC18,true
+2124,Nordur-Isafjardarsysla,112,NI,IC19,true
+2125,Nordur-Mulasysla,112,NM,IC20,true
+2126,Nordur-Tingeyjarsysla,112,NT,IC21,true
+2127,Olafsfjordur,112,OL,IC22,true
+2128,RangÀrvallasysla,112,RA,IC23,true
+2129,Reykjavik,112,RE,IC24,true
+2130,Saudarkrokur,112,SA,IC25,true
+2131,Seydisfjordur,112,SE,IC26,true
+2132,Siglufjordur,112,SI,IC27,true
+2133,Skagafjardarsysla,112,SG,IC28,true
+2134,Snafellsnes-og Hnappadalssysla,112,SH,IC29,true
+2135,Strandasysla,112,SD,IC30,true
+2136,Sudur-Mulasysla,112,SM,IC31,true
+2137,Sudur-Tingeyjarsysla,112,ST,IC32,true
+2138,Vestmannaeyjar,112,VE,IC33,true
+2139,Vestur-Bardastrandarsysla,112,VB,IC34,true
+2140,Vestur-Hunavatnssysla,112,VH,IC35,true
+2141,Vestur-Isafjardarsysla,112,VI,IC36,true
+2142,Vestur-Skaftafellssysla,112,VS,IC37,true
+2143,Aceh (Atjeh),114,AC,ID01,true
+2144,Bengkulu,114,BE,ID03,true
+2145,Jakarta Raya (Djakarta Raya),114,JK,ID04,true
+2146,Jambi (Djambi),114,JA,ID05,true
+2147,Jawa Barat (Djawa Barat),114,JR,ID30,true
+2148,Jawa Tengah (Djawa Tengah),114,JT,ID07,true
+2149,Jawa Timur (Djawa Timur),114,JI,ID08,true
+2150,Yogyakarta (Jogjakarta),114,YO,ID10,true
+2151,Kalimantan Barat,114,KB,ID11,true
+2152,Kalimantan Selatan,114,KS,ID12,true
+2153,Kalimantan Tengah,114,KT,ID13,true
+2154,Kalimantan Timur,114,KI,ID14,true
+2155,Lampung,114,LA,ID15,true
+2156,Maluku,114,MA,ID28,true
+2157,Nusa Tenggara Barat,114,NB,ID17,true
+2158,Nusa Tenggara Timur,114,NT,ID18,true
+2159,Riau,114,RI,ID19,true
+2160,Sulawesi Selatan,114,SN,ID20,true
+2161,Sulawesi Tengah,114,ST,ID21,true
+2162,Sulawesi Tenggara,114,SG,ID22,true
+2163,Sulawesi Utara,114,SW,ID31,true
+2164,Sumatera Barat,114,SB,ID24,true
+2165,Sumatera Selatan,114,SL,ID32,true
+2166,Sumatera Utara,114,SU,ID26,true
+2168,Andaman and Nicobar Islands,113,AN,IN01,true
+2169,Andhra Pradesh,113,AP,IN02,true
+2170,Assam,113,AS,IN03,true
+2171,Bihar,113,BR,IN34,true
+2172,Chandigarh,113,CH,IN05,true
+2173,Dadra and Nagar Haveli,113,DN,IN06,true
+2174,Delhi,113,DL,IN07,true
+2175,Gujarat,113,GJ,IN09,true
+2176,Haryana,113,HR,IN10,true
+2177,Himachal Pradesh,113,HP,IN11,true
+2178,Jammu and Kashmir,113,JK,IN12,true
+2179,Kerala,113,KL,IN13,true
+2180,Lakshadweep,113,LD,IN14,true
+2181,Madhya Pradesh,113,MP,IN35,true
+2182,Maharashtra,113,MH,IN16,true
+2183,Manipur,113,MM,IN17,true
+2184,Meghalaya,113,ML,IN18,true
+2185,Karnataka,113,KA,IN19,true
+2186,Nagaland,113,NL,IN20,true
+2187,Odisha,113,OR,IN21,true
+2188,Pondicherry,113,PY,IN22,true
+2189,Punjab,113,PB,IN23,true
+2190,Rajasthan,113,RJ,IN24,true
+2191,Tamil Nadu,113,TN,IN25,true
+2192,Tripura,113,TR,IN26,true
+2193,Uttar Pradesh,113,UP,IN36,true
+2194,West Bengal,113,WB,IN28,true
+2195,Sikkim,113,SK,IN29,true
+2196,Arunachal Pradesh,113,AR,IN30,true
+2197,Mizoram,113,MZ,IN31,true
+2198,Daman and Diu,113,DD,IN32,true
+2199,Goa,113,GA,IN33,true
+2200,Azarbayjan-e Gharbi,115,WA,IR01,true
+2202,Chahar Ma¦all va Bakhtiari,115,CM,IR03,true
+2203,Sistan va Baluchestan,115,SB,IR04,true
+2204,Kohgiluyeh va Buyer Ahmad,115,KB,IR05,true
+2206,Fars,115,FA,IR07,true
+2207,Gilan,115,GI,IR08,true
+2208,Hamadan,115,HD,IR09,true
+2209,Ilam,115,IL,IR10,true
+2210,Hormozgan,115,HG,IR11,true
+2212,Kermanshah,115,BK,IR13,true
+2213,Khuzestan,115,KZ,IR15,true
+2214,Kordestan,115,KD,IR16,true
+2215,Mazandaran,115,MN,IR35,true
+2219,Bushehr,115,BS,IR22,true
+2220,Lorestan,115,LO,IR23,true
+2221,Markazi,115,MK,IR34,true
+2222,Semnan,115,SM,IR25,true
+2223,Tehran,115,TH,IR26,true
+2224,Zanjan,115,ZA,IR36,true
+2225,Esfahan,115,ES,IR28,true
+2226,Kerman,115,KE,IR29,true
+2227,Khorasan,115,KR,IR30,true
+2228,Yazd,115,YA,IR31,true
+2229,Ardabil,115,AR,IR32,true
+2230,Azarbayjan-e Sharqi,115,EA,IR33,true
+2232,HaDarom (Southern),118,HD,IS01,true
+2233,HaMerkaz (Central),118,HM,IS02,true
+2234,Ha¹afon  (Northern),118,HZ,IS03,true
+2235,HÝefa  (Haifa),118,HA,IS04,true
+2236,Tel Aviv,118,TA,IS05,true
+2237,Yerushalayim  (Jerusalem),118,JM,IS06,true
+2238,Abruzzi,119,AB,IT01,true
+2239,Basilicata,119,BA,IT02,true
+2240,Calabria,119,CA,IT03,true
+2241,Campania,119,CM,IT04,true
+2242,Emilia-Romagna,119,EM,IT05,true
+2243,Friuli-Venezia Giulia,119,FR,IT06,true
+2244,Lazio,119,LA,IT07,true
+2245,Liguria,119,LI,IT08,true
+2246,Lombardia,119,LO,IT09,true
+2247,Marche,119,MA,IT10,true
+2248,Molise,119,MO,IT11,true
+2249,Piemonte,119,PI,IT12,true
+2250,Puglia,119,PU,IT13,true
+2251,Sardegna,119,SA,IT14,true
+2252,Sicilia,119,SI,IT15,true
+2253,Toscana,119,TO,IT16,true
+2254,Trentino-Alto Adige,119,TR,IT17,true
+2255,Umbria,119,UM,IT18,true
+2256,Valle d'Aosta,119,VA,IT19,true
+2257,Veneto,119,VE,IT20,true
+2259,Dabakala,60,DB,IV03,true
+2260,Aboisso,60,AO,IV62,true
+2261,Adzope,60,AZ,IV05,true
+2262,Agboville,60,AV,IV06,true
+2263,Biankouma,60,BI,IV07,true
+2264,Bouna,60,BO,IV11,true
+2265,Boundiali,60,BL,IV12,true
+2266,Danane,60,DN,IV14,true
+2267,Divo,60,DV,IV16,true
+2268,Ferkessedougou,60,FE,IV17,true
+2269,Gagnoa,60,GA,IV18,true
+2270,Katiola,60,KA,IV20,true
+2271,Korhogo,60,KO,IV21,true
+2272,Odienne,60,OD,IV23,true
+2273,Seguela,60,SE,IV25,true
+2274,Touba,60,TO,IV26,true
+2275,Bongouanou,60,BG,IV27,true
+2276,Issia,60,IS,IV28,true
+2277,Lakota,60,LA,IV29,true
+2278,Mankono,60,MK,IV30,true
+2279,Oume,60,OU,IV31,true
+2280,Soubre,60,SO,IV32,true
+2281,Tingrela,60,TG,IV33,true
+2282,Zuenoula,60,ZU,IV34,true
+2283,Abidjan,60,AB,IV61,true
+2284,Bangolo,60,BA,IV36,true
+2285,Beoumi,60,BE,IV37,true
+2286,Bondoukou,60,BD,IV38,true
+2287,Bouafle,60,BF,IV39,true
+2288,Bouake,60,BK,IV40,true
+2289,Daloa,60,DL,IV41,true
+2290,Daoukro,60,DO,IV42,true
+2291,Dimbokro,60,DI,IV67,true
+2292,Duekoue,60,DU,IV44,true
+2293,Grand-Lahou,60,GL,IV45,true
+2294,Guiglo,60,GU,IV69,true
+2296,Mbahiakro,60,MB,IV48,true
+2297,Sakassou,60,SK,IV49,true
+2298,San Pedro,60,SP,IV50,true
+2299,Sassandra,60,SA,IV51,true
+2300,Sinfra,60,SI,IV52,true
+2301,Tabou,60,TA,IV53,true
+2302,Tanda,60,TD,IV54,true
+2303,Tiassale,60,TI,IV55,true
+2304,Toumodi,60,TM,IV56,true
+2305,Vavoua,60,VA,IV57,true
+2306,Yamoussoukro,60,YA,IV73,true
+2307,Agnilbilekrou,60,AG,IV60,true
+2308,Al Anbar,116,AN,IZ01,true
+2309,Al Basrah,116,BA,IZ02,true
+2310,Al MuthannÀ,116,MU,IZ03,true
+2311,Al Qadisiyah,116,QA,IZ04,true
+2312,As Sulaymaniyah,116,SU,IZ05,true
+2313,Babil,116,BB,IZ06,true
+2314,Baghdad,116,BG,IZ07,true
+2315,Dahuk,116,DA,IZ08,true
+2316,Dhi Qar,116,DQ,IZ09,true
+2317,Diyala,116,DI,IZ10,true
+2318,Arbil,116,AR,IZ11,true
+2319,Karbala',116,KA,IZ12,true
+2320,At Ta'mim,116,TS,IZ13,true
+2321,Maysan,116,MA,IZ14,true
+2322,Ninawa,116,NI,IZ15,true
+2323,Wasit,116,WA,IZ16,true
+2324,An Najaf,116,NA,IZ17,true
+2325,S±alah ad Din,116,SD,IZ18,true
+2326,Aichi,122,AI,JA01,true
+2327,Akita,122,AK,JA02,true
+2328,Aomori,122,AM,JA03,true
+2329,Chiba,122,CH,JA04,true
+2330,Ehime,122,EH,JA05,true
+2331,Fukui,122,FU,JA06,true
+2332,Fukuoka,122,FK,JA07,true
+2333,Fukushima,122,FS,JA08,true
+2334,Gifu,122,GI,JA09,true
+2335,Gumma,122,GU,JA10,true
+2336,Hiroshima,122,HI,JA11,true
+2337,Hokkaido,122,HO,JA12,true
+2338,Hyogo,122,HY,JA13,true
+2339,Ibaraki,122,IB,JA14,true
+2340,Ishikawa,122,IS,JA15,true
+2341,Iwate,122,IW,JA16,true
+2342,Kagawa,122,KA,JA17,true
+2343,Kagoshima,122,KG,JA18,true
+2344,Kanagawa,122,KN,JA19,true
+2345,Kochi,122,KO,JA20,true
+2346,Kumamoto,122,KU,JA21,true
+2347,Kyoto,122,KY,JA22,true
+2348,Mie,122,MI,JA23,true
+2349,Miyagi,122,MY,JA24,true
+2350,Miyazaki,122,MZ,JA25,true
+2351,Nagano,122,NA,JA26,true
+2352,Nagasaki,122,NG,JA27,true
+2353,Nara,122,NR,JA28,true
+2354,Niigata,122,NI,JA29,true
+2355,Oita,122,OI,JA30,true
+2356,Okayama,122,OK,JA31,true
+2357,Osaka,122,OS,JA32,true
+2358,Saga,122,SA,JA33,true
+2359,Saitama,122,SI,JA34,true
+2360,Shiga,122,SH,JA35,true
+2361,Shimane,122,SM,JA36,true
+2362,Shizuoka,122,SZ,JA37,true
+2363,Tochigi,122,TO,JA38,true
+2364,Tokushima,122,TK,JA39,true
+2365,Tokyo,122,TY,JA40,true
+2366,Tottori,122,TT,JA41,true
+2367,Toyama,122,TA,JA42,true
+2368,Wakayama,122,WA,JA43,true
+2369,Yamagata,122,YA,JA44,true
+2370,Yamaguchi,122,YM,JA45,true
+2371,Yamanashi,122,YN,JA46,true
+2372,Okinawa,122,ON,JA47,true
+2373,Clarendon,120,CL,JM01,true
+2374,Hanover,120,HA,JM02,true
+2375,Manchester,120,MA,JM04,true
+2376,Portland,120,PO,JM07,true
+2378,Saint Ann,120,SN,JM09,true
+2379,Saint Catherine,120,SC,JM10,true
+2380,Saint Elizabeth,120,SE,JM11,true
+2384,Trelawny,120,TR,JM15,true
+2385,Westmoreland,120,WE,JM16,true
+2386,Kingston,120,KI,JM17,true
+2387,Al Balqa',126,BA,JO02,true
+2388,Ma'an,126,MN,JO19,true
+2389,Al Karak,126,KA,JO09,true
+2390,Al Mafraq,126,MA,JO15,true
+2391,'Amman,126,AM,JO16,true
+2392,At Tafilah,126,AT,JO12,true
+2393,Az Zaraq,126,AZ,JO17,true
+2394,Irbid,126,IR,JO18,true
+2396,Coast,129,CO,KE02,true
+2398,Nairobi Area,129,NA,KE05,true
+2399,NorthEastern,129,NE,KE06,true
+2400,Nyanza,129,NY,KE07,true
+2401,Rift Valley,129,RV,KE08,true
+2403,Bishkek,135,BI,KG01,true
+2404,Chuy,135,CH,KG02,true
+2405,Jalal-Abad,135,DA,KG03,true
+2406,Naryn,135,NA,KG04,true
+2407,Osh,135,OS,KG08,true
+2408,Talas,135,TL,KG06,true
+2409,Ysyk-Kol,135,YK,KG07,true
+2410,Chagang-do,132,CH,KN01,true
+2411,Hamgyong-namdo,132,HN,KN03,true
+2412,Hwanghae-namdo,132,WN,KN06,true
+2413,Hwanghae-bukto,132,WB,KN07,true
+2414,Kaesong-si,132,KS,KN08,true
+2415,Kangwon-do,132,KW,KN09,true
+2416,P'yongan-namdo,132,PN,KN15,true
+2417,P'yongyang-si,132,PY,KN12,true
+2418,Yanggang-do,132,YG,KN13,true
+2419,Namp'o-si,132,NP,KN14,true
+2420,Hamgyong-bukto,132,HG,KN17,true
+2421,Gilbert Islands,131,GI,KR01,true
+2422,Line Islands,131,LI,KR02,true
+2423,Phoenix Islands,131,PI,KR03,true
+2424,Cheju-do,133,CJ,KS01,true
+2425,Cholla-bukto,133,CB,KS03,true
+2426,Ch'ungch'ong-bukto,133,GB,KS05,true
+2428,Kyongsang-namdo,133,KN,KS20,true
+2429,Pusan-gwangyoksi,133,PU,KS10,true
+2430,Soul-t'ukpyolsi,133,SO,KS11,true
+2431,Inch'on-gwangyoksi,133,IN,KS12,true
+2432,Kyonggi-do,133,KG,KS13,true
+2433,Kyongsang-bukto,133,KB,KS14,true
+2434,Taegu-gwangyoksi,133,TG,KS15,true
+2435,Cholla-namdo,133,CN,KS16,true
+2436,Ch'ungch'ong-namdo,133,GN,KS17,true
+2437,Kwangju-gwangyoksi,133,KJ,KS18,true
+2438,Taejon-gwangyoksi,133,TJ,KS19,true
+2439,Al Kuwayt,134,KU,KU02,true
+2441,Hawalli,134,HA,KU03,true
+2442,Al Ahmadi,134,AH,KU04,true
+2443,Al Jahra',134,JA,KU05,true
+2444,Al Farwaniyah,134,FA,KU06,true
+2445,Almaty,128,AC,KZ02,true
+2446,Aqmola,128,AM,KZ03,true
+2447,Aqtobe,128,AT,KZ04,true
+2448,Astana,128,AS,KZ05,true
+2449,Atyrau,128,AR,KZ06,true
+2450,Batys Qazaqstan,128,BQ,KZ07,true
+2451,Bayqongyr,128,BY,KZ08,true
+2452,Mangghystau,128,MG,KZ09,true
+2453,Ongtustik Qazaqstan,128,OQ,KZ10,true
+2454,Pavlodar,128,PA,KZ11,true
+2455,Qaraghandy,128,QG,KZ12,true
+2456,Qostanay,128,QS,KZ13,true
+2457,Qyzylorda,128,QO,KZ14,true
+2458,Shyghys Qazaqstan,128,SQ,KZ15,true
+2459,Soltustik Qazaqstan,128,SA,KZ16,true
+2460,Zhambyl,128,ZM,KZ17,true
+2464,Attapu,136,AT,LA01,true
+2465,Champasak,136,CH,LA02,true
+2466,Houaphan,136,HO,LA03,true
+2467,Oudomxai,136,OU,LA07,true
+2468,Xiagnabouli,136,XA,LA13,true
+2469,Xiangkhoang,136,XI,LA14,true
+2470,Khammouan,136,KH,LA15,true
+2471,Louangnamtha,136,LM,LA16,true
+2472,Louangphabang,136,LP,LA17,true
+2473,Phongsali,136,PH,LA18,true
+2474,Salavan,136,SL,LA19,true
+2475,Savannakhet,136,SV,LA20,true
+2476,Bokeo,136,BK,LA22,true
+2477,Bolikhamxai,136,BL,LA23,true
+2478,Viangchan,136,VI,LA27,true
+2479,Xaisomboun,136,XS,LA25,true
+2480,Xekong,136,XE,LA26,true
+2481,Beqaa,138,BI,LE01,true
+2482,Liban-Sud,138,JA,LE06,true
+2483,Liban-Nord,138,AS,LE03,true
+2484,Beyrouth,138,BA,LE04,true
+2485,Mont-Liban,138,JL,LE05,true
+2486,Aizjrayjkes Rajons,137,AI,LG01,true
+2487,Aluksnes Rajons,137,AL,LG02,true
+2488,Balvu Rajons,137,BL,LG03,true
+2489,Bauskas Rajons,137,BU,LG04,true
+2490,Cesu Rajons,137,CE,LG05,true
+2491,Daugavpils,137,DA,LG06,true
+2492,Daugavpils Rajons,137,DU,LG07,true
+2493,Dobeles Rajons,137,DO,LG08,true
+2494,Gulbenes Rajons,137,GU,LG09,true
+2495,Jekabpils Rajons,137,JK,LG10,true
+2496,Jelgava,137,JE,LG11,true
+2497,Jelgavas Rajons,137,JL,LG12,true
+2498,Jurmala,137,JU,LG13,true
+2499,Kraslavas Rajons,137,KR,LG14,true
+2500,Kuldigas Rajons,137,KU,LG15,true
+2501,Liepaja,137,LI,LG16,true
+2502,Liepajas Rajons,137,LE,LG17,true
+2503,Limbazu Rajons,137,LM,LG18,true
+2504,Ludzas Rajons,137,LU,LG19,true
+2505,Madonas Rajons,137,MA,LG20,true
+2506,Ogres Rajons,137,OG,LG21,true
+2507,Preiju Rajons,137,PR,LG22,true
+2508,Rezekne,137,RE,LG23,true
+2509,Rezeknes Rajons,137,RA,LG24,true
+2510,Riga,137,RI,LG25,true
+2511,Rigas Rajons,137,RG,LG26,true
+2512,Saldus Rajons,137,SA,LG27,true
+2513,Talsu Rajons,137,TA,LG28,true
+2514,Tukuma Rajons,137,TU,LG29,true
+2515,Valkas Rajons,137,VK,LG30,true
+2516,Valmieras Rajons,137,VM,LG31,true
+2517,Ventspils,137,VE,LG32,true
+2518,Ventspils Rajons,137,VN,LG33,true
+2521,Alytaus Apskritis,143,AL,LH56,true
+2531,Kauno Apskritis,143,KU,LH57,true
+2535,Klaipedos Apskritis,143,KL,LH58,true
+2540,Marijampoles Apskritis,143,MR,LH59,true
+2548,Panevezio Apskritis,143,PN,LH60,true
+2557,Siauliu Apskritis,143,SA,LH61,true
+2564,Taurages Apskritis,143,TA,LH62,true
+2565,Telsiu Apskritis,143,TE,LH63,true
+2568,Utenos Apskritis,143,UT,LH64,true
+2572,Vilniaus Apskritis,143,VL,LH65,true
+2574,Bong,140,BG,LI01,true
+2575,Grand Gedeh,140,GG,LI02,true
+2576,Lofa,140,LO,LI05,true
+2578,Nimba,140,NI,LI09,true
+2579,Sinoe,140,SI,LI10,true
+2580,Grand Bassa,140,GB,LI11,true
+2581,Grand Cape Mount,140,CM,LI12,true
+2583,Montserrado,140,MO,LI14,true
+2584,Bomi,140,BM,LI15,true
+2585,Grand Kru,140,GK,LI16,true
+2586,Margibi,140,MG,LI17,true
+2587,River Cess,140,RI,LI18,true
+2588,Banskobystricky,220,BC,LO01,true
+2589,Bratislavsky,220,BL,LO02,true
+2590,Kosicky,220,KI,LO03,true
+2591,Nitrinsky,220,NI,LO04,true
+2592,Presovsky,220,PV,LO05,true
+2593,Treciansky,220,TC,LO06,true
+2594,Trnavsky,220,TA,LO07,true
+2595,Zilinsky,220,ZI,LO08,true
+2596,Balzers,142,BA,LS01,true
+2597,Eschen,142,ES,LS02,true
+2598,Gamprin,142,GA,LS03,true
+2599,Mauren,142,MA,LS04,true
+2600,Planken,142,PL,LS05,true
+2601,Ruggell,142,RU,LS06,true
+2602,Schaan,142,SN,LS07,true
+2603,Schellenberg,142,SB,LS08,true
+2604,Triesen,142,TN,LS09,true
+2605,Triesenberg,142,TB,LS10,true
+2606,Vaduz,142,VA,LS11,true
+2613,Berea,139,BE,LT10,true
+2614,Butha-Buthe,139,BB,LT11,true
+2615,Leribe,139,LE,LT12,true
+2616,Mafeteng,139,MF,LT13,true
+2617,Maseru,139,MS,LT14,true
+2618,Mohale's Hoek,139,MH,LT15,true
+2619,Mokhotlong,139,MK,LT16,true
+2620,Qacha's Hoek,139,QN,LT17,true
+2621,Quthing,139,QT,LT18,true
+2622,Thaba-Tseka,139,TT,LT19,true
+2623,Diekirch,144,DI,LU01,true
+2624,Grevenmacher,144,GR,LU02,true
+2627,Al 'Aziziyah,141,AZ,LY03,true
+2629,Al Jufrah,141,JU,LY05,true
+2631,Al Kufrah,141,KU,LY08,true
+2636,Ash Shati',141,SH,LY13,true
+2646,Murzuq,141,MU,LY30,true
+2650,Sabha,141,SB,LY34,true
+2655,Tarhunah,141,TH,LY41,true
+2656,T÷ubruq,141,TU,LY42,true
+2658,Zlitan,141,ZL,LY45,true
+2660,Ajdabiya,141,AJ,LY47,true
+2661,Al Fatih,141,FA,LY48,true
+2662,Al Jabal al Akhdar,141,JA,LY49,true
+2663,Al Khums,141,KH,LY50,true
+2664,An Nuqat al Khams,141,NK,LY51,true
+2665,Awbari,141,AW,LY52,true
+2666,Az Zawiyah,141,ZA,LY53,true
+2667,Banghazi,141,BA,LY54,true
+2668,Darnah,141,DA,LY55,true
+2669,Ghadamis,141,GD,LY56,true
+2670,Gharyan,141,GR,LY57,true
+2671,Misratah,141,MI,LY58,true
+2672,Sawfajjin,141,SF,LY59,true
+2673,Surt,141,SU,LY60,true
+2674,Tarabulus,141,TB,LY61,true
+2675,Yafran,141,YA,LY62,true
+2676,Antsiranana,147,AS,MA01,true
+2677,Fianarantsoa,147,FI,MA02,true
+2678,Mahajanga,147,MA,MA03,true
+2679,Toamasina,147,TM,MA04,true
+2680,Antananarivo,147,AV,MA05,true
+2681,Toliara,147,TL,MA06,true
+2682,Ilhas,145,IL,MC01,true
+2683,Macau,145,MA,MC02,true
+2685,Balti,163,BL,MD46,true
+2689,Cahul,163,CG,MD47,true
+2696,Chisinau,163,CE,MD48,true
+2702,Stinga Nistrului,163,DU,MD49,true
+2703,Edinet,163,ET,MD50,true
+2706,Gagauzia,163,GA,MD51,true
+2714,Orhei,163,OR,MD53,true
+2721,Soroca,163,SR,MD54,true
+2727,Ungheni,163,UN,MD56,true
+2729,Arhangay,165,AR,MG01,true
+2730,Bayanhongor,165,BH,MG02,true
+2731,Bayan-Olgiy,165,BO,MG03,true
+2734,Dornogovi,165,DG,MG07,true
+2735,Dundgovi,165,DU,MG08,true
+2736,Dzavhan,165,DZ,MG09,true
+2737,Govi-Altay,165,GA,MG10,true
+2738,Hentiy,165,HN,MG11,true
+2739,Omnogovi,165,OG,MG14,true
+2740,Ovorhangay,165,OH,MG15,true
+2741,Ulaanbaatar,165,UB,MG20,true
+2742,Orhon,165,ER,MG25,true
+2743,Saint Anthony,167,SA,MH01,true
+2744,Saint Georges,167,SG,MH02,true
+2746,Chikwawa,148,CK,MI02,true
+2747,Chiradzulu,148,CR,MI03,true
+2748,Chitipa,148,CT,MI04,true
+2749,Thyolo,148,TH,MI05,true
+2750,Dedza,148,DE,MI06,true
+2751,Dowa,148,DO,MI07,true
+2752,Karonga,148,KR,MI08,true
+2753,Kasungu,148,KS,MI09,true
+2754,Machinga (Kasupe),148,MA,MI10,true
+2755,Lilongwe,148,LI,MI11,true
+2756,Mangochi (Fort Johnston),148,MG,MI12,true
+2757,Mchinji,148,MC,MI13,true
+2758,Mulanje (Mlange),148,MJ,MI14,true
+2759,Mzimba,148,MZ,MI15,true
+2760,Ntcheu,148,NU,MI16,true
+2761,Nkhata Bay,148,NA,MI17,true
+2762,Nkhotakota,148,NK,MI18,true
+2763,Nsanje,148,NS,MI19,true
+2764,Ntchisi (Nchisi),148,NI,MI20,true
+2765,Rumphi (Rumpil),148,RU,MI21,true
+2766,Salima,148,SA,MI22,true
+2767,Zomba,148,ZO,MI23,true
+2768,Blantyre,148,BL,MI24,true
+2769,Mwanza,148,MN,MI25,true
+2770,Bamako,151,BA,ML01,true
+2771,Gao,151,GA,ML02,true
+2772,Kayes,151,KY,ML03,true
+2773,Mopti,151,MO,ML04,true
+2774,Segou,151,SG,ML05,true
+2775,Sikasso,151,SK,ML06,true
+2776,Koulikoro,151,KK,ML07,true
+2777,Tombouctou,151,TB,ML08,true
+2781,Agadir,168,AG,MO01,true
+2782,Al HoceÈma,168,AH,MO02,true
+2783,Azilal,168,AZ,MO03,true
+2784,Ben Slimane,168,BS,MO04,true
+2785,Beni Mellal,168,BM,MO05,true
+2786,Boulemane,168,BO,MO06,true
+2787,Casablanca,168,CA,MO07,true
+2788,Chaouen,168,CH,MO08,true
+2789,El Jadida,168,EJ,MO09,true
+2790,El Kelaa des Sraghna,168,EK,MO10,true
+2791,Er Rachidia,168,ER,MO11,true
+2792,Essaouira,168,ES,MO12,true
+2793,Fes,168,FE,MO13,true
+2794,Figuig,168,FI,MO14,true
+2795,Kenitra,168,KE,MO15,true
+2796,Khemisset,168,KH,MO16,true
+2797,Khenifra,168,KN,MO17,true
+2798,Khouribga,168,KO,MO18,true
+2799,Marrakech,168,MR,MO19,true
+2800,Meknes,168,ME,MO20,true
+2801,Nador,168,NA,MO21,true
+2802,Ouarzazate,168,OU,MO22,true
+2803,Oujda,168,OJ,MO23,true
+2804,Rabat-Sale,168,RA,MO24,true
+2805,Safi,168,SA,MO25,true
+2806,Settat,168,SE,MO26,true
+2807,Tanger,168,TG,MO27,true
+2808,Tata,168,TT,MO29,true
+2809,Taza,168,TZ,MO30,true
+2810,Tiznit,168,TI,MO32,true
+2811,Guelmim,168,GU,MO42,true
+2812,Ifrane,168,IF,MO34,true
+2813,Laayoune,168,LA,MO35,true
+2814,Tan-Tan,168,TN,MO36,true
+2815,Taounate,168,TO,MO37,true
+2816,Sidi Kacem,168,SK,MO38,true
+2817,Taroudannt,168,TA,MO39,true
+2818,Tetouan,168,TE,MO40,true
+2819,Larache,168,LR,MO41,true
+2820,Assa-Zag,168,AS,MO43,true
+2821,Es Smara,168,EM,MO44,true
+2822,Black River,157,BL,MP12,true
+2823,Flacq,157,FL,MP13,true
+2824,Grand Port,157,GP,MP14,true
+2825,Moka,157,MO,MP15,true
+2826,Pamplemousses,157,PA,MP16,true
+2827,Plaines Wilhems,157,PW,MP17,true
+2828,Port Louis,157,PL,MP18,true
+2829,Rivi-re du Rempart,157,RR,MP19,true
+2830,Savanne,157,SA,MP20,true
+2831,Agalega Islands,157,AG,MP21,true
+2832,Cargados Carajos,157,CC,MP22,true
+2833,Rodrigues,157,RO,MP23,true
+2834,Hodh Ech Chargui,156,HC,MR01,true
+2835,Hodh El Gharbi,156,HG,MR02,true
+2836,Assaba,156,AS,MR03,true
+2837,Gorgol,156,GO,MR04,true
+2838,Brakna,156,BR,MR05,true
+2839,Trarza,156,TR,MR06,true
+2841,Dakhlet Nouadhibou,156,DN,MR08,true
+2842,Tagant,156,TG,MR09,true
+2843,Guidimaka,156,GD,MR10,true
+2844,Tiris Zemmour,156,TZ,MR11,true
+2845,Inchiri,156,IN,MR12,true
+2846,Ad Dakhiliyah,186,DA,MU01,true
+2847,Al Batinah,186,BA,MU02,true
+2848,Al Wusta,186,WU,MU03,true
+2850,Az Zahirah,186,ZA,MU05,true
+2851,Masqat,186,MA,MU06,true
+2852,Musandam,186,MU,MU07,true
+2853,Zufar,186,JA,MU08,true
+2854,Seenu,150,SE,MV01,true
+2858,Laamu,150,LM,MV05,true
+2860,Thaa,150,TH,MV46,true
+2862,Raa,150,RA,MV44,true
+2865,Baa,150,BA,MV31,true
+2867,Shaviyani,150,SH,MV45,true
+2868,Noonu,150,NO,MV43,true
+2869,Kaafu,150,KA,MV38,true
+2873,Alifu,150,AA,MV30,true
+2874,Dhaalu,150,DA,MV32,true
+2875,Faafa,150,FA,MV33,true
+2876,Gaafu Alifu,150,GA,MV34,true
+2877,Gaafu Dhaalu,150,GD,MV35,true
+2878,Haa Alifu,150,HA,MV36,true
+2879,Haa Dhaalu,150,HD,MV37,true
+2880,Lhaviyani,150,LV,MV39,true
+2881,Maale,150,MA,MV40,true
+2882,Meenu,150,ME,MV41,true
+2883,Gnaviyani,150,NA,MV42,true
+2884,Vaavu,150,WA,MV47,true
+2885,Aguascalientes,159,AG,MX01,true
+2886,Campeche,159,CM,MX04,true
+2887,Coahuila de Zaragoza,159,CA,MX07,true
+2890,Michoacan de Ocampo,159,MC,MX16,true
+2891,Nayarit,159,NA,MX18,true
+2892,Puebla,159,PU,MX21,true
+2893,Queretaro de Arteaga,159,QE,MX22,true
+2894,Sinaloa,159,SI,MX25,true
+2895,Veracruz-Llave,159,VE,MX30,true
+2896,Yucatan,159,YU,MX31,true
+2897,Johor,149,JH,MY01,true
+2898,Kedah,149,KH,MY02,true
+2899,Kelantan,149,KN,MY03,true
+2900,Melaka,149,ME,MY04,true
+2901,Negeri Sembilan,149,NS,MY05,true
+2902,Pahang,149,PH,MY06,true
+2903,Perak,149,PK,MY07,true
+2904,Perlis,149,PL,MY08,true
+2905,Pulau Pinang,149,PG,MY09,true
+2906,Sarawak,149,SK,MY11,true
+2907,Selangor,149,SL,MY12,true
+2908,Terengganu,149,TE,MY13,true
+2909,Wilayah Persekutuan,149,KL,MY14,true
+2910,Labuan,149,LA,MY15,true
+2911,Sabah,149,SA,MY16,true
+2912,Cabo Delgado,169,CD,MZ01,true
+2913,Gaza,169,GA,MZ02,true
+2914,Inhambane,169,IN,MZ03,true
+2915,Maputo,169,MP,MZ04,true
+2916,Sofala,169,SO,MZ05,true
+2917,Nampula,169,NM,MZ06,true
+2918,Niassa,169,NS,MZ07,true
+2919,Tete,169,TE,MZ08,true
+2920,Zambezia,169,ZA,MZ09,true
+2921,Manica,169,MN,MZ10,true
+2922,Agadez,180,AG,NG01,true
+2923,Diffa,180,DF,NG02,true
+2924,Dosso,180,DS,NG03,true
+2925,Maradi,180,MA,NG04,true
+2926,Niamey,180,NI,NG08,true
+2927,Tahoua,180,TH,NG06,true
+2928,Zinder,180,ZI,NG07,true
+2929,Tillaberi,180,TL,NG09,true
+2931,Aoba//Maewo,258,AO,NH06,true
+2932,Torba,258,TR,NH07,true
+2938,Sanma,258,SN,NH13,true
+2940,Tafea,258,TF,NH15,true
+2941,Lagos,181,LA,NI05,true
+2942,Bauchi,181,BA,NI46,true
+2943,Rivers,181,RI,NI50,true
+2944,Abuja Capital Territory,181,FC,NI11,true
+2946,Ogun,181,OG,NI16,true
+2947,Ondo,181,ON,NI48,true
+2949,Plateau,181,PL,NI49,true
+2951,Akwa Ibom,181,AK,NI21,true
+2952,Cross River,181,CR,NI22,true
+2953,Kaduna,181,KD,NI23,true
+2955,Anambra,181,AN,NI25,true
+2956,Benue,181,BE,NI26,true
+2957,Borno,181,BO,NI27,true
+2959,Kano,181,KN,NI29,true
+2960,Kwara,181,KW,NI30,true
+2962,Oyo,181,OY,NI32,true
+2963,Sokoto,181,SO,NI51,true
+2964,Abia,181,AB,NI45,true
+2965,Adamawa,181,AD,NI35,true
+2966,Delta,181,DE,NI36,true
+2967,Edo,181,ED,NI37,true
+2968,Enugu,181,EN,NI47,true
+2969,Jigawa,181,JI,NI39,true
+2970,Kebbi,181,KE,NI40,true
+2971,Kogi,181,KO,NI41,true
+2972,Osun,181,OS,NI42,true
+2973,Taraba,181,TA,NI43,true
+2974,Yobe,181,YO,NI44,true
+2975,Drenthe,175,DR,NL01,true
+2976,Friesland,175,FR,NL02,true
+2977,Gelderland,175,GE,NL03,true
+2978,Groningen,175,GR,NL04,true
+2980,Noord-Brabant,175,NB,NL06,true
+2981,Noord-Holland,175,NH,NL07,true
+2982,Overijssel,175,OV,NL15,true
+2983,Utrecht,175,UT,NL09,true
+2984,Zeeland,175,ZE,NL10,true
+2985,Zuid-Holland,175,ZH,NL11,true
+2989,Flevoland,175,FL,NL16,true
+2990,Akershus,185,AK,NO01,true
+2991,Aust-Agder,185,AA,NO02,true
+2992,Buskerud,185,BU,NO04,true
+2993,Finnmark,185,FI,NO05,true
+2994,Hedmark,185,HE,NO06,true
+2995,Hordaland,185,HO,NO07,true
+2996,More og Romsdal,185,MR,NO08,true
+2997,Nordland,185,NL,NO09,true
+2998,Nord-Trondelag,185,NR,NO10,true
+2999,Oppland,185,OP,NO11,true
+3000,Oslo,185,OS,NO12,true
+3001, stfold,185,OF,NO13,true
+3002,Rogaland,185,RO,NO14,true
+3003,Sogn og Fjordane,185,SF,NO15,true
+3004,Sor-Trondelag,185,ST,NO16,true
+3005,Telemark,185,TE,NO17,true
+3006,Troms,185,TR,NO18,true
+3007,Vest-Agder,185,VA,NO19,true
+3008,Vestfold,185,VF,NO20,true
+3009,Bagmati,174,BA,NP01,true
+3010,Bheri,174,BH,NP02,true
+3011,Dhawalagiri,174,DH,NP03,true
+3012,Gandaki,174,GA,NP04,true
+3013,Janakpur,174,JA,NP05,true
+3014,Karnali,174,KA,NP06,true
+3015,Kosi,174,KO,NP07,true
+3016,Lumbini,174,LU,NP08,true
+3017,Mahakali,174,MA,NP09,true
+3018,Mechi,174,ME,NP10,true
+3019,Narayani,174,NA,NP11,true
+3020,Rapti,174,RA,NP12,true
+3021,Sagarmatha,174,SA,NP13,true
+3022,Seti,174,SE,NP14,true
+3023,Aiwo,172,AI,NR01,true
+3024,Anabar,172,AB,NR02,true
+3025,Anetan,172,AT,NR03,true
+3026,Anibare,172,AR,NR04,true
+3027,Baiti,172,BA,NR05,true
+3028,Boe,172,BO,NR06,true
+3029,Buada,172,BU,NR07,true
+3030,Denigomodu,172,DE,NR08,true
+3031,Ewa,172,EW,NR09,true
+3032,Ijuw,172,IJ,NR10,true
+3033,Meneng,172,ME,NR11,true
+3034,Nibok,172,NI,NR12,true
+3035,Uaboe,172,UA,NR13,true
+3036,Yaren,172,YA,NR14,true
+3037,Brokopondo,230,BR,NS10,true
+3038,Commewijne,230,CM,NS11,true
+3039,Coronie,230,CR,NS12,true
+3040,Marowijne,230,MA,NS13,true
+3041,Nickerie,230,NI,NS14,true
+3042,Para,230,PR,NS15,true
+3043,Paramaribo,230,PM,NS16,true
+3044,Saramacca,230,SA,NS17,true
+3045,Sipaliwini,230,SI,NS18,true
+3046,Wanica,230,WA,NS19,true
+3047,Boaco,179,BO,NU01,true
+3048,Carazo,179,CA,NU02,true
+3049,Chinandega,179,CI,NU03,true
+3050,Chontales,179,CO,NU04,true
+3051,Esteli,179,ES,NU05,true
+3052,Granada,179,GR,NU06,true
+3053,Jinotega,179,JI,NU07,true
+3054,Leon,179,LE,NU08,true
+3055,Madriz,179,MD,NU09,true
+3056,Managua,179,MN,NU10,true
+3057,Masaya,179,MS,NU11,true
+3058,Matagalpa,179,MT,NU12,true
+3059,Nueva Segovia,179,NS,NU13,true
+3060,Rio San Juan,179,SJ,NU14,true
+3061,Rivas,179,RI,NU15,true
+3063,Atlantico Norte,179,AN,NU17,true
+3064,Atlantico Sur,179,AS,NU18,true
+3089,Hawke's Bay,178,HB,NZ31,true
+3106,Marlborough,178,MA,NZ50,true
+3126,Southland,178,SO,NZ72,true
+3129,Taranaki,178,TK,NZ76,true
+3137,Waikato,178,WK,NZ85,true
+3170,Alto Parana,193,AA,PA01,true
+3171,Amambay,193,AM,PA02,true
+3172,Caaguazu,193,CG,PA04,true
+3173,Caazapa,193,CZ,PA05,true
+3175,Concepcion,193,CN,PA07,true
+3176,Cordillera,193,CR,PA08,true
+3177,Guaira,193,GU,PA10,true
+3178,Itapua,193,IT,PA11,true
+3180,Neembucu,193,NE,PA13,true
+3181,Paraguari,193,PG,PA15,true
+3182,Presidente Hayes,193,PH,PA16,true
+3184,Canindeyu,193,CY,PA19,true
+3185,Asuncion,193,AS,PA22,true
+3186,Alto Paraguay,193,AG,PA23,true
+3187,Boqueron,193,BQ,PA24,true
+3189,Ancash,194,AN,PE02,true
+3190,Apurimac,194,AP,PE03,true
+3191,Arequipa,194,AR,PE04,true
+3192,Ayacucho,194,AY,PE05,true
+3193,Cajamarca,194,CJ,PE06,true
+3194,Callao,194,CL,PE07,true
+3195,Cusco,194,CS,PE08,true
+3196,Huancavelica,194,HV,PE09,true
+3197,Huanuco,194,HC,PE10,true
+3198,Ica,194,IC,PE11,true
+3199,Junin,194,JU,PE12,true
+3201,Lambayeque,194,LB,PE14,true
+3202,Lima,194,LI,PE15,true
+3203,Loreto,194,LO,PE16,true
+3204,Madre de Dios,194,MD,PE17,true
+3205,Moquegua,194,MQ,PE18,true
+3206,Pasco,194,PA,PE19,true
+3207,Piura,194,PI,PE20,true
+3208,Puno,194,PU,PE21,true
+3209,San Martin,194,SM,PE22,true
+3210,Tacna,194,TA,PE23,true
+3211,Tumbes,194,TU,PE24,true
+3212,Ucayali,194,UC,PE25,true
+3216,Federally Administered Tribal Areas,187,TA,PK01,true
+3217,Balochistan,187,BA,PK02,true
+3218,North-West Frontier,187,NW,PK03,true
+3220,Sindh,187,SD,PK05,true
+3221,Azad Kashmir,187,JK,PK06,true
+3222,Northern Areas,187,NA,PK07,true
+3223,Islamabad,187,IS,PK08,true
+3274,Dolnoslaskie,197,DS,PL72,true
+3275,Kujawsko-Pomorskie,197,KP,PL73,true
+3276,Lodzkie,197,LD,PL74,true
+3277,Lubelskie,197,LU,PL75,true
+3278,Lubuskie,197,LB,PL76,true
+3279,Malopolskie,197,MA,PL77,true
+3280,Mazowieckie,197,MZ,PL78,true
+3281,Opolskie,197,OP,PL79,true
+3282,Podkarpackie,197,PK,PL80,true
+3283,Podlaskie,197,PD,PL81,true
+3284,Pomorskie,197,PM,PL82,true
+3285,Slaskie,197,SL,PL83,true
+3286,Swietokrzyskie,197,SK,PL84,true
+3287,Warminsko-Mazurskie,197,WN,PL85,true
+3288,Wielkopolskie,197,WP,PL86,true
+3289,Zachodniopomorskie,197,ZP,PL87,true
+3290,Bocas del Toro,190,BC,PM01,true
+3291,Chiriqui,190,CH,PM02,true
+3292,Cocle,190,CC,PM03,true
+3294,Darien,190,DR,PM05,true
+3295,Herrera,190,HE,PM06,true
+3296,Los Santos,190,LS,PM07,true
+3298,San Blas,190,SB,PM09,true
+3299,Veraguas,190,VR,PM10,true
+3300,Aveiro,198,AV,PO02,true
+3301,Beja,198,BE,PO03,true
+3302,Braga,198,BR,PO04,true
+3303,Braganca,198,BA,PO05,true
+3304,Castelo Branco,198,CB,PO06,true
+3305,Coimbra,198,CO,PO07,true
+3306,Evora,198,EV,PO08,true
+3307,Faro,198,FA,PO09,true
+3308,Madeira,198,MA,PO10,true
+3309,Guarda,198,GU,PO11,true
+3310,Leiria,198,LE,PO13,true
+3311,Lisboa,198,LI,PO14,true
+3312,Portalegre,198,PA,PO16,true
+3313,Porto,198,PO,PO17,true
+3314,Santarem,198,SA,PO18,true
+3315,Setubal,198,SE,PO19,true
+3316,Viana do Castelo,198,VC,PO20,true
+3317,Vila Real,198,VR,PO21,true
+3318,Viseu,198,VI,PO22,true
+3319,Azores,198,AC,PO23,true
+3321,Gulf,191,GU,PP02,true
+3322,Milne Bay,191,MB,PP03,true
+3324,Southern Highlands,191,SH,PP05,true
+3326,Bougainville,191,NS,PP07,true
+3327,Chimbu,191,CH,PP08,true
+3328,Eastern Highlands,191,EH,PP09,true
+3329,East New Britain,191,EN,PP10,true
+3330,East Sepik,191,ES,PP11,true
+3331,Madang,191,MD,PP12,true
+3332,Manus,191,MN,PP13,true
+3333,Morobe,191,MR,PP14,true
+3334,New Ireland,191,NI,PP15,true
+3335,Western Highlands,191,WH,PP16,true
+3336,West New Britain,191,WN,PP17,true
+3337,Sandaun,191,SA,PP18,true
+3338,Enga,191,EG,PP19,true
+3339,National Capital,191,NC,PP20,true
+3340,Bafata,103,BA,PU01,true
+3341,Quinara,103,QU,PU02,true
+3342,Oio,103,OI,PU04,true
+3343,Bolama,103,BL,PU05,true
+3344,Cacheu,103,CA,PU06,true
+3345,Tombali,103,TO,PU07,true
+3346,Gabu,103,GA,PU10,true
+3347,Bissau,103,BS,PU11,true
+3348,Biombo,103,BM,PU12,true
+3349,Ad Dawhah,200,DA,QA01,true
+3350,Al Ghuwayriyah,200,GH,QA02,true
+3351,Al Jumayliyah,200,JU,QA03,true
+3352,Al Khawr,200,KH,QA04,true
+3353,Al Wakrah,200,WA,QA05,true
+3354,Ar Rayyan,200,RA,QA06,true
+3355,Jarayan al Batinah,200,JB,QA07,true
+3356,Madinat ash Shamal,200,MS,QA08,true
+3357,Umm Salal,200,US,QA09,true
+3358,Alba,202,AB,RO01,true
+3359,Arad,202,AR,RO02,true
+3360,Arges,202,AG,RO03,true
+3361,Bacau,202,BC,RO04,true
+3362,Bihor,202,BH,RO05,true
+3363,Bistrita-Nasaud,202,BN,RO06,true
+3364,Botosani,202,BT,RO07,true
+3365,Braila,202,BR,RO08,true
+3366,Brasov,202,BV,RO09,true
+3367,Bucuresti,202,BU,RO10,true
+3368,Buzau,202,BZ,RO11,true
+3369,Caras-Severin,202,CS,RO12,true
+3370,Cluj,202,CJ,RO13,true
+3371,Constanta,202,CT,RO14,true
+3372,Covasna,202,CV,RO15,true
+3373,Dambovita,202,DB,RO16,true
+3374,Dolj,202,DJ,RO17,true
+3375,Galati,202,GL,RO18,true
+3376,Gorj,202,GJ,RO19,true
+3377,Harghita,202,HR,RO20,true
+3378,Hunedoara,202,HD,RO21,true
+3379,Ialomita,202,IL,RO22,true
+3380,Iasi,202,IS,RO23,true
+3381,Maramures,202,MM,RO25,true
+3382,Mehedinti,202,MH,RO26,true
+3383,Mures,202,MS,RO27,true
+3384,Neamt,202,NT,RO28,true
+3385,Olt,202,OT,RO29,true
+3386,Prahova,202,PH,RO30,true
+3387,Salaj,202,SJ,RO31,true
+3388,Satu Mare,202,SM,RO32,true
+3389,Sibiu,202,SB,RO33,true
+3390,Suceava,202,SV,RO34,true
+3391,Teleorman,202,TR,RO35,true
+3392,Timis,202,TM,RO36,true
+3393,Tulcea,202,TL,RO37,true
+3394,Vaslui,202,VS,RO38,true
+3395,Valcea,202,VL,RO39,true
+3396,Vrancea,202,VN,RO40,true
+3397,Calarasi,202,CL,RO41,true
+3398,Giurgiu,202,GR,RO42,true
+3399,Abra,195,AB,RP01,true
+3400,Agusan del Norte,195,AN,RP02,true
+3401,Agusan del Sur,195,AS,RP03,true
+3402,Aklan,195,AK,RP04,true
+3403,Albay,195,AL,RP05,true
+3404,Antique,195,AQ,RP06,true
+3405,Bataan,195,BA,RP07,true
+3406,Batanes,195,BN,RP08,true
+3407,Batangas,195,BT,RP09,true
+3408,Benguet,195,BG,RP10,true
+3409,Bohol,195,BO,RP11,true
+3410,Bukidnon,195,BK,RP12,true
+3411,Bulacan,195,BU,RP13,true
+3412,Cagayan,195,CG,RP14,true
+3413,Camarines Norte,195,CN,RP15,true
+3414,Camarines Sur,195,CS,RP16,true
+3415,Camiguin,195,CM,RP17,true
+3416,Capiz,195,CP,RP18,true
+3417,Catanduanes,195,CT,RP19,true
+3418,Cavite,195,CV,RP20,true
+3419,Cebu,195,CB,RP21,true
+3420,Basilan,195,BS,RP22,true
+3421,Eastern Samar,195,ES,RP23,true
+3422,Davao del Norte,195,DV,RP24,true
+3423,Davao del Sur,195,DS,RP25,true
+3424,Davao Oriental,195,DO,RP26,true
+3425,Ifugao,195,IF,RP27,true
+3426,Ilocos Norte,195,IN,RP28,true
+3427,Ilocos Sur,195,IS,RP29,true
+3428,Iloilo,195,II,RP30,true
+3429,Isabela,195,IB,RP31,true
+3430,Kalinga-Apayao,195,KA,RP32,true
+3431,Laguna,195,LG,RP33,true
+3432,Lanao del Norte,195,LN,RP34,true
+3433,Lanao del Sur,195,LS,RP35,true
+3435,Leyte,195,LY,RP37,true
+3436,Marinduque,195,MQ,RP38,true
+3437,Masbate,195,MB,RP39,true
+3438,Mindoro Occidental,195,MC,RP40,true
+3439,Mindoro Oriental,195,MR,RP41,true
+3440,Misamis Occidental,195,MD,RP42,true
+3441,Misamis Oriental,195,MN,RP43,true
+3442,Mountain,195,MT,RP44,true
+3443,RP45,195,RP,RP45,true
+3444,Negros Oriental,195,NR,RP46,true
+3445,Nueva Ecija,195,NE,RP47,true
+3446,Nueva Vizcaya,195,NV,RP48,true
+3447,Palawan,195,PL,RP49,true
+3448,Pampanga,195,PM,RP50,true
+3449,Pangasinan,195,PN,RP51,true
+3450,Rizal,195,RI,RP53,true
+3451,Romblon,195,RM,RP54,true
+3452,Samar,195,SM,RP55,true
+3453,Maguindanao,195,MG,RP56,true
+3454,North Cotabato,195,NC,RP57,true
+3455,Sorsogon,195,SR,RP58,true
+3456,Southern Leyte,195,SL,RP59,true
+3457,Sulu,195,SU,RP60,true
+3458,Surigao del Norte,195,SN,RP61,true
+3459,Surigao del Sur,195,SS,RP62,true
+3460,Tarlac,195,TR,RP63,true
+3461,Zambales,195,ZM,RP64,true
+3462,Zamboanga del Norte,195,ZN,RP65,true
+3463,Zamboanga del Sur,195,ZS,RP66,true
+3464,Northern Samar,195,NS,RP67,true
+3465,Quirino,195,QR,RP68,true
+3466,Siquijor,195,SQ,RP69,true
+3467,South Cotabato,195,SC,RP70,true
+3468,Sultan Kudarat,195,SK,RP71,true
+3469,Tawi-Tawi,195,TT,RP72,true
+3470,Angeles,195,AG,RPA1,true
+3471,Bacolod,195,BL,RPA2,true
+3473,Baguio,195,BI,RPA4,true
+3474,Bais,195,BD,RPA5,true
+3475,Basilan City,195,BC,RPA6,true
+3476,Batangas City,195,BY,RPA7,true
+3477,Butuan,195,BV,RPA8,true
+3478,Cabanatuan,195,CA,RPA9,true
+3479,Cadiz,195,CI,RPB1,true
+3480,Cagayan de Oro,195,CD,RPB2,true
+3481,Calbayog,195,CL,RPB3,true
+3482,Caloocan,195,CF,RPB4,true
+3483,Canlaon,195,CH,RPB5,true
+3484,Cavite City,195,CE,RPB6,true
+3485,Cebu City,195,CU,RPB7,true
+3486,Cotabato,195,CO,RPB8,true
+3487,Dagupan,195,DA,RPB9,true
+3488,Danao,195,DN,RPC1,true
+3489,Dapitane,195,DP,RPC2,true
+3490,Davao City,195,DC,RPC3,true
+3491,Dipolog,195,DI,RPC4,true
+3492,Dumaguete,195,DU,RPC5,true
+3493,General Santos,195,GS,RPC6,true
+3494,Gingoog,195,GI,RPC7,true
+3495,Iligan,195,IL,RPC8,true
+3496,Iloilo City,195,IC,RPC9,true
+3497,Iriga,195,IR,RPD1,true
+3498,La Carlota,195,LC,RPD2,true
+3499,Laoag,195,LO,RPD3,true
+3500,LapuLapu,195,LA,RPD4,true
+3501,Legaspi,195,LE,RPD5,true
+3502,Lipa,195,LI,RPD6,true
+3503,Lucena,195,LU,RPD7,true
+3504,Mandaue,195,MU,RPD8,true
+3505,Manila,195,MM,RPD9,true
+3506,Marawi,195,MA,RPE1,true
+3507,Naga,195,NA,RPE2,true
+3508,Olongapo,195,OL,RPE3,true
+3509,Ormoc,195,OM,RPE4,true
+3510,Oroquieta,195,OR,RPE5,true
+3511,Ozamis,195,OZ,RPE6,true
+3512,Pagadiane,195,PG,RPE7,true
+3513,Palayan,195,PY,RPE8,true
+3514,Pasay,195,PA,RPE9,true
+3515,Puerto Princesa,195,PP,RPF1,true
+3516,Quezon City,195,QC,RPF2,true
+3517,Roxas,195,RO,RPF3,true
+3518,Negros Occidental San Carlos,195,SA,RPF4,true
+3519,Pangasinan San Carlos,195,SO,RPF5,true
+3521,San Pablo,195,SP,RPF7,true
+3522,Silay,195,SI,RPF8,true
+3523,Surigao,195,SG,RPF9,true
+3524,Tacloban,195,TC,RPG1,true
+3525,Tagaytay,195,TG,RPG2,true
+3526,Tagbilaran,195,TB,RPG3,true
+3527,Tangub,195,TA,RPG4,true
+3529,Trece Martires,195,TM,RPG6,true
+3530,Zamboanga,195,ZA,RPG7,true
+3531,Aurora,195,AU,RPG8,true
+3532,Quezon,195,QZ,RPH2,true
+3533,Negros Occidental,195,ND,RPH3,true
+3534,Adygeya,203,AD,RS01,true
+3535,Aginskiy Buryatskiy Avtonomnyy Okrug,203,AB,RS02,true
+3536,Altay,203,GA,RS03,true
+3537,Altayskiy Kray,203,AL,RS04,true
+3538,Amurskaya Oblast',203,AM,RS05,true
+3539,Arkhangel'skaya Oblast',203,AR,RS06,true
+3540,Astrakhanskaya Oblast',203,AS,RS07,true
+3541,Bashkortostan,203,BK,RS08,true
+3542,Belgorodskaya Oblast',203,BL,RS09,true
+3543,Bryanskaya Oblast',203,BR,RS10,true
+3544,Buryatiya,203,BU,RS11,true
+3545,Chechnya,203,CN,RS12,true
+3546,Chelyabinskaya Oblast',203,CL,RS13,true
+3547,Chitinskaya Oblast',203,CT,RS14,true
+3548,Chukotskiy Avtonomnyy Okrug,203,CK,RS15,true
+3549,Chuvashiya,203,CV,RS16,true
+3550,Evenkiyskiy Avtonomnyy Okrug,203,EN,RS18,true
+3551,Ingushetiya,203,IN,RS19,true
+3552,Irkutskaya Oblast',203,IR,RS20,true
+3553,Ivanovskaya Oblast',203,IV,RS21,true
+3554,Kabardino-Balkariya,203,KB,RS22,true
+3555,Kaliningradskaya Oblast',203,KN,RS23,true
+3556,Kalmykiya,203,KL,RS24,true
+3557,Kaluzhskaya Oblast',203,KG,RS25,true
+3558,Kamchatskaya Oblast',203,KA,RS26,true
+3559,Karachayevo-Cherkesiya,203,KC,RS27,true
+3560,Kareliya,203,KI,RS28,true
+3561,Kemerovskaya Oblast',203,KE,RS29,true
+3562,Khabarovskiy Kray,203,KH,RS30,true
+3563,Khakasiya,203,KK,RS31,true
+3564,Khanty-Mansiyskiy Avtonomnyy Okrug,203,KM,RS32,true
+3565,Kirovskaya Oblast',203,KV,RS33,true
+3566,Komi-Permyatskiy Avtonomnyy Okrug,203,KP,RS35,true
+3567,Koryakskiy Avtonomnyy Okrug,203,KR,RS36,true
+3568,Kostromskaya Oblast',203,KT,RS37,true
+3569,Krasnodarskiy Kray,203,KD,RS38,true
+3570,Krasnoyarskiy Kray,203,KY,RS39,true
+3571,Kurganskaya Oblast',203,KU,RS40,true
+3572,Kurskaya Oblast',203,KS,RS41,true
+3573,Leningradskaya Oblast',203,LN,RS42,true
+3574,Lipetskaya Oblast',203,LP,RS43,true
+3575,Magadanskaya Oblast',203,MG,RS44,true
+3576,Mordoviya,203,MR,RS46,true
+3577,Moskovskaya Oblast',203,MS,RS47,true
+3578,Moskva,203,MC,RS48,true
+3579,Murmanskaya Oblast',203,MM,RS49,true
+3580,Nenetskiy Avtonomnyy Okrug,203,NN,RS50,true
+3581,Nizhegorodskaya Oblast',203,NZ,RS51,true
+3582,Novgorodskaya Oblast',203,NG,RS52,true
+3583,Novosibirskaya Oblast',203,NS,RS53,true
+3584,Omskaya Oblast',203,OM,RS54,true
+3585,Orenburgskaya Oblast',203,OB,RS55,true
+3586,Orlovskaya Oblast',203,OL,RS56,true
+3587,Penzenskaya Oblast',203,PZ,RS57,true
+3588,Permskaya Oblast',203,PM,RS58,true
+3589,Primorskiy Kray,203,PR,RS59,true
+3590,Pskovskaya Oblast',203,PS,RS60,true
+3591,Rostovskaya Oblast',203,RO,RS61,true
+3592,Ryazanskaya Oblast',203,RZ,RS62,true
+3593,Sakha (Yakutiya),203,SK,RS63,true
+3594,Sakhalinskaya Oblast',203,SL,RS64,true
+3595,Samarskaya Oblast',203,SA,RS65,true
+3596,Sankt-Peterburg,203,SP,RS66,true
+3597,Saratovskaya Oblast',203,SR,RS67,true
+3598,Severnaya Osetiya-Alaniya,203,NO,RS68,true
+3599,Smolenskaya Oblast',203,SM,RS69,true
+3600,Stavropol'skiy Kray,203,ST,RS70,true
+3601,Sverdlovskaya Oblast',203,SV,RS71,true
+3602,Tambovskaya Oblast',203,TB,RS72,true
+3603,Taymyrskiy Dolgano-Nenetskiy Avtonomnyy Okrug,203,TM,RS74,true
+3604,Tomskaya Oblast',203,TO,RS75,true
+3605,Tul'skaya Oblast',203,TL,RS76,true
+3606,Tverskaya Oblast',203,TV,RS77,true
+3607,Tyumenskaya Oblast',203,TY,RS78,true
+3608,Udmurtiya,203,UD,RS80,true
+3609,Ul'yanovskaya Oblast',203,UL,RS81,true
+3610,Ust'-Ordynskiy Buryatskiy Avtonomnyy Okrug,203,UB,RS82,true
+3611,Vladimirskaya Oblast',203,VL,RS83,true
+3612,Volgogradskaya Oblast',203,VG,RS84,true
+3613,Vologodskaya oblast',203,VO,RS85,true
+3614,Voronezhskaya Oblast',203,VR,RS86,true
+3615,Yamalo-Nenetskiy Avtonomnyy Okrug,203,YN,RS87,true
+3616,Yaroslavskaya Oblast',203,YS,RS88,true
+3617,Yevreyskaya Avtonomnyy Oblast',203,YV,RS89,true
+3619,Butare,204,BT,RW01,true
+3620,Byumba,204,BM,RW02,true
+3621,Cyangugu,204,CY,RW03,true
+3622,Gikongoro,204,GK,RW04,true
+3623,Gisenyi,204,GS,RW05,true
+3624,Gitarama,204,GT,RW06,true
+3625,Kibungo,204,KN,RW07,true
+3626,Kibuye,204,KY,RW08,true
+3627,Kigali-Rural,204,KR,RW09,true
+3628,Ruhengeri,204,RU,RW10,true
+3629,Al Bahah,213,BA,SA02,true
+3630,Al Madinah,213,MD,SA05,true
+3632,Al Qasim,213,QS,SA08,true
+3633,Ar Riyad,213,RI,SA10,true
+3634,'Asir,213,AS,SA11,true
+3635,Ha'il,213,HA,SA13,true
+3636,Makkah,213,MK,SA14,true
+3637,Al Hudud ash Shamaliyah,213,HS,SA15,true
+3638,Najran,213,NJ,SA16,true
+3639,Jizan,213,JZ,SA17,true
+3640,Tabuk,213,TB,SA19,true
+3641,Al Jawf,213,JF,SA20,true
+3643,Christ Church Nicholatown,206,CC,SC01,true
+3644,Saint Anne Sandy Point,206,AS,SC02,true
+3645,Saint George Basseterre,206,GB,SC03,true
+3646,Saint George Gingerland,206,GG,SC04,true
+3647,Saint James Windward,206,JW,SC05,true
+3648,Saint John Capesterre,206,JC,SC06,true
+3649,Saint John Figtree,206,JF,SC07,true
+3650,Saint Mary Cayon,206,MC,SC08,true
+3651,Saint Paul Capesterre,206,PP,SC09,true
+3652,Saint Paul Charlestown,206,PL,SC10,true
+3653,Saint Peter Basseterre,206,PB,SC11,true
+3654,Saint Thomas Lowland,206,TL,SC12,true
+3655,Saint Thomas Middle Island,206,TM,SC13,true
+3656,Trinity Palmetto Point,206,TP,SC15,true
+3657,Anse aux Pins,217,PI,SE01,true
+3658,Anse Boileau,217,AB,SE02,true
+3659,Anse Etoile,217,ET,SE03,true
+3660,Anse Louis,217,LO,SE04,true
+3661,Anse Royale,217,RO,SE05,true
+3662,Baie Lazare,217,BL,SE06,true
+3663,Baie Sainte Anne,217,BS,SE07,true
+3664,Beau Vallon,217,BV,SE08,true
+3665,Bel Air,217,BA,SE09,true
+3666,Bel Ombre,217,BO,SE10,true
+3667,Cascade,217,CA,SE11,true
+3668,Glacis,217,GL,SE12,true
+3669,Grand' Anse,217,GP,SE14,true
+3670,La Digue,217,DI,SE15,true
+3671,La Riviere Anglaise,217,RA,SE16,true
+3672,Mont Buxton,217,MB,SE17,true
+3673,Mont Fleuri,217,MF,SE18,true
+3674,Plaisance,217,PL,SE19,true
+3675,Pointe La Rue,217,PR,SE20,true
+3676,Port Glaud,217,PG,SE21,true
+3677,Saint Louis,217,SL,SE22,true
+3678,Takamaka,217,TA,SE23,true
+3680,KwaZulu-Natal,224,NL,SF02,true
+3681,Free State,224,FS,SF03,true
+3683,Eastern Cape,224,EC,SF05,true
+3684,Gauteng,224,GT,SF06,true
+3685,Mpumalanga,224,MP,SF07,true
+3686,Northern Cape,224,NC,SF08,true
+3687,Northern Province,224,NP,SF09,true
+3688,North-West,224,NW,SF10,true
+3689,Western Cape,224,WC,SF11,true
+3690,Dakar,214,DK,SG01,true
+3691,Diourbel,214,DB,SG03,true
+3692,Saint-Louis,214,SL,SG04,true
+3693,Tambacounda,214,TC,SG05,true
+3694,Thies,214,TH,SG07,true
+3695,Louga,214,LG,SG08,true
+3696,Fatick,214,FK,SG09,true
+3697,Kaolack,214,KL,SG10,true
+3698,Kolda,214,KD,SG11,true
+3699,Ziguinchor,214,ZG,SG12,true
+3700,Ascension,205,AC,SH01,true
+3702,Tristan da Cunha,205,TA,SH03,true
+3703,Ajdovscina,221,AJ,SI01,true
+3704,Beltinci,221,BE,SI02,true
+3705,Bled,221,BL,SI03,true
+3706,Bohinj,221,BH,SI04,true
+3707,Borovnica,221,BO,SI05,true
+3708,Bovec,221,BC,SI06,true
+3709,Brda,221,BR,SI07,true
+3710,Brezice,221,BZ,SI08,true
+3711,Brezovica,221,BV,SI09,true
+3712,Cankova-Tisina,221,CA,SI10,true
+3713,Celje,221,CL,SI11,true
+3714,Cerklje Na Gorenjskem,221,CG,SI12,true
+3715,Cerknica,221,CK,SI13,true
+3716,Cerkno,221,CE,SI14,true
+3717,Crensovci,221,CR,SI15,true
+3718,Crna na Koroskem,221,CN,SI16,true
+3719,Crnomelj,221,CO,SI17,true
+3720,Destrnik-Trnovska Vas,221,DV,SI18,true
+3721,Divaca,221,DI,SI19,true
+3722,Dobrepolje,221,DB,SI20,true
+3723,Dobrova-Horjul-Polhov Gradec,221,DG,SI21,true
+3724,Dol pri Ljubljani,221,DP,SI22,true
+3725,Domzale,221,DM,SI23,true
+3726,Dornava,221,DO,SI24,true
+3727,Dravograd,221,DR,SI25,true
+3728,Duplek,221,DU,SI26,true
+3729,Gorenja Vas-Poljane,221,GV,SI27,true
+3730,Gorisnica,221,GO,SI28,true
+3731,Gornja Radgona,221,GR,SI29,true
+3732,Gornji Grad,221,GG,SI30,true
+3733,Gornji Petrovci,221,GP,SI31,true
+3734,Grosuplje,221,GS,SI32,true
+3735,HodosSalovci,221,HO,SI33,true
+3736,Hrastnik,221,HR,SI34,true
+3737,Hrpelje-Kozina,221,HK,SI35,true
+3738,Idrija,221,ID,SI36,true
+3739,Ig,221,IG,SI37,true
+3740,Ilirska Bistrica,221,IB,SI38,true
+3741,Ivancna Gorica,221,IV,SI39,true
+3742,Izola,221,IZ,SI40,true
+3743,Jesenice,221,JE,SI41,true
+3744,Jursinci,221,JU,SI42,true
+3745,Kamnik,221,KA,SI43,true
+3746,Kanal,221,KN,SI44,true
+3747,Kidricevo,221,KI,SI45,true
+3748,Kobarid,221,KO,SI46,true
+3749,Kobilje,221,KB,SI47,true
+3750,Kocevje,221,KC,SI48,true
+3751,Komen,221,KM,SI49,true
+3752,Koper,221,KP,SI50,true
+3753,Kozje,221,KJ,SI51,true
+3754,Kranj,221,KR,SI52,true
+3755,Kranjska Gora,221,KG,SI53,true
+3756,Krsko,221,KS,SI54,true
+3757,Kungota,221,KZ,SI55,true
+3758,Kuzma,221,KU,SI56,true
+3759,Lasko,221,LA,SI57,true
+3760,Lenart,221,LE,SI58,true
+3761,Lendava,221,LN,SI59,true
+3762,Litija,221,LI,SI60,true
+3763,Ljubljana,221,LB,SI61,true
+3764,Ljubno,221,LC,SI62,true
+3765,Ljutomer,221,LJ,SI63,true
+3766,Logatec,221,LO,SI64,true
+3767,Loska Dolina,221,LD,SI65,true
+3768,Loski Potok,221,LP,SI66,true
+3769,Luce,221,LU,SI67,true
+3770,Lukovica,221,LK,SI68,true
+3771,Majsperk,221,MJ,SI69,true
+3772,Maribor,221,MA,SI70,true
+3773,Medvode,221,MD,SI71,true
+3774,Menges,221,MN,SI72,true
+3775,Metlika,221,ME,SI73,true
+3776,Mezica,221,MZ,SI74,true
+3777,Miren-Kostanjevica,221,MI,SI75,true
+3778,Mislinja,221,ML,SI76,true
+3779,Moravce,221,MV,SI77,true
+3780,Moravske Toplice,221,MT,SI78,true
+3781,Mozirje,221,MO,SI79,true
+3782,Murska Sobota,221,MS,SI80,true
+3783,Muta,221,MU,SI81,true
+3784,Naklo,221,NA,SI82,true
+3785,Nazarje,221,NZ,SI83,true
+3786,Nova Gorica,221,NG,SI84,true
+3787,Novo Mesto,221,NM,SI85,true
+3788,Odranci,221,OD,SI86,true
+3789,Ormoz,221,OR,SI87,true
+3790,Osilnica,221,OS,SI88,true
+3791,Pesnica,221,PE,SI89,true
+3792,Piran,221,PA,SI90,true
+3793,Pivka,221,PI,SI91,true
+3794,Podcetrtek,221,PD,SI92,true
+3795,Podvelka-Ribnica,221,PV,SI93,true
+3796,Postojna,221,PO,SI94,true
+3797,Preddvor,221,PR,SI95,true
+3798,Ptuj,221,PT,SI96,true
+3799,Puconci,221,PU,SI97,true
+3800,Race-Fram,221,RF,SI98,true
+3801,Radece,221,RA,SI99,true
+3802,Radenci,221,RD,SIA1,true
+3803,Radlje ob Dravi,221,RL,SIA2,true
+3804,Radovljica,221,RV,SIA3,true
+3805,Ravne-Prevalje,221,RN,SIA4,true
+3806,Ribnica,221,RI,SIA5,true
+3807,Rogasevci,221,RO,SIA6,true
+3808,Rogaska Slatina,221,RS,SIA7,true
+3809,Rogatec,221,RT,SIA8,true
+3810,Ruse,221,RU,SIA9,true
+3811,Semic,221,SM,SIB1,true
+3812,Sencur,221,SN,SIB2,true
+3813,Sentilj,221,SE,SIB3,true
+3814,Sentjernej,221,SR,SIB4,true
+3815,Sentjur pri Celju,221,SU,SIB5,true
+3816,Sevnica,221,SV,SIB6,true
+3817,Sezana,221,SZ,SIB7,true
+3818,Skocjan,221,SC,SIB8,true
+3819,Skofja Loka,221,SL,SIB9,true
+3820,Skofljica,221,SK,SIC1,true
+3821,Slovenj Gradec,221,SG,SIC2,true
+3822,Slovenska Bistrica,221,SB,SIC3,true
+3823,Slovenske Konjice,221,SS,SIC4,true
+3824,Smarje pri Jelsah,221,SP,SIC5,true
+3825,Smartno ob Paki,221,SA,SIC6,true
+3826,Sostanj,221,SO,SIC7,true
+3827,Starse,221,SH,SIC8,true
+3828,Store,221,ST,SIC9,true
+3829,Sveti Jurij,221,SJ,SID1,true
+3830,Tolmin,221,TO,SID2,true
+3831,Trbovlje,221,TB,SID3,true
+3832,Trebnje,221,TE,SID4,true
+3833,Trzic,221,TR,SID5,true
+3834,Turnisce,221,TU,SID6,true
+3835,Velenje,221,VE,SID7,true
+3836,Velike Lasce,221,VL,SID8,true
+3837,Videm,221,VI,SID9,true
+3838,Vipava,221,VP,SIE1,true
+3839,Vitanje,221,VT,SIE2,true
+3840,Vodice,221,VO,SIE3,true
+3841,Vojnik,221,VJ,SIE4,true
+3842,Vrhnika,221,VR,SIE5,true
+3843,Vuzenica,221,VU,SIE6,true
+3844,Zagorje ob Savi,221,ZO,SIE7,true
+3845,Zalec,221,ZA,SIE8,true
+3846,Zavrc,221,ZV,SIE9,true
+3847,Zelezniki,221,ZE,SIF1,true
+3848,Ziri,221,ZI,SIF2,true
+3849,Zrece,221,ZR,SIF3,true
+3853,Western Area,218,WE,SL04,true
+3854,Acquaviva,211,AC,SM01,true
+3855,Chiesanuova,211,CH,SM02,true
+3856,Domagnano,211,DO,SM03,true
+3857,Faetano,211,FA,SM04,true
+3858,Fiorentino,211,FI,SM05,true
+3859,Borgo Maaggiore,211,BM,SM06,true
+3861,Monte Giardino,211,MG,SM08,true
+3862,Serravalle,211,SE,SM09,true
+3863,Bakool,223,BK,SO01,true
+3864,Banaadir,223,BN,SO02,true
+3865,Bari,223,BR,SO03,true
+3866,Bay,223,BY,SO04,true
+3867,Galguduud,223,GA,SO05,true
+3868,Gedo,223,GE,SO06,true
+3869,Hiiraan,223,HI,SO07,true
+3870,Jubbada Dhexe,223,JD,SO08,true
+3871,Jubbada Hoose,223,JH,SO09,true
+3872,Mudug,223,MU,SO10,true
+3873,Nugaal,223,NU,SO11,true
+3874,Sanaag,223,SA,SO12,true
+3875,Shabeellaha Dhexe,223,SD,SO13,true
+3876,Shabeellaha Hoose,223,SH,SO14,true
+3877,Togdheer,223,TO,SO15,true
+3878,Woqooyi Galbeed,223,WO,SO16,true
+3886,Islas Baleares,226,PM,SP07,true
+3908,Madrid,226,MD,SP29,true
+3910,Murcia,226,MU,SP31,true
+3911,Navarra,226,NA,SP32,true
+3913,Asturias,226,AS,SP34,true
+3918,Cantabria,226,CB,SP39,true
+3930,Andalucia,226,AN,SP51,true
+3931,Aragon,226,AR,SP52,true
+3932,Canarias,226,CN,SP53,true
+3933,Castilla-La Mancha,226,CM,SP54,true
+3934,Castilla y Leon,226,CL,SP55,true
+3935,Catalu±a,226,CT,SP56,true
+3936,Extremadura,226,EX,SP57,true
+3937,Galicia,226,GA,SP58,true
+3938,Pais Vasco,226,PV,SP59,true
+3939,Valenciana,226,VC,SP60,true
+3941,Vojvodina,271,VO,    ,true
+3942,Anse-la-Raye,207,AR,ST01,true
+3943,Dauphin,207,DA,ST02,true
+3944,Castries,207,CS,ST03,true
+3945,Choiseul,207,CH,ST04,true
+3946,Dennery,207,DE,ST05,true
+3947,Gros-Islet,207,GI,ST06,true
+3948,Laborie,207,LB,ST07,true
+3949,Micoud,207,MI,ST08,true
+3950,Soufriere,207,CO,ST09,true
+3951,Vieux-Fort,207,VF,ST10,true
+3952,Praslin,207,PR,ST11,true
+3953,A'ali an Nil,229,UN,SU35,true
+3956,Al Khartum,229,KH,SU29,true
+3957,Ash Shamaliyah,229,NO,SU43,true
+3962,Al Babr al Ahmar,229,RS,SU36,true
+3963,Al Buhayrat,229,EB,SU37,true
+3964,Al Jazirah,229,GZ,SU38,true
+3965,Al Qadarif,229,GD,SU39,true
+3966,Al Wahdah,229,WH,SU40,true
+3967,An Nil al Abyad,229,WN,SU41,true
+3968,An Nil al Azraq,229,BN,SU42,true
+3969,Bahr al Jabal,229,BG,SU44,true
+3970,Gharb al Istiwa'iyah,229,WE,SU45,true
+3971,Gharb Bahr al Ghazal,229,WB,SU46,true
+3972,Gharb Darfur,229,WD,SU47,true
+3973,Gharb Kurdufan,229,WK,SU48,true
+3974,Janub Darfur,229,JD,SU49,true
+3975,Janub Kurdufan,229,SK,SU50,true
+3976,Junqali,229,JG,SU51,true
+3977,Kassala,229,KA,SU52,true
+3978,Nahr an Nil,229,RN,SU53,true
+3979,Shamal Bahr al Ghazal,229,NB,SU54,true
+3980,Shamal Darfur,229,ND,SU55,true
+3981,Shamal Kurdufan,229,NK,SU56,true
+3982,Sharq al Istiwa'iyah,229,EE,SU57,true
+3983,Sinnar,229,SI,SU58,true
+3984,Warab,229,WR,SU59,true
+3986,Blekinge Lan,233,BL,SW02,true
+3987,Gavleborgs Lan,233,GV,SW03,true
+3989,Gotlands Lan,233,GT,SW05,true
+3990,Hallands Lan,233,HA,SW06,true
+3991,Jamtlands Lan,233,JA,SW07,true
+3992,Jonkopings Lan,233,JO,SW08,true
+3993,Kalmar Lan,233,KA,SW09,true
+3994,Dalarnas Lan,233,KO,SW10,true
+3996,Kronobergs Lan,233,KR,SW12,true
+3998,Norrbottens Lan,233,NB,SW14,true
+3999,Orebro Lan,233,OR,SW15,true
+4000,Ostergotlands Lan,233,OG,SW16,true
+4002,Sodermanlands Lan,233,SD,SW18,true
+4003,Uppsala Lan,233,UP,SW21,true
+4004,Varmlands Lan,233,VR,SW22,true
+4005,Vasterbottens Lan,233,VB,SW23,true
+4006,Vasternorrlands Lan,233,VN,SW24,true
+4007,Vastmanlands Lan,233,VM,SW25,true
+4008,Stockholms Lan,233,ST,SW26,true
+4009,Skane Lan,233,SN,SW27,true
+4010,Vastra Gotaland,233,VG,SW28,true
+4011,Al Hasakah,235,HA,SY01,true
+4012,Al Ladhiqiyah,235,LA,SY02,true
+4013,Al Qunaytirah,235,QU,SY03,true
+4014,Ar Raqqah,235,RA,SY04,true
+4015,As Suwayda',235,SU,SY05,true
+4016,Dar'a,235,DR,SY06,true
+4017,Dayr az Zawr,235,DY,SY07,true
+4018,Rif Dimashq,235,RD,SY08,true
+4019,Halab,235,HL,SY09,true
+4020,Hamah,235,HM,SY10,true
+4021,Hims,235,HI,SY11,true
+4022,Idlib,235,ID,SY12,true
+4023,Dimashq,235,DI,SY13,true
+4024,Tartus,235,TA,SY14,true
+4025,Aargau,234,AG,SZ01,true
+4026,Ausser-Rhoden,234,AR,SZ02,true
+4027,Basel-Landschaft,234,BL,SZ03,true
+4028,Basel-Stadt,234,BS,SZ04,true
+4029,Bern,234,BE,SZ05,true
+4030,Fribourg,234,FR,SZ06,true
+4031,Geneve,234,GE,SZ07,true
+4032,Glarus,234,GL,SZ08,true
+4033,Graubunden,234,GR,SZ09,true
+4034,Inner-Rhoden,234,AI,SZ10,true
+4035,Luzern,234,LU,SZ11,true
+4036,Neuchatel,234,NE,SZ12,true
+4037,Nidwalden,234,NW,SZ13,true
+4038,Obwalden,234,OW,SZ14,true
+4039,Sankt Gallen,234,SG,SZ15,true
+4040,Schaffhausen,234,SH,SZ16,true
+4041,Schwyz,234,SZ,SZ17,true
+4042,Solothurn,234,SO,SZ18,true
+4043,Thurgau,234,TG,SZ19,true
+4044,Ticino,234,TI,SZ20,true
+4045,Uri,234,UR,SZ21,true
+4046,Valais,234,VS,SZ22,true
+4047,Vaud,234,VD,SZ23,true
+4048,Zug,234,ZG,SZ24,true
+4049,Zurich,234,ZH,SZ25,true
+4050,Jura,234,JU,SZ26,true
+4051,Arima,243,AR,TD01,true
+4052,Caroni,243,CA,TD02,true
+4053,Mayaro,243,MA,TD03,true
+4054,Nariva,243,NA,TD04,true
+4055,Port-of-Spain,243,PO,TD05,true
+4060,San Fernando,243,SF,TD10,true
+4061,Tobago,243,TO,TD11,true
+4063,Mae Hong Son,239,MH,TH01,true
+4064,Chiang Mai,239,CM,TH02,true
+4065,Chiang Rai,239,CR,TH03,true
+4066,Nan,239,NA,TH04,true
+4067,Lamphun,239,LN,TH05,true
+4068,Lampang,239,LG,TH06,true
+4069,Phrae,239,PR,TH07,true
+4070,Tak,239,TK,TH08,true
+4071,Sukhothai,239,SO,TH09,true
+4072,Uttaradit,239,UD,TH10,true
+4073,Kamphaeng Phet,239,KP,TH11,true
+4074,Phitsanulok,239,PS,TH12,true
+4075,Phichit,239,PC,TH13,true
+4076,Phetchabun,239,PH,TH14,true
+4077,Uthai Thani,239,UT,TH15,true
+4078,Nakhon Sawan,239,NS,TH16,true
+4079,Nong Khai,239,NK,TH17,true
+4080,Loei,239,LE,TH18,true
+4081,Udon Thani,239,UN,TH76,true
+4082,Sakon Nakhon,239,SN,TH20,true
+4083,Nakhon Phanom,239,NF,TH73,true
+4084,Khon Kaen,239,KK,TH22,true
+4085,Kalasin,239,KL,TH23,true
+4086,Maha Sarakham,239,MS,TH24,true
+4087,Roi Et,239,RE,TH25,true
+4088,Chaiyaphum,239,CY,TH26,true
+4089,Nakhon Ratchasima,239,NR,TH27,true
+4090,Buriram,239,BR,TH28,true
+4091,Surin,239,SU,TH29,true
+4092,Sisaket,239,SI,TH30,true
+4093,Narathiwat,239,NW,TH31,true
+4094,Chai Nat,239,CN,TH32,true
+4095,Sing Buri,239,SB,TH33,true
+4096,Lop Buri,239,LB,TH34,true
+4097,Ang Thong,239,AT,TH35,true
+4098,Phra Nakhon Si Ayutthaya,239,PA,TH36,true
+4099,Sara Buri,239,SR,TH37,true
+4100,Nonthaburi,239,NO,TH38,true
+4101,Pathum Thani,239,PT,TH39,true
+4102,Krung Thep Mahanakhon,239,BM,TH40,true
+4103,Phayao,239,PY,TH41,true
+4104,Samut Prakan,239,SP,TH42,true
+4105,Nakhon Nayok,239,NN,TH43,true
+4106,Chachoengsao,239,CC,TH44,true
+4107,Prachin Buri,239,PB,TH74,true
+4108,Chon Buri,239,CB,TH46,true
+4109,Rayong,239,RY,TH47,true
+4110,Chanthaburi,239,CT,TH48,true
+4111,Trat,239,TT,TH49,true
+4112,Kanchanaburi,239,KN,TH50,true
+4113,Suphan Buri,239,SH,TH51,true
+4114,Ratchaburi,239,RT,TH52,true
+4115,Nakhon Pathom,239,NP,TH53,true
+4116,Samut Songkhram,239,SM,TH54,true
+4117,Samut Sakhon,239,SS,TH55,true
+4118,Phetchaburi,239,PE,TH56,true
+4119,Prachuap Khiri Khan,239,PK,TH57,true
+4120,Chumphon,239,CP,TH58,true
+4121,Ranong,239,RN,TH59,true
+4122,Surat Thani,239,ST,TH60,true
+4123,Phangnga,239,PG,TH61,true
+4124,Phuket,239,PU,TH62,true
+4125,Krabi,239,KR,TH63,true
+4126,Nakon Si Thammarat,239,NT,TH64,true
+4127,Trang,239,TG,TH65,true
+4128,Phatthalung,239,PL,TH66,true
+4129,Satun,239,SA,TH67,true
+4130,Songkhla,239,SG,TH68,true
+4131,Pattani,239,PI,TH69,true
+4132,Yala,239,YL,TH70,true
+4134,Yasothon,239,YS,TH72,true
+4135,Ubon Ratchanthani,239,UR,TH75,true
+4136,Amnat Charoen,239,AC,TH77,true
+4137,Mukdahan,239,MD,TH78,true
+4138,Nong Bua Lamphu,239,NB,TH79,true
+4139,Sa Kaeo,239,SK,TH80,true
+4140,Kuhistoni Badakhshon,237,BK,TI01,true
+4141,Khatlon,237,KL,TI02,true
+4142,Leninobod,237,LE,TI03,true
+4143,Ha'apai,242,HA,TN01,true
+4144,Tongatapu,242,TT,TN02,true
+4145,Vava'u,242,VA,TN03,true
+4167,Principe,212,PR,TP01,true
+4168,Sao Tome,212,ST,TP02,true
+4169,Al Qasrayn,245,KS,TS02,true
+4170,Al Qayrawan,245,KR,TS03,true
+4171,Jundubah,245,JE,TS06,true
+4172,Al Kaf,245,KF,TS14,true
+4173,Al Mahdiyah,245,MH,TS15,true
+4174,Al Munastir,245,MS,TS16,true
+4175,Bajah,245,BJ,TS17,true
+4176,Banzart,245,BZ,TS18,true
+4177,Nabul,245,NB,TS19,true
+4178,Silyanah,245,SL,TS22,true
+4179,Susah,245,SS,TS23,true
+4180,Aryanah,245,AN,TS26,true
+4181,Bin 'Arus,245,BA,TS27,true
+4182,Madanin,245,ME,TS28,true
+4183,Qabis,245,GB,TS29,true
+4184,Qafsah,245,QA,TS30,true
+4185,Qibili,245,KB,TS31,true
+4186,Safaqi,245,SF,TS32,true
+4187,Sidi Bu Zayd,245,SZ,TS33,true
+4188,Tatawin,245,TA,TS34,true
+4189,Tawzar,245,TO,TS35,true
+4190,Tunis,245,TU,TS36,true
+4191,Zaghwan,245,ZA,TS37,true
+4192,Adana,246,AA,TU81,true
+4193,Adiyaman,246,AD,TU02,true
+4194,Afyon,246,AF,TU03,true
+4195,Agri,246,AG,TU04,true
+4196,Amasya,246,AM,TU05,true
+4198,Antalya,246,AL,TU07,true
+4199,Artvin,246,AV,TU08,true
+4200,Aydin,246,AY,TU09,true
+4201,Balikesir,246,BK,TU10,true
+4202,Bilecik,246,BC,TU11,true
+4203,Bingol,246,BG,TU12,true
+4204,Bitlis,246,BT,TU13,true
+4205,Bolu,246,BL,TU14,true
+4206,Burdur,246,BD,TU15,true
+4207,Bursa,246,BU,TU16,true
+4208,Canakkale,246,CK,TU17,true
+4209,Cankiri,246,CI,TU82,true
+4210,Corum,246,CM,TU19,true
+4211,Denizli,246,DN,TU20,true
+4212,Diyarbakir,246,DY,TU21,true
+4213,Edirne,246,ED,TU22,true
+4214,Elazig,246,EG,TU23,true
+4215,Erzincan,246,EN,TU24,true
+4216,Erzurum,246,EM,TU25,true
+4217,Eskisehir,246,ES,TU26,true
+4218,Gaziantep,246,GA,TU83,true
+4219,Giresun,246,GI,TU28,true
+4222,Hatay,246,HT,TU31,true
+4223,Icel,246,IC,TU32,true
+4224,Isparta,246,IP,TU33,true
+4225,Istanbul,246,IB,TU34,true
+4226,Izmir,246,IZ,TU35,true
+4227,Kars,246,KA,TU84,true
+4228,Kastamonu,246,KS,TU37,true
+4229,Kayseri,246,KY,TU38,true
+4230,Kirklareli,246,KL,TU39,true
+4231,Kirsehir,246,KH,TU40,true
+4232,Kocaeli,246,KC,TU41,true
+4234,Kutahya,246,KU,TU43,true
+4235,Malatya,246,ML,TU44,true
+4236,Manisa,246,MN,TU45,true
+4237,Kahramanmaras,246,KM,TU46,true
+4239,Mugla,246,MG,TU48,true
+4240,Mus,246,MS,TU49,true
+4241,Nevsehir,246,NV,TU50,true
+4243,Ordu,246,OR,TU52,true
+4244,Rize,246,RI,TU53,true
+4245,Sakarya,246,SK,TU54,true
+4246,Samsun,246,SS,TU55,true
+4248,Sinop,246,SP,TU57,true
+4249,Sivas,246,SV,TU58,true
+4250,Tekirdag,246,TG,TU59,true
+4251,Tokat,246,TT,TU60,true
+4252,Trabzon,246,TB,TU61,true
+4253,Tunceli,246,TC,TU62,true
+4254,Sanliurfa,246,SU,TU63,true
+4255,Usak,246,US,TU64,true
+4256,Van,246,VA,TU65,true
+4257,Yozgat,246,YZ,TU66,true
+4258,Zonguldak,246,ZO,TU85,true
+4259,Ankara,246,AN,TU68,true
+4260,Gumushane,246,GU,TU69,true
+4261,Hakkari,246,HK,TU70,true
+4262,Konya,246,KO,TU71,true
+4263,Mardin,246,MR,TU72,true
+4264,Nigde,246,NG,TU73,true
+4265,Siirt,246,SI,TU74,true
+4266,Aksaray,246,AK,TU75,true
+4267,Batman,246,BM,TU76,true
+4268,Bayburt,246,BB,TU77,true
+4269,Karaman,246,KR,TU78,true
+4270,Kirikkale,246,KK,TU79,true
+4271,Sirnak,246,SR,TU80,true
+4272,Fu-chien,236,FK,TW01,true
+4273,Kao-hsiung,236,KH,TW02,true
+4274,T'ai-pei,236,TP,TW03,true
+4275,T'ai-wan,236,TA,TW04,true
+4276,Arusha,238,AR,TZ01,true
+4277,Dar es Salaam,238,DS,TZ23,true
+4278,Dodoma,238,DO,TZ03,true
+4279,Iringa,238,IR,TZ04,true
+4280,Kigoma,238,KM,TZ05,true
+4281,Kilimanjaro,238,KL,TZ06,true
+4282,Lindi,238,LI,TZ07,true
+4283,Mara,238,MA,TZ08,true
+4284,Mbeya,238,MB,TZ09,true
+4285,Morogoro,238,MO,TZ10,true
+4286,Mtwara,238,MT,TZ11,true
+4288,Pemba North,238,PN,TZ13,true
+4289,Ruvuma,238,RV,TZ14,true
+4290,Shinyanga,238,SH,TZ15,true
+4291,Singida,238,SD,TZ16,true
+4292,Tabora,238,TB,TZ17,true
+4293,Tanga,238,TN,TZ18,true
+4294,Kagera,238,KR,TZ19,true
+4295,Pemba South,238,PS,TZ20,true
+4296,Zanzibar Central//South,238,ZS,TZ21,true
+4297,Zanzibar North,238,ZN,TZ22,true
+4298,Rukwa,238,RK,TZ24,true
+4299,Zanzibar Urban//West,238,ZW,TZ25,true
+4300,Apac,250,AP,UG26,true
+4301,Arua,250,AR,UG27,true
+4302,Bundibogyo,250,BN,UG28,true
+4303,Bushenyi,250,BS,UG29,true
+4304,Gulu,250,GU,UG30,true
+4305,Hoima,250,HO,UG31,true
+4306,Iganga,250,IG,UG68,true
+4307,Jinja,250,JI,UG33,true
+4308,Kabale,250,KA,UG34,true
+4309,Kabarole,250,KB,UG35,true
+4310,Kalangala,250,KN,UG36,true
+4311,Kampala,250,KM,UG37,true
+4312,Kamuli,250,KL,UG38,true
+4313,Kapchorwa,250,KC,UG39,true
+4314,Kasese,250,KS,UG40,true
+4315,Kibale,250,KI,UG41,true
+4316,Kiboga,250,KG,UG42,true
+4317,Kisoro,250,KR,UG43,true
+4318,Kitgum,250,KT,UG44,true
+4319,Kotido,250,KO,UG45,true
+4320,Kumi,250,KU,UG46,true
+4321,Lira,250,LI,UG47,true
+4322,Luwero,250,LU,UG70,true
+4323,Masaka,250,MA,UG71,true
+4324,Masindi,250,MS,UG50,true
+4325,Mbale,250,ML,UG51,true
+4326,Mbarara,250,MR,UG52,true
+4327,Moroto,250,MO,UG53,true
+4328,Moyo,250,MY,UG72,true
+4329,Mpigi,250,MP,UG55,true
+4330,Mubende,250,MU,UG56,true
+4331,Mukono,250,MK,UG57,true
+4332,Nebbi,250,NE,UG58,true
+4333,Ntungamo,250,NT,UG59,true
+4334,Pallisa,250,PA,UG60,true
+4335,Rakai,250,RA,UG61,true
+4336,Rukungiri,250,RU,UG62,true
+4337,Soroti,250,SO,UG75,true
+4338,Tororo,250,TO,UG76,true
+4431,Cherkas'ka Oblast',251,CK,UP01,true
+4432,Chernihivs'ka Oblast',251,CH,UP02,true
+4433,Chernivets'ka Oblast',251,CV,UP03,true
+4434,Dnipropetrovs'ka Oblast',251,DP,UP04,true
+4435,Donets'ka Oblast',251,DT,UP05,true
+4436,Ivano-Frankivs'ka Oblast',251,IF,UP06,true
+4437,Kharkivs'ka Oblast',251,KK,UP07,true
+4438,Khersons'ka Oblast',251,KS,UP08,true
+4439,Khmel'nyts'ka Oblast',251,KM,UP09,true
+4440,Kirovohrads'ka Oblast',251,KH,UP10,true
+4441,Avtonomna Respublika Krym,251,KR,UP11,true
+4442,Misto Kyyiv,251,KC,UP12,true
+4443,Kyyivs'ka Oblast',251,KV,UP13,true
+4444,Luhans'ka Oblast',251,LH,UP14,true
+4445,L'vivs'ka Oblast',251,LV,UP15,true
+4446,Mykolayivs'ka Oblast',251,MY,UP16,true
+4447,Odes'ka Oblast,251,OD,UP17,true
+4448,Poltavs'ka Oblast',251,PL,UP18,true
+4449,Rivnens'ka Oblast',251,RV,UP19,true
+4450,Misto Sevastopol,251,SC,UP20,true
+4451,Sums'ka Oblast',251,SM,UP21,true
+4452,Ternopil's'ka Oblast',251,TP,UP22,true
+4453,Vinnyts'ka Oblast',251,VI,UP23,true
+4454,Volyns'ka Oblast',251,VO,UP24,true
+4455,Zakarpats'ka Oblast',251,ZK,UP25,true
+4456,Zaporiz'ka Oblast',251,ZP,UP26,true
+4457,Zhytomyrs'ka Oblast',251,ZT,UP27,true
+4458,Bam,38,BM,UV15,true
+4459,Bazega,38,BZ,UV16,true
+4460,Bougouriba,38,BB,UV17,true
+4461,Boulgou,38,BL,UV18,true
+4462,Boulkiemde,38,BK,UV19,true
+4463,Ganzourgou,38,GZ,UV20,true
+4464,Gnagna,38,GG,UV21,true
+4465,Gourma,38,GM,UV22,true
+4466,Houe,38,HO,UV23,true
+4467,Kadiogo,38,KA,UV24,true
+4468,Kenedougou,38,KN,UV25,true
+4469,Komoe,38,KM,UV26,true
+4470,Kossi,38,KS,UV27,true
+4471,Kouritenga,38,KR,UV28,true
+4472,Mouhoun,38,MO,UV29,true
+4473,Namentenga,38,NM,UV30,true
+4474,Naouri,38,NR,UV31,true
+4475,Oubritenga,38,OB,UV32,true
+4476,Oudalan,38,OD,UV33,true
+4477,Passore,38,PA,UV34,true
+4478,Poni,38,PO,UV35,true
+4479,Sanguie,38,SG,UV36,true
+4480,Sanmatenga,38,ST,UV37,true
+4481,Seno,38,SE,UV38,true
+4482,Sissili,38,SS,UV39,true
+4483,Soum,38,SM,UV40,true
+4484,Sourou,38,SR,UV41,true
+4485,Tapoa,38,TA,UV42,true
+4486,Yatenga,38,YT,UV43,true
+4487,Zoundweogo,38,ZW,UV44,true
+4488,Artigas,256,AR,UY01,true
+4489,Canelones,256,CA,UY02,true
+4490,Cerro Largo,256,CL,UY03,true
+4491,Colonia,256,CO,UY04,true
+4492,Durazno,256,DU,UY05,true
+4493,Flores,256,FS,UY06,true
+4495,Lavalleja,256,LA,UY08,true
+4496,Maldonado,256,MA,UY09,true
+4497,Montevideo,256,MO,UY10,true
+4498,Paysandu,256,PA,UY11,true
+4500,Rivera,256,RV,UY13,true
+4501,Rocha,256,RO,UY14,true
+4502,Salto,256,SA,UY15,true
+4504,Soriano,256,SO,UY17,true
+4505,Tacuarembo,256,TA,UY18,true
+4506,Treinta y Tres,256,TT,UY19,true
+4507,Andijon,257,AN,UZ01,true
+4508,Bukhoro,257,BU,UZ02,true
+4509,Farghona,257,FA,UZ03,true
+4510,Jizzakh,257,JI,UZ15,true
+4511,Khorazm,257,KH,UZ05,true
+4512,Namangan,257,NG,UZ06,true
+4513,Nawoiy,257,NW,UZ07,true
+4514,Qashqadaryo,257,QA,UZ08,true
+4515,Qoraqalpoghiston,257,QR,UZ09,true
+4516,Samarqand,257,SA,UZ10,true
+4517,Sirdaryo,257,SI,UZ15,true
+4518,Surkhondaryo,257,SU,UZ12,true
+4519,Toshkent,257,TO,UZ14,true
+4520,Charlotte,209,CH,VC01,true
+4525,Grenadines,209,GT,VC06,true
+4527,Anzoategui,259,AN,VE02,true
+4528,Apure,259,AP,VE03,true
+4529,Aragua,259,AR,VE04,true
+4530,Barinas,259,BA,VE05,true
+4532,Carabobo,259,CA,VE07,true
+4533,Cojedes,259,CO,VE08,true
+4534,Delta Amacuro,259,DA,VE09,true
+4536,Falcon,259,FA,VE11,true
+4537,Guarico,259,GU,VE12,true
+4538,Lara,259,LA,VE13,true
+4539,Merida,259,ME,VE14,true
+4540,Miranda,259,MI,VE15,true
+4541,Monagas,259,MO,VE16,true
+4542,Nueva Esparta,259,NE,VE17,true
+4543,Portuguesa,259,PO,VE18,true
+4545,Tachira,259,TA,VE20,true
+4546,Trujillo,259,TR,VE21,true
+4547,Yaracuy,259,YA,VE22,true
+4548,Zulia,259,ZU,VE23,true
+4549,Dependencias Federales,259,DP,VE24,true
+4551,An Giang,260,AG,VM01,true
+4553,Ben Tre,260,BR,VM03,true
+4555,Cao Bang,260,CB,VM05,true
+4557,Dak Lak,260,DL,VM07,true
+4558,Dong Thap,260,DT,VM09,true
+4562,Hai Phong,260,HP,VM13,true
+4564,Ha Noi,260,HN,VM44,true
+4568,Ho Chi Minh,260,HC,VM20,true
+4569,Kien Giang,260,KG,VM21,true
+4570,Lai Chau,260,LC,VM22,true
+4571,Lam Dong,260,LD,VM23,true
+4572,Long An,260,LA,VM24,true
+4578,Quang Ninh,260,QN,VM30,true
+4580,Son La,260,SL,VM32,true
+4581,Tay Ninh,260,TN,VM33,true
+4582,Thanh Hoa,260,TH,VM34,true
+4583,Thai Binh,260,TB,VM35,true
+4585,Tien Giang,260,TG,VM37,true
+4587,Lang Son,260,LS,VM39,true
+4590,Dong Nai,260,DN,VM43,true
+4591,Ba Ria-Vung Tau,260,BV,VM45,true
+4592,Binh Dinh,260,BD,VM46,true
+4593,Binh Thuan,260,BU,VM47,true
+4594,Can Tho,260,CT,VM48,true
+4595,Gia Lai,260,GL,VM49,true
+4596,Ha Giang,260,HG,VM50,true
+4597,Ha Tay,260,HA,VM51,true
+4598,Ha Tinh,260,HT,VM52,true
+4599,Hoa Binh,260,HO,VM53,true
+4600,Khanh Hoa,260,KH,VM54,true
+4601,Kon Tum,260,KT,VM55,true
+4602,Lao Cai,260,LO,VM56,true
+4604,Nghe An,260,NA,VM58,true
+4605,Ninh Binh,260,NB,VM59,true
+4606,Ninh Thuan,260,NT,VM60,true
+4607,Phu Yen,260,PY,VM61,true
+4608,Quang Binh,260,QB,VM62,true
+4609,Quang Ngai,260,QG,VM63,true
+4610,Quang Tri,260,QT,VM64,true
+4611,Soc Trang,260,ST,VM65,true
+4612,Thura Thien-Hue,260,TT,VM66,true
+4613,Tra Vinh,260,TV,VM67,true
+4614,Tuyen Quang,260,TQ,VM68,true
+4615,Vinh Long,260,VL,VM69,true
+4616,Yen Bai,260,YB,VM70,true
+4617,Bac Giang,260,BG,VM71,true
+4618,Bac Kan,260,BK,VM72,true
+4619,Bac Lieu,260,BL,VM73,true
+4620,Bac Ninh,260,BN,VM74,true
+4621,Bin Duong,260,BI,VM75,true
+4622,Bin Phuoc,260,BP,VM76,true
+4623,Ca Mau,260,CM,VM77,true
+4624,Da Nang,260,DA,VM78,true
+4625,Hai Duong,260,HD,VM79,true
+4626,Ha Nam,260,HM,VM80,true
+4627,Hung Yen,260,HY,VM81,true
+4628,Nam Dinh,260,ND,VM82,true
+4629,Phu Tho,260,PT,VM83,true
+4630,Quang Nam,260,QM,VM84,true
+4631,Thai Nguyen,260,TY,VM85,true
+4632,Vinh Phuc,260,VC,VM86,true
+4635,Khomas,171,KH,WA21,true
+4636,Caprivi,171,CA,WA28,true
+4637,Erongo,171,ER,WA29,true
+4638,Hardap,171,HA,WA30,true
+4639,Karas,171,KA,WA31,true
+4640,Kunene,171,KU,WA32,true
+4641,Ohangwena,171,OW,WA33,true
+4642,Okavango,171,OK,WA34,true
+4643,Omaheke,171,OH,WA35,true
+4644,Omusati,171,OS,WA36,true
+4645,Oshana,171,ON,WA37,true
+4646,Oshikoto,171,OT,WA38,true
+4647,Otjozondjupa,171,OD,WA39,true
+4648,A'ana,210,AA,WS01,true
+4649,Aiga-i-le-Tai,210,AL,WS02,true
+4650,Atua,210,AT,WS03,true
+4651,Fa'asaleleaga,210,FA,WS04,true
+4652,Gaga'emauga,210,GE,WS05,true
+4653,Va'a-o-Fonoti,210,VF,WS06,true
+4654,Gagaifomauga,210,GI,WS07,true
+4655,Palauli,210,PA,WS08,true
+4656,Satupa'itea,210,SA,WS09,true
+4657,Tuamasaga,210,TU,WS10,true
+4658,Vaisigano,210,VS,WS11,true
+4659,Hhohho,232,HH,WZ01,true
+4660,Lubombo,232,LU,WZ02,true
+4661,Manzini,232,MA,WZ03,true
+4662,Shiselweni,232,SH,WZ04,true
+4663,Abyan,270,AB,YM01,true
+4664,'Adan,270,AD,YM02,true
+4665,Al Mahrah,270,MR,YM03,true
+4666,Hadramawt,270,HD,YM04,true
+4667,Shabwah,270,SH,YM05,true
+4668,Lahij,270,LA,YM06,true
+4669,Al Bayda',270,BA,YM07,true
+4670,Al Hudaydah,270,HU,YM08,true
+4672,Al Mahwit,270,MW,YM10,true
+4673,Dhamar,270,DH,YM11,true
+4674,Hajjah,270,HJ,YM12,true
+4675,Ibb,270,IB,YM13,true
+4676,Ma'rib,270,MA,YM14,true
+4677,Sa'dah,270,SD,YM15,true
+4678,San'a',270,SN,YM16,true
+4679,Ta'izz,270,TA,YM17,true
+4680,North-Western,273,WE,ZA01,true
+4681,Copperbelt,273,CE,ZA02,true
+4687,Luapula,273,CO,ZA08,true
+4688,Lusaka,273,LS,ZA09,true
+4689,Manicaland,274,MA,ZI01,true
+4690,Midlands,274,MI,ZI02,true
+4691,Mashonaland Central,274,MC,ZI03,true
+4692,Mashonaland East,274,ME,ZI04,true
+4693,Mashonaland West,274,MW,ZI05,true
+4694,Matabeleland North,274,MN,ZI06,true
+4695,Matabeleland South,274,MS,ZI07,true
+4696,Masvingo,274,MV,ZI08,true
+4706,Auckland,178,AU,    ,true
+4721,Wellington,178,WG,    ,true
+4723,Canterbury,178,CA,    ,true
+4729,Bay of Plenty,178,BP,    ,true
+4741,Northland,178,NO,    ,true
+4744,Otago,178,OT,    ,true
+4761,Enderby Land,8,EL,    ,true
+4763,Ross Island,8,RI,    ,true
+4814,Chatham Islands,178,CI,    ,true
+4879,Etela-Suomen Laani,81,ES,FI13,true
+4975,Nouakchott,156,NO,    ,true
+4996,Nunavut,43,NU,CA14,true
+4997,United Arab Emigrates (general),252,UA,AE00,true
+4998,Abu Zaby,252,AZ,AE01,true
+4999,'Ajman,252,AJ,AE02,true
+5002,Dubayy,252,DU,AE03,true
+5003,Al Fujayrah,252,FU,AE04,true
+5004,Ra's al Khaymah,252,RK,AE05,true
+5005,Ash Shariqah,252,SH,AE06,true
+5006,Umm al Qaywayn,252,UQ,AE07,true
+5007,Gisborne,178,GI,    ,true
+5010,Nelson,178,NE,    ,true
+5018,Tasman,178,TS,    ,true
+5019,Wanganui-Manawatu,178,MW,    ,true
+5020,West Coast,178,WC,    ,true
+5022,Ita-Suomen Laani,81,IS,FI14,true
+5023,Lansi-Suomen Laani,81,LS,FI15,true
+5025,Bjelovarsko-Bilogorska,61,BB,HR01,true
+5026,Brodsko-Posavka,61,SP,HR02,true
+5027,Dubrovacko-Neretvanska,61,DN,HR03,true
+5028,Istarska,61,IS,HR04,true
+5029,Karlovacka,61,KA,HR05,true
+5030,Koprivnicko-Krizevacka,61,KK,HR06,true
+5031,Krapinsko-Zagorska,61,KZ,HR07,true
+5032,Licko-Senjska,61,LS,HR08,true
+5033,Medimurska,61,ME,HR09,true
+5034,Osjecko-Baranjska,61,OB,HR10,true
+5035,Pozesko-Slavonska,61,PS,HR11,true
+5036,Primorsko-Goranska,61,PG,HR12,true
+5037,Sibensko-Kninska,61,SB,HR13,true
+5038,Sisacko-Moslavacka,61,SM,HR14,true
+5039,Splitsko-Dalmatinska,61,SD,HR15,true
+5040,Varazdinska,61,VA,HR16,true
+5041,Viroviticko-Podravska,61,VP,HR17,true
+5042,Vukovarsko-Srijemska,61,VS,HR18,true
+5043,Zadarska,61,ZD,HR19,true
+5044,Zagrebacka,61,ZG,HR20,true
+5045,Grad Zagreb,61,GZ,HR21,true
+5047,Curacao,176,CU,    ,true
+5048,Bonaire,176,BO,    ,true
+5049,St Maarten,176,SM,    ,true
+5051,Brussels,24,BU,BE11,true
+5052,Escaldes-Engordany,5,EE,AN08,true
+5053,Ahal,247,AL,TX01,true
+5054,Balkan,247,BA,TX02,true
+5055,Dashhowuz,247,DA,TX03,true
+5056,Lebap,247,LE,TX04,true
+5057,Mary,247,MA,TX05,true
+5058,Pailin,41,PL,CB30,true
+5059,Orellana,70,OR,EC24,true
+5060,Maluku Utara,114,MU,ID29,true
+5061,Vargas,259,VA,VE26,true
+5062,Crna Gora (Montenegro),271,CG,YI01,true
+5063,Srbija (Serbia),271,SR,YI02,true
+5064,Maniema,55,MN,CG10,true
+5065,Nord-Kivu,55,NK,CG11,true
+5066,Sud-Kivu,55,SK,CG12,true
+5067,Ajlun,126,AJ,JO20,true
+5068,Al Aqabah,126,AQ,JO21,true
+5069,Jarash,126,JA,JO22,true
+5070,Madaba,126,MD,JO23,true
+5071,Malampa,258,ML,NH16,true
+5072,Penama,258,PM,NH17,true
+5073,Shefa,258,SE,NH18,true
+5074,Bayelsa,181,BY,NI52,true
+5075,Ebonyi,181,EB,NI53,true
+5079,Ekiti,181,EK,NI54,true
+5080,Gombe,181,GO,NI55,true
+5081,Nassarawa,181,NA,NI56,true
+5082,Zamfara,181,ZA,NI57,true
+5083,Lapusna,163,LP,MD52,true
+5084,Tighina,163,TG,MD55,true
+5085,Blagoevgrad,37,BL,BU38,true
+5086,Dobrich,37,DO,BU40,true
+5087,Gabrovo ,37,GB,BU41,true
+5088,Kurdzhali,37,KZ,BU44,true
+5089,Kyustendil,37,KY,BU45,true
+5090,Pazardzhik,37,PZ,BU48,true
+5091,Pernik,37,PN,BU49,true
+5092,Pleven,37,PV,BU50,true
+5094,Shumen,37,SH,BU54,true
+5095,Silistra,37,SI,BU55,true
+5096,Sliven,37,SL,BU56,true
+5097,Smolyan,37,SM,BU57,true
+5098,Stara Zagora,37,SZ,BU59,true
+5099,Turgovishte,37,TU,BU60,true
+5100,Veliko Turnovo,37,VT,BU62,true
+5101,Vidin,37,VD,BU63,true
+5102,Vratsa,37,VR,BU64,true
+5103,Yambol,37,YA,BU65,true
+5104,Golestan,115,GO,IR37,true
+5105,Qazvin,115,QZ,IR38,true
+5106,Qom,115,QM,IR39,true
+5107,Ardahan,246,AR,TU86,true
+5108,Bartin,246,BR,TU87,true
+5109,Igdir,246,IG,TU88,true
+5110,Karabuk,246,KB,TU89,true
+5111,Kilis,246,KI,TU90,true
+5112,Osmaniye,246,OS,TU91,true
+5113,Yalova,246,YL,TU92,true
+5114,Ar Rifa' wa al Mintaqah al Janubiyah,18,RF,BA13,true
+5115,Republika Srpska,30,SR,BK02,true
+5116,Federation of Bosnia and Herzegovina,30,BF,BK01,true
+5118,Batken,135,BA,KG09,true
+5119,P'yongan-bukto,132,PB,KN11,true
+5120,Tyva,203,TU,RS79,true
+5122,Jihomoravsky Kraj,64,JM,EZ78,true
+5123,Jihocesky Kraj,64,JC,EZ79,true
+5124,Vysocina,64,VY,EZ80,true
+5125,Karlovarsky Kraj,64,KA,EZ81,true
+5126,Kralovehradecky Kraj,64,KR,EZ82,true
+5127,Liberecky Kraj,64,LI,EZ83,true
+5128,Olomoucky Kraj,64,OL,EZ84,true
+5129,Moravskoslezsky Kraj,64,MO,EZ85,true
+5130,Pardubicky Kraj,64,PA,EZ86,true
+5131,Plzensky Kraj,64,PL,EZ87,true
+5132,Stredocesky Kraj,64,ST,EZ88,true
+5133,Ustecky Kraj,64,US,EZ89,true
+5134,Zlinsky Kraj,64,ZL,EZ90,true
+5135,Aracinovo,146,AR,MK01,true
+5136,Bac,146,BA,MK02,true
+5137,Belcista,146,BE,MK03,true
+5138,Berovo,146,BR,MK04,true
+5139,Bistrica,146,BI,MK05,true
+5140,Bitola,146,BO,MK06,true
+5141,Blatec,146,BL,MK07,true
+5142,Bogdanci,146,BG,MK08,true
+5143,Bogomila,146,BM,MK09,true
+5144,Bogovinje,146,BJ,MK10,true
+5145,Bosilovo,146,BS,MK11,true
+5146,Brvenica,146,BN,MK12,true
+5147,Cair,146,CR,MK13,true
+5148,Capari,146,CP,MK14,true
+5149,Caska,146,CK,MK15,true
+5150,Cegrane,146,CG,MK16,true
+5151,Centar,146,CE,MK17,true
+5152,Centar Zupa,146,CZ,MK18,true
+5153,Cesinovo,146,CN,MK19,true
+5154,Cucer-Sandevo,146,CS,MK20,true
+5155,Debar,146,DB,MK21,true
+5156,Delcevo,146,DL,MK22,true
+5157,Delogozdi,146,DG,MK23,true
+5158,Demir Hisar,146,DX,MK24,true
+5159,Demir Kapija,146,DK,MK25,true
+5160,Dobrusevo,146,DO,MK26,true
+5161,Dolna Banjica,146,DJ,MK27,true
+5162,Dolneni,146,DN,MK28,true
+5163,Dorce Petrov,146,GP,MK29,true
+5164,Drugovo,146,DR,MK30,true
+5165,Dzepciste,146,DZ,MK31,true
+5166,Gazi Baba,146,GB,MK32,true
+5167,Gevgelija,146,GE,MK33,true
+5168,Gostivar,146,GO,MK34,true
+5169,Gradsko,146,GR,MK35,true
+5170,Ilinden,146,IL,MK36,true
+5171,Izvor,146,IZ,MK37,true
+5172,Jegunovce,146,JE,MK38,true
+5173,Kamenjane,146,KJ,MK39,true
+5174,Karbinci,146,KB,MK40,true
+5175,Karpos,146,KX,MK41,true
+5176,Kavadarci,146,KD,MK42,true
+5177,Kicevo,146,KH,MK43,true
+5178,Kisela Voda,146,KV,MK44,true
+5179,Klecevce,146,KL,MK45,true
+5180,Kocani,146,KC,MK46,true
+5181,Konce,146,KN,MK47,true
+5182,Kondovo,146,KW,MK48,true
+5183,Konopiste,146,KF,MK49,true
+5184,Kosel,146,KE,MK50,true
+5185,Kartovo,146,KY,MK51,true
+5186,Kriva Palanka,146,KZ,MK52,true
+5187,Krivogastani,146,KG,MK53,true
+5188,Krusevo,146,KS,MK54,true
+5189,Kuklis,146,KK,MK55,true
+5190,Kukurecani,146,KQ,MK56,true
+5191,Kumanovo,146,KM,MK57,true
+5192,Labunista,146,LA,MK58,true
+5193,Lipkovo,146,LI,MK59,true
+5194,Lozovo,146,LO,MK60,true
+5195,Lukovo,146,LU,MK61,true
+5196,Makedonska Kamenica,146,MM,MK62,true
+5197,Makedonski Brod,146,MB,MK63,true
+5198,Mavrovi Anovi,146,MA,MK64,true
+5199,Meseista,146,ME,MK65,true
+5200,Miravci,146,MI,MK66,true
+5201,Mogila,146,MO,MK67,true
+5202,Murtino,146,MU,MK68,true
+5203,Negotino,146,NG,MK69,true
+5204,Negotino-Polosko,146,NP,MK70,true
+5205,Novaci,146,NO,MK71,true
+5206,Novo Selo,146,NS,MK72,true
+5207,Oblesevo,146,OB,MK73,true
+5208,Ohrid,146,OX,MK74,true
+5209,Orasac,146,OR,MK75,true
+5210,Orizari,146,OZ,MK76,true
+5211,Oslomej,146,OS,MK77,true
+5212,Pehcevo,146,PH,MK78,true
+5213,Petrovec,146,PE,MK79,true
+5214,Plasnica,146,PN,MK80,true
+5215,Podares,146,PO,MK81,true
+5216,Prilep,146,PR,MK82,true
+5217,Probistip,146,PB,MK83,true
+5218,Radovis,146,RD,MK84,true
+5219,Rankovce,146,RN,MK85,true
+5220,Resen,146,RE,MK86,true
+5221,Rosoman,146,RM,MK87,true
+5222,Rostusa,146,RT,MK88,true
+5223,Samokov,146,SA,MK89,true
+5224,Saraj,146,SJ,MK90,true
+5225,Sipkovica,146,SI,MK91,true
+5226,Sopiste,146,SS,MK92,true
+5227,Sopotnica,146,SC,MK93,true
+5228,Srbinovo,146,SB,MK94,true
+5229,Staravina,146,SV,MK95,true
+5230,Star Dojran,146,SD,MK96,true
+5231,Star Nagoricane,146,SE,MK97,true
+5232,Stip,146,ST,MK98,true
+5233,Struga,146,SQ,MK99,true
+5234,Strumica,146,SR,MKA1,true
+5235,Studenicani,146,SU,MKA2,true
+5236,Suto Orizari,146,SO,MKA3,true
+5237,Sveti Nikole,146,SL,MKA4,true
+5238,Tearce,146,TR,MKA5,true
+5239,Tetovo,146,TT,MKA6,true
+5240,Topolcani,146,TO,MKA7,true
+5241,Valandovo,146,VA,MKA8,true
+5242,Vasilevo,146,VL,MKA9,true
+5243,Veles,146,VE,MKB1,true
+5244,Velesta,146,VS,MKB2,true
+5245,Vevcani,146,VV,MKB3,true
+5246,Vinica,146,VN,MKB4,true
+5247,Vitoliste,146,VT,MKB5,true
+5248,Vranestica,146,VC,MKB6,true
+5249,Vrapciste,146,VP,MKB7,true
+5250,Vratnica,146,VR,MKB8,true
+5251,Vrutok,146,VK,MKB9,true
+5252,Zajas,146,ZA,MKC1,true
+5253,Zelenikovo,146,ZK,MKC2,true
+5254,Zelino,146,ZE,MKC3,true
+5255,Zitose,146,ZI,MKC4,true
+5256,Zletovo,146,ZL,MKC5,true
+5257,Zrnovci,146,ZR,MKC6,true
+5258,Kosovo,271,KM,    ,true
+5259,Uttaranchal,113,UL,IN39,true
+5260,AOL,254,AO,    ,true
+5261,WebTV,254,WE,    ,true
+5267,Chhattisgarh,113,CT,IN37,true
+5268,Jharkhand,113,JH,IN38,true
+5269,Mwaro,40,MW,BY23,true
+5270,Bulawayo,274,BU,ZI09,true
+5271,Harare,274,HA,ZI10,true
+5272,Adiake,60,AD,IV63,true
+5273,Alepe,60,AL,IV64,true
+5274,Bocanda,60,BN,IV65,true
+5275,Dabou,60,DA,IV66,true
+5276,Grand-Bassam,60,GR,IV68,true
+5277,Jacqueville,60,JA,IV70,true
+5278,Toulepleu,60,TP,IV72,true
+5279,Mandiana,102,MD,GV37,true
+5280,Lola,102,LO,GV36,true
+5281,Lelouma,102,LE,GV35,true
+5282,Koubia,102,KB,GV33,true
+5283,Coyah,102,CO,GV30,true
+5284,Gorontalo,114,GO,ID34,true
+5285,Kepulauan Bangka Belitung,114,BB,ID35,true
+5286,Banten,114,BT,ID33,true
+5287,Ulsan-gwangyoksi,133,UL,KS21,true
+5289,Sembabule,250,SE,UG74,true
+5290,Nakasongola,250,NA,UG73,true
+5291,Katakwi,250,KW,UG69,true
+5292,Busia,250,BU,UG67,true
+5293,Bugiri,250,BG,UG66,true
+5294,Adjumani,250,AD,UG65,true
+5295,Nabatiye,138,NA,LE07,true
+5296,Khost,1,KT,    ,true
+5297,Nuristan,1,NR,    ,true
+5298,Sarur,16,SR,    ,true
+5299,Sahbuz,16,SH,    ,true
+5300,Sadarak,16,SD,    ,true
+5301,Ordubud,16,OR,    ,true
+5302,Babak,16,BB,    ,true
+5303,Barisal,20,BA,    ,true
+5304,Sylhet,20,SY,    ,true
+5305,Brabant Wallon,24,BW,BE10,true
+5306,Vlaams-Brabant,24,VB,BE12,true
+5308,Hamilton,27,HA,BD02,true
+5309,Eastern Tutuila,4,ET,    ,true
+5310,Unorganized,4,UU,    ,true
+5311,Western Tutuila,4,WT,    ,true
+5312,Manu'a,4,MA,    ,true
+5313,Brcko District,30,BR,BKBD,true
+5314,Tashi Yangtse,28,TY,    ,true
+5315,Gasa,28,GA,    ,true
+5318,Donga,26,DO,    ,true
+5319,Couffo,26,CF,    ,true
+5320,Collines,26,CL,    ,true
+5321,Alibori,26,AL,    ,true
+5322,Guria,90,GU,    ,true
+5323,Imereti,90,IM,    ,true
+5324,Kakheti,90,KA,    ,true
+5325,Kvemo Kartli,90,KK,    ,true
+5327,Mtskheta-Mtianeti,90,MM,    ,true
+5328,Racha-Lochkhumi-Kvemo Svaneti,90,RL,    ,true
+5329,Samegrelo-Zemo Svateni,90,SZ,    ,true
+5330,Samtskhe-Javakheti,90,SJ,    ,true
+5331,Shida Kartli,90,SK,    ,true
+5332,Govi-Sumber,165,GS,MG24,true
+5333,Darhan Uul,165,DA,MG23,true
+5334,Najin Sonbong-si,132,NJ,KN18,true
+5335,Anseba,74,AN,    ,true
+5336,Semenawi Keyih Bahri,74,SK,    ,true
+5337,Maekel,74,MA,    ,true
+5338,Gash Barka,74,GB,    ,true
+5339,Debubawi Keyih Bahri,74,DK,    ,true
+5340,Debub,74,DU,    ,true
+5341,Mosteiros,44,MO,    ,true
+5342,Porto Novo,44,PN,    ,true
+5344,SÒo Domingos,44,SD,    ,true
+5345,SÒo Filipe,44,SF,    ,true
+5346,BalÚ,38,BA,    ,true
+5347,Banwa,38,BW,    ,true
+5348,Ioba,38,IO,    ,true
+5349,Komondjari,38,KJ,    ,true
+5350,Kompienga,38,KP,    ,true
+5351,KoulpÚlogo,38,KL,    ,true
+5352,KourwÚogo,38,KW,    ,true
+5353,LÚraba,38,LE,    ,true
+5354,Loroum,38,LO,    ,true
+5355,Nayala,38,NY,    ,true
+5356,Noumbiel,38,NB,    ,true
+5357,Tui,38,TU,    ,true
+5358,Yagha,38,YG,    ,true
+5359,Ziro,38,ZR,    ,true
+5360,Zondoma,38,ZM,    ,true
+5361,Carriacou,97,CA,    ,true
+5362,River Gee,140,RG,    ,true
+5363,Gbarpolu,140,GP,    ,true
+5364,Pwani,238,PW,TZ02,true
+5365,D³zce,246,DU,TU93,true
+5366,Manouba,245,MN,    ,true
+5367,Kidal,151,KD,    ,true
+5368,Rota,184,RO,    ,true
+5369,Saipan,184,SA,    ,true
+5370,Tinian,184,TA,    ,true
+5371,Kigali-Ville,204,KV,    ,true
+5372,Umutara,204,UM,    ,true
+5373,TrinitÚ,155,TR,    ,true
+5374,Saint-Pierre,155,SP,    ,true
+5375,Marin,155,MA,    ,true
+5376,Fort-de-France,155,FF,    ,true
+5377,Taraclia,163,TR,    ,true
+5378,Phalombe,148,PH,    ,true
+5379,Likoma,148,LK,    ,true
+5380,Balaka,148,BA,    ,true
+5381,Putrajaya,149,PJ,    ,true
+5382,Saint-Laurent-du-Maroni,84,SL,    ,true
+5383,Cayenne,84,CY,    ,true
+5386,Saint Croix,261,SC,    ,true
+5389,Wales,253,WA,    ,true
+5390,Scotland,253,SC,    ,true
+5391,Northern Ireland,253,NI,    ,true
+5392,England,253,EN,    ,true
+5394,Kara,240,KA,    ,true
+5395,Maritime,240,MA,    ,true
+5397,Savanes,240,SA,    ,true
+5398,Imo,221,IM,NI28,true
+5399,Katsina,181,KT,NI24,true
+5400,Telangana,113,TS,,true

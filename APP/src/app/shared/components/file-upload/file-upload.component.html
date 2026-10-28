@@ -1,0 +1,54 @@
+<div class="file-upload">
+  <!-- Drop zone -->
+  <div
+    class="drop-zone"
+    [class.drag-over]="isDragOver()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (drop)="onDrop($event)"
+    (click)="fileInput.click()"
+  >
+    <mat-icon class="drop-zone__icon">cloud_upload</mat-icon>
+    <span class="drop-zone__text">Drag & drop files here or click to browse</span>
+    <span class="drop-zone__hint">
+      Max {{ maxFiles() }} files, {{ formatFileSize(maxSizeBytes()) }} each
+    </span>
+  </div>
+
+  <input #fileInput type="file" multiple hidden (change)="onFileSelected($event)" />
+
+  <!-- Validation errors -->
+  @if (errors().length > 0) {
+    <div class="file-upload__errors">
+      @for (error of errors(); track error) {
+        <div class="file-upload__error">
+          <mat-icon class="file-upload__error-icon">error_outline</mat-icon>
+          <span>{{ error }}</span>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Selected files -->
+  @if (selectedFiles().length > 0) {
+    <div class="file-chips">
+      @for (file of selectedFiles(); track file.name + $index; let i = $index) {
+        <div class="file-chip">
+          <mat-icon class="file-chip__icon">{{ getFileIcon(file) }}</mat-icon>
+          <div class="file-chip__info">
+            <span class="file-chip__name">{{ file.name }}</span>
+            <span class="file-chip__size">{{ formatFileSize(file.size) }}</span>
+          </div>
+          <button
+            mat-icon-button
+            class="file-chip__remove"
+            (click)="removeFile(i); $event.stopPropagation()"
+            aria-label="Remove file"
+          >
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      }
+    </div>
+  }
+</div>

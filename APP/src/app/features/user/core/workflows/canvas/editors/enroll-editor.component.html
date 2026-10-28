@@ -1,0 +1,27 @@
+<div class="space-y-3">
+  <div>
+    <label class="block text-[11px] font-medium text-zinc-600 mb-1">
+      {{ isEnroll() ? 'Enrol in' : 'Remove from' }}
+      {{ isWorkflow() ? 'workflow' : 'email sequence' }}
+    </label>
+    <input
+      type="text"
+      [ngModel]="targetId()"
+      (ngModelChange)="onTargetChange($event)"
+      placeholder="uuid"
+      class="w-full text-xs px-2 py-1.5 rounded border border-zinc-300 focus:outline-none focus:border-zinc-500 font-mono"
+    />
+    @if (!targetId().trim()) {
+      <p class="text-[10px] text-rose-600 mt-1">Target is required.</p>
+    } @else {
+      <p class="text-[10px] text-zinc-500 mt-1">
+        @if (isEnroll()) {
+          The contact will be enrolled in the
+          {{ isWorkflow() ? 'workflow' : 'sequence' }} with this UUID.
+        } @else {
+          Any active enrolment of this contact in the target is cancelled.
+        }
+      </p>
+    }
+  </div>
+</div>

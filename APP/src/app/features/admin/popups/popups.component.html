@@ -1,0 +1,91 @@
+<div class="popups">
+  <div class="popups__toolbar">
+    <button mat-flat-button color="primary" (click)="openUploadDialog()">
+      <mat-icon>upload</mat-icon>
+      Upload Popup
+    </button>
+  </div>
+
+  <app-page-layout
+    [formGroup]="searchForm"
+    [data]="data()"
+    [dataCount]="dataCount()"
+    [isFiltered]="isFiltered()"
+    [pageTitle]="'Popups'"
+    [pageSubtitle]="'Manage popup images'"
+    [tableId]="'tblPopups'"
+    (submitEvent)="onSubmit()"
+    (clearEvent)="clearFilters()"
+    (pageEvent)="onPageChange($event)"
+    (exportEvent)="exportToCSV()">
+
+    <ng-template #filters>
+      <mat-form-field appearance="outline">
+        <mat-label>Status</mat-label>
+        <mat-select formControlName="status">
+          @for (opt of statusOptions; track opt.value) {
+            <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>User Type</mat-label>
+        <mat-select formControlName="user_type">
+          @for (opt of userTypeOptions; track opt.value) {
+            <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </ng-template>
+
+    <ng-template #tableHeader>
+      <tr>
+        <th>SR#</th>
+        <th>Image</th>
+        <th>Title</th>
+        <th>User Type</th>
+        <th>Status</th>
+        <th>Created By</th>
+        <th>Created</th>
+        <th class="popups__actions-col">Actions</th>
+      </tr>
+    </ng-template>
+
+    <ng-template #tableBody let-d let-srNo="srNo">
+      <tr>
+        <td>{{ srNo }}</td>
+        <td>
+          <img
+            class="popups__thumbnail"
+            [src]="staticBaseUrl + '/' + d.image_path"
+            [alt]="d.title || 'Popup image'"
+            loading="lazy" />
+        </td>
+        <td>{{ d.title || '—' }}</td>
+        <td>
+          @let utBadge = getUserTypeBadge(d.user_type);
+          <span class="popups__badge" [style.color]="utBadge.color" [style.background-color]="utBadge.bgVar">
+            {{ d.user_type }}
+          </span>
+        </td>
+        <td>
+          @let statusBadge = getStatusBadge(d.is_active);
+          <span class="popups__badge" [style.color]="statusBadge.color" [style.background-color]="statusBadge.bgVar">
+            {{ d.is_active ? 'Active' : 'Inactive' }}
+          </span>
+        </td>
+        <td>{{ d.created_by }}</td>
+        <td>{{ d.created_at | date:'mediumDate' }}</td>
+        <td class="popups__actions-col">
+          <button mat-icon-button [matTooltip]="d.is_active ? 'Deactivate' : 'Activate'" (click)="toggleStatus(d)">
+            <mat-icon>{{ d.is_active ? 'toggle_on' : 'toggle_off' }}</mat-icon>
+          </button>
+          <button mat-icon-button matTooltip="Delete" (click)="deletePopup(d)">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </td>
+      </tr>
+    </ng-template>
+  </app-page-layout>
+</div>

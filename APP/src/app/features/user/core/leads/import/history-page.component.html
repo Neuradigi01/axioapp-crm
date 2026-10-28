@@ -1,0 +1,259 @@
+<div class="mx-auto max-w-6xl p-6 space-y-5">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div class="space-y-1">
+      <nav class="flex items-center gap-1 text-xs text-zinc-500">
+        <a routerLink="/user/leads" class="hover:text-zinc-700">Leads</a>
+        <lucide-icon name="chevron-right" class="h-3 w-3" />
+        <span class="text-zinc-700">Import history</span>
+      </nav>
+      <h1 class="text-lg font-semibold text-zinc-900">Import history</h1>
+      <p class="text-xs text-zinc-500">
+        Every bulk import this org has run. Download the original source file or the per-row error
+        report from any past run.
+      </p>
+    </div>
+    <a
+      routerLink="/user/leads/import"
+      class="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+    >
+      <lucide-icon name="plus" class="h-4 w-4" />
+      New import
+    </a>
+  </header>
+
+  <!-- Filters -->
+  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div>
+      <label for="status-filter" class="mb-1 block text-xs font-medium text-zinc-700">
+        Status
+      </label>
+      <select
+        id="status-filter"
+        [value]="statusFilter()"
+        (change)="onStatusChange($event)"
+        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      >
+        @for (opt of statusOptions; track opt.value) {
+          <option [value]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+    </div>
+    <div>
+      <label for="platform-filter" class="mb-1 block text-xs font-medium text-zinc-700">
+        Source platform
+      </label>
+      <select
+        id="platform-filter"
+        [value]="platformFilter()"
+        (change)="onPlatformChange($event)"
+        class="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+      >
+        @for (opt of platformOptions; track opt.value) {
+          <option [value]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  @if (loadError(); as err) {
+    <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ err }}
+    </p>
+  }
+
+  @if (loading()) {
+    <p class="text-sm text-zinc-500">Loading imports…</p>
+  } @else if (!hasResults()) {
+    <div class="rounded-md border border-zinc-200 bg-white p-8 text-center">
+      <lucide-icon name="inbox" class="mx-auto h-8 w-8 text-zinc-400" />
+      <p class="mt-2 text-sm font-medium text-zinc-900">No imports yet</p>
+      <p class="mt-1 text-xs text-zinc-500">
+        Upload a CSV or Excel file from another CRM to migrate your leads.
+      </p>
+      <a
+        routerLink="/user/leads/import"
+        class="mt-4 inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+      >
+        <lucide-icon name="upload" class="h-4 w-4" />
+        Start an import
+      </a>
+    </div>
+  } @else {
+    <!-- Desktop table -->
+    <div class="hidden md:block overflow-visible rounded-md border border-zinc-200 bg-white">
+      <table class="min-w-full text-sm">
+        <thead class="bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500">
+          <tr>
+            <th class="px-4 py-2 text-left">Date</th>
+            <th class="px-4 py-2 text-left">Name</th>
+            <th class="px-4 py-2 text-left">Source</th>
+            <th class="px-4 py-2 text-left">Status</th>
+            <th class="px-4 py-2 text-left">Counts</th>
+            <th class="w-12 px-4 py-2"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-100">
+          @for (row of rows(); track row.id) {
+            <tr>
+              <td class="px-4 py-3 text-zinc-700">
+                <span [title]="absoluteTime(row.created_at)">{{
+                  relativeTime(row.created_at)
+                }}</span>
+              </td>
+              <td class="px-4 py-3">
+                <p class="truncate font-medium text-zinc-900">{{ row.name }}</p>
+                <p class="truncate text-xs text-zinc-500">
+                  {{ row.original_filename }} · {{ formatBytes(row.byte_size) }} ·
+                  {{ row.row_count_estimate }} rows
+                </p>
+              </td>
+              <td class="px-4 py-3 text-zinc-700">
+                {{ platformLabel(row.source_platform) }}
+              </td>
+              <td class="px-4 py-3">
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1"
+                  [class]="statusBadgeClass(row.status)"
+                >
+                  {{ statusLabel(row.status) }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-xs text-zinc-600">
+                @if (row.counts; as c) {
+                  <span class="text-emerald-700">{{ c.imported ?? 0 }} ✓</span>
+                  ·
+                  <span class="text-indigo-700">{{ c.duplicates_skipped ?? 0 }} dup</span>
+                  ·
+                  <span class="text-red-700">{{ c.errors ?? 0 }} err</span>
+                } @else {
+                  <span class="text-zinc-400">—</span>
+                }
+              </td>
+              <td class="px-4 py-3 text-right relative">
+                <button
+                  type="button"
+                  (click)="toggleKebab(row.id)"
+                  class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+                  aria-label="Actions"
+                >
+                  <lucide-icon name="more-vertical" class="h-4 w-4" />
+                </button>
+                @if (isKebabOpen(row.id)) {
+                  <div
+                    class="absolute right-4 top-10 z-10 w-48 rounded-md border border-zinc-200 bg-white py-1 shadow-lg"
+                    (click)="$event.stopPropagation()"
+                  >
+                    <button
+                      type="button"
+                      [disabled]="downloading() === row.id"
+                      (click)="downloadSource(row)"
+                      class="block w-full px-3 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                    >
+                      Download source
+                    </button>
+                    @if (hasErrors(row)) {
+                      <button
+                        type="button"
+                        [disabled]="downloading() === row.id"
+                        (click)="downloadErrors(row)"
+                        class="block w-full px-3 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                      >
+                        Download error report
+                      </button>
+                    }
+                    @if (canCancel(row)) {
+                      <button
+                        type="button"
+                        [disabled]="cancelling() === row.id"
+                        (click)="cancelImport(row)"
+                        class="block w-full px-3 py-1.5 text-left text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {{ cancelling() === row.id ? 'Cancelling…' : 'Cancel import' }}
+                      </button>
+                    }
+                  </div>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile card list -->
+    <div class="md:hidden space-y-2">
+      @for (row of rows(); track row.id) {
+        <div class="rounded-md border border-zinc-200 bg-white p-3 space-y-2">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <p class="truncate text-sm font-medium text-zinc-900">{{ row.name }}</p>
+              <p class="text-xs text-zinc-500">
+                {{ relativeTime(row.created_at) }} · {{ platformLabel(row.source_platform) }}
+              </p>
+            </div>
+            <span
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 shrink-0"
+              [class]="statusBadgeClass(row.status)"
+            >
+              {{ statusLabel(row.status) }}
+            </span>
+          </div>
+          @if (row.counts; as c) {
+            <p class="text-xs text-zinc-600">
+              <span class="text-emerald-700">{{ c.imported ?? 0 }} ✓</span>
+              · <span class="text-indigo-700">{{ c.duplicates_skipped ?? 0 }} dup</span> ·
+              <span class="text-red-700">{{ c.errors ?? 0 }} err</span>
+            </p>
+          }
+          <div class="flex flex-wrap gap-2 text-xs">
+            <button
+              (click)="downloadSource(row)"
+              class="rounded border border-zinc-300 px-2 py-1 text-zinc-700"
+            >
+              Source
+            </button>
+            @if (hasErrors(row)) {
+              <button
+                (click)="downloadErrors(row)"
+                class="rounded border border-zinc-300 px-2 py-1 text-zinc-700"
+              >
+                Errors
+              </button>
+            }
+            @if (canCancel(row)) {
+              <button
+                (click)="cancelImport(row)"
+                class="rounded border border-red-300 px-2 py-1 text-red-700"
+              >
+                Cancel
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between text-sm text-zinc-600">
+      <p>Page {{ page() }} of {{ totalPages() }} · {{ total() }} imports total</p>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          [disabled]="page() <= 1"
+          (click)="prevPage()"
+          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 hover:bg-zinc-50 disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          [disabled]="page() >= totalPages()"
+          (click)="nextPage()"
+          class="rounded-md border border-zinc-300 bg-white px-3 py-1.5 hover:bg-zinc-50 disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  }
+</div>

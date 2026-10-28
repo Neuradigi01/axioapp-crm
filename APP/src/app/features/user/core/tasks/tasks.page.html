@@ -1,0 +1,276 @@
+<div class="px-6 py-6" [appUrlFilterState]="urlState">
+  <!-- Header -->
+  <header class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-semibold text-zinc-900">Tasks</h1>
+      <p class="mt-1 flex items-center gap-3 text-xs text-zinc-500">
+        <span class="inline-flex items-center gap-1.5">
+          <span class="h-2 w-2 rounded-full bg-zinc-400"></span>
+          {{ headlineCounts().open }} open
+        </span>
+        <span class="inline-flex items-center gap-1.5">
+          <span class="h-2 w-2 rounded-full bg-rose-500"></span>
+          {{ headlineCounts().overdue }} overdue
+        </span>
+        <span class="inline-flex items-center gap-1.5">
+          <span class="h-2 w-2 rounded-full bg-amber-500"></span>
+          {{ headlineCounts().dueToday }} due today
+        </span>
+      </p>
+    </div>
+    <button
+      type="button"
+      (click)="openCreate()"
+      class="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+    >
+      + Create task
+    </button>
+  </header>
+
+  <!-- Chips + assignee dropdown + search -->
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-2">
+      @for (c of chips(); track c.key) {
+        <button
+          type="button"
+          (click)="selectChip(c.key)"
+          [class.bg-zinc-900]="activeChip() === c.key"
+          [class.text-white]="activeChip() === c.key"
+          [class.border-zinc-900]="activeChip() === c.key"
+          class="rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          {{ c.label }}
+        </button>
+      }
+
+      <!-- Assignee dropdown — orthogonal to chips. Selecting "All
+           owners" leaves the chip scope in charge; picking a user
+           narrows the visible list to that owner. -->
+      <select
+        [formControl]="assigneeControl"
+        class="rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs text-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+        aria-label="Filter by assignee"
+      >
+        <option value="">All owners</option>
+        <option value="me">Me</option>
+        @for (u of users(); track u.id) {
+          <option [value]="u.id">{{ u.full_name }}</option>
+        }
+      </select>
+    </div>
+    <input
+      [formControl]="searchCtrl"
+      type="text"
+      placeholder="Search tasks…"
+      class="w-full max-w-xs rounded-md border border-zinc-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none sm:w-64"
+    />
+  </div>
+
+  @if (state.loadError(); as err) {
+    <div class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      {{ err }}
+    </div>
+  }
+
+  <!-- Table -->
+  @if (state.loading() && state.items().length === 0) {
+    <div class="space-y-2">
+      @for (i of [1, 2, 3, 4]; track i) {
+        <div class="h-12 animate-pulse rounded-lg border border-zinc-200 bg-zinc-50"></div>
+      }
+    </div>
+  } @else if (state.items().length === 0) {
+    <div class="rounded-xl border border-dashed border-zinc-300 bg-white p-12 text-center">
+      <p class="text-sm text-zinc-500">No tasks match this filter.</p>
+      <button
+        type="button"
+        (click)="openCreate()"
+        class="mt-3 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+      >
+        Create your first task
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+      <table class="w-full text-sm">
+        <thead class="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
+          <tr>
+            <th class="w-10 px-3 py-2"></th>
+            <th class="w-10 px-3 py-2"></th>
+            <th
+              class="cursor-pointer px-3 py-2 text-left font-medium hover:text-zinc-900"
+              (click)="setSort('title')"
+            >
+              Title
+              @if (sortBy() === 'title') {
+                <span class="ml-1 text-zinc-400">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
+              }
+            </th>
+            <th
+              class="cursor-pointer px-3 py-2 text-left font-medium hover:text-zinc-900"
+              (click)="setSort('priority')"
+            >
+              Priority
+              @if (sortBy() === 'priority') {
+                <span class="ml-1 text-zinc-400">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
+              }
+            </th>
+            <th
+              class="cursor-pointer px-3 py-2 text-left font-medium hover:text-zinc-900"
+              (click)="setSort('due_at')"
+            >
+              Due
+              @if (sortBy() === 'due_at') {
+                <span class="ml-1 text-zinc-400">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
+              }
+            </th>
+            <th
+              class="cursor-pointer px-3 py-2 text-right font-medium hover:text-zinc-900"
+              (click)="setSort('last_activity_at')"
+            >
+              Last activity
+              @if (sortBy() === 'last_activity_at') {
+                <span class="ml-1 text-zinc-400">{{ sortDir() === 'asc' ? '↑' : '↓' }}</span>
+              }
+            </th>
+            <th class="px-3 py-2 text-left font-medium">Assignee</th>
+            <th class="px-3 py-2 text-left font-medium">Related</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-100">
+          @for (t of state.items(); track t.id) {
+            <tr class="group hover:bg-zinc-50" [class.bg-zinc-50]="isSelected(t.id)">
+              <!-- Selection checkbox (Step 2). Separate from the
+                   quick-complete checkbox below. -->
+              <td class="px-3 py-2 align-middle" (click)="$event.stopPropagation()">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                  [checked]="isSelected(t.id)"
+                  (click)="toggleRow(t.id, $event)"
+                  [attr.aria-label]="'Select task ' + t.title"
+                />
+              </td>
+              <!-- Existing quick-complete checkbox. -->
+              <td class="px-3 py-2 align-middle">
+                <input
+                  type="checkbox"
+                  [checked]="t.status === 'done'"
+                  [disabled]="togglingId() !== null"
+                  (change)="toggleComplete(t, $any($event.target).checked)"
+                  class="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 disabled:cursor-not-allowed"
+                  aria-label="Mark task complete"
+                />
+              </td>
+              <td class="px-3 py-2">
+                <button
+                  type="button"
+                  (click)="openEdit(t)"
+                  class="text-left text-sm font-medium text-zinc-900 hover:underline"
+                  [class.line-through]="t.status === 'done'"
+                  [class.text-zinc-400]="t.status === 'done'"
+                >
+                  {{ t.title }}
+                </button>
+                @if (t.description) {
+                  <p class="mt-0.5 truncate text-[11px] text-zinc-500">{{ t.description }}</p>
+                }
+              </td>
+              <td class="px-3 py-2">
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1"
+                  [class]="priorityClass(t.priority)"
+                >
+                  {{ t.priority }}
+                </span>
+              </td>
+              <td class="px-3 py-2 text-xs">
+                <span [class.text-rose-600]="isOverdue(t)" [class.font-medium]="isOverdue(t)">
+                  {{ formatDue(t.due_at) }}
+                </span>
+              </td>
+              <td class="whitespace-nowrap px-3 py-2 text-right text-xs text-zinc-600 tabular-nums">
+                {{ t.last_activity_at | relativeTime }}
+              </td>
+              <td class="px-3 py-2 text-xs text-zinc-600">
+                {{ assigneeName(t) }}
+              </td>
+              <td class="px-3 py-2 text-xs text-zinc-500">
+                {{ t.related_entity_type || '—' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <div class="border-t border-zinc-100 bg-zinc-50 px-3 py-2 text-[11px] text-zinc-500">
+        Showing {{ state.items().length }} of {{ state.total() }}
+        @if (state.loading()) {
+          <span class="ml-2">refreshing…</span>
+        }
+      </div>
+    </div>
+  }
+</div>
+
+@if (modalOpen()) {
+  <app-task-form-modal
+    [task]="editingTask()"
+    [assignees]="assignees()"
+    [callerUuid]="callerUuid()"
+    (saved)="onSaved()"
+    (cancelled)="closeModal()"
+  />
+}
+
+<!-- Bulk action bar -->
+<app-bulk-action-bar
+  [selectedCount]="state.selectedCount()"
+  [actions]="state.bulkActions()"
+  (action)="onBulkAction($event)"
+  (clear)="clearSelection()"
+/>
+
+<!-- Bulk reassign modal -->
+@if (state.bulkModal() === 'reassign') {
+  <app-reassign-modal
+    [entityLabel]="'task'"
+    [count]="state.selectedCount()"
+    [submitting]="state.bulkSubmitting()"
+    [error]="state.bulkError()"
+    (confirm)="onBulkReassign($event)"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Bulk mark-done confirm -->
+@if (state.bulkModal() === 'done') {
+  <app-confirm-dialog
+    [title]="
+      'Mark ' +
+      state.selectedCount() +
+      ' task' +
+      (state.selectedCount() === 1 ? '' : 's') +
+      ' as done?'
+    "
+    [body]="'Already-done tasks are skipped.'"
+    [confirmLabel]="'Mark done'"
+    [submitting]="state.bulkSubmitting()"
+    (confirm)="onBulkMarkDone()"
+    (cancel)="closeBulkModal()"
+  />
+}
+
+<!-- Bulk delete confirm -->
+@if (state.bulkModal() === 'delete') {
+  <app-confirm-dialog
+    [title]="
+      'Delete ' + state.selectedCount() + ' task' + (state.selectedCount() === 1 ? '' : 's') + '?'
+    "
+    [body]="'This cannot be undone.'"
+    [confirmLabel]="'Delete'"
+    [danger]="true"
+    [submitting]="state.bulkSubmitting()"
+    (confirm)="onBulkDelete()"
+    (cancel)="closeBulkModal()"
+  />
+}

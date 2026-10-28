@@ -1,0 +1,217 @@
+// =============================================================================
+// Design Tokens — Single Source of Truth
+// =============================================================================
+// All color, spacing, typography, and visual tokens are defined here.
+// Theme files (dark.scss, light.scss) map semantic tokens to these primitives.
+// Components consume ONLY semantic tokens via var(--token-name).
+// =============================================================================
+
+:root {
+  // ---------------------------------------------------------------------------
+  // Brand Colors
+  // ---------------------------------------------------------------------------
+  --brand-grad-1: #57bdff;
+  --brand-grad-2: #4f77fb;
+  --brand-grad-3: #6528cf;
+  --brand-gradient: linear-gradient(
+    135deg,
+    var(--brand-grad-1),
+    var(--brand-grad-2),
+    var(--brand-grad-3)
+  );
+
+  // ---------------------------------------------------------------------------
+  // Primitive Colors — Dark Palette
+  // ---------------------------------------------------------------------------
+  --c-dark-bg: #0b0f19;
+  --c-dark-surface-1: #131823;
+  --c-dark-surface-2: #1a2035;
+  --c-dark-surface-3: #212840;
+  --c-dark-text-primary: #e8eaf0;
+  --c-dark-text-secondary: #a0a8c0;
+  --c-dark-text-muted: #6b7280;
+  --c-dark-border: #2a3148;
+  --c-dark-divider: #1f2640;
+
+  // ---------------------------------------------------------------------------
+  // Primitive Colors — Light Palette
+  // ---------------------------------------------------------------------------
+  --c-light-bg: #f4f9ff;
+  --c-light-surface-1: #ffffff;
+  --c-light-surface-2: #f0f4fa;
+  --c-light-surface-3: #e8edf5;
+  --c-light-text-primary: #1a1a2e;
+  --c-light-text-secondary: #4a5568;
+  --c-light-text-muted: #9ca3af;
+  --c-light-border: #e2e8f0;
+  --c-light-divider: #edf2f7;
+
+  // ---------------------------------------------------------------------------
+  // Overlay
+  // ---------------------------------------------------------------------------
+  --overlay-dark: rgba(0, 0, 0, 0.45);
+
+  // ---------------------------------------------------------------------------
+  // Feedback Colors
+  // ---------------------------------------------------------------------------
+  --feedback-success: #22c55e;
+  --feedback-success-bg-dark: rgba(34, 197, 94, 0.1);
+  --feedback-success-bg-light: rgba(34, 197, 94, 0.08);
+  --feedback-error: #ef4444;
+  --feedback-error-bg-dark: rgba(239, 68, 68, 0.1);
+  --feedback-error-bg-light: rgba(239, 68, 68, 0.08);
+  --feedback-warning: #f59e0b;
+  --feedback-warning-bg-dark: rgba(245, 158, 11, 0.1);
+  --feedback-warning-bg-light: rgba(245, 158, 11, 0.08);
+  --feedback-info: #3b82f6;
+  --feedback-info-bg-dark: rgba(59, 130, 246, 0.1);
+  --feedback-info-bg-light: rgba(59, 130, 246, 0.08);
+
+  // ---------------------------------------------------------------------------
+  // Spacing
+  // ---------------------------------------------------------------------------
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  // ---------------------------------------------------------------------------
+  // Border Radius
+  // ---------------------------------------------------------------------------
+  --radius-sm: 5px;
+  --radius-md: 10px;
+  --radius-lg: 15px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  // ---------------------------------------------------------------------------
+  // Typography
+  // ---------------------------------------------------------------------------
+  --font-family-primary: 'Roboto', sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 2rem;
+
+  // ---------------------------------------------------------------------------
+  // Shadows — Dark
+  // ---------------------------------------------------------------------------
+  --shadow-card-dark: 0 1px 15px 1px rgba(0, 0, 0, 0.3);
+  --shadow-card-blue-dark: 0 1px 15px 1px rgba(79, 119, 251, 0.08);
+  --shadow-elevated-dark: 0 4px 20px rgba(0, 0, 0, 0.4);
+
+  // ---------------------------------------------------------------------------
+  // Shadows — Light
+  // ---------------------------------------------------------------------------
+  --shadow-card-light: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-card-blue-light: 0 2px 8px rgba(79, 119, 251, 0.12);
+  --shadow-elevated-light: 0 4px 16px rgba(0, 0, 0, 0.12);
+
+  // ---------------------------------------------------------------------------
+  // Auth Card
+  // ---------------------------------------------------------------------------
+  --auth-card-bg-dark: #131823;
+  --auth-card-bg-light: #ffffff;
+  --auth-card-border-dark: #2a3148;
+  --auth-card-border-light: #e2e8f0;
+  --auth-card-shadow-dark: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --auth-card-shadow-light: 0 4px 24px rgba(0, 0, 0, 0.08);
+
+  // ---------------------------------------------------------------------------
+  // Contrast Text (on brand / colored backgrounds — always white)
+  // ---------------------------------------------------------------------------
+  --on-brand-text: #ffffff;
+
+  // ---------------------------------------------------------------------------
+  // Transitions
+  // ---------------------------------------------------------------------------
+  --transition-fast: 0.15s ease-in-out;
+  --transition-normal: 0.2s ease-in-out;
+  --transition-slow: 0.3s ease-in-out;
+
+  // ---------------------------------------------------------------------------
+  // Sidenav (premium)
+  // ---------------------------------------------------------------------------
+  --sidenav-active-accent-dark: var(--brand-grad-2);
+  --sidenav-active-accent-light: var(--brand-grad-2);
+  --sidenav-active-text-dark: #ffffff;
+  --sidenav-active-text-light: var(--brand-grad-2);
+  --sidenav-shadow-dark: 2px 0 12px rgba(0, 0, 0, 0.3);
+  --sidenav-shadow-light: 2px 0 12px rgba(0, 0, 0, 0.06);
+
+  // ---------------------------------------------------------------------------
+  // Toolbar (premium)
+  // ---------------------------------------------------------------------------
+  --toolbar-shadow-dark: 0 1px 8px rgba(0, 0, 0, 0.3);
+  --toolbar-shadow-light: 0 1px 8px rgba(0, 0, 0, 0.06);
+
+  // ---------------------------------------------------------------------------
+  // Dashboard Tiles
+  // ---------------------------------------------------------------------------
+  --tile-bg-dark: #131823;
+  --tile-bg-light: #ffffff;
+  --tile-border-dark: #2a3148;
+  --tile-border-light: #e2e8f0;
+  --tile-shadow-dark: 0 2px 12px rgba(0, 0, 0, 0.3);
+  --tile-shadow-light: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --tile-hover-shadow-dark: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --tile-hover-shadow-light: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --tile-icon-bg-opacity: 0.12;
+
+  // ---------------------------------------------------------------------------
+  // Form Card
+  // ---------------------------------------------------------------------------
+  --form-card-bg-dark: #131823;
+  --form-card-bg-light: #ffffff;
+  --form-card-border-dark: #2a3148;
+  --form-card-border-light: #e2e8f0;
+  --form-card-shadow-dark: 0 2px 12px rgba(0, 0, 0, 0.3);
+  --form-card-shadow-light: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --form-card-header-bg-dark: rgba(79, 119, 251, 0.06);
+  --form-card-header-bg-light: rgba(79, 119, 251, 0.04);
+  --form-card-header-border-dark: rgba(79, 119, 251, 0.15);
+  --form-card-header-border-light: rgba(79, 119, 251, 0.1);
+
+  // ---------------------------------------------------------------------------
+  // Page Layout / Table
+  // ---------------------------------------------------------------------------
+  --table-header-bg-dark: #1a2035;
+  --table-header-bg-light: #f0f4fa;
+  --table-row-hover-dark: rgba(79, 119, 251, 0.04);
+  --table-row-hover-light: rgba(79, 119, 251, 0.03);
+  --table-row-alt-dark: rgba(255, 255, 255, 0.02);
+  --table-row-alt-light: rgba(0, 0, 0, 0.015);
+
+  // ---------------------------------------------------------------------------
+  // File Upload / Drop Zone
+  // ---------------------------------------------------------------------------
+  --drop-zone-hover-bg-dark: rgba(79, 119, 251, 0.06);
+  --drop-zone-hover-bg-light: rgba(79, 119, 251, 0.04);
+
+  // ---------------------------------------------------------------------------
+  // Status Badge
+  // ---------------------------------------------------------------------------
+  --badge-active-color: #22c55e;
+  --badge-active-bg-dark: rgba(34, 197, 94, 0.12);
+  --badge-active-bg-light: rgba(34, 197, 94, 0.1);
+  --badge-inactive-color: #ef4444;
+  --badge-inactive-bg-dark: rgba(239, 68, 68, 0.12);
+  --badge-inactive-bg-light: rgba(239, 68, 68, 0.1);
+  --badge-open-color: #3b82f6;
+  --badge-open-bg-dark: rgba(59, 130, 246, 0.12);
+  --badge-open-bg-light: rgba(59, 130, 246, 0.1);
+  --badge-in-progress-color: #f59e0b;
+  --badge-in-progress-bg-dark: rgba(245, 158, 11, 0.12);
+  --badge-in-progress-bg-light: rgba(245, 158, 11, 0.1);
+  --badge-resolved-color: #22c55e;
+  --badge-resolved-bg-dark: rgba(34, 197, 94, 0.12);
+  --badge-resolved-bg-light: rgba(34, 197, 94, 0.1);
+  --badge-closed-color: #6b7280;
+  --badge-closed-bg-dark: rgba(107, 114, 128, 0.12);
+  --badge-closed-bg-light: rgba(107, 114, 128, 0.1);
+}
