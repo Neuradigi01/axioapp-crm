@@ -74,9 +74,15 @@ keys.txt
 *.dec.env
 secrets.dec.env
 
+<<<<<<< HEAD
 # Per-machine environment marker (one word: "local" or "prod"). Not committed —
 # every checkout picks its own env. `run.cmd` / `run.sh` refuse to start
 # without it, so a missing marker is a hard error, not a silent default.
+=======
+# Per-machine environment marker (one word: "local" or "prod"), written by
+# `run env local|prod`. Not committed — every checkout picks its own env, and
+# run.cmd / run.sh refuse stack commands without it.
+>>>>>>> f3b2a8dce5f529b28cc81ec1937120c9812280d5
 .environment
 
 # Celery stuff

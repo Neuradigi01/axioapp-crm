@@ -10,10 +10,17 @@
 # (&name) so it can be referenced (*name) in creation_rules below. sops itself
 # ignores the `keys:` block — it exists so every key is labelled with its owner.
 #
+<<<<<<< HEAD
 # To grant access: add an anchored key line + its *alias under the appropriate
 # rule's `age:` list, then run `run.cmd secrets-rekey <local|prod>`. To revoke:
 # delete both lines, re-key, AND rotate the actual secret values at their source
 # (a removed key still holds any plaintext/data-key it already had).
+=======
+# To grant access: add an anchored key line + its *alias under the right rule's
+# `age:` list, then run `run.cmd secrets-rekey <local|prod>`. To revoke: delete both lines, re-key, AND rotate the
+# actual secret values at their source (a removed key still holds any
+# plaintext/data-key it already had).
+>>>>>>> f3b2a8dce5f529b28cc81ec1937120c9812280d5
 #
 # Generate your keypair with `run.cmd secrets-keygen` (prints your age1... key),
 # then send it to whoever manages this file.
@@ -27,10 +34,20 @@ keys:
   - &ankesh        age1m5408duwpttc7hr59nd44fn2dvnc0aqxru7yrlffxqlkuyjvvqzqe2k0ev   # Ankesh
   - &ajay          age19e8x8gw2smj9ldhxww5jxmc074y3unutwc7lxm04esahrjwex4xsf5adxx   # Ajay
 
+<<<<<<< HEAD
 # The .env extension lets sops auto-detect dotenv format — required for
 # `sops exec-env`, which has no --input-type flag. path_regex uses a `$`
 # anchor so `secrets.local.enc.env` and `secrets.prod.enc.env` match their
 # own rule and nothing else.
+=======
+# One secrets file per environment: secrets.local.enc.env and
+# secrets.prod.enc.env (the .env extension lets sops auto-detect dotenv
+# format — required for `sops exec-env`, which has no --input-type flag).
+# Each path_regex is `$`-anchored so a file matches its own rule only.
+#
+# Prod servers are deliberately NOT recipients of the local file: a deployed
+# box never needs local credentials.
+>>>>>>> f3b2a8dce5f529b28cc81ec1937120c9812280d5
 creation_rules:
   - path_regex: secrets\.local\.enc\.env$
     key_groups:
@@ -43,6 +60,7 @@ creation_rules:
           - *ajay
 
   - path_regex: secrets\.prod\.enc\.env$
+<<<<<<< HEAD
     key_groups:
       - age:
           - *ryder-home
@@ -55,6 +73,8 @@ creation_rules:
           - *ajay
 
   - path_regex: secrets\.prod-neuradigi\.enc\.env$
+=======
+>>>>>>> f3b2a8dce5f529b28cc81ec1937120c9812280d5
     key_groups:
       - age:
           - *ryder-home
