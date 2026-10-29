@@ -1,7 +1,13 @@
 # Secret passthrough. A null value means "forward this variable from the
 # compose process environment" — which run.cmd / run.sh populate via
 # `sops exec-env` (secrets decrypted in memory, never written to disk).
-# Keep this list in sync with the keys in secrets.enc.env.
+# Keep this list in sync with the keys in secrets.local.enc.env and
+# secrets.prod.enc.env. A key missing from the active env's secrets file
+# is simply left unset in the container.
+#
+# Non-secret config: config.env (shared) is loaded first, then
+# config.${APP_ENV}.env overrides it. APP_ENV comes from the .environment
+# file, read and exported by run.cmd / run.sh.
 x-secret-vars: &secret-vars
   DB_PASSWORD:
   JWT_SECRET_KEY:
@@ -22,6 +28,10 @@ x-secret-vars: &secret-vars
   META_WEBHOOK_VERIFY_TOKEN:
   STRIPE_SECRET_KEY:
   STRIPE_WEBHOOK_SECRET:
+  WHATSAPP_APP_SECRET:
+  TRACKING_HMAC_KEY:
+  AUTOMATION_TRACKING_SECRET:
+  MAILGUN_WEBHOOK_SIGNING_KEY:
 
 services:
   api:
@@ -33,6 +43,7 @@ services:
       - ./logs:/app/logs
     env_file:
       - config.env
+      - config.${APP_ENV}.env
     environment:
       <<: *secret-vars
     depends_on:
@@ -44,6 +55,7 @@ services:
     command: celery -A src.celery.worker.celery worker --loglevel=info --hostname=celery_worker@%h
     env_file:
       - config.env
+      - config.${APP_ENV}.env
     environment:
       <<: *secret-vars
     volumes:
@@ -60,6 +72,7 @@ services:
     command: celery -A src.celery.worker.celery beat --loglevel=info
     env_file:
       - config.env
+      - config.${APP_ENV}.env
     environment:
       <<: *secret-vars
     depends_on:
@@ -76,6 +89,7 @@ services:
       sh -c "celery -A src.celery.worker.celery flower --port=5555 --basic_auth='${FLOWER_USER:-admin}:${FLOWER_PASS:-admin}' --persistent=True --db=./flower/flower.db"
     env_file:
       - config.env
+      - config.${APP_ENV}.env
     environment:
       <<: *secret-vars
     volumes:

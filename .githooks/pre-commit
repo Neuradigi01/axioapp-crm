@@ -27,8 +27,11 @@ staged() { git diff --cached --name-only --diff-filter=ACMR -- "$@"; }
 PY_FILES=$(staged 'API/**/*.py' 'API/*.py')
 if [ -n "$PY_FILES" ]; then
   CID=""
-  if command -v docker >/dev/null 2>&1; then
-    CID=$(cd "$API_DIR" 2>/dev/null && docker compose -f docker-compose.yml -f docker-compose.dev.yml ps -q api 2>/dev/null | head -n1)
+  APP_ENV=$(tr -d '[:space:]' < "$API_DIR/.environment" 2>/dev/null || true)
+  if [ -n "$APP_ENV" ] && command -v docker >/dev/null 2>&1; then
+    export APP_ENV
+    CID=$(cd "$API_DIR" 2>/dev/null && docker compose --env-file config.env --env-file "config.$APP_ENV.env" \
+      -f docker-compose.yml -f "docker-compose.$APP_ENV.yml" ps -q api 2>/dev/null | head -n1)
   fi
   if [ -z "$CID" ]; then
     echo "pre-commit: API container not running — skipping Python checks (CI will enforce)."

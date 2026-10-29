@@ -1,10 +1,11 @@
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Non-secret configuration is read from config.env (committed in plaintext).
 # Secrets (DB_PASSWORD, JWT_SECRET_KEY, FERNET_KEY, ...) live in
-# secrets.enc.env (SOPS + age encrypted) and are injected into the process
+# secrets.<env>.enc.env (SOPS + age encrypted) and are injected into the process
 # environment at runtime by `sops exec-env` (see run.cmd / run.sh). Both
 # config and secrets are then read uniformly via os.getenv — there is no
 # plaintext secrets file on disk and no in-app decryption.
@@ -175,9 +176,7 @@ MICROSOFT_GRAPH_REDIRECT_URI = os.getenv(
 # subscription creation with a non-public URL). For dev, tunnel via
 # ngrok and set this to the public ngrok URL. Leave empty to disable
 # subscriptions; sync falls back to Step 4's 60-second poll.
-MICROSOFT_GRAPH_WEBHOOK_URL = os.getenv(
-    "MICROSOFT_GRAPH_WEBHOOK_URL", ""
-)
+MICROSOFT_GRAPH_WEBHOOK_URL = os.getenv("MICROSOFT_GRAPH_WEBHOOK_URL", "")
 
 # Developer Token — separate from OAuth, attached to Google Ads
 # Manager (MCC) account. See Stage 4 of the manual checklist.

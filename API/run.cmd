@@ -1,14 +1,23 @@
 @echo off
-REM Manage the API application stack (Windows / development compose files).
+REM Manage the API application stack (Windows).
+REM
+REM The per-machine .environment file (one word: local | prod, not committed)
+REM picks the environment:
+REM   local -> config.env + config.local.env, docker-compose.local.yml, secrets.local.enc.env
+REM   prod  -> config.env + config.prod.env,  docker-compose.prod.yml,  secrets.prod.enc.env
+REM Create or switch it with `run.cmd env local|prod`.
+REM
 REM Secrets are decrypted in-memory by `sops exec-env` for each stack/DB command
 REM and forwarded into containers via the `environment:` passthrough - never
 REM written to disk. Run `run.cmd help` for the command list.
 
 setlocal enabledelayedexpansion
-set ENV_FILE_FLAGS=--env-file config.env
-set COMPOSE_FILES=-f docker-compose.yml -f docker-compose.dev.yml
+set "APP_ENV="
+if exist ".environment" for /f "usebackq tokens=1" %%a in (`type .environment`) do if not defined APP_ENV set "APP_ENV=%%a"
+set "ENV_FILE_FLAGS=--env-file config.env --env-file config.!APP_ENV!.env"
+set "COMPOSE_FILES=-f docker-compose.yml -f docker-compose.!APP_ENV!.yml"
+set "SECRETS_FILE=secrets.!APP_ENV!.enc.env"
 set UV_IMAGE=ghcr.io/astral-sh/uv:0.5-python3.13-bookworm-slim
-set SECRETS_FILE=secrets.enc.env
 set AGE_KEY_DIR=%USERPROFILE%\.config\sops\age
 set AGE_KEY_FILE=%AGE_KEY_DIR%\keys.txt
 set SOPS_AGE_KEY_FILE=%AGE_KEY_FILE%
@@ -27,9 +36,10 @@ if "%1"=="" ( call :print_help & exit /b 0 )
 if /i "%1"=="help" ( call :print_help & exit /b 0
 ) else if /i "%1"=="-h" ( call :print_help & exit /b 0
 ) else if /i "%1"=="--help" ( call :print_help & exit /b 0
+) else if /i "%1"=="env" ( call :do_env "%~2" & exit /b !errorlevel!
 ) else if /i "%1"=="up" ( call :do_up & exit /b !errorlevel!
 ) else if /i "%1"=="up-api" ( call :do_up_api & exit /b !errorlevel!
-) else if /i "%1"=="down" ( call :do_down & exit /b !errorlevel!
+) else if /i "%1"=="down" ( call :do_down "%~2" & exit /b !errorlevel!
 ) else if /i "%1"=="restart" (
     echo Restarting the API stack...
     call :do_down
@@ -129,22 +139,21 @@ if /i "%1"=="help" ( call :print_help & exit /b 0
     age-keygen -y "%AGE_KEY_FILE%"
     exit /b 0
 ) else if /i "%1"=="secrets-edit" (
-    call :require_secrets
+    call :resolve_secrets_target "%~2"
     if errorlevel 1 exit /b 1
     where code >nul 2>nul
     if not errorlevel 1 set "EDITOR=code --wait"
-    sops %SECRETS_FILE%
+    sops !TARGET_FILE!
     if errorlevel 1 exit /b 1
-    echo Saved and re-encrypted. Commit %SECRETS_FILE%.
+    echo Saved and re-encrypted. Commit !TARGET_FILE!.
     exit /b 0
 ) else if /i "%1"=="secrets-rekey" (
-    where sops >nul 2>nul
-    if errorlevel 1 ( echo %C_ERR%Error: sops not installed. Run "run.cmd secrets-install" first.%C_RESET% & exit /b 1 )
-    if not exist "%SECRETS_FILE%" ( echo %C_ERR%Error: %SECRETS_FILE% not found.%C_RESET% & exit /b 1 )
-    echo Re-encrypting %SECRETS_FILE% to the recipients in .sops.yaml ...
-    sops updatekeys -y %SECRETS_FILE%
+    call :resolve_secrets_target "%~2"
     if errorlevel 1 exit /b 1
-    echo Done. Commit %SECRETS_FILE%.
+    echo Re-encrypting !TARGET_FILE! to the recipients in .sops.yaml ...
+    sops updatekeys -y !TARGET_FILE!
+    if errorlevel 1 exit /b 1
+    echo Done. Commit !TARGET_FILE!.
     exit /b 0
 ) else (
     echo %C_ERR%Error: Invalid command '%1'.%C_RESET%
@@ -157,14 +166,18 @@ REM Guard against fall-through into the internal labels below.
 exit /b 0
 
 :print_help
-echo %C_TITLE%FurnitureCRM API stack runner ^(development / Windows^)%C_RESET%
+echo %C_TITLE%CRM API stack runner ^(env: !APP_ENV!, Windows^)%C_RESET%
 echo %C_DIM%Usage: run.cmd ^<command^> [args]%C_RESET%
 echo.
+echo %C_SECTION%Environment%C_RESET%
+echo   %C_CMD%env [local^|prod]%C_RESET%   Show or switch this machine's env ^(writes .environment^)
+echo.
 echo %C_SECTION%Stack%C_RESET%
-echo   %C_CMD%up%C_RESET%                 Start the full stack ^(api + redis + celery + beat + flower^)
-echo   %C_CMD%up-api%C_RESET%             Start API + Redis only ^(no celery / beat / flower^)
-echo   %C_CMD%down%C_RESET%               Stop and remove the stack ^(with volumes^)
-echo   %C_CMD%restart%C_RESET%            Down then up ^(clean reload of code/config^)
+echo   %C_CMD%up%C_RESET%                 Start the full stack ^(api + redis + celery + beat + flower [+ db if local]^)
+echo   %C_CMD%up-api%C_RESET%             Start API + Redis [+ db if local] only ^(no celery / beat / flower^)
+echo   %C_CMD%down%C_RESET%               Stop and remove the stack, KEEP volumes ^(local DB data preserved^)
+echo   %C_CMD%down reset%C_RESET%         Stop and remove the stack and WIPE volumes ^(local DB data lost^)
+echo   %C_CMD%restart%C_RESET%            Down then up ^(clean reload of code/config, keeps volumes^)
 echo   %C_CMD%shell [service]%C_RESET%    Open a shell in a running service ^(default: api^)
 echo.
 echo %C_SECTION%Database%C_RESET%
@@ -187,23 +200,62 @@ echo.
 echo %C_SECTION%Secrets ^(SOPS + age^)%C_RESET%
 echo   %C_CMD%secrets-install%C_RESET%    Install sops + age via winget ^(open a new terminal after^)
 echo   %C_CMD%secrets-keygen%C_RESET%     Generate this machine's age key; print the public key
-echo   %C_CMD%secrets-edit%C_RESET%       Edit secrets.enc.env ^(decrypts in your editor^)
-echo   %C_CMD%secrets-rekey%C_RESET%      Re-encrypt secrets.enc.env to current .sops.yaml recipients
+echo   %C_CMD%secrets-edit [local^|prod]%C_RESET%   Edit secrets.^<env^>.enc.env ^(default: active env^)
+echo   %C_CMD%secrets-rekey [local^|prod]%C_RESET%  Re-encrypt secrets.^<env^>.enc.env to current .sops.yaml recipients
 echo.
 echo   %C_CMD%help%C_RESET%               Show this help ^(aliases: -h, --help^)
 goto :eof
 
+:require_env
+if "!APP_ENV!"=="local" exit /b 0
+if "!APP_ENV!"=="prod" exit /b 0
+if defined APP_ENV (
+    echo %C_ERR%Error: .environment must contain 'local' or 'prod', got '!APP_ENV!'. Fix it with "run.cmd env local".%C_RESET%
+) else (
+    echo %C_ERR%Error: .environment file missing. Run "run.cmd env local" ^(or "run.cmd env prod" on the server^).%C_RESET%
+)
+exit /b 1
+
 :require_secrets
+call :require_env
+if errorlevel 1 exit /b 1
 where sops >nul 2>nul
 if errorlevel 1 ( echo %C_ERR%Error: sops not installed. Run "run.cmd secrets-install" first.%C_RESET% & exit /b 1 )
 if not exist "%SECRETS_FILE%" ( echo %C_ERR%Error: %SECRETS_FILE% not found. Run "run.cmd secrets-keygen" and get added to .sops.yaml.%C_RESET% & exit /b 1 )
+exit /b 0
+
+:resolve_secrets_target
+set "TARGET_ENV=%~1"
+if not defined TARGET_ENV set "TARGET_ENV=!APP_ENV!"
+if not "!TARGET_ENV!"=="local" if not "!TARGET_ENV!"=="prod" (
+    echo %C_ERR%Error: secrets target must be 'local' or 'prod', got '!TARGET_ENV!'.%C_RESET%
+    exit /b 1
+)
+set "TARGET_FILE=secrets.!TARGET_ENV!.enc.env"
+where sops >nul 2>nul
+if errorlevel 1 ( echo %C_ERR%Error: sops not installed. Run "run.cmd secrets-install" first.%C_RESET% & exit /b 1 )
+if not exist "!TARGET_FILE!" ( echo %C_ERR%Error: !TARGET_FILE! not found.%C_RESET% & exit /b 1 )
+exit /b 0
+
+:do_env
+set "NEW_ENV=%~1"
+if not defined NEW_ENV (
+    if defined APP_ENV ( echo Current env: !APP_ENV! ^(from .environment^). Pass 'local' or 'prod' to change. ) else ( echo No .environment yet. Run "run.cmd env local" ^(or "run.cmd env prod" on the server^). )
+    exit /b 0
+)
+if not "!NEW_ENV!"=="local" if not "!NEW_ENV!"=="prod" (
+    echo %C_ERR%Error: env must be 'local' or 'prod', got '!NEW_ENV!'.%C_RESET%
+    exit /b 1
+)
+> .environment echo !NEW_ENV!
+echo Switched .environment to '!NEW_ENV!'. Run "run.cmd up" to start the stack in this env.
 exit /b 0
 
 :do_up
 call :require_secrets
 if errorlevel 1 exit /b 1
 call :ensure_hooks
-echo Starting the full API stack...
+echo Starting the full API stack ^(env: !APP_ENV!^)...
 sops exec-env %SECRETS_FILE% "docker compose %ENV_FILE_FLAGS% %COMPOSE_FILES% --profile celery up --build -d"
 exit /b !errorlevel!
 
@@ -211,16 +263,25 @@ exit /b !errorlevel!
 call :require_secrets
 if errorlevel 1 exit /b 1
 call :ensure_hooks
-echo Starting the API stack (api + redis only)...
+echo Starting the API stack ^(env: !APP_ENV!, api + redis only^)...
 sops exec-env %SECRETS_FILE% "docker compose %ENV_FILE_FLAGS% %COMPOSE_FILES% up --build -d"
 exit /b !errorlevel!
 
 :do_down
 call :require_secrets
 if errorlevel 1 exit /b 1
-echo Stopping and removing the full API stack...
-sops exec-env %SECRETS_FILE% "docker compose %ENV_FILE_FLAGS% %COMPOSE_FILES% --profile celery down -v"
-exit /b !errorlevel!
+if "%~1"=="" (
+    echo Stopping the full API stack, keeping volumes ^(env: !APP_ENV!^)...
+    sops exec-env %SECRETS_FILE% "docker compose %ENV_FILE_FLAGS% %COMPOSE_FILES% --profile celery down"
+    exit /b !errorlevel!
+)
+if /i "%~1"=="reset" (
+    echo Stopping the full API stack and WIPING volumes - local DB data will be lost ^(env: !APP_ENV!^)...
+    sops exec-env %SECRETS_FILE% "docker compose %ENV_FILE_FLAGS% %COMPOSE_FILES% --profile celery down -v"
+    exit /b !errorlevel!
+)
+echo %C_ERR%Error: unknown option '%~1' for down. Use "down" or "down reset".%C_RESET%
+exit /b 1
 
 :ensure_hooks
 set "HP="
@@ -240,7 +301,7 @@ exit /b 0
 :do_lint
 set "RC=0"
 set "CID="
-for /f "delims=" %%i in ('docker compose %COMPOSE_FILES% ps -q api 2^>nul') do set "CID=%%i"
+for /f "delims=" %%i in ('docker compose %ENV_FILE_FLAGS% %COMPOSE_FILES% ps -q api 2^>nul') do set "CID=%%i"
 if not defined CID (
     echo Skipping Python lint: dev 'api' container not running ^(run.cmd up^).
 ) else (
@@ -268,7 +329,7 @@ exit /b !RC!
 
 :do_lint_fix
 set "CID="
-for /f "delims=" %%i in ('docker compose %COMPOSE_FILES% ps -q api 2^>nul') do set "CID=%%i"
+for /f "delims=" %%i in ('docker compose %ENV_FILE_FLAGS% %COMPOSE_FILES% ps -q api 2^>nul') do set "CID=%%i"
 if not defined CID (
     echo Skipping Python autofix: dev 'api' container not running ^(run.cmd up^).
 ) else (

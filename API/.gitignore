@@ -67,12 +67,17 @@ env.bak/
 venv.bak/
 
 # SOPS + age — never commit private keys or decrypted secret dumps.
-# (config.env and secrets.enc.env ARE committed — do NOT ignore them.)
+# (config.env, config.*.env and secrets.*.enc.env ARE committed — do NOT ignore them.)
 *.agekey
 age-key*.txt
 keys.txt
 *.dec.env
 secrets.dec.env
+
+# Per-machine environment marker (one word: "local" or "prod"), written by
+# `run env local|prod`. Not committed — every checkout picks its own env, and
+# run.cmd / run.sh refuse stack commands without it.
+.environment
 
 # Celery stuff
 celerybeat-schedule*

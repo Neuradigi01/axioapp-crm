@@ -1,0 +1,82 @@
+# LOCAL overrides (non-secret). Selected when .environment == local.
+# Secrets come from secrets.local.enc.env via `sops exec-env`; shared infra
+# (redis) is defined once in docker-compose.yml.
+#
+# Adds a local Postgres 17 container so local development never touches the
+# production database. Every service reaches it at hostname `db` on the
+# compose network. From your machine (DBeaver / psql) connect to
+# ${LISTEN_ADDR}:${DB_HOST_PORT} — see DB_HOST_PORT in config.local.env.
+x-local-env: &local-env
+  IS_DEVELOPMENT: "true"
+  DB_NULL_POOL: "1"
+
+services:
+  api:
+    build:
+      args:
+        - is_development=true
+    ports:
+      - "5682:5678"
+    volumes:
+      - .:/app
+    environment:
+      <<: *local-env
+    command: ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "-m", "uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  celery:
+    volumes:
+      - .:/app
+    environment:
+      <<: *local-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  celery-beat:
+    volumes:
+      - .:/app
+    environment:
+      <<: *local-env
+    depends_on:
+      db:
+        condition: service_healthy
+      celery:
+        condition: service_started
+
+  flower:
+    volumes:
+      - .:/app
+    environment:
+      <<: *local-env
+
+  # User, password and database name come from the same variables the API
+  # reads (DB_USER / DB_NAME in config.local.env, DB_PASSWORD in
+  # secrets.local.enc.env), so the container and the app always agree.
+  # Published on loopback only. Data lives in the `db_data` volume:
+  # `run down` keeps it, `run down reset` wipes it.
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${LISTEN_ADDR}:${DB_HOST_PORT}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  db_data:

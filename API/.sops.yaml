@@ -5,8 +5,8 @@
 # (&name) so it can be referenced (*name) in creation_rules below. sops itself
 # ignores the `keys:` block — it exists so every key is labelled with its owner.
 #
-# To grant access: add an anchored key line + its *alias under `age:`, then run
-# `run.cmd secrets-rekey`. To revoke: delete both lines, re-key, AND rotate the
+# To grant access: add an anchored key line + its *alias under the right rule's
+# `age:` list, then run `run.cmd secrets-rekey <local|prod>`. To revoke: delete both lines, re-key, AND rotate the
 # actual secret values at their source (a removed key still holds any
 # plaintext/data-key it already had).
 #
@@ -22,11 +22,25 @@ keys:
   - &ankesh        age1m5408duwpttc7hr59nd44fn2dvnc0aqxru7yrlffxqlkuyjvvqzqe2k0ev   # Ankesh
   - &ajay          age19e8x8gw2smj9ldhxww5jxmc074y3unutwc7lxm04esahrjwex4xsf5adxx   # Ajay
 
-# The secrets file is named secrets.enc.env (the .env extension lets sops
-# auto-detect dotenv format — required for `sops exec-env`, which has no
-# --input-type flag). path_regex matches it; the $ anchor stops over-matching.
+# One secrets file per environment: secrets.local.enc.env and
+# secrets.prod.enc.env (the .env extension lets sops auto-detect dotenv
+# format — required for `sops exec-env`, which has no --input-type flag).
+# Each path_regex is `$`-anchored so a file matches its own rule only.
+#
+# Prod servers are deliberately NOT recipients of the local file: a deployed
+# box never needs local credentials.
 creation_rules:
-  - path_regex: secrets\.enc\.env$
+  - path_regex: secrets\.local\.enc\.env$
+    key_groups:
+      - age:
+          - *ryder-home
+          - *ryder-office
+          - *sagar
+          - *pratik
+          - *ankesh
+          - *ajay
+
+  - path_regex: secrets\.prod\.enc\.env$
     key_groups:
       - age:
           - *ryder-home

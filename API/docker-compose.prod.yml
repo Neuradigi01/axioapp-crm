@@ -1,5 +1,6 @@
-# Production overrides (non-secret). Secrets come from secrets.enc.env via
-# `sops exec-env`; shared infra (redis) is defined once in docker-compose.yml.
+# Production overrides (non-secret). Selected when .environment == prod.
+# Secrets come from secrets.prod.enc.env via `sops exec-env`; shared infra
+# (redis) is defined once in docker-compose.yml.
 # Env-specific non-secret values are merged in via the *prod-env anchor.
 x-prod-env: &prod-env
   IS_DEVELOPMENT: "false"
