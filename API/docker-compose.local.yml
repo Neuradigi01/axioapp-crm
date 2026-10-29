@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # LOCAL overrides (non-secret). Adds a local Postgres 17 container so
 # your machine can run entirely offline — no dependency on the remote
 # prod DB. Shared infra (redis) is defined once in docker-compose.yml.
@@ -28,19 +27,6 @@ x-local-env: &local-env
   # make prod servers recipients of secrets.local.enc.env, so a prod
   # host could not decrypt the value even if the seed did run.
   DEV_SEED_PASSWORD:
-=======
-# LOCAL overrides (non-secret). Selected when .environment == local.
-# Secrets come from secrets.local.enc.env via `sops exec-env`; shared infra
-# (redis) is defined once in docker-compose.yml.
-#
-# Adds a local Postgres 17 container so local development never touches the
-# production database. Every service reaches it at hostname `db` on the
-# compose network. From your machine (DBeaver / psql) connect to
-# ${LISTEN_ADDR}:${DB_HOST_PORT} — see DB_HOST_PORT in config.local.env.
-x-local-env: &local-env
-  IS_DEVELOPMENT: "true"
-  DB_NULL_POOL: "1"
->>>>>>> f3b2a8dce5f529b28cc81ec1937120c9812280d5
 
 services:
   api:
@@ -88,7 +74,6 @@ services:
     environment:
       <<: *local-env
 
-<<<<<<< HEAD
   # Local Postgres 17 with pgvector. `pgvector/pgvector:pg17` is the
   # official pgvector image — identical to postgres:17 except it ships
   # the pgvector extension (needed by migration 0200_install_pgvector
@@ -104,15 +89,6 @@ services:
   # down` removes it (uses `-v`).
   db:
     image: pgvector/pgvector:pg17
-=======
-  # User, password and database name come from the same variables the API
-  # reads (DB_USER / DB_NAME in config.local.env, DB_PASSWORD in
-  # secrets.local.enc.env), so the container and the app always agree.
-  # Published on loopback only. Data lives in the `db_data` volume:
-  # `run down` keeps it, `run down reset` wipes it.
-  db:
-    image: postgres:17
->>>>>>> f3b2a8dce5f529b28cc81ec1937120c9812280d5
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}

@@ -166,31 +166,11 @@ python -m pytest tests/test_auth/test_login.py -v
 ## Secrets (SOPS + age)
 
 Secrets are **not** stored in plaintext. Non-secret config lives in `config.env`
-(shared) plus one overlay per environment (committed in the clear); secrets live in one
-file per environment, encrypted with
+(committed in the clear); secrets live in `secrets.enc.env`, encrypted with
 [SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age) and
 committed. At runtime `run.cmd` / `run.sh` decrypt them **in memory** and forward them
 into the containers — there is no plaintext secrets file on disk. Full design notes:
 [`SOPS_INTEGRATION_GUIDE.md`](SOPS_INTEGRATION_GUIDE.md).
-
-### Environments (local / prod)
-
-Each machine picks its environment with a one-word, uncommitted `.environment` file:
-
-```
-run.cmd env local           # developer machine
-./run.sh env prod           # production server
-```
-
-| `.environment` | Config loaded                    | Compose overlay            | Secrets                 |
-|----------------|----------------------------------|----------------------------|-------------------------|
-| `local`        | `config.env` + `config.local.env` | `docker-compose.local.yml` (adds a local Postgres) | `secrets.local.enc.env` |
-| `prod`         | `config.env` + `config.prod.env`  | `docker-compose.prod.yml`  | `secrets.prod.enc.env`  |
-
-Stack and database commands refuse to run without `.environment`. Local runs its own
-Postgres container, so a fresh machine needs `run.cmd upgrade` (and `run.cmd seed`) after
-the first `run.cmd up`. `run.cmd down` keeps the local database; `run.cmd down reset`
-wipes it.
 
 ### First-time machine setup
 
@@ -201,17 +181,16 @@ run.cmd secrets-keygen      # generate this machine's age key; prints your age1.
 ```
 
 Send your **public** key to whoever manages `.sops.yaml`. They add it and run
-`run.cmd secrets-rekey <local|prod>`, then commit the re-keyed file. After that you can decrypt.
+`run.cmd secrets-rekey`, then commit `secrets.enc.env`. After that you can decrypt.
 
 ### Day-to-day
 
 ```
-run.cmd secrets-edit        # opens the active env's secrets file decrypted in your editor; re-encrypts on save
-run.cmd secrets-edit prod   # same, for a specific env
-run.cmd secrets-rekey local # re-encrypt to the current recipients in .sops.yaml
+run.cmd secrets-edit        # opens secrets.enc.env decrypted in your editor; re-encrypts on save
+run.cmd secrets-rekey       # re-encrypt to the current recipients in .sops.yaml
 ```
 
-> **Never hand-edit `secrets.*.enc.env`** — they have an integrity MAC and per-recipient
+> **Never hand-edit `secrets.enc.env`** — it has an integrity MAC and per-recipient
 > wrapped keys. Change secrets only via `run.cmd secrets-edit`.
 
 The age **private** key (`~/.config/sops/age/keys.txt`) never leaves your machine and is

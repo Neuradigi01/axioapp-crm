@@ -24,7 +24,6 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from src.app.core.email_templates import service as templates_service
 from src.app.core.email_templates.models import EmailTemplate
 from src.app.core.email_templates.schemas import (
     EmailTemplateCreate,
@@ -32,6 +31,7 @@ from src.app.core.email_templates.schemas import (
 )
 
 from src.app.core.email import variables as vars_engine
+from src.app.core.email_templates import service as templates_service
 
 _ORG_ID = uuid.uuid4()
 _ACTOR_ID = uuid.uuid4()

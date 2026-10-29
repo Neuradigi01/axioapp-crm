@@ -1,11 +1,10 @@
 import os
 from pathlib import Path
-
 from dotenv import load_dotenv
 
 # Non-secret configuration is read from config.env (committed in plaintext).
 # Secrets (DB_PASSWORD, JWT_SECRET_KEY, FERNET_KEY, ...) live in
-# secrets.<env>.enc.env (SOPS + age encrypted) and are injected into the process
+# secrets.enc.env (SOPS + age encrypted) and are injected into the process
 # environment at runtime by `sops exec-env` (see run.cmd / run.sh). Both
 # config and secrets are then read uniformly via os.getenv — there is no
 # plaintext secrets file on disk and no in-app decryption.

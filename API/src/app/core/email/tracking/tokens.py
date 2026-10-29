@@ -47,7 +47,7 @@ def _get_key() -> bytes:
     if not raw:
         raise _MissingKey(
             "TRACKING_HMAC_KEY is not set — tracking links cannot be "
-            "encoded or decoded. Add it to secrets.<env>.enc.env via "
+            "encoded or decoded. Add it to secrets.enc.env via "
             "`run secrets-edit`."
         )
     return raw.encode("utf-8")

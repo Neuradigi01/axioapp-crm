@@ -1,13 +1,7 @@
 # Secret passthrough. A null value means "forward this variable from the
 # compose process environment" — which run.cmd / run.sh populate via
 # `sops exec-env` (secrets decrypted in memory, never written to disk).
-# Keep this list in sync with the keys in secrets.local.enc.env and
-# secrets.prod.enc.env. A key missing from the active env's secrets file
-# is simply left unset in the container.
-#
-# Non-secret config: config.env (shared) is loaded first, then
-# config.${APP_ENV}.env overrides it. APP_ENV comes from the .environment
-# file, read and exported by run.cmd / run.sh.
+# Keep this list in sync with the keys in secrets.enc.env.
 x-secret-vars: &secret-vars
   DB_PASSWORD:
   JWT_SECRET_KEY:
@@ -31,7 +25,6 @@ x-secret-vars: &secret-vars
   WHATSAPP_APP_SECRET:
   STRIPE_SECRET_KEY:
   STRIPE_WEBHOOK_SECRET:
-<<<<<<< HEAD
   AI_PROVIDER_KEY_KEK:
   # mailgun-inbound track — inbound webhook + Route API auth.
   # MAILGUN_SIGNING_KEY_PREVIOUS is empty except during a key
@@ -46,12 +39,6 @@ x-secret-vars: &secret-vars
   R2_ACCESS_KEY_ID:
   R2_SECRET_ACCESS_KEY:
   R2_BUCKET:
-=======
-  WHATSAPP_APP_SECRET:
-  TRACKING_HMAC_KEY:
-  AUTOMATION_TRACKING_SECRET:
-  MAILGUN_WEBHOOK_SIGNING_KEY:
->>>>>>> f3b2a8dce5f529b28cc81ec1937120c9812280d5
 
 services:
   api:

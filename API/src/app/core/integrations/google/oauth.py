@@ -79,7 +79,7 @@ def _state_secret() -> bytes:
     if not INTEGRATIONS_ENCRYPTION_KEY:
         raise RuntimeError(
             "INTEGRATIONS_ENCRYPTION_KEY not configured — required for "
-            "OAuth state signing. Add it to secrets.<env>.enc.env via `run secrets-edit`."
+            "OAuth state signing. Add it to secrets.enc.env via `run secrets-edit`."
         )
     return INTEGRATIONS_ENCRYPTION_KEY.encode("utf-8")
 

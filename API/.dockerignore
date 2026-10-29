@@ -1,7 +1,7 @@
 # Secrets are injected at runtime via `sops exec-env`, never baked into the
 # image. config.env (non-secret) is intentionally NOT excluded so the loader's
 # load_dotenv() works for non-Docker local runs.
-secrets*.enc.env
+secrets.enc.env
 *.dec.env
 .sops.yaml
 *.agekey
